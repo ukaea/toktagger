@@ -21,7 +21,7 @@ type DisruptionPlotProps = {
  * @param zoneCategories Zone categories to display in context menu
  * @param disruptionCategory Category relating to disruption
  */
-export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps) => {
+export const DisruptionPlot = ({data, plotId: externalId, zoneCategories, disruptionCategory} : DisruptionPlotProps) => {
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
 
@@ -130,9 +130,8 @@ export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps)
         /**
          * Builds the props packet for the Context-Menu.
          * We now include BOTH:
-         *   – the new generic fields  { x, y, xScale, yScale }
-         *   – the legacy helpers      { x0, x1 }  (100-px wide slice)
-         * so that pre-existing menu items that still expect x0/x1 keep working.
+         *   – the new generic fields  { relX, relY, xRange, yRange }
+         *   – the legacy helpers      { xScale, yScale, x0, x1 }  (100-px wide slice)
          */
         function handleContextMenu(event: MouseEvent, plot) {
             const xaxis = plot._fullLayout.xaxis
@@ -142,10 +141,17 @@ export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps)
             const relX  = event.clientX - bb.left
             const relY  = event.clientY - bb.top
 
+            // existing data-space coords
             const x      = xaxis.p2d(relX)
             const y      = yaxis.p2d(relY)
             const xScale = Math.abs(xaxis.d2p(1) - xaxis.d2p(0))   // px / unit
             const yScale = Math.abs(yaxis.d2p(1) - yaxis.d2p(0))
+
+            // New: compute full data-range spans from axis.range
+            const [xMin, xMax] = xaxis.range as [number, number]
+            const [yMin, yMax] = yaxis.range as [number, number]
+            const xRange       = xMax - xMin
+            const yRange       = yMax - yMin
 
             /* legacy helpers – 100-pixel-wide default zone */
             const unitWidth = 100 / xScale
@@ -154,10 +160,14 @@ export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps)
 
             showContextMenuRef.current({
                 event,
-                props: { x, y, xScale, yScale, x0, x1 }            // merged packet
+                props: {
+                    // legacy props
+                    x, y, xScale, yScale, x0, x1,
+                    // new generic props
+                    relX, relY, xRange, yRange
+                }
             })
         }
-
 
         const dragElement = plot.querySelector(".drag")
         if (!dragElement) {
