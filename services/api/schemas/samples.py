@@ -5,18 +5,18 @@ from pydantic import BaseModel, Field
 from services.api.schemas.annotations import Annotation
 
 
-class FileType(Enum, str):
+class FileType(str, Enum):
     CSV = "csv"
     PARQUET = "parquet"
     MP4 = "mp4"
 
 
-class FileProtocol(Enum, str):
+class FileProtocol(str, Enum):
     S3 = "s3"
     LOCAL = "file"
 
 
-class ShotProtocol(Enum, str):
+class ShotProtocol(str, Enum):
     UDA = "uda"
     SAL = "sal"
 

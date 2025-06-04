@@ -1,7 +1,9 @@
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
+from datetime import datetime
 
+from services.api.schemas import Model
 from services.api.schemas.samples import Sample
 
 
@@ -20,9 +22,10 @@ class DataLoaderType(str, Enum):
     UDA = "uda"
 
 
-class Project(BaseModel):
+class Project(Model):
     name: str
-    samples: List[Sample]
+    samples: List[Sample] = None
     task: Task
     query_strategy: QueryStrategyType
     data_loader: DataLoaderType
+    timestamp: datetime = Field(default_factory=datetime.now)
