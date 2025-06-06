@@ -3,13 +3,7 @@ import { useContextMenu } from "react-contexify";
 
 import * as d3 from "d3"
 import { useZoneContext, ZONE_MENU_ID } from "../providers/zone-provider";
-import { Zone } from "@/types";
-
-type ZoneProps = {
-    plotId: string;
-    plotReady: boolean;
-    forceUpdate: number;
-}
+import { ToolingProps, Zone } from "@/types";
 
 /**
  * Handles the rendering of zones onto a specific plot
@@ -21,7 +15,7 @@ export const Zones = ({
     plotId,  
     plotReady, 
     forceUpdate
-} : ZoneProps) => {
+} : ToolingProps) => {
     const dragOffset = useRef(0)
 
     // Hook to trigger the context provider to render context menu
@@ -34,8 +28,9 @@ export const Zones = ({
 
     // Main rendering effect
     useEffect(() => {
+        console.log("Render Zones: ", plotReady, plotId)
         // This shall not run until the target plot is initialised
-        if (!plotReady) {
+        if (!plotId || !plotReady || forceUpdate === undefined) {
             return
         }
 
@@ -64,7 +59,7 @@ export const Zones = ({
             const overplot = document.getElementsByClassName(`${plotId}-overplot-${subplotId}`)[0]
             
             if (!overplot) {
-                console.error("Could not locate D3 overplot to generate zones")
+                console.error(`Could not locate D3 overplot to generate zones: ${plotId}-overplot-${subplotId}`)
                 handleZoneUpdate()
                 return
             }

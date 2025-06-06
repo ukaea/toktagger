@@ -3,13 +3,7 @@ import { useContextMenu } from "react-contexify";
 
 import * as d3 from "d3"
 import { useVSpanContext, VSPAN_MENU_ID } from "../providers/vpsan-provider";
-import { VSpan } from "@/types";
-
-type VSpanProps = {
-    plotId: string;
-    plotReady: boolean;
-    forceUpdate: number;
-}
+import { ToolingProps, VSpan } from "@/types";
 
 /**
  * Handles the rendering of VSpans onto a specific plot
@@ -17,7 +11,7 @@ type VSpanProps = {
  * @param plotId Used to identify the plot that the tooling should be rendered on
  * @param plotReady Signal from main plot that tooling can be drawn
  */
-export const VSpans = ({plotId, plotReady} : VSpanProps) => {
+export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
     const dragOffset = useRef(0)
 
     // Hook to trigger the context provider to render context menu
@@ -31,7 +25,7 @@ export const VSpans = ({plotId, plotReady} : VSpanProps) => {
     // Main rendering effect
     useEffect(() => {
         // This shall not run until the target plot is initialised
-        if (!plotReady) {
+        if (!plotId || !plotReady || forceUpdate === undefined) {
             return
         }
 
@@ -133,7 +127,7 @@ export const VSpans = ({plotId, plotReady} : VSpanProps) => {
                     .on("contextmenu", handleContextMenu)
             }
         }))
-    }, [handleVSpanUpdate, plotId, plotReady, showVSpanMenu, vspans, triggerUpdate])
+    }, [handleVSpanUpdate, plotId, plotReady, showVSpanMenu, vspans, triggerUpdate, forceUpdate])
 
     return (
         <div />
