@@ -36,12 +36,27 @@ async def get_next_annotation(project_id: str):
     # This should then be passed in to the /data endpoint to get required data for visualisation
     pass
 
-@router.get("/samples/{sample_id}/annotations")
-async def get_annotations(project_id: str, sample_id: int, params: Sample = None):
+@router.get("/samples/{sample_id}/annotations", response_model=list[Annotation])
+async def get_annotations(request: Request, project_id: str, sample_id: int, filters: dict = None, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[Annotation]:
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
     # Should return whether these are validated as a boolean
-    pass
+    db_filters = filters or {} 
+    db_filters["project_id"] = project_id
+    db_filters["sample_id"] = sample_id
+    if validated is not None:
+        db_filters["validated"] = validated
+    
+    _annotations = await request.app.state.db_client.get_filtered_documents(
+        collection="annotations", 
+        filters=db_filters, 
+        sort_by="timestamp", 
+        sort_direction=-1, 
+        start=range_low, 
+        limit = range_high - range_low + 1 if range_high is not None else 0
+        )
+    
+    return _annotations
 
 @router.put("/samples/{sample_id}/annotations")
 async def add_annotations(request: Request, project_id: str, sample_id: int, annotations: list[Annotation]):

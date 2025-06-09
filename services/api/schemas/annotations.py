@@ -1,12 +1,15 @@
 from datetime import datetime
 from typing import Tuple
-from services.api.schemas import Model
+from services.api.schemas import ConfiguredModel
+from bson.objectid import ObjectId
+from pydantic import Field
 
-class Annotation(Model):
+class Annotation(ConfiguredModel):
     validated: bool = False
     label: str
     
 class AnnotationOut(Annotation):
+    id: str = Field(..., alias="_id")
     sample_id: int
 
 

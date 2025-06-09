@@ -1,8 +1,9 @@
 import pandas as pd
 import pyuda
 from abc import ABC, abstractmethod
-
-from services.api.schemas.data import MultiVariateTimeSeriesData
+import PIL
+import numpy as np
+from services.api.schemas.data import MultiVariateTimeSeriesData, ImageData
 from services.api.schemas.samples import FileData, Sample, ShotData
 
 
@@ -15,6 +16,21 @@ class DataLoader(ABC):
     def __getitem__(self, index):
         pass
 
+
+class ImageDataLoader(DataLoader):
+    """DataLoader for retrieving data using a folder of image files"""
+
+    def __init__(self, samples: list[Sample]):
+        self.data_items: list[FileData] = [sample.data for sample in samples]
+
+    def __len__(self) -> int:
+        return len(self.data_items)
+
+    def __getitem__(self, index) -> MultiVariateTimeSeriesData:
+        item: FileData = self.data_items[index]
+        im = PIL.Image.open(item.file_name)
+        arr = np.asarray(im)
+        return ImageData(arr.tolist())
 
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""

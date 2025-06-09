@@ -2,8 +2,8 @@ from typing import List
 from pydantic import BaseModel, Field
 from enum import Enum
 from datetime import datetime
-
-from services.api.schemas import Model
+from bson.objectid import ObjectId
+from services.api.schemas import ConfiguredModel
 from services.api.schemas.samples import Sample
 
 
@@ -22,10 +22,13 @@ class DataLoaderType(str, Enum):
     UDA = "uda"
 
 
-class Project(Model):
+class Project(ConfiguredModel):
     name: str
     samples: List[Sample] = None
     task: Task
     query_strategy: QueryStrategyType
     data_loader: DataLoaderType
     timestamp: datetime = Field(default_factory=datetime.now)
+
+class ProjectOut(Project):
+    id: str = Field(..., alias="_id")
