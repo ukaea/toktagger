@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from services.api.schemas.data import Data
 from services.api.schemas.samples import Sample
 
-router = APIRouter(prefix="/projects/{project_id}/samples/{sample_id}/data")
+router = APIRouter(prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"])
 
 
 @router.get("")

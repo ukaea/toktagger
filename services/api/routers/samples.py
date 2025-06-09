@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from typing import Tuple
 from services.api.schemas.samples import Sample
 
-router = APIRouter(prefix="/projects/{project_id}/samples")
+router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
 
 @router.get("")

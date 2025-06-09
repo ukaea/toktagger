@@ -1,13 +1,13 @@
 from datetime import datetime
 from typing import Tuple
-from pydantic import BaseModel
+from services.api.schemas import Model
 
-
-class Annotation(BaseModel):
-    sample_id: int
-    created: str = datetime.now().isoformat()
+class Annotation(Model):
     validated: bool = False
     label: str
+    
+class AnnotationOut(Annotation):
+    sample_id: int
 
 
 class TimePoint(Annotation):

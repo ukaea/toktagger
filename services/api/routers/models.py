@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Request
 from services.api.schemas.models import Model
-from services.api.schemas.filters import Filters
 
-router = APIRouter(prefix="/projects/{project_id}/models")
+router = APIRouter(prefix="/projects/{project_id}/models", tags=["Models"])
 
 
 @router.get("")
@@ -59,7 +58,7 @@ async def stop_model_training(project_id: str, model_id: str):
 
 
 @router.post("/{model_id}/predict")
-async def predict(project_id: str, model_id: str, filters: Filters):
+async def predict(project_id: str, model_id: str):
     # Create predictions using the given model for this project
     # Predict on samples as specified by filters
     # Stores results in the database with validated=False
@@ -67,21 +66,21 @@ async def predict(project_id: str, model_id: str, filters: Filters):
 
 
 @router.get("/{model_id}/predict")
-async def get_predictions(project_id: str, model_id: str, filters: Filters):
+async def get_predictions(project_id: str, model_id: str):
     # Get predictions made using the given model for this project
     # Predict on samples as specified by filters
     pass
 
 
 @router.delete("/{model_id}/predict")
-async def delete_predictions(project_id: str, model_id: str, filters: Filters):
+async def delete_predictions(project_id: str, model_id: str):
     # Delete predictions using the given model for this project
     # Predict on samples as specified by filters
     pass
 
 
 @router.get("/{model_id}/evaluate")
-async def evaluate(project_id: str, model_id: str, filters: Filters):
+async def evaluate(project_id: str, model_id: str):
     # Get evaluation of model by comparing model predictions to human evaluations
     # Specify samples to use via filters
     # Return overall statistics, as well as correct/incorrect for each sample ID
