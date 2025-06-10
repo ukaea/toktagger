@@ -32,11 +32,11 @@ class ImageDataLoader(DataLoader):
         arr = np.asarray(im)
         return ImageData(arr.tolist())
     
-    def get_sample(self, sample: Sample):
+    def get_sample(self, sample: Sample)-> ImageData:
         item: FileData = sample.data
-        im = Image.open(item.file_name).resize((20, 10))
+        im = Image.open(item.file_name).resize((20, 10)) # TODO: Get rid of this temp resizing
         arr = np.asarray(im)
-        return ImageData(arr.tolist())
+        return ImageData(data=arr.tolist())
 
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""

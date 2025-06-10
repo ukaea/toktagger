@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.data import Data
+from services.api.schemas.data import Data, ImageData
 from services.api.schemas.samples import Sample
+from typing import Union
 
 router = APIRouter(prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"])
 
 
-@router.get("")
-async def get_data(request: Request, project_id: str, sample_id: str): #-> Data:
+@router.get("", response_model=Union[Data, ImageData])
+async def get_data(request: Request, project_id: str, sample_id: str) -> Union[Data, ImageData]:
     # Get data, eg time trace, about the given sample required for the given project
     
     # First check that the project being queried here is the one we are set up for
@@ -33,12 +34,12 @@ async def get_data(request: Request, project_id: str, sample_id: str): #-> Data:
     
     # The app state should be set to use the correct data loader for this project
     # TODO: get_sample only on image data loader for now as I experiment...
-    return {"data": request.app.state.data_pool.data_loader.get_sample(sample)}
+    return request.app.state.data_pool.data_loader.get_sample(sample)
     
     
 
 @router.put("")
-async def add_data(project_id: str, sample_id: str, request: Request) -> Data:
+async def add_data(project_id: str, sample_id: str, request: Request) -> Union[Data, ImageData]:
     # Add some data for this sample for a given project
     # Eg, could upload a CSV of time trace data for a certain pulse via the web UI
     # Have set the request as just a Request body, because I dont (yet) know what format that needs to be
@@ -46,7 +47,7 @@ async def add_data(project_id: str, sample_id: str, request: Request) -> Data:
 
 
 @router.delete("")
-async def delete_data(project_id: str, sample_id: str, params: Sample = None) -> Data:
+async def delete_data(project_id: str, sample_id: str, params: Sample = None) -> Union[Data, ImageData]:
     # Delete data for this sample from this project
     # Not sure if we really need this, but might be nice in case you have a sample which is junk in your dataset
     # Ie the images are all black because the camera failed, etc
