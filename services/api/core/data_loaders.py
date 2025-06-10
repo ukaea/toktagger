@@ -1,5 +1,5 @@
 import pandas as pd
-import pyuda
+#import pyuda
 from abc import ABC, abstractmethod
 import PIL
 import numpy as np
@@ -31,6 +31,12 @@ class ImageDataLoader(DataLoader):
         im = PIL.Image.open(item.file_name)
         arr = np.asarray(im)
         return ImageData(arr.tolist())
+    
+    def get_sample(self, sample: Sample):
+        item: FileData = sample.data
+        im = PIL.Image.open(item.file_name)
+        arr = np.asarray(im)
+        return ImageData(arr.tolist())
 
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
@@ -52,24 +58,25 @@ class ParquetDataLoader(DataLoader):
 
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
+    pass
 
-    def __init__(self, samples: list[Sample]):
-        self.client = pyuda.Client()
-        self.data_items: list[ShotData] = [sample.data for sample in samples]
+    # def __init__(self, samples: list[Sample]):
+    #     self.client = pyuda.Client()
+    #     self.data_items: list[ShotData] = [sample.data for sample in samples]
 
-    def __len__(self) -> int:
-        return len(self.data_items)
+    # def __len__(self) -> int:
+    #     return len(self.data_items)
 
-    def __getitem__(self, index):
-        item: ShotData = self.data_items[index]
+    # def __getitem__(self, index):
+    #     item: ShotData = self.data_items[index]
 
-        results = {}
-        for name in item.signal_names:
-            signal = self.client.get(item.shot_id, name)
-            results[name] = signal.data
-            time = signal.time.data
+    #     results = {}
+    #     for name in item.signal_names:
+    #         signal = self.client.get(item.shot_id, name)
+    #         results[name] = signal.data
+    #         time = signal.time.data
 
-        return MultiVariateTimeSeriesData(time=time, values=results)
+    #     return MultiVariateTimeSeriesData(time=time, values=results)
 
 DATA_LOADERS = {
     DataLoaderType.PARQUET: ParquetDataLoader,

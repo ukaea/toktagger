@@ -1,7 +1,5 @@
-from datetime import datetime
 from typing import Tuple
 from services.api.schemas import ConfiguredModel
-from bson.objectid import ObjectId
 from pydantic import Field
 
 class Annotation(ConfiguredModel):

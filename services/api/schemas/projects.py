@@ -1,10 +1,6 @@
-from typing import List
-from pydantic import BaseModel, Field
+from pydantic import Field
 from enum import Enum
-from datetime import datetime
-from bson.objectid import ObjectId
 from services.api.schemas import ConfiguredModel
-from services.api.schemas.samples import Sample
 
 
 class Task(Enum):

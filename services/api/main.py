@@ -14,6 +14,8 @@ async def lifespan(app: FastAPI):
     db_name = "annotate_db"
     
     app.state.db_client = MongoDBClient(mongo_url, db_name)
+    app.state.project = None
+    app.state.date_pool = None
     
     yield
     

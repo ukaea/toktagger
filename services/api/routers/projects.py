@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas.projects import Project, ProjectOut
-from bson import ObjectId
-from bson.errors import InvalidId
+from services.api.schemas import convert_to_objectid
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.query_strategy import QUERY_STRATEGIES
@@ -34,11 +33,8 @@ async def create_project(request: Request, project: Project):
 async def get_project(request: Request, project_id: str) -> ProjectOut:
     # Return information about a specific project
     # Have put project_id as a string for now, but might want to use ShortUUID?
-    try:
-        obj_id = ObjectId(project_id)
-    except InvalidId as e:
-        raise HTTPException(status_code=400, detail="Project ID is not valid.")
-
+    obj_id = convert_to_objectid(project_id)
+    
     projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
         filters={"_id": obj_id}
@@ -60,10 +56,7 @@ async def set_project(request: Request, project_id: str):
     # TODO ^^
     
     # Get project with that ID:
-    try:
-        obj_id = ObjectId(project_id)
-    except InvalidId as e:
-        raise HTTPException(status_code=400, detail="Project ID is not valid.")
+    obj_id = convert_to_objectid(project_id)
 
     projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
@@ -76,9 +69,11 @@ async def set_project(request: Request, project_id: str):
     project = Project.model_validate(projects[0])
     
     # Set some global variables in the app state
+    request.app.project = project
+    
     request.app.state.data_pool = DataPool(
-        data_loader=DATA_LOADERS[project.data_loader], 
-        query_strategy=QUERY_STRATEGIES[project.query_strategy]
+        data_loader=DATA_LOADERS[project.data_loader]([]), 
+        query_strategy=QUERY_STRATEGIES[project.query_strategy]([])
         )
     
     # TODO: Add annotator etc based on task?
@@ -88,11 +83,8 @@ async def set_project(request: Request, project_id: str):
 @router.delete("/{project_id}")
 async def delete_project(request: Request, project_id: str):
     # Delete this specific project
-    try:
-        obj_id = ObjectId(project_id)
-    except InvalidId as e:
-        raise HTTPException(status_code=400, detail="Project ID is not valid.")
-
+    obj_id = convert_to_objectid(project_id)
+    
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="projects", 
         filters={"_id": obj_id}

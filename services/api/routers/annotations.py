@@ -2,13 +2,14 @@ from fastapi import APIRouter, Request
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotators import Annotator
 from services.api.schemas.annotations import Annotation, AnnotationOut
+from services.api.schemas import convert_to_objectid
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Annotations"],
 )
 
 @router.get("/annotations", response_model=list[AnnotationOut])
 async def get_all_annotations(request: Request, project_id: str, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[AnnotationOut]:
-    db_filters = {"project_id" : project_id}
+    db_filters = {"project_id" : convert_to_objectid(project_id)}
     if validated is not None:
         db_filters["validated"] = validated
     
@@ -42,8 +43,8 @@ async def get_annotations(request: Request, project_id: str, sample_id: int, fil
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
     # Should return whether these are validated as a boolean
     db_filters = filters or {} 
-    db_filters["project_id"] = project_id
-    db_filters["sample_id"] = sample_id
+    db_filters["project_id"] = convert_to_objectid(project_id)
+    db_filters["sample_id"] = convert_to_objectid(sample_id)
     if validated is not None:
         db_filters["validated"] = validated
     
@@ -64,13 +65,13 @@ async def add_annotations(request: Request, project_id: str, sample_id: int, ann
     # Again dont know what form this data will take so have set to a Request for now
     # This data could be for one or more events per task, ie multiple ELMs or UFOs per pulse
     # This should be added into the database, with validated=True
-    return await request.app.state.db_client.insert_many(collection="annotations", models=annotations, ids={"project_id": project_id, "sample_id": sample_id})
+    return await request.app.state.db_client.insert_many(collection="annotations", models=annotations, ids={"project_id": convert_to_objectid(project_id), "sample_id": convert_to_objectid(sample_id)})
     
 @router.delete("/samples/{sample_id}/annotations")
 async def remove_annotations(request: Request, project_id: str, sample_id: int):
     # Remove annotations for this project and sample
     # Probably dont need to be able to specify params here, don't envisage how/why the UI would allow you to remove specific annotations
-    await request.app.state.db_client.delete_filtered_documents(collection="annotations", filters={"project_id": project_id, "sample_id": sample_id})
+    await request.app.state.db_client.delete_filtered_documents(collection="annotations", filters={"project_id": convert_to_objectid(project_id), "sample_id": convert_to_objectid(sample_id)})
 
 @router.get("/annotator")
 async def get_annotators(project_id: str):
