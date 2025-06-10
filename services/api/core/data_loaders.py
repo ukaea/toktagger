@@ -1,5 +1,5 @@
 import pandas as pd
-#import pyuda
+
 from abc import ABC, abstractmethod
 from PIL import Image
 import numpy as np
@@ -7,13 +7,10 @@ from services.api.schemas.data import MultiVariateTimeSeriesData, ImageData
 from services.api.schemas.samples import FileData, Sample, ShotData
 from services.api.schemas.projects import DataLoaderType
 
+
 class DataLoader(ABC):
     @abstractmethod
-    def __len__(self) -> int:
-        pass
-
-    @abstractmethod
-    def __getitem__(self, index):
+    def get_sample(self, sample: Sample):
         pass
 
 
@@ -23,20 +20,14 @@ class ImageDataLoader(DataLoader):
     def __init__(self, samples: list[Sample]):
         self.data_items: list[FileData] = [sample.data for sample in samples]
 
-    def __len__(self) -> int:
-        return len(self.data_items)
-
-    def __getitem__(self, index) -> ImageData:
-        item: FileData = self.data_items[index]
-        im = Image.open(item.file_name)
-        arr = np.asarray(im)
-        return ImageData(arr.tolist())
-    
-    def get_sample(self, sample: Sample)-> ImageData:
+    def get_sample(self, sample: Sample) -> ImageData:
         item: FileData = sample.data
-        im = Image.open(item.file_name).resize((20, 10)) # TODO: Get rid of this temp resizing
+        im = Image.open(item.file_name).resize(
+            (20, 10)
+        )  # TODO: Get rid of this temp resizing
         arr = np.asarray(im)
         return ImageData(data=arr.tolist())
+
 
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
@@ -44,42 +35,39 @@ class ParquetDataLoader(DataLoader):
     def __init__(self, samples: list[Sample]):
         self.data_items: list[FileData] = [sample.data for sample in samples]
 
-    def __len__(self) -> int:
-        return len(self.data_items)
-
-    def __getitem__(self, index) -> MultiVariateTimeSeriesData:
-        item: FileData = self.data_items[index]
+    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        item: FileData = sample.data
         df = pd.read_parquet(item.file_name)
-        df = df[item.column_names]
-        data = df.to_dict("records")
+        # df = df[item.column_names]
+        df = df.fillna(0)
+        data = df.to_dict("list")
         time = df.index.values
         return MultiVariateTimeSeriesData(time=time, values=data)
 
 
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
-    pass
 
-    # def __init__(self, samples: list[Sample]):
-    #     self.client = pyuda.Client()
-    #     self.data_items: list[ShotData] = [sample.data for sample in samples]
+    def __init__(self, samples: list[Sample]):
+        import pyuda
 
-    # def __len__(self) -> int:
-    #     return len(self.data_items)
+        self.client = pyuda.Client()
+        self.data_items: list[ShotData] = [sample.data for sample in samples]
 
-    # def __getitem__(self, index):
-    #     item: ShotData = self.data_items[index]
+    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        item: ShotData = sample.data
 
-    #     results = {}
-    #     for name in item.signal_names:
-    #         signal = self.client.get(item.shot_id, name)
-    #         results[name] = signal.data
-    #         time = signal.time.data
+        results = {}
+        for name in item.signal_names:
+            signal = self.client.get(name, sample.shot_id)
+            results[name] = signal.data
+            time = signal.time.data
 
-    #     return MultiVariateTimeSeriesData(time=time, values=results)
+        return MultiVariateTimeSeriesData(time=time, values=results)
+
 
 DATA_LOADERS = {
     DataLoaderType.PARQUET: ParquetDataLoader,
     DataLoaderType.UDA: UDADataLoader,
-    DataLoaderType.IMAGE: ImageDataLoader
+    DataLoaderType.IMAGE: ImageDataLoader,
 }

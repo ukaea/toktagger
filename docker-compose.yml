@@ -30,54 +30,26 @@ services:
     networks:
       - app-network
 
-  redis:
-    image: redis:latest
-    container_name: redis
-    ports:
-      - "6379:6379"
-    restart: always
-    networks:
-      - app-network
-
-  model_worker:
+  api:
     build:
-      context: ./services/data_api/
-      dockerfile: Dockerfile
-    container_name: model_worker
-    environment:
-      REDIS_HOST: "redis"
-      MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
-    volumes:
-      - ./data:/data
-      - ./services/data_api:/app
-    command: ["celery", "-A", "model_runner.app", "worker", "--loglevel=info"]
-    depends_on:
-      - redis
-      - data_api
-    restart: always
-    working_dir: /app
-    networks:
-      - app-network
-
-  data_api:
-    build:
-      context: ./services/data_api/
-      dockerfile: Dockerfile
-    container_name: data_app
+      context: ./
+      dockerfile: ./api.dockerfile
+    container_name: api_app
     restart: always
     ports:
       - "8002:8002"
     depends_on:
-      - redis
       - mongo
     volumes:
       - ./data/:/data
-      - ./services/data_api:/app
+      - ./services:/app/services
     environment:
-      REDIS_HOST: "redis"
       MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
+      UDA_HOST: "uda2.mast.l"
+      UDA_META_PLUGINNAME: "MASTU_DB"
+      UDA_METANEW_PLUGINNAME: "MAST_DB"
     working_dir: /app
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
+    command: ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
     networks:
       - app-network
 
@@ -89,7 +61,7 @@ services:
     environment:
       PORT: 3001
       NODE_ENV: development
-      DATA_API_URL: "http://data_app:8002"
+      DATA_API_URL: "http://api_app:8002"
       NEXT_PUBLIC_API_URL: "http://localhost:3001"
     volumes:
       - ./services/ui:/app
