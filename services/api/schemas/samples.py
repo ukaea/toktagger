@@ -44,3 +44,7 @@ class Sample(ConfiguredModel):
     shot_id: int
     data: FileData | ShotData
     annotations: Optional[List[Annotation]] = None
+    
+class SampleOut(ConfiguredModel):
+    id: str = Field(..., alias="_id")
+    project_id: int

@@ -36,8 +36,8 @@ async def get_next_annotation(project_id: str):
     # This should then be passed in to the /data endpoint to get required data for visualisation
     pass
 
-@router.get("/samples/{sample_id}/annotations", response_model=list[Annotation])
-async def get_annotations(request: Request, project_id: str, sample_id: int, filters: dict = None, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[Annotation]:
+@router.get("/samples/{sample_id}/annotations", response_model=list[AnnotationOut])
+async def get_annotations(request: Request, project_id: str, sample_id: int, filters: dict = None, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[AnnotationOut]:
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
     # Should return whether these are validated as a boolean
@@ -64,7 +64,7 @@ async def add_annotations(request: Request, project_id: str, sample_id: int, ann
     # Again dont know what form this data will take so have set to a Request for now
     # This data could be for one or more events per task, ie multiple ELMs or UFOs per pulse
     # This should be added into the database, with validated=True
-    await request.app.state.db_client.insert_many(collection="annotations", models=annotations, ids={"project_id": project_id, "sample_id": sample_id})
+    return await request.app.state.db_client.insert_many(collection="annotations", models=annotations, ids={"project_id": project_id, "sample_id": sample_id})
     
 @router.delete("/samples/{sample_id}/annotations")
 async def remove_annotations(request: Request, project_id: str, sample_id: int):

@@ -25,7 +25,6 @@ class DataLoaderType(str, Enum):
 
 class Project(ConfiguredModel):
     name: str
-    samples: List[Sample] = None
     task: Task
     query_strategy: QueryStrategyType
     data_loader: DataLoaderType
