@@ -2,7 +2,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 from services.api.schemas.samples import Sample
-
+from services.api.schemas.projects import QueryStrategyType
 
 class QueryStrategy(ABC):
     def __init__(self, samples: list[Sample]):
@@ -47,3 +47,9 @@ class SequentialQueryStrategy(QueryStrategy):
 
         self.index += 1
         return self.index
+
+
+QUERY_STRATEGIES = {
+    QueryStrategyType.RANDOM: RandomQueryStrategy,
+    QueryStrategyType.SEQUENTIAL: SequentialQueryStrategy
+}

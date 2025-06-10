@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    app.state.db_client.client.close()
+    await app.state.db_client.client.close()
     
 app = FastAPI(lifespan=lifespan)
 app.include_router(annotations_router)

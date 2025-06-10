@@ -5,7 +5,7 @@ import PIL
 import numpy as np
 from services.api.schemas.data import MultiVariateTimeSeriesData, ImageData
 from services.api.schemas.samples import FileData, Sample, ShotData
-
+from services.api.schemas.projects import DataLoaderType
 
 class DataLoader(ABC):
     @abstractmethod
@@ -70,3 +70,9 @@ class UDADataLoader(DataLoader):
             time = signal.time.data
 
         return MultiVariateTimeSeriesData(time=time, values=results)
+
+DATA_LOADERS = {
+    DataLoaderType.PARQUET: ParquetDataLoader,
+    DataLoaderType.UDA: UDADataLoader,
+    DataLoaderType.IMAGE: ImageDataLoader
+}

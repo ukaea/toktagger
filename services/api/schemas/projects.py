@@ -20,6 +20,7 @@ class QueryStrategyType(str, Enum):
 class DataLoaderType(str, Enum):
     PARQUET = "parquet"
     UDA = "uda"
+    IMAGE = "image"
 
 
 class Project(ConfiguredModel):
@@ -28,7 +29,6 @@ class Project(ConfiguredModel):
     task: Task
     query_strategy: QueryStrategyType
     data_loader: DataLoaderType
-    timestamp: datetime = Field(default_factory=datetime.now)
 
 class ProjectOut(Project):
     id: str = Field(..., alias="_id")

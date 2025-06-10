@@ -18,11 +18,12 @@ class MongoDBClient():
         self, 
         collection: typing.Literal["projects", "annotations", "models", "samples"], 
         model: pydantic.BaseModel, 
-        ids: dict = None
+        ids: dict = {}
     ):
         document = model.model_dump(mode="python")
         document.update(ids)
-        await self.db[collection].insert_one(document)
+        result = await self.db[collection].insert_one(document)
+        return str(result.inserted_id)
         
     async def insert_many(
         self, 
@@ -32,7 +33,8 @@ class MongoDBClient():
     ):
         documents = [model.model_dump(mode="python") for model in models]
         documents  = [{**document, **ids} for document in documents]
-        await self.db[collection].insert_many(documents)
+        result = await self.db[collection].insert_many(documents)
+        return [str(object_id) for object_id in await result.inserted_ids]
         
     async def get_all_documents(
         self, 

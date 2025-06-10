@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas.projects import Project, ProjectOut
+from bson import ObjectId
+from bson.errors import InvalidId
+from services.api.core.data_pool import DataPool
+from services.api.core.data_loaders import DATA_LOADERS
+from services.api.core.query_strategy import QUERY_STRATEGIES
+
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
 @router.get("")
-async def get_projects(request: Request, range_low: int = 0, range_high: int = None) -> list[Project]:
+async def get_projects(request: Request, range_low: int = 0, range_high: int = None) -> list[ProjectOut]:
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
@@ -14,39 +20,83 @@ async def get_projects(request: Request, range_low: int = 0, range_high: int = N
         start=range_low, 
         limit = range_high - range_low + 1 if range_high is not None else 0
         )
-    
-    print(_projects)
-    
+        
     return _projects
 
 @router.post("")
-async def create_project(project: Project):
+async def create_project(request: Request, project: Project):
     # Create instance of this project class, instantiating all required classes for that task, and return its ID
     # In the future, should be able to specify eg dataloader, data type, query strategy etc
-    pass
-
+    _id = await request.app.state.db_client.insert(collection="projects", model=project)
+    return {"_id": _id}
 
 @router.get("/{project_id}")
-async def get_project(request: Request, project_id: str) -> Project:
+async def get_project(request: Request, project_id: str) -> ProjectOut:
     # Return information about a specific project
     # Have put project_id as a string for now, but might want to use ShortUUID?
-    pass
+    try:
+        obj_id = ObjectId(project_id)
+    except InvalidId as e:
+        raise HTTPException(status_code=400, detail="Project ID is not valid.")
+
+    projects = await request.app.state.db_client.get_filtered_documents(
+        collection="projects", 
+        filters={"_id": obj_id}
+    )
+    
+    if len(projects) == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    
+    return projects[0]
 
 
 @router.put("/{project_id}")
-async def set_project(project_id: str):
+async def set_project(request: Request, project_id: str):
     # This is not a complete solution, but I'm going to go for this to get a MVP going
     # This endpoint is used to select which project we want to use for all subsequent API calls
     # Defines the data pool, data loader, annotator, etc etc
     # Set these in the app state so that they can be used by other endpoints
     # Obviously this makes it not scalable and will only work for one user/project at a time, and should be eventually replaced by Redis caching or something?
+    # TODO ^^
     
+    # Get project with that ID:
+    try:
+        obj_id = ObjectId(project_id)
+    except InvalidId as e:
+        raise HTTPException(status_code=400, detail="Project ID is not valid.")
+
+    projects = await request.app.state.db_client.get_filtered_documents(
+        collection="projects", 
+        filters={"_id": obj_id}
+    )
     
+    if len(projects) == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
     
-    pass
+    project = Project.model_validate(projects[0])
+    
+    # Set some global variables in the app state
+    request.app.state.data_pool = DataPool(
+        data_loader=DATA_LOADERS[project.data_loader], 
+        query_strategy=QUERY_STRATEGIES[project.query_strategy]
+        )
+    
+    # TODO: Add annotator etc based on task?
+    
 
 
 @router.delete("/{project_id}")
-async def delete_project(project_id: str):
+async def delete_project(request: Request, project_id: str):
     # Delete this specific project
-    pass
+    try:
+        obj_id = ObjectId(project_id)
+    except InvalidId as e:
+        raise HTTPException(status_code=400, detail="Project ID is not valid.")
+
+    result = await request.app.state.db_client.delete_filtered_documents(
+        collection="projects", 
+        filters={"_id": obj_id}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
