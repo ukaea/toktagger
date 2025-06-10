@@ -7,8 +7,9 @@ class ConfiguredModel(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     @model_validator(mode='before')
     def convert_objectid(cls, values):
-        if _id := values.get("_id"):
-            values['_id'] = str(_id)
+        for key in ("_id", "project_id", "sample_id"):
+            if _id := values.get(key):
+                values[key] = str(_id)
         return values
     
     class Config:

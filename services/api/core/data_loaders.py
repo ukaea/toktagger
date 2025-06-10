@@ -1,7 +1,7 @@
 import pandas as pd
 #import pyuda
 from abc import ABC, abstractmethod
-import PIL
+from PIL import Image
 import numpy as np
 from services.api.schemas.data import MultiVariateTimeSeriesData, ImageData
 from services.api.schemas.samples import FileData, Sample, ShotData
@@ -26,15 +26,15 @@ class ImageDataLoader(DataLoader):
     def __len__(self) -> int:
         return len(self.data_items)
 
-    def __getitem__(self, index) -> MultiVariateTimeSeriesData:
+    def __getitem__(self, index) -> ImageData:
         item: FileData = self.data_items[index]
-        im = PIL.Image.open(item.file_name)
+        im = Image.open(item.file_name)
         arr = np.asarray(im)
         return ImageData(arr.tolist())
     
     def get_sample(self, sample: Sample):
         item: FileData = sample.data
-        im = PIL.Image.open(item.file_name)
+        im = Image.open(item.file_name).resize((20, 10))
         arr = np.asarray(im)
         return ImageData(arr.tolist())
 

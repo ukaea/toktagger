@@ -8,7 +8,7 @@ router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 @router.get("", response_model=list[SampleOut])
 async def get_samples(request: Request, project_id: str, range_low: int = 0, range_high: int = None) -> list[SampleOut]:
     # Return a list of all samples for this project and info about them    
-    project_obj_id = convert_to_objectid(project_id)
+    project_obj_id = convert_to_objectid(project_id, "project")
     
     _samples = await request.app.state.db_client.get_filtered_documents(
         collection="samples", 
@@ -28,17 +28,17 @@ async def add_samples(request: Request, project_id: str, samples: list[Sample]):
     # I'm assuming these will be shot/pulse numbers, hence int, but could be unique ID strings instead
     # Depends if for us a 'sample' will always be a shot/pulse, or if it could be a subset eg a single frame of video
     # Do we also want to allow a single value, or list of specific value?
-    return await request.app.state.db_client.insert_many(collection="samples", models=samples, ids={"project_id": project_id})
+    return await request.app.state.db_client.insert_many(collection="samples", models=samples, ids={"project_id": convert_to_objectid(project_id, "project")})
 
 @router.get("/{sample_id}")
 async def get_sample(request: Request, project_id: str, sample_id: str) -> SampleOut:
     # Get sample with this ID
-    project_obj_id = convert_to_objectid(project_id)
-    sample_obj_id = convert_to_objectid(sample_id)
+    project_obj_id = convert_to_objectid(project_id, "project")
+    sample_obj_id = convert_to_objectid(sample_id, "sample")
 
     samples = await request.app.state.db_client.get_filtered_documents(
         collection="samples", 
-        filters={"_id": sample_obj_id, "project_id": project_obj_id}
+        filters={"_id": sample_obj_id}
     )
     
     if len(samples) == 0:
@@ -52,8 +52,8 @@ async def remove_sample(request: Request, project_id: str, sample_id: str):
     # Remove samples from the project
     # Dont envisage this actually deleting the data stored about these samples
     # But do we need a separate method for that?
-    project_obj_id = convert_to_objectid(project_id)
-    sample_obj_id = convert_to_objectid(sample_id)
+    project_obj_id = convert_to_objectid(project_id, "project")
+    sample_obj_id = convert_to_objectid(sample_id, "sample")
     
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="projects", 

@@ -22,4 +22,4 @@ class SpectrogramData(Data):
 
 
 class ImageData(Data):
-    data: list[list[float]]
+    data: list[list[tuple[int, int, int]]]

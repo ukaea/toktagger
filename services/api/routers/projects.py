@@ -33,7 +33,7 @@ async def create_project(request: Request, project: Project):
 async def get_project(request: Request, project_id: str) -> ProjectOut:
     # Return information about a specific project
     # Have put project_id as a string for now, but might want to use ShortUUID?
-    obj_id = convert_to_objectid(project_id)
+    obj_id = convert_to_objectid(project_id, "project")
     
     projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
@@ -56,7 +56,7 @@ async def set_project(request: Request, project_id: str):
     # TODO ^^
     
     # Get project with that ID:
-    obj_id = convert_to_objectid(project_id)
+    obj_id = convert_to_objectid(project_id, "project")
 
     projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
@@ -66,10 +66,10 @@ async def set_project(request: Request, project_id: str):
     if len(projects) == 0:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
     
-    project = Project.model_validate(projects[0])
+    project = ProjectOut.model_validate(projects[0])
     
     # Set some global variables in the app state
-    request.app.project = project
+    request.app.state.project = project
     
     request.app.state.data_pool = DataPool(
         data_loader=DATA_LOADERS[project.data_loader]([]), 
@@ -83,7 +83,7 @@ async def set_project(request: Request, project_id: str):
 @router.delete("/{project_id}")
 async def delete_project(request: Request, project_id: str):
     # Delete this specific project
-    obj_id = convert_to_objectid(project_id)
+    obj_id = convert_to_objectid(project_id, "project")
     
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="projects", 
