@@ -41,7 +41,8 @@ async def add_samples(request: Request, project_id: str, samples: list[Sample]):
 @router.get("/{sample_id}")
 async def get_sample(request: Request, project_id: str, sample_id: str) -> SampleOut:
     # Get sample with this ID
-    sample = await utils.get_sample(sample_id)
+    db_client = request.app.state.db_client
+    sample = await utils.get_sample(db_client, sample_id)
     return sample
 
 

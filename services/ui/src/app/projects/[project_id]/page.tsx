@@ -1,18 +1,14 @@
 "use client";
-import { useEffect, useState, use } from 'react';
+import { use } from 'react';
+import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
 
-
-type BreadCrumbInfo = {
-    project_id: string,
-}
-
-export const BreadCrumbs = (info: BreadCrumbInfo) => {
+export const SampleBreadCrumbs = (info) => {
   return (
       <Provider theme={defaultTheme}>
         <Breadcrumbs>
           <Item key="projects" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}>Projects</Item>
-          <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${info.project_id}`}>Project {info.project_id}</Item>
+          <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${info.project.project_id}`}>Project: {info.project.name}</Item>
         </Breadcrumbs>
       </Provider>
   );
@@ -23,36 +19,13 @@ type SampleTableParams = {
 };
 
 export const SamplesTable = ({project_id}: SampleTableParams) => {
-  const [data, setData] = useState<any>(null);
-  const [projectData, setProjectData] = useState<any>(null);
+  const samples = getSamples(project_id);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples`);
-      const data = await response.json();
-      setData(data);
-    };
-
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
-      const data = await response.json();
-      setProjectData(data);
-    };
-
-    fetchData();
-  }, []);
-
-  if (!data) {
+  if (!samples) {
     return;
   }
 
-  console.log(data);
-
-  const rows = data.map(({ _id, ...rest }) => ({
+  const rows = samples.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id
   }));
@@ -86,9 +59,15 @@ type Props = {
 
 export default function ProjectView({params} : Props) {
   const project_id = use(params).project_id;
+  const project = getProject(project_id);
+
+  if (!project) {
+    return;
+  }
+
   return (
     <div>
-    <BreadCrumbs project_id={project_id} />
+    <SampleBreadCrumbs project={project} />
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
       <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
         <h1 className="text-2xl font-bold mb-4">

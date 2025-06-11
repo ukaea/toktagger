@@ -14,12 +14,6 @@ type DisruptionInfo = {
     values: Record<string, Array<number>>
 }
 
-/**
- * Handles the creation of the zoning and disruption context providers as well as any necessary plots and tables
- * 
- * @param data Time series data relating to the plasma current 
- * @returns 
- */
 export const Disruption = ({ data }: DisruptionInfo) => {
     const zoneCategories: Category[] = [
             { name: "RampUp", color: 'rgb(233, 170, 98)' },

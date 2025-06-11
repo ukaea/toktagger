@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { getProjects } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
 
-export const BreadCrumbs = () => {
+export const ProjectsBreadCrumbs = () => {
   return (
       <Provider theme={defaultTheme}>
         <Breadcrumbs>
@@ -13,23 +13,12 @@ export const BreadCrumbs = () => {
 };
 
 export const ProjectsTable = () => {
-  const [data, setData] = useState<any>(null);
+  const projects = getProjects();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects`);
-      const data = await response.json();
-      setData(data);
-    };
-
-    fetchData();
-  }, []);
-
-  if (!data) {
+  if (!projects) {
     return;
   }
-
-  const rows = data.map(({ _id, ...rest }) => ({
+  const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id
   }));
@@ -65,7 +54,7 @@ export default function Projects() {
 
   return (
     <div>
-      <BreadCrumbs />
+      <ProjectsBreadCrumbs />
       <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">

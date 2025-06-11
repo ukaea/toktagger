@@ -2,20 +2,16 @@
 import {Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
 import { Disruption } from '@/app/disruption/components/disruption';
 import { ElmGraph } from '@/app/elm/components/elms';
-import { useEffect, useState, use } from 'react';
+import { getSample, getProject, getSampleData } from '@/app/core';
+import { use } from 'react';
 
-type BreadCrumbInfo = {
-    project_id: string,
-    sample_id: string
-}
-
-export const BreadCrumbs = (info: BreadCrumbInfo) => {
+export const SampleDataBreadCrumbs = (info) => {
   return (
       <Provider theme={defaultTheme}>
         <Breadcrumbs>
           <Item key="projects" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}>Projects</Item>
-          <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${info.project_id}`}>Project {info.project_id}</Item>
-          <Item key="samples">Sample {info.sample_id}</Item>
+          <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${info.project.project_id}`}>Project: {info.project.name}</Item>
+          <Item key="samples">Sample: {info.sample.shot_id}</Item>
         </Breadcrumbs>
       </Provider>
   );
@@ -33,33 +29,14 @@ type Props = {
   params: { project_id: string, sample_id: string };
 };
 
-
 export default function DisruptionPage({ params }: Props) {
   const props = use(params);
-  const [data, setData] = useState<any>(null);
-  const [projectData, setProjectData] = useState<any>(null);
   const project_id = props.project_id;
   const sample_id = props.sample_id;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`);
-      const data = await response.json();
-      setData(data);
-    };
-
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
-      const data = await response.json();
-      setProjectData(data);
-    };
-
-    fetchData();
-  }, []);
+  const project = getProject(project_id);
+  const sample = getSample(project_id, sample_id);
+  const data = getSampleData(project_id, sample_id);
 
   if (!data) {
     return;
@@ -67,9 +44,9 @@ export default function DisruptionPage({ params }: Props) {
 
   return (
     <div>
-      <BreadCrumbs project_id={project_id} sample_id={sample_id}></BreadCrumbs>
+      <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
       <div className="justify-center">
-        <SampleView project={projectData} data={data}/>
+        <SampleView project={project} data={data}/>
       </div>
     </div>
   );

@@ -1,0 +1,82 @@
+"use client";
+import { useEffect, useState } from 'react';
+
+export const getSamples = (project_id: string) => {
+  const [samples, setSamples] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples`);
+      const data = await response.json();
+      setSamples(data);
+    };
+
+    fetchData();
+  }, []);
+
+  return samples;
+} 
+
+export const getSample = (project_id: string, sample_id: string) => {
+  const [sample, setSample] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
+      const data = await response.json();
+      setSample(data);
+    };
+
+    fetchData();
+  }, []);
+
+  return sample;
+} 
+
+export const getProjects = (project_id: string) => {
+  const [projects, setProjects] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`);
+      const data = await response.json();
+      setProjects(data);
+    };
+
+    fetchData();
+  }, []);
+
+  return projects;
+} 
+
+export const getProject = (project_id: string) => {
+  const [project, setProject] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+      const data = await response.json();
+      setProject(data);
+    };
+
+    fetchData();
+  }, []);
+
+  return project;
+} 
+
+export const getSampleData = (project_id: string, sample_id: string) => {
+  const [sampleData, setSampleData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`);
+      const data = await response.json();
+      setSampleData(data);
+    };
+
+    fetchData();
+  }, []);
+
+  return sampleData;
+} 
