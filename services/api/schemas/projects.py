@@ -5,6 +5,7 @@ from services.api.schemas import ConfiguredModel
 
 class Task(Enum):
     ELM = "ELM"
+    DISRUPTION = "disruption"
     UFO = "UFO"
 
 
@@ -24,6 +25,7 @@ class Project(ConfiguredModel):
     task: Task
     query_strategy: QueryStrategyType
     data_loader: DataLoaderType
+
 
 class ProjectOut(Project):
     id: str = Field(..., alias="_id")

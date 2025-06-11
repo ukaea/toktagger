@@ -1,6 +1,7 @@
 "use client";
 import {Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
 import { Disruption } from '@/app/disruption/components/disruption';
+import { ElmGraph } from '@/app/elm/components/elms';
 import { useEffect, useState, use } from 'react';
 
 type BreadCrumbInfo = {
@@ -20,13 +21,23 @@ export const BreadCrumbs = (info: BreadCrumbInfo) => {
   );
 };
 
+const SampleView = (args) => {
+  if (args.project.task == 'disruption') {
+    return (<Disruption data={args.data}/>);
+  } else if (args.project.task == 'ELM') {
+    return (<ElmGraph data={args.data}/>);
+  }
+}
+
 type Props = {
   params: { project_id: string, sample_id: string };
 };
 
+
 export default function DisruptionPage({ params }: Props) {
   const props = use(params);
   const [data, setData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<any>(null);
   const project_id = props.project_id;
   const sample_id = props.sample_id;
 
@@ -40,6 +51,16 @@ export default function DisruptionPage({ params }: Props) {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+      const data = await response.json();
+      setProjectData(data);
+    };
+
+    fetchData();
+  }, []);
+
   if (!data) {
     return;
   }
@@ -47,8 +68,8 @@ export default function DisruptionPage({ params }: Props) {
   return (
     <div>
       <BreadCrumbs project_id={project_id} sample_id={sample_id}></BreadCrumbs>
-      <div class="justify-center">
-        <Disruption data={data}/>
+      <div className="justify-center">
+        <SampleView project={projectData} data={data}/>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 from typing import Annotated, List, Optional
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import Field
 from services.api.schemas import ConfiguredModel
 from services.api.schemas.annotations import Annotation
 
@@ -26,10 +26,12 @@ class FileData(ConfiguredModel):
     file_name: str
     type: FileType
     protocol: FileProtocol = FileProtocol.LOCAL
-    
+
+
 class TimeSeriesFileData(FileData):
     column_names: Optional[list[str]]
-    
+
+
 class ImageFileData(FileData):
     frame: int
     time: int
@@ -44,7 +46,8 @@ class Sample(ConfiguredModel):
     shot_id: int
     data: FileData | ShotData
     annotations: Optional[List[Annotation]] = None
-    
+
+
 class SampleOut(Sample):
     id: str = Field(..., alias="_id")
     project_id: str
