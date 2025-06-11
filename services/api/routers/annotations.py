@@ -29,14 +29,6 @@ async def delete_all_annotations(request: Request, project_id: str):
     # Delete annotations available for this project across all samples
     await request.app.state.db_client.delete_filtered_documents(collection="annotations", filters={"project_id": project_id})
 
-@router.get("/annotations/next")
-async def get_next_annotation(project_id: str):
-    # Return the next annotation for human validation for this project
-    # Should use the query strategy, which access the database to determine the next sample to annotate
-    # Returns data about the annotation, and also the sample_id and any additional info required (eg camera, frame number)
-    # This should then be passed in to the /data endpoint to get required data for visualisation
-    pass
-
 @router.get("/samples/{sample_id}/annotations", response_model=list[Annotation])
 async def get_annotations(request: Request, project_id: str, sample_id: int, filters: dict = None, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[Annotation]:
     # Return annotations available for this project and sample, if any

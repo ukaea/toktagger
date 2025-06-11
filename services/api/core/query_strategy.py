@@ -13,7 +13,7 @@ class QueryStrategy(ABC):
         self.annotations = annotations
     
     @abstractmethod
-    def next_sample(self) -> Sample:
+    def get_next_sample(self) -> Sample:
         pass
 
 
@@ -23,7 +23,7 @@ class RandomQueryStrategy(QueryStrategy):
     Randomly chooses a sample as the next one to show to the user
     """
 
-    def next_sample(self) -> Sample:
+    def get_next_sample(self) -> Sample:
         if len(self.samples) == 0:
             raise RuntimeError("No more samples to label!")
 
@@ -37,14 +37,14 @@ class SequentialQueryStrategy(QueryStrategy):
     Chooses the next sample from the ordered list of samples
     """
 
-    def next_sample(self) -> Sample:
+    def get_next_sample(self) -> Sample:
         if len(self.samples) == 0:
             raise RuntimeError("No more samples to label!")
 
         return self.samples.pop(0)
 
 class UncertaintyQueryStrategy(QueryStrategy):
-    def next_sample(self) -> Sample:
+    def get_next_sample(self) -> Sample:
         if len(self.samples) == 0:
             raise RuntimeError("No more samples to label!")
 

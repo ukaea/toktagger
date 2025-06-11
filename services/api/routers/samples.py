@@ -57,7 +57,20 @@ async def add_samples(request: Request, project_id: str, samples: list[SampleIn]
     
     return ids
 
-@router.get("/{sample_id}")
+@router.get("/next", response_model=Sample)
+async def get_next_sample(request: Request, project_id: str) -> Sample:
+    # Return the next sample for human validation for this project
+    # Should use the query strategy, which access the database to determine the next sample to annotate
+    # This should then be passed in to the /data endpoint to get required data for visualisation
+    # And the /annotation endpoint to get initial prediction (if available)
+    try:
+        sample = request.app.state.data_pool.query_strategy.get_next_sample()
+    except RuntimeError as e:
+        raise HTTPException(status_code=204, detail=str(e))
+    
+    return sample
+
+@router.get("/{sample_id}", response_model=Sample)
 async def get_sample(request: Request, project_id: str, sample_id: str) -> Sample:
     # Get sample with this ID
     project_obj_id = convert_to_objectid(project_id, "project")
