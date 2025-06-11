@@ -1,4 +1,4 @@
-import numpy as np
+import random
 from abc import ABC, abstractmethod
 
 from services.api.schemas.samples import Sample
@@ -27,7 +27,7 @@ class RandomQueryStrategy(QueryStrategy):
         if len(self.samples) == 0:
             raise RuntimeError("No more samples to label!")
 
-        index = np.random.choice(len(self.samples), replace=False, size=1)
+        index = random.randint(0, len(self.samples) - 1)
         return self.samples.pop(index)
 
 
@@ -50,7 +50,7 @@ class UncertaintyQueryStrategy(QueryStrategy):
 
         if len(self.annotations) == 0:
             print("Warning: No unvalidated annotations available - falling back to random sample selection.")
-            index = np.random.choice(len(self.samples), replace=False, size=1)
+            index = random.randint(0, len(self.samples) - 1)
         else:
             index = -1
         
@@ -60,5 +60,6 @@ class UncertaintyQueryStrategy(QueryStrategy):
     
 QUERY_STRATEGIES = {
     QueryStrategyType.RANDOM: RandomQueryStrategy,
-    QueryStrategyType.SEQUENTIAL: SequentialQueryStrategy
+    QueryStrategyType.SEQUENTIAL: SequentialQueryStrategy,
+    QueryStrategyType.UNCERTAINTY: UncertaintyQueryStrategy
 }

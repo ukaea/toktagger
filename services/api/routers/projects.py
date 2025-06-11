@@ -35,7 +35,7 @@ async def create_project(request: Request, project: ProjectIn):
 async def get_project(request: Request, project_id: str) -> Project:
     # Return information about a specific project
     # Have put project_id as a string for now, but might want to use ShortUUID?
-    obj_id = convert_to_objectid(project_id, "project")
+    obj_id = convert_to_objectid(project_id, "projects")
     
     project = await request.app.state.db_client.get_document_by_id(
         collection="projects", 
@@ -57,7 +57,7 @@ async def set_project(request: Request, project_id: str):
     # TODO ^^
     
     # Get project with that ID:
-    obj_id = convert_to_objectid(project_id, "project")
+    obj_id = convert_to_objectid(project_id, "projects")
 
     projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
@@ -81,14 +81,20 @@ async def set_project(request: Request, project_id: str):
     )
     
     # Then get all non-validated annotations for these samples, sorted by uncertainty:
-    annotations = await request.app.state.db_client.get_filtered_documents(
+    non_validated_annotations = await request.app.state.db_client.get_filtered_documents(
         collection="annotations", 
         filters={"project_id": obj_id, "validated": False},
         sort_by= "uncertainty", 
         sort_direction= 1,
     )
-    sample_models = [Sample.model_validate(sample) for sample in samples]
-    annotation_models = [Annotation.model_validate(annotation) for annotation in annotations]
+    validated_annotations = await request.app.state.db_client.get_filtered_documents(
+        collection="annotations", 
+        filters={"project_id": obj_id, "validated": True},
+    )
+    validated_sample_ids = [validated_annotation["sample_id"] for validated_annotation in validated_annotations]
+
+    sample_models = [Sample.model_validate(sample) for sample in samples if sample["_id"] not in validated_sample_ids]
+    annotation_models = [Annotation.model_validate(annotation) for annotation in non_validated_annotations]
     
     request.app.state.data_pool = DataPool(
         data_loader=DATA_LOADERS[project.data_loader](sample_models), 
@@ -102,7 +108,7 @@ async def set_project(request: Request, project_id: str):
 @router.delete("/{project_id}")
 async def delete_project(request: Request, project_id: str):
     # Delete this specific project
-    obj_id = convert_to_objectid(project_id, "project")
+    obj_id = convert_to_objectid(project_id, "projects")
     
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="projects", 

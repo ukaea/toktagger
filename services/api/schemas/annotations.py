@@ -37,7 +37,8 @@ class VideoBoundingBox(BoundingBox):
 
 class Annotation(AnnotationIn):
     id: str = Field(..., alias="_id")
-    sample_id: int
+    project_id: str
+    sample_id: str
 
 
 class ModelAnnotation(Annotation):

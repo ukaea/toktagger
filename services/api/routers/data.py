@@ -19,8 +19,8 @@ async def get_data(request: Request, project_id: str, sample_id: str) -> Union[D
         raise HTTPException(status_code=409, detail="Server is not setup for this project!")
     
     # Then find that sample in the datbase
-    project_obj_id = convert_to_objectid(project_id, "project")
-    sample_obj_id = convert_to_objectid(sample_id, "sample")
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    sample_obj_id = convert_to_objectid(sample_id, "samples")
     
     if not await request.app.state.db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")

@@ -9,7 +9,7 @@ router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 @router.get("", response_model=list[Sample])
 async def get_samples(request: Request, project_id: str, range_low: int = 0, range_high: int = None) -> list[Sample]:
     # Return a list of all samples for this project and info about them    
-    project_obj_id = convert_to_objectid(project_id, "project")
+    project_obj_id = convert_to_objectid(project_id, "projects")
     
     if not await request.app.state.db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
@@ -32,20 +32,26 @@ async def add_samples(request: Request, project_id: str, samples: list[SampleIn]
     # I'm assuming these will be shot/pulse numbers, hence int, but could be unique ID strings instead
     # Depends if for us a 'sample' will always be a shot/pulse, or if it could be a subset eg a single frame of video
     # Do we also want to allow a single value, or list of specific value?
-    project_obj_id = convert_to_objectid(project_id, "project")
+    project_obj_id = convert_to_objectid(project_id, "projects")
     
     # Remove annotations (if they exist), these will be added later
     all_annotations = [sample.annotations for sample in samples]
-    
+        
     # Insert new samples
     ids = await request.app.state.db_client.insert_many(collection="samples", models=samples, ids={"project_id": project_obj_id})
     
-    all_annotation_ids = [{"project_id": project_obj_id, "sample_id": convert_to_objectid(sample_id, "sample")} for sample_id in ids]
-    annotations, annotation_ids = zip(*[(_ann, _id) for _ann, _id in zip(all_annotations, all_annotation_ids) if _ann is not None])
+    all_ids = [{"project_id": project_obj_id, "sample_id": convert_to_objectid(sample_id, "samples")} for sample_id in ids]
+    
+    annotations, annotation_ids = zip(*[
+        (_ann, _id) 
+        for _ann_list, _id in zip(all_annotations, all_ids) 
+        if _ann_list is not None 
+        for _ann in _ann_list]
+        )
     
     # If there are any annotations provided, insert new annotations
     if annotations:
-        request.app.state.db_client.insert_many(collection="annotations", models=annotations, ids=annotation_ids)
+        await request.app.state.db_client.insert_many(collection="annotations", models=list(annotations), ids=list(annotation_ids))
      
     # If a project has been set, update data pool
     if request.app.state.project:
@@ -57,18 +63,23 @@ async def add_samples(request: Request, project_id: str, samples: list[SampleIn]
             sort_by= "shot_id", 
             sort_direction= 1, 
         )
-        
+
         # Then get all non-validated annotations for these samples, sorted by uncertainty:
-        annotations = await request.app.state.db_client.get_filtered_documents(
+        non_validated_annotations = await request.app.state.db_client.get_filtered_documents(
             collection="annotations", 
             filters={"project_id": project_obj_id, "validated": False},
             sort_by= "uncertainty", 
             sort_direction= 1,
         )
-            
+        validated_annotations = await request.app.state.db_client.get_filtered_documents(
+            collection="annotations", 
+            filters={"project_id": project_obj_id, "validated": False},
+        )
+        validated_sample_ids = [validated_annotation["sample_id"] for validated_annotation in validated_annotations]
+                
         # Update query strategy in the app state with these
-        request.app.state.data_pool.query_strategy.samples = [Sample.model_validate(sample) for sample in samples]
-        request.app.state.data_pool.query_strategy.annotations = [Annotation.model_validate(annotation) for annotation in annotations]
+        request.app.state.data_pool.query_strategy.samples = [Sample.model_validate(sample) for sample in samples if sample["_id"] not in validated_sample_ids]
+        request.app.state.data_pool.query_strategy.annotations = [Annotation.model_validate(annotation) for annotation in non_validated_annotations]
     
     return ids
 
@@ -90,8 +101,8 @@ async def get_next_sample(request: Request, project_id: str) -> Sample:
 @router.get("/{sample_id}", response_model=Sample)
 async def get_sample(request: Request, project_id: str, sample_id: str) -> Sample:
     # Get sample with this ID
-    project_obj_id = convert_to_objectid(project_id, "project")
-    sample_obj_id = convert_to_objectid(sample_id, "sample")
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    sample_obj_id = convert_to_objectid(sample_id, "samples")
     
     if not await request.app.state.db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
@@ -112,8 +123,8 @@ async def remove_sample(request: Request, project_id: str, sample_id: str):
     # Remove samples from the project
     # Dont envisage this actually deleting the data stored about these samples
     # But do we need a separate method for that?
-    project_obj_id = convert_to_objectid(project_id, "project")
-    sample_obj_id = convert_to_objectid(sample_id, "sample")
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    sample_obj_id = convert_to_objectid(sample_id, "samples")
     
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="projects", 

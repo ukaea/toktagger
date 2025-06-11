@@ -13,6 +13,7 @@ class Task(Enum):
 class QueryStrategyType(str, Enum):
     RANDOM = "random"
     SEQUENTIAL = "sequential"
+    UNCERTAINTY = "uncertainty"
 
 
 class DataLoaderType(str, Enum):
