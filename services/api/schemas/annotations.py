@@ -1,15 +1,20 @@
 from typing import Tuple
 from services.api.schemas import ConfiguredModel
-from pydantic import Field
+from pydantic import Field, model_validator
 
 class AnnotationIn(ConfiguredModel):
-    validated: bool = False
-    label: str
+    @model_validator(mode='before')
+    def set_uncertainty(cls, values):
+        if values.get("validated"):
+            values['uncertainty'] = 0
+        elif not values.get("validated") and values.get("uncertainty") is None:
+            values['uncertainty'] = 1
+            
+        return values
     
-class Annotation(AnnotationIn):
-    id: str = Field(..., alias="_id")
-    sample_id: int
-
+    validated: bool = False
+    uncertainty: float = None
+    label: str
 
 class TimePoint(AnnotationIn):
     time: int
@@ -28,3 +33,12 @@ class BoundingBox(AnnotationIn):
 
 class VideoBoundingBox(BoundingBox):
     frame: int
+    
+
+class Annotation(AnnotationIn):
+    id: str = Field(..., alias="_id")
+    sample_id: int
+
+
+class ModelAnnotation(Annotation):
+    uncertainty: float

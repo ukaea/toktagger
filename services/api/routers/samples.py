@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas.samples import SampleIn, Sample
-from services.api.schemas.annotations import AnnotationOut
+from services.api.schemas.annotations import Annotation
 from services.api.schemas import convert_to_objectid
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
@@ -43,15 +43,17 @@ async def add_samples(request: Request, project_id: str, samples: list[SampleIn]
         sort_direction= 1, 
     )
     
-    # Then get all non-validated annotations for these samples:
+    # Then get all non-validated annotations for these samples, sorted by uncertainty:
     annotations = await request.app.state.db_client.get_filtered_documents(
         collection="annotations", 
-        filters={"project_id": project_obj_id, "sample_id": {"$in": [sample["_id"] for sample in samples]}, "validated": False},
+        filters={"project_id": project_obj_id, "validated": False},
+        sort_by= "uncertainty", 
+        sort_direction= 1,
     )
         
     # Update query strategy in the app state with these
     request.app.state.data_pool.query_strategy.samples = [Sample.model_validate(sample) for sample in samples]
-    request.app.state.data_pool.query_strategy.annotations = [AnnotationOut.model_validate(annotation) for annotation in annotations]
+    request.app.state.data_pool.query_strategy.annotations = [Annotation.model_validate(annotation) for annotation in annotations]
     
     return ids
 

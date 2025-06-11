@@ -66,6 +66,7 @@ async def add_annotations(request: Request, project_id: str, sample_id: int, ann
     # This data could be for one or more events per task, ie multiple ELMs or UFOs per pulse
     # This should be added into the database, with validated=True
     return await request.app.state.db_client.insert_many(collection="annotations", models=annotations, ids={"project_id": convert_to_objectid(project_id, "project"), "sample_id": convert_to_objectid(sample_id, "sample")})
+
     
 @router.delete("/samples/{sample_id}/annotations")
 async def remove_annotations(request: Request, project_id: str, sample_id: int):
