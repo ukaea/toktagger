@@ -10,10 +10,8 @@ import { Zones } from "@/app/components/tools/zones"
 import { VSpans } from "@/app/components/tools/vspans"
 
 type DisruptionInfo = {
-    data: Array<{
-        time: number,
-        value: number
-    }>
+    time: Array<number>,
+    values: Record<string, Array<number>>
 }
 
 /**
@@ -43,8 +41,8 @@ export const Disruption = ({ data }: DisruptionInfo) => {
     ]
 
     const plotData: Plotly.Data[] = [{
-            x: data.map(({ time }) => time),
-            y: data.map(({ value }) => value),
+            x: data.time,
+            y: data.values['ip'],
             line: {
                 color: "black"
             },
@@ -70,7 +68,7 @@ export const Disruption = ({ data }: DisruptionInfo) => {
         <div className="flex flex-col items-center space-y-3">
             <header className="p-6">
                 <h1 className="text-4xl font-bold text-center text-gray-900">
-                    Ramp-up / Flat-top / Disruption point Demo
+                    Ip Demo
                 </h1>
             </header>
             <ContextMenuProvider menuId="disruption-menu">
