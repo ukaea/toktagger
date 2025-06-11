@@ -1,11 +1,15 @@
+"use client"
+
 import { Category, VSpan, Zone } from "@/types"
-import { DisruptionPlot } from "./disruption-plot"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { DisruptionTable } from "./disruption-table"
+import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
+import { TimeSeries } from "@/app/components/plots/time-series"
+import { Zones } from "@/app/components/tools/zones"
+import { VSpans } from "@/app/components/tools/vspans"
 
 type DisruptionInfo = {
-
     data: Array<{
         time: number,
         value: number
@@ -38,6 +42,30 @@ export const Disruption = ({ data }: DisruptionInfo) => {
         { x: 0.3, category: disruptionCategories[0] }
     ]
 
+    const plotData: Plotly.Data[] = [{
+            x: data.map(({ time }) => time),
+            y: data.map(({ value }) => value),
+            line: {
+                color: "black"
+            },
+            name: "ip"
+        }];
+    
+    const plotLayout: Partial<Plotly.Layout> = {
+        xaxis: {
+            title: {
+                text: 'Time [s]'
+            },
+        },
+        yaxis: {
+            title: {
+                text: 'Plasma current, ip [A]'
+            },
+        },
+        showlegend: true,
+        dragmode: 'pan',
+    };
+
     return (
         <div className="flex flex-col items-center space-y-3">
             <header className="p-6">
@@ -45,12 +73,17 @@ export const Disruption = ({ data }: DisruptionInfo) => {
                     Ramp-up / Flat-top / Disruption point Demo
                 </h1>
             </header>
-            <VSpanProvider categories={disruptionCategories} initialData={initialDisruption}>
-                <ZoneProvider categories={zoneCategories} initialData={initialZones}>
-                    <DisruptionPlot data={data} zoneCategories={zoneCategories} disruptionCategory={disruptionCategories[0]}/>
-                    <DisruptionTable />
-                </ZoneProvider>
-            </VSpanProvider>
+            <ContextMenuProvider menuId="disruption-menu">
+                <VSpanProvider categories={disruptionCategories} initialData={initialDisruption}>
+                    <ZoneProvider categories={zoneCategories} initialData={initialZones}>
+                        <TimeSeries plotId="Disruption" plotConfig={{data: plotData, layout: plotLayout}}>
+                            <Zones />
+                            <VSpans />
+                        </TimeSeries>
+                        <DisruptionTable />
+                    </ZoneProvider>
+                </VSpanProvider>
+            </ContextMenuProvider>
         </div>
     )
 }
