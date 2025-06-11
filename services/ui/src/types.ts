@@ -19,3 +19,9 @@ export type VSpan = {
   category: Category;
   x: number;
 };
+
+export type ToolingProps = {
+  plotId?: string;
+  plotReady?: boolean;
+  forceUpdate?: number;
+};
