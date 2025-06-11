@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Request
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotators import Annotator
-from services.api.schemas.annotations import Annotation, AnnotationOut
+from services.api.schemas.annotations import AnnotationIn, Annotation
 from services.api.schemas import convert_to_objectid
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Annotations"],
 )
 
-@router.get("/annotations", response_model=list[AnnotationOut])
-async def get_all_annotations(request: Request, project_id: str, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[AnnotationOut]:
+@router.get("/annotations", response_model=list[Annotation])
+async def get_all_annotations(request: Request, project_id: str, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[Annotation]:
     db_filters = {"project_id" : convert_to_objectid(project_id, "project")}
     if validated is not None:
         db_filters["validated"] = validated
@@ -60,7 +60,7 @@ async def get_annotations(request: Request, project_id: str, sample_id: int, fil
     return _annotations
 
 @router.put("/samples/{sample_id}/annotations")
-async def add_annotations(request: Request, project_id: str, sample_id: int, annotations: list[Annotation]):
+async def add_annotations(request: Request, project_id: str, sample_id: int, annotations: list[AnnotationIn]):
     # Add human annotations to this project and sample
     # Again dont know what form this data will take so have set to a Request for now
     # This data could be for one or more events per task, ie multiple ELMs or UFOs per pulse

@@ -2,7 +2,7 @@ from typing import Annotated, List, Optional
 from enum import Enum
 from pydantic import BaseModel, Field
 from services.api.schemas import ConfiguredModel
-from services.api.schemas.annotations import Annotation
+from services.api.schemas.annotations import AnnotationIn
 
 
 class FileType(str, Enum):
@@ -40,11 +40,11 @@ class ShotData(ConfiguredModel):
     signal_names: Annotated[list[str], Field(min_items=1)]
 
 
-class Sample(ConfiguredModel):
+class SampleIn(ConfiguredModel):
     shot_id: int
     data: FileData | ShotData
-    annotations: Optional[List[Annotation]] = None
+    annotations: Optional[List[AnnotationIn]] = None
     
-class SampleOut(Sample):
+class Sample(SampleIn):
     id: str = Field(..., alias="_id")
     project_id: str

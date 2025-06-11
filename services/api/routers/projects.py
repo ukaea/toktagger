@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException
-from services.api.schemas.projects import Project, ProjectOut
+from services.api.schemas.projects import ProjectIn, Project
 from services.api.schemas import convert_to_objectid
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS
@@ -10,7 +10,7 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
 @router.get("")
-async def get_projects(request: Request, range_low: int = 0, range_high: int = None) -> list[ProjectOut]:
+async def get_projects(request: Request, range_low: int = 0, range_high: int = None) -> list[Project]:
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
@@ -23,14 +23,14 @@ async def get_projects(request: Request, range_low: int = 0, range_high: int = N
     return _projects
 
 @router.post("")
-async def create_project(request: Request, project: Project):
+async def create_project(request: Request, project: ProjectIn):
     # Create instance of this project class, instantiating all required classes for that task, and return its ID
     # In the future, should be able to specify eg dataloader, data type, query strategy etc
     _id = await request.app.state.db_client.insert(collection="projects", model=project)
     return {"_id": _id}
 
 @router.get("/{project_id}")
-async def get_project(request: Request, project_id: str) -> ProjectOut:
+async def get_project(request: Request, project_id: str) -> Project:
     # Return information about a specific project
     # Have put project_id as a string for now, but might want to use ShortUUID?
     obj_id = convert_to_objectid(project_id, "project")
@@ -66,7 +66,7 @@ async def set_project(request: Request, project_id: str):
     if len(projects) == 0:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
     
-    project = ProjectOut.model_validate(projects[0])
+    project = Project.model_validate(projects[0])
     
     # Set some global variables in the app state
     request.app.state.project = project

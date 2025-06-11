@@ -19,11 +19,11 @@ class DataLoaderType(str, Enum):
     IMAGE = "image"
 
 
-class Project(ConfiguredModel):
+class ProjectIn(ConfiguredModel):
     name: str
     task: Task
     query_strategy: QueryStrategyType
     data_loader: DataLoaderType
 
-class ProjectOut(Project):
+class Project(ProjectIn):
     id: str = Field(..., alias="_id")
