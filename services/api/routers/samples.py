@@ -11,6 +11,9 @@ async def get_samples(request: Request, project_id: str, range_low: int = 0, ran
     # Return a list of all samples for this project and info about them    
     project_obj_id = convert_to_objectid(project_id, "project")
     
+    if not await request.app.state.db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    
     _samples = await request.app.state.db_client.get_filtered_documents(
         collection="samples", 
         filters={"project_id" : project_obj_id}, 
@@ -31,29 +34,41 @@ async def add_samples(request: Request, project_id: str, samples: list[SampleIn]
     # Do we also want to allow a single value, or list of specific value?
     project_obj_id = convert_to_objectid(project_id, "project")
     
+    # Remove annotations (if they exist), these will be added later
+    all_annotations = [sample.annotations for sample in samples]
+    
     # Insert new samples
     ids = await request.app.state.db_client.insert_many(collection="samples", models=samples, ids={"project_id": project_obj_id})
     
-    # Update the query strategy with the new list of samples that can be considered
-    # Get all samples which can be considered - sort by shot ID
-    samples = await request.app.state.db_client.get_filtered_documents(
-        collection="samples", 
-        filters={"project_id": project_obj_id},
-        sort_by= "shot_id", 
-        sort_direction= 1, 
-    )
+    all_annotation_ids = [{"project_id": project_obj_id, "sample_id": convert_to_objectid(sample_id, "sample")} for sample_id in ids]
+    annotations, annotation_ids = zip(*[(_ann, _id) for _ann, _id in zip(all_annotations, all_annotation_ids) if _ann is not None])
     
-    # Then get all non-validated annotations for these samples, sorted by uncertainty:
-    annotations = await request.app.state.db_client.get_filtered_documents(
-        collection="annotations", 
-        filters={"project_id": project_obj_id, "validated": False},
-        sort_by= "uncertainty", 
-        sort_direction= 1,
-    )
+    # If there are any annotations provided, insert new annotations
+    if annotations:
+        request.app.state.db_client.insert_many(collection="annotations", models=annotations, ids=annotation_ids)
+     
+    # If a project has been set, update data pool
+    if request.app.state.project:
+        # Update the query strategy with the new list of samples that can be considered
+        # Get all samples which can be considered - sort by shot ID
+        samples = await request.app.state.db_client.get_filtered_documents(
+            collection="samples", 
+            filters={"project_id": project_obj_id},
+            sort_by= "shot_id", 
+            sort_direction= 1, 
+        )
         
-    # Update query strategy in the app state with these
-    request.app.state.data_pool.query_strategy.samples = [Sample.model_validate(sample) for sample in samples]
-    request.app.state.data_pool.query_strategy.annotations = [Annotation.model_validate(annotation) for annotation in annotations]
+        # Then get all non-validated annotations for these samples, sorted by uncertainty:
+        annotations = await request.app.state.db_client.get_filtered_documents(
+            collection="annotations", 
+            filters={"project_id": project_obj_id, "validated": False},
+            sort_by= "uncertainty", 
+            sort_direction= 1,
+        )
+            
+        # Update query strategy in the app state with these
+        request.app.state.data_pool.query_strategy.samples = [Sample.model_validate(sample) for sample in samples]
+        request.app.state.data_pool.query_strategy.annotations = [Annotation.model_validate(annotation) for annotation in annotations]
     
     return ids
 
@@ -63,10 +78,12 @@ async def get_next_sample(request: Request, project_id: str) -> Sample:
     # Should use the query strategy, which access the database to determine the next sample to annotate
     # This should then be passed in to the /data endpoint to get required data for visualisation
     # And the /annotation endpoint to get initial prediction (if available)
+    if not request.app.state.project:
+        raise HTTPException(status_code=400, detail="You must setup a project first!")
     try:
         sample = request.app.state.data_pool.query_strategy.get_next_sample()
     except RuntimeError as e:
-        raise HTTPException(status_code=204, detail=str(e))
+        raise HTTPException(status_code=204, detail="No more samples available!")
     
     return sample
 
@@ -75,6 +92,9 @@ async def get_sample(request: Request, project_id: str, sample_id: str) -> Sampl
     # Get sample with this ID
     project_obj_id = convert_to_objectid(project_id, "project")
     sample_obj_id = convert_to_objectid(sample_id, "sample")
+    
+    if not await request.app.state.db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
     samples = await request.app.state.db_client.get_filtered_documents(
         collection="samples", 

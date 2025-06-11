@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.data import Data, ImageData
+from services.api.schemas.data import Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData
 from services.api.schemas.samples import Sample
 from typing import Union
 
 router = APIRouter(prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"])
 
 
-@router.get("", response_model=Union[Data, ImageData])
-async def get_data(request: Request, project_id: str, sample_id: str) -> Union[Data, ImageData]:
+@router.get("", response_model=Union[Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData])
+async def get_data(request: Request, project_id: str, sample_id: str) -> Union[Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData]:
     # Get data, eg time trace, about the given sample required for the given project
     
     # First check that the project being queried here is the one we are set up for
@@ -21,6 +21,11 @@ async def get_data(request: Request, project_id: str, sample_id: str) -> Union[D
     # Then find that sample in the datbase
     project_obj_id = convert_to_objectid(project_id, "project")
     sample_obj_id = convert_to_objectid(sample_id, "sample")
+    
+    if not await request.app.state.db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    if not await request.app.state.db_client.get_document_by_id("samples",sample_obj_id):
+        raise HTTPException(status_code=404, detail="Sample not found with that ID.")
 
     samples = await request.app.state.db_client.get_filtered_documents(
         collection="samples", 

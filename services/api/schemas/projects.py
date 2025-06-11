@@ -1,6 +1,8 @@
 from pydantic import Field
+from typing import Optional, List
 from enum import Enum
 from services.api.schemas import ConfiguredModel
+from services.api.schemas.samples import SampleIn
 
 
 class Task(Enum):

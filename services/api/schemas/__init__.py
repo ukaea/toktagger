@@ -21,5 +21,5 @@ def convert_to_objectid(id: str, collection: str):
     try:
         obj_id = ObjectId(id)
     except InvalidId as e:
-        raise HTTPException(status_code=400, detail=f"{collection.title()} ID is not valid.")
+        raise HTTPException(status_code=400, detail=f"{collection[:-1].title()} ID is not valid.")
     return obj_id

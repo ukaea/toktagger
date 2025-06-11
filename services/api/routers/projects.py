@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas.projects import ProjectIn, Project
+from services.api.schemas.annotations import Annotation
+from services.api.schemas.samples import Sample
 from services.api.schemas import convert_to_objectid
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS
@@ -35,15 +37,14 @@ async def get_project(request: Request, project_id: str) -> Project:
     # Have put project_id as a string for now, but might want to use ShortUUID?
     obj_id = convert_to_objectid(project_id, "project")
     
-    projects = await request.app.state.db_client.get_filtered_documents(
+    project = await request.app.state.db_client.get_document_by_id(
         collection="projects", 
-        filters={"_id": obj_id}
+        object_id = obj_id
     )
-    
-    if len(projects) == 0:
+    if not project:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
     
-    return projects[0]
+    return project
 
 
 @router.put("/{project_id}")
@@ -71,9 +72,27 @@ async def set_project(request: Request, project_id: str):
     # Set some global variables in the app state
     request.app.state.project = project
     
+    # Get all samples which can be considered - sort by shot ID
+    samples = await request.app.state.db_client.get_filtered_documents(
+        collection="samples", 
+        filters={"project_id": obj_id},
+        sort_by= "shot_id", 
+        sort_direction= 1, 
+    )
+    
+    # Then get all non-validated annotations for these samples, sorted by uncertainty:
+    annotations = await request.app.state.db_client.get_filtered_documents(
+        collection="annotations", 
+        filters={"project_id": obj_id, "validated": False},
+        sort_by= "uncertainty", 
+        sort_direction= 1,
+    )
+    sample_models = [Sample.model_validate(sample) for sample in samples]
+    annotation_models = [Annotation.model_validate(annotation) for annotation in annotations]
+    
     request.app.state.data_pool = DataPool(
-        data_loader=DATA_LOADERS[project.data_loader]([]), 
-        query_strategy=QUERY_STRATEGIES[project.query_strategy]([], [])
+        data_loader=DATA_LOADERS[project.data_loader](sample_models), 
+        query_strategy=QUERY_STRATEGIES[project.query_strategy](sample_models, annotation_models)
         )
     
     # TODO: Add annotator etc based on task?

@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from services.api.schemas import ConfiguredModel
 from pydantic import Field, model_validator
 
@@ -13,7 +13,7 @@ class AnnotationIn(ConfiguredModel):
         return values
     
     validated: bool = False
-    uncertainty: float = None
+    uncertainty: Optional[float] = None
     label: str
 
 class TimePoint(AnnotationIn):

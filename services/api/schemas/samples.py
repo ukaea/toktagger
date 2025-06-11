@@ -39,12 +39,13 @@ class ShotData(ConfiguredModel):
     protocol: ShotProtocol
     signal_names: Annotated[list[str], Field(min_items=1)]
 
-
-class SampleIn(ConfiguredModel):
+class SampleBase(ConfiguredModel):
     shot_id: int
     data: FileData | ShotData
+
+class SampleIn(SampleBase):
     annotations: Optional[List[AnnotationIn]] = None
     
-class Sample(SampleIn):
+class Sample(SampleBase):
     id: str = Field(..., alias="_id")
     project_id: str
