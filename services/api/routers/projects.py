@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Query, Path
 from services.api.schemas.projects import ProjectIn, Project
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.samples import Sample
@@ -11,28 +11,64 @@ from services.api.core.query_strategy import QUERY_STRATEGIES
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
-@router.get("")
-async def get_projects(request: Request, range_low: int = 0, range_high: int = None) -> list[Project]:
+@router.get(
+    "", 
+    responses={
+        200: {"description": "Returns a list of available Projects."},
+        }
+    )
+async def get_projects(
+    request: Request, 
+    start: int = Query(0, description="Index of the first project you want returned when sorted newest - oldest"), 
+    end: int = Query(None, description="Index of the last project you want returned when sorted newest - oldest, leave blank to return all entries")
+    ) -> list[Project]:
+    """
+    Get a list of all available projects.
+    -------------------------------------
+    """
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects", 
         sort_by="timestamp", 
         sort_direction=-1, 
-        start=range_low, 
-        limit = range_high - range_low + 1 if range_high is not None else 0
+        start=start, 
+        limit = end - start + 1 if end is not None else 0
         )
         
     return _projects
 
-@router.post("")
-async def create_project(request: Request, project: ProjectIn):
+@router.post(
+    "",
+    responses = {
+        200: {"description": "Project has been created successfully, returning the Project's ID."},
+    })
+async def create_project(
+    request: Request, 
+    project: ProjectIn
+    ):
+    """
+    Create a new project.
+    ---------------------
+    """
     # Create instance of this project class, instantiating all required classes for that task, and return its ID
     # In the future, should be able to specify eg dataloader, data type, query strategy etc
     _id = await request.app.state.db_client.insert(collection="projects", model=project)
     return {"_id": _id}
 
-@router.get("/{project_id}")
-async def get_project(request: Request, project_id: str) -> Project:
+@router.get(
+    "/{project_id}",
+        responses = {
+        200: {"description": "Project has been retrieved successfully."},
+        404: {"description": "Project not found with that ID."},
+    })
+async def get_project(
+    request: Request, 
+    project_id: str = Path(description="The ID of the project to return")
+    ) -> Project:
+    """
+    Get a single project using its ID.
+    -----------------------------------
+    """
     # Return information about a specific project
     # Have put project_id as a string for now, but might want to use ShortUUID?
     obj_id = convert_to_objectid(project_id, "projects")
@@ -47,8 +83,20 @@ async def get_project(request: Request, project_id: str) -> Project:
     return project
 
 
-@router.put("/{project_id}")
-async def set_project(request: Request, project_id: str):
+@router.put(
+    "/{project_id}",
+    responses = {
+        200: {"description": "Project has been successfully set as the active project."},
+        404: {"description": "Project not found with that ID."},
+    })
+async def set_project(
+    request: Request, 
+    project_id: str = Path(description="The ID of the project to activate")
+    ):
+    """
+    Set a project as the active project using its ID.
+    --------------------------------------------------
+    """
     # This is not a complete solution, but I'm going to go for this to get a MVP going
     # This endpoint is used to select which project we want to use for all subsequent API calls
     # Defines the data pool, data loader, annotator, etc etc
@@ -105,8 +153,20 @@ async def set_project(request: Request, project_id: str):
     
 
 
-@router.delete("/{project_id}")
-async def delete_project(request: Request, project_id: str):
+@router.delete(
+    "/{project_id}",
+    responses = {
+        200: {"description": "Project has been successfully deleted."},
+        404: {"description": "Project not found with that ID."},
+    })
+async def delete_project(
+    request: Request, 
+    project_id: str = Path(description="The ID of the project to delete")
+    ):
+    """
+    Permanently delete a project.
+    -----------------------------
+    """
     # Delete this specific project
     obj_id = convert_to_objectid(project_id, "projects")
     

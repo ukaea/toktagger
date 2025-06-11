@@ -8,7 +8,7 @@ router = APIRouter(prefix="/projects/{project_id}", tags=["Annotations"],
 )
 
 @router.get("/annotations", response_model=list[Annotation])
-async def get_all_annotations(request: Request, project_id: str, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[Annotation]:    
+async def get_all_annotations(request: Request, project_id: str, start: int = 0, end: int = None, validated: bool = None) -> list[Annotation]:    
     db_filters = {"project_id" : convert_to_objectid(project_id, "projects")}
     if validated is not None:
         db_filters["validated"] = validated
@@ -21,8 +21,8 @@ async def get_all_annotations(request: Request, project_id: str, range_low: int 
         filters=db_filters, 
         sort_by="timestamp", 
         sort_direction=-1, 
-        start=range_low, 
-        limit = range_high - range_low + 1 if range_high is not None else 0
+        start=start, 
+        limit = end - start + 1 if end is not None else 0
         )
     
     return _annotations
@@ -33,7 +33,7 @@ async def delete_all_annotations(request: Request, project_id: str):
     await request.app.state.db_client.delete_filtered_documents(collection="annotations", filters={"project_id": project_id})
 
 @router.get("/samples/{sample_id}/annotations", response_model=list[Annotation])
-async def get_annotations(request: Request, project_id: str, sample_id: str, range_low: int = 0, range_high: int = None, validated: bool = None) -> list[Annotation]:
+async def get_annotations(request: Request, project_id: str, sample_id: str, start: int = 0, end: int = None, validated: bool = None) -> list[Annotation]:
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
     # Should return whether these are validated as a boolean
@@ -51,8 +51,8 @@ async def get_annotations(request: Request, project_id: str, sample_id: str, ran
         filters=db_filters, 
         sort_by="timestamp", 
         sort_direction=-1, 
-        start=range_low, 
-        limit = range_high - range_low + 1 if range_high is not None else 0
+        start=start, 
+        limit = end - start + 1 if end is not None else 0
         )
     
     return _annotations

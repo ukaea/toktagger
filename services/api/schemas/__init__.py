@@ -4,7 +4,7 @@ from datetime import datetime
 from bson.errors import InvalidId
 from fastapi import HTTPException
 class ConfiguredModel(BaseModel):
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now, description="Time when this object was created, leave blank to automatically generate.")
     @model_validator(mode='before')
     def convert_objectid(cls, values):
         for key in ("_id", "project_id", "sample_id"):

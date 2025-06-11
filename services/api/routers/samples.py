@@ -7,7 +7,7 @@ router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
 
 @router.get("", response_model=list[Sample])
-async def get_samples(request: Request, project_id: str, range_low: int = 0, range_high: int = None) -> list[Sample]:
+async def get_samples(request: Request, project_id: str, start: int = 0, end: int = None) -> list[Sample]:
     # Return a list of all samples for this project and info about them    
     project_obj_id = convert_to_objectid(project_id, "projects")
     
@@ -19,8 +19,8 @@ async def get_samples(request: Request, project_id: str, range_low: int = 0, ran
         filters={"project_id" : project_obj_id}, 
         sort_by="timestamp", 
         sort_direction=-1, 
-        start=range_low, 
-        limit = range_high - range_low + 1 if range_high is not None else 0
+        start=start, 
+        limit = end - start + 1 if end is not None else 0
         )
     
     return _samples
@@ -45,7 +45,7 @@ async def add_samples(request: Request, project_id: str, samples: list[SampleIn]
     annotations, annotation_ids = zip(*[
         (_ann, _id) 
         for _ann_list, _id in zip(all_annotations, all_ids) 
-        if _ann_list is not None 
+        if _ann_list
         for _ann in _ann_list]
         )
     
