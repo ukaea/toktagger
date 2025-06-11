@@ -2,12 +2,14 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 from services.api.schemas.samples import Sample
+from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import QueryStrategyType
 
 class QueryStrategy(ABC):
-    def __init__(self, samples: list[Sample]):
+    def __init__(self, samples: list[Sample], annotations: list[Annotation]):
         self.samples = samples
-
+        self.annotations = annotations
+    
     @abstractmethod
     def next_sample_index(self):
         pass

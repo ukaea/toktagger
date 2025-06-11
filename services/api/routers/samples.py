@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas.samples import Sample, SampleOut
+from services.api.schemas.annotations import AnnotationOut
 from services.api.schemas import convert_to_objectid
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
@@ -28,7 +29,31 @@ async def add_samples(request: Request, project_id: str, samples: list[Sample]):
     # I'm assuming these will be shot/pulse numbers, hence int, but could be unique ID strings instead
     # Depends if for us a 'sample' will always be a shot/pulse, or if it could be a subset eg a single frame of video
     # Do we also want to allow a single value, or list of specific value?
-    return await request.app.state.db_client.insert_many(collection="samples", models=samples, ids={"project_id": convert_to_objectid(project_id, "project")})
+    project_obj_id = convert_to_objectid(project_id, "project")
+    
+    # Insert new samples
+    ids = await request.app.state.db_client.insert_many(collection="samples", models=samples, ids={"project_id": project_obj_id})
+    
+    # Update the query strategy with the new list of samples that can be considered
+    # Get all samples which can be considered - sort by shot ID
+    samples = await request.app.state.db_client.get_filtered_documents(
+        collection="samples", 
+        filters={"project_id": project_obj_id},
+        sort_by= "shot_id", 
+        sort_direction= 1, 
+    )
+    
+    # Then get all non-validated annotations for these samples:
+    annotations = await request.app.state.db_client.get_filtered_documents(
+        collection="annotations", 
+        filters={"project_id": project_obj_id, "sample_id": {"$in": [sample["_id"] for sample in samples]}, "validated": False},
+    )
+        
+    # Update query strategy in the app state with these
+    request.app.state.data_pool.query_strategy.samples = [SampleOut.model_validate(sample) for sample in samples]
+    request.app.state.data_pool.query_strategy.annotations = [AnnotationOut.model_validate(annotation) for annotation in annotations]
+    
+    return ids
 
 @router.get("/{sample_id}")
 async def get_sample(request: Request, project_id: str, sample_id: str) -> SampleOut:
@@ -38,7 +63,7 @@ async def get_sample(request: Request, project_id: str, sample_id: str) -> Sampl
 
     samples = await request.app.state.db_client.get_filtered_documents(
         collection="samples", 
-        filters={"_id": sample_obj_id}
+        filters={"_id": sample_obj_id, "project_id": project_obj_id}
     )
     
     if len(samples) == 0:

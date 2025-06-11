@@ -73,7 +73,7 @@ async def set_project(request: Request, project_id: str):
     
     request.app.state.data_pool = DataPool(
         data_loader=DATA_LOADERS[project.data_loader]([]), 
-        query_strategy=QUERY_STRATEGIES[project.query_strategy]([])
+        query_strategy=QUERY_STRATEGIES[project.query_strategy]([], [])
         )
     
     # TODO: Add annotator etc based on task?
