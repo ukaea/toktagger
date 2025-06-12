@@ -36,7 +36,7 @@ export const TimeSeries = ({
         config = {
             displaylogo: false,
             displayModeBar: true,
-            scrollZoom: true
+            scrollZoom: false
         }
     }, 
     children
