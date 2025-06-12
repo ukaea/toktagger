@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Path
 from services.api.schemas import convert_to_objectid
 from services.api.schemas.data import Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData
 from services.api.schemas.samples import Sample
@@ -7,8 +7,23 @@ from typing import Union
 router = APIRouter(prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"])
 
 
-@router.get("", response_model=Union[Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData])
-async def get_data(request: Request, project_id: str, sample_id: str) -> Union[Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData]:
+@router.get(
+    "", 
+    response_model=Union[Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData],
+    responses = {
+        200: {"description": "Project has been retrieved successfully."},
+        404: {"description": "Project not found with that ID."},
+        409: {"description": "Server has not been setup to process the specified project."}
+    })
+async def get_data(
+    request: Request, 
+    project_id: str = Path(description="The ID of the project to retrieve data from."), 
+    sample_id: str = Path(description="The ID of the sample to retrieve data for.")
+    ) -> Union[Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData]:
+    """
+    Return data from the specified sample for display.
+    --------------------------------------------------
+    """
     # Get data, eg time trace, about the given sample required for the given project
     
     # First check that the project being queried here is the one we are set up for
@@ -45,16 +60,24 @@ async def get_data(request: Request, project_id: str, sample_id: str) -> Union[D
 
 @router.put("")
 async def add_data(project_id: str, sample_id: str, request: Request) -> Union[Data, ImageData]:
+    """
+    Endpoint not implemented
+    ------------------------
+    """
     # Add some data for this sample for a given project
     # Eg, could upload a CSV of time trace data for a certain pulse via the web UI
     # Have set the request as just a Request body, because I dont (yet) know what format that needs to be
-    pass
+    raise HTTPException(status_code=501, detail="Endpoint not implemented")
 
 
 @router.delete("")
 async def delete_data(project_id: str, sample_id: str, params: Sample = None) -> Union[Data, ImageData]:
+    """
+    Endpoint not implemented
+    ------------------------
+    """
     # Delete data for this sample from this project
     # Not sure if we really need this, but might be nice in case you have a sample which is junk in your dataset
     # Ie the images are all black because the camera failed, etc
     # What if the same data is in use by multiple projects?
-    pass
+    raise HTTPException(status_code=501, detail="Endpoint not implemented")
