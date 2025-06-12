@@ -28,7 +28,6 @@ export const Zones = ({
 
     // Main rendering effect
     useEffect(() => {
-        console.log("Render Zones: ", plotReady, plotId)
         // This shall not run until the target plot is initialised
         if (!plotId || !plotReady || forceUpdate === undefined) {
             return
