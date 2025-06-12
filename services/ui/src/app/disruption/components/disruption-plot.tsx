@@ -9,8 +9,8 @@ import { useEffect, useRef, useState } from "react"
 type DisruptionPlotProps = {
     plotId?: string;
     data: TimeSeriesData;
-    zoneCategories: Category[];
-    disruptionCategory: Category;
+  //  zoneCategories: Category[];
+  //  disruptionCategory: Category;
 }
 
 /**
@@ -21,7 +21,7 @@ type DisruptionPlotProps = {
  * @param zoneCategories Zone categories to display in context menu
  * @param disruptionCategory Category relating to disruption
  */
-export const DisruptionPlot = ({data, plotId: externalId, zoneCategories, disruptionCategory} : DisruptionPlotProps) => {
+export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps) => {
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
 
@@ -162,9 +162,11 @@ export const DisruptionPlot = ({data, plotId: externalId, zoneCategories, disrup
                 event,
                 props: {
                     // legacy props
-                    x, y, xScale, yScale, x0, x1,
+                    //x, y, xScale, yScale, x0, x1,
+                    x, y,  //click in data units
+                    x0, x1, // 100-px legacy slice 
                     // new generic props
-                    relX, relY, xRange, yRange
+                    xRange, yRange, xLimits: [xMin,xMax], yLimits: [yMin,yMax]
                 }
             })
         }
