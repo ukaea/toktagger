@@ -188,13 +188,15 @@ export const ElmGraph = ({data} : GraphProps) => {
                     ELM Tagging Demo
                 </h1>
             </header>
-            <ContextMenuProvider menuId="elm-menu">
-                <ZoneProvider categories={zoneCategories} initialData={[]}>
-                    <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>
-                        <Zones />
-                    </TimeSeries>
-                </ZoneProvider>
-            </ContextMenuProvider>
+            <div className="text-center">
+                <ContextMenuProvider menuId="elm-menu">
+                    <ZoneProvider categories={zoneCategories} initialData={[]}>
+                        <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>
+                            <Zones />
+                        </TimeSeries>
+                    </ZoneProvider>
+                </ContextMenuProvider>
+            </div>
         </div>
     )
 }
