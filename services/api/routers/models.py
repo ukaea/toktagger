@@ -1,4 +1,10 @@
 from fastapi import APIRouter, Request
+from services.api.core.annotators import FindPeaksAnnotator
+from services.api.core.data_loaders import DATA_LOADERS
+from services.api.crud import utils
+from services.api.crud.utils import get_project
+from services.api.schemas.annotations import TimeRegion
+from services.api.schemas.annotators import Annotator, FindPeaksParams
 from services.api.schemas.models import Model
 
 router = APIRouter(prefix="/projects/{project_id}/models", tags=["Models"])
@@ -65,8 +71,32 @@ async def predict(project_id: str, model_id: str):
     pass
 
 
+@router.post("/{model_id}/predict/{sample_id}")
+async def predict_sample(
+    request: Request,
+    project_id: str,
+    model_id: str,
+    sample_id: str,
+    params: FindPeaksParams,
+) -> list[TimeRegion]:
+    db_client = request.app.state.db_client
+
+    project = await utils.get_project(db_client, project_id)
+    sample = await utils.get_sample(db_client, sample_id)
+
+    data_loader = DATA_LOADERS[project.data_loader]()
+    data_item = data_loader.get_sample(sample)
+
+    tagger = FindPeaksAnnotator(params)
+    annotations = tagger.predict(data_item)
+
+    return annotations
+
+
 @router.get("/{model_id}/predict")
-async def get_predictions(project_id: str, model_id: str):
+async def get_predictions(
+    request: Request, project_id: str, model_id: str, params: Annotator
+):
     # Get predictions made using the given model for this project
     # Predict on samples as specified by filters
     pass

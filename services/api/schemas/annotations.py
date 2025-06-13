@@ -2,10 +2,12 @@ from typing import Tuple
 from services.api.schemas import ConfiguredModel
 from pydantic import Field
 
+
 class Annotation(ConfiguredModel):
     validated: bool = False
     label: str
-    
+
+
 class AnnotationOut(Annotation):
     id: str = Field(..., alias="_id")
     sample_id: int

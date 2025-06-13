@@ -11,7 +11,14 @@ type GraphProps = {
     values: Record<string, Array<number>>
 }
 
-export const ElmGraph = ({data} : GraphProps) => {
+type Annotations = Array<{
+    timestamp: string,
+    time_min: number,
+    time_max: number,
+    label: string, 
+}>;
+
+export const ElmGraph = ({data, annotations}) => {
     var dataTrace = {
         name: 'Dalpha',
         x: data.time,
@@ -175,11 +182,7 @@ export const ElmGraph = ({data} : GraphProps) => {
             { name: "ELM", color: 'rgb(233, 170, 98)' },
         ]
 
-    const initialZones: Zone[] = [
-        { x0: 0.05, x1: 0.1, category: zoneCategories[0] },
-        { x0: 0.15, x1: 0.2, category: zoneCategories[1] },
-    ]
-
+    const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
 
     return (
         <div className="flex flex-col items-center space-y-3">
@@ -190,7 +193,7 @@ export const ElmGraph = ({data} : GraphProps) => {
             </header>
             <div className="text-center">
                 <ContextMenuProvider menuId="elm-menu">
-                    <ZoneProvider categories={zoneCategories} initialData={[]}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones}>
                         <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>
                             <Zones />
                         </TimeSeries>

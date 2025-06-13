@@ -4,6 +4,7 @@ import { Disruption } from '@/app/disruption/components/disruption';
 import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
 import { use } from 'react';
+import { useEffect, useState } from 'react';
 
 export const SampleDataBreadCrumbs = (info) => {
   return (
@@ -21,7 +22,7 @@ const SampleView = (args) => {
   if (args.project.task == 'disruption') {
     return (<Disruption data={args.data}/>);
   } else if (args.project.task == 'ELM') {
-    return (<ElmGraph data={args.data}/>);
+    return (<ElmGraph data={args.data} annotations={args.annotations}/>);
   }
 }
 
@@ -38,6 +39,28 @@ export default function DisruptionPage({ params }: Props) {
   const sample = getSample(project_id, sample_id);
   const data = getSampleData(project_id, sample_id);
 
+  const [annotations, setAnnotations] = useState<any>(null);
+
+  useEffect(() => {
+      const fetchData = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/models/abc/predict/${sample_id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+              prominence: 0.5,
+              distance: 1
+          }),
+      });
+      const data = await response.json();
+      setAnnotations(data);
+      };
+
+      fetchData();
+  }, []);
+
+
   if (!data) {
     return;
   }
@@ -46,7 +69,7 @@ export default function DisruptionPage({ params }: Props) {
     <div>
       <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
       <div className="justify-center">
-        <SampleView project={project} data={data}/>
+        <SampleView project={project} data={data} annotations={annotations}/>
       </div>
     </div>
   );

@@ -9,12 +9,10 @@ class DataTypes(Enum):
 
 
 class Annotator(BaseModel):
-    supported_datatypes: List[
-        DataTypes
-    ]  # This is just a placeholder, not sure what this would need?
+    pass
 
 
-class FindPeaks(Annotator):
+class FindPeaksParams(Annotator):
     prominence: float
     distance: int
 
