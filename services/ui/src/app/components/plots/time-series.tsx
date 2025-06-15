@@ -1,16 +1,25 @@
 "use client"
 
 import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { VSpans } from "@/app/components/tools/vspans"
-import { Zones } from "@/app/components/tools/zones"
-import { Category, TimeSeriesData } from "@/types"
-import { useEffect, useRef, useState } from "react"
+import { Config, Layout, Data } from "plotly.js"
+import React, { useEffect, useRef, useState } from "react"
+
+type InjectedProps = {
+    plotId: string;
+    plotReady: boolean;
+    forceUpdate: number;
+}
+
+interface PlotConfiguration {
+    data: Data[],
+    layout: Partial<Layout>,
+    config?: Partial<Config>
+}
 
 type DisruptionPlotProps = {
     plotId?: string;
-    data: TimeSeriesData;
-    zoneCategories: Category[];
-    disruptionCategory: Category;
+    plotConfig: PlotConfiguration;
+    children: React.ReactElement<InjectedProps> | React.ReactElement<InjectedProps>[]
 }
 
 /**
@@ -18,19 +27,31 @@ type DisruptionPlotProps = {
  * 
  * @param data Disruption time series data
  * @param plotId Set plot id externally in case multiple plots are used
- * @param zoneCategories Zone categories to display in context menu
- * @param disruptionCategory Category relating to disruption
  */
-export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps) => {
+export const TimeSeries = ({
+    plotId: externalId,
+    plotConfig: {
+        data,
+        layout,
+        config = {
+            displaylogo: false,
+            displayModeBar: true,
+            scrollZoom: true
+        }
+    }, 
+    children
+} : DisruptionPlotProps) => {
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
 
     const plotId =  externalId || "disruption" // Facilitate an external or default ID
-    const time = useRef(data.map(({ time }) => time));
-    const value = useRef(data.map(({ value }) => value));
 
     const {show: showContextMenu} = useContextMenuProvider()
     const showContextMenuRef = useRef(showContextMenu)
+
+    const dataRef = useRef(data)
+    const layoutRef = useRef(layout)
+    const configRef = useRef(config)
 
     const triggerToolUpdate = () => {
         setUpdateTools((current) => (current + 1) % 100)
@@ -45,57 +66,39 @@ export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps)
             return
         }
 
-        const plotData: Plotly.Data[] = [{
-            x: time.current,
-            y: value.current,
-            line: {
-                color: "black"
-            },
-            name: "ip"
-        }];
-    
-        const plotLayout: Partial<Plotly.Layout> = {
-            xaxis: {
-                title: {
-                    text: 'Time [s]'
-                },
-            },
-            yaxis: {
-                title: {
-                    text: 'Plasma current, ip [A]'
-                },
-            },
-            showlegend: true,
-            dragmode: 'pan',
-        };
-    
-        const plotConfig: Partial<Plotly.Config> = {
-            displaylogo: false,
-            displayModeBar: true,
-            scrollZoom: false,
-        }
-
         let plotElement: Plotly.PlotlyHTMLElement | null = null // holds the created plot for later cleanup
+
+        const overplots: string[] = [];
 
         const initGraph = async () => {
             const { react } = await import('plotly.js') // Annoyingly there seems to be an issue with plotly so dynamic import is needed
 
-            react(root, plotData, plotLayout, plotConfig).then((plot: Plotly.PlotlyHTMLElement) => {
+            react(root, dataRef.current, layoutRef.current, configRef.current).then((plot: Plotly.PlotlyHTMLElement) => {
                 plotElement = plot // save reference to remove listeners later
 
-                const subplot = plot.querySelector(".overplot")?.querySelector(".xy") as HTMLElement
-                if (!subplot) {
-                    console.error("Cannot locate disruption plotly subplot")
-                    return
-                }
+                // Get all subplot elements and extract the subplot name (xy for example) from the class list
+                const subplots = plot.querySelectorAll(".subplot")
+                const subplotNames = [...subplots].map(el => 
+                    [...el.classList].find(cls => cls !== "subplot")
+                )
 
-                if (!subplot.querySelector(`.${plotId}-overplot`)) { // ensure only one custom overlay group is present
-                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "g")
-                    svg.setAttribute("class", `${plotId}-overplot`)
-                    svg.setAttribute("fill", "none");
-                    subplot.appendChild(svg)
-                }
+                // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
+                subplotNames.forEach(coordinateSystem => {
+                    const subplot = plot.querySelector(`.subplot.${coordinateSystem}`)?.querySelector(".overplot")?.querySelector(`.${coordinateSystem}`) as HTMLElement
+                    if (!subplot) {
+                        console.error("Cannot locate disruption plotly subplot")
+                        return
+                    }
 
+                    if (!subplot.querySelector(`.${plotId}-overplot-${coordinateSystem}`)) { // ensure only one custom overlay group is present
+                        const svg = document.createElementNS("http://www.w3.org/2000/svg", "g")
+                        svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`)
+                        svg.setAttribute("fill", "none");
+                        subplot.appendChild(svg)
+                        overplots.push(`${plotId}-overplot-${coordinateSystem}`) // Store overplots for removal
+                    }
+                });
+                
                 setPlotReady(true)
 
                 const relayoutHandler = () => { // triggers re-render of overlay tools when axes change
@@ -107,8 +110,11 @@ export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps)
         initGraph()
         
         return () => { // cleanup on unmount / Fast-Refresh
+            console.log("Clean up")
             plotElement?.removeAllListeners?.("plotly_relayout"); // detach relayout listener
-            root?.querySelector(`.${plotId}-overplot`)?.remove(); // remove custom overlay group
+            overplots.forEach(overplot => {
+                root?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
+            })
             setPlotReady(false); // reset ready state
         } 
     }, [plotId])
@@ -165,8 +171,15 @@ export const DisruptionPlot = ({data, plotId: externalId} : DisruptionPlotProps)
         <div className="w-full px-6 py-3 space-y-3 flex-col">
             {/* Div where plot is inserted */}
             <div id={plotId} className="" />
-            <Zones plotId={plotId} plotReady={plotReady} forceUpdate={updateTools} />
-            <VSpans plotId={plotId} plotReady={plotReady} forceUpdate={updateTools} />
+            <>
+                {React.Children.map(children, child => {
+                    return (
+                        React.isValidElement(child)
+                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools })
+                        : child
+                    )
+                })}
+            </>
         </div>
     )
 }
