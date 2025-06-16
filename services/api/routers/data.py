@@ -1,7 +1,13 @@
+<<<<<<< HEAD
 from fastapi import APIRouter, Request
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
 from services.api.schemas.data import Data, ImageData, MultiVariateTimeSeriesData
+=======
+from fastapi import APIRouter, Request, HTTPException, Path
+from services.api.schemas import convert_to_objectid
+from services.api.schemas.data import Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData
+>>>>>>> wk9874/api_structure
 from services.api.schemas.samples import Sample
 from typing import Union
 
@@ -26,21 +32,25 @@ async def get_data(
 
 
 @router.put("")
-async def add_data(
-    project_id: str, sample_id: str, request: Request
-) -> DataResponseType:
+async def add_data(project_id: str, sample_id: str, request: Request) -> Union[Data, ImageData]:
+    """
+    Endpoint not implemented
+    ------------------------
+    """
     # Add some data for this sample for a given project
     # Eg, could upload a CSV of time trace data for a certain pulse via the web UI
     # Have set the request as just a Request body, because I dont (yet) know what format that needs to be
-    pass
+    raise HTTPException(status_code=501, detail="Endpoint not implemented")
 
 
 @router.delete("")
-async def delete_data(
-    project_id: str, sample_id: str, params: Sample = None
-) -> DataResponseType:
+async def delete_data(project_id: str, sample_id: str, params: Sample = None) -> Union[Data, ImageData]:
+    """
+    Endpoint not implemented
+    ------------------------
+    """
     # Delete data for this sample from this project
     # Not sure if we really need this, but might be nice in case you have a sample which is junk in your dataset
     # Ie the images are all black because the camera failed, etc
     # What if the same data is in use by multiple projects?
-    pass
+    raise HTTPException(status_code=501, detail="Endpoint not implemented")

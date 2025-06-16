@@ -6,7 +6,10 @@ from fastapi import HTTPException
 
 
 class ConfiguredModel(BaseModel):
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(
+        default_factory=datetime.now,
+        description="Time when this object was created, leave blank to automatically generate.",
+    )
 
     @model_validator(mode="before")
     def convert_objectid(cls, values):
@@ -26,6 +29,6 @@ def convert_to_objectid(id: str, collection: str):
         obj_id = ObjectId(id)
     except InvalidId as e:
         raise HTTPException(
-            status_code=400, detail=f"{collection.title()} ID is not valid."
+            status_code=400, detail=f"{collection[:-1].title()} ID is not valid."
         )
     return obj_id

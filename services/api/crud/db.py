@@ -2,6 +2,7 @@ import pymongo
 import os
 import pydantic
 import typing
+from bson.objectid import ObjectId
 
 # MONGO_URL = os.environ["MONGO_URL"]
 MONGO_URL = "mongodb://root:example@localhost:27017"
@@ -29,13 +30,27 @@ class MongoDBClient():
         self, 
         collection: typing.Literal["projects", "annotations", "models", "samples"], 
         models: list[pydantic.BaseModel], 
-        ids: dict = None
+        ids: typing.Union[dict, list[dict]] = None
     ):
         documents = [model.model_dump(mode="python") for model in models]
-        documents  = [{**document, **ids} for document in documents]
+        
+        if type(ids) is list:
+            if len(ids) != len(models):
+                raise ValueError("If providing IDs as a list, must be the same length as models")
+            documents  = [{**document, **_id} for document, _id in zip(documents, ids)]
+        else:
+            documents  = [{**document, **ids} for document in documents]
+            
         result = await self.db[collection].insert_many(documents)
         return [str(object_id) for object_id in result.inserted_ids]
         
+    async def get_document_by_id(
+        self,
+        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        object_id: ObjectId
+    ):
+        return await self.db[collection].find_one({"_id": object_id})
+    
     async def get_all_documents(
         self, 
         collection: typing.Literal["projects", "annotations", "models", "samples"]

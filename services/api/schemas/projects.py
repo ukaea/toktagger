@@ -1,6 +1,8 @@
 from pydantic import Field
+from typing import Optional, List
 from enum import Enum
 from services.api.schemas import ConfiguredModel
+from services.api.schemas.samples import SampleIn
 
 
 class Task(Enum):
@@ -12,6 +14,7 @@ class Task(Enum):
 class QueryStrategyType(str, Enum):
     RANDOM = "random"
     SEQUENTIAL = "sequential"
+    UNCERTAINTY = "uncertainty"
 
 
 class DataLoaderType(str, Enum):
@@ -20,12 +23,18 @@ class DataLoaderType(str, Enum):
     IMAGE = "image"
 
 
-class Project(ConfiguredModel):
-    name: str
-    task: Task
-    query_strategy: QueryStrategyType
-    data_loader: DataLoaderType
+class ProjectIn(ConfiguredModel):
+    name: str = Field(..., description="The name of the project.")
+    task: Task = Field(..., description="The type of labelling task.")
+    query_strategy: QueryStrategyType = Field(
+        ...,
+        description="The strategy to use when selecting the next sample to annotate.",
+    )
+    data_loader: DataLoaderType = Field(
+        ...,
+        description="The type of data which will need to be loaded for this project.",
+    )
 
 
-class ProjectOut(Project):
-    id: str = Field(..., alias="_id")
+class Project(ProjectIn):
+    id: str = Field(..., alias="_id", description="The ID of this project.")
