@@ -14,8 +14,8 @@ class ConfiguredModel(BaseModel):
     @model_validator(mode="before")
     def convert_objectid(cls, values):
         for key in ("_id", "project_id", "sample_id"):
-            if _id := values.get(key):
-                values[key] = str(_id)
+            if key in values:
+                values[key] = str(values.get("_id"))
         return values
 
     class Config:

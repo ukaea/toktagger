@@ -51,7 +51,25 @@ def main():
                 "type": "parquet",
                 "protocol": "file",
             },
-        }
+        },
+        {
+            "project_id": project_id,
+            "shot_id": 30458,
+            "data": {
+                "file_name": "/data/elms/30458.parquet",
+                "type": "parquet",
+                "protocol": "file",
+            },
+        },
+        {
+            "project_id": project_id,
+            "shot_id": 30440,
+            "data": {
+                "file_name": "/data/elms/30440.parquet",
+                "type": "parquet",
+                "protocol": "file",
+            },
+        },
     ]
     response = requests.put(
         f"http://localhost:8002/projects/{project_id}/samples", json=samples

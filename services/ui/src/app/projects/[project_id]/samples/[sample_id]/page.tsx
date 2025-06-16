@@ -2,9 +2,10 @@
 import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, Slider, Flex, Header, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
 import { Disruption } from '@/app/disruption/components/disruption';
 import { ElmGraph } from '@/app/elm/components/elms';
-import { getSample, getProject, getSampleData } from '@/app/core';
+import { getSample, getProject, getSampleData, getURL } from '@/app/core';
 import { use } from 'react';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import FindPeaksTool from '@/app/components/peaks';
 
 export const SampleDataBreadCrumbs = (info) => {
@@ -30,6 +31,36 @@ const SampleView = (args) => {
 type Props = {
   params: { project_id: string, sample_id: string };
 };
+
+
+export function NextButton({project_id, sample_id, annotations}) {
+  const router = useRouter();
+
+  const handleClick = async () => {
+    try {
+      const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+      const response = await fetch(ANNOTATIONS_URL, {
+          method: 'PUT',
+          headers: {
+          'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(annotations),
+      });
+
+      const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
+      const sampleResult = await fetch(NEXT_URL);
+      const sample = await sampleResult.json();
+
+      const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
+      router.push(NEXT_SAMPLE_URL);
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+    }
+  };
+
+  return <Button variant="primary" onPress={handleClick} >Next</Button>
+}
+
 
 export default function DisruptionPage({ params }: Props) {
   const props = use(params);
@@ -62,9 +93,7 @@ export default function DisruptionPage({ params }: Props) {
         <Provider theme={defaultTheme}>
         <div className='h-screen text-center'>
           <div className='p-4'>
-            <ButtonGroup>
-                <Button variant="primary">Next</Button>
-            </ButtonGroup>
+            <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}></NextButton>
           </div>
           <hr className='m-4'/>
           {tools.map((item, i) => <div className='h-screen' key={i}>{item}</div>)}

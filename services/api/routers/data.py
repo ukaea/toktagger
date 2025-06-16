@@ -1,15 +1,13 @@
-<<<<<<< HEAD
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
+from services.api.schemas.data import (
+    Data,
+    ImageData,
+    MultiVariateTimeSeriesData,
+)
+from typing import Union
+from services.api.schemas.samples import Sample
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
-from services.api.schemas.data import Data, ImageData, MultiVariateTimeSeriesData
-=======
-from fastapi import APIRouter, Request, HTTPException, Path
-from services.api.schemas import convert_to_objectid
-from services.api.schemas.data import Data, ImageData, TimeSeriesData, MultiVariateTimeSeriesData, SpectrogramData
->>>>>>> wk9874/api_structure
-from services.api.schemas.samples import Sample
-from typing import Union
 
 DataResponseType = Union[Data, ImageData, MultiVariateTimeSeriesData]
 
@@ -32,7 +30,9 @@ async def get_data(
 
 
 @router.put("")
-async def add_data(project_id: str, sample_id: str, request: Request) -> Union[Data, ImageData]:
+async def add_data(
+    project_id: str, sample_id: str, request: Request
+) -> Union[Data, ImageData]:
     """
     Endpoint not implemented
     ------------------------
@@ -44,7 +44,9 @@ async def add_data(project_id: str, sample_id: str, request: Request) -> Union[D
 
 
 @router.delete("")
-async def delete_data(project_id: str, sample_id: str, params: Sample = None) -> Union[Data, ImageData]:
+async def delete_data(
+    project_id: str, sample_id: str, params: Sample = None
+) -> Union[Data, ImageData]:
     """
     Endpoint not implemented
     ------------------------

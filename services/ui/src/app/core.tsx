@@ -1,6 +1,22 @@
 "use client";
 import { useEffect, useState } from 'react';
 
+export const getURL = (url: string) => {
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(url);
+      const payload = await response.json();
+      setData(payload);
+    };
+
+    fetchData();
+  }, []);
+
+  return data;
+}
+
 export const getSamples = (project_id: string) => {
   const [samples, setSamples] = useState<any>(null);
 

@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request
 from services.api.core.annotators import FindPeaksAnnotator
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
-from services.api.crud.utils import get_project
 from services.api.schemas.annotations import TimeRegion
 from services.api.schemas.annotators import Annotator, FindPeaksParams
 from services.api.schemas.models import Model

@@ -82,7 +82,7 @@ async def get_project(
     # Return information about a specific project
     # Have put project_id as a string for now, but might want to use ShortUUID?
     db_client = request.app.state.db_client
-    project = utils.get_project(db_client, project_id)
+    project = await utils.get_project(db_client, project_id)
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
@@ -166,7 +166,7 @@ async def set_project(
     ]
 
     request.app.state.data_pool = DataPool(
-        data_loader=DATA_LOADERS[project.data_loader](sample_models),
+        data_loader=DATA_LOADERS[project.data_loader](),
         query_strategy=QUERY_STRATEGIES[project.query_strategy](
             sample_models, annotation_models
         ),
