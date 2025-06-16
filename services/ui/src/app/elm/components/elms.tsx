@@ -69,7 +69,7 @@ export const ElmGraph = ({data, annotations}) => {
         uirevision: 'true',
         grid: {rows: 5, columns: 1, pattern: 'independent'},
         dragmode: false,  // Disable default drag behavior
-        width: 1500,
+        width: 1100,
         height: 800,
         xaxis: {
             title: {
@@ -185,13 +185,8 @@ export const ElmGraph = ({data, annotations}) => {
     const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
 
     return (
-        <div className="flex flex-col items-center space-y-3">
-            <header className="p-6">
-                <h1 className="text-4xl font-bold text-center text-gray-900">
-                    ELM Tagging Demo
-                </h1>
-            </header>
-            <div className="text-center">
+        <div className="flex space-y-3">
+            <div className="flex-1 text-center items-center">
                 <ContextMenuProvider menuId="elm-menu">
                     <ZoneProvider categories={zoneCategories} initialData={zones}>
                         <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>

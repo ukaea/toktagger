@@ -1,5 +1,5 @@
 "use client";
-import {Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, Slider, Flex, Header} from '@adobe/react-spectrum'
 import { Disruption } from '@/app/disruption/components/disruption';
 import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
@@ -40,25 +40,30 @@ export default function DisruptionPage({ params }: Props) {
   const data = getSampleData(project_id, sample_id);
 
   const [annotations, setAnnotations] = useState<any>(null);
+  const [prominence, setProminance] = useState(0.1);
+  const [distance, setDistance] = useState(1);
+
 
   useEffect(() => {
       const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/models/abc/predict/${sample_id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-              prominence: 0.5,
-              distance: 1
-          }),
-      });
-      const data = await response.json();
-      setAnnotations(data);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/models/abc/predict/${sample_id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                prominence: prominence,
+                distance: distance
+            }),
+        });
+
+        const data = await response.json();
+        setAnnotations(data);
+        console.log(data);
       };
 
       fetchData();
-  }, []);
+  }, [prominence, distance]);
 
 
   if (!data) {
@@ -68,8 +73,26 @@ export default function DisruptionPage({ params }: Props) {
   return (
     <div>
       <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
-      <div className="justify-center">
-        <SampleView project={project} data={data} annotations={annotations}/>
+      <div className='flex'>
+        <div className='flex h-screen text-center w-100'>
+            <Provider theme={defaultTheme}>
+                <hr className='m-4'/>
+                <Header>Find Peaks</Header>
+                <div className='m-4'>
+                <Flex direction="column">
+                    <Slider label="Prominence" minValue={0.01} maxValue={1} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
+                    <Slider label="Distance" minValue={1} maxValue={100} defaultValue={distance} onChangeEnd={setDistance}/>
+                </Flex>
+                </div>
+                <hr className='m-4'/>
+                <ButtonGroup>
+                    <Button variant="primary">Next</Button>
+                </ButtonGroup>
+            </Provider>
+        </div>
+        <div className="flex-1 justify-center">
+          <SampleView project={project} data={data} annotations={annotations}/>
+        </div>
       </div>
     </div>
   );
