@@ -25,9 +25,13 @@ class FindPeaksAnnotator:
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
-        time = data.time
+        time = np.array(data.time)
         signal = data.values["dalpha"]
         signal = np.array(signal)
+
+        tmin, tmax = self.params.time_min, self.params.time_max
+        tmin = time.min() if tmin is None else tmin
+        tmax = time.max() if tmax is None else tmax
 
         trend = uniform_filter1d(signal, 1000)
         dalpha_detrend = signal - trend
@@ -43,10 +47,13 @@ class FindPeaksAnnotator:
         regions = []
         for w, idx in zip(params["widths"], peak_idx):
             width = w * 3 * dt
-            t = time[idx]
-            region = TimeRegion(
-                label="ELM", time_min=float(t - width), time_max=float(t + width)
-            )
-            regions.append(region)
+            peak_time = time[idx]
+            if peak_time >= tmin and peak_time <= tmax:
+                region = TimeRegion(
+                    label="ELM",
+                    time_min=float(peak_time - width),
+                    time_max=float(peak_time + width),
+                )
+                regions.append(region)
 
         return regions

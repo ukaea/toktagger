@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from enum import Enum
 
@@ -15,6 +15,8 @@ class Annotator(BaseModel):
 class FindPeaksParams(Annotator):
     prominence: float
     distance: int
+    time_min: Optional[float]
+    time_max: Optional[float]
 
 
 class TimeSeriesChangepoints(Annotator):

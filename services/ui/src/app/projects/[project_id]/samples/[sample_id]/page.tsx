@@ -1,5 +1,5 @@
 "use client";
-import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, Slider, Flex, Header} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, Slider, Flex, Header, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
 import { Disruption } from '@/app/disruption/components/disruption';
 import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
@@ -42,10 +42,28 @@ export default function DisruptionPage({ params }: Props) {
   const [annotations, setAnnotations] = useState<any>(null);
   const [prominence, setProminance] = useState(0.1);
   const [distance, setDistance] = useState(1);
+  const [clearPeaks, setClearPeaks] = useState(false);
 
+  const [timeMinDefault, setTimeMinDefault] = useState(null);
+  const [timeMaxDefault, setTimeMaxDefault] = useState(null);
+  const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
+
+  useEffect(() => {
+      if (data) {
+        const tmin = Math.min(...data.time);
+        const tmax = Math.max(...data.time)
+        setTimeMinDefault(tmin);
+        setTimeMaxDefault(tmax);
+      }
+  }, [data]);
 
   useEffect(() => {
       const fetchData = async () => {
+        if (clearPeaks) {
+          setAnnotations([]);
+          return;
+        }
+
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/models/abc/predict/${sample_id}`, {
             method: 'POST',
             headers: {
@@ -53,18 +71,18 @@ export default function DisruptionPage({ params }: Props) {
             },
             body: JSON.stringify({ 
                 prominence: prominence,
-                distance: distance
+                distance: distance,
+                time_min: timeRange.start,
+                time_max: timeRange.end,
             }),
         });
 
-        const data = await response.json();
-        setAnnotations(data);
-        console.log(data);
+        const payload = await response.json();
+        setAnnotations(payload);
       };
 
       fetchData();
-  }, [prominence, distance]);
-
+  }, [prominence, distance, clearPeaks, timeRange]);
 
   if (!data) {
     return;
@@ -82,6 +100,8 @@ export default function DisruptionPage({ params }: Props) {
                 <Flex direction="column">
                     <Slider label="Prominence" minValue={0.01} maxValue={1} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
                     <Slider label="Distance" minValue={1} maxValue={100} defaultValue={distance} onChangeEnd={setDistance}/>
+                    <RangeSlider label="Time Range" defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChange={setTimeRange} step={0.001} minValue={timeMinDefault} maxValue={timeMaxDefault}/>
+                    <ToggleButton isSelected={clearPeaks} onChange={setClearPeaks}>Clear Peaks</ToggleButton>
                 </Flex>
                 </div>
                 <hr className='m-4'/>
