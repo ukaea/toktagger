@@ -19,7 +19,7 @@ def main():
             "project_id": project_id,
             "shot_id": 30421,
             "data": {
-                "signal_names": ["ip"],
+                "signal_names": ["ip", "ANE_DENSITY"],
                 "protocol": "uda",
             },
         }
