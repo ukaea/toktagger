@@ -5,6 +5,7 @@ import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
 import { use } from 'react';
 import { useEffect, useState } from 'react';
+import FindPeaksTool from '@/app/components/peaks';
 
 export const SampleDataBreadCrumbs = (info) => {
   return (
@@ -88,28 +89,30 @@ export default function DisruptionPage({ params }: Props) {
     return;
   }
 
+  const findPeaksTool = (
+      <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
+  );
+
+  let tools = [];
+  if (project.task == 'ELM') {
+    tools.push(findPeaksTool); 
+  } 
+
   return (
     <div>
       <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
       <div className='flex'>
-        <div className='flex h-screen text-center w-100'>
-            <Provider theme={defaultTheme}>
-                <hr className='m-4'/>
-                <Header>Find Peaks</Header>
-                <div className='m-4'>
-                <Flex direction="column">
-                    <Slider label="Prominence" minValue={0.01} maxValue={1} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
-                    <Slider label="Distance" minValue={1} maxValue={100} defaultValue={distance} onChangeEnd={setDistance}/>
-                    <RangeSlider label="Time Range" defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChange={setTimeRange} step={0.001} minValue={timeMinDefault} maxValue={timeMaxDefault}/>
-                    <ToggleButton isSelected={clearPeaks} onChange={setClearPeaks}>Clear Peaks</ToggleButton>
-                </Flex>
-                </div>
-                <hr className='m-4'/>
-                <ButtonGroup>
-                    <Button variant="primary">Next</Button>
-                </ButtonGroup>
-            </Provider>
+        <Provider theme={defaultTheme}>
+        <div className='h-screen text-center'>
+          <div className='p-4'>
+            <ButtonGroup>
+                <Button variant="primary">Next</Button>
+            </ButtonGroup>
+          </div>
+          <hr className='m-4'/>
+          {tools.map((item, i) => <div className='h-screen' key={i}>{item}</div>)}
         </div>
+        </Provider>
         <div className="flex-1 justify-center">
           <SampleView project={project} data={data} annotations={annotations}/>
         </div>
