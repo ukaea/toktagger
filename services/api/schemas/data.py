@@ -7,12 +7,11 @@ class Data(BaseModel):
 
 class TimeSeriesData(Data):
     time: list[float]
-    value: list[float]
+    values: list[float]
 
 
 class MultiVariateTimeSeriesData(Data):
-    time: list[float]
-    values: dict[str, list[float]]
+    values: dict[str, TimeSeriesData]
 
 
 class SpectrogramData(Data):

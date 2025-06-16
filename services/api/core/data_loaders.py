@@ -3,7 +3,12 @@ import pandas as pd
 from abc import ABC, abstractmethod
 from PIL import Image
 import numpy as np
-from services.api.schemas.data import Data, MultiVariateTimeSeriesData, ImageData
+from services.api.schemas.data import (
+    Data,
+    MultiVariateTimeSeriesData,
+    TimeSeriesData,
+    ImageData,
+)
 from services.api.schemas.samples import FileData, Sample, ShotData
 from services.api.schemas.projects import DataLoaderType
 
@@ -36,7 +41,11 @@ class ParquetDataLoader(DataLoader):
         df = df.fillna(0)
         data = df.to_dict("list")
         time = df.index.values
-        return MultiVariateTimeSeriesData(time=time, values=data)
+        results = {}
+        for key, value in data.items():
+            results[key] = TimeSeriesData(time=time, values=value)
+
+        return MultiVariateTimeSeriesData(values=results)
 
 
 class UDADataLoader(DataLoader):
@@ -53,10 +62,12 @@ class UDADataLoader(DataLoader):
         results = {}
         for name in item.signal_names:
             signal = self.client.get(name, sample.shot_id)
-            results[name] = signal.data
+            data = signal.data
             time = signal.time.data
+            item = TimeSeriesData(time=time, values=data)
+            results[name] = item
 
-        return MultiVariateTimeSeriesData(time=time, values=results)
+        return MultiVariateTimeSeriesData(values=results)
 
 
 DATA_LOADERS = {

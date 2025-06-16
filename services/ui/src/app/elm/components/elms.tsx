@@ -21,15 +21,15 @@ type Annotations = Array<{
 export const ElmGraph = ({data, annotations}) => {
     var dataTrace = {
         name: 'Dalpha',
-        x: data.time,
-        y: data.values.dalpha,
+        x: data.values.dalpha.time,
+        y: data.values.dalpha.values,
         mode: 'lines',
     };
 
     var ipTrace = {
         name: 'Ip',
-        x: data.time,
-        y: data.values.ip,
+        x: data.values.ip.time,
+        y: data.values.ip.values,
         xaxis: "x2",
         yaxis: "y2",
         mode: 'lines',
@@ -37,8 +37,8 @@ export const ElmGraph = ({data, annotations}) => {
 
     var powerNBITrace = {
         name: 'NBI Power',
-        x: data.time,
-        y: data.values.power_nbi,
+        x: data.values.power_nbi.time,
+        y: data.values.power_nbi.values,
         xaxis: "x3",
         yaxis: "y3",
         mode: 'lines',
@@ -46,8 +46,8 @@ export const ElmGraph = ({data, annotations}) => {
 
     var densityGradientTrace = {
         name: 'Density Gradient',
-        x: data.time,
-        y: data.values.density_gradient,
+        x: data.values.density_gradient.time,
+        y: data.values.density_gradient.values,
         xaxis: "x4",
         yaxis: "y4",
         mode: 'lines',
@@ -55,8 +55,8 @@ export const ElmGraph = ({data, annotations}) => {
 
     var t_e_coreTrace = {
         name: 'Te Core',
-        x: data.time,
-        y: data.values.t_e_core,
+        x: data.values.t_e_core.time,
+        y: data.values.t_e_core.values,
         xaxis: "x5",
         yaxis: "y5",
         mode: 'lines',

@@ -34,16 +34,30 @@ export const Disruption = ({ data }: DisruptionInfo) => {
         { x: 0.3, category: disruptionCategories[0] }
     ]
 
-    const plotData: Plotly.Data[] = [{
-            x: data.time,
-            y: data.values['ip'],
+    const plotData: Plotly.Data[] = [
+        {
+            x: data.values['ip'].time,
+            y: data.values['ip'].values,
             line: {
                 color: "black"
             },
             name: "ip"
-        }];
+        },
+        {
+            x: data.values['ANE_DENSITY'].time,
+            y: data.values['ANE_DENSITY'].values,
+            line: {
+                color: "black"
+            },
+            name: "density",
+            xaxis: "x2",
+            yaxis: "y2",
+        }
+    ];
     
     const plotLayout: Partial<Plotly.Layout> = {
+        uirevision: 'true',
+        grid: {rows: 2, columns: 1, pattern: 'independent'},
         xaxis: {
             title: {
                 text: 'Time [s]'
@@ -54,17 +68,23 @@ export const Disruption = ({ data }: DisruptionInfo) => {
                 text: 'Plasma current, ip [A]'
             },
         },
+        xaxis2: {
+            matches: 'x',
+            title: {
+                text: 'Time [s]'
+            },
+        },
+        yaxis2: {
+            title: {
+                text: 'Plasma current, ip [A]'
+            },
+        },
         showlegend: true,
         dragmode: 'pan',
     };
 
     return (
         <div className="flex flex-col items-center space-y-3">
-            <header className="p-6">
-                <h1 className="text-4xl font-bold text-center text-gray-900">
-                    Ip Demo
-                </h1>
-            </header>
             <ContextMenuProvider menuId="disruption-menu">
                 <VSpanProvider categories={disruptionCategories} initialData={initialDisruption}>
                     <ZoneProvider categories={zoneCategories} initialData={initialZones}>

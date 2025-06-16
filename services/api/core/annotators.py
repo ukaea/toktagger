@@ -25,8 +25,8 @@ class FindPeaksAnnotator:
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
-        time = np.array(data.time)
-        signal = data.values["dalpha"]
+        time = np.array(data.values["dalpha"].time)
+        signal = data.values["dalpha"].values
         signal = np.array(signal)
 
         tmin, tmax = self.params.time_min, self.params.time_max

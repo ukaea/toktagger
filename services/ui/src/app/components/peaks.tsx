@@ -13,8 +13,9 @@ export default function FindPeaksTool({ project_id, sample_id, data, setAnnotati
 
     useEffect(() => {
         if (data) {
-            const tmin = Math.min(...data.time);
-            const tmax = Math.max(...data.time)
+            const time = data.values['ip'].time;
+            const tmin = Math.min(...time);
+            const tmax = Math.max(...time)
             setTimeMinDefault(tmin);
             setTimeMaxDefault(tmax);
         }
@@ -54,7 +55,7 @@ export default function FindPeaksTool({ project_id, sample_id, data, setAnnotati
             <div className='m-4'>
             <Flex direction="column">
                 <Slider label="Prominence" minValue={0.01} maxValue={1} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
-                <Slider label="Distance" minValue={1} maxValue={100} defaultValue={distance} onChangeEnd={setDistance}/>
+                <Slider label="Distance" minValue={1} maxValue={1000} defaultValue={distance} onChangeEnd={setDistance}/>
                 <RangeSlider label="Time Range" defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChange={setTimeRange} step={0.001} minValue={timeMinDefault} maxValue={timeMaxDefault}/>
                 <ToggleButton isSelected={clearPeaks} onChange={setClearPeaks}>Clear Peaks</ToggleButton>
             </Flex>
