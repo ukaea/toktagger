@@ -6,18 +6,6 @@ import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
 
-type GraphProps = {
-    time: Array<number>,
-    values: Record<string, Array<number>>
-}
-
-type Annotations = Array<{
-    timestamp: string,
-    time_min: number,
-    time_max: number,
-    label: string, 
-}>;
-
 export const ElmGraph = ({data, annotations}) => {
     var dataTrace = {
         name: 'Dalpha',

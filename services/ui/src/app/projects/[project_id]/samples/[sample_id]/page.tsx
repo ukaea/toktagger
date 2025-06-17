@@ -24,7 +24,7 @@ const SampleView = (args) => {
   if (args.project.task == 'disruption') {
     return (<Disruption data={args.data}/>);
   } else if (args.project.task == 'ELM') {
-    return (<ElmGraph data={args.data} annotations={args.annotations}/>);
+    return (<ElmGraph data={args.data} annotations={args.annotations} onAnnotationsChange={args.onAnnotationsChange}/>);
   }
 }
 
@@ -61,6 +61,29 @@ export function NextButton({project_id, sample_id, annotations}) {
   return <Button variant="primary" onPress={handleClick} >Next</Button>
 }
 
+function ToolBar({ project, sample_id, data, annotations, annotationsCallback}) {
+  const project_id = project._id;
+  const findPeaksTool = (
+      <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={annotationsCallback}></FindPeaksTool>
+  );
+
+  let tools = [];
+  if (project.task == 'ELM') {
+    tools.push(findPeaksTool); 
+  } 
+
+  return (
+        <Provider theme={defaultTheme}>
+        <div className='h-screen text-center'>
+          <div className='p-4'>
+            <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}></NextButton>
+          </div>
+          <hr className='m-4'/>
+          {tools.map((item, i) => <div className='h-screen' key={i}>{item}</div>)}
+        </div>
+        </Provider>
+  );
+}
 
 export default function DisruptionPage({ params }: Props) {
   const props = use(params);
@@ -77,30 +100,13 @@ export default function DisruptionPage({ params }: Props) {
     return;
   }
 
-  const findPeaksTool = (
-      <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
-  );
-
-  let tools = [];
-  if (project.task == 'ELM') {
-    tools.push(findPeaksTool); 
-  } 
-
   return (
     <div>
       <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
       <div className='flex'>
-        <Provider theme={defaultTheme}>
-        <div className='h-screen text-center'>
-          <div className='p-4'>
-            <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}></NextButton>
-          </div>
-          <hr className='m-4'/>
-          {tools.map((item, i) => <div className='h-screen' key={i}>{item}</div>)}
-        </div>
-        </Provider>
+        <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} annotationsCallback={setAnnotations}/>
         <div className="flex-1 justify-center">
-          <SampleView project={project} data={data} annotations={annotations}/>
+          <SampleView project={project} data={data} annotations={annotations} />
         </div>
       </div>
     </div>

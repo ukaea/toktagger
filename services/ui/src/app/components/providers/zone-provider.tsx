@@ -34,7 +34,7 @@ export const ZONE_MENU_ID = "zone-provider"
 export const ZoneProvider = ({categories, initialData, children} : {
     categories: Category[],
     initialData?: Zone[],
-    children: React.ReactNode
+    children: React.ReactNode,
 }) => {
     const zones = useRef<Zone[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh

@@ -14,7 +14,8 @@ import { ToolingProps, Zone } from "@/types";
 export const Zones = ({
     plotId,  
     plotReady, 
-    forceUpdate
+    forceUpdate,
+    onZoneUpdate
 } : ToolingProps) => {
     const dragOffset = useRef(0)
 
