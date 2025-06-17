@@ -31,15 +31,17 @@ export const ZONE_MENU_ID = "zone-provider"
  * @param categories Array of categories that the zones provided by this context can be
  * @param initialData Array of zones that should be added when initialised
  */
-export const ZoneProvider = ({categories, initialData, children} : {
+export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
     categories: Category[],
     initialData?: Zone[],
     children: React.ReactNode,
+    onAddZone: CallableFunction
 }) => {
     const zones = useRef<Zone[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
 
     const {registerMenuItem} = useContextMenuProvider()
+
     
     // It is necessary for the context to trigger child refreshes
     const triggerZoneUpdate = () => {
@@ -88,6 +90,7 @@ export const ZoneProvider = ({categories, initialData, children} : {
                 }
             )
             triggerZoneUpdate()
+            onAddZone(zones.current);
         }
     
             const addZoneItems = categories.map((category, index) => {

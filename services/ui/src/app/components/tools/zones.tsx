@@ -15,7 +15,6 @@ export const Zones = ({
     plotId,  
     plotReady, 
     forceUpdate,
-    onZoneUpdate
 } : ToolingProps) => {
     const dragOffset = useRef(0)
 

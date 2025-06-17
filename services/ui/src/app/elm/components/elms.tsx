@@ -6,7 +6,8 @@ import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
 
-export const ElmGraph = ({data, annotations}) => {
+export const ElmGraph = ({data, annotations, setAnnotations}) => {
+
     var dataTrace = {
         name: 'Dalpha',
         x: data.values.dalpha.time,
@@ -172,11 +173,21 @@ export const ElmGraph = ({data, annotations}) => {
 
     const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
 
+    const updateAnnotations = (newZones) => {
+        const zones = newZones.map(item => ({
+                time_min: item.x0,
+                time_max: item.x1,
+                label: item.category.name
+        }));
+
+        setAnnotations(zones)
+    }
+
     return (
         <div className="flex space-y-3">
             <div className="flex-1 text-center items-center">
                 <ContextMenuProvider menuId="elm-menu">
-                    <ZoneProvider categories={zoneCategories} initialData={zones}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onAddZone={updateAnnotations}>
                         <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>
                             <Zones />
                         </TimeSeries>
