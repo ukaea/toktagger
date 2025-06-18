@@ -28,7 +28,6 @@ export const Zones = ({
 
     // Main rendering effect
     useEffect(() => {
-        console.log("Render Zones: ", plotReady, plotId)
         // This shall not run until the target plot is initialised
         if (!plotId || !plotReady || forceUpdate === undefined) {
             return
@@ -128,7 +127,7 @@ export const Zones = ({
                 const x0 = xaxis.d2p(zone.x0);
                 const x1 = xaxis.d2p(zone.x1);
                 graphGroup.append("rect")
-                    .attr("class", "zone span cursor-grab")
+                    .attr("class", "zone span cursor-grab disable-on-shift")
                     .attr("x", x0)
                     .attr("y", upperLimit)
                     .attr("width", x1 - x0)
@@ -142,7 +141,7 @@ export const Zones = ({
                     .on("contextmenu", handleContextMenu)
 
                 graphGroup.append("rect")
-                    .attr("class", "zone leftHandle")
+                    .attr("class", "zone leftHandle disable-on-shift")
                     .attr("x", x0-10)
                     .attr("y", upperLimit)
                     .attr("width", 20)
@@ -154,7 +153,7 @@ export const Zones = ({
                     .call(getBoundaryHandler(true))
 
                 graphGroup.append("rect")
-                    .attr("class", "zone rightHandle")
+                    .attr("class", "zone rightHandle disable-on-shift")
                     .attr("x", x1-10)
                     .attr("y", upperLimit)
                     .attr("width", 20)
