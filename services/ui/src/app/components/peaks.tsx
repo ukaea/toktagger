@@ -10,23 +10,28 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
     const [timeMinDefault, setTimeMinDefault] = useState(null);
     const [timeMaxDefault, setTimeMaxDefault] = useState(null);
     const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
-    const [signalName, setSignalName] = useState('dalpha');
+    const [signalName, setSignalName] = useState(null);
+    const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
 
     useEffect(() => {
-        if (data) {
+        if (data && (signalName in data.values)) {
             const time = data.values[signalName].time;
             const tmin = Math.min(...time);
             const tmax = Math.max(...time)
             setTimeMinDefault(tmin);
             setTimeMaxDefault(tmax);
         }
-    }, [data]);
+    }, [data, signalName]);
 
     useEffect(() => {
         const fetchData = async () => {
             if (clearPeaks) {
                 setAnnotations([]);
+                return;
+            }
+
+            if (signalName == null && !(signalName in data.values)) {
                 return;
             }
 
@@ -49,17 +54,16 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
         };
 
         fetchData();
-    }, [prominence, distance, clearPeaks, timeRange]);
+    }, [prominence, distance, clearPeaks, timeRange, signalName]);
 
 
-    const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
     return (
         <Provider theme={defaultTheme}>
             <Header>Find Peaks</Header>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox defaultItems={signalOptions} defaultInputValue={'dalpha'} onInputChange={setSignalName}>
+                <ComboBox defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true} placeholder="None selected">
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>
