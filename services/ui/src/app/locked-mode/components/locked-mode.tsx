@@ -29,28 +29,24 @@ export const LockedMode = ({ data }) => {
     const lockedModeCategories: Category[] = [
         { name: "Locked Mode", color: "rgb(255, 0, 0)" },
     ]
-    const initialLockedMode: VSpan[] = [
-        { x: 0.1, category: lockedModeCategories[0] },
-    ]
+    const initialLockedMode: VSpan[] = []
 
     const zoneCategories: Category[] = [
-        { name: "ZoneA", color: 'rgb(255, 0, 0)' },
+        { name: "NTM", color: 'rgb(0, 0, 255)' },
+        { name: "LLM", color: 'rgb(211, 0, 255)' },
     ]
-    const initialZones: Zone[] = [
-        { x0: 0.4, x1: 0.5, category: zoneCategories[0] },
-    ]
+    const initialZones: Zone[] = []
 
     const originalAmpMin = Math.min(...data.amplitude.flat());
     const originalAmpMax = Math.max(...data.amplitude.flat());
 
-    const logAmplitude = data.amplitude.map(row => row.map(x => Math.log10(x)));
+    const logAmplitude = data.amplitude.map(row => row.map(x => Math.log10(Math.max(x, 1e-4))));
     const logAmpMin = Math.min(...logAmplitude.flat());
     const logAmpMax = Math.max(...logAmplitude.flat());
 
     const tickvals = linspace(logAmpMin, logAmpMax, 10)
-    let ticktext = linspace(originalAmpMin, originalAmpMax, 10);
-    ticktext = ticktext.map(x => Math.round(x * 100) / 100);
-
+    let ticktext = tickvals.map(x => Math.pow(10, x));
+    ticktext = ticktext.map(x => Math.round(x * 10000) / 10000);
 
     const plotData: Plotly.Data[] = [{
         name: "Saddle Coil FFT",

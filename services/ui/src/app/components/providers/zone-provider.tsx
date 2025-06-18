@@ -90,7 +90,9 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
                 }
             )
             triggerZoneUpdate()
-            onAddZone(zones.current);
+            if (onAddZone) {
+                onAddZone(zones.current);
+            }
         }
     
             const addZoneItems = categories.map((category, index) => {

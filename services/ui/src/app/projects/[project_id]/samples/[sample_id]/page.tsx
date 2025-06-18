@@ -5,7 +5,8 @@ import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FindPeaksTool, TimeRangeSlider } from '@/app/components/peaks';
+import { FindPeaksTool } from '@/app/components/peaks';
+import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 import { LockedMode } from '@/app/locked-mode/components/locked-mode';
 
 export const SampleDataBreadCrumbs = (info) => {
@@ -105,9 +106,36 @@ function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewPa
 
     let mhdData = data.values['mirnov'];
     const timeRangeTool = (
-        <TimeRangeSlider data={mhdData} onChange={onTimeRangeChange} />
+        <DataRangeSlider name={"Time Range"} data={mhdData.time} onChange={onTimeRangeChange} />
     );
+
     tools.push(timeRangeTool);
+
+    const onFrequencyRangeChange = async (freqRange) => {
+        viewParams.frequency_min = freqRange.start;
+        viewParams.frequency_max = freqRange.end;
+        setViewParams(viewParams);
+    };
+
+    const freqRangeTool = (
+        <DataRangeSlider name={"Frequency Range"} data={mhdData.frequency} onChange={onFrequencyRangeChange}/>
+    );
+
+    tools.push(freqRangeTool);
+
+    const onAmplitudeRangeChange = async (ampRange) => {
+        viewParams.amplitude_min = Math.pow(10, ampRange.start);
+        viewParams.amplitude_max = Math.pow(10, ampRange.end);
+        setViewParams(viewParams);
+    };
+
+    let ampValues = mhdData.amplitude.flat();
+    ampValues = ampValues.map(x => Math.log10(Math.max(x, 1e-6)));
+    const ampRangeTool = (
+        <DataRangeSlider name={'Amplitude Range'} data={ampValues} onChange={onAmplitudeRangeChange} 
+        getValueLabel={val => `${Math.round(Math.pow(10, val.start)*10000, 2)/10000} - ${Math.round(Math.pow(10, val.end)*10000, 2)/10000}`}/>
+    );
+    tools.push(ampRangeTool);
   }
 
   return (
@@ -120,7 +148,7 @@ function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewPa
             </ButtonGroup>
           </div>
           <hr className='m-4'/>
-          {tools.map((item, i) => <div className='h-screen' key={i}>{item}</div>)}
+          {tools.map((item, i) => <div  key={i}>{item}</div>)}
         </div>
         </Provider>
   );
@@ -162,7 +190,6 @@ export default function SamplePage({ params }: Props) {
     if (project.task == 'MHD') {
       viewParams.name = 'spectrogram';
       viewParams.nperseg = 256;
-      viewParams.amplitude_min = 1e-4;
     }
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {

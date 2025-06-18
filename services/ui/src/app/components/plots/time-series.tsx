@@ -140,7 +140,7 @@ export const TimeSeries = ({
         const reload = async () => {
             const { react } = await import('plotly.js') // Annoyingly there seems to be an issue with plotly so dynamic import is needed
             const root = document.getElementById(plotId)
-            react(root, data, layout, config).then(renderZones);
+            react(root, data, layout, config);
         };
         reload();
     }, [plotId, data]);
