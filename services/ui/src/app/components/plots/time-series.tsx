@@ -36,7 +36,7 @@ export const TimeSeries = ({
         config = {
             displaylogo: false,
             displayModeBar: true,
-            scrollZoom: true
+            scrollZoom: false
         }
     }, 
     children
@@ -105,13 +105,35 @@ export const TimeSeries = ({
                     triggerToolUpdate()
                 } 
                 plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
+
+                document.addEventListener("keydown", (e) => {
+                    if (e.key === "Shift") {
+                        const elements = plot.querySelectorAll(".disable-on-shift")
+                        elements.forEach((element) => {
+                            element.setAttribute("style", "pointer-events: none")
+                        })
+                    }
+                })
+
+                document.addEventListener("keyup", (e) => {
+                    if (e.key === "Shift") {
+                        const elements = plot.querySelectorAll(".disable-on-shift")
+                        elements.forEach((element) => {
+                            element.setAttribute("style", "pointer-events: all")
+                        })
+                    }
+                })
             })
         }
         initGraph()
         
         return () => { // cleanup on unmount / Fast-Refresh
-            console.log("Clean up")
             plotElement?.removeAllListeners?.("plotly_relayout"); // detach relayout listener
+
+            // detach key press listeners
+            plotElement?.removeAllListeners?.("keydown");
+            plotElement?.removeAllListeners?.("keyup");
+
             overplots.forEach(overplot => {
                 root?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
             })
