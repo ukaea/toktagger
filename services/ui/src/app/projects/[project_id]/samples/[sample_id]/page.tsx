@@ -98,30 +98,7 @@ function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewPa
     tools.push(findPeaksTool); 
   } else if (project.task == 'MHD') {
 
-    const onTimeRangeChange = async (timeRange) => {
-        viewParams.time_min = timeRange.start;
-        viewParams.time_max = timeRange.end;
-        setViewParams(viewParams);
-    };
-
     let mhdData = data.values['mirnov'];
-    const timeRangeTool = (
-        <DataRangeSlider name={"Time Range"} data={mhdData.time} onChange={onTimeRangeChange} />
-    );
-
-    tools.push(timeRangeTool);
-
-    const onFrequencyRangeChange = async (freqRange) => {
-        viewParams.frequency_min = freqRange.start;
-        viewParams.frequency_max = freqRange.end;
-        setViewParams(viewParams);
-    };
-
-    const freqRangeTool = (
-        <DataRangeSlider name={"Frequency Range"} data={mhdData.frequency} onChange={onFrequencyRangeChange}/>
-    );
-
-    tools.push(freqRangeTool);
 
     const onAmplitudeRangeChange = async (ampRange) => {
         viewParams.amplitude_min = Math.pow(10, ampRange.start);
