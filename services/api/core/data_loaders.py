@@ -1,3 +1,4 @@
+from typing import Union
 import pandas as pd
 
 from abc import ABC, abstractmethod
@@ -9,7 +10,7 @@ from services.api.schemas.data import (
     TimeSeriesData,
     ImageData,
 )
-from services.api.schemas.samples import FileData, Sample, ShotData
+from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 from services.api.schemas.projects import DataLoaderType
 
 
@@ -35,8 +36,8 @@ class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        item: FileData = sample.data
-        df = pd.read_parquet(item.file_name)
+        item: TimeSeriesFileData = sample.data
+        df = pd.read_parquet(item.file_name, columns=item.column_names)
         # df = df[item.column_names]
         df = df.fillna(0)
         data = df.to_dict("list")

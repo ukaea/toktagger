@@ -1,38 +1,43 @@
 from fastapi import APIRouter, Request, HTTPException
-from services.api.schemas.data import (
-    Data,
-    ImageData,
-    MultiVariateTimeSeriesData,
-)
-from typing import Union
-from services.api.schemas.samples import Sample
+from typing import Optional
 from services.api.core.data_loaders import DATA_LOADERS
+from services.api.core.views import DATA_VIEWS
 from services.api.crud import utils
+from services.api.schemas.samples import Sample
+from services.api.schemas.data import DataResponseType
+from services.api.schemas.views import ViewParams, ViewParamTypes
 
-DataResponseType = Union[Data, ImageData, MultiVariateTimeSeriesData]
 
 router = APIRouter(
     prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"]
 )
 
 
-@router.get("", response_model=DataResponseType)
+@router.post("", response_model=DataResponseType)
 async def get_data(
-    request: Request, project_id: str, sample_id: str
+    request: Request,
+    project_id: str,
+    sample_id: str,
+    view: Optional[ViewParamTypes] = ViewParams(),
 ) -> DataResponseType:
     """Get data, e.g. time trace, about the given sample required for the given project"""
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, sample_id)
+
     data_loader = DATA_LOADERS[project.data_loader]()
-    data_item = data_loader.get_sample(sample)
-    return data_item
+    data = data_loader.get_sample(sample)
+
+    data_view = DATA_VIEWS[view.name](view)
+    data = data_view(data)
+
+    return data
 
 
 @router.put("")
 async def add_data(
     project_id: str, sample_id: str, request: Request
-) -> Union[Data, ImageData]:
+) -> DataResponseType:
     """
     Endpoint not implemented
     ------------------------
@@ -46,7 +51,7 @@ async def add_data(
 @router.delete("")
 async def delete_data(
     project_id: str, sample_id: str, params: Sample = None
-) -> Union[Data, ImageData]:
+) -> DataResponseType:
     """
     Endpoint not implemented
     ------------------------

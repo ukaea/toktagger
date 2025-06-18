@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 import requests
 
 
@@ -34,7 +35,12 @@ def create_uda_samples(project_id: str, shot_ids: list[int]):
     requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
-def create_local_samples(project_id: str, shot_ids: list[int], base_path: str):
+def create_local_samples(
+    project_id: str,
+    shot_ids: list[int],
+    base_path: str,
+    columns: Optional[list[str]] = None,
+):
     samples = []
 
     base_path = Path(base_path)
@@ -46,6 +52,7 @@ def create_local_samples(project_id: str, shot_ids: list[int], base_path: str):
                 "file_name": str(base_path / f"{shot_id}.parquet"),
                 "type": "parquet",
                 "protocol": "file",
+                "column_names": columns,
             },
         }
         samples.append(sample)
@@ -69,7 +76,9 @@ def main():
     shot_ids = [int(path.stem) for path in shot_files]
 
     project_id = create_project("Local MHD Project", "MHD", "parquet")
-    create_local_samples(project_id, shot_ids, base_path="/data/test/mhd")
+    create_local_samples(
+        project_id, shot_ids, base_path="/data/test/mhd", columns=["mirnov"]
+    )
 
 
 if __name__ == "__main__":
