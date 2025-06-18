@@ -42,34 +42,29 @@ export const LockedMode = ({ data }: LockedModeInfo) => {
         { x0: 0.4, x1: 0.5, category: zoneCategories[0] },
     ]
 
-    const [range, setRange] = useState<number[]>([1E-4, 1E-3]);
+    const originalAmpMin = Math.min(...data.amplitude.flat());
+    const originalAmpMax = Math.max(...data.amplitude.flat());
 
-    const ampl = data.map(({ amplitude }) => amplitude);
-    const logvals = linspace(range[0], range[1], 10)
-    const logvalsMapped = logvals.map((x) => (9 / (Math.max(...logvals) - Math.min(...logvals))) * (x - Math.min(...logvals)) + 1.0)
-    const tickvals = logvalsMapped.map((x) => Math.log10(x))
-    let zdata: number[] = []
-    ampl.forEach((val) => {
-        const index = logvals.findIndex(i => i >= val)
-        const ratio = (val - logvals[index - 1]) / (logvals[index] - logvals[index - 1])
-        const valScaled = (tickvals[index] - tickvals[index - 1]) * ratio + tickvals[index - 1]
-        if (index === -1) {
-            zdata.push(1.0)
-        } else {
-            zdata.push(valScaled)
-        }
-    })
+    const logAmplitude = data.amplitude.map(row => row.map(x => Math.log10(x)));
+    const logAmpMin = Math.min(...logAmplitude.flat());
+    const logAmpMax = Math.max(...logAmplitude.flat());
+
+    const tickvals = linspace(logAmpMin, logAmpMax, 10)
+    let ticktext = linspace(originalAmpMin, originalAmpMax, 10);
+    ticktext = ticktext.map(x => Math.round(x * 100) / 100);
+
 
     const plotData: Plotly.Data[] = [{
         name: "Saddle Coil FFT",
         type: 'heatmap',
-        x: data.map(({ time }) => time),
-        y: data.map(({ frequency }) => frequency),
-        z: zdata,
-        customdata: ampl,
+        x: data.time,
+        y: data.frequency,
+        z: logAmplitude,
         hovertemplate: "t: %{x:.2f}s<br>f: %{y:.2f}Hz<br>s: %{customdata:.2e}<extra></extra>",
         coloraxis: 'coloraxis'
     }];
+
+    const interpFunc = d3.interpolateTurbo;
 
     const plotLayout: Partial<Plotly.Layout> = {
         xaxis: {
@@ -83,24 +78,24 @@ export const LockedMode = ({ data }: LockedModeInfo) => {
             },
         },
         coloraxis: {
-            cmin: 0,
-            cmax: 1,
+            cmin: logAmpMin,
+            cmax: logAmpMax,
             colorscale: [
-                [0, d3.interpolateCividis(0)],
-                [0.1, d3.interpolateCividis(0.1)],
-                [0.2, d3.interpolateCividis(0.2)],
-                [0.3, d3.interpolateCividis(0.3)],
-                [0.4, d3.interpolateCividis(0.4)],
-                [0.5, d3.interpolateCividis(0.5)],
-                [0.6, d3.interpolateCividis(0.6)],
-                [0.7, d3.interpolateCividis(0.7)],
-                [0.8, d3.interpolateCividis(0.8)],
-                [0.9, d3.interpolateCividis(0.9)],
-                [1, d3.interpolateCividis(1)]
+                [0, interpFunc(0)],
+                [0.1, interpFunc(0.1)],
+                [0.2, interpFunc(0.2)],
+                [0.3, interpFunc(0.3)],
+                [0.4, interpFunc(0.4)],
+                [0.5, interpFunc(0.5)],
+                [0.6, interpFunc(0.6)],
+                [0.7, interpFunc(0.7)],
+                [0.8, interpFunc(0.8)],
+                [0.9, interpFunc(0.9)],
+                [1, interpFunc(1)]
             ],
             colorbar: {
                 tickmode: 'array',
-                ticktext: logvals.map((x) => x.toExponential(1)),
+                ticktext: ticktext,
                 tickvals: tickvals,
             }
         },

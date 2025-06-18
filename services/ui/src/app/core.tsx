@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 
+
 export const getURL = (url: string) => {
   const [data, setData] = useState<any>(null);
 
@@ -81,12 +82,18 @@ export const getProject = (project_id: string) => {
   return project;
 } 
 
-export const getSampleData = (project_id: string, sample_id: string) => {
+export const getSampleData = (project_id: string, sample_id: string, viewParams) => {
   const [sampleData, setSampleData] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
+        method: 'POST',
+        headers: {
+        'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(viewParams),
+      });
       const data = await response.json();
       setSampleData(data);
     };

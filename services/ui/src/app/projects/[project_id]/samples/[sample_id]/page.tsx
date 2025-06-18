@@ -3,9 +3,10 @@ import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, ToastCon
 import { Disruption } from '@/app/disruption/components/disruption';
 import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
-import { use, useState, createContext, useContext } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import FindPeaksTool from '@/app/components/peaks';
+import { LockedMode } from '@/app/locked-mode/components/locked-mode';
 
 export const SampleDataBreadCrumbs = (info) => {
   return (
@@ -24,6 +25,8 @@ const SampleView = (args) => {
     return (<Disruption data={args.data}/>);
   } else if (args.project.task == 'ELM') {
     return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations}/>);
+  } else if (args.project.task == 'MHD') {
+    return (<LockedMode data={args.data.values['mirnov']}/>);
   }
 }
 
@@ -109,21 +112,63 @@ function ToolBar({ project, sample_id, data, annotations, setAnnotations}) {
   );
 }
 
+export async function getData(url) {
+    const response = await fetch(url);
+    const payload = await response.json();
+    return payload;
+}
+
+async function getSample(project_id: string, sample_id: string) {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
+}
+
+async function getProject(project_id: string) {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+}
+
+
+
 export default function SamplePage({ params }: Props) {
   const props = use(params);
   const project_id = props.project_id;
   const sample_id = props.sample_id;
 
-  const project = getProject(project_id);
-  const sample = getSample(project_id, sample_id);
-  const data = getSampleData(project_id, sample_id);
-  const [ annotations, setAnnotations ] = useState([]);
+  const [project, setProject] = useState<any>(null);
+  const [sample, setSample] = useState<any>(null);
+  const [data, setData] = useState<any>(null);
+  const [annotations, setAnnotations] = useState<any>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const project = await getProject(project_id);
+      setProject(project);
+
+      const sample = await getSample(project_id, sample_id)
+      setSample(sample);
+
+      let viewParams = null;
+      if (project.task == 'MHD') {
+        viewParams = {name: 'spectrogram', 'nperseg': 256, 'amplitude_min': 1e-4};
+      }
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
+          method: 'POST',
+          headers: {
+          'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(viewParams),
+      });
+      const data = await response.json();
+      setData(data);
+    };
+
+    fetchData();
+  }, []);
 
   if (!data) {
     return;
   }
+  console.log(data);
 
-  console.log(annotations);
   return (
     <div>
       <Provider theme={defaultTheme}>

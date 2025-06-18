@@ -22,7 +22,7 @@ class CompositeData(Data):
 class SpectrogramData(Data):
     time: list[float]
     frequency: list[float]
-    values: list[list[float]]
+    amplitude: list[list[float]]
 
 
 class ImageData(Data):

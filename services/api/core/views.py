@@ -45,7 +45,7 @@ class SpectrogramView:
             values,
             fs=int(sample_rate),
             nperseg=self.params.nperseg,
-            noverlap=self.params.nperseg // 5,
+            noverlap=self.params.nperseg // 2,
         )
         values = np.absolute(values)
 
@@ -68,14 +68,26 @@ class SpectrogramView:
             else freq.max()
         )
 
+        amplitude_min = (
+            self.params.amplitude_min
+            if self.params.amplitude_min is not None
+            else values.min()
+        )
+        amplitude_max = (
+            self.params.amplitude_max
+            if self.params.amplitude_max is not None
+            else values.max()
+        )
+
         ds = xr.DataArray(values, coords=dict(frequency=freq, time=time))
         ds = ds.sel(time=slice(time_min, time_max))
         ds = ds.sel(frequency=slice(frequency_min, frequency_max))
+        ds = ds.clip(amplitude_min, amplitude_max)
 
         return SpectrogramData(
             time=ds.time.values.tolist(),
             frequency=ds.frequency.values.tolist(),
-            values=ds.values.tolist(),
+            amplitude=ds.values.tolist(),
         )
 
 
