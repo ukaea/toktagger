@@ -1,11 +1,10 @@
 "use client";
-import {Provider, defaultTheme, Slider, Flex, Header, ComboBox, Item, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Slider, Button, Flex, Header, ComboBox, Item, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
 import { useEffect, useState } from 'react';
 
 export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
     const [prominence, setProminance] = useState(0.1);
     const [distance, setDistance] = useState(1);
-    const [clearPeaks, setClearPeaks] = useState(false);
 
     const [timeMinDefault, setTimeMinDefault] = useState(null);
     const [timeMaxDefault, setTimeMaxDefault] = useState(null);
@@ -13,6 +12,9 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
     const [signalName, setSignalName] = useState(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
+    const clearPeaks = () => {
+        setAnnotations([]);
+    };
 
     useEffect(() => {
         if (data && (signalName in data.values)) {
@@ -26,11 +28,6 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (clearPeaks) {
-                setAnnotations([]);
-                return;
-            }
-
             if (signalName == null && !(signalName in data.values)) {
                 return;
             }
@@ -54,7 +51,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
         };
 
         fetchData();
-    }, [prominence, distance, clearPeaks, timeRange, signalName]);
+    }, [prominence, distance, timeRange, signalName]);
 
 
 
@@ -70,7 +67,8 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
                 <Slider label="Prominence" minValue={0.01} maxValue={1} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
                 <Slider label="Distance" minValue={1} maxValue={1000} defaultValue={distance} onChangeEnd={setDistance}/>
                 <RangeSlider label="Time Range" defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChange={setTimeRange} step={0.001} minValue={timeMinDefault} maxValue={timeMaxDefault}/>
-                <ToggleButton isSelected={clearPeaks} onChange={setClearPeaks}>Clear Peaks</ToggleButton>
+                <br />
+                <Button variant="primary" onPress={clearPeaks} >Clear Peaks</Button>
             </Flex>
             </div>
         </Provider>
