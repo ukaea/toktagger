@@ -5,7 +5,7 @@ import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import FindPeaksTool from '@/app/components/peaks';
+import { FindPeaksTool, TimeRangeSlider } from '@/app/components/peaks';
 import { LockedMode } from '@/app/locked-mode/components/locked-mode';
 
 export const SampleDataBreadCrumbs = (info) => {
@@ -26,7 +26,7 @@ const SampleView = (args) => {
   } else if (args.project.task == 'ELM') {
     return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations}/>);
   } else if (args.project.task == 'MHD') {
-    return (<LockedMode data={args.data.values['mirnov']}/>);
+    return (<LockedMode data={args.data.values['mirnov']} viewParams={args.viewParams}/>);
   }
 }
 
@@ -85,16 +85,30 @@ export function SaveButton({project_id, sample_id, annotations}) {
 }
 
 
-function ToolBar({ project, sample_id, data, annotations, setAnnotations}) {
+function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewParams, setViewParams}) {
   const project_id = project._id;
-  const findPeaksTool = (
-      <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
-  );
+
 
   let tools = [];
   if (project.task == 'ELM') {
+    const findPeaksTool = (
+        <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
+    );
     tools.push(findPeaksTool); 
-  } 
+  } else if (project.task == 'MHD') {
+
+    const onTimeRangeChange = async (timeRange) => {
+        viewParams.time_min = timeRange.start;
+        viewParams.time_max = timeRange.end;
+        setViewParams(viewParams);
+    };
+
+    let mhdData = data.values['mirnov'];
+    const timeRangeTool = (
+        <TimeRangeSlider data={mhdData} onChange={onTimeRangeChange} />
+    );
+    tools.push(timeRangeTool);
+  }
 
   return (
         <Provider theme={defaultTheme}>
@@ -127,7 +141,6 @@ async function getProject(project_id: string) {
 }
 
 
-
 export default function SamplePage({ params }: Props) {
   const props = use(params);
   const project_id = props.project_id;
@@ -137,37 +150,42 @@ export default function SamplePage({ params }: Props) {
   const [sample, setSample] = useState<any>(null);
   const [data, setData] = useState<any>(null);
   const [annotations, setAnnotations] = useState<any>([]);
+  const [viewParams, setViewParams] = useState<any>({name: 'identity'});
+
+  const refreshData = async ( viewParams ) => {
+    const project = await getProject(project_id);
+    setProject(project);
+
+    const sample = await getSample(project_id, sample_id)
+    setSample(sample);
+    
+    if (project.task == 'MHD') {
+      viewParams.name = 'spectrogram';
+      viewParams.nperseg = 256;
+      viewParams.amplitude_min = 1e-4;
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
+        method: 'POST',
+        headers: {
+        'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(viewParams),
+    });
+    const data = await response.json();
+    setData(data);
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      const project = await getProject(project_id);
-      setProject(project);
-
-      const sample = await getSample(project_id, sample_id)
-      setSample(sample);
-
-      let viewParams = null;
-      if (project.task == 'MHD') {
-        viewParams = {name: 'spectrogram', 'nperseg': 256, 'amplitude_min': 1e-4};
-      }
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
-          method: 'POST',
-          headers: {
-          'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(viewParams),
-      });
-      const data = await response.json();
-      setData(data);
-    };
-
-    fetchData();
-  }, []);
+    const run = async () => {
+      await refreshData(viewParams);
+    }
+    run();
+  }, [viewParams]);
 
   if (!data) {
     return;
   }
-  console.log(data);
 
   return (
     <div>
@@ -175,9 +193,9 @@ export default function SamplePage({ params }: Props) {
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
           <div className='flex'>
-            <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations}/>
+            <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={refreshData}/>
             <div className="flex-1 justify-center">
-              <SampleView project={project} data={data} annotations={annotations} setAnnotations={setAnnotations} />
+              <SampleView project={project} data={data} annotations={annotations} setAnnotations={setAnnotations}/>
             </div>
           </div>
       </Provider>

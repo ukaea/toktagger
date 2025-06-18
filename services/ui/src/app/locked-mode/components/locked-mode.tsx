@@ -9,8 +9,6 @@ import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import { VSpans } from "@/app/components/tools/vspans"
 
-import { useState } from "react"
-
 import * as d3 from "d3"
 
 const linspace = (start: number, end: number, num: number) => {
@@ -26,7 +24,7 @@ type LockedModeInfo = {
     data: SpectrogramData
 }
 
-export const LockedMode = ({ data }: LockedModeInfo) => {
+export const LockedMode = ({ data }) => {
 
     const lockedModeCategories: Category[] = [
         { name: "Locked Mode", color: "rgb(255, 0, 0)" },
@@ -60,7 +58,8 @@ export const LockedMode = ({ data }: LockedModeInfo) => {
         x: data.time,
         y: data.frequency,
         z: logAmplitude,
-        hovertemplate: "t: %{x:.2f}s<br>f: %{y:.2f}Hz<br>s: %{customdata:.2e}<extra></extra>",
+        customdata: data.amplitude,
+        hovertemplate: "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
         coloraxis: 'coloraxis'
     }];
 
@@ -108,20 +107,15 @@ export const LockedMode = ({ data }: LockedModeInfo) => {
         displaylogo: false,
         displayModeBar: true,
         scrollZoom: false,
-        modeBarButtonsToRemove: ['toImage', 'zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d'],
+        modeBarButtonsToRemove: ['pan'],
     }
 
     return (
         <div className="flex flex-col items-center space-y-3">
-            <header className="p-6">
-                <h1 className="text-4xl font-bold text-center text-gray-900">
-                    Locked Mode demo
-                </h1>
-            </header>
             <ContextMenuProvider menuId="locked-mode-menu">
                 <VSpanProvider categories={lockedModeCategories} initialData={initialLockedMode}>
                     <ZoneProvider categories={zoneCategories} initialData={initialZones}>
-                        <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData!, layout: plotLayout!, config: plotConfig }} >
+                        <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
                             <Zones />
                             <VSpans />
                         </TimeSeries>

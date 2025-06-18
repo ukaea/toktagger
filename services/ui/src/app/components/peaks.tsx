@@ -1,8 +1,31 @@
 "use client";
-import {Provider, defaultTheme, Button, ButtonGroup, Slider, Flex, Header, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Slider, Flex, Header, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
 import { useEffect, useState } from 'react';
 
-export default function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
+export function TimeRangeSlider({ data, onChange }) {
+    const [timeMinDefault, setTimeMinDefault] = useState(null);
+    const [timeMaxDefault, setTimeMaxDefault] = useState(null);
+    const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
+
+    useEffect(() => {
+        if (data && (!timeMinDefault || !timeMinDefault)) {
+            const time = data.time;
+            const tmin = Math.min(...time);
+            const tmax = Math.max(...time)
+            setTimeMinDefault(tmin);
+            setTimeMaxDefault(tmax);
+            setTimeRange({start: tmin, end: tmax});
+        }
+    }, [data]);
+
+    return (
+        <div className='m-4'>
+            <RangeSlider label="Time Range" defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChange={setTimeRange} onChangeEnd={onChange} step={0.001} minValue={timeMinDefault} maxValue={timeMaxDefault}/>
+        </div>
+    );
+}
+
+export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
     const [prominence, setProminance] = useState(0.1);
     const [distance, setDistance] = useState(1);
     const [clearPeaks, setClearPeaks] = useState(false);
@@ -10,6 +33,7 @@ export default function FindPeaksTool({ project_id, sample_id, data, setAnnotati
     const [timeMinDefault, setTimeMinDefault] = useState(null);
     const [timeMaxDefault, setTimeMaxDefault] = useState(null);
     const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
+
 
     useEffect(() => {
         if (data) {
@@ -24,8 +48,8 @@ export default function FindPeaksTool({ project_id, sample_id, data, setAnnotati
     useEffect(() => {
         const fetchData = async () => {
             if (clearPeaks) {
-            setAnnotations([]);
-            return;
+                setAnnotations([]);
+                return;
             }
 
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/models/abc/predict/${sample_id}`, {

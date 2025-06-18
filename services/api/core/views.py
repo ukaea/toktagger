@@ -41,13 +41,15 @@ class SpectrogramView:
 
         # Compute the Short-Time Fourier Transform (STFT)
         sample_rate = 1 / (time[1] - time[0])
-        freq, time, values = stft(
+        freq, ts, values = stft(
             values,
             fs=int(sample_rate),
             nperseg=self.params.nperseg,
             noverlap=self.params.nperseg // 2,
         )
         values = np.absolute(values)
+        freq /= 1000
+        time = ts + time[0]
 
         # Clip to time/frequency range
         time_min = (
