@@ -15,7 +15,7 @@ export const SampleDataBreadCrumbs = (info) => {
         <Breadcrumbs>
           <Item key="projects" href={`${process.env.NEXT_PUBLIC_API_URL}/projects`}>Projects</Item>
           <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${info.project._id}`}>Project: {info.project.name}</Item>
-          <Item key="samples">Sample: {info.sample.shot_id}</Item>
+          <Item key="samples">Shot: {info.sample.shot_id}</Item>
         </Breadcrumbs>
       </Provider>
   );
