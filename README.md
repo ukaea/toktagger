@@ -1,5 +1,5 @@
 
-## Overview
+# Overview
 
 Below is a high level overview of the project structure:
 ```
@@ -8,22 +8,21 @@ Below is a high level overview of the project structure:
 ├── active_learning     # Experiments in active learning
 ├── notebooks           # Notebooks for exploring data
 ├── services            # Implementations of different apis/services
-│   ├── data_api        # Data API: For pulling signals for display
-│   ├── event_api       # Event API: For storing event data and tags
-│   ├── model_api       # Model API: For running and quering models
-│   └── ui              # UI: the front end of the application
+│   ├── api             # API: backend for pulling data, annotations, running models.
+│   └── ui              # UI: the react front end of the application
 ├── README.md           # This README doc
 └── docker-compose.yml  # Master docker compose for running the application
 ```
 
+
+# Development Setup
 
 ## Installation
 
 1. Install `docker` and `docker compose`: https://docs.docker.com/engine/install/
 2. Install and setup `git lfs`: https://git-lfs.com/
 
-## Setup
-
+## Setup local data
 Configure git LFS and pull the model
 ```sh
 git lfs install
@@ -35,7 +34,7 @@ Build the relevant dataset for the ML model locally
 uv venv --python 3.12.6 
 source .venv/bin/activate
 uv pip install -r ./scripts/requirements.txt
-python -m scripts.build_dataset scripts/shots.csv
+python -m scripts.setup scripts/shots.csv
 ```
 
 ## Run
@@ -43,7 +42,7 @@ python -m scripts.build_dataset scripts/shots.csv
 Run the application by running the following command:
 
 ```sh
-docker compose --env-file .env.dev up 
+docker compose --env-file .env.dev up --build
 ```
 
 This will start the following services:
@@ -51,7 +50,5 @@ This will start the following services:
 | Service URL                     | Description                |
 |---------------------------------|----------------------------|
 | `http://localhost:3001/`        | User Interface             |
-| `http://localhost:8082/`        | MongoExpress Admin Panel   |
-| `http://localhost:8000/`        | Event Database API         |
-| `http://localhost:8001/`        | Model Runner API           |
-| `http://localhost:8002/`        | Data API                   |
+| `http://localhost:8002/`        | Backend API                |
+| `http://localhost:8081/`        | MongoExpress Admin Panel   |
