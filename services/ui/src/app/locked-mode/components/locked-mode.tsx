@@ -24,21 +24,16 @@ type LockedModeInfo = {
     data: SpectrogramData
 }
 
-export const LockedMode = ({ data }) => {
+export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedModeInfo}) => {
 
     const lockedModeCategories: Category[] = [
         { name: "Locked Mode", color: "rgb(255, 0, 0)" },
     ]
     const initialLockedMode: VSpan[] = []
-
     const zoneCategories: Category[] = [
         { name: "NTM", color: 'rgb(0, 0, 255)' },
-        { name: "LLM", color: 'rgb(211, 0, 255)' },
     ]
-    const initialZones: Zone[] = []
-
-    const originalAmpMin = Math.min(...data.amplitude.flat());
-    const originalAmpMax = Math.max(...data.amplitude.flat());
+    const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
 
     const logAmplitude = data.amplitude.map(row => row.map(x => Math.log10(Math.max(x, 1e-4))));
     const logAmpMin = Math.min(...logAmplitude.flat());
@@ -106,11 +101,21 @@ export const LockedMode = ({ data }) => {
         modeBarButtonsToRemove: ['pan'],
     }
 
+    const updateAnnotations = (newZones) => {
+        const zones = newZones.map(item => ({
+                time_min: item.x0,
+                time_max: item.x1,
+                label: item.category.name
+        }));
+
+        setAnnotations(zones);
+    }
+
     return (
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="locked-mode-menu">
                 <VSpanProvider categories={lockedModeCategories} initialData={initialLockedMode}>
-                    <ZoneProvider categories={zoneCategories} initialData={initialZones}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onAddZone={updateAnnotations}>
                         <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
                             <Zones />
                             <VSpans />

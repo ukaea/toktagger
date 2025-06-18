@@ -25,9 +25,9 @@ const SampleView = (args) => {
   if (args.project.task == 'disruption') {
     return (<Disruption data={args.data}/>);
   } else if (args.project.task == 'ELM') {
-    return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations}/>);
+    return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations} />);
   } else if (args.project.task == 'MHD') {
-    return (<LockedMode data={args.data.values['mirnov']} viewParams={args.viewParams}/>);
+    return (<LockedMode data={args.data.values['mirnov']} viewParams={args.viewParams} annotations={args.annotations} setAnnotations={args.setAnnotations}/>);
   }
 }
 
@@ -168,6 +168,10 @@ async function getProject(project_id: string) {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
 }
 
+async function getAnnotations(project_id: string, sample_id: string) {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
+}
+
 
 export default function SamplePage({ params }: Props) {
   const props = use(params);
@@ -184,8 +188,11 @@ export default function SamplePage({ params }: Props) {
     const project = await getProject(project_id);
     setProject(project);
 
-    const sample = await getSample(project_id, sample_id)
+    const sample = await getSample(project_id, sample_id);
     setSample(sample);
+
+    const annotations = await getAnnotations(project_id, sample_id);
+    setAnnotations(annotations);
     
     if (project.task == 'MHD') {
       viewParams.name = 'spectrogram';

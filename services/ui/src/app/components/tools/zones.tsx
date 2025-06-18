@@ -24,7 +24,7 @@ export const Zones = ({
     })
 
     // Hook to pull in data from context provider
-    const {zones, handleZoneUpdate, triggerUpdate} = useZoneContext()
+    const {zones, handleZoneUpdate, handleZoneDragFinish, triggerUpdate} = useZoneContext()
 
     // Main rendering effect
     useEffect(() => {
@@ -111,6 +111,8 @@ export const Zones = ({
                     d.x0 = x0;
                     d.x1 = x1;
                     handleZoneUpdate()
+                }).on("end", function(event, d) {
+                    handleZoneDragFinish();  
                 })
 
             function handleContextMenu(event, zone: Zone) {

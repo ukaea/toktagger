@@ -9,6 +9,7 @@ import { useContextMenuProvider } from "./context-menu-provider";
 interface ZoneContextInfo {
     zones: Zone[];
     handleZoneUpdate: () => void;
+    handleZoneDragFinish: () => void;
     addZone: (x0: number, x1: number, category: Category) => void;
     triggerUpdate: number;
 }
@@ -53,6 +54,10 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
         triggerZoneUpdate()
     }
 
+    const handleZoneDragFinish = () => {
+        onAddZone(zones.current);
+    }
+
     const addZone = (x0: number, x1: number, category: Category) => {
         zones.current.push(
             {
@@ -61,7 +66,8 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
                 x1
             }
         )
-        triggerZoneUpdate()
+        triggerZoneUpdate();
+        onAddZone(zones.current);
     }
 
     const handleDelete = (input: unknown) => {
@@ -89,10 +95,7 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
                     x1
                 }
             )
-            triggerZoneUpdate()
-            if (onAddZone) {
-                onAddZone(zones.current);
-            }
+            triggerZoneUpdate();
         }
     
             const addZoneItems = categories.map((category, index) => {
@@ -138,7 +141,7 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
 
     // The context provider is responsible for rendering the context menu relating to zones
     return(
-        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, addZone, triggerUpdate}}>
+        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, triggerUpdate}}>
             {children}
             <Menu id={`${ZONE_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {
