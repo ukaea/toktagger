@@ -115,7 +115,7 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="locked-mode-menu">
                 <VSpanProvider categories={lockedModeCategories} initialData={initialLockedMode}>
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onAddZone={updateAnnotations}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
                         <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
                             <Zones />
                             <VSpans />

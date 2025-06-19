@@ -32,7 +32,7 @@ export const ZONE_MENU_ID = "zone-provider"
  * @param categories Array of categories that the zones provided by this context can be
  * @param initialData Array of zones that should be added when initialised
  */
-export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
+export const ZoneProvider = ({categories, initialData, children, onModifyZone} : {
     categories: Category[],
     initialData?: Zone[],
     children: React.ReactNode,
@@ -55,7 +55,7 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
     }
 
     const handleZoneDragFinish = () => {
-        onAddZone(zones.current);
+        onModifyZone(zones.current);
     }
 
     const addZone = (x0: number, x1: number, category: Category) => {
@@ -67,12 +67,13 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
             }
         )
         triggerZoneUpdate();
-        onAddZone(zones.current);
+        onModifyZone(zones.current);
     }
 
     const handleDelete = (input: unknown) => {
         zones.current = zones.current.filter(zone => zone !== input)
         triggerZoneUpdate()
+        onModifyZone(zones.current);
     }
 
     const handleTypeSetting = ({props}: ItemParams, targetCategory: Category) => {
