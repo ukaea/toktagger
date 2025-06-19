@@ -45,6 +45,7 @@ async def get_all_annotations(
     annotations = await utils.get_annotations(
         db_client, project_id, validated, start, end
     )
+    print(annotations)
     return annotations
 
 
