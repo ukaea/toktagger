@@ -32,8 +32,14 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
     const initialLockedMode: VSpan[] = []
     const zoneCategories: Category[] = [
         { name: "NTM", color: 'rgb(0, 255, 255)' },
+        { name: "LLM", color: 'rgb(200, 100, 100)' },
     ]
-    const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
+
+    const convertRegionToZone = (item) => {
+        const category = zoneCategories.find(x => x.name === item.label);
+        return {x0: item.time_min, x1: item.time_max, category: category};
+    };
+    const zones = annotations.map(convertRegionToZone);
 
     const amplitude = data.amplitude;
     const ampMin = Math.max(1e-4, Math.min(...amplitude.flat()));

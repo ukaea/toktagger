@@ -25,7 +25,11 @@ export const Disruption = ({ data, annotations, setAnnotations}: {data: Disrupti
             { name: "Disruption", color: 'rgb(255, 0, 0)' },
         ]
 
-    const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
+    const convertRegionToZone = (item) => {
+        const category = zoneCategories.find(x => x.name === item.label);
+        return {x0: item.time_min, x1: item.time_max, category: category};
+    };
+    const zones = annotations.map(convertRegionToZone);
 
     const plotData: Plotly.Data[] = [
         {
