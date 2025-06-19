@@ -36,7 +36,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     categories: Category[],
     initialData?: Zone[],
     children: React.ReactNode,
-    onAddZone: CallableFunction
+    onModifyZone: CallableFunction
 }) => {
     const zones = useRef<Zone[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh

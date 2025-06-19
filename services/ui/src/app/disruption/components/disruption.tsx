@@ -14,25 +14,18 @@ type DisruptionInfo = {
     values: Record<string, Array<number>>
 }
 
-export const Disruption = ({ data }: DisruptionInfo) => {
+export const Disruption = ({ data, annotations, setAnnotations}: {data: DisruptionInfo}) => {
     const zoneCategories: Category[] = [
             { name: "RampUp", color: 'rgb(233, 170, 98)' },
             { name: "FlatTop", color: 'rgb(120, 167, 85)' },
             { name: "RampDown", color: 'rgb(108, 189, 224)' }
         ]
 
-    const initialZones: Zone[] = [
-        { x0: 0.05, x1: 0.1, category: zoneCategories[0] },
-        { x0: 0.15, x1: 0.2, category: zoneCategories[1] },
-    ]
-
     const disruptionCategories: Category[] = [
             { name: "Disruption", color: 'rgb(255, 0, 0)' },
         ]
 
-    const initialDisruption: VSpan[] = [
-        { x: 0.3, category: disruptionCategories[0] }
-    ]
+    const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
 
     const plotData: Plotly.Data[] = [
         {
@@ -83,11 +76,22 @@ export const Disruption = ({ data }: DisruptionInfo) => {
         dragmode: 'pan',
     };
 
+    const updateAnnotations = (newZones) => {
+
+        const zones = newZones.map(item => ({
+                time_min: item.x0,
+                time_max: item.x1,
+                label: item.category.name
+        }));
+
+        setAnnotations(zones);
+    }
+
     return (
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="disruption-menu">
-                <VSpanProvider categories={disruptionCategories} initialData={initialDisruption}>
-                    <ZoneProvider categories={zoneCategories} initialData={initialZones}>
+                <VSpanProvider categories={disruptionCategories} initialData={[]}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
                         <TimeSeries plotId="Disruption" plotConfig={{data: plotData, layout: plotLayout}}>
                             <Zones />
                             <VSpans />
