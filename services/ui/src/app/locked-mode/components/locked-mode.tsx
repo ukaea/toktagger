@@ -58,7 +58,7 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
         coloraxis: 'coloraxis'
     }];
 
-    const interpFunc = d3.interpolatePlasma;
+    const interpFunc = d3.interpolateRdBu;
 
     const plotLayout: Partial<Plotly.Layout> = {
         height: 600,
