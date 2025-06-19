@@ -31,15 +31,19 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
     ]
     const initialLockedMode: VSpan[] = []
     const zoneCategories: Category[] = [
-        { name: "NTM", color: 'rgb(0, 0, 255)' },
+        { name: "NTM", color: 'rgb(0, 255, 255)' },
     ]
     const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
 
-    const logAmplitude = data.amplitude.map(row => row.map(x => Math.log10(Math.max(x, 1e-4))));
+    const amplitude = data.amplitude;
+    const ampMin = Math.max(1e-4, Math.min(...amplitude.flat()));
+    const ampMax = Math.max(...amplitude.flat());
+    
+    const logAmplitude = amplitude.map(row => row.map(x => Math.log10(Math.max(x, 1e-4))));
     const logAmpMin = Math.min(...logAmplitude.flat());
     const logAmpMax = Math.max(...logAmplitude.flat());
 
-    const tickvals = linspace(logAmpMin, logAmpMax, 10)
+    const tickvals = linspace(ampMin, ampMax, 6).map(x => Math.log10(x));
     let ticktext = tickvals.map(x => Math.pow(10, x));
     ticktext = ticktext.map(x => Math.round(x * 10000) / 10000);
 
@@ -54,9 +58,10 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
         coloraxis: 'coloraxis'
     }];
 
-    const interpFunc = d3.interpolateTurbo;
+    const interpFunc = d3.interpolatePlasma;
 
     const plotLayout: Partial<Plotly.Layout> = {
+        height: 600,
         xaxis: {
             title: {
                 text: 'Time [s]'
@@ -87,6 +92,9 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
                 tickmode: 'array',
                 ticktext: ticktext,
                 tickvals: tickvals,
+                tickfont: {
+                    size: 10
+                }
             }
         },
         showlegend: true,
@@ -115,7 +123,7 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="locked-mode-menu">
                 <VSpanProvider categories={lockedModeCategories} initialData={initialLockedMode}>
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onAddZone={updateAnnotations}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
                         <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
                             <Zones />
                             <VSpans />
