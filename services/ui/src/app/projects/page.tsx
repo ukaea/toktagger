@@ -47,7 +47,7 @@ export const ProjectsTable = ({projects}) => {
 }
 
 export default function Projects() {
-  const [projectsPerPage, setProjectsPerPage] = useState(2);
+  const [projectsPerPage, setProjectsPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
   
   const projects = getProjects(currentPage, projectsPerPage);
