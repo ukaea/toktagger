@@ -7,12 +7,12 @@ import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
 
-type ElmGraphInfo = {
+type ELMViewInfo = {
     data: MultiVariateTimeSeriesData, 
     annotations: Annotations, 
     setAnnotations: (annotations: Annotations) => void
 };
-export const ElmGraph = ({data, annotations, setAnnotations}: ElmGraphInfo) => {
+export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
 
     var dataTrace = {
         name: 'Dalpha',

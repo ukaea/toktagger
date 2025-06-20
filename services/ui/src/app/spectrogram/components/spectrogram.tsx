@@ -1,6 +1,6 @@
 "use client"
 
-import { LockedModeTable } from "./locked-mode-table"
+import { SpectrogramViewTable } from "./spectrogram-table"
 import { SpectrogramData, Category, Annotations, Zone, TimeRegion } from "@/types"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
@@ -20,13 +20,13 @@ const linspace = (start: number, end: number, num: number) => {
     return arr
 }
 
-type LockedModeProps = {
+type SpectrogramViewInfo = {
     data: SpectrogramData, 
     annotations: Annotations,
     setAnnotations: (annotations: Annotations) => void
 };
 
-export const LockedMode = ({data, annotations, setAnnotations}: LockedModeProps) => {
+export const SpectrogramView = ({data, annotations, setAnnotations}: SpectrogramViewInfo) => {
 
     const lockedModeCategories: Category[] = [
         { name: "Locked Mode", color: "rgb(255, 0, 0)" },
@@ -135,7 +135,7 @@ export const LockedMode = ({data, annotations, setAnnotations}: LockedModeProps)
                             <Zones />
                             <VSpans />
                         </TimeSeries>
-                        <LockedModeTable />
+                        <SpectrogramViewTable />
                     </ZoneProvider>
                 </VSpanProvider>
             </ContextMenuProvider>

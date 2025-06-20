@@ -1,10 +1,10 @@
 "use client";
-import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, ToastContainer, ToastQueue } from '@adobe/react-spectrum'
-import { Disruption } from '@/app/disruption/components/disruption';
-import { ElmGraph } from '@/app/elm/components/elms';
 import { use, useState, useEffect } from 'react';
-import { LockedMode } from '@/app/locked-mode/components/locked-mode';
+import {Provider, defaultTheme, Breadcrumbs, Item, ToastContainer} from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from '@/types';
+import { ELMView } from '@/app/elms/components/elms';
+import { SpectrogramView } from '@/app/spectrogram/components/spectrogram';
+import { DisruptionView } from '@/app/disruption/components/disruption';
 import ToolBar from '@/app/components/tools/toolbar';
 
 type SampleDataBreadCrumbsInfo = {
@@ -33,11 +33,11 @@ type SampleViewInfo = {
 const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo) => {
   console.log(data);
   if (project.task == 'disruption') {
-    return (<Disruption data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    return (<DisruptionView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'ELM') {
-    return (<ElmGraph data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    return (<ELMView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'MHD') {
-    return (<LockedMode data={data.values['mirnov']} annotations={annotations} setAnnotations={setAnnotations}/>);
+    return (<SpectrogramView data={data.values['mirnov']} annotations={annotations} setAnnotations={setAnnotations}/>);
   }
 }
 

@@ -15,7 +15,7 @@ type DisruptionViewInfo = {
   setAnnotations: (annotations: Annotations) => void
 };
 
-export const Disruption = ({data, annotations, setAnnotations} : DisruptionViewInfo) => {
+export const DisruptionView = ({data, annotations, setAnnotations} : DisruptionViewInfo) => {
     const disruptionCategories: Category[] = [
             { name: "Disruption", color: 'rgb(255, 0, 0)' },
         ]
