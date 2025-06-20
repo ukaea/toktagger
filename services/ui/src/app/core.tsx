@@ -50,18 +50,18 @@ export const getSample = (project_id: string, sample_id: string) => {
   return sample;
 } 
 
-export const getProjects = (project_id: string) => {
+export const getProjects = (page, projectsPerPage) => {
   const [projects, setProjects] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/?start=${(page - 1) * projectsPerPage}&count=${projectsPerPage}`);
       const data = await response.json();
       setProjects(data);
     };
 
     fetchData();
-  }, []);
+  }, [page, projectsPerPage]);
 
   return projects;
 } 

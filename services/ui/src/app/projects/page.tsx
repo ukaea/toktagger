@@ -1,6 +1,12 @@
 "use client";
 import { getProjects } from '@/app/core';
-import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import { use, useState, useEffect } from 'react';
+import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button} from '@adobe/react-spectrum'
+
+type ProjecsTableProps = {
+  page: number,
+  projectsPerPage: number
+}
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -12,8 +18,8 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = () => {
-  const projects = getProjects();
+export const ProjectsTable = ({page, projectsPerPage}: ProjecsTableProps) => {
+  const projects = getProjects(page, projectsPerPage);
 
   if (!projects) {
     return;
@@ -51,6 +57,8 @@ export const ProjectsTable = () => {
 }
 
 export default function Projects() {
+  const [projectsPerPage, setProjectsPerRow] = useState(2);
+  const [currentPage, setCurrentPage] = useState(1);
 
   return (
     <div>
@@ -60,7 +68,14 @@ export default function Projects() {
           <h1 className="text-2xl font-bold mb-4">
             Projects
           </h1>
-          <ProjectsTable></ProjectsTable>
+          <ProjectsTable page={currentPage} projectsPerPage={projectsPerPage}></ProjectsTable>
+          <p>Current page: {currentPage}</p>
+          <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
+            Previous
+          </Button>
+          <Button onPress={() => setCurrentPage((p) => p + 1)}>
+            Next
+          </Button>
         </div>
       </div>
     </div>

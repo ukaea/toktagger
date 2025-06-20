@@ -24,9 +24,9 @@ async def get_projects(
         0,
         description="Index of the first project you want returned when sorted newest - oldest",
     ),
-    end: int = Query(
+    count: int = Query(
         None,
-        description="Index of the last project you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="Number of projects you want returned, leave blank to return all entries",
     ),
 ) -> list[Project]:
     """
@@ -39,7 +39,7 @@ async def get_projects(
         sort_by="timestamp",
         sort_direction=-1,
         start=start,
-        limit=end - start + 1 if end is not None else 0,
+        limit=count if count is not None else 0,
     )
 
     return _projects
