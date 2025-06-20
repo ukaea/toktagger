@@ -107,7 +107,6 @@ export const Disruption = ({ data, annotations, setAnnotations}: {data: Disrupti
         }));
 
 
-        console.log(spans);
         const otherAnnotations = annotations.filter(x => !TimePoint.safeParse(x).success);
         spans = spans.concat(otherAnnotations);
         setAnnotations(spans);
