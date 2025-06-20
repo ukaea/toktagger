@@ -34,7 +34,7 @@ Build the relevant dataset for the ML model locally
 uv venv --python 3.12.6 
 source .venv/bin/activate
 uv pip install -r ./scripts/requirements.txt
-python -m scripts.setup scripts/shots.csv
+python -m scripts.setup 
 ```
 
 ## Run
