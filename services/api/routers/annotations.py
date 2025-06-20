@@ -28,9 +28,9 @@ async def get_all_annotations(
         0,
         description="Index of the first annotation you want returned when sorted newest - oldest",
     ),
-    end: int = Query(
+    count: int = Query(
         None,
-        description="Index of the last annotation you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="The number of annotations to return, leave blank to return all entries",
     ),
     validated: bool = Query(
         None,
@@ -43,7 +43,7 @@ async def get_all_annotations(
     """
     db_client = request.app.state.db_client
     annotations = await utils.get_annotations(
-        db_client, project_id, validated, start, end
+        db_client, project_id, validated, start, count
     )
     print(annotations)
     return annotations
@@ -93,9 +93,9 @@ async def get_annotations(
         0,
         description="Index of the first annotation you want returned when sorted newest - oldest",
     ),
-    end: int = Query(
+    count: int = Query(
         None,
-        description="Index of the last annotation you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="The number of annotations to return, leave blank to return all entries",
     ),
     validated: bool = Query(
         None,
@@ -127,7 +127,7 @@ async def get_annotations(
         sort_by="timestamp",
         sort_direction=-1,
         start=start,
-        limit=end - start + 1 if end is not None else 0,
+        limit=count if count is not None else 0,
     )
     print(_annotations)
 

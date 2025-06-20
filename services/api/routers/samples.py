@@ -25,9 +25,9 @@ async def get_samples(
         0,
         description="Index of the first sample you want returned when sorted newest - oldest",
     ),
-    end: int = Query(
+    count: int = Query(
         None,
-        description="Index of the last sample you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="The number of samples to return, leave blank to return all entries",
     ),
 ) -> list[Sample]:
     """
@@ -35,7 +35,7 @@ async def get_samples(
     --------------------------------------------------------
     """
     db_client = request.app.state.db_client
-    samples = await utils.get_samples(db_client, project_id, start, end)
+    samples = await utils.get_samples(db_client, project_id, start, count)
     return samples
 
 
