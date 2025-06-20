@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Request, HTTPException
-from services.api.schemas.projects import Project
+from services.api.schemas.projects import Project, Task
 from services.api.schemas.samples import Sample
-from services.api.schemas.annotators import Annotator, AnnotatorTypes
+from services.api.schemas.annotators import Annotator, AnnotatorIds, AnnotatorTypes
 from services.api.schemas.annotations import AnnotationIn, Annotation
 from services.api.schemas import convert_to_objectid
 from services.api.crud.utils import get_project, get_sample
 from services.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from services.api.core.data_loaders import DATA_LOADERS
 
-router = APIRouter(prefix="/projects/{project_id}", tags=["Annotations"],
+router = APIRouter(prefix="/projects/{project_id}", tags=["Annotators"],
 )
 
 @router.get("/annotator")
@@ -17,7 +17,7 @@ async def get_annotators(request: Request, project_id: str):
     pass
 
 @router.post("/samples/{sample_id}/annotator/{annotator_id}")
-async def create_annotations(request: Request, project_id: str, sample_id: str, annotator_id: AnnotatorTypes, params: Annotator):
+async def create_annotations(request: Request, project_id: str, sample_id: str, annotator_id: AnnotatorIds, params: AnnotatorTypes):
     # Use the specified annotator to label this sample for this project
     # Would use the datapool to load and process the data
     # The pass it through the selected annotator within the Project to make predictions
@@ -26,9 +26,10 @@ async def create_annotations(request: Request, project_id: str, sample_id: str, 
     db_client = request.app.state.db_client
     project: Project = await get_project(db_client, project_id)
     annotator_cls = ANNOTATORS[annotator_id]
+
     if not annotator_cls:
         raise HTTPException(status_code=404, detail="No annotator found for this project type.")
-    if annotator_cls not in ANNOTATORS_PER_TASK(project.task):
+    if annotator_id not in ANNOTATORS_PER_TASK[Task(project.task)]:
         raise HTTPException(status_code=409, detail=f"The selected annotator cannot be used for {project.task} labelling projects.")
     
     sample: Sample = await get_sample(db_client, sample_id)

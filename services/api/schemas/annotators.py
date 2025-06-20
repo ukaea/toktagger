@@ -1,8 +1,8 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
 
-class AnnotatorTypes(str, Enum):
+class AnnotatorIds(str, Enum):
     FIND_PEAKS = "find_peaks"
 
 class DataTypes(Enum):
@@ -25,3 +25,4 @@ class FindPeaksParams(Annotator):
 class TimeSeriesChangepoints(Annotator):
     penalty: int
 
+AnnotatorTypes = Union[FindPeaksParams, TimeSeriesChangepoints]

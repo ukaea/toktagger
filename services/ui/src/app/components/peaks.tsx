@@ -32,7 +32,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
                 return;
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/models/abc/predict/${sample_id}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/find_peaks`, {
                 method: 'POST',
                 headers: {
                 'Content-Type': 'application/json',
