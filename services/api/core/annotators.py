@@ -8,12 +8,7 @@ from services.api.schemas.data import MultiVariateTimeSeriesData
 from services.api.schemas.annotators import FindPeaksParams
 from services.api.schemas.annotations import TimeRegion
 from services.api.schemas.projects import Task
-
-
-class AnnotatorType(str, Enum):  # noqa: F821
-    CLASSIC = "classic"
-    UNET = "unet"
-
+from services.api.schemas.annotators import AnnotatorTypes
 
 class DataAnnotator(ABC):
     @abstractmethod
@@ -59,10 +54,14 @@ class FindPeaksAnnotator:
 
         return regions
 
-
 ANNOTATORS = {
-    Task.ELM: FindPeaksAnnotator,
-    Task.DISRUPTION: None,
-    Task.MHD: None,
-    Task.UFO: None
+    AnnotatorTypes.FIND_PEAKS: FindPeaksAnnotator,
+}
+# Currently only allowing these annotators to task mapping
+# Might want user to be able to specify a choice when making the project down the line?
+ANNOTATORS_PER_TASK = {
+    Task.ELM: [AnnotatorTypes.FIND_PEAKS,],
+    Task.DISRUPTION: [],
+    Task.MHD: [],
+    Task.UFO: []
 }
