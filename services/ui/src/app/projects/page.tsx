@@ -71,7 +71,7 @@ export default function Projects() {
             <Button onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
               Next
             </Button>
-            <Picker label="Projects per Page:" onSelectionChange={(selected) => setProjectsPerPage(selected)} defaultSelectedKey="5">
+            <Picker label="Projects per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
               <Item key="2">2</Item>
               <Item key="5">5</Item>
               <Item key="10">10</Item>
