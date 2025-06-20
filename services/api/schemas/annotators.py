@@ -22,3 +22,4 @@ class FindPeaksParams(Annotator):
 
 class TimeSeriesChangepoints(Annotator):
     penalty: int
+

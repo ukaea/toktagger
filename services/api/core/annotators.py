@@ -7,6 +7,7 @@ import numpy as np
 from services.api.schemas.data import MultiVariateTimeSeriesData
 from services.api.schemas.annotators import FindPeaksParams
 from services.api.schemas.annotations import TimeRegion
+from services.api.schemas.projects import Task
 
 
 class AnnotatorType(str, Enum):  # noqa: F821
@@ -57,3 +58,11 @@ class FindPeaksAnnotator:
                 regions.append(region)
 
         return regions
+
+
+ANNOTATORS = {
+    Task.ELM: FindPeaksAnnotator,
+    Task.DISRUPTION: None,
+    Task.MHD: None,
+    Task.UFO: None
+}
