@@ -1,12 +1,7 @@
 "use client";
 import { getProjects } from '@/app/core';
 import { use, useState, useEffect } from 'react';
-import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button} from '@adobe/react-spectrum'
-
-type ProjecsTableProps = {
-  page: number,
-  projectsPerPage: number
-}
+import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker} from '@adobe/react-spectrum'
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -18,12 +13,7 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = ({page, projectsPerPage}: ProjecsTableProps) => {
-  const projects = getProjects(page, projectsPerPage);
-
-  if (!projects) {
-    return;
-  }
+export const ProjectsTable = ({projects}) => {
   const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id
@@ -57,8 +47,13 @@ export const ProjectsTable = ({page, projectsPerPage}: ProjecsTableProps) => {
 }
 
 export default function Projects() {
-  const [projectsPerPage, setProjectsPerRow] = useState(2);
+  const [projectsPerPage, setProjectsPerPage] = useState(2);
   const [currentPage, setCurrentPage] = useState(1);
+  
+  const projects = getProjects(currentPage, projectsPerPage);
+  if (!projects) {
+    return;
+  }
 
   return (
     <div>
@@ -68,14 +63,21 @@ export default function Projects() {
           <h1 className="text-2xl font-bold mb-4">
             Projects
           </h1>
-          <ProjectsTable page={currentPage} projectsPerPage={projectsPerPage}></ProjectsTable>
-          <p>Current page: {currentPage}</p>
-          <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
-            Previous
-          </Button>
-          <Button onPress={() => setCurrentPage((p) => p + 1)}>
-            Next
-          </Button>
+          <ProjectsTable projects={projects}></ProjectsTable>
+          <Provider theme={defaultTheme}>
+            <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
+              Previous
+            </Button>
+            <Button onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
+              Next
+            </Button>
+            <Picker label="Projects per Page:" onSelectionChange={(selected) => setProjectsPerPage(selected)} defaultSelectedKey="5">
+              <Item key="2">2</Item>
+              <Item key="5">5</Item>
+              <Item key="10">10</Item>
+              <Item key="25">25</Item>
+            </Picker>
+          </Provider>
         </div>
       </div>
     </div>
