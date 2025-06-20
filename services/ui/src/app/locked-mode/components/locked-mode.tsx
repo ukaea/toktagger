@@ -1,7 +1,7 @@
 "use client"
 
 import { LockedModeTable } from "./locked-mode-table"
-import { SpectrogramData, Category, VSpan, Zone } from "@/types"
+import { SpectrogramData, Category, Annotations, Zone, TimeRegion } from "@/types"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
@@ -20,26 +20,27 @@ const linspace = (start: number, end: number, num: number) => {
     return arr
 }
 
-type LockedModeInfo = {
-    data: SpectrogramData
-}
+type LockedModeProps = {
+    data: SpectrogramData, 
+    annotations: Annotations,
+    setAnnotations: (annotations: Annotations) => void
+};
 
-export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedModeInfo}) => {
+export const LockedMode = ({data, annotations, setAnnotations}: LockedModeProps) => {
 
     const lockedModeCategories: Category[] = [
         { name: "Locked Mode", color: "rgb(255, 0, 0)" },
     ]
-    const initialLockedMode: VSpan[] = []
     const zoneCategories: Category[] = [
         { name: "NTM", color: 'rgb(0, 255, 255)' },
         { name: "LLM", color: 'rgb(200, 100, 100)' },
     ]
 
-    const convertRegionToZone = (item) => {
+    const convertRegionToZone = (item: TimeRegion) => {
         const category = zoneCategories.find(x => x.name === item.label);
         return {x0: item.time_min, x1: item.time_max, category: category};
     };
-    const zones = annotations.map(convertRegionToZone);
+    const zones: Zone = annotations.map(convertRegionToZone);
 
     const amplitude = data.amplitude;
     const ampMin = Math.max(1e-4, Math.min(...amplitude.flat()));
@@ -115,7 +116,7 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
         modeBarButtonsToRemove: ['pan'],
     }
 
-    const updateAnnotations = (newZones) => {
+    const updateAnnotations = (newZones: Array<Zone>) => {
         const zones = newZones.map(item => ({
                 time_min: item.x0,
                 time_max: item.x1,
@@ -128,7 +129,7 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
     return (
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="locked-mode-menu">
-                <VSpanProvider categories={lockedModeCategories} initialData={initialLockedMode}>
+                <VSpanProvider categories={lockedModeCategories} initialData={[]}>
                     <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
                         <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
                             <Zones />

@@ -1,13 +1,18 @@
 'use client'
+import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
-import { DisruptionTable } from "@/app/disruption/components/disruption-table"
 
-export const ElmGraph = ({data, annotations, setAnnotations}) => {
+type ElmGraphInfo = {
+    data: MultiVariateTimeSeriesData, 
+    annotations: Annotations, 
+    setAnnotations: (annotations: Annotations) => void
+};
+export const ElmGraph = ({data, annotations, setAnnotations}: ElmGraphInfo) => {
 
     var dataTrace = {
         name: 'Dalpha',
@@ -173,13 +178,13 @@ export const ElmGraph = ({data, annotations, setAnnotations}) => {
         { name: "H-Mode", color: 'rgb(100, 170, 98)' },
     ]
 
-    const convertRegionToZone = (item) => {
+    const convertRegionToZone = (item: TimeRegion) => {
         const category = zoneCategories.find(x => x.name === item.label);
         return {x0: item.time_min, x1: item.time_max, category: category};
     };
     const zones = annotations.map(convertRegionToZone);
 
-    const updateAnnotations = (newZones) => {
+    const updateAnnotations = (newZones: Array<Zone>) => {
         const zones = newZones.map(item => ({
                 time_min: item.x0,
                 time_max: item.x1,
