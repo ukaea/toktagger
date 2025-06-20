@@ -31,7 +31,6 @@ type SampleViewInfo = {
 };
 
 const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo) => {
-  console.log(data);
   if (project.task == 'disruption') {
     return (<DisruptionView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'ELM') {

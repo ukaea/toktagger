@@ -64,6 +64,29 @@ export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo)
 
   return <Button variant="primary" onPress={handleClick} >Save</Button>
 }
+
+type AmplitudeSliderInfo = {
+  data: Data,
+  viewParams: any,
+  setViewParams: (viewParams: any) => void
+}
+
+export function AmplitudeSlider({data, viewParams, setViewParams}: AmplitudeSliderInfo) {
+    const onAmplitudeRangeChange = async (ampRange) => {
+        viewParams.amplitude_min = Math.pow(10, ampRange.start);
+        viewParams.amplitude_max = Math.pow(10, ampRange.end);
+        setViewParams(viewParams);
+    };
+
+    let ampValues = data.amplitude.flat();
+    ampValues = ampValues.map(x => Math.log10(Math.max(x, 1e-6)));
+    const ampRangeTool = (
+        <DataRangeSlider name={'Amplitude Range'} data={ampValues} onChange={onAmplitudeRangeChange} 
+        getValueLabel={val => `${Math.round(Math.pow(10, val.start)*10000, 2)/10000} - ${Math.round(Math.pow(10, val.end)*10000, 2)/10000}`}/>
+    );
+    return ampRangeTool;
+}
+
 type ToolBarInfo = {
   project: Project
   sample: Sample
@@ -73,7 +96,6 @@ type ToolBarInfo = {
   viewParams: any,
   setViewParams: (viewParams: any) => void
 }
-
 export default function ToolBar({ project, sample, data, annotations, setAnnotations, viewParams, setViewParams} : ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
@@ -86,21 +108,8 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
     );
     tools.push(findPeaksTool); 
   } else if (project.task == 'MHD') {
-
     let mhdData = data.values['mirnov'];
-
-    const onAmplitudeRangeChange = async (ampRange) => {
-        viewParams.amplitude_min = Math.pow(10, ampRange.start);
-        viewParams.amplitude_max = Math.pow(10, ampRange.end);
-        setViewParams(viewParams);
-    };
-
-    let ampValues = mhdData.amplitude.flat();
-    ampValues = ampValues.map(x => Math.log10(Math.max(x, 1e-6)));
-    const ampRangeTool = (
-        <DataRangeSlider name={'Amplitude Range'} data={ampValues} onChange={onAmplitudeRangeChange} 
-        getValueLabel={val => `${Math.round(Math.pow(10, val.start)*10000, 2)/10000} - ${Math.round(Math.pow(10, val.end)*10000, 2)/10000}`}/>
-    );
+    const ampRangeTool = <AmplitudeSlider data={mhdData} viewParams={viewParams} setViewParams={setViewParams}/>
     tools.push(ampRangeTool);
   }
 
