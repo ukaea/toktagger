@@ -3,9 +3,11 @@ import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, ToastCon
 import { Disruption } from '@/app/disruption/components/disruption';
 import { ElmGraph } from '@/app/elm/components/elms';
 import { getSample, getProject, getSampleData } from '@/app/core';
-import { use, useState, createContext, useContext } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import FindPeaksTool from '@/app/components/peaks';
+import { FindPeaksTool } from '@/app/components/peaks';
+import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
+import { LockedMode } from '@/app/locked-mode/components/locked-mode';
 
 export const SampleDataBreadCrumbs = (info) => {
   return (
@@ -23,7 +25,9 @@ const SampleView = (args) => {
   if (args.project.task == 'disruption') {
     return (<Disruption data={args.data}/>);
   } else if (args.project.task == 'ELM') {
-    return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations}/>);
+    return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations} />);
+  } else if (args.project.task == 'MHD') {
+    return (<LockedMode data={args.data.values['mirnov']} viewParams={args.viewParams} annotations={args.annotations} setAnnotations={args.setAnnotations}/>);
   }
 }
 
@@ -82,16 +86,34 @@ export function SaveButton({project_id, sample_id, annotations}) {
 }
 
 
-function ToolBar({ project, sample_id, data, annotations, setAnnotations}) {
+function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewParams, setViewParams}) {
   const project_id = project._id;
-  const findPeaksTool = (
-      <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
-  );
+
 
   let tools = [];
   if (project.task == 'ELM') {
+    const findPeaksTool = (
+        <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
+    );
     tools.push(findPeaksTool); 
-  } 
+  } else if (project.task == 'MHD') {
+
+    let mhdData = data.values['mirnov'];
+
+    const onAmplitudeRangeChange = async (ampRange) => {
+        viewParams.amplitude_min = Math.pow(10, ampRange.start);
+        viewParams.amplitude_max = Math.pow(10, ampRange.end);
+        setViewParams(viewParams);
+    };
+
+    let ampValues = mhdData.amplitude.flat();
+    ampValues = ampValues.map(x => Math.log10(Math.max(x, 1e-6)));
+    const ampRangeTool = (
+        <DataRangeSlider name={'Amplitude Range'} data={ampValues} onChange={onAmplitudeRangeChange} 
+        getValueLabel={val => `${Math.round(Math.pow(10, val.start)*10000, 2)/10000} - ${Math.round(Math.pow(10, val.end)*10000, 2)/10000}`}/>
+    );
+    tools.push(ampRangeTool);
+  }
 
   return (
         <Provider theme={defaultTheme}>
@@ -103,36 +125,88 @@ function ToolBar({ project, sample_id, data, annotations, setAnnotations}) {
             </ButtonGroup>
           </div>
           <hr className='m-4'/>
-          {tools.map((item, i) => <div className='h-screen' key={i}>{item}</div>)}
+          {tools.map((item, i) => <div  key={i}>{item}</div>)}
         </div>
         </Provider>
   );
 }
+
+export async function getData(url) {
+    const response = await fetch(url);
+    const payload = await response.json();
+    return payload;
+}
+
+async function getSample(project_id: string, sample_id: string) {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
+}
+
+async function getProject(project_id: string) {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+}
+
+async function getAnnotations(project_id: string, sample_id: string) {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
+}
+
 
 export default function SamplePage({ params }: Props) {
   const props = use(params);
   const project_id = props.project_id;
   const sample_id = props.sample_id;
 
-  const project = getProject(project_id);
-  const sample = getSample(project_id, sample_id);
-  const data = getSampleData(project_id, sample_id);
-  const [ annotations, setAnnotations ] = useState([]);
+  const [project, setProject] = useState<any>(null);
+  const [sample, setSample] = useState<any>(null);
+  const [data, setData] = useState<any>(null);
+  const [annotations, setAnnotations] = useState<any>([]);
+  const [viewParams, setViewParams] = useState<any>({name: 'identity'});
+
+  const refreshData = async ( viewParams ) => {
+    const project = await getProject(project_id);
+    setProject(project);
+
+    const sample = await getSample(project_id, sample_id);
+    setSample(sample);
+
+    const annotations = await getAnnotations(project_id, sample_id);
+    setAnnotations(annotations);
+    
+    if (project.task == 'MHD') {
+      viewParams.name = 'spectrogram';
+      viewParams.nperseg = 256;
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
+        method: 'POST',
+        headers: {
+        'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(viewParams),
+    });
+    const data = await response.json();
+    setData(data);
+  };
+
+  useEffect(() => {
+    const run = async () => {
+      await refreshData(viewParams);
+    }
+    run();
+  }, [viewParams]);
 
   if (!data) {
     return;
   }
 
-  console.log(annotations);
   return (
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
           <div className='flex'>
-            <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations}/>
+            <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={refreshData}/>
             <div className="flex-1 justify-center">
-              <SampleView project={project} data={data} annotations={annotations} setAnnotations={setAnnotations} />
+              <SampleView project={project} data={data} annotations={annotations} setAnnotations={setAnnotations}/>
             </div>
           </div>
       </Provider>

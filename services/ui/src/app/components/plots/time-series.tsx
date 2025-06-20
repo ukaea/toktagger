@@ -49,13 +49,62 @@ export const TimeSeries = ({
     const {show: showContextMenu} = useContextMenuProvider()
     const showContextMenuRef = useRef(showContextMenu)
 
-    const dataRef = useRef(data)
-    const layoutRef = useRef(layout)
-    const configRef = useRef(config)
+    const overplots: string[] = [];
 
     const triggerToolUpdate = () => {
         setUpdateTools((current) => (current + 1) % 100)
     }
+
+    const renderZones = (plot: Plotly.PlotlyHTMLElement) =>  {
+        // Get all subplot elements and extract the subplot name (xy for example) from the class list
+        const subplots = plot.querySelectorAll(".subplot")
+        const subplotNames = [...subplots].map(el => 
+            [...el.classList].find(cls => cls !== "subplot")
+        )
+
+        // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
+        subplotNames.forEach(coordinateSystem => {
+            const subplot = plot.querySelector(`.subplot.${coordinateSystem}`)?.querySelector(".overplot")?.querySelector(`.${coordinateSystem}`) as HTMLElement
+            if (!subplot) {
+                console.error("Cannot locate disruption plotly subplot")
+                return
+            }
+
+            if (!subplot.querySelector(`.${plotId}-overplot-${coordinateSystem}`)) { // ensure only one custom overlay group is present
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "g")
+                svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`)
+                svg.setAttribute("fill", "none");
+                subplot.appendChild(svg)
+                overplots.push(`${plotId}-overplot-${coordinateSystem}`) // Store overplots for removal
+            }
+        });
+        
+        setPlotReady(true)
+
+        const relayoutHandler = () => { // triggers re-render of overlay tools when axes change
+            triggerToolUpdate()
+        } 
+        plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Shift") {
+                const elements = plot.querySelectorAll(".disable-on-shift")
+                elements.forEach((element) => {
+                    element.setAttribute("style", "pointer-events: none")
+                })
+            }
+        })
+
+        document.addEventListener("keyup", (e) => {
+            if (e.key === "Shift") {
+                const elements = plot.querySelectorAll(".disable-on-shift")
+                elements.forEach((element) => {
+                    element.setAttribute("style", "pointer-events: all")
+                })
+            }
+        })
+    };
+
 
     // Main plotly rendering
     useEffect(() => {
@@ -68,65 +117,11 @@ export const TimeSeries = ({
 
         let plotElement: Plotly.PlotlyHTMLElement | null = null // holds the created plot for later cleanup
 
-        const overplots: string[] = [];
-
         const initGraph = async () => {
             const { react } = await import('plotly.js') // Annoyingly there seems to be an issue with plotly so dynamic import is needed
-
-            react(root, dataRef.current, layoutRef.current, configRef.current).then((plot: Plotly.PlotlyHTMLElement) => {
-                plotElement = plot // save reference to remove listeners later
-
-                // Get all subplot elements and extract the subplot name (xy for example) from the class list
-                const subplots = plot.querySelectorAll(".subplot")
-                const subplotNames = [...subplots].map(el => 
-                    [...el.classList].find(cls => cls !== "subplot")
-                )
-
-                // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
-                subplotNames.forEach(coordinateSystem => {
-                    const subplot = plot.querySelector(`.subplot.${coordinateSystem}`)?.querySelector(".overplot")?.querySelector(`.${coordinateSystem}`) as HTMLElement
-                    if (!subplot) {
-                        console.error("Cannot locate disruption plotly subplot")
-                        return
-                    }
-
-                    if (!subplot.querySelector(`.${plotId}-overplot-${coordinateSystem}`)) { // ensure only one custom overlay group is present
-                        const svg = document.createElementNS("http://www.w3.org/2000/svg", "g")
-                        svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`)
-                        svg.setAttribute("fill", "none");
-                        subplot.appendChild(svg)
-                        overplots.push(`${plotId}-overplot-${coordinateSystem}`) // Store overplots for removal
-                    }
-                });
-                
-                setPlotReady(true)
-
-                const relayoutHandler = () => { // triggers re-render of overlay tools when axes change
-                    triggerToolUpdate()
-                } 
-                plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
-
-                document.addEventListener("keydown", (e) => {
-                    if (e.key === "Shift") {
-                        const elements = plot.querySelectorAll(".disable-on-shift")
-                        elements.forEach((element) => {
-                            element.setAttribute("style", "pointer-events: none")
-                        })
-                    }
-                })
-
-                document.addEventListener("keyup", (e) => {
-                    if (e.key === "Shift") {
-                        const elements = plot.querySelectorAll(".disable-on-shift")
-                        elements.forEach((element) => {
-                            element.setAttribute("style", "pointer-events: all")
-                        })
-                    }
-                })
-            })
+            react(root, data, layout, config).then(renderZones);
         }
         initGraph()
-        
         return () => { // cleanup on unmount / Fast-Refresh
             plotElement?.removeAllListeners?.("plotly_relayout"); // detach relayout listener
 
@@ -140,6 +135,15 @@ export const TimeSeries = ({
             setPlotReady(false); // reset ready state
         } 
     }, [plotId])
+
+    useEffect(() => {
+        const reload = async () => {
+            const { react } = await import('plotly.js') // Annoyingly there seems to be an issue with plotly so dynamic import is needed
+            const root = document.getElementById(plotId)
+            react(root, data, layout, config);
+        };
+        reload();
+    }, [plotId, data]);
 
     // Handles context menu creation
     useEffect(() => {

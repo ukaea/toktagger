@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
 from pydantic import Field, model_validator
 
@@ -43,5 +43,8 @@ class Annotation(AnnotationIn):
     sample_id: str
 
 
-class ModelAnnotation(Annotation):
+class ModelAnnotation(AnnotationIn):
     uncertainty: float
+
+
+AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]

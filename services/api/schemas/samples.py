@@ -29,7 +29,7 @@ class FileData(ConfiguredModel):
 
 
 class TimeSeriesFileData(FileData):
-    column_names: Optional[list[str]]
+    column_names: Optional[list[str]] = None
 
 
 class ImageFileData(FileData):
@@ -44,7 +44,7 @@ class ShotData(ConfiguredModel):
 
 class SampleBase(ConfiguredModel):
     shot_id: int
-    data: FileData | ShotData
+    data: FileData | ShotData | TimeSeriesFileData
 
 
 class SampleIn(SampleBase):

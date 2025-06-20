@@ -5,6 +5,7 @@ import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
+import { DisruptionTable } from "@/app/disruption/components/disruption-table"
 
 export const ElmGraph = ({data, annotations, setAnnotations}) => {
 
@@ -180,7 +181,7 @@ export const ElmGraph = ({data, annotations, setAnnotations}) => {
                 label: item.category.name
         }));
 
-        setAnnotations(zones)
+        setAnnotations(zones);
     }
 
     return (

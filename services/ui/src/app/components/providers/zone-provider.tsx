@@ -9,6 +9,7 @@ import { useContextMenuProvider } from "./context-menu-provider";
 interface ZoneContextInfo {
     zones: Zone[];
     handleZoneUpdate: () => void;
+    handleZoneDragFinish: () => void;
     addZone: (x0: number, x1: number, category: Category) => void;
     triggerUpdate: number;
 }
@@ -31,7 +32,7 @@ export const ZONE_MENU_ID = "zone-provider"
  * @param categories Array of categories that the zones provided by this context can be
  * @param initialData Array of zones that should be added when initialised
  */
-export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
+export const ZoneProvider = ({categories, initialData, children, onModifyZone} : {
     categories: Category[],
     initialData?: Zone[],
     children: React.ReactNode,
@@ -53,6 +54,10 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
         triggerZoneUpdate()
     }
 
+    const handleZoneDragFinish = () => {
+        onModifyZone(zones.current);
+    }
+
     const addZone = (x0: number, x1: number, category: Category) => {
         zones.current.push(
             {
@@ -61,12 +66,14 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
                 x1
             }
         )
-        triggerZoneUpdate()
+        triggerZoneUpdate();
+        onModifyZone(zones.current);
     }
 
     const handleDelete = (input: unknown) => {
         zones.current = zones.current.filter(zone => zone !== input)
         triggerZoneUpdate()
+        onModifyZone(zones.current);
     }
 
     const handleTypeSetting = ({props}: ItemParams, targetCategory: Category) => {
@@ -89,8 +96,7 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
                     x1
                 }
             )
-            triggerZoneUpdate()
-            onAddZone(zones.current);
+            triggerZoneUpdate();
         }
     
             const addZoneItems = categories.map((category, index) => {
@@ -136,7 +142,7 @@ export const ZoneProvider = ({categories, initialData, children, onAddZone} : {
 
     // The context provider is responsible for rendering the context menu relating to zones
     return(
-        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, addZone, triggerUpdate}}>
+        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, triggerUpdate}}>
             {children}
             <Menu id={`${ZONE_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {

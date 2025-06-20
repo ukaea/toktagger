@@ -1,3 +1,4 @@
+from typing import Union
 from pydantic import BaseModel
 
 
@@ -14,11 +15,25 @@ class MultiVariateTimeSeriesData(Data):
     values: dict[str, TimeSeriesData]
 
 
+class CompositeData(Data):
+    values: dict[str, "DataResponseType"]
+
+
 class SpectrogramData(Data):
     time: list[float]
     frequency: list[float]
-    value: list[float]
+    amplitude: list[list[float]]
 
 
 class ImageData(Data):
     data: list[list[tuple[int, int, int]]]
+
+
+DataResponseType = Union[
+    Data,
+    ImageData,
+    MultiVariateTimeSeriesData,
+    ImageData,
+    CompositeData,
+    SpectrogramData,
+]

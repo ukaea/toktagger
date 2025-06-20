@@ -9,8 +9,6 @@ import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import { VSpans } from "@/app/components/tools/vspans"
 
-import { useState } from "react"
-
 import * as d3 from "d3"
 
 const linspace = (start: number, end: number, num: number) => {
@@ -26,52 +24,44 @@ type LockedModeInfo = {
     data: SpectrogramData
 }
 
-export const LockedMode = ({ data }: LockedModeInfo) => {
+export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedModeInfo}) => {
 
     const lockedModeCategories: Category[] = [
         { name: "Locked Mode", color: "rgb(255, 0, 0)" },
     ]
-    const initialLockedMode: VSpan[] = [
-        { x: 0.1, category: lockedModeCategories[0] },
-    ]
-
+    const initialLockedMode: VSpan[] = []
     const zoneCategories: Category[] = [
-        { name: "ZoneA", color: 'rgb(255, 0, 0)' },
+        { name: "NTM", color: 'rgb(0, 255, 255)' },
     ]
-    const initialZones: Zone[] = [
-        { x0: 0.4, x1: 0.5, category: zoneCategories[0] },
-    ]
+    const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
 
-    const [range, setRange] = useState<number[]>([1E-4, 1E-3]);
+    const amplitude = data.amplitude;
+    const ampMin = Math.max(1e-4, Math.min(...amplitude.flat()));
+    const ampMax = Math.max(...amplitude.flat());
+    
+    const logAmplitude = amplitude.map(row => row.map(x => Math.log10(Math.max(x, 1e-4))));
+    const logAmpMin = Math.min(...logAmplitude.flat());
+    const logAmpMax = Math.max(...logAmplitude.flat());
 
-    const ampl = data.map(({ amplitude }) => amplitude);
-    const logvals = linspace(range[0], range[1], 10)
-    const logvalsMapped = logvals.map((x) => (9 / (Math.max(...logvals) - Math.min(...logvals))) * (x - Math.min(...logvals)) + 1.0)
-    const tickvals = logvalsMapped.map((x) => Math.log10(x))
-    let zdata: number[] = []
-    ampl.forEach((val) => {
-        const index = logvals.findIndex(i => i >= val)
-        const ratio = (val - logvals[index - 1]) / (logvals[index] - logvals[index - 1])
-        const valScaled = (tickvals[index] - tickvals[index - 1]) * ratio + tickvals[index - 1]
-        if (index === -1) {
-            zdata.push(1.0)
-        } else {
-            zdata.push(valScaled)
-        }
-    })
+    const tickvals = linspace(ampMin, ampMax, 6).map(x => Math.log10(x));
+    let ticktext = tickvals.map(x => Math.pow(10, x));
+    ticktext = ticktext.map(x => Math.round(x * 10000) / 10000);
 
     const plotData: Plotly.Data[] = [{
         name: "Saddle Coil FFT",
         type: 'heatmap',
-        x: data.map(({ time }) => time),
-        y: data.map(({ frequency }) => frequency),
-        z: zdata,
-        customdata: ampl,
-        hovertemplate: "t: %{x:.2f}s<br>f: %{y:.2f}Hz<br>s: %{customdata:.2e}<extra></extra>",
+        x: data.time,
+        y: data.frequency,
+        z: logAmplitude,
+        customdata: data.amplitude,
+        hovertemplate: "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
         coloraxis: 'coloraxis'
     }];
 
+    const interpFunc = d3.interpolateCividis;
+
     const plotLayout: Partial<Plotly.Layout> = {
+        height: 600,
         xaxis: {
             title: {
                 text: 'Time [s]'
@@ -83,25 +73,28 @@ export const LockedMode = ({ data }: LockedModeInfo) => {
             },
         },
         coloraxis: {
-            cmin: 0,
-            cmax: 1,
+            cmin: logAmpMin,
+            cmax: logAmpMax,
             colorscale: [
-                [0, d3.interpolateCividis(0)],
-                [0.1, d3.interpolateCividis(0.1)],
-                [0.2, d3.interpolateCividis(0.2)],
-                [0.3, d3.interpolateCividis(0.3)],
-                [0.4, d3.interpolateCividis(0.4)],
-                [0.5, d3.interpolateCividis(0.5)],
-                [0.6, d3.interpolateCividis(0.6)],
-                [0.7, d3.interpolateCividis(0.7)],
-                [0.8, d3.interpolateCividis(0.8)],
-                [0.9, d3.interpolateCividis(0.9)],
-                [1, d3.interpolateCividis(1)]
+                [0, interpFunc(0)],
+                [0.1, interpFunc(0.1)],
+                [0.2, interpFunc(0.2)],
+                [0.3, interpFunc(0.3)],
+                [0.4, interpFunc(0.4)],
+                [0.5, interpFunc(0.5)],
+                [0.6, interpFunc(0.6)],
+                [0.7, interpFunc(0.7)],
+                [0.8, interpFunc(0.8)],
+                [0.9, interpFunc(0.9)],
+                [1, interpFunc(1)]
             ],
             colorbar: {
                 tickmode: 'array',
-                ticktext: logvals.map((x) => x.toExponential(1)),
+                ticktext: ticktext,
                 tickvals: tickvals,
+                tickfont: {
+                    size: 10
+                }
             }
         },
         showlegend: true,
@@ -113,20 +106,25 @@ export const LockedMode = ({ data }: LockedModeInfo) => {
         displaylogo: false,
         displayModeBar: true,
         scrollZoom: false,
-        modeBarButtonsToRemove: ['toImage', 'zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d'],
+        modeBarButtonsToRemove: ['pan'],
+    }
+
+    const updateAnnotations = (newZones) => {
+        const zones = newZones.map(item => ({
+                time_min: item.x0,
+                time_max: item.x1,
+                label: item.category.name
+        }));
+
+        setAnnotations(zones);
     }
 
     return (
         <div className="flex flex-col items-center space-y-3">
-            <header className="p-6">
-                <h1 className="text-4xl font-bold text-center text-gray-900">
-                    Locked Mode demo
-                </h1>
-            </header>
             <ContextMenuProvider menuId="locked-mode-menu">
                 <VSpanProvider categories={lockedModeCategories} initialData={initialLockedMode}>
-                    <ZoneProvider categories={zoneCategories} initialData={initialZones}>
-                        <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData!, layout: plotLayout!, config: plotConfig }} >
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
+                        <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
                             <Zones />
                             <VSpans />
                         </TimeSeries>

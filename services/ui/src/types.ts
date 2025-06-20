@@ -3,11 +3,11 @@ export type TimeSeriesData = Array<{
   value: number;
 }>;
 
-export type SpectrogramData = Array<{
-  time: number;
-  frequency: number;
-  amplitude: number;
-}>;
+export type SpectrogramData = {
+  time: Array<number>;
+  frequency: Array<number>;
+  amplitude: Array<Array<number>>;
+};
 
 export type Category = {
   name: string;

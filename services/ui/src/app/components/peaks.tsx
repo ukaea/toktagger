@@ -1,8 +1,8 @@
 "use client";
-import {Provider, defaultTheme, Button, ButtonGroup, Slider, Flex, Header, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Slider, Flex, Header, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
 import { useEffect, useState } from 'react';
 
-export default function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
+export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
     const [prominence, setProminance] = useState(0.1);
     const [distance, setDistance] = useState(1);
     const [clearPeaks, setClearPeaks] = useState(false);
@@ -10,6 +10,7 @@ export default function FindPeaksTool({ project_id, sample_id, data, setAnnotati
     const [timeMinDefault, setTimeMinDefault] = useState(null);
     const [timeMaxDefault, setTimeMaxDefault] = useState(null);
     const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
+
 
     useEffect(() => {
         if (data) {
@@ -24,8 +25,8 @@ export default function FindPeaksTool({ project_id, sample_id, data, setAnnotati
     useEffect(() => {
         const fetchData = async () => {
             if (clearPeaks) {
-            setAnnotations([]);
-            return;
+                setAnnotations([]);
+                return;
             }
 
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/models/abc/predict/${sample_id}`, {

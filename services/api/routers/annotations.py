@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, Path, Query
 from services.api.crud import utils
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotators import Annotator
-from services.api.schemas.annotations import AnnotationIn, Annotation
+from services.api.schemas.annotations import AnnotationIn, Annotation, AnnotationTypes
 from services.api.schemas import convert_to_objectid
 
 router = APIRouter(
@@ -78,7 +78,7 @@ async def delete_all_annotations(
 
 @router.get(
     "/samples/{sample_id}/annotations",
-    response_model=list[Annotation],
+    response_model=list[AnnotationTypes],
     responses={
         200: {"description": "Annotations for this sample retrieved successfully."},
         404: {"description": "Project or Sample not found with that ID."},
@@ -128,6 +128,7 @@ async def get_annotations(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
+    print(_annotations)
 
     return _annotations
 
@@ -141,7 +142,7 @@ async def get_annotations(
 )
 async def add_annotations(
     request: Request,
-    annotations: list[AnnotationIn],
+    annotations: list[AnnotationTypes],
     project_id: str = Path(description="The ID of the project to add annotations for."),
     sample_id: str = Path(description="The ID of the sample to add annotations for."),
 ):
@@ -158,6 +159,11 @@ async def add_annotations(
         "project_id": convert_to_objectid(project_id, "projects"),
         "sample_id": convert_to_objectid(sample_id, "samples"),
     }
+
+    print(annotations)
+    if len(annotations) == 0:
+        # Nothing to do!
+        return
 
     if not await request.app.state.db_client.get_document_by_id(
         "projects", ids["project_id"]

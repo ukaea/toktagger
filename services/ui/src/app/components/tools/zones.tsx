@@ -24,7 +24,7 @@ export const Zones = ({
     })
 
     // Hook to pull in data from context provider
-    const {zones, handleZoneUpdate, triggerUpdate} = useZoneContext()
+    const {zones, handleZoneUpdate, handleZoneDragFinish, triggerUpdate} = useZoneContext()
 
     // Main rendering effect
     useEffect(() => {
@@ -111,6 +111,8 @@ export const Zones = ({
                     d.x0 = x0;
                     d.x1 = x1;
                     handleZoneUpdate()
+                }).on("end", function(event, d) {
+                    handleZoneDragFinish();  
                 })
 
             function handleContextMenu(event, zone: Zone) {
@@ -133,7 +135,7 @@ export const Zones = ({
                     .attr("width", x1 - x0)
                     .attr("height", height)
                     .attr("fill", zone.category.color)
-                    .attr("opacity", 0.3)
+                    .attr("opacity", 0.5)
                     .attr("style", "pointer-events: all")
                     .style("cursor", "move")
                     .datum(zone)
