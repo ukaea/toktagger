@@ -36,7 +36,7 @@ async def get_projects(
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects",
-        sort_by="timestamp",
+        sort_by="_id",
         sort_direction=-1,
         start=start,
         limit=count if count is not None else 0,

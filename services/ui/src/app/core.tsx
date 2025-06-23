@@ -18,23 +18,23 @@ export const getURL = (url: string) => {
   return data;
 }
 
-export const getSamples = (project_id: string) => {
+export const useGetSamples = (project_id: string, page: number, samplesPerPage: number) => {
   const [samples, setSamples] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?start=${(page - 1) * samplesPerPage}&count=${samplesPerPage}`);
       const data = await response.json();
       setSamples(data);
     };
 
     fetchData();
-  }, []);
+  }, [project_id, page, samplesPerPage]);
 
   return samples;
 } 
 
-export const getSample = (project_id: string, sample_id: string) => {
+export const useGetSample = (project_id: string, sample_id: string) => {
   const [sample, setSample] = useState<any>(null);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export const getSample = (project_id: string, sample_id: string) => {
   return sample;
 } 
 
-export const getProjects = (page, projectsPerPage) => {
+export const useGetProjects = (page: number, projectsPerPage: number) => {
   const [projects, setProjects] = useState<any>(null);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export const getProjects = (page, projectsPerPage) => {
   return projects;
 } 
 
-export const getProject = (project_id: string) => {
+export const useGetProject = (project_id: string) => {
   const [project, setProject] = useState<any>(null);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export const getProject = (project_id: string) => {
     };
 
     fetchData();
-  }, []);
+  }, [project_id]);
 
   return project;
 } 

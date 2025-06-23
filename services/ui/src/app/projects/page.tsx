@@ -1,5 +1,5 @@
 "use client";
-import { getProjects } from '@/app/core';
+import { useGetProjects } from '@/app/core';
 import { use, useState, useEffect } from 'react';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker} from '@adobe/react-spectrum'
 
@@ -50,7 +50,7 @@ export default function Projects() {
   const [projectsPerPage, setProjectsPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
   
-  const projects = getProjects(currentPage, projectsPerPage);
+  const projects = useGetProjects(currentPage, projectsPerPage);
   if (!projects) {
     return;
   }
@@ -69,12 +69,15 @@ export default function Projects() {
               <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
                 Previous
               </Button>
-              <Picker label="Projects per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
+              <div className="flex items-center justify-center gap-8">
+                <p> Page: {currentPage} </p>
+              <Picker label="Samples per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
                 <Item key="2">2</Item>
                 <Item key="5">5</Item>
                 <Item key="10">10</Item>
                 <Item key="25">25</Item>
               </Picker>
+              </div>
               <Button variant="primary" onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
                 Next
               </Button>
