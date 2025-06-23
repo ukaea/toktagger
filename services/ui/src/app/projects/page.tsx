@@ -65,18 +65,20 @@ export default function Projects() {
           </h1>
           <ProjectsTable projects={projects}></ProjectsTable>
           <Provider theme={defaultTheme}>
-            <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
-              Previous
-            </Button>
-            <Button onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
-              Next
-            </Button>
-            <Picker label="Projects per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
-              <Item key="2">2</Item>
-              <Item key="5">5</Item>
-              <Item key="10">10</Item>
-              <Item key="25">25</Item>
-            </Picker>
+            <div className="flex items-center justify-between">
+              <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
+                Previous
+              </Button>
+              <Picker label="Projects per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
+                <Item key="2">2</Item>
+                <Item key="5">5</Item>
+                <Item key="10">10</Item>
+                <Item key="25">25</Item>
+              </Picker>
+              <Button onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
+                Next
+              </Button>
+            </div>
           </Provider>
         </div>
       </div>
