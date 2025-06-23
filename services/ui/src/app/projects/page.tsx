@@ -75,7 +75,7 @@ export default function Projects() {
                 <Item key="10">10</Item>
                 <Item key="25">25</Item>
               </Picker>
-              <Button onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
+              <Button variant="primary" onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
                 Next
               </Button>
             </div>
