@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
+from typing import Literal
 from services.api.schemas.projects import ProjectIn, Project
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.samples import Sample
@@ -24,6 +25,10 @@ async def get_projects(
         "_id", 
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
     ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "descending", 
+        description="Direction to sort responses, by default 'descending'",
+    ),
     start: int = Query(
         0,
         description="Index of the first project you want returned when sorted by above parameter",
@@ -40,8 +45,8 @@ async def get_projects(
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects",
-        sort_by="_id",
-        sort_direction=-1,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
         start=start,
         limit=count if count is not None else 0,
     )

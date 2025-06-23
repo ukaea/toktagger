@@ -1,11 +1,10 @@
-from typing import Optional
+from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
-
 
 async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     obj_id = convert_to_objectid(project_id, "projects")
@@ -42,6 +41,8 @@ async def get_annotations(
     project_id: str,
     validated: Optional[bool] = None,
     sort_by: str = "_id",
+    sort_direction: Literal["ascending", "descending"] = "descending", 
+
     start: int = 0,
     count: Optional[int] = None,
 ) -> list[Annotation]:
@@ -53,7 +54,7 @@ async def get_annotations(
         collection="annotations",
         filters=db_filters,
         sort_by=sort_by,
-        sort_direction=-1,
+        sort_direction=sort_direction,
         start=start,
         limit=count if count is not None else 0,
     )
@@ -61,7 +62,12 @@ async def get_annotations(
 
 
 async def get_samples(
-    db_client: MongoDBClient, project_id: str, sort_by: str = "_id", start: int = 0, count: Optional[int] = None
+    db_client: MongoDBClient, 
+    project_id: str, 
+    sort_by: str = "_id", 
+    sort_direction: Literal["ascending", "descending"] = "descending", 
+    start: int = 0, 
+    count: Optional[int] = None
 ) -> list[Sample]:
     # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -73,7 +79,7 @@ async def get_samples(
         collection="samples",
         filters={"project_id": project_obj_id},
         sort_by=sort_by,
-        sort_direction=-1,
+        sort_direction=sort_direction,
         start=start,
         limit=count if count is not None else 0,
     )

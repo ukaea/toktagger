@@ -63,11 +63,11 @@ class MongoDBClient():
         collection: typing.Literal["projects", "annotations", "models", "samples"], 
         filters: dict = {}, 
         sort_by: str = "timestamp", 
-        sort_direction: typing.Literal[1, -1] = -1, 
+        sort_direction: typing.Literal["ascending", "descending"] = "descending", 
         start=0, 
         limit=0
     ):
-        project_documents = self.db[collection].find(filters).sort(sort_by, sort_direction).skip(start).limit(limit)
+        project_documents = self.db[collection].find(filters).sort(sort_by, pymongo.ASCENDING if sort_direction == "ascending" else pymongo.DESCENDING).skip(start).limit(limit)
         return await project_documents.to_list()
     
     async def delete_filtered_documents(
