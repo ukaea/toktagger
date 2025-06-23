@@ -14,7 +14,7 @@ export const SampleBreadCrumbs = (info) => {
   );
 };
 
-export const SamplesTable = ({project_id, samples}) => {
+export const SamplesTable = ({project_id, samples, sortDescriptor, onSortChange}) => {
 
   const rows = samples.map(({ _id, ...rest }) => ({
     ...rest,
@@ -26,10 +26,12 @@ export const SamplesTable = ({project_id, samples}) => {
       <TableView
       selectionMode="none"
       selectionStyle="highlight"
+      sortDescriptor={sortDescriptor}
+      onSortChange={onSortChange}
       >
         <TableHeader>
-          <Column>Shot ID</Column>
-          <Column>Date Created</Column>
+          <Column key="shot_id" allowsSorting>Shot ID</Column>
+          <Column key="_id" allowsSorting>Date Created</Column>
         </TableHeader>
         <TableBody items={rows}>
           {item => (
@@ -52,10 +54,12 @@ export default function ProjectView({params} : ProjectViewInfo) {
 
   const [samplesPerPage, setSamplesPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortDescriptor, setSortDescriptor] = useState({ column: 'shot_id', direction: 'ascending' });
+
   
   const project_id = use(params).project_id;
   const project = useGetProject(project_id);
-  const samples = useGetSamples(project_id, currentPage, samplesPerPage);
+  const samples = useGetSamples(sortDescriptor, project_id, currentPage, samplesPerPage);
 
   if (!project) {
     return;
@@ -65,6 +69,10 @@ export default function ProjectView({params} : ProjectViewInfo) {
     return;
   }
 
+  const onSortChange = (newSortDescriptor) => {
+    setSortDescriptor(newSortDescriptor);
+  };
+
   return (
     <div>
     <SampleBreadCrumbs project={project} />
@@ -73,7 +81,7 @@ export default function ProjectView({params} : ProjectViewInfo) {
         <h1 className="text-2xl font-bold mb-4">
           Samples
         </h1>
-        <SamplesTable project_id={project_id} samples={samples}></SamplesTable>
+        <SamplesTable project_id={project_id} samples={samples} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></SamplesTable>
         <Provider theme={defaultTheme}>
           <div className="flex items-center justify-between">
             <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>

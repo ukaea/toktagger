@@ -18,18 +18,18 @@ export const getURL = (url: string) => {
   return data;
 }
 
-export const useGetSamples = (project_id: string, page: number, samplesPerPage: number) => {
+export const useGetSamples = (sortDescriptor, project_id: string, page: number, samplesPerPage: number) => {
   const [samples, setSamples] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?sort_by=shot_id&start=${(page - 1) * samplesPerPage}&count=${samplesPerPage}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?sort_by=${(sortDescriptor.column)}&sort_direction=${(sortDescriptor.direction)}&start=${(page - 1) * samplesPerPage}&count=${samplesPerPage}`);
       const data = await response.json();
       setSamples(data);
     };
 
     fetchData();
-  }, [project_id, page, samplesPerPage]);
+  }, [sortDescriptor, project_id, page, samplesPerPage]);
 
   return samples;
 } 
@@ -50,18 +50,18 @@ export const useGetSample = (project_id: string, sample_id: string) => {
   return sample;
 } 
 
-export const useGetProjects = (page: number, projectsPerPage: number) => {
+export const useGetProjects = (sortDescriptor, page: number, projectsPerPage: number) => {
   const [projects, setProjects] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/?start=${(page - 1) * projectsPerPage}&count=${projectsPerPage}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/?sort_by=${(sortDescriptor.column)}&sort_direction=${(sortDescriptor.direction)}&start=${(page - 1) * projectsPerPage}&count=${projectsPerPage}`);
       const data = await response.json();
       setProjects(data);
     };
 
     fetchData();
-  }, [page, projectsPerPage]);
+  }, [sortDescriptor, page, projectsPerPage]);
 
   return projects;
 } 

@@ -13,7 +13,7 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = ({projects}) => {
+export const ProjectsTable = ({projects, sortDescriptor, onSortChange}) => {
   const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id
@@ -24,12 +24,14 @@ export const ProjectsTable = ({projects}) => {
       <TableView
       selectionMode="none"
       selectionStyle="highlight"
+      sortDescriptor={sortDescriptor}
+      onSortChange={onSortChange}
       >
         <TableHeader>
-          <Column>Name</Column>
-          <Column>Task</Column>
-          <Column>Date Created</Column>
-          <Column>Loader</Column>
+          <Column key="name" allowsSorting>Name</Column>
+          <Column key="task" allowsSorting>Task</Column>
+          <Column key="_id" allowsSorting>Date Created</Column>
+          <Column key="data_loader" allowsSorting>Loader</Column>
         </TableHeader>
         <TableBody items={rows}>
           {item => (
@@ -49,11 +51,16 @@ export const ProjectsTable = ({projects}) => {
 export default function Projects() {
   const [projectsPerPage, setProjectsPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortDescriptor, setSortDescriptor] = useState({ column: '_id', direction: 'descending' });
   
-  const projects = useGetProjects(currentPage, projectsPerPage);
+  const projects = useGetProjects(sortDescriptor, currentPage, projectsPerPage);
   if (!projects) {
     return;
   }
+
+  const onSortChange = (newSortDescriptor) => {
+    setSortDescriptor(newSortDescriptor);
+  };
 
   return (
     <div>
@@ -63,7 +70,7 @@ export default function Projects() {
           <h1 className="text-2xl font-bold mb-4">
             Projects
           </h1>
-          <ProjectsTable projects={projects}></ProjectsTable>
+          <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
           <Provider theme={defaultTheme}>
             <div className="flex items-center justify-between">
               <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
@@ -71,7 +78,7 @@ export default function Projects() {
               </Button>
               <div className="flex items-center justify-center gap-8">
                 <p> Page: {currentPage} </p>
-              <Picker label="Samples per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
+              <Picker label="Projects per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
                 <Item key="2">2</Item>
                 <Item key="5">5</Item>
                 <Item key="10">10</Item>
