@@ -23,7 +23,7 @@ export const useGetSamples = (project_id: string, page: number, samplesPerPage: 
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?start=${(page - 1) * samplesPerPage}&count=${samplesPerPage}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?sort_by=shot_id&start=${(page - 1) * samplesPerPage}&count=${samplesPerPage}`);
       const data = await response.json();
       setSamples(data);
     };

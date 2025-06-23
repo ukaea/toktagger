@@ -20,9 +20,13 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 )
 async def get_projects(
     request: Request,
+    sort_by: str = Query(
+        "_id", 
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
     start: int = Query(
         0,
-        description="Index of the first project you want returned when sorted newest - oldest",
+        description="Index of the first project you want returned when sorted by above parameter",
     ),
     count: int = Query(
         None,

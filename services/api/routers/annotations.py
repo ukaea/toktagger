@@ -24,9 +24,13 @@ async def get_all_annotations(
     project_id: str = Path(
         description="The ID of the project to retrieve annotations for"
     ),
+    sort_by: str = Query(
+        "_id", 
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
     start: int = Query(
         0,
-        description="Index of the first annotation you want returned when sorted newest - oldest",
+        description="Index of the first annotation you want returned when sorted by above parameter",
     ),
     count: int = Query(
         None,
@@ -43,7 +47,7 @@ async def get_all_annotations(
     """
     db_client = request.app.state.db_client
     annotations = await utils.get_annotations(
-        db_client, project_id, validated, start, count
+        db_client, project_id, validated, sort_by, start, count
     )
     print(annotations)
     return annotations

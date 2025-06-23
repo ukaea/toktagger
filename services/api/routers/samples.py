@@ -21,9 +21,13 @@ router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 async def get_samples(
     request: Request,
     project_id: str = Path(description="The ID of the project to get samples for."),
+    sort_by: str = Query(
+        "_id", 
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
     start: int = Query(
         0,
-        description="Index of the first sample you want returned when sorted newest - oldest",
+        description="Index of the first sample you want returned when sorted by above parameter",
     ),
     count: int = Query(
         None,
@@ -35,7 +39,7 @@ async def get_samples(
     --------------------------------------------------------
     """
     db_client = request.app.state.db_client
-    samples = await utils.get_samples(db_client, project_id, start, count)
+    samples = await utils.get_samples(db_client, project_id, sort_by, start, count)
     return samples
 
 
