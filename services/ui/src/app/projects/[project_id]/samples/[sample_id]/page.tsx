@@ -103,7 +103,7 @@ function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewPa
     const onAmplitudeRangeChange = async (ampRange) => {
         viewParams.amplitude_min = Math.pow(10, ampRange.start);
         viewParams.amplitude_max = Math.pow(10, ampRange.end);
-        setViewParams(viewParams);
+        setViewParams({...viewParams});
     };
 
     let ampValues = mhdData.amplitude.flat();
@@ -161,38 +161,35 @@ export default function SamplePage({ params }: Props) {
   const [annotations, setAnnotations] = useState<any>([]);
   const [viewParams, setViewParams] = useState<any>({name: 'identity'});
 
-  const refreshData = async ( viewParams ) => {
-    const project = await getProject(project_id);
-    setProject(project);
-
-    const sample = await getSample(project_id, sample_id);
-    setSample(sample);
-
-    const annotations = await getAnnotations(project_id, sample_id);
-    setAnnotations(annotations);
-    
-    if (project.task == 'MHD') {
-      viewParams.name = 'spectrogram';
-      viewParams.nperseg = 256;
-      setViewParams(viewParams);
-    }
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
-        method: 'POST',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(viewParams),
-    });
-    const data = await response.json();
-    setData(data);
-  };
 
   useEffect(() => {
-    const run = async () => {
-      await refreshData(viewParams);
-    }
-    run();
+    const refreshData = async () => {
+      const project = await getProject(project_id);
+      setProject(project);
+
+      const sample = await getSample(project_id, sample_id);
+      setSample(sample);
+
+      const annotations = await getAnnotations(project_id, sample_id);
+      setAnnotations(annotations);
+      
+      if (project.task == 'MHD') {
+        viewParams.name = 'spectrogram';
+        viewParams.nperseg = 256;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
+          method: 'POST',
+          headers: {
+          'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(viewParams),
+      });
+      const data = await response.json();
+      setData(data);
+    };
+
+    refreshData();
   }, [viewParams]);
 
   if (!data) {
@@ -205,7 +202,7 @@ export default function SamplePage({ params }: Props) {
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
           <div className='flex'>
-            <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={refreshData}/>
+            <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={setViewParams}/>
             <div className="flex-1 justify-center">
               <SampleView project={project} data={data} annotations={annotations} setAnnotations={setAnnotations}/>
             </div>
