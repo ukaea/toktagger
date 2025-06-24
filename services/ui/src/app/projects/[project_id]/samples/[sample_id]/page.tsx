@@ -174,6 +174,7 @@ export default function SamplePage({ params }: Props) {
     if (project.task == 'MHD') {
       viewParams.name = 'spectrogram';
       viewParams.nperseg = 256;
+      setViewParams(viewParams);
     }
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
