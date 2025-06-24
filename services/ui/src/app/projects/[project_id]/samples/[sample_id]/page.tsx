@@ -1,7 +1,7 @@
 "use client";
 import { use, useState, useEffect } from 'react';
 import {Provider, defaultTheme, Breadcrumbs, Item, ToastContainer} from '@adobe/react-spectrum'
-import { Annotations, Data, Project, Sample } from '@/types';
+import { Annotations, Data, Project, Sample, ViewParams } from '@/types';
 import { ELMView } from '@/app/elms/components/elms';
 import { SpectrogramView } from '@/app/spectrogram/components/spectrogram';
 import { DisruptionView } from '@/app/disruption/components/disruption';
@@ -67,13 +67,13 @@ export default function SamplePage({ params }: SamplePageInfo) {
   const project_id = props.project_id;
   const sample_id = props.sample_id;
 
-  const [project, setProject] = useState<any>(null);
-  const [sample, setSample] = useState<any>(null);
+  const [project, setProject] = useState<Project>(null);
+  const [sample, setSample] = useState<Sample>(null);
   const [data, setData] = useState<Data>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
-  const [viewParams, setViewParams] = useState<any>({name: 'identity'});
+  const [viewParams, setViewParams] = useState<ViewParams>({name: 'identity'});
 
-  const refreshData = async ( viewParams ) => {
+  const refreshData = async ( viewParams: ViewParams ) => {
     const project = await getProject(project_id);
     setProject(project);
 

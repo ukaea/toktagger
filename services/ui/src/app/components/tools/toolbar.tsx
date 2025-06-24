@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from 'next/navigation';
 import {Provider, defaultTheme,  ButtonGroup, ToastQueue, Button } from '@adobe/react-spectrum'
-import { Annotations, Data, Project, Sample } from "@/types";
+import { Annotations, Data, Project, Sample, ViewParams } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 
@@ -93,8 +93,8 @@ type ToolBarInfo = {
   data: Data,
   annotations: Annotations,
   setAnnotations: (annotations: Annotations) => void,
-  viewParams: any,
-  setViewParams: (viewParams: any) => void
+  viewParams: ViewParams,
+  setViewParams: (viewParams: ViewParams) => void
 }
 export default function ToolBar({ project, sample, data, annotations, setAnnotations, viewParams, setViewParams} : ToolBarInfo) {
   const project_id = project._id;

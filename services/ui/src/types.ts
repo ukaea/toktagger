@@ -82,6 +82,22 @@ export const SampleSchema = z.object({
 }); 
 export type Sample = z.infer<typeof SampleSchema>;
 
+export const ViewParamsSchema = z.object({
+  name: z.string()
+});
+export type ViewParams = z.infer<typeof ViewParamsSchema>;
+
+export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
+  nperseg: z.number().optional(),
+  time_min: z.number().optional(),
+  time_max: z.number().optional(),
+  frequency_min: z.number().optional(),
+  frequency_max: z.number().optional(),
+  amplitude_min: z.number().optional(),
+  amplitude_max: z.number().optional(),
+});
+export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
+
 export type ToolingProps = {
   plotId?: string;
   plotReady?: boolean;
