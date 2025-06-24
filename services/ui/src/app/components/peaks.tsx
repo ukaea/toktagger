@@ -32,7 +32,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null && !(signalName in data.values)) {
+            if (signalName == null || !(signalName in data.values)) {
                 return;
             }
 
