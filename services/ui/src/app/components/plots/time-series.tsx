@@ -159,19 +159,59 @@ export const TimeSeries = ({
             return
         }
 
-        function handleContextMenu(event, plot) {
-            const xaxis = plot._fullLayout.xaxis;
-            const bb = event.target.getBoundingClientRect();
-            const x0 = xaxis.p2d(event.clientX - bb.left);
-            const x1 = xaxis.p2d(event.clientX - bb.left + 100);
+        /* 
+        Context-menu dispatcher
+
+            1. Converts the mouse click (pixel-space) to data-space coordinates (x, y) using Plotly’s axis converters.
+
+            2. Derives the current axis ranges (xRange, yRange) so tools can size new elements as a fraction of the view, independent of zoom level.
+    
+            3. Computes a 100-pixel-wide default window (x0, x1) to keep legacy menu actions working 
+
+            information delivered to the menu is  { x, y, x0, x1, xRange, yRange, xLimits: [xMin, xMax], yLimits: [yMin, yMax] }
+
+            xScale, yScale, relX, relY are not exposed because current tooling must remain plot-agnostic and operate purely in data coordinates.
+
+        */
+        function handleContextMenu(event: MouseEvent, plot) {
+            const xaxis = plot._fullLayout.xaxis  // x-axis descriptor
+            const yaxis = plot._fullLayout.yaxis  // y-axis descriptor
+
+            const bb = (event.target as HTMLElement).getBoundingClientRect()
+            const relX = event.clientX - bb.left    // click X in pixels, relative to plot
+            const relY = event.clientY - bb.top       // click Y in pixels, relative to plot
+
+            // Coordinates in data space
+            const x      = xaxis.p2d(relX)   // data-space X at click
+            const y      = yaxis.p2d(relY)     // data-space Y at click
+
+            // Pixels-per-unit (positive values)
+            const xScale = Math.abs(xaxis.d2p(1) - xaxis.d2p(0))  // px per 1 unit on x
+            const yScale = Math.abs(yaxis.d2p(1) - yaxis.d2p(0))   // px per 1 unit on y
+            
+            // compute full data range spans from axis.range 
+            const [xMin, xMax] = xaxis.range as [number, number]  // data-space limits on x
+            const [yMin, yMax] = yaxis.range as [number, number]  // data-space limits on y
+            const xRange       = xMax - xMin    // total span on x axis
+            const yRange       = yMax - yMin    // total span on y axis
+ 
+            // legacy helpers - 100 pixel wide default zone helpers
+            const unitWidth = 100 / xScale    // 100 px converted to units
+            const x0 = x   // left edge of default window
+            const x1 = x + unitWidth    // right edge of default window
 
             showContextMenuRef.current({
                 event,
                 props: {
-                    x0,
-                    x1
+                    // backwards compatible props
+                    x0, x1,   // legacy 100 px helpers
+                    // new generic props 
+                    x, y,   // generic data-space click position
+                    xRange, yRange,  // current axis spans
+                    xLimits: [xMin, xMax], yLimits: [yMin, yMax]  // explicit axis limits
                 }
             })
+
         }
 
         const dragElement = plot.querySelector(".drag")
@@ -181,7 +221,7 @@ export const TimeSeries = ({
             return
         }
 
-        const contextHandler = (event) => { //  wrap handler so we can remove it
+        const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
             handleContextMenu(event, plot)
         } 
 
