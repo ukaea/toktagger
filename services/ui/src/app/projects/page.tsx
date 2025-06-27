@@ -81,7 +81,7 @@ export default function Projects() {
           </h1>
           <Provider theme={defaultTheme}>
           <div className="pl-4">
-            <SearchField label="Search By Name" onSubmit={setProjectName}></SearchField>
+            <SearchField label="Search By Name" onSubmit={(name) => {setProjectName(name); setCurrentPage(1)}}></SearchField>
           </div>
           <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
             <div className="flex items-center justify-between pl-4 pr-4">

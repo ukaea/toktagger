@@ -88,6 +88,7 @@ export default function ProjectView({params} : ProjectViewInfo) {
     if (/^[0-9]*$/.test(newValue)) {
       setErrorMessage("")
       setShotId(newValue)
+      setCurrentPage(1)
     } else {
       setErrorMessage("Please enter a number.")
     }
