@@ -33,18 +33,31 @@ async def get_projects(
         0,
         description="Index of the first project you want returned when sorted by above parameter",
     ),
-    count: int = Query(
+    count: int | None = Query(
         None,
         description="Number of projects you want returned, leave blank to return all entries",
     ),
+    name: str | None = Query(
+        None,
+        description="Name of a project to search for, by default None"
+    )
 ) -> list[Project]:
     """
     Get a list of all available projects.
     -------------------------------------
     """
+    filters = {}
+    if name:
+        # Search with regex, return any projects which start with the searched for string, case insensitive
+        filters['name'] = {
+            "$regex": f"^{name}",
+            "$options": "i"
+        }
+        
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects",
+        filters=filters,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,

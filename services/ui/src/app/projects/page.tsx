@@ -1,7 +1,7 @@
 "use client";
 import { getProjects } from '@/app/core';
 import { use, useState, useEffect } from 'react';
-import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker, SearchField} from '@adobe/react-spectrum'
 import type { SortDescriptor } from '@react-types/shared';
 import type { Project } from '@/types';
 
@@ -59,9 +59,10 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange}: Projects
 export default function Projects() {
   const [projectsPerPage, setProjectsPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [projectName, setProjectName] = useState<string>("");
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor<Project>>({ column: '_id', direction: 'descending' });
   
-  const projects = getProjects(sortDescriptor, currentPage, projectsPerPage);
+  const projects = getProjects(sortDescriptor, currentPage, projectsPerPage, projectName);
   if (!projects) {
     return;
   }
@@ -78,8 +79,11 @@ export default function Projects() {
           <h1 className="text-2xl font-bold mb-4">
             Projects
           </h1>
-          <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
           <Provider theme={defaultTheme}>
+          <div className="pl-4">
+            <SearchField label="Search By Name" onSubmit={setProjectName}></SearchField>
+          </div>
+          <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
             <div className="flex items-center justify-between pl-4 pr-4">
               <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
                 Previous

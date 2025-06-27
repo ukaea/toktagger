@@ -51,18 +51,27 @@ export const getSample = (project_id: string, sample_id: string) => {
   return sample;
 } 
 
-export const getProjects = (sortDescriptor: SortDescriptor<Project>, page: number, projectsPerPage: number): Project[] | null => {
+export const getProjects = (sortDescriptor: SortDescriptor<Project>, page: number, projectsPerPage: number, name: string): Project[] | null => {
   const [projects, setProjects] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/?sort_by=${(sortDescriptor.column)}&sort_direction=${(sortDescriptor.direction)}&start=${(page - 1) * projectsPerPage}&count=${projectsPerPage}`);
+      const params = new URLSearchParams();
+      params.append('sort_by', sortDescriptor.column);
+      params.append('sort_direction', sortDescriptor.direction);
+      params.append('start', ((page - 1) * projectsPerPage).toString());
+      params.append('count', projectsPerPage.toString());
+      if (name !== ""){
+        params.append('name', name);
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/?${params.toString()}`);
       const data = await response.json();
       setProjects(data);
     };
 
     fetchData();
-  }, [sortDescriptor, page, projectsPerPage]);
+  }, [sortDescriptor, page, projectsPerPage, name]);
 
   return projects;
 } 
