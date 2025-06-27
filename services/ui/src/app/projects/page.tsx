@@ -57,8 +57,8 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange}: Projects
 }
 
 export default function Projects() {
-  const [projectsPerPage, setProjectsPerPage] = useState(5);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [projectsPerPage, setProjectsPerPage] = useState<number>(5);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor<Project>>({ column: '_id', direction: 'descending' });
   
   const projects = getProjects(sortDescriptor, currentPage, projectsPerPage);
