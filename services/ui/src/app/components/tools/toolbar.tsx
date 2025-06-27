@@ -1,6 +1,7 @@
 "use client";
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {Provider, defaultTheme,  ButtonGroup, ToastQueue, Button } from '@adobe/react-spectrum'
+import {Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, SearchField } from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
@@ -16,10 +17,21 @@ async function saveAnnotations(project_id: string, sample_id: string, annotation
     });
 }
 
-async function getNextSample(project_id: str) {
+async function getNextSample(project_id: string) {
     const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
     const sampleResult = await fetch(NEXT_URL);
     const sample = await sampleResult.json();
+    return sample;
+}
+
+async function getShotSample(project_id: string, shot_id: string) {
+    const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?shot_id=${shot_id}`;
+    const sampleResult = await fetch(NEXT_URL);
+    const sampleArray = await sampleResult.json();
+    let sample = null
+    if (sampleArray.length > 0) {
+      sample = sampleArray[0];
+    }
     return sample;
 }
 
@@ -63,6 +75,46 @@ export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo)
   };
 
   return <Button variant="primary" onPress={handleClick} >Save</Button>
+}
+
+type ShotSearchInfo = {
+  project_id: string
+  sample_id: string
+  annotations: Annotations
+};
+export function ShotSearch({project_id, sample_id, annotations} : ShotSearchInfo) {
+  const router = useRouter();
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  
+  const onSearchSubmit = async (newValue: string) => {
+    if (newValue == '') {
+      setErrorMessage("")
+    } else if (/^[0-9]*$/.test(newValue)) {
+      setErrorMessage("")
+      const shot_id = newValue 
+      try {
+        await saveAnnotations(project_id, sample_id, annotations);
+        const sample = await getShotSample(project_id, shot_id);
+        if (sample !== null) {
+          const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
+          router.push(NEXT_SAMPLE_URL);
+        } else {
+          setErrorMessage("Shot not found!");
+        }
+      } catch (err) {
+        console.error('Failed to fetch data:', err);
+      }
+    } else {
+      setErrorMessage("Please enter a number.");
+    }
+    }
+
+  return  <SearchField 
+            label="Jump to Shot" 
+            onSubmit={onSearchSubmit}
+            validationState={errorMessage ? 'invalid' : ''}
+            errorMessage={errorMessage} >
+          </SearchField>
 }
 
 type AmplitudeSliderInfo = {
@@ -116,11 +168,14 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
   return (
         <Provider theme={defaultTheme}>
         <div className='h-screen text-center'>
-          <div className='p-4'>
+          <div className='pl-4 pr-4 pt-4'>
             <ButtonGroup>
               <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
               <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
             </ButtonGroup>
+          </div>
+          <div className='pl-4 pr-4 pb-4'>
+            <ShotSearch project_id={project_id} sample_id={sample_id} annotations={annotations}/>
           </div>
           <hr className='m-4'/>
           {tools.map((item, i) => <div  key={i}>{item}</div>)}
