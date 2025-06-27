@@ -108,12 +108,27 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                     </Item>
                 )
             })
-    
-            registerMenuItem("zone", (
-                <Submenu key="zone-submenu" label="Add zone">
-                    {addZoneItems}
-                </Submenu>
-            ))
+            
+            /* Decide what to register in the main context‑menu:
+           – Single category → direct “Add <Category>” item.
+           – Multiple categories → keep existing submenu.
+            */
+            const menuElement =
+                categories.length === 1
+                    ? (
+                        <Item key="add-zone-single" id="add-zone-single" onClick={({props}) => {
+                            add(props.x0, props.x1, categories[0])
+                        }}>
+                            {`Add ${categories[0].name}`}
+                        </Item>
+                    ) : (
+                        <Submenu key="zone-submenu" label="Add zone">
+                            {addZoneItems}
+                        </Submenu>
+                    )
+
+            registerMenuItem("zone", menuElement)
+
         }, [categories, registerMenuItem])
 
     // Initialisation of data - this should only run once
