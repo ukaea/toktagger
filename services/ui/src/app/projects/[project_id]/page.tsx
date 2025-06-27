@@ -2,6 +2,8 @@
 import { use, useState } from 'react';
 import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item} from '@adobe/react-spectrum'
+import { SortDescriptor } from '@react-types/shared';
+import type { Sample } from '@/types';
 
 export const SampleBreadCrumbs = (info) => {
   return (
@@ -14,7 +16,14 @@ export const SampleBreadCrumbs = (info) => {
   );
 };
 
-export const SamplesTable = ({project_id, samples, sortDescriptor, onSortChange}) => {
+type SamplesTableProps = {
+  project_id: string;
+  samples: Sample[];
+  sortDescriptor: SortDescriptor<Sample>;
+  onSortChange: (sort: SortDescriptor<Sample>) => void;
+}
+
+export const SamplesTable = ({project_id, samples, sortDescriptor, onSortChange}: SamplesTableProps) => {
 
   const rows = samples.map(({ _id, ...rest }) => ({
     ...rest,
@@ -52,9 +61,9 @@ type ProjectViewInfo = {
 
 export default function ProjectView({params} : ProjectViewInfo) {
 
-  const [samplesPerPage, setSamplesPerPage] = useState(5);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortDescriptor, setSortDescriptor] = useState({ column: 'shot_id', direction: 'ascending' });
+  const [samplesPerPage, setSamplesPerPage] = useState<number>(5);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor<Sample>>({ column: 'shot_id', direction: 'ascending' });
 
   
   const project_id = use(params).project_id;
@@ -69,7 +78,7 @@ export default function ProjectView({params} : ProjectViewInfo) {
     return;
   }
 
-  const onSortChange = (newSortDescriptor) => {
+  const onSortChange = (newSortDescriptor: SortDescriptor<Sample>) => {
     setSortDescriptor(newSortDescriptor);
   };
 
