@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
-
+import type { SortDescriptor } from '@react-types/shared';
+import type { Project } from '@/types';
 
 export const getURL = (url: string) => {
   const [data, setData] = useState<any>(null);
@@ -50,7 +51,7 @@ export const getSample = (project_id: string, sample_id: string) => {
   return sample;
 } 
 
-export const getProjects = (sortDescriptor, page: number, projectsPerPage: number) => {
+export const getProjects = (sortDescriptor: SortDescriptor<Project>, page: number, projectsPerPage: number): Project[] | null => {
   const [projects, setProjects] = useState<any>(null);
 
   useEffect(() => {

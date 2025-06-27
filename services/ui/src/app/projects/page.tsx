@@ -2,6 +2,14 @@
 import { getProjects } from '@/app/core';
 import { use, useState, useEffect } from 'react';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker} from '@adobe/react-spectrum'
+import type { SortDescriptor } from '@react-types/shared';
+import type { Project } from '@/types';
+
+type ProjectsTableProps = {
+  projects: Project[];
+  sortDescriptor: SortDescriptor<Project>;
+  onSortChange: (sort: SortDescriptor<Project>) => void;
+}
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -13,7 +21,7 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = ({projects, sortDescriptor, onSortChange}) => {
+export const ProjectsTable = ({projects, sortDescriptor, onSortChange}: ProjectsTableProps) => {
   const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id
@@ -51,14 +59,14 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange}) => {
 export default function Projects() {
   const [projectsPerPage, setProjectsPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortDescriptor, setSortDescriptor] = useState({ column: '_id', direction: 'descending' });
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor<Project>>({ column: '_id', direction: 'descending' });
   
   const projects = getProjects(sortDescriptor, currentPage, projectsPerPage);
   if (!projects) {
     return;
   }
 
-  const onSortChange = (newSortDescriptor) => {
+  const onSortChange = (newSortDescriptor: SortDescriptor<Project>) => {
     setSortDescriptor(newSortDescriptor);
   };
 
