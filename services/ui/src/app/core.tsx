@@ -19,18 +19,26 @@ export const getURL = (url: string) => {
   return data;
 }
 
-export const getSamples = (sortDescriptor: SortDescriptor<Sample>, project_id: string, page: number, samplesPerPage: number): Sample[] | null => {
+export const getSamples = (sortDescriptor: SortDescriptor<Sample>, project_id: string, page: number, samplesPerPage: number, shotId: string): Sample[] | null => {
   const [samples, setSamples] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?sort_by=${(sortDescriptor.column)}&sort_direction=${(sortDescriptor.direction)}&start=${(page - 1) * samplesPerPage}&count=${samplesPerPage}`);
+      const params = new URLSearchParams();
+      params.append('sort_by', sortDescriptor.column);
+      params.append('sort_direction', sortDescriptor.direction);
+      params.append('start', ((page - 1) * samplesPerPage).toString());
+      params.append('count', samplesPerPage.toString());
+      if (shotId !== ""){
+        params.append('shot_id', shotId);
+      }
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?${params.toString()}`);
       const data = await response.json();
       setSamples(data);
     };
 
     fetchData();
-  }, [sortDescriptor, project_id, page, samplesPerPage]);
+  }, [sortDescriptor, project_id, page, samplesPerPage, shotId]);
 
   return samples;
 } 

@@ -64,6 +64,7 @@ async def get_annotations(
 async def get_samples(
     db_client: MongoDBClient, 
     project_id: str, 
+    shot_id: int,
     sort_by: str = "_id", 
     sort_direction: Literal["ascending", "descending"] = "descending", 
     start: int = 0, 
@@ -74,10 +75,15 @@ async def get_samples(
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    
+    filters = {"project_id": project_obj_id}
+    
+    if shot_id:
+        filters["shot_id"] = shot_id
 
     samples = await db_client.get_filtered_documents(
         collection="samples",
-        filters={"project_id": project_obj_id},
+        filters=filters,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,

@@ -1,8 +1,8 @@
 "use client";
 import { use, useState } from 'react';
 import { getSamples, getProject } from '@/app/core';
-import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item} from '@adobe/react-spectrum'
-import { SortDescriptor } from '@react-types/shared';
+import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item, SearchField, Form} from '@adobe/react-spectrum'
+import { SortDescriptor, ValidationDetails, ValidationResult } from '@react-types/shared';
 import type { Sample } from '@/types';
 
 export const SampleBreadCrumbs = (info) => {
@@ -63,12 +63,14 @@ export default function ProjectView({params} : ProjectViewInfo) {
 
   const [samplesPerPage, setSamplesPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [shotId, setShotId] = useState<string>("");
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor<Sample>>({ column: 'shot_id', direction: 'ascending' });
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  
+
   const project_id = use(params).project_id;
   const project = getProject(project_id);
-  const samples = getSamples(sortDescriptor, project_id, currentPage, samplesPerPage);
+  const samples = getSamples(sortDescriptor, project_id, currentPage, samplesPerPage, shotId);
 
   if (!project) {
     return;
@@ -82,6 +84,15 @@ export default function ProjectView({params} : ProjectViewInfo) {
     setSortDescriptor(newSortDescriptor);
   };
 
+  const onSearchSubmit = (newValue: string) => {
+    if (/^[0-9]*$/.test(newValue)) {
+      setErrorMessage("")
+      setShotId(newValue)
+    } else {
+      setErrorMessage("Please enter a number.")
+    }
+  }
+
   return (
     <div>
     <SampleBreadCrumbs project={project} />
@@ -90,8 +101,18 @@ export default function ProjectView({params} : ProjectViewInfo) {
         <h1 className="text-2xl font-bold mb-4">
           Samples
         </h1>
-        <SamplesTable project_id={project_id} samples={samples} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></SamplesTable>
         <Provider theme={defaultTheme}>
+        <div className="pl-4">
+          <SearchField 
+          label="Search By Shot ID" 
+          // SearchField should be able to do validation when provided a 'pattern' inside a Form element
+          // But I could not for the life of me get that to work, so will do it manually...
+          onSubmit={onSearchSubmit}
+          validationState={errorMessage ? 'invalid' : ''}
+          errorMessage={errorMessage} >
+          </SearchField>
+        </div>
+        <SamplesTable project_id={project_id} samples={samples} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></SamplesTable>
           <div className="flex items-center justify-between pl-4 pr-4">
             <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
               Previous
