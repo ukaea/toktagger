@@ -83,11 +83,11 @@ export default function ProjectView({params} : ProjectViewInfo) {
         </h1>
         <SamplesTable project_id={project_id} samples={samples} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></SamplesTable>
         <Provider theme={defaultTheme}>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pl-4 pr-4">
             <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
               Previous
             </Button>
-            <div className="flex items-center justify-center gap-8">
+            <div className="flex items-center justify-center gap-8 pb-2">
               <p> Page: {currentPage} </p>
             <Picker label="Samples per Page:" onSelectionChange={(selected) => {setSamplesPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
               <Item key="2">2</Item>

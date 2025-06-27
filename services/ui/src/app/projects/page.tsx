@@ -72,11 +72,11 @@ export default function Projects() {
           </h1>
           <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
           <Provider theme={defaultTheme}>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pl-4 pr-4">
               <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
                 Previous
               </Button>
-              <div className="flex items-center justify-center gap-8">
+              <div className="flex items-center justify-center gap-8 pb-2">
                 <p> Page: {currentPage} </p>
               <Picker label="Projects per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
                 <Item key="2">2</Item>
