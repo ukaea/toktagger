@@ -1,5 +1,5 @@
 "use client";
-import { useGetProjects } from '@/app/core';
+import { getProjects } from '@/app/core';
 import { use, useState, useEffect } from 'react';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker} from '@adobe/react-spectrum'
 
@@ -53,7 +53,7 @@ export default function Projects() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortDescriptor, setSortDescriptor] = useState({ column: '_id', direction: 'descending' });
   
-  const projects = useGetProjects(sortDescriptor, currentPage, projectsPerPage);
+  const projects = getProjects(sortDescriptor, currentPage, projectsPerPage);
   if (!projects) {
     return;
   }

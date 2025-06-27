@@ -1,6 +1,6 @@
 "use client";
 import { use, useState } from 'react';
-import { useGetSamples, useGetProject } from '@/app/core';
+import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item} from '@adobe/react-spectrum'
 
 export const SampleBreadCrumbs = (info) => {
@@ -58,8 +58,8 @@ export default function ProjectView({params} : ProjectViewInfo) {
 
   
   const project_id = use(params).project_id;
-  const project = useGetProject(project_id);
-  const samples = useGetSamples(sortDescriptor, project_id, currentPage, samplesPerPage);
+  const project = getProject(project_id);
+  const samples = getSamples(sortDescriptor, project_id, currentPage, samplesPerPage);
 
   if (!project) {
     return;
