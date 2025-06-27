@@ -35,12 +35,12 @@ async function getShotSample(project_id: string, shot_id: string) {
     return sample;
 }
 
-type NextButtonInfo = {
+type SaveInfo = {
   project_id: string
   sample_id: string
   annotations: Annotations
 };
-export function NextButton({project_id, sample_id, annotations} : NextButtonInfo) {
+export function NextButton({project_id, sample_id, annotations} : SaveInfo) {
   const router = useRouter();
 
   const handleClick = async () => {
@@ -57,12 +57,7 @@ export function NextButton({project_id, sample_id, annotations} : NextButtonInfo
   return <Button variant="primary" onPress={handleClick} >Next</Button>
 }
 
-type SaveButtonInfo = {
-  project_id: string
-  sample_id: string
-  annotations: Annotations
-};
-export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo) {
+export function SaveButton({project_id, sample_id, annotations}: SaveInfo) {
   const router = useRouter();
 
   const handleClick = async () => {
@@ -77,12 +72,7 @@ export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo)
   return <Button variant="primary" onPress={handleClick} >Save</Button>
 }
 
-type ShotSearchInfo = {
-  project_id: string
-  sample_id: string
-  annotations: Annotations
-};
-export function ShotSearch({project_id, sample_id, annotations} : ShotSearchInfo) {
+export function ShotSearch({project_id, sample_id, annotations} : SaveInfo) {
   const router = useRouter();
   const [errorMessage, setErrorMessage] = useState<string>('');
   
