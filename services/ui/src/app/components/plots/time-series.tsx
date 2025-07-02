@@ -214,9 +214,9 @@ export const TimeSeries = ({
 
         }
 
-        const dragElement = plot.querySelector(".drag")
+        const dragElements = plot.querySelectorAll(".drag")
 
-        if (!dragElement) {
+        if (dragElements.length === 0) {
             console.error("Could not locate drag element to assign context menu")
             return
         }
@@ -225,10 +225,14 @@ export const TimeSeries = ({
             handleContextMenu(event, plot)
         } 
 
-        dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
+        dragElements.forEach((dragElement) => {
+            dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
+        })
 
         return () => { // remove listener on effect cleanup
-            dragElement.removeEventListener("contextmenu", contextHandler) 
+            dragElements.forEach((dragElement) => {
+                dragElement.removeEventListener("contextmenu", contextHandler)
+            })
         }
 
     }, [plotId, plotReady])
