@@ -198,7 +198,7 @@ export const TimeSeries = ({
                 event,
                 props: {
                     // new generic props 
-                    xScale, yScale, 
+                    xScale
                     x, y,   // generic data-space click position
                     xRange, yRange,  // current axis spans
                     xLimits: [xMin, xMax], yLimits: [yMin, yMax]  // explicit axis limits
