@@ -162,15 +162,11 @@ export const TimeSeries = ({
         /* 
         Context-menu dispatcher
 
-            1. Converts the mouse click (pixel-space) to data-space coordinates (x, y) using Plotly’s axis converters.
+            Converts the mouse click (pixel-space) to data-space coordinates (x, y) using Plotly’s axis converters.
 
-            2. Derives the current axis ranges (xRange, yRange) so tools can size new elements as a fraction of the view, independent of zoom level.
+            Derives the current axis ranges (xRange, yRange) so tools can size new elements as a fraction of the view, independent of zoom level.
     
-            3. Computes a 100-pixel-wide default window (x0, x1) to keep legacy menu actions working 
-
-            information delivered to the menu is  { x, y, x0, x1, xRange, yRange, xLimits: [xMin, xMax], yLimits: [yMin, yMax] }
-
-            xScale, yScale, relX, relY are not exposed because current tooling must remain plot-agnostic and operate purely in data coordinates.
+            information delivered to the menu is  { x, y, xScale, yScale, xRange, yRange, xLimits: [xMin, xMax], yLimits: [yMin, yMax] }
 
         */
         function handleContextMenu(event: MouseEvent, plot) {
@@ -197,15 +193,12 @@ export const TimeSeries = ({
  
             // legacy helpers - 100 pixel wide default zone helpers
             const unitWidth = 100 / xScale    // 100 px converted to units
-            const x0 = x   // left edge of default window
-            const x1 = x + unitWidth    // right edge of default window
 
             showContextMenuRef.current({
                 event,
                 props: {
-                    // backwards compatible props
-                    x0, x1,   // legacy 100 px helpers
                     // new generic props 
+                    xScale, yScale, 
                     x, y,   // generic data-space click position
                     xRange, yRange,  // current axis spans
                     xLimits: [xMin, xMax], yLimits: [yMin, yMax]  // explicit axis limits
