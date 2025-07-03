@@ -88,21 +88,22 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
     // On initialisation the tool registers a menu item with the general context menu
     useEffect(() => {
-        const add = (x0: number, x1: number, category: Category) => {
-            zones.current.push(
-                {
-                    category,
-                    x0,
-                    x1
-                }
-            )
-            triggerZoneUpdate();
-        }
+        /**
+         * Converts generic context-menu props into a new zone and
+         * re-creates the legacy “100 px default width” behaviour.
+         */
+        const addFromClick = (
+            props: { x: number; xScale: number },
+            category: Category,
+            ) => {
+            const width = 100 / props.xScale; // 100 px → data-units
+            addZone(props.x, props.x + width, category)
+            }
     
             const addZoneItems = categories.map((category, index) => {
                 return (
                     <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
-                        add(props.x0, props.x1, category)
+                        addFromClick(props as any, category)
                     }}>
                         {category.name}
                     </Item>
@@ -117,7 +118,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                 categories.length === 1
                     ? (
                         <Item key="add-zone-single" id="add-zone-single" onClick={({props}) => {
-                            add(props.x0, props.x1, categories[0])
+                            addFromClick(props as any, categories[0])
                         }}>
                             {`Add ${categories[0].name}`}
                         </Item>
