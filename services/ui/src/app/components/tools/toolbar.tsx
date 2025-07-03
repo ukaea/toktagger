@@ -164,7 +164,7 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
               <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
             </ButtonGroup>
           </div>
-          <div className='pl-4 pr-4 pb-4'>
+          <div className='pl-4 pr-4 pb-4 pt-2'>
             <ShotSearch project_id={project_id} sample_id={sample_id} annotations={annotations}/>
           </div>
           <hr className='m-4'/>
