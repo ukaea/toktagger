@@ -119,7 +119,6 @@ export const TimeSeries = ({
                 if (yValues.length > 0) {
                     const yMin = Math.min(...yValues)
                     const yMax = Math.max(...yValues)
-                    console.log(yMin, yMax)
 
                     const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`].range;
                     
