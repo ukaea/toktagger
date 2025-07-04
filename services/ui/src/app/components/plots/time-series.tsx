@@ -180,25 +180,17 @@ export const TimeSeries = ({
             // Coordinates in data space
             const x      = xaxis.p2d(relX)   // data-space X at click
             const y      = yaxis.p2d(relY)     // data-space Y at click
-
-            // Pixels-per-unit (positive values)
-            const xScale = Math.abs(xaxis.d2p(1) - xaxis.d2p(0))  // px per 1 unit on x
-            const yScale = Math.abs(yaxis.d2p(1) - yaxis.d2p(0))   // px per 1 unit on y
-            
+           
             // compute full data range spans from axis.range 
             const [xMin, xMax] = xaxis.range as [number, number]  // data-space limits on x
             const [yMin, yMax] = yaxis.range as [number, number]  // data-space limits on y
             const xRange       = xMax - xMin    // total span on x axis
             const yRange       = yMax - yMin    // total span on y axis
  
-            // legacy helpers - 100 pixel wide default zone helpers
-            const unitWidth = 100 / xScale    // 100 px converted to units
-
             showContextMenuRef.current({
                 event,
                 props: {
                     // new generic props 
-                    xScale,
                     x, y,   // generic data-space click position
                     xRange, yRange,  // current axis spans
                     xLimits: [xMin, xMax], yLimits: [yMin, yMax]  // explicit axis limits
