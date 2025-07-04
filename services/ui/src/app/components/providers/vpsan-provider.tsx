@@ -86,7 +86,7 @@ export const VSpanProvider = ({categories, initialData, children} : {
         const addVSpanItems = categories.map((category, index) => {
             return (
                 <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
-                    add(props.x0, category)
+                    add(props.x, category)
                 }}>
                     {category.name}
                 </Item>
@@ -105,7 +105,7 @@ export const VSpanProvider = ({categories, initialData, children} : {
                         key="add-vspan-single"
                         id="add-vspan-single"
                         onClick={({props}) => {
-                            add(props.x0, categories[0])
+                            add(props.x, categories[0]) 
                         }}
                     >
                         {`Add ${categories[0].name}`}
