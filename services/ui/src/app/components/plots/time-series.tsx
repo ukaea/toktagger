@@ -168,19 +168,58 @@ export const TimeSeries = ({
     
             information delivered to the menu is  { x, y, xScale, yScale, xRange, yRange, xLimits: [xMin, xMax], yLimits: [yMin, yMax] }
 
+            The dispatcher now auto-detects which subplot was clicked (via the element data-subplot attribute or nearest .subplot group) and 
+            picks the matching xaxisN / yaxisN, so the props are correct for any subplot.
         */
         function handleContextMenu(event: MouseEvent, plot) {
-            const xaxis = plot._fullLayout.xaxis  // x-axis descriptor
-            const yaxis = plot._fullLayout.yaxis  // y-axis descriptor
+            let xaxis = plot._fullLayout.xaxis  // x-axis descriptor
+            let yaxis = plot._fullLayout.yaxis  // y-axis descriptor
 
             const bb = (event.target as HTMLElement).getBoundingClientRect()
             const relX = event.clientX - bb.left    // click X in pixels, relative to plot
             const relY = event.clientY - bb.top       // click Y in pixels, relative to plot
 
+            /* 
+            determine local axes for the subplot clicked
+            Prefer the data-subplot attribute available on drag layers;
+            fall back to searching for the closest subplot element
+            */
+            let subplotId = (event.target as HTMLElement).dataset.subplot // e.g. "x2y2"
+            //  Fast path: drag rectangle always has data-subplot
+            if (!subplotId) {
+                const subplotEl = (event.target as HTMLElement).closest(".subplot") as HTMLElement | null
+                //  Fallback: walk up DOM if attribute missing
+                if (subplotEl) {
+                    subplotId = [...subplotEl.classList].find(c => c !== "subplot") // extract "xNyN"
+                }
+            }
+            if (subplotId) {
+                const m = subplotId.match(/^x(\d*)y(\d*)$/)               // ['', '2', '2']
+                // m[1]/m[2] hold numeric suffixes empty string -> primary axis
+                if (m) {
+                    const suffixX = m[1] ?? ""                            // '' -> xaxis
+                    const suffixY = m[2] ?? ""                            // '' -> yaxis
+                    // Swap to subplot-specific axes if they exist
+                    xaxis = plot._fullLayout[`xaxis${suffixX}`] ?? xaxis
+                    yaxis = plot._fullLayout[`yaxis${suffixY}`] ?? yaxis
+                }
+            }
+
             // Coordinates in data space
             const x      = xaxis.p2d(relX)   // data-space X at click
             const y      = yaxis.p2d(relY)     // data-space Y at click
-           
+            
+            // DEBUG statemtents to verify the axis data is correct when testing
+            console.groupCollapsed("context-menu debug"); 
+            console.log("relX / relY (px)", { relX, relY });// click position in pixel space
+            console.log("subplotId", subplotId ?? "(primary)"); // subplot identifier Plotly attached to the drag rect
+            console.log("axes in use", { // axis objects chosen for the conversion
+            xAxis: xaxis._id ?? "primary xaxis",
+            yAxis: yaxis._id ?? "primary yaxis",
+            });
+            console.log("global axes (x, y)", { x, y }); // final data-space coordinates returned to tools
+            console.groupEnd()
+
             // compute full data range spans from axis.range 
             const [xMin, xMax] = xaxis.range as [number, number]  // data-space limits on x
             const [yMin, yMax] = yaxis.range as [number, number]  // data-space limits on y
