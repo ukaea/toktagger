@@ -108,13 +108,17 @@ export const TimeSeries = ({
                     }
                 }
 
+                const xArray = (dataSet as PlotData).x as number[];
+                const yArray = (dataSet as PlotData).y as number[];
+
                 // Find min and max y data values
                 const yValues: number[] = [];
-                ((dataSet as PlotData).x as number[]).forEach((xVal, i) => {
+                for (let i = 0; i < xArray.length; i++) {
+                    const xVal = xArray[i];
                     if (xVal >= x0 && xVal <= x1) {
-                        yValues.push(((data[index] as PlotData).y as number[])[i])
+                        yValues.push(yArray[i]);
                     }
-                })
+                }
 
                 if (yValues.length > 0) {
                     const yMin = Math.min(...yValues)
