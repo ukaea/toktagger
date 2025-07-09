@@ -1,13 +1,16 @@
 "use client"
 
-import React, { createContext, useCallback, useContext, useState } from "react"
+import { ToolingCallbacks } from "@/types";
+import React, { createContext, useCallback, useContext, useRef, useState } from "react"
 import { Menu, ShowContextMenuParams, useContextMenu } from "react-contexify";
 
 type MakeOptional<Type, Key extends keyof Type> = Omit<Type, Key> & Partial<Pick<Type, Key>>;
 
 interface ContextMenuContextType {
+    setToolingCallbacks: (callbacks: ToolingCallbacks) => void;
     registerMenuItem: (id: string, element: React.ReactNode) => void;
     show: (params: MakeOptional<ShowContextMenuParams<unknown>, "id">) => void
+    toolingCallbacks: ToolingCallbacks | null;
 }
 
 const ContextMenuContext = createContext<ContextMenuContextType | null>(null);
@@ -31,6 +34,7 @@ export const ContextMenuProvider = ({menuId, children} : {
 }) => {
     const [menuElements, setMenuElements] = useState<Map<string, React.ReactNode>>(new Map());
     const {show} = useContextMenu({ id:  menuId})
+    const [toolingCallbacksState, setToolingCallbacksState] = useState<ToolingCallbacks | null>(null);
 
     // Allows tools to register their own menu item in the general context menu
     const registerMenuItem = useCallback((id: string, element: React.ReactNode) => {
@@ -42,8 +46,13 @@ export const ContextMenuProvider = ({menuId, children} : {
         })
     }, [])
 
+    const setToolingCallbacks = (callbacks: ToolingCallbacks) => {
+        console.log("Set")
+        setToolingCallbacksState(callbacks)
+    }
+
     return (
-        <ContextMenuContext.Provider value={{registerMenuItem, show}}>
+        <ContextMenuContext.Provider value={{setToolingCallbacks, registerMenuItem, show, toolingCallbacks: toolingCallbacksState}}>
             {children}
             <Menu id={menuId}>
                 {[...menuElements.values()]}
