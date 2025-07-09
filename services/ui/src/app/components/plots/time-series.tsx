@@ -1,7 +1,7 @@
 "use client"
 
 import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { Config, Layout, Data } from "plotly.js"
+import { Config, Layout, Data, relayout } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
 
 type InjectedProps = {
@@ -43,10 +43,11 @@ export const TimeSeries = ({
 } : DisruptionPlotProps) => {
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
+    const isDraggingRef = useRef(false)
 
     const plotId =  externalId || "disruption" // Facilitate an external or default ID
 
-    const {show: showContextMenu} = useContextMenuProvider()
+    const {show: showContextMenu, toolingCallbacks} = useContextMenuProvider()
     const showContextMenuRef = useRef(showContextMenu)
 
     const overplots: string[] = [];
@@ -159,6 +160,21 @@ export const TimeSeries = ({
             return
         }
 
+        function getClickData(event: MouseEvent, plot): [number, number] {
+            const xaxis = plot._fullLayout.xaxis  // x-axis descriptor
+            const yaxis = plot._fullLayout.yaxis  // y-axis descriptor
+
+            const bb = (event.target as HTMLElement).getBoundingClientRect()
+            const relX = event.clientX - bb.left    // click X in pixels, relative to plot
+            const relY = event.clientY - bb.top       // click Y in pixels, relative to plot
+
+            // Coordinates in data space
+            const x      = xaxis.p2d(relX)   // data-space X at click
+            const y      = yaxis.p2d(relY)     // data-space Y at click
+
+            return [x, y]
+        }
+
         /* 
         Context-menu dispatcher
 
@@ -199,7 +215,7 @@ export const TimeSeries = ({
 
         }
 
-        const dragElements = plot.querySelectorAll(".drag")
+        const dragElements = plot.querySelectorAll<HTMLDivElement>(".drag")
 
         if (dragElements.length === 0) {
             console.error("Could not locate drag element to assign context menu")
@@ -209,18 +225,48 @@ export const TimeSeries = ({
         const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
             handleContextMenu(event, plot)
         } 
+        const downHandler = (event: MouseEvent) => {
+            if (toolingCallbacks && event.ctrlKey) {
+                isDraggingRef.current = true
+                const [x, y] = getClickData(event, plot)
+                toolingCallbacks.start(x, y)
+            }
+        }
+
+        const upHandler = (event: MouseEvent) => {
+            console.log("UP")
+            if (toolingCallbacks && isDraggingRef.current) {
+                isDraggingRef.current = false
+                const [x, y] = getClickData(event, plot)
+                toolingCallbacks.end(x, y)
+            }
+        }
+
+        const dragHandler = (event: MouseEvent) => {
+            if (toolingCallbacks && isDraggingRef.current) {
+                console.log("Drag")
+                const [x, y] = getClickData(event, plot)
+                toolingCallbacks.move(x, y)
+            }
+        }
 
         dragElements.forEach((dragElement) => {
             dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
+            dragElement.addEventListener("mousedown", downHandler)
+            dragElement.addEventListener("mouseup", upHandler)
+            dragElement.addEventListener("mousemove", dragHandler)
         })
 
         return () => { // remove listener on effect cleanup
             dragElements.forEach((dragElement) => {
                 dragElement.removeEventListener("contextmenu", contextHandler)
+                dragElement.removeEventListener("mousedown", downHandler)
+                dragElement.removeEventListener("mouseup", upHandler)
+                dragElement.removeEventListener("mousemove", dragHandler)
             })
         }
 
-    }, [plotId, plotReady])
+    }, [plotId, plotReady, toolingCallbacks])
 
     return (
         <div className="w-full px-6 py-3 space-y-3 flex-col">
