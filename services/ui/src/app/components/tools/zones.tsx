@@ -102,16 +102,18 @@ export const Zones = ({
             // Handles the dragging of the zones itself
             const drag = d3.drag<SVGRectElement, Zone>()
                 .on("start", function (event, d) {
-                    dragOffset.current = xaxis.d2p(d.x0) - event.x
+                    const leftBoundary = Math.min(d.x0, d.x1)
+                    dragOffset.current = xaxis.d2p(leftBoundary) - event.x
                 })
                 .on("drag", function (event, d) {
                     const newX = event.x + dragOffset.current;
                     d3.select(this).attr("x", newX);
 
                     const x0 = xaxis.p2d(newX);
-                    const x1 = xaxis.p2d(newX + xaxis.d2p(d.x1) - xaxis.d2p(d.x0));
-                    d.x0 = x0;
-                    d.x1 = x1;
+                    const x1 = xaxis.p2d(newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0)));
+                    const x0Left = d.x0 < d.x1
+                    d.x0 = x0Left ? x0 : x1;
+                    d.x1 = x0Left ? x1 : x0;
                     handleZoneUpdate()
                 }).on("end", function(event, d) {
                     handleZoneDragFinish();  
@@ -130,12 +132,13 @@ export const Zones = ({
             for (const zone of zones) {
                 const x0 = xaxis.d2p(zone.x0);
                 const x1 = xaxis.d2p(zone.x1);
+                const x = Math.min(x0, x1)
                 const pointerEvent = disableToolingInteraction ? "none" : "all"
                 graphGroup.append("rect")
                     .attr("class", "zone span cursor-grab disable-on-modifier")
-                    .attr("x", x0)
+                    .attr("x", x)
                     .attr("y", upperLimit)
-                    .attr("width", x1 - x0)
+                    .attr("width", Math.abs(x1 - x0))
                     .attr("height", height)
                     .attr("fill", zone.category.color)
                     .attr("opacity", 0.5)
