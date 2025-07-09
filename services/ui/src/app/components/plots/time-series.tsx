@@ -203,17 +203,6 @@ export const TimeSeries = ({
             const x      = xaxis.p2d(relX)   // data-space X at click
             const y      = yaxis.p2d(relY)     // data-space Y at click
             
-            // DEBUG statemtents to verify the axis data is correct when testing
-            console.groupCollapsed("context-menu debug"); 
-            console.log("relX / relY (px)", { relX, relY });// click position in pixel space
-            console.log("subplotId", subplotId ?? "(primary)"); // subplot identifier Plotly attached to the drag rect
-            console.log("axes in use", { // axis objects chosen for the conversion
-            xAxis: xaxis._id ?? "primary xaxis",
-            yAxis: yaxis._id ?? "primary yaxis",
-            });
-            console.log("global axes (x, y)", { x, y }); // final data-space coordinates returned to tools
-            console.groupEnd()
-
             // compute full data range spans from axis.range 
             const [xMin, xMax] = xaxis.range as [number, number]  // data-space limits on x
             const [yMin, yMax] = yaxis.range as [number, number]  // data-space limits on y
