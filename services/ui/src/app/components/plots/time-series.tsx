@@ -172,8 +172,8 @@ export const TimeSeries = ({
             picks the matching xaxisN / yaxisN, so the props are correct for any subplot.
         */
         function handleContextMenu(event: MouseEvent, plot) {
-            let xaxis = plot._fullLayout.xaxis  // x-axis descriptor
-            let yaxis = plot._fullLayout.yaxis  // y-axis descriptor
+            let xaxis: any // will be assigned to the subplot-specific or primary x-axis below
+            let yaxis: any  // will be assigned to the subplot-specific or primary y-axis below
 
             const bb = (event.target as HTMLElement).getBoundingClientRect()
             const relX = event.clientX - bb.left    // click X in pixels, relative to plot
@@ -200,10 +200,13 @@ export const TimeSeries = ({
                     const suffixX = m[1] ?? ""                            // '' -> xaxis
                     const suffixY = m[2] ?? ""                            // '' -> yaxis
                     // Swap to subplot-specific axes if they exist
-                    xaxis = plot._fullLayout[`xaxis${suffixX}`] ?? xaxis
-                    yaxis = plot._fullLayout[`yaxis${suffixY}`] ?? yaxis
+                    xaxis = plot._fullLayout[`xaxis${suffixX}`] ?? plot._fullLayout.xaxis
+                    yaxis = plot._fullLayout[`yaxis${suffixY}`] ?? plot._fullLayout.yaxis
                 }
             }
+            // final catch-all fallback – runs whether or not we found a subplotId 
+            xaxis = xaxis ?? plot._fullLayout.xaxis
+            yaxis = yaxis ?? plot._fullLayout.yaxis
 
             // Coordinates in data space
             const x      = xaxis.p2d(relX)   // data-space X at click
