@@ -243,7 +243,7 @@ export const TimeSeries = ({
         const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
             handleContextMenu(event, plot)
         }
-        const downHandler = (event: MouseEvent) => {
+        const startToolCreation = (event: MouseEvent) => {
             if (toolingCallbacks && event.ctrlKey) {
                 isDraggingRef.current = true
                 const [x, y] = getClickData(event, plot)
@@ -251,8 +251,14 @@ export const TimeSeries = ({
             }
         }
 
-        const upHandler = (event: MouseEvent) => {
-            console.log("UP")
+        // This is a backup listener in case the user lifts the control key first - this isn't ideal as a final update won't be sent
+        const cancelToolCreation = (event: KeyboardEvent) => {
+            if (event.key === "Control" && toolingCallbacks && isDraggingRef.current) {
+                isDraggingRef.current = false
+            }
+        }
+
+        const finishToolCreation = (event: MouseEvent) => {
             if (toolingCallbacks && isDraggingRef.current) {
                 isDraggingRef.current = false
                 const [x, y] = getClickData(event, plot)
@@ -260,9 +266,8 @@ export const TimeSeries = ({
             }
         }
 
-        const dragHandler = (event: MouseEvent) => {
+        const updateTool = (event: MouseEvent) => {
             if (toolingCallbacks && isDraggingRef.current) {
-                console.log("Drag")
                 const [x, y] = getClickData(event, plot)
                 toolingCallbacks.move(x, y)
             }
@@ -270,18 +275,21 @@ export const TimeSeries = ({
 
         dragElements.forEach((dragElement) => {
             dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
-            dragElement.addEventListener("mousedown", downHandler)
-            dragElement.addEventListener("mouseup", upHandler)
-            dragElement.addEventListener("mousemove", dragHandler)
+            dragElement.addEventListener("mousedown", startToolCreation)
+            dragElement.addEventListener("mouseup", finishToolCreation)
+            dragElement.addEventListener("mousemove", updateTool)
         })
+
+        document.addEventListener("keyup", cancelToolCreation)
 
         return () => { // remove listener on effect cleanup
             dragElements.forEach((dragElement) => {
                 dragElement.removeEventListener("contextmenu", contextHandler)
-                dragElement.removeEventListener("mousedown", downHandler)
-                dragElement.removeEventListener("mouseup", upHandler)
-                dragElement.removeEventListener("mousemove", dragHandler)
+                dragElement.removeEventListener("mousedown", startToolCreation)
+                dragElement.removeEventListener("mouseup", finishToolCreation)
+                dragElement.removeEventListener("mousemove", updateTool)
             })
+            document.removeEventListener("keyup", cancelToolCreation)
         }
 
     }, [plotId, plotReady, toolingCallbacks])
