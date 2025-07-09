@@ -182,17 +182,8 @@ export const TimeSeries = ({
             /* 
             determine local axes for the subplot clicked
             Prefer the data-subplot attribute available on drag layers;
-            fall back to searching for the closest subplot element
             */
-            let subplotId = (event.target as HTMLElement).dataset.subplot // e.g. "x2y2"
-            //  Fast path: drag rectangle always has data-subplot
-            if (!subplotId) {
-                const subplotEl = (event.target as HTMLElement).closest(".subplot") as HTMLElement | null
-                //  Fallback: walk up DOM if attribute missing
-                if (subplotEl) {
-                    subplotId = [...subplotEl.classList].find(c => c !== "subplot") // extract "xNyN"
-                }
-            }
+            let subplotId = (event.target as HTMLElement).dataset.subplot // e.g. "x2y2"         
             if (subplotId) {
                 const m = subplotId.match(/^x(\d*)y(\d*)$/)               // ['', '2', '2']
                 // m[1]/m[2] hold numeric suffixes empty string -> primary axis
