@@ -41,7 +41,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     const zones = useRef<Zone[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
 
-    const {registerMenuItem} = useContextMenuProvider()
+    const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
 
     
     // It is necessary for the context to trigger child refreshes
@@ -58,12 +58,13 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         onModifyZone(zones.current);
     }
 
-    const addZone = (x0: number, x1: number, category: Category) => {
+    const addZone = (x0: number, x1: number, category: Category, active = true) => {
         zones.current.push(
             {
                 category,
                 x0,
-                x1
+                x1,
+                active
             }
         )
         triggerZoneUpdate();
@@ -130,6 +131,23 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                     )
 
             registerMenuItem("zone", menuElement)
+
+            document.addEventListener("keyup", (event) => {
+                if (event.key === "z") {
+                    setToolingCallbacks({
+                        start: (x, y) => {addZone(x, x, categories[0], false)},
+                        move: (x, y) => {
+                            zones.current[zones.current.length-1].x1 = x;
+                            triggerZoneUpdate()
+                        },
+                        end: (x, y) => {
+                            zones.current[zones.current.length-1].x1 = x;
+                            zones.current[zones.current.length-1].active = true;
+                            triggerZoneUpdate()
+                        },
+                    })
+                }
+            })
 
         }, [categories, registerMenuItem])
 
