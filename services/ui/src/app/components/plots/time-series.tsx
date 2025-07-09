@@ -88,8 +88,18 @@ export const TimeSeries = ({
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
 
         document.addEventListener("keydown", (e) => {
-            if (e.key === "Shift") {
-                const elements = plot.querySelectorAll(".disable-on-shift")
+            if (e.key === "Control") {
+                relayout(plot, {dragmode: false})
+                const elements = plot.querySelectorAll(".disable-on-modifier")
+                elements.forEach((element) => {
+                    element.setAttribute("style", "pointer-events: none")
+                })
+            }
+        })
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Shift" || e.key === "Control") {
+                const elements = plot.querySelectorAll(".disable-on-modifier")
                 elements.forEach((element) => {
                     element.setAttribute("style", "pointer-events: none")
                 })
@@ -97,8 +107,9 @@ export const TimeSeries = ({
         })
 
         document.addEventListener("keyup", (e) => {
-            if (e.key === "Shift") {
-                const elements = plot.querySelectorAll(".disable-on-shift")
+            if (e.key === "Shift" || e.key === "Control") {
+                relayout(plot, {dragmode: "pan"})
+                const elements = plot.querySelectorAll(".disable-on-modifier")
                 elements.forEach((element) => {
                     element.setAttribute("style", "pointer-events: all")
                 })
@@ -224,7 +235,7 @@ export const TimeSeries = ({
 
         const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
             handleContextMenu(event, plot)
-        } 
+        }
         const downHandler = (event: MouseEvent) => {
             if (toolingCallbacks && event.ctrlKey) {
                 isDraggingRef.current = true

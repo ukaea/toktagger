@@ -103,7 +103,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
             for (const vspan of vspans) {
                 const x = xaxis.d2p(vspan.x);
                 graphGroup.append("line")
-                    .attr("class", "vspan disable-on-shift")
+                    .attr("class", "vspan disable-on-modifier")
                     .attr("x1", x)
                     .attr("x2", x)
                     .attr("y1", upperLimit)
@@ -114,7 +114,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
                     .style("cursor", "move")
 
                 graphGroup.append("rect")
-                    .attr("class", "vspan disable-on-shift")
+                    .attr("class", "vspan disable-on-modifier")
                     .attr("x", x-10)
                     .attr("y", upperLimit)
                     .attr("width", 20)

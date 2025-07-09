@@ -19,6 +19,8 @@ export type Zone = {
 
   x0: number;
   x1: number;
+
+  active: boolean;
 };
 
 export type VSpan = {

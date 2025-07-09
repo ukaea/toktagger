@@ -22,8 +22,8 @@ export const Disruption = ({ data }: DisruptionInfo) => {
         ]
 
     const initialZones: Zone[] = [
-        { x0: 0.05, x1: 0.1, category: zoneCategories[0] },
-        { x0: 0.15, x1: 0.2, category: zoneCategories[1] },
+        { x0: 0.05, x1: 0.1, category: zoneCategories[0], active: true },
+        { x0: 0.15, x1: 0.2, category: zoneCategories[1], active: true },
     ]
 
     const disruptionCategories: Category[] = [
