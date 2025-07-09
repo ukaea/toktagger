@@ -32,3 +32,9 @@ export type ToolingProps = {
   forceUpdate?: number;
   onZoneUpdate: CallableFunction;
 };
+
+export type ToolingCallbacks = {
+  start: (x: number, y: number) => void
+  move: (x: number, y: number) => void
+  end: (x: number, y: number) => void
+}
