@@ -1,15 +1,18 @@
 "use client"
 
+import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { useVSpanContext } from "@/app/components/providers/vpsan-provider"
 import { useZoneContext } from "@/app/components/providers/zone-provider"
-import { Category } from "@/types"
+import { Category, ToolingTypes } from "@/types"
+import { ToggleButton } from "@adobe/react-spectrum"
 import { JSX, useEffect, useState } from "react"
 
 export const DisruptionTable = () => {
     const [entries, setEntries] = useState<JSX.Element[]>([])
 
-    const {zones, triggerUpdate: triggerZoneUpdate} = useZoneContext()
-    const {vspans: disruptions, triggerUpdate: triggerDisruptionUpdate} = useVSpanContext()
+    const {zones, triggerUpdate: triggerZoneUpdate, activateTooling: activateZoning} = useZoneContext()
+    const {vspans: disruptions, triggerUpdate: triggerDisruptionUpdate, activateTooling: activateDisruption} = useVSpanContext()
+    const {toolingCallbacks} = useContextMenuProvider()
 
     useEffect(() => {
         const entriesBuffer: JSX.Element[] = []
@@ -70,6 +73,12 @@ export const DisruptionTable = () => {
                     {entries}
                 </tbody>
             </table>
+            <ToggleButton isSelected={toolingCallbacks?.id === ToolingTypes.ZONE} onPressStart={activateZoning}>
+                Zoning
+            </ToggleButton>
+            <ToggleButton isSelected={toolingCallbacks?.id === ToolingTypes.VSPAN} onPressStart={activateDisruption}>
+                Disruption
+            </ToggleButton>
         </div>
     )
 }

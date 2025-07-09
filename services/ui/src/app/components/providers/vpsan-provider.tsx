@@ -1,6 +1,6 @@
 "use client"
 
-import { Category, VSpan } from "@/types"
+import { Category, ToolingTypes, VSpan } from "@/types"
 import React, { createContext, useContext, useEffect, useRef, useState } from "react"
 import { Item, ItemParams, Menu, Submenu } from "react-contexify"
 import { useContextMenuProvider } from "./context-menu-provider";
@@ -9,6 +9,7 @@ interface VSpanContextInfo {
     vspans: VSpan[];
     handleVSpanUpdate: () => void;
     addVSpan: (x: number, category: Category) => void;
+    activateTooling: () => void
     triggerUpdate: number;
 }
 
@@ -38,7 +39,7 @@ export const VSpanProvider = ({categories, initialData, children} : {
     const spans = useRef<VSpan[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
 
-    const {registerMenuItem} = useContextMenuProvider()
+    const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
 
     // It is necessary for the context to trigger child refreshes
     const triggerVSpanUpdate = () => {
@@ -71,6 +72,21 @@ export const VSpanProvider = ({categories, initialData, children} : {
             return span
         })
         triggerVSpanUpdate()
+    }
+
+    const activateTooling = () => {
+        setToolingCallbacks({
+            id: ToolingTypes.VSPAN,
+            start: (x, y) => {addVSpan(x, categories[0])},
+            move: (x, y) => {
+                spans.current[spans.current.length-1].x = x;
+                triggerVSpanUpdate()
+            },
+            end: (x, y) => {
+                spans.current[spans.current.length-1].x = x;
+                triggerVSpanUpdate()
+            },
+        })
     }
 
     // On initialisation the tool registers a menu item with the general context menu
@@ -116,7 +132,7 @@ export const VSpanProvider = ({categories, initialData, children} : {
                     </Submenu>
                 )
         registerMenuItem("vspan", menuElement)
-    }, [categories, registerMenuItem])
+    }, [addVSpan, categories, registerMenuItem])
 
     // Initialisation of data - this should only run once
     useEffect(() => {
@@ -142,7 +158,7 @@ export const VSpanProvider = ({categories, initialData, children} : {
 
     // The context provider is responsible for rendering the context menu relating to VSpans
     return (
-        <VSpanContext.Provider value={{vspans: spans.current, handleVSpanUpdate, addVSpan, triggerUpdate}}>
+        <VSpanContext.Provider value={{vspans: spans.current, handleVSpanUpdate, addVSpan, activateTooling, triggerUpdate}}>
             {children}
             <Menu id={`${VSPAN_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {
