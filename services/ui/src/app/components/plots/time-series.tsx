@@ -44,6 +44,7 @@ export const TimeSeries = ({
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
     const isDraggingRef = useRef(false)
+    const controlHeldRef = useRef(false);
 
     const plotId =  externalId || "disruption" // Facilitate an external or default ID
 
@@ -86,35 +87,6 @@ export const TimeSeries = ({
             triggerToolUpdate()
         } 
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
-
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Control") {
-                relayout(plot, {dragmode: false})
-                const elements = plot.querySelectorAll(".disable-on-modifier")
-                elements.forEach((element) => {
-                    element.setAttribute("style", "pointer-events: none")
-                })
-            }
-        })
-
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Shift" || e.key === "Control") {
-                const elements = plot.querySelectorAll(".disable-on-modifier")
-                elements.forEach((element) => {
-                    element.setAttribute("style", "pointer-events: none")
-                })
-            }
-        })
-
-        document.addEventListener("keyup", (e) => {
-            if (e.key === "Shift" || e.key === "Control") {
-                relayout(plot, {dragmode: "pan"})
-                const elements = plot.querySelectorAll(".disable-on-modifier")
-                elements.forEach((element) => {
-                    element.setAttribute("style", "pointer-events: all")
-                })
-            }
-        })
     };
 
 
@@ -137,10 +109,6 @@ export const TimeSeries = ({
         return () => { // cleanup on unmount / Fast-Refresh
             plotElement?.removeAllListeners?.("plotly_relayout"); // detach relayout listener
 
-            // detach key press listeners
-            plotElement?.removeAllListeners?.("keydown");
-            plotElement?.removeAllListeners?.("keyup");
-
             overplots.forEach(overplot => {
                 root?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
             })
@@ -156,6 +124,45 @@ export const TimeSeries = ({
         };
         reload();
     }, [plotId, data]);
+
+    // Change drag mode based on tooling interactability
+    useEffect(() => {
+        if (!plotReady) {
+            // Plot may not have loaded yet - this will rerun after loading
+            return
+        }
+
+        const plot = document.getElementById(plotId)
+
+        if (!plot) {
+            console.error("Could not locate plot to set drag mode")
+            return
+        }
+
+        const disableInteraction = (event: KeyboardEvent) => {
+            if (event.key === "Control") {
+                if (!controlHeldRef.current) {
+                    controlHeldRef.current = true
+                    relayout(plot, {dragmode: false})
+                }
+            }
+        }
+
+        const enableInteraction = (event: KeyboardEvent) => {
+            if (event.key === "Control") {
+                controlHeldRef.current = false
+                relayout(plot, {dragmode: "pan"})
+            }
+        }
+
+        document.addEventListener("keydown", disableInteraction)
+        document.addEventListener("keyup", enableInteraction)
+
+        return () => {
+            document.removeEventListener("keydown", disableInteraction)
+            document.removeEventListener("keyup", enableInteraction)
+        }
+    }, [plotId, plotReady])
 
     // Handles context menu creation
     useEffect(() => {

@@ -1,7 +1,7 @@
 "use client"
 
 import { ToolingCallbacks } from "@/types";
-import React, { createContext, useCallback, useContext, useRef, useState } from "react"
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { Menu, ShowContextMenuParams, useContextMenu } from "react-contexify";
 
 type MakeOptional<Type, Key extends keyof Type> = Omit<Type, Key> & Partial<Pick<Type, Key>>;
@@ -11,6 +11,7 @@ interface ContextMenuContextType {
     registerMenuItem: (id: string, element: React.ReactNode) => void;
     show: (params: MakeOptional<ShowContextMenuParams<unknown>, "id">) => void
     toolingCallbacks: ToolingCallbacks | null;
+    disableToolingInteraction: boolean;
 }
 
 const ContextMenuContext = createContext<ContextMenuContextType | null>(null);
@@ -35,6 +36,9 @@ export const ContextMenuProvider = ({menuId, children} : {
     const [menuElements, setMenuElements] = useState<Map<string, React.ReactNode>>(new Map());
     const {show} = useContextMenu({ id:  menuId})
     const [toolingCallbacksState, setToolingCallbacksState] = useState<ToolingCallbacks | null>(null);
+    const [disableToolingInteraction, setDisableToolInteraction] = useState(false)
+
+    const keyHeldRef = useRef(false);
 
     // Allows tools to register their own menu item in the general context menu
     const registerMenuItem = useCallback((id: string, element: React.ReactNode) => {
@@ -46,13 +50,40 @@ export const ContextMenuProvider = ({menuId, children} : {
         })
     }, [])
 
+    // Set up listeners to toggle tooling interaction
+    useEffect(() => {
+        const disableInteraction = (event: KeyboardEvent) => {
+            if (event.key === "Shift" || event.key === "Control") {
+                if (!keyHeldRef.current) {
+                    keyHeldRef.current = true
+                    setDisableToolInteraction(true)
+                }
+            }
+        }
+
+        const enableInteraction = (event: KeyboardEvent) => {
+            if (event.key === "Shift" || event.key === "Control") {
+                keyHeldRef.current = false
+                setDisableToolInteraction(false)
+            }
+        }
+
+        document.addEventListener("keydown", disableInteraction)
+        document.addEventListener("keyup", enableInteraction)
+
+        return () => {
+            document.removeEventListener("keydown", disableInteraction)
+            document.removeEventListener("keyup", enableInteraction)
+        }
+    }, [])
+
     const setToolingCallbacks = (callbacks: ToolingCallbacks) => {
-        console.log("Set")
+
         setToolingCallbacksState(callbacks)
     }
 
     return (
-        <ContextMenuContext.Provider value={{setToolingCallbacks, registerMenuItem, show, toolingCallbacks: toolingCallbacksState}}>
+        <ContextMenuContext.Provider value={{setToolingCallbacks, registerMenuItem, show, toolingCallbacks: toolingCallbacksState, disableToolingInteraction}}>
             {children}
             <Menu id={menuId}>
                 {[...menuElements.values()]}

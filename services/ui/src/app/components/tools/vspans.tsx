@@ -4,6 +4,7 @@ import { useContextMenu } from "react-contexify";
 import * as d3 from "d3"
 import { useVSpanContext, VSPAN_MENU_ID } from "../providers/vpsan-provider";
 import { ToolingProps, VSpan } from "@/types";
+import { useContextMenuProvider } from "../providers/context-menu-provider";
 
 /**
  * Handles the rendering of VSpans onto a specific plot
@@ -18,6 +19,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
     const {show: showVSpanMenu} = useContextMenu({
         id: VSPAN_MENU_ID
     })
+    const {disableToolingInteraction} = useContextMenuProvider()
 
     // Hook to pull in data from context provider
     const {vspans, handleVSpanUpdate, triggerUpdate} = useVSpanContext()
@@ -102,6 +104,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
             // Create a line and a transparent drag handle for each VSpan
             for (const vspan of vspans) {
                 const x = xaxis.d2p(vspan.x);
+                const pointerEvent = disableToolingInteraction ? "none" : "all"
                 graphGroup.append("line")
                     .attr("class", "vspan disable-on-modifier")
                     .attr("x1", x)
@@ -110,7 +113,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
                     .attr("y2", upperLimit + height)
                     .attr("stroke", vspan.category.color)
                     .attr("stroke-width", 6)
-                    .attr("style", "pointer-events: all")
+                    .attr("style", `pointer-events: ${pointerEvent}`)
                     .style("cursor", "move")
 
                 graphGroup.append("rect")
@@ -120,14 +123,14 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
                     .attr("width", 20)
                     .attr("height", height)
                     .attr("fill", "transparent")
-                    .attr("style", "pointer-events: all")
+                    .attr("style", `pointer-events: ${pointerEvent}`)
                     .style("cursor", "move")
                     .datum(vspan)
                     .call(drag)
                     .on("contextmenu", handleContextMenu)
             }
         }))
-    }, [handleVSpanUpdate, plotId, plotReady, showVSpanMenu, vspans, triggerUpdate, forceUpdate])
+    }, [handleVSpanUpdate, plotId, plotReady, showVSpanMenu, vspans, triggerUpdate, forceUpdate, disableToolingInteraction])
 
     return (
         <div />
