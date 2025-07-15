@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from 'next/navigation';
 import {Provider, defaultTheme,  ButtonGroup, ToastQueue, Button } from '@adobe/react-spectrum'
-import { Annotations, BaseAnnotation, CompositeDataSchema, Data, Project, Sample, SpectrogramData, SpectrogramDataSchema, SpectrogramViewParams, ViewParams } from "@/types";
+import { Annotations, BaseAnnotation, CompositeDataSchema, Data, MultiVariateTimeSeriesDataSchema, Project, Sample, SpectrogramData, SpectrogramDataSchema, SpectrogramViewParams, ViewParams } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 
@@ -51,8 +51,6 @@ type SaveButtonInfo = {
   annotations: BaseAnnotation
 };
 export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo) {
-  const router = useRouter();
-
   const handleClick = async () => {
     try {
       await saveAnnotations(project_id, sample_id, annotations);
@@ -102,6 +100,7 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
 
   let tools = [];
   if (project.task == 'ELM') {
+    data = MultiVariateTimeSeriesDataSchema.parse(data);
     const findPeaksTool = (
         <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
     );
