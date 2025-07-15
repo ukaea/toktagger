@@ -22,13 +22,13 @@ def mongo_container():
     with MongoDbContainer("mongo:latest") as mongo:
         yield mongo.get_connection_url()
         
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def db_client(mongo_container):
     db_client = MongoDBClient(mongo_container, "annotate_db")
     yield db_client
     db_client.client.close()
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def api_client(mongo_container):
     os.environ["MONGO_URL"] = mongo_container
     # Have hit various issues getting this setup
@@ -44,7 +44,7 @@ async def api_client(mongo_container):
         yield client
 
     
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def db_projects(db_client):
     project_1 = ProjectIn(
         name="test_project_1",
