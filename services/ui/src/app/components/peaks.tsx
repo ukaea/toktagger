@@ -11,13 +11,13 @@ type FindPeaksToolInfo = {
 };
 
 export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }: FindPeaksToolInfo) {
-    const [prominence, setProminance] = useState(0.1);
-    const [distance, setDistance] = useState(1);
+    const [prominence, setProminance] = useState<number>(0.1);
+    const [distance, setDistance] = useState<number>(1);
 
-    const [timeMinDefault, setTimeMinDefault] = useState(null);
-    const [timeMaxDefault, setTimeMaxDefault] = useState(null);
-    const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
-    const [signalName, setSignalName] = useState(null);
+    const [timeMinDefault, setTimeMinDefault] = useState<number | null>(null);
+    const [timeMaxDefault, setTimeMaxDefault] = useState<number | null>(null);
+    const [timeRange, setTimeRange] = useState<Record<string, number>>({start: 0, end: 100}); 
+    const [signalName, setSignalName] = useState<string | null>(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
     const clearPeaks = () => {
