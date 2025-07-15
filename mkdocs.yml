@@ -7,6 +7,7 @@ nav:
   - Home: index.md
   - Developer Documentation: 
     - Getting Started: dev/developer-setup.md
+    - Building the Docs: dev/building-the-docs.md
     - API Design: dev/API-Design.md
     - System Architecture: dev/System-Architecture.md
     - User Interface:
