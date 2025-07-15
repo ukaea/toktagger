@@ -1,5 +1,5 @@
 import { ZodSchema } from "zod/v4";
-import { DisplayAnnotation, Annotation, Annotations, TimeRegionSchema, ZoneSchema, VSpanSchema TimePointSchema, VSpan, Zone, TimePoint, TimeRegion} from "@/types"
+import { DisplayAnnotation, Annotation, Annotations, TimeRegionSchema, ZoneSchema, VSpanSchema, TimePointSchema, VSpan, Zone, TimePoint, TimeRegion} from "@/types"
 
 export const convertDisplayAnnotationToAnnotation = (annotation: DisplayAnnotation): Annotation => {
     if (ZoneSchema.safeParse(annotation).success) {
@@ -23,7 +23,7 @@ export const convertDisplayAnnotationToAnnotation = (annotation: DisplayAnnotati
 };
 
 
-export const createAnnotationToDisplayAnnotationFunc = (colors) => {
+export const createAnnotationToDisplayAnnotationFunc = (colors: Record<string, string>) => {
     const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
         if (TimeRegionSchema.safeParse(item).success) {
             const timeRegion = TimeRegionSchema.parse(item);

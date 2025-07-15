@@ -11,13 +11,13 @@ import { VSpans } from "@/app/components/tools/vspans"
 import { createAnnotationToDisplayAnnotationFunc, updateAnnotations } from "@/app/utils"
 
 const disruptionCategories: Category[] = [
-    { label: "Disruption", color: 'rgb(255, 0, 0)' },
+    { name: "Disruption", color: 'rgb(255, 0, 0)' },
 ]
 
 const zoneCategories: Category[] = [
-    { label: "RampUp", color: 'rgb(233, 170, 98)' },
-    { label: "FlatTop", color: 'rgb(120, 167, 85)' },
-    { label: "RampDown", color: 'rgb(108, 189, 224)' }
+    { name: "RampUp", color: 'rgb(233, 170, 98)' },
+    { name: "FlatTop", color: 'rgb(120, 167, 85)' },
+    { name: "RampDown", color: 'rgb(108, 189, 224)' }
 ]
 
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>((acc, curr) => {
@@ -52,7 +52,6 @@ export const DisruptionView = ({data, annotations, setAnnotations} : DisruptionV
     const updateVSpans = (newVSpans: Array<VSpan>) => {
         updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
     }
-
 
     const plotData: Plotly.Data[] = [
         {

@@ -15,7 +15,7 @@ export const SampleBreadCrumbs = (info) => {
 };
 
 type SampleTableInfo = {
-  project_id: string;
+  project_id: Promise<string>;
 };
 
 export const SamplesTable = ({project_id}: SampleTableInfo) => {

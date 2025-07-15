@@ -197,7 +197,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         <div className="flex space-y-3">
             <div className="flex-1 text-center items-center">
                 <ContextMenuProvider menuId="elm-menu">
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
                         <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>
                             <Zones />
                         </TimeSeries>
