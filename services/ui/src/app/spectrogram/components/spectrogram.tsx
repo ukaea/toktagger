@@ -1,16 +1,15 @@
 "use client"
 
-import { ZodSchema } from "zod/v4";
 import { SpectrogramViewTable } from "./spectrogram-table"
-import { SpectrogramData, Category, Annotations, Zone, TimeRegion, TimeRegionSchema, TimePointSchema, Annotation, DisplayAnnotation, ZoneSchema, VSpanSchema, VSpan, TimePoint } from "@/types"
+import { SpectrogramData, Category, Annotations, Zone, TimeRegionSchema, TimePointSchema, DisplayAnnotation, ZoneSchema, VSpanSchema, VSpan} from "@/types"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import { VSpans } from "@/app/components/tools/vspans"
-
 import * as d3 from "d3"
+import { createAnnotationToDisplayAnnotationFunc, updateAnnotations } from "@/app/utils"
 
 const linspace = (start: number, end: number, num: number) => {
     const step = (end - start) / (num - 1)
@@ -40,48 +39,7 @@ const lockedModeCategoryColors = lockedModeCategories.reduce<Record<string, stri
   return acc;
 }, {});
 
-const convertDisplayAnnotationToAnnotation = (annotation: DisplayAnnotation): Annotation => {
-    if (ZoneSchema.safeParse(annotation).success) {
-        const zone = ZoneSchema.parse(annotation);
-        const timeRegion: TimeRegion = {
-            time_min: zone.x0,
-            time_max: zone.x1,
-            label: zone.category.name
-        };
-        return timeRegion;
-    } else if (VSpanSchema.safeParse(annotation).success) {
-        const vspan = VSpanSchema.parse(annotation);
-        const timePoint: TimePoint = {
-            time: vspan.x,
-            label: vspan.category.name
-        }
-        return timePoint;
-    } else {
-        throw new Error("Unsupported annotation type");
-    }
-};
-
-
-const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
-    if (TimeRegionSchema.safeParse(item).success) {
-        const timeRegion = TimeRegionSchema.parse(item);
-        const zone: Zone = {
-            x0: timeRegion.time_min,
-            x1: timeRegion.time_max,
-            category: { name: timeRegion.label, color: zoneCategoryColors[timeRegion.label]},
-        };
-        return zone;
-    } else if (TimePointSchema.safeParse(item).success) {
-        const timePoint = TimePointSchema.parse(item);
-        const vspan: VSpan = {
-            x: timePoint.time,
-            category: { name: timePoint.label, color: lockedModeCategoryColors[timePoint.label] },
-        };
-        return vspan;
-    } else {
-        throw new Error("Unsupported annotation type");
-    }
-};
+const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
 
 type SpectrogramViewInfo = {
     data: SpectrogramData, 
@@ -90,10 +48,18 @@ type SpectrogramViewInfo = {
 };
 
 export const SpectrogramView = ({data, annotations, setAnnotations}: SpectrogramViewInfo) => {
-    console.log('create view', annotations);
+    const convertAnnotationToDisplayAnnotation = createAnnotationToDisplayAnnotationFunc(colorMapping);
     const displayAnnotations: DisplayAnnotation[] = annotations.map(convertAnnotationToDisplayAnnotation);
     const zones: Zone[] = displayAnnotations.filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success);
     const vspans: VSpan[] = displayAnnotations.filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success);
+
+    const updateZones = (newZones: Array<Zone>) => {
+        updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
+    }
+
+    const updateVSpans = (newVSpans: Array<VSpan>) => {
+        updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
+    }
 
     const amplitude = data.amplitude;
     const ampMin = Math.max(1e-4, Math.min(...amplitude.flat()));
@@ -169,22 +135,6 @@ export const SpectrogramView = ({data, annotations, setAnnotations}: Spectrogram
         modeBarButtonsToRemove: ['pan'],
     }
 
-    function updateAnnotations<T> (newDisplayAnnotations: DisplayAnnotation[], schema: ZodSchema<T>): void {
-        setAnnotations((prevAnnotations: Annotations) => {
-            const otherAnnotations: Annotations = prevAnnotations.filter((item: Annotation) => !schema.safeParse(item).success);
-            let newAnnotations: Annotations = newDisplayAnnotations.map(convertDisplayAnnotationToAnnotation);
-            newAnnotations = newAnnotations.concat(otherAnnotations);
-            return newAnnotations;
-        });
-    }
-
-    const updateZones = (newZones: Array<Zone>) => {
-        updateAnnotations(newZones, TimeRegionSchema);
-    }
-
-    const updateVSpans = (newVSpans: Array<VSpan>) => {
-        updateAnnotations(newVSpans, TimePointSchema);
-    }
 
     return (
         <div className="flex flex-col items-center space-y-3">

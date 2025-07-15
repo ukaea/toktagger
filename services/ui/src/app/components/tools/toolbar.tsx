@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from 'next/navigation';
 import {Provider, defaultTheme,  ButtonGroup, ToastQueue, Button } from '@adobe/react-spectrum'
-import { Annotations, BaseAnnotation, CompositeDataSchema, Data, MultiVariateTimeSeriesDataSchema, Project, Sample, SpectrogramData, SpectrogramDataSchema, SpectrogramViewParams, ViewParams } from "@/types";
+import { Annotation, Annotations, CompositeDataSchema, Data, MultiVariateTimeSeriesDataSchema, Project, Sample, SpectrogramData, SpectrogramDataSchema, SpectrogramViewParams, ViewParams } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 
@@ -26,7 +26,7 @@ async function getNextSample(project_id: string) {
 type NextButtonInfo = {
   project_id: string
   sample_id: string
-  annotations: BaseAnnotation
+  annotations: Annotation
 };
 export function NextButton({project_id, sample_id, annotations} : NextButtonInfo) {
   const router = useRouter();
@@ -48,7 +48,7 @@ export function NextButton({project_id, sample_id, annotations} : NextButtonInfo
 type SaveButtonInfo = {
   project_id: string
   sample_id: string
-  annotations: BaseAnnotation
+  annotations: Annotation
 };
 export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo) {
   const handleClick = async () => {
