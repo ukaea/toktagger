@@ -11,22 +11,22 @@ import asyncio
 from httpx import AsyncClient, ASGITransport
 import os
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# @pytest.fixture(scope="session")
+# def event_loop():
+#     loop = asyncio.new_event_loop()
+#     yield loop
+#     loop.close()
 
 @pytest.fixture(scope="session")
 def mongo_container():
     with MongoDbContainer("mongo:latest") as mongo:
         yield mongo.get_connection_url()
         
-@pytest.fixture(scope="function")
-def db_client(mongo_container):
+@pytest_asyncio.fixture(scope="function")
+async def db_client(mongo_container):
     db_client = MongoDBClient(mongo_container, "annotate_db")
     yield db_client
-    db_client.client.close()
+    await db_client.client.close()
 
 @pytest_asyncio.fixture(scope="function")
 async def api_client(mongo_container):
@@ -42,24 +42,33 @@ async def api_client(mongo_container):
     await lifespan_ctx.__aenter__()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
+    await lifespan_ctx.__aexit__(None, None, None)
 
     
 @pytest_asyncio.fixture(scope="function")
 async def db_projects(db_client):
     project_1 = ProjectIn(
-        name="test_project_1",
+        name="test_project_0",
         task="ELM",
         query_strategy="random",
         data_loader="uda"
     )
     project_2 = ProjectIn(
-        name="test_project_2",
+        name="test_project_1",
         task="UFO",
         query_strategy="sequential",
         data_loader="image"
     )
+    project_3 = ProjectIn(
+        name="test_project_2",
+        task="disruption",
+        query_strategy="uncertainty",
+        data_loader="parquet"
+    )
     id_1 = await db_client.insert('projects', project_1)
-    time.sleep(0.1)
+    await asyncio.sleep(0.5)
     id_2 = await db_client.insert('projects', project_2)
-    yield [id_1, id_2]
+    await asyncio.sleep(0.5)
+    id_3 = await db_client.insert('projects', project_3)
+    yield [id_1, id_2, id_3]
     await db_client.delete_filtered_documents('projects')

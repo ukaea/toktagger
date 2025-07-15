@@ -7,7 +7,7 @@ from services.api.crud import utils
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.query_strategy import QUERY_STRATEGIES
-
+from fastapi import HTTPException
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -33,6 +33,9 @@ async def get_projects(
     Get a list of all available projects.
     -------------------------------------
     """
+    if start > 0 and end is not None and start > end:
+        raise HTTPException(status_code=400, detail="Invalid parameters - end must be higher than start, or leave one bound unspecified.")
+        
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects",
