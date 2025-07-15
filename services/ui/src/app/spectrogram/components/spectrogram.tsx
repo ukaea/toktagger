@@ -1,7 +1,8 @@
 "use client"
 
+import { ZodSchema } from "zod/v4";
 import { SpectrogramViewTable } from "./spectrogram-table"
-import { SpectrogramData, Category, Annotations, Zone, TimeRegion } from "@/types"
+import { SpectrogramData, Category, Annotations, Zone, TimeRegion, TimeRegionSchema, TimePointSchema, Annotation, DisplayAnnotation, ZoneSchema, VSpanSchema, VSpan, TimePoint } from "@/types"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
@@ -20,6 +21,68 @@ const linspace = (start: number, end: number, num: number) => {
     return arr
 }
 
+const lockedModeCategories: Category[] = [
+    { name: "Locked Mode", color: "rgb(255, 0, 0)" },
+]
+
+const zoneCategories: Category[] = [
+    { name: "NTM", color: 'rgb(0, 255, 255)' },
+    { name: "LLM", color: 'rgb(200, 100, 100)' },
+]
+
+const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>((acc, curr) => {
+  acc[curr.name] = curr.color;
+  return acc;
+}, {});
+
+const lockedModeCategoryColors = lockedModeCategories.reduce<Record<string, string>>((acc, curr) => {
+  acc[curr.name] = curr.color;
+  return acc;
+}, {});
+
+const convertDisplayAnnotationToAnnotation = (annotation: DisplayAnnotation): Annotation => {
+    if (ZoneSchema.safeParse(annotation).success) {
+        const zone = ZoneSchema.parse(annotation);
+        const timeRegion: TimeRegion = {
+            time_min: zone.x0,
+            time_max: zone.x1,
+            label: zone.category.name
+        };
+        return timeRegion;
+    } else if (VSpanSchema.safeParse(annotation).success) {
+        const vspan = VSpanSchema.parse(annotation);
+        const timePoint: TimePoint = {
+            time: vspan.x,
+            label: vspan.category.name
+        }
+        return timePoint;
+    } else {
+        throw new Error("Unsupported annotation type");
+    }
+};
+
+
+const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
+    if (TimeRegionSchema.safeParse(item).success) {
+        const timeRegion = TimeRegionSchema.parse(item);
+        const zone: Zone = {
+            x0: timeRegion.time_min,
+            x1: timeRegion.time_max,
+            category: { name: timeRegion.label, color: zoneCategoryColors[timeRegion.label]},
+        };
+        return zone;
+    } else if (TimePointSchema.safeParse(item).success) {
+        const timePoint = TimePointSchema.parse(item);
+        const vspan: VSpan = {
+            x: timePoint.time,
+            category: { name: timePoint.label, color: lockedModeCategoryColors[timePoint.label] },
+        };
+        return vspan;
+    } else {
+        throw new Error("Unsupported annotation type");
+    }
+};
+
 type SpectrogramViewInfo = {
     data: SpectrogramData, 
     annotations: Annotations,
@@ -27,32 +90,22 @@ type SpectrogramViewInfo = {
 };
 
 export const SpectrogramView = ({data, annotations, setAnnotations}: SpectrogramViewInfo) => {
-
-    const lockedModeCategories: Category[] = [
-        { name: "Locked Mode", color: "rgb(255, 0, 0)" },
-    ]
-    const zoneCategories: Category[] = [
-        { name: "NTM", color: 'rgb(0, 255, 255)' },
-        { name: "LLM", color: 'rgb(200, 100, 100)' },
-    ]
-
-    const convertRegionToZone = (item: TimeRegion) => {
-        const category = zoneCategories.find(x => x.name === item.label);
-        return {x0: item.time_min, x1: item.time_max, category: category};
-    };
-    const zones: Zone = annotations.map(convertRegionToZone);
+    console.log('create view', annotations);
+    const displayAnnotations: DisplayAnnotation[] = annotations.map(convertAnnotationToDisplayAnnotation);
+    const zones: Zone[] = displayAnnotations.filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success);
+    const vspans: VSpan[] = displayAnnotations.filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success);
 
     const amplitude = data.amplitude;
     const ampMin = Math.max(1e-4, Math.min(...amplitude.flat()));
     const ampMax = Math.max(...amplitude.flat());
     
-    const logAmplitude = amplitude.map(row => row.map(x => Math.log10(Math.max(x, 1e-4))));
+    const logAmplitude = amplitude.map((row: Array<number>) => row.map(x => Math.log10(Math.max(x, 1e-4))));
     const logAmpMin = Math.min(...logAmplitude.flat());
     const logAmpMax = Math.max(...logAmplitude.flat());
 
     const tickvals = linspace(ampMin, ampMax, 6).map(x => Math.log10(x));
-    let ticktext = tickvals.map(x => Math.pow(10, x));
-    ticktext = ticktext.map(x => Math.round(x * 10000) / 10000);
+    let ticktext = tickvals.map((x: number) => Math.pow(10, x));
+    ticktext = ticktext.map((x: number) => Math.round(x * 10000) / 10000);
 
     const plotData: Plotly.Data[] = [{
         name: "Saddle Coil FFT",
@@ -116,21 +169,28 @@ export const SpectrogramView = ({data, annotations, setAnnotations}: Spectrogram
         modeBarButtonsToRemove: ['pan'],
     }
 
-    const updateAnnotations = (newZones: Array<Zone>) => {
-        const zones = newZones.map(item => ({
-                time_min: item.x0,
-                time_max: item.x1,
-                label: item.category.name
-        }));
+    function updateAnnotations<T> (newDisplayAnnotations: DisplayAnnotation[], schema: ZodSchema<T>): void {
+        setAnnotations((prevAnnotations: Annotations) => {
+            const otherAnnotations: Annotations = prevAnnotations.filter((item: Annotation) => !schema.safeParse(item).success);
+            let newAnnotations: Annotations = newDisplayAnnotations.map(convertDisplayAnnotationToAnnotation);
+            newAnnotations = newAnnotations.concat(otherAnnotations);
+            return newAnnotations;
+        });
+    }
 
-        setAnnotations(zones);
+    const updateZones = (newZones: Array<Zone>) => {
+        updateAnnotations(newZones, TimeRegionSchema);
+    }
+
+    const updateVSpans = (newVSpans: Array<VSpan>) => {
+        updateAnnotations(newVSpans, TimePointSchema);
     }
 
     return (
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="locked-mode-menu">
-                <VSpanProvider categories={lockedModeCategories} initialData={[]}>
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
+                <VSpanProvider categories={lockedModeCategories} initialData={vspans} onModifyVSpan={updateVSpans}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
                         <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
                             <Zones />
                             <VSpans />

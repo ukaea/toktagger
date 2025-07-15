@@ -1,13 +1,13 @@
 "use client";
-import { Annotation, Data } from '@/types';
-import {Provider, defaultTheme, Slider, Button, Flex, Header, ComboBox, Item, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
+import { Annotations, MultiVariateTimeSeriesData } from '@/types';
+import {Provider, defaultTheme, Slider, Button, Flex, Header, ComboBox, Item, RangeSlider} from '@adobe/react-spectrum'
 import { useEffect, useState } from 'react';
 
 type FindPeaksToolInfo = {
     project_id: string,
     sample_id: string,
-    data: Data,
-    setAnnotations: (annotations: Annotation) => void
+    data: MultiVariateTimeSeriesData,
+    setAnnotations: (annotations: Annotations) => void
 };
 
 export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }: FindPeaksToolInfo) {

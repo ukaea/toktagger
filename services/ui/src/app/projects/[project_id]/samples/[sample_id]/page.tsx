@@ -1,7 +1,7 @@
 "use client";
 import { use, useState, useEffect } from 'react';
 import {Provider, defaultTheme, Breadcrumbs, Item, ToastContainer} from '@adobe/react-spectrum'
-import { Annotations, Data, Project, Sample, ViewParams } from '@/types';
+import { Annotations, CompositeDataSchema, Data, MultiVariateTimeSeriesDataSchema, Project, Sample, SpectrogramDataSchema, ViewParams } from '@/types';
 import { ELMView } from '@/app/elms/components/elms';
 import { SpectrogramView } from '@/app/spectrogram/components/spectrogram';
 import { DisruptionView } from '@/app/disruption/components/disruption';
@@ -32,29 +32,33 @@ type SampleViewInfo = {
 
 const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo) => {
   if (project.task == 'disruption') {
+    data = MultiVariateTimeSeriesDataSchema.parse(data);
     return (<DisruptionView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'ELM') {
+    data = MultiVariateTimeSeriesDataSchema.parse(data);
     return (<ELMView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'MHD') {
-    return (<SpectrogramView data={data.values['mirnov']} annotations={annotations} setAnnotations={setAnnotations}/>);
+    data = CompositeDataSchema.parse(data)
+    let mhdData = SpectrogramDataSchema.parse(data.values['mirnov']);
+    return (<SpectrogramView data={mhdData} annotations={annotations} setAnnotations={setAnnotations}/>);
   }
 }
 
-export async function getData(url: string): Data {
+export async function getData(url: string){
     const response = await fetch(url);
     const payload = await response.json();
     return payload;
 }
 
-async function getSample(project_id: string, sample_id: string) {
+async function getSample(project_id: string, sample_id: string): Promise<Sample> {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
 }
 
-async function getProject(project_id: string) {
+async function getProject(project_id: string):  Promise<Project> {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
 }
 
-async function getAnnotations(project_id: string, sample_id: string): Annotations {
+async function getAnnotations(project_id: string, sample_id: string): Promise<Annotations> {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
 }
 
@@ -67,9 +71,9 @@ export default function SamplePage({ params }: SamplePageInfo) {
   const project_id = props.project_id;
   const sample_id = props.sample_id;
 
-  const [project, setProject] = useState<Project>(null);
-  const [sample, setSample] = useState<Sample>(null);
-  const [data, setData] = useState<Data>(null);
+  const [project, setProject] = useState<Project | null>(null);
+  const [sample, setSample] = useState<Sample | null>(null);
+  const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
   const [viewParams, setViewParams] = useState<ViewParams>({name: 'identity'});
 
@@ -80,8 +84,8 @@ export default function SamplePage({ params }: SamplePageInfo) {
     const sample = await getSample(project_id, sample_id);
     setSample(sample);
 
-    const annotations = await getAnnotations(project_id, sample_id);
-    setAnnotations(annotations);
+    const dbAnnotations = await getAnnotations(project_id, sample_id);
+    setAnnotations(dbAnnotations);
     
     if (project.task == 'MHD') {
       viewParams.name = 'spectrogram';

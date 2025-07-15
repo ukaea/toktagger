@@ -1,5 +1,5 @@
 'use client'
-import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category } from "@/types"
+import { BaseAnnotation, MultiVariateTimeSeriesData, TimeRegion, Zone, Category } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
@@ -9,8 +9,8 @@ import Plotly from "plotly.js-dist";
 
 type ELMViewInfo = {
     data: MultiVariateTimeSeriesData, 
-    annotations: Annotations, 
-    setAnnotations: (annotations: Annotations) => void
+    annotations: BaseAnnotation, 
+    setAnnotations: (annotations: BaseAnnotation) => void
 };
 export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
 

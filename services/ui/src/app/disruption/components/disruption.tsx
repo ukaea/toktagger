@@ -1,6 +1,6 @@
 "use client"
 
-import { Category, TimeRegionSchema, TimePointSchema, MultiVariateTimeSeriesData, Annotations, VSpan, Zone, TimePoint, TimeRegion, Annotation, Project, Data} from "@/types"
+import { Category, TimeRegionSchema, TimePointSchema, MultiVariateTimeSeriesData, Annotations, BaseAnnotation, VSpan, Zone, TimePoint, TimeRegion} from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { DisruptionTable } from "./disruption-table"
@@ -17,26 +17,26 @@ type DisruptionViewInfo = {
 
 export const DisruptionView = ({data, annotations, setAnnotations} : DisruptionViewInfo) => {
     const disruptionCategories: Category[] = [
-            { name: "Disruption", color: 'rgb(255, 0, 0)' },
+            { label: "Disruption", color: 'rgb(255, 0, 0)' },
         ]
 
     const convertTimePointToVSpan = (item: TimePoint) => {
-        const category = disruptionCategories.find(x => x.name === item.label);
+        const category = disruptionCategories.find((x: Category) => x.label === item.label);
         return {x: item.time, category: category};
     };
-    const spans = annotations.filter((x: Annotation) => TimePointSchema.safeParse(x).success).map(convertTimePointToVSpan);
+    const spans = annotations.filter((x: BaseAnnotation) => TimePointSchema.safeParse(x).success).map(convertTimePointToVSpan);
 
     const zoneCategories: Category[] = [
-            { name: "RampUp", color: 'rgb(233, 170, 98)' },
-            { name: "FlatTop", color: 'rgb(120, 167, 85)' },
-            { name: "RampDown", color: 'rgb(108, 189, 224)' }
+            { label: "RampUp", color: 'rgb(233, 170, 98)' },
+            { label: "FlatTop", color: 'rgb(120, 167, 85)' },
+            { label: "RampDown", color: 'rgb(108, 189, 224)' }
         ]
 
     const convertTimeRegionToZone = (item: TimeRegion) => {
-        const category = zoneCategories.find(x => x.name === item.label);
+        const category = zoneCategories.find((x: Category) => x.label === item.label);
         return {x0: item.time_min, x1: item.time_max, category: category};
     };
-    const zones = annotations.filter((x: Annotation) => TimeRegionSchema.safeParse(x).success).map(convertTimeRegionToZone);
+    const zones = annotations.filter((x: BaseAnnotation) => TimeRegionSchema.safeParse(x).success).map(convertTimeRegionToZone);
 
     const plotData: Plotly.Data[] = [
         {
@@ -88,26 +88,30 @@ export const DisruptionView = ({data, annotations, setAnnotations} : DisruptionV
     };
 
     const updateZones = (newZones: Array<Zone>) => {
-        let zones = newZones.map(item => ({
+        let zones = newZones.map(item => (
+            TimeRegionSchema.parse({
                 time_min: item.x0,
                 time_max: item.x1,
-                label: item.category.name
-        }));
+                label: item.category.label
+            })
+        ));
 
 
-        const otherAnnotations: Annotations = annotations.filter((x: Annotation) => !TimeRegionSchema.safeParse(x).success);
+        const otherAnnotations: BaseAnnotation = annotations.filter((x: BaseAnnotation) => !TimeRegionSchema.safeParse(x).success);
         zones = zones.concat(otherAnnotations);
         setAnnotations(zones);
     };
 
     const updateVSpans = (newVSpans: Array<VSpan>) =>  {
-        let spans = newVSpans.map(item => ({
+        let spans = newVSpans.map(item => (
+            TimePointSchema.parse({
                 time: item.x,
-                label: item.category.name
-        }));
+                label: item.category.label
+            })
+        ));
 
 
-        const otherAnnotations: Annotations = annotations.filter((x: Annotation) => !TimePointSchema.safeParse(x).success);
+        const otherAnnotations: Annotations = annotations.filter((x: BaseAnnotation) => !TimePointSchema.safeParse(x).success);
         spans = spans.concat(otherAnnotations);
         setAnnotations(spans);
     };

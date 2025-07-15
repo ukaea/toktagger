@@ -10,7 +10,6 @@ interface ZoneContextInfo {
     zones: Zone[];
     handleZoneUpdate: () => void;
     handleZoneDragFinish: () => void;
-    addZone: (x0: number, x1: number, category: Category) => void;
     triggerUpdate: number;
 }
 
@@ -36,7 +35,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     categories: Category[],
     initialData?: Zone[],
     children: React.ReactNode,
-    onModifyZone: CallableFunction
+    onModifyZone: (newZones: Zone[]) => void
 }) => {
     const zones = useRef<Zone[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
@@ -58,17 +57,17 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         onModifyZone(zones.current);
     }
 
-    const addZone = (x0: number, x1: number, category: Category) => {
-        zones.current.push(
-            {
-                category,
-                x0,
-                x1
-            }
-        )
-        triggerZoneUpdate();
-        onModifyZone(zones.current);
-    }
+    // const addZone = (x0: number, x1: number, category: Category) => {
+    //     zones.current.push(
+    //         {
+    //             category,
+    //             x0,
+    //             x1
+    //         }
+    //     )
+    //     triggerZoneUpdate();
+    //     onModifyZone(zones.current);
+    // }
 
     const handleDelete = (input: unknown) => {
         zones.current = zones.current.filter(zone => zone !== input)
@@ -143,7 +142,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
     // The context provider is responsible for rendering the context menu relating to zones
     return(
-        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, triggerUpdate}}>
+        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, triggerUpdate}}>
             {children}
             <Menu id={`${ZONE_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {

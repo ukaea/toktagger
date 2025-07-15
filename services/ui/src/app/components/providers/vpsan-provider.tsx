@@ -9,7 +9,6 @@ interface VSpanContextInfo {
     vspans: VSpan[];
     handleVSpanUpdate: () => void;
     handleVSpanDragFinish: () => void;
-    addVSpan: (x: number, category: Category) => void;
     triggerUpdate: number;
 }
 
@@ -35,7 +34,7 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
     categories: Category[],
     initialData?: VSpan[],
     children: React.ReactNode,
-    onModifyVSpan: CallableFunction
+    onModifyVSpan: (newVSpans: VSpan[]) => void
 }) => {
     const spans = useRef<VSpan[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
@@ -54,16 +53,6 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
 
     // Provides a method for child components to update on drag finish
     const handleVSpanDragFinish = () => {
-        onModifyVSpan(spans.current);
-    }
-
-
-    const addVSpan = (x: number, category: Category) => {
-        spans.current.push({
-            category,
-            x
-        })
-        triggerVSpanUpdate()
         onModifyVSpan(spans.current);
     }
 
@@ -135,7 +124,7 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
 
     // The context provider is responsible for rendering the context menu relating to VSpans
     return (
-        <VSpanContext.Provider value={{vspans: spans.current, handleVSpanUpdate, handleVSpanDragFinish, addVSpan, triggerUpdate}}>
+        <VSpanContext.Provider value={{vspans: spans.current, handleVSpanUpdate, handleVSpanDragFinish, triggerUpdate}}>
             {children}
             <Menu id={`${VSPAN_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {
