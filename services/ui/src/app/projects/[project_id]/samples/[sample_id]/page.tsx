@@ -44,7 +44,7 @@ const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo
   }
 }
 
-export async function getData(url: string){
+export async function getData(url: string): Promise<Data> {
     const response = await fetch(url);
     const payload = await response.json();
     return payload;
@@ -63,7 +63,7 @@ async function getAnnotations(project_id: string, sample_id: string): Promise<An
 }
 
 type SamplePageInfo = {
-  params: { project_id: string, sample_id: string };
+  params: Promise<{ project_id: string, sample_id: string }>;
 };
 
 export default function SamplePage({ params }: SamplePageInfo) {
