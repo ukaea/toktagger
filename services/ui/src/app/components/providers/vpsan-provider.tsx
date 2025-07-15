@@ -86,18 +86,36 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
         const addVSpanItems = categories.map((category, index) => {
             return (
                 <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
-                    add(props.x0, category)
+                    add(props.x, category)
                 }}>
                     {category.name}
                 </Item>
             )
         })
 
-        registerMenuItem("vspan", (
-            <Submenu key="vspan-submenu" label="Add VSpan">
-                {addVSpanItems}
-            </Submenu>
-        ))
+        /* Decide what to register in the main context-menu:
+            - When there is exactly one V-Span category (e.g. “Disruption”) show a single top-level Item “Add Disruption”.
+            - When there are multiple categories keep the existing “Add VSpan” submenu containing one Item per type.
+            - This prevents an unnecessary extra click in the single-category case.
+        */
+        const menuElement =
+            categories.length === 1
+                ? ( // single-category Case 
+                    <Item
+                        key="add-vspan-single"
+                        id="add-vspan-single"
+                        onClick={({props}) => {
+                            add(props.x, categories[0]) 
+                        }}
+                    >
+                        {`Add ${categories[0].name}`}
+                    </Item>
+                ) : ( // multiple-category branch
+                    <Submenu key="vspan-submenu" label="Add VSpan">
+                        {addVSpanItems}
+                    </Submenu>
+                )
+        registerMenuItem("vspan", menuElement)
     }, [categories, registerMenuItem])
 
     // Initialisation of data - this should only run once
