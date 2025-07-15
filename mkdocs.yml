@@ -6,6 +6,7 @@ theme:
 nav:
   - Home: index.md
   - Developer Documentation: 
+    - Getting Started: dev/developer-setup.md
     - API Design: dev/API-Design.md
     - System Architecture: dev/System-Architecture.md
     - User Interface:
