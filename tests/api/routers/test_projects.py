@@ -67,24 +67,6 @@ async def test_get_project_id(api_client, db_projects):
     # Then also check ID and timestamp are returned - should have been added automatically
     assert returned_project.get("_id") == project_id
     assert returned_project.get("timestamp")
-
-@pytest.mark.asyncio
-async def test_get_project_wrong_id(api_client, db_projects):
-    # Generate a random project ID (must be valid ObjectID)
-    wrong_id = str(ObjectId())
-    
-    response = await api_client.get(f"/projects/{wrong_id}")
-    assert response.status_code == 404
-    assert 'Project not found' in response.json().get("detail")
-    
-@pytest.mark.asyncio
-async def test_get_project_invalid_id(api_client, db_projects):
-    # Use an ID which cannot be cast to an ObjectID correctly
-    # This error should be caught and raised as an appropriate HTTP response
-    # Eg, try using the project's name instead of its ID:
-    response = await api_client.get("/projects/test_project_0")
-    assert response.status_code == 400
-    assert 'ID is not valid' in response.json().get("detail")   
     
 @pytest.mark.asyncio
 async def test_delete_project(api_client, db_projects, db_client):

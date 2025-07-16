@@ -1,4 +1,5 @@
 from services.api.schemas.projects import ProjectIn
+from services.api.schemas.annotations import AnnotationIn
 from services.api.schemas.samples import SampleIn, ShotData
 
 # Define some common things to add to db
@@ -13,3 +14,7 @@ SAMPLE = SampleIn(
         data=ShotData(protocol="uda", signal_names=["Ip"]),
         annotations=None
     ) 
+
+ANNOTATION = AnnotationIn(
+    label="annotation"
+)

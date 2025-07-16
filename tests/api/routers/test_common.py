@@ -3,7 +3,7 @@
 import pytest
 import pytest_asyncio
 from bson.objectid import ObjectId
-from tests.db_definitions import SAMPLE
+from tests.db_definitions import SAMPLE, ANNOTATION
 
 def create_endpoint(endpoint: str, test_component: str, db_ids: dict, invalid_obj_id: bool):
     """Create valid endpoint by inserting either valid or invalid IDs into their relevant positions."""
@@ -44,18 +44,45 @@ async def make_request(api_client, request_method, endpoint, request_body):
 # and if required provide a valid request body as a dict
 @pytest.mark.parametrize(
     "endpoint, test_component, request_method, request_body", [
+        ("/projects/id/annotations", "project", "get", {}),
+        ("/projects/id/annotations", "project", "delete", {}),
+        ("/projects/id/samples/id/annotations", "project", "get", {}),
+        ("/projects/id/samples/id/annotations", "sample", "get", {}),
+        ("/projects/id/samples/id/annotations", "project", "delete", {}),
+        ("/projects/id/samples/id/annotations", "sample", "delete", {}),
+        ("/projects/id/samples/id/annotations", "project", "put", [ANNOTATION.model_dump(mode='json'),]),
+        ("/projects/id/samples/id/annotations", "sample", "put", [ANNOTATION.model_dump(mode='json'),]),
+        ("/projects/id/samples/id/data", "project", "get", {}),
+        ("/projects/id/samples/id/data", "sample", "get", {}),
         ("/projects/id", "project", "get", {}),
-        ("/projects/id/samples/id", "project", "get", {}),
-        ("/projects/id/samples/id", "sample", "get", {}),
         ("/projects/id/samples", "project", "get", {}),
         ("/projects/id/samples", "project", "put", [SAMPLE.model_dump(mode='json'),]),
+        ("/projects/id/samples/next", "project", "get", {}),
+        ("/projects/id/samples/id", "project", "get", {}),
+        ("/projects/id/samples/id", "sample", "get", {}),
+        ("/projects/id/samples/id", "project", "delete", {}),
+        ("/projects/id/samples/id", "sample", "delete", {}),
+
     ],
     ids=[
-        "get_projects-wrong_project_id", 
+        "get_annotations-wrong_project_id",
+        "delete_annotations-wrong_project_id",
+        "get_sample_annotations-wrong_project_id",
+        "get_sample_annotations-wrong_sample_id",
+        "delete_sample_annotations-wrong_project_id",
+        "delete_sample_annotations-wrong_sample_id",
+        "put_sample_annotations-wrong_project_id",
+        "put_sample_annotations-wrong_sample_id",
+        "get_data-wrong_project_id",
+        "get_data-wrong_sample_id",
+        "get_project-wrong_project_id",
+        "get_samples-wrong_project_id",
+        "put_samples-wrong_project_id",
+        "get_next_sample-wrong_project_id",
         "get_sample-wrong_project_id", 
         "get_sample-wrong_sample_id",
-        "get_samples-wrong_project_id",
-        "put_samples-wrong_project_id"
+        "delete_sample-wrong_project_id", 
+        "delete_sample-wrong_sample_id",
         ]
     )
 @pytest.mark.parametrize("invalid_obj_id", (True, False), ids=["invalid_obj_id", "valid_obj_id"])

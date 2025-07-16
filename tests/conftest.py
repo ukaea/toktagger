@@ -7,7 +7,7 @@ from testcontainers.mongodb import MongoDbContainer
 from contextlib import asynccontextmanager
 from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, ShotData
-from tests.db_definitions import PROJECT, SAMPLE
+from tests.db_definitions import PROJECT, SAMPLE, ANNOTATION
 
 import time
 import asyncio
@@ -75,10 +75,11 @@ async def db_all(db_client):
     ids = {}
     ids['projects'] = await db_client.insert('projects', PROJECT)
     ids['samples'] = await db_client.insert('samples', SAMPLE)
+    ids['annotations'] = await db_client.insert('annotations', ANNOTATION)
     
     yield ids
     
     await db_client.delete_filtered_documents('projects')
     await db_client.delete_filtered_documents('samples')
-        
+    await db_client.delete_filtered_documents('annotations')  
     
