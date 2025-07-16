@@ -1,13 +1,37 @@
 'use client'
+import { MultiVariateTimeSeriesData, Zone, Category, DisplayAnnotation, ZoneSchema, TimeRegionSchema, Annotation } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
-import { DisruptionTable } from "@/app/disruption/components/disruption-table"
+import { createAnnotationToDisplayAnnotationFunc, updateAnnotations } from "@/app/utils"
 
-export const ElmGraph = ({data, annotations, setAnnotations}) => {
+const zoneCategories: Category[] = [
+    { name: "ELM", color: 'rgb(233, 170, 98)' },
+    { name: "H-Mode", color: 'rgb(100, 170, 98)' },
+]
+
+const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>((acc, curr) => {
+  acc[curr.name] = curr.color;
+  return acc;
+}, {});
+
+type ELMViewInfo = {
+    data: MultiVariateTimeSeriesData, 
+    annotations: Annotation, 
+    setAnnotations: (annotations: Annotation) => void
+};
+
+export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
+    const convertAnnotationToDisplayAnnotation = createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
+    const displayAnnotations: DisplayAnnotation[] = annotations.map(convertAnnotationToDisplayAnnotation);
+    const zones: Zone[] = displayAnnotations.filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success);
+
+    const updateZones = (newZones: Array<Zone>) => {
+        updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
+    }
 
     var dataTrace = {
         name: 'Dalpha',
@@ -168,27 +192,12 @@ export const ElmGraph = ({data, annotations, setAnnotations}) => {
     };
 
     
-    const zoneCategories: Category[] = [
-            { name: "ELM", color: 'rgb(233, 170, 98)' },
-        ]
-
-    const zones = annotations.map(item => ({x0: item.time_min, x1: item.time_max, category: zoneCategories[0]}));
-
-    const updateAnnotations = (newZones) => {
-        const zones = newZones.map(item => ({
-                time_min: item.x0,
-                time_max: item.x1,
-                label: item.category.name
-        }));
-
-        setAnnotations(zones);
-    }
 
     return (
         <div className="flex space-y-3">
             <div className="flex-1 text-center items-center">
                 <ContextMenuProvider menuId="elm-menu">
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onAddZone={updateAnnotations}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
                         <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>
                             <Zones />
                         </TimeSeries>

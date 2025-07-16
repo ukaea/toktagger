@@ -14,11 +14,11 @@ export const SampleBreadCrumbs = (info) => {
   );
 };
 
-type SampleTableParams = {
-  project_id: string;
+type SampleTableInfo = {
+  project_id: Promise<string>;
 };
 
-export const SamplesTable = ({project_id}: SampleTableParams) => {
+export const SamplesTable = ({project_id}: SampleTableInfo) => {
   const samples = getSamples(project_id);
 
   if (!samples) {
@@ -53,11 +53,11 @@ export const SamplesTable = ({project_id}: SampleTableParams) => {
   )
 }
 
-type Props = {
+type ProjectViewInfo = {
   params: { project_id: string };
 };
 
-export default function ProjectView({params} : Props) {
+export default function ProjectView({params} : ProjectViewInfo) {
   const project_id = use(params).project_id;
   const project = getProject(project_id);
 

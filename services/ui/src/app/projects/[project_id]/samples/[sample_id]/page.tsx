@@ -1,175 +1,91 @@
 "use client";
-import {Provider, defaultTheme, Breadcrumbs, Item, Button, ButtonGroup, ToastContainer, ToastQueue } from '@adobe/react-spectrum'
-import { Disruption } from '@/app/disruption/components/disruption';
-import { ElmGraph } from '@/app/elm/components/elms';
-import { getSample, getProject, getSampleData } from '@/app/core';
 import { use, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { FindPeaksTool } from '@/app/components/peaks';
-import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
-import { LockedMode } from '@/app/locked-mode/components/locked-mode';
+import {Provider, defaultTheme, Breadcrumbs, Item, ToastContainer} from '@adobe/react-spectrum'
+import { Annotations, CompositeDataSchema, Data, MultiVariateTimeSeriesDataSchema, Project, Sample, SpectrogramDataSchema, ViewParams } from '@/types';
+import { ELMView } from '@/app/elms/components/elms';
+import { SpectrogramView } from '@/app/spectrogram/components/spectrogram';
+import { DisruptionView } from '@/app/disruption/components/disruption';
+import ToolBar from '@/app/components/tools/toolbar';
 
-export const SampleDataBreadCrumbs = (info) => {
+type SampleDataBreadCrumbsInfo = {
+  project: Project,
+  sample: Sample
+};
+export const SampleDataBreadCrumbs = ({project, sample}: SampleDataBreadCrumbsInfo) => {
   return (
       <Provider theme={defaultTheme}>
         <Breadcrumbs>
           <Item key="projects" href={`${process.env.NEXT_PUBLIC_API_URL}/projects`}>Projects</Item>
-          <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${info.project._id}`}>Project: {info.project.name}</Item>
-          <Item key="samples">Sample: {info.sample.shot_id}</Item>
+          <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project._id}`}>Project: {project.name}</Item>
+          <Item key="samples">Shot: {sample.shot_id}</Item>
         </Breadcrumbs>
       </Provider>
   );
 };
 
-const SampleView = (args) => {
-  if (args.project.task == 'disruption') {
-    return (<Disruption data={args.data}/>);
-  } else if (args.project.task == 'ELM') {
-    return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations} />);
-  } else if (args.project.task == 'MHD') {
-    return (<LockedMode data={args.data.values['mirnov']} viewParams={args.viewParams} annotations={args.annotations} setAnnotations={args.setAnnotations}/>);
-  }
-}
-
-type Props = {
-  params: { project_id: string, sample_id: string };
+type SampleViewInfo = {
+  project: Project,
+  data: Data,
+  annotations: Annotations,
+  setAnnotations: (annotations: Annotations) => void
 };
 
-async function saveAnnotations(project_id: string, sample_id: string, annotations) {
-    const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
-    const response = await fetch(ANNOTATIONS_URL, {
-        method: 'PUT',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(annotations),
-    });
-}
-
-async function getNextSample(project_id: str) {
-    const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
-    const sampleResult = await fetch(NEXT_URL);
-    const sample = await sampleResult.json();
-    return sample;
-}
-
-export function NextButton({project_id, sample_id, annotations}) {
-  const router = useRouter();
-
-  const handleClick = async () => {
-    try {
-      await saveAnnotations(project_id, sample_id, annotations);
-      const sample = await getNextSample(project_id)
-      const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
-      router.push(NEXT_SAMPLE_URL);
-    } catch (err) {
-      console.error('Failed to fetch data:', err);
-    }
-  };
-
-  return <Button variant="primary" onPress={handleClick} >Next</Button>
-}
-
-export function SaveButton({project_id, sample_id, annotations}) {
-  const router = useRouter();
-
-  const handleClick = async () => {
-    try {
-      await saveAnnotations(project_id, sample_id, annotations);
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {timeout: 5000})
-    } catch (err) {
-      console.error('Failed to fetch data:', err);
-    }
-  };
-
-  return <Button variant="primary" onPress={handleClick} >Save</Button>
-}
-
-
-function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewParams, setViewParams}) {
-  const project_id = project._id;
-
-
-  let tools = [];
-  if (project.task == 'ELM') {
-    const findPeaksTool = (
-        <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
-    );
-    tools.push(findPeaksTool); 
+const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo) => {
+  if (project.task == 'disruption') {
+    data = MultiVariateTimeSeriesDataSchema.parse(data);
+    return (<DisruptionView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+  } else if (project.task == 'ELM') {
+    data = MultiVariateTimeSeriesDataSchema.parse(data);
+    return (<ELMView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'MHD') {
-
-    let mhdData = data.values['mirnov'];
-
-    const onAmplitudeRangeChange = async (ampRange) => {
-        viewParams.amplitude_min = Math.pow(10, ampRange.start);
-        viewParams.amplitude_max = Math.pow(10, ampRange.end);
-        setViewParams(viewParams);
-    };
-
-    let ampValues = mhdData.amplitude.flat();
-    ampValues = ampValues.map(x => Math.log10(Math.max(x, 1e-6)));
-    const ampRangeTool = (
-        <DataRangeSlider name={'Amplitude Range'} data={ampValues} onChange={onAmplitudeRangeChange} 
-        getValueLabel={val => `${Math.round(Math.pow(10, val.start)*10000, 2)/10000} - ${Math.round(Math.pow(10, val.end)*10000, 2)/10000}`}/>
-    );
-    tools.push(ampRangeTool);
+    data = CompositeDataSchema.parse(data)
+    let mhdData = SpectrogramDataSchema.parse(data.values['mirnov']);
+    return (<SpectrogramView data={mhdData} annotations={annotations} setAnnotations={setAnnotations}/>);
   }
-
-  return (
-        <Provider theme={defaultTheme}>
-        <div className='h-screen text-center'>
-          <div className='p-4'>
-            <ButtonGroup>
-              <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-              <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-            </ButtonGroup>
-          </div>
-          <hr className='m-4'/>
-          {tools.map((item, i) => <div  key={i}>{item}</div>)}
-        </div>
-        </Provider>
-  );
 }
 
-export async function getData(url) {
+export async function getData(url: string): Promise<Data> {
     const response = await fetch(url);
     const payload = await response.json();
     return payload;
 }
 
-async function getSample(project_id: string, sample_id: string) {
+async function getSample(project_id: string, sample_id: string): Promise<Sample> {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
 }
 
-async function getProject(project_id: string) {
+async function getProject(project_id: string):  Promise<Project> {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
 }
 
-async function getAnnotations(project_id: string, sample_id: string) {
+async function getAnnotations(project_id: string, sample_id: string): Promise<Annotations> {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
 }
 
+type SamplePageInfo = {
+  params: Promise<{ project_id: string, sample_id: string }>;
+};
 
-export default function SamplePage({ params }: Props) {
+export default function SamplePage({ params }: SamplePageInfo) {
   const props = use(params);
   const project_id = props.project_id;
   const sample_id = props.sample_id;
 
-  const [project, setProject] = useState<any>(null);
-  const [sample, setSample] = useState<any>(null);
-  const [data, setData] = useState<any>(null);
-  const [annotations, setAnnotations] = useState<any>([]);
-  const [viewParams, setViewParams] = useState<any>({name: 'identity'});
+  const [project, setProject] = useState<Project | null>(null);
+  const [sample, setSample] = useState<Sample | null>(null);
+  const [data, setData] = useState<Data | null>(null);
+  const [annotations, setAnnotations] = useState<Annotations>([]);
+  const [viewParams, setViewParams] = useState<ViewParams>({name: 'identity'});
 
-  const refreshData = async ( viewParams ) => {
+  const refreshData = async ( viewParams: ViewParams ) => {
     const project = await getProject(project_id);
     setProject(project);
 
     const sample = await getSample(project_id, sample_id);
     setSample(sample);
 
-    const annotations = await getAnnotations(project_id, sample_id);
-    setAnnotations(annotations);
+    const dbAnnotations = await getAnnotations(project_id, sample_id);
+    setAnnotations(dbAnnotations);
     
     if (project.task == 'MHD') {
       viewParams.name = 'spectrogram';
@@ -183,7 +99,7 @@ export default function SamplePage({ params }: Props) {
         },
         body: JSON.stringify(viewParams),
     });
-    const data = await response.json();
+    const data: Data = await response.json();
     setData(data);
   };
 
@@ -204,7 +120,7 @@ export default function SamplePage({ params }: Props) {
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
           <div className='flex'>
-            <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={refreshData}/>
+            <ToolBar project={project} sample={sample} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={refreshData}/>
             <div className="flex-1 justify-center">
               <SampleView project={project} data={data} annotations={annotations} setAnnotations={setAnnotations}/>
             </div>

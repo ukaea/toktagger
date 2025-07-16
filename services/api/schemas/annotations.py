@@ -19,7 +19,7 @@ class AnnotationIn(ConfiguredModel):
 
 
 class TimePoint(AnnotationIn):
-    time: int
+    time: float
 
 
 class TimeRegion(AnnotationIn):

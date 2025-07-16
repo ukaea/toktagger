@@ -13,6 +13,7 @@ class Annotator(BaseModel):
 
 
 class FindPeaksParams(Annotator):
+    signal_name: str
     prominence: float
     distance: int
     time_min: Optional[float]

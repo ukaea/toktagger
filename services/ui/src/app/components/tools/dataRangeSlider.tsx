@@ -1,8 +1,16 @@
 "use client";
-import { RangeSlider} from '@adobe/react-spectrum'
+import { ViewParams } from '@/types';
+import { RangeSlider, RangeValue } from '@adobe/react-spectrum'
 import { useEffect, useState } from 'react';
 
-export function DataRangeSlider({ name, data, onChange, getValueLabel}) {
+type DataRangeSliderInfo = {
+  name: string,
+  data: Array<number>,
+  onChange: (params: ViewParams) => void,
+  getValueLabel: (param: RangeValue<number>) => string
+}
+
+export function DataRangeSlider({ name, data, onChange, getValueLabel}: DataRangeSliderInfo) {
     const [timeMinDefault, setTimeMinDefault] = useState(null);
     const [timeMaxDefault, setTimeMaxDefault] = useState(null);
     const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
