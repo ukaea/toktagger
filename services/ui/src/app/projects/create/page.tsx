@@ -153,14 +153,12 @@ const UDADataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions: 
 }
 
 const FileDataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
+  const [filePath, setFilePath] = useState<string>('/data');
   const [fileType, setFileType] = useState<string>(FileTypes[0].key);
-  const [files, setFiles] = useState<File[]>([]);
+  const [fileNames, setFileNames] = useState<string[]>([]);
   const [signalNames, setSignalNames] = useState<string[]>([]);
 
   useEffect(() => { 
-    let fileNames: string[] = Array.from(files).map((file: File) => file.webkitRelativePath);
-    fileNames = fileNames.filter((name: string) => name.endsWith(`.${fileType}`));
-
     const options = FileDataLoaderOptionsSchema.safeParse({
       name: fileType,
       signal_names: signalNames,
@@ -173,7 +171,26 @@ const FileDataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions:
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [signalNames, files]);
+  }, [signalNames, fileNames]);
+
+  useEffect(() => {
+    async function fetchFileList() { 
+      if (filePath) {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/files?file_path=${filePath}&file_type=${fileType}`);
+          if (response.ok) {
+            const fileList = await response.json();
+            setFileNames(fileList);
+          } else {
+            ToastQueue.negative(`Error fetching files from ${filePath}`, {timeout: 3000});
+          }
+        } catch (error) {
+          ToastQueue.negative(`Error fetching files: ${error}`, {timeout: 3000});
+        }
+      }
+    }
+    fetchFileList();
+  }, [filePath])
 
   return (
     <View
@@ -182,23 +199,22 @@ const FileDataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions:
       borderColor="dark"
       borderRadius="medium"
       padding="size-250">
-      <Flex direction="row" gap="size-200" alignItems="end">
+      <Flex direction="column" gap="size-200">
         <ComboBox label="File Type" items={FileTypes} selectedKey={fileType} onSelectionChange={setFileType} isRequired>
           {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
         </ComboBox>
-
-        <FileTrigger
-          acceptDirectory
-          onSelect={setFiles}
-        >
-            <Button variant="primary">Select Directory</Button>
-        </FileTrigger>
-        {files.length > 0 && (
-          <Text>{files.length}</Text>
-        )}
+        <Flex direction="row" gap="size-200" alignItems="end">
+          <TextField
+            label="File Path"
+            value={filePath}
+            onChange={setFilePath}
+            isRequired
+          >
+          </TextField>
+          <Text>{fileNames.length} {fileType} files found.</Text>
+        </Flex>
+        <SignalNamesUI displayName={'File Columns'} setSignalNames={setSignalNames} />
       </Flex>
-
-      <SignalNamesUI displayName={'File Columns'} setSignalNames={setSignalNames} />
     </View>
   );
 }
