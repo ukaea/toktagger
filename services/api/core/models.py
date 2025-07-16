@@ -3,12 +3,11 @@ from services.api.schemas.projects import Task
 class Model():
     
     def train(self):
-        pass
-    
-    def retrain(self):
+        # pass in list of samples and list of annotations
         pass
     
     def predict(self):
+        # pass in list of samples and list of annotations (could be size 1)
         pass
     
     def save(self):
