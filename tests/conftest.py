@@ -7,6 +7,7 @@ from testcontainers.mongodb import MongoDbContainer
 from contextlib import asynccontextmanager
 from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, ShotData
+from tests.db_definitions import PROJECT, SAMPLE
 
 import time
 import asyncio
@@ -46,15 +47,9 @@ async def api_client(mongo_container):
         yield client
     await lifespan_ctx.__aexit__(None, None, None)
 
-    
 @pytest_asyncio.fixture(scope="function")
 async def db_projects(db_client):
-    project_1 = ProjectIn(
-        name="test_project_0",
-        task="ELM",
-        query_strategy="random",
-        data_loader="uda"
-    )
+    project_1 = PROJECT
     project_2 = ProjectIn(
         name="test_project_1",
         task="UFO",
@@ -78,20 +73,8 @@ async def db_projects(db_client):
 @pytest_asyncio.fixture(scope="function")
 async def db_all(db_client):
     ids = {}
-    project = ProjectIn(
-        name="test_project",
-        task="ELM",
-        query_strategy="random",
-        data_loader="uda"
-    )
-    ids['projects'] = await db_client.insert('projects', project)
-    
-    sample = SampleIn(
-        shot_id=1,
-        data=ShotData(protocol="uda", signal_names=["Ip"]),
-        annotations=None
-    )
-    ids['samples'] = await db_client.insert('samples', sample)
+    ids['projects'] = await db_client.insert('projects', PROJECT)
+    ids['samples'] = await db_client.insert('samples', SAMPLE)
     
     yield ids
     
