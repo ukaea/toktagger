@@ -77,7 +77,7 @@ export const DisplayAnnotationSchema = z.union([ZoneSchema, VSpanSchema]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export const ProjectSchema = z.object({
-  _id: z.string(),
+  _id: z.string().optional(),
   name: z.string(),
   task: z.string(),
   query_strategy: z.string(),

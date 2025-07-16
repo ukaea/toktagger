@@ -1,11 +1,13 @@
 "use client";
 import { useState } from 'react';
-import {Form, FileTrigger, Button, Flex, View, TextField, Text, ComboBox, RadioGroup, ContextualHelp, NumberField, Radio, Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import { useRouter } from 'next/navigation';
+import {Form, FileTrigger, Button, ToastQueue, ToastContainer, View, TextField, Text, ComboBox, RadioGroup, ContextualHelp, NumberField, Radio, Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import { Project } from '@/types';
 
 const Tasks = [
-  {'key': 'elm', 'value': 'ELM'},
+  {'key': 'ELM', 'value': 'ELM'},
   {'key': 'disruption', 'value': 'Disruption'},
-  {'key': 'mhd', 'value': 'MHD'},
+  {'key': 'MHD', 'value': 'MHD'},
 ]
 
 const DataLoaders = [
@@ -156,18 +158,44 @@ const TaskLoaderForm = ({task, setTaskSelection} : {task: string | null, setTask
 }
 
 const ProjectCreateForm = () => {
-  const [projectName, setProjectName] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string>('');
   const [queryStrategy, setQueryStrategy] = useState<string>(QueryStrategies[0].key);
   const [dataLoaderSelection, setDataLoaderSelection] = useState<String | null>(null);
   const [taskSelection, setTaskSelection] = useState<String | null>(null);
+  const router = useRouter();
 
   const createProject = async (e) => {
     e.preventDefault();
+
+    const project: Project = {
+      name: projectName,
+      data_loader: dataLoaderSelection,
+      task: taskSelection,
+      query_strategy: queryStrategy,
+    };
+
+    console.log('Creating project:', project);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(project),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      ToastQueue.negative(`Error creating project: ${error}`, {timeout: 3000})
+      return;
+    }
+    
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/projects`;
+    router.push(url);
   }
 
   return (
     <Form  maxWidth="size-3000" onSubmit={createProject}>
-      <TextField label="Project Name" isRequired setValue={setProjectName} />
+      <TextField label="Project Name" isRequired value={projectName} onChange={setProjectName} />
 
       <DataLoaderForm dataLoader={dataLoaderSelection} setDataLoaderSelection={setDataLoaderSelection} />
       <TaskLoaderForm task={taskSelection} setTaskSelection={setTaskSelection} />
@@ -191,6 +219,7 @@ export default function ProjectCreate() {
             Create Project
           </h1>
             <Provider theme={defaultTheme}>
+            <ToastContainer placement="top" />
             <div className="mb-4 p-4">
               <ProjectCreateForm />
             </div>
