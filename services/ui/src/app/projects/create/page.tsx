@@ -124,10 +124,11 @@ const UDADataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions: 
   useEffect(() => { 
     const options = UDADataLoaderOptionsSchema.safeParse({
       name: 'uda',
-      signame_names: signalNames,
+      signal_names: signalNames,
       shot_min: shotMin,
       shot_max: shotMax
     });
+    console.log(options);
 
     if (options.success) {
       setDataLoaderOptions(options.data);
