@@ -86,7 +86,7 @@ export const ProjectSchema = z.object({
 export type Project = z.infer<typeof ProjectSchema>;
 
 export const SampleSchema = z.object({
-  _id: z.string(),
+  _id: z.string().optional(),
   project_id: z.string(),
   shot_id: z.number(),
   data: z.record(DataSchema)
