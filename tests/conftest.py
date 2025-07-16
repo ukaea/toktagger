@@ -6,6 +6,8 @@ from services.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
 from contextlib import asynccontextmanager
 from services.api.schemas.projects import ProjectIn
+from services.api.schemas.samples import SampleIn, ShotData
+
 import time
 import asyncio
 from httpx import AsyncClient, ASGITransport
@@ -72,3 +74,28 @@ async def db_projects(db_client):
     id_3 = await db_client.insert('projects', project_3)
     yield [id_1, id_2, id_3]
     await db_client.delete_filtered_documents('projects')
+    
+@pytest_asyncio.fixture(scope="function")
+async def db_all(db_client):
+    ids = {}
+    project = ProjectIn(
+        name="test_project",
+        task="ELM",
+        query_strategy="random",
+        data_loader="uda"
+    )
+    ids['projects'] = await db_client.insert('projects', project)
+    
+    sample = SampleIn(
+        shot_id=1,
+        data=ShotData(protocol="uda", signal_names=["Ip"]),
+        annotations=None
+    )
+    ids['samples'] = await db_client.insert('samples', sample)
+    
+    yield ids
+    
+    await db_client.delete_filtered_documents('projects')
+    await db_client.delete_filtered_documents('samples')
+        
+    

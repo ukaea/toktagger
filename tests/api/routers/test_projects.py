@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+from bson.objectid import ObjectId
 
 @pytest.mark.asyncio
 async def test_get_all_projects(api_client, db_projects):
@@ -51,6 +52,40 @@ async def test_get_projects_invalid_start_lessthan_end(api_client, db_projects):
     assert response.status_code == 400
     assert 'Invalid parameters - end must be higher than start' in response.json().get("detail")
     
+@pytest.mark.asyncio
+async def test_get_project_id(api_client, db_projects):
+    project_id = db_projects[0]
+    response = await api_client.get(f"/projects/{project_id}")
+    assert response.status_code == 200
+    returned_project = response.json()
+    # Check info matches what we created the entry with
+    assert returned_project.get("name") == "test_project_0"
+    assert returned_project.get("task") == 'ELM'
+    assert returned_project.get("query_strategy") == "random"
+    assert returned_project.get("data_loader") == "uda"
+    
+    # Then also check ID and timestamp are returned - should have been added automatically
+    assert returned_project.get("_id") == project_id
+    assert returned_project.get("timestamp")
+
+@pytest.mark.asyncio
+async def test_get_project_wrong_id(api_client, db_projects):
+    # Generate a random project ID (must be valid ObjectID)
+    wrong_id = str(ObjectId())
+    
+    response = await api_client.get(f"/projects/{wrong_id}")
+    assert response.status_code == 404
+    assert 'Project not found' in response.json().get("detail")
+    
+@pytest.mark.asyncio
+async def test_get_project_invalid_id(api_client, db_projects):
+    # Use an ID which cannot be cast to an ObjectID correctly
+    # This error should be caught and raised as an appropriate HTTP response
+    # Eg, try using the project's name instead of its ID:
+    response = await api_client.get("/projects/test_project_0")
+    assert response.status_code == 400
+    assert 'ID is not valid' in response.json().get("detail")   
+    
     
 @pytest.mark.asyncio
 async def test_create_project(api_client, db_client):
@@ -61,6 +96,7 @@ async def test_create_project(api_client, db_client):
         "data_loader": "image"
     }
     response = await api_client.post("/projects", json=in_project)
+    assert response.status_code == 200
     assert (_id := response.json().get("_id"))
     
     # Check it has been added to database
@@ -72,4 +108,23 @@ async def test_create_project(api_client, db_client):
         
     assert str(projects[0]["_id"]) == _id
     assert projects[0].get("timestamp")
+    
+
+@pytest.mark.asyncio
+async def test_create_project_invalid(api_client, db_client):
+    in_project = {
+        "name": "test_project",
+        "task": "UFOs",
+        "data_loader": "files"
+        # missing: query_strategy
+    }
+    response = await api_client.post("/projects", json=in_project)
+    assert response.status_code == 422
+    errors = response.json().get('detail', [])
+    # Should flag that task and data_loader are invalid options, and query_strategy is missing...
+    assert len(errors) == 3
+    
+    # Check it has not been added to database
+    projects = await db_client.get_all_documents("projects")
+    assert len(projects) == 0
     
