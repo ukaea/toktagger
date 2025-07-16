@@ -1,6 +1,6 @@
 "use client";
 import { getProjects } from '@/app/core';
-import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Button, Text, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -24,7 +24,6 @@ export const ProjectsTable = () => {
   }));
 
   return (
-    <Provider theme={defaultTheme}>
       <TableView
       selectionMode="none"
       selectionStyle="highlight"
@@ -46,7 +45,6 @@ export const ProjectsTable = () => {
           )}
         </TableBody>
       </TableView>
-    </Provider>
   )
 }
 
@@ -60,7 +58,12 @@ export default function Projects() {
           <h1 className="text-2xl font-bold mb-4">
             Projects
           </h1>
-          <ProjectsTable></ProjectsTable>
+          <Provider theme={defaultTheme}>
+            <div className="p-2">
+              <Button elementType="a" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}>Create</Button>
+            </div>
+            <ProjectsTable></ProjectsTable>
+          </Provider>
         </div>
       </div>
     </div>
