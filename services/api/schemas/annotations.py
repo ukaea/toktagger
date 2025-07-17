@@ -19,7 +19,7 @@ class AnnotationIn(ConfiguredModel):
 
 
 class TimePoint(AnnotationIn):
-    time: int
+    time: float
 
 
 class TimeRegion(AnnotationIn):
@@ -28,9 +28,9 @@ class TimeRegion(AnnotationIn):
 
 
 class BoundingBox(AnnotationIn):
-    height: float = None
-    width: float = None
-    centre: Tuple[float, float] = None
+    height: float
+    width: float
+    centre: Tuple[float, float]
 
 
 class VideoBoundingBox(BoundingBox):

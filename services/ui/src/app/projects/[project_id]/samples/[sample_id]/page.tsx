@@ -23,7 +23,7 @@ export const SampleDataBreadCrumbs = (info) => {
 
 const SampleView = (args) => {
   if (args.project.task == 'disruption') {
-    return (<Disruption data={args.data}/>);
+    return (<Disruption data={args.data} annotations={args.annotations}/>);
   } else if (args.project.task == 'ELM') {
     return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations} />);
   } else if (args.project.task == 'MHD') {

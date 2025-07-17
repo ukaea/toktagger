@@ -87,9 +87,10 @@ async def add_samples(
 
     annotations = []
     annotation_ids = []
+    print(all_annotations)
     for _ann_list, _id in zip(all_annotations, all_ids):
+
         if _ann_list is not None:
-            _ann_list = [(items, _id) for items in _ann_list]
             _ids = [_id for item in _ann_list]
             annotations.extend(_ann_list)
             annotation_ids.extend(_ids)

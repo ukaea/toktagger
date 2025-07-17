@@ -11,10 +11,11 @@ import { VSpans } from "@/app/components/tools/vspans"
 
 type DisruptionInfo = {
     time: Array<number>,
-    values: Record<string, Array<number>>
+    values: Record<string, Array<number>>,
+    annotations: Record<string, Array<Record<string, any>>>
 }
 
-export const Disruption = ({ data }: DisruptionInfo) => {
+export const Disruption = ({ data, annotations }: DisruptionInfo) => {
     const zoneCategories: Category[] = [
             { name: "RampUp", color: 'rgb(233, 170, 98)' },
             { name: "FlatTop", color: 'rgb(120, 167, 85)' },
@@ -30,8 +31,10 @@ export const Disruption = ({ data }: DisruptionInfo) => {
             { name: "Disruption", color: 'rgb(255, 0, 0)' },
         ]
 
+    console.log("Annotations:", annotations);
+
     const initialDisruption: VSpan[] = [
-        { x: 0.3, category: disruptionCategories[0] }
+        { x: annotations.find(a => a.label === "disruption")?.time ?? 0.3, category: disruptionCategories[0] }
     ]
 
     const plotData: Plotly.Data[] = [
@@ -43,16 +46,16 @@ export const Disruption = ({ data }: DisruptionInfo) => {
             },
             name: "ip"
         },
-        {
-            x: data.values['ANE_DENSITY'].time,
-            y: data.values['ANE_DENSITY'].values,
-            line: {
-                color: "black"
-            },
-            name: "density",
-            xaxis: "x2",
-            yaxis: "y2",
-        }
+        // {
+        //     x: data.values['ANE_DENSITY'].time,
+        //     y: data.values['ANE_DENSITY'].values,
+        //     line: {
+        //         color: "black"
+        //     },
+        //     name: "density",
+        //     xaxis: "x2",
+        //     yaxis: "y2",
+        // } # TODO: Put this back......
     ];
     
     const plotLayout: Partial<Plotly.Layout> = {

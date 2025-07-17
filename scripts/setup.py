@@ -39,22 +39,28 @@ def create_local_samples(
     project_id: str,
     shot_ids: list[int],
     base_path: str,
-    columns: Optional[list[str]] = None,
+    file_type: str,
+    signals: Optional[list[str]] = None,
+    annotations: Optional[list[dict]] = None
 ):
     samples = []
 
     base_path = Path(base_path)
+    file_name = str(base_path)
     for shot_id in shot_ids:
+        if file_type != "json":
+            file_name = str(base_path / f"{shot_id}.{file_type}")
         sample = {
-            "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "file_name": str(base_path / f"{shot_id}.parquet"),
-                "type": "parquet",
+                "file_name": file_name,
+                "type": file_type,
                 "protocol": "file",
-                "column_names": columns,
-            },
+                "signal_names": signals,
+            }
         }
+        if annotations:
+            sample["annotations"] = annotations[shot_id]
         samples.append(sample)
 
     requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
@@ -69,14 +75,14 @@ def main():
     create_uda_samples(project_id, shot_ids)
 
     project_id = create_project("Local ELM Project", "ELM", "parquet")
-    create_local_samples(project_id, shot_ids, base_path="/data/test/summary")
+    create_local_samples(project_id, shot_ids, base_path="/data/test/summary", file_type="parquet")
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
     project_id = create_project("Local MHD Project", "MHD", "parquet")
     create_local_samples(
-        project_id, shot_ids, base_path="/data/test/mhd", columns=["mirnov"]
+        project_id, shot_ids, base_path="/data/test/mhd", file_type="parquet", signals=["mirnov"]
     )
 
 

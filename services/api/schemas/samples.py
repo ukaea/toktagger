@@ -2,7 +2,7 @@ from typing import Annotated, List, Optional
 from enum import Enum
 from pydantic import Field
 from services.api.schemas import ConfiguredModel
-from services.api.schemas.annotations import AnnotationIn
+from services.api.schemas.annotations import AnnotationTypes
 
 
 class FileType(str, Enum):
@@ -10,6 +10,7 @@ class FileType(str, Enum):
     PARQUET = "parquet"
     MP4 = "mp4"
     PNG = "png"
+    JSON = "json"
 
 
 class FileProtocol(str, Enum):
@@ -29,7 +30,7 @@ class FileData(ConfiguredModel):
 
 
 class TimeSeriesFileData(FileData):
-    column_names: Optional[list[str]] = None
+    signal_names: Optional[list[str]] = None
 
 
 class ImageFileData(FileData):
@@ -44,11 +45,11 @@ class ShotData(ConfiguredModel):
 
 class SampleBase(ConfiguredModel):
     shot_id: int
-    data: FileData | ShotData | TimeSeriesFileData
+    data: FileData | ShotData | TimeSeriesFileData | ImageFileData
 
 
 class SampleIn(SampleBase):
-    annotations: Optional[List[AnnotationIn]] = None
+    annotations: Optional[List[AnnotationTypes]] = None
 
 
 class Sample(SampleBase):
