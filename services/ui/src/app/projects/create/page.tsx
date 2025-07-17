@@ -2,7 +2,7 @@
 import { z } from "zod/v4";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {Form, FileTrigger, Flex, Button, ToastQueue, ListView, ToastContainer, View, TextField, Text, ComboBox, RadioGroup, ContextualHelp, NumberField, Radio, Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import {Form, Flex, Button, ToastQueue, ListView, ToastContainer, View, TextField, Text, ComboBox, RadioGroup, NumberField, Radio, Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
 import { Project, Sample } from '@/types';
 import { ProjectConfigForm } from "../components/project_config";
 
