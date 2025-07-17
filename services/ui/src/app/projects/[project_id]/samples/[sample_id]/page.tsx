@@ -44,23 +44,6 @@ const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo
   }
 }
 
-export async function getData(url: string): Promise<Data> {
-    const response = await fetch(url);
-    const payload = await response.json();
-    return payload;
-}
-
-async function getSample(project_id: string, sample_id: string): Promise<Sample> {
-    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
-}
-
-async function getProject(project_id: string):  Promise<Project> {
-    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
-}
-
-async function getAnnotations(project_id: string, sample_id: string): Promise<Annotations> {
-    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
-}
 
 type SamplePageInfo = {
   params: Promise<{ project_id: string, sample_id: string }>;

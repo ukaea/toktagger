@@ -2,9 +2,8 @@
 import { z } from "zod/v4";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {Form, FileTrigger, Flex, Button, ToastQueue, ListView, ToastContainer, View, TextField, Text, ComboBox, RadioGroup, ContextualHelp, NumberField, Radio, Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
-import { Project, Sample } from '@/types';
-import { ProjectConfigForm } from "../components/project_config";
+import {Form, Flex, Button, ToastQueue, ListView, View, TextField, Text, ComboBox, RadioGroup, ContextualHelp, NumberField, Radio, Provider, defaultTheme, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import { Project, Sample, SamplesSummary } from '@/types';
 
 const Tasks = [
   {'key': 'ELM', 'value': 'ELM'},
@@ -44,19 +43,8 @@ const FileDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
 });
 type FileDataLoaderOptions = z.infer<typeof FileDataLoaderOptionsSchema>;
 
-const ProjectCreateBreadCrumbs = () => {
-  return (
-      <Provider theme={defaultTheme}>
-        <Breadcrumbs>
-          <Item key="projects" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}>Projects</Item>
-          <Item key="create">Create</Item>
-        </Breadcrumbs>
-      </Provider>
-  );
-};
-
-const SignalNamesUI = ({displayName, setSignalNames} : {displayName: string, setSignalNames: (items: string[]) => void}) => {
-  const [items, setItems] = useState<string[]>([]);
+const SignalNamesUI = ({displayName, signalNames, setSignalNames} : {displayName: string, signalNames: string[], setSignalNames: (items: string[]) => void}) => {
+  const [items, setItems] = useState<string[]>(signalNames);
   const [input, setInput] = useState('');
 
   const handleAddItem = () => {
@@ -75,6 +63,7 @@ const SignalNamesUI = ({displayName, setSignalNames} : {displayName: string, set
       return newItems;
     });
   };
+
 
   useEffect(() => {
     setSignalNames(items);
@@ -116,11 +105,11 @@ const SignalNamesUI = ({displayName, setSignalNames} : {displayName: string, set
   );
 }
 
-const UDADataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
-    
-  const [shotMin, setShotMin] = useState<number | null>(null);
-  const [shotMax, setShotMax] = useState<number | null>(null);
-  const [signalNames, setSignalNames] = useState<string[]>([]);
+const UDADataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: UDADataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
+  const [shotMin, setShotMin] = useState<number | null>(dataLoaderOptions.shot_min);
+  const [shotMax, setShotMax] = useState<number | null>(dataLoaderOptions.shot_max);
+  const [signalNames, setSignalNames] = useState<string[]>(dataLoaderOptions.signal_names);
+
 
   useEffect(() => { 
     const options = UDADataLoaderOptionsSchema.safeParse({
@@ -144,16 +133,16 @@ const UDADataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions: 
       padding="size-250">
         <Flex direction='column'>
           <Flex direction="row" gap="size-200" alignItems="center">
-            <NumberField label="Shot Min" isRequired onChange={setShotMin}/>
-            <NumberField label="Shot Max" isRequired onChange={setShotMax} />
+            <NumberField label="Shot Min" isRequired value={shotMin} onChange={setShotMin}/>
+            <NumberField label="Shot Max" isRequired value={shotMax} onChange={setShotMax} />
           </Flex>
-        <SignalNamesUI displayName={'UDA Signal Names'} setSignalNames={setSignalNames} />
+        <SignalNamesUI displayName={'UDA Signal Names'} signalNames={signalNames} setSignalNames={setSignalNames} />
         </Flex>
     </View>
   );
 }
 
-const FileDataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
+const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: FileDataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
   const [filePath, setFilePath] = useState<string>('/data');
   const [fileType, setFileType] = useState<string>(FileTypes[0].key);
   const [fileNames, setFileNames] = useState<string[]>([]);
@@ -218,39 +207,76 @@ const FileDataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions:
   );
 }
 
-const DataLoaderForm = ({setDataLoaderOptions} : {setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
+const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: DataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
   const [dataLoader, setDataLoaderSelection] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (dataLoaderOptions !== null) {
+      setDataLoaderSelection(dataLoaderOptions.name);
+    }
+  }, [dataLoaderOptions]);
+
   return (
     <>
-      <ComboBox label="Data Loader" items={DataLoaders} onSelectionChange={setDataLoaderSelection} isRequired>
+      <ComboBox label="Data Loader" items={DataLoaders} onSelectionChange={setDataLoaderSelection} isRequired selectedKey={dataLoader ? dataLoaderOptions.name : DataLoaders[0].key}>
         {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
       </ComboBox>
-      {dataLoader === 'uda' && (<UDADataLoaderOptionsUI setDataLoaderOptions={setDataLoaderOptions} />)}
-      {dataLoader === 'local_file' && (<FileDataLoaderOptionsUI setDataLoaderOptions={setDataLoaderOptions} />)}
+      {dataLoader === 'uda' && (<UDADataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
+      {dataLoader === 'local_file' && (<FileDataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
     </>
   );
 }
 
-const TaskLoaderForm = ({setTaskName} : {setTaskName: (selection: string) => void}) => {
+const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string, setTaskName: (selection: string) => void}) => {
   return (
     <>
-      <ComboBox label="Task" items={Tasks} onSelectionChange={setTaskName} isRequired>
+      <ComboBox label="Task" items={Tasks} onSelectionChange={setTaskName} isRequired selectedKey={taskName}>
         {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
       </ComboBox>
     </>
   );
 }
 
-const ProjectCreateForm = () => {
+export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project | null, samplesSummary?: SamplesSummary | null}) => {
   const router = useRouter();
-
   const [projectName, setProjectName] = useState<string>('');
   const [queryStrategy, setQueryStrategy] = useState<string>(QueryStrategies[0].key);
-  const [taskSelection, setTaskSelection] = useState<String | null>(null);
+  const [taskSelection, setTaskSelection] = useState<string | null>(null);
   const [dataLoaderOptions, setDataLoaderOptions] = useState<DataLoaderOptions | null>(null);
+
+  useEffect(() => {
+    if (project !== null && samplesSummary !== null) {
+      samplesSummary = samplesSummary as SamplesSummary;
+
+      const dataLoaderName = samplesSummary.data?.protocol;
+
+      if (dataLoaderName === 'uda') {
+        setDataLoaderOptions({
+          name: dataLoaderName,
+          signal_names: samplesSummary.data.signal_names || [],
+          shot_min: samplesSummary.shot_min || null,
+          shot_max: samplesSummary.shot_max || null,
+        } as UDADataLoaderOptions);
+      } else if (dataLoaderName && FileTypes.map(item => item.key).includes(dataLoaderName)) {
+        setDataLoaderOptions({
+          name: dataLoaderName,
+          signal_names: samplesSummary.data.column_names || [],
+          file_type: dataLoaderName,
+          file_names: samplesSummary.data.file_names || [],
+        } as FileDataLoaderOptions);
+      } else {
+        setDataLoaderOptions(null);
+      }
+
+      setProjectName(project.name);
+      setQueryStrategy(project.query_strategy);
+      setTaskSelection(project.task);
+    }
+  }, [project, samplesSummary]);
 
   const setupProject = async (e) => {
     e.preventDefault();
+
     if (dataLoaderOptions === null) {
       return;
     }
@@ -369,12 +395,13 @@ const ProjectCreateForm = () => {
       ToastQueue.negative(`Error creating samples: ${error}`, {timeout: 3000})
     }
   }
+
   return (
     <Form maxWidth="size-6000" onSubmit={setupProject}>
       <TextField label="Project Name" isRequired value={projectName} onChange={setProjectName} />
 
-      <DataLoaderForm setDataLoaderOptions={setDataLoaderOptions}/>
-      <TaskLoaderForm setTaskName={setTaskSelection}/>
+      <DataLoaderForm dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions}/>
+      <TaskLoaderForm taskName={taskSelection} setTaskName={setTaskSelection}/>
 
       <RadioGroup label="Query Strategy" isRequired value={queryStrategy} onChange={setQueryStrategy}>
         {QueryStrategies.map((item: Record<string, string>) => <Radio key={item.key} value={item.key}>{item.value}</Radio>)}
@@ -382,26 +409,4 @@ const ProjectCreateForm = () => {
       <Button variant="primary" type="submit">Create</Button>
     </Form>
   );
-}
-
-export default function ProjectCreate() {
-
-  return (
-    <div>
-      <ProjectCreateBreadCrumbs />
-      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
-        <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
-          <h1 className="text-2xl font-bold mb-4">
-            Create Project
-          </h1>
-            <Provider theme={defaultTheme}>
-            <ToastContainer placement="top" />
-            <div className="mb-4 p-4">
-              <ProjectConfigForm />
-            </div>
-            </Provider>
-        </div>
-      </div>
-    </div>
-  )
 }

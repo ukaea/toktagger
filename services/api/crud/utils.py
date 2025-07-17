@@ -76,4 +76,5 @@ async def get_samples(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
+    samples = [Sample(**sample) for sample in samples]
     return samples

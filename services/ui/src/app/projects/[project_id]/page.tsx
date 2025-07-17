@@ -1,7 +1,8 @@
 "use client";
-import { use } from 'react';
+import { use, useEffect, useState } from 'react';
 import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import { Project } from '@/types';
 
 export const SampleBreadCrumbs = (info) => {
   return (
@@ -59,7 +60,15 @@ type ProjectViewInfo = {
 
 export default function ProjectView({params} : ProjectViewInfo) {
   const project_id = use(params).project_id;
-  const project = getProject(project_id);
+  const [project, setProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+      const run = async () => {
+        const project = await getProject(project_id);
+        setProject(project);
+      } 
+      run();
+  }, []);
 
   if (!project) {
     return;

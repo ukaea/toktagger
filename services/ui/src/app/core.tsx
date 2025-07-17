@@ -1,4 +1,5 @@
 "use client";
+import { Annotations, Data, Project, Sample } from '@/types';
 import { useEffect, useState } from 'react';
 
 
@@ -34,22 +35,6 @@ export const getSamples = (project_id: string) => {
   return samples;
 } 
 
-export const getSample = (project_id: string, sample_id: string) => {
-  const [sample, setSample] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
-      const data = await response.json();
-      setSample(data);
-    };
-
-    fetchData();
-  }, []);
-
-  return sample;
-} 
-
 export const getProjects = (project_id: string) => {
   const [projects, setProjects] = useState<any>(null);
 
@@ -64,22 +49,6 @@ export const getProjects = (project_id: string) => {
   }, []);
 
   return projects;
-} 
-
-export const getProject = (project_id: string) => {
-  const [project, setProject] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
-      const data = await response.json();
-      setProject(data);
-    };
-
-    fetchData();
-  }, []);
-
-  return project;
 } 
 
 export const getSampleData = (project_id: string, sample_id: string, viewParams) => {
@@ -103,3 +72,25 @@ export const getSampleData = (project_id: string, sample_id: string, viewParams)
 
   return sampleData;
 } 
+
+export async function getData(url: string): Promise<Data> {
+    const response = await fetch(url);
+    const payload = await response.json();
+    return payload;
+}
+
+export async function getProject(project_id: string):  Promise<Project> {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+}
+
+export async function getSample(project_id: string, sample_id: string): Promise<Sample> {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
+}
+
+export async function getSamplesSummary(project_id: string): Promise<Sample[]> {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/summary`);
+}
+
+export async function getAnnotations(project_id: string, sample_id: string): Promise<Annotations> {
+    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
+}

@@ -1,6 +1,6 @@
 "use client";
 import { getProjects } from '@/app/core';
-import {Provider, defaultTheme, Button, Text, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import {Flex, Provider, defaultTheme, Button, Text, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -33,6 +33,7 @@ export const ProjectsTable = () => {
           <Column>Task</Column>
           <Column>Date Created</Column>
           <Column>Loader</Column>
+          <Column>Controls</Column>
         </TableHeader>
         <TableBody items={rows}>
           {item => (
@@ -41,6 +42,12 @@ export const ProjectsTable = () => {
               <Cell>{item['task']}</Cell>
               <Cell>{item['timestamp']}</Cell>
               <Cell>{item['data_loader']}</Cell>
+              <Cell>
+                <Flex direction="row" gap="size-100">
+                  <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['id']}/edit`}>Edit</Button>
+                  <Button variant='negative'>Delete</Button>
+                </Flex>
+              </Cell>
             </Row>
           )}
         </TableBody>

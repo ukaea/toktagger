@@ -3,7 +3,7 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
 from services.api.crud import utils
-from services.api.schemas.samples import SampleIn, Sample
+from services.api.schemas.samples import SampleIn, Sample, SampleSummary
 from services.api.schemas.annotations import Annotation
 from services.api.schemas import convert_to_objectid
 
@@ -173,7 +173,6 @@ async def get_next_sample(
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
     samples = await utils.get_samples(db_client, project_id)
-    print(samples)
     annotations = await utils.get_annotations(db_client, project_id, validated=False)
 
     data_pool = DataPool(
@@ -186,6 +185,26 @@ async def get_next_sample(
         raise HTTPException(status_code=204, detail="No more samples available!")
 
     return sample
+
+
+@router.get("/summary")
+async def get_sample_summary(
+    request: Request,
+    project_id: str = Path(
+        description="The ID of the project to get a summary of samples from."
+    ),
+):
+    db_client = request.app.state.db_client
+    samples = await utils.get_samples(db_client, project_id)
+
+    summary = SampleSummary(
+        total=len(samples),
+        shot_min=min(sample.shot_id for sample in samples) if samples else None,
+        shot_max=max(sample.shot_id for sample in samples) if samples else None,
+        data=samples[0].data if samples else None,
+    )
+
+    return summary
 
 
 @router.get(

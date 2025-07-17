@@ -1,6 +1,6 @@
 from typing import Annotated, List, Optional
 from enum import Enum
-from pydantic import Field
+from pydantic import BaseModel, Field
 from services.api.schemas import ConfiguredModel
 from services.api.schemas.annotations import AnnotationIn
 
@@ -54,3 +54,10 @@ class SampleIn(SampleBase):
 class Sample(SampleBase):
     id: str = Field(..., alias="_id")
     project_id: str
+
+
+class SampleSummary(BaseModel):
+    total: int
+    shot_min: Optional[int]
+    shot_max: Optional[int]
+    data: Optional[FileData | ShotData]

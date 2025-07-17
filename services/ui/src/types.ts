@@ -93,6 +93,14 @@ export const SampleSchema = z.object({
 }); 
 export type Sample = z.infer<typeof SampleSchema>;
 
+export const SamplesSummarySchema = z.object({
+  total: z.number(),
+  shot_min: z.number().optional(),
+  shot_max: z.number().optional(),
+  data: DataSchema.optional()
+});
+export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
+
 export const ViewParamsSchema = z.object({
   name: z.string()
 });
