@@ -46,17 +46,19 @@ export const Disruption = ({ data, annotations }: DisruptionInfo) => {
             },
             name: "ip"
         },
-        // {
-        //     x: data.values['ANE_DENSITY'].time,
-        //     y: data.values['ANE_DENSITY'].values,
-        //     line: {
-        //         color: "black"
-        //     },
-        //     name: "density",
-        //     xaxis: "x2",
-        //     yaxis: "y2",
-        // } # TODO: Put this back......
-    ];
+        ];
+        if (data.values['ANE_DENSITY']) {
+        plotData.push({
+            x: data.values['ANE_DENSITY'].time,
+            y: data.values['ANE_DENSITY'].values,
+            line: {
+                color: "black"
+            },
+            name: "density",
+            xaxis: "x2",
+            yaxis: "y2",
+        });
+    }
     
     const plotLayout: Partial<Plotly.Layout> = {
         uirevision: 'true',
