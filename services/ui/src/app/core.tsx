@@ -35,21 +35,10 @@ export const getSamples = (project_id: string) => {
   return samples;
 } 
 
-export const getProjects = (project_id: string) => {
-  const [projects, setProjects] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`);
-      const data = await response.json();
-      setProjects(data);
-    };
-
-    fetchData();
-  }, []);
-
-  return projects;
+export const getProjects = async () => {
+  return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`);
 } 
+
 
 export const getSampleData = (project_id: string, sample_id: string, viewParams) => {
   const [sampleData, setSampleData] = useState<any>(null);

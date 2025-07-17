@@ -44,7 +44,7 @@ class ShotData(ConfiguredModel):
 
 class SampleBase(ConfiguredModel):
     shot_id: int
-    data: FileData | ShotData | TimeSeriesFileData
+    data: TimeSeriesFileData | FileData | ShotData
 
 
 class SampleIn(SampleBase):
@@ -60,4 +60,4 @@ class SampleSummary(BaseModel):
     total: int
     shot_min: Optional[int]
     shot_max: Optional[int]
-    data: Optional[FileData | ShotData]
+    data: Optional[TimeSeriesFileData | FileData | ShotData]

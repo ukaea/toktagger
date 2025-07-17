@@ -12,7 +12,7 @@ const Tasks = [
 ]
 
 const DataLoaders = [
-  {'key': 'local_file', 'value': 'Local File'},
+  {'key': 'file', 'value': 'Local File'},
   {'key': 'uda', 'value': 'UDA'},
 ];
 
@@ -106,9 +106,9 @@ const SignalNamesUI = ({displayName, signalNames, setSignalNames} : {displayName
 }
 
 const UDADataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: UDADataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
-  const [shotMin, setShotMin] = useState<number | null>(dataLoaderOptions.shot_min);
-  const [shotMax, setShotMax] = useState<number | null>(dataLoaderOptions.shot_max);
-  const [signalNames, setSignalNames] = useState<string[]>(dataLoaderOptions.signal_names);
+  const [shotMin, setShotMin] = useState<number | null>(dataLoaderOptions?.shot_min || null);
+  const [shotMax, setShotMax] = useState<number | null>(dataLoaderOptions?.shot_max || null);
+  const [signalNames, setSignalNames] = useState<string[]>(dataLoaderOptions?.signal_names || []);
 
 
   useEffect(() => { 
@@ -143,14 +143,14 @@ const UDADataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dat
 }
 
 const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: FileDataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
-  const [filePath, setFilePath] = useState<string>('/data');
-  const [fileType, setFileType] = useState<string>(FileTypes[0].key);
+  const [filePath, setFilePath] = useState<string>(dataLoaderOptions?.file_name || '' );
+  const [fileType, setFileType] = useState<string>(dataLoaderOptions?.protocol || FileTypes[0].key);
+  const [signalNames, setSignalNames] = useState<string[]>(dataLoaderOptions?.signal_names || []);
   const [fileNames, setFileNames] = useState<string[]>([]);
-  const [signalNames, setSignalNames] = useState<string[]>([]);
 
   useEffect(() => { 
     const options = FileDataLoaderOptionsSchema.safeParse({
-      name: fileType,
+      name: 'file',
       signal_names: signalNames,
       file_type: fileType,
       file_names: fileNames
@@ -201,28 +201,30 @@ const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {da
           </TextField>
           <Text>{fileNames.length} {fileType} files found.</Text>
         </Flex>
-        <SignalNamesUI displayName={'File Columns'} setSignalNames={setSignalNames} />
+        <SignalNamesUI displayName={'File Columns'} signalNames={signalNames} setSignalNames={setSignalNames} />
       </Flex>
     </View>
   );
 }
 
 const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: DataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
-  const [dataLoader, setDataLoaderSelection] = useState<string | null>(null);
+  const name = dataLoaderOptions ? dataLoaderOptions.name : null;
+  console.log(`DataLoaderForm: name=${name}`);
+  const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
 
   useEffect(() => {
-    if (dataLoaderOptions !== null) {
-      setDataLoaderSelection(dataLoaderOptions.name);
+    if (name !== selectedKey) {
+      setSelectedKey(name);
     }
-  }, [dataLoaderOptions]);
+  }, [name, selectedKey]);
 
   return (
     <>
-      <ComboBox label="Data Loader" items={DataLoaders} onSelectionChange={setDataLoaderSelection} isRequired selectedKey={dataLoader ? dataLoaderOptions.name : DataLoaders[0].key}>
+      <ComboBox label="Data Loader" items={DataLoaders} isRequired onSelectionChange={setSelectedKey} selectedKey={selectedKey}>
         {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
       </ComboBox>
-      {dataLoader === 'uda' && (<UDADataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
-      {dataLoader === 'local_file' && (<FileDataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
+      {name === 'uda' && (<UDADataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
+      {name === 'file' && (<FileDataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
     </>
   );
 }
@@ -238,6 +240,7 @@ const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string, setTaskName
 }
 
 export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project | null, samplesSummary?: SamplesSummary | null}) => {
+  const editMode = project !== undefined && project !== null;
   const router = useRouter();
   const [projectName, setProjectName] = useState<string>('');
   const [queryStrategy, setQueryStrategy] = useState<string>(QueryStrategies[0].key);
@@ -245,10 +248,11 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
   const [dataLoaderOptions, setDataLoaderOptions] = useState<DataLoaderOptions | null>(null);
 
   useEffect(() => {
-    if (project !== null && samplesSummary !== null) {
+    if (project && samplesSummary !== null) {
       samplesSummary = samplesSummary as SamplesSummary;
 
-      const dataLoaderName = samplesSummary.data?.protocol;
+      const dataLoaderName = samplesSummary?.data?.protocol;
+      console.log(`Data loader name`, samplesSummary);
 
       if (dataLoaderName === 'uda') {
         setDataLoaderOptions({
@@ -257,12 +261,13 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
           shot_min: samplesSummary.shot_min || null,
           shot_max: samplesSummary.shot_max || null,
         } as UDADataLoaderOptions);
-      } else if (dataLoaderName && FileTypes.map(item => item.key).includes(dataLoaderName)) {
+      } else if (dataLoaderName === 'file') {
         setDataLoaderOptions({
           name: dataLoaderName,
           signal_names: samplesSummary.data.column_names || [],
           file_type: dataLoaderName,
-          file_names: samplesSummary.data.file_names || [],
+          file_names: [],
+          file_name: samplesSummary.data.file_name || [],
         } as FileDataLoaderOptions);
       } else {
         setDataLoaderOptions(null);
@@ -281,10 +286,20 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
       return;
     }
 
-    const project = createProject();
-    const projectId = await makeProject(project);
-    const samples = createSamples(projectId, dataLoaderOptions);
-    await makeSamples(projectId, samples);
+
+    if (editMode) {
+      const projectId = project._id;
+      let updatedProject = createProject();
+      updatedProject.data_loader = project.data_loader;
+      updatedProject.task = project.task;
+      console.log(`Editing project ${projectId}`, updatedProject);
+      await editProject(projectId, updatedProject);
+    } else {
+      const project = createProject();
+      const projectId = await makeProject(project);
+      const samples = createSamples(projectId, dataLoaderOptions);
+      await makeSamples(projectId, samples);
+    }
     
     const url = `${process.env.NEXT_PUBLIC_API_URL}/projects`;
     router.push(url);
@@ -316,6 +331,24 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
     }
 
     const projectId = (await response.json())["_id"];
+    return projectId;
+  }
+
+  const editProject = async (projectId: string, project: Project): Promise<string | null> => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(project),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      ToastQueue.negative(`Error editing project ${projectId}: ${error}`, {timeout: 3000})
+      return null;
+    }
+
     return projectId;
   }
 
@@ -400,13 +433,19 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
     <Form maxWidth="size-6000" onSubmit={setupProject}>
       <TextField label="Project Name" isRequired value={projectName} onChange={setProjectName} />
 
-      <DataLoaderForm dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions}/>
-      <TaskLoaderForm taskName={taskSelection} setTaskName={setTaskSelection}/>
+      {!editMode && (
+        <>
+        <DataLoaderForm dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions}/>
+        <TaskLoaderForm taskName={taskSelection} setTaskName={setTaskSelection}/>
+        </>
+      )}
 
       <RadioGroup label="Query Strategy" isRequired value={queryStrategy} onChange={setQueryStrategy}>
         {QueryStrategies.map((item: Record<string, string>) => <Radio key={item.key} value={item.key}>{item.value}</Radio>)}
       </RadioGroup>
-      <Button variant="primary" type="submit">Create</Button>
+      <Button variant="primary" type="submit">{
+        project ? 'Edit' : 'Create'  
+      }</Button>
     </Form>
   );
 }

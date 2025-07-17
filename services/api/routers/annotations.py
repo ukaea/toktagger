@@ -129,7 +129,6 @@ async def get_annotations(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
-    print(_annotations)
 
     return _annotations
 
