@@ -6,6 +6,7 @@ import { ELMView } from '@/app/elms/components/elms';
 import { SpectrogramView } from '@/app/spectrogram/components/spectrogram';
 import { DisruptionView } from '@/app/disruption/components/disruption';
 import ToolBar from '@/app/components/tools/toolbar';
+import { getAnnotations, getProject, getSample } from '@/app/core';
 
 type SampleDataBreadCrumbsInfo = {
   project: Project,
