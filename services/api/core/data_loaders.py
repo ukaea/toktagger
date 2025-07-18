@@ -13,6 +13,7 @@ from services.api.schemas.data import (
 from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 from services.api.schemas.projects import DataLoaderType
 
+import pathlib
 
 class DataLoader(ABC):
     @abstractmethod
@@ -74,7 +75,9 @@ class JsonDataLoader(DataLoader):
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         # Open the file which contains the data, getting the path from sample.data
-        with open(sample.data.file_name, "r") as json_file:
+        # TODO: TEMP FIX FOR WHEWN RUNNING LCALLY
+        #with open(sample.data.file_name, "r") as json_file:
+        with open(str(pathlib.Path(__file__).parents[3])+sample.data.file_name, "r") as json_file:
             # Load in the data, and extract only the data for the shot relevant to this sample
             shot_data = json.load(json_file)[str(sample.shot_id)]["data"]
         

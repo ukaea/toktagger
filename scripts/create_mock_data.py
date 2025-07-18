@@ -26,7 +26,7 @@ def create_mock_data(file_path: str, num_samples: int):
 
         down = numpy.linspace(spike[-1], 0, down_time) + numpy.random.uniform(0, 2, down_time)
 
-        low_2 = numpy.random.uniform(0, 2, random.randint(50, 100))
+        low_2 = numpy.random.uniform(0, 2, 600 - (t_disrupt_start + spike_time + down_time))
 
         current = numpy.concatenate((low, ramping, flat, spike, down, low_2))
         time = 0.02*numpy.arange(len(current))
@@ -52,7 +52,7 @@ def create_mock_data(file_path: str, num_samples: int):
 
 
 def main():
-    num_samples = 10
+    num_samples = 200
     file_path = "/data/test/mock_data.json"
     data = create_mock_data(file_path, num_samples)
     project_id = create_project("Mock Disruption Project", "disruption", "json")
