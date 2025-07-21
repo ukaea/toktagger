@@ -66,7 +66,7 @@ async def run_training(project: Project): # TODO: do we want to support retraini
     # Get model
     model = DisruptionCNN(project, samples, annotations_2d)
     # Train model
-    losses = model.train(num_epochs=50, batch_size=32)
+    losses = model.train(num_epochs=100, batch_size=32)
     print(losses)
     
     model.save("model.pt")
@@ -99,10 +99,9 @@ async def run_inference(project: Project, sample_ids: list[str]):
         for sample_id in sample_ids
         ]
     # Load the model
-    model = DisruptionCNN(project, samples)
-    model.load("model.pt") # TODO should be from DB
+    model = DisruptionCNN.load(project, "model.pt") # TODO should be from DB
     
-    mean, uncertainty =  model.predict(batch_size=32)
+    mean, uncertainty =  model.predict(samples, batch_size=32)
     
     annotations = []
     for sample in samples:
@@ -125,7 +124,7 @@ if __name__ == "__main__":
     project = asyncio.run(db_client.get_document_by_id(collection="projects", object_id=ObjectId(PROJECT_ID)))
     db_client = MongoDBClient(mongo_url, db_name)
     
-    #asyncio.run(run_training(project=Project(**project)))
+    asyncio.run(run_training(project=Project(**project)))
     
     samples = [
         "687a5aacd311e40b035a10cf",
@@ -135,4 +134,4 @@ if __name__ == "__main__":
         "687a5aacd311e40b035a1105",
     ]
     
-    mean= asyncio.run(run_inference(project=Project(**project), sample_ids=samples))
+    # mean= asyncio.run(run_inference(project=Project(**project), sample_ids=samples))
