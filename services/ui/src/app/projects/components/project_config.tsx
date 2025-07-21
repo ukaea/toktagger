@@ -208,23 +208,16 @@ const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {da
 }
 
 const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: DataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
-  const name = dataLoaderOptions ? dataLoaderOptions.name : null;
-  console.log(`DataLoaderForm: name=${name}`);
-  const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
-
-  useEffect(() => {
-    if (name !== selectedKey) {
-      setSelectedKey(name);
-    }
-  }, [name, selectedKey]);
+  const name = dataLoaderOptions?.name ? dataLoaderOptions.name : null;
+  const [selectedKey, setSelectedKey] = useState<string | null>(name | null);
 
   return (
     <>
       <ComboBox label="Data Loader" items={DataLoaders} isRequired onSelectionChange={setSelectedKey} selectedKey={selectedKey}>
         {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
       </ComboBox>
-      {name === 'uda' && (<UDADataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
-      {name === 'file' && (<FileDataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
+      {selectedKey === 'uda' && (<UDADataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
+      {selectedKey === 'file' && (<FileDataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
     </>
   );
 }
