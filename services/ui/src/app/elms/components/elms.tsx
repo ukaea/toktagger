@@ -57,12 +57,21 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         mode: 'lines',
     };
 
-    const plotData: Plotly.Data[] = [dataTrace, ipTrace, densityGradientTrace, powerNBITrace, t_e_coreTrace];
+    var sxrTrace = {
+        name: 'Soft X-Ray',
+        x: data.values.sxr.time,
+        y: data.values.sxr.values,
+        xaxis: "x6",
+        yaxis: "y6",
+        mode: 'lines',
+    };
+
+    const plotData: Plotly.Data[] = [dataTrace, ipTrace, densityGradientTrace, powerNBITrace, t_e_coreTrace, sxrTrace];
 
 
     var plotLayout = {
         uirevision: 'true',
-        grid: {rows: 5, columns: 1, pattern: 'independent'},
+        grid: {rows: 6, columns: 1, pattern: 'independent'},
         dragmode: false,  // Disable default drag behavior
         width: 1100,
         height: 800,
@@ -170,13 +179,35 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
                 }
             },
         },
+        xaxis6: {
+            matches:'x',
+            title: {
+                text: 'Time [s]',
+                font: {
+                family: 'Courier New, monospace',
+                size: 12,
+                color: '#7f7f7f'
+                }
+            },
+        },
+        yaxis6: {
+            title: {
+                text: 'SXR [arb]',
+                font: {
+                family: 'Courier New, monospace',
+                size: 12,
+                color: '#7f7f7f'
+                }
+            },
+        },
     };
 
     
     const zoneCategories: Category[] = [
         { name: "Peak", color: 'rgb(233, 170, 98)' },
         { name: "Outlier", color: 'rgb(233, 170, 250)' },
-        { name: "H-Mode", color: 'rgb(100, 170, 98)' },
+        { name: "Jump", color: 'rgb(1, 250, 1)' },
+        { name: "Change Point", color: 'rgb(133, 170, 250)' },
     ]
 
     const convertRegionToZone = (item: TimeRegion) => {

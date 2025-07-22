@@ -3,6 +3,7 @@ import ruptures as rpt
 from abc import ABC, abstractmethod
 from scipy.signal import find_peaks
 from scipy.ndimage import uniform_filter1d, median_filter
+from scipy.interpolate import interp1d
 
 from sklearn.preprocessing import StandardScaler
 from services.api.schemas.data import MultiVariateTimeSeriesData
@@ -28,6 +29,18 @@ def binary_runs_to_tuples(arr):
     if ends[-1] == len(arr):
         ends[-1] = ends[-1] - 1
     return list(zip(starts, ends))
+
+
+def downsample_time_series(time, signal, num_points=500):
+    """Downsample a time series to a specified number of points."""
+    if len(time) <= num_points:
+        return time, signal
+
+    time_coarse = np.linspace(time.min(), time.max(), num_points)
+    interpolator = interp1d(time, signal, kind="linear")
+    signal = interpolator(time_coarse)
+    time = time_coarse
+    return time, signal
 
 
 class DataAnnotator(ABC):
@@ -149,6 +162,9 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
 
+        # Downsample the time series to for performance
+        time, signal = downsample_time_series(time, signal, num_points=500)
+
         time = time.reshape(-1, 1)
         signal = signal.reshape(-1, 1)
 
@@ -185,6 +201,9 @@ class JumpDetectionAnnotator(DataAnnotator):
         signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
 
+        # Downsample the time series to for performance
+        time, signal = downsample_time_series(time, signal, num_points=2000)
+
         signal = signal.reshape(-1, 1)
 
         scaler = StandardScaler()
@@ -194,7 +213,7 @@ class JumpDetectionAnnotator(DataAnnotator):
         # Smooth the signal to reduce noise
         signal -= median_filter(signal, 100)
         signal = median_filter(signal, 10)
-        signal = -np.gradient(signal)
+        signal = np.absolute(np.gradient(signal))
 
         # Detect sharp drops (e.g., drops > 3 * std of normal fluctuations)
         threshold = self.params.threshold * signal.std()
@@ -206,7 +225,7 @@ class JumpDetectionAnnotator(DataAnnotator):
         bounds = []
         for i in peak_idx:
             wsize = 10
-            window = data[i - wsize : i + wsize]
+            window = signal[i - wsize : i + wsize]
             twindow = time[i - wsize : i + wsize]
             tmin = twindow[np.argmin(window)]
             tmax = twindow[np.argmax(window)]

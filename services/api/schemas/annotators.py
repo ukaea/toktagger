@@ -40,7 +40,7 @@ class IsoforestOutliersParams(Annotator):
 
 class ChangePointDetectionParams(Annotator):
     signal_name: str
-    penalty: int
+    penalty: float
 
 
 class JumpDetectionParams(Annotator):
@@ -49,15 +49,10 @@ class JumpDetectionParams(Annotator):
     min_distance: int
 
 
-class TimeSeriesChangepoints(Annotator):
-    penalty: int
-
-
 AnnotatorTypes = Union[
     FindPeaksParams,
     MeanAbsoluteDeviationOutliersParams,
     IsoforestOutliersParams,
     ChangePointDetectionParams,
     JumpDetectionParams,
-    TimeSeriesChangepoints,
 ]

@@ -1,10 +1,13 @@
 "use client";
 import { useRouter } from 'next/navigation';
-import { Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
+import { Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { IsoForestTool } from '@/app/components/isoforest';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
+import { MeanAbsoluteDeviationOutliersTool } from '@/app/components/mad';
+import { ChangePointDetectionTool } from '@/app/components/changepoints';
+import { JumpDetectionTool } from '@/app/components/jump';
 
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
     const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
@@ -117,6 +120,26 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
         <IsoForestTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></IsoForestTool>
     )});
 
+    tools.push({
+      name: 'MAD Outliers',
+      component: (
+        <MeanAbsoluteDeviationOutliersTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></MeanAbsoluteDeviationOutliersTool>
+    )});
+
+    tools.push({
+      name: 'Change Point Detection',
+      component: (
+        <ChangePointDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></ChangePointDetectionTool>
+      )
+    })
+
+    tools.push({
+      name: 'Jump Detection',
+      component: (
+        <JumpDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></JumpDetectionTool>
+      )
+    });
+
   } else if (project.task == 'MHD') {
     let mhdData = data.values['mirnov'];
     const ampRangeTool = <AmplitudeSlider data={mhdData} viewParams={viewParams} setViewParams={setViewParams}/>
@@ -137,12 +160,17 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
                   <Button variant="primary" onPress={clearAnnotations} >Clear</Button>
                 </ButtonGroup>
             </Flex>
+            <Flex justifyContent="center" alignItems="center">
+                <Header height="size-300" marginBottom="size-100">
+                  <span style={{ fontSize: '1.5rem' }}>Toolbox</span>
+                </Header>
+            </Flex>
             <Accordion>
             {tools.map((item, i) => (
                 <Disclosure key={i}>
-                  <DisclosureTitle >
-                    {item.name}
-                  </DisclosureTitle>
+                    <DisclosureTitle>
+                    <span style={{ fontSize: '0.8rem' }}>{item.name}</span>
+                    </DisclosureTitle>
                   <DisclosurePanel>
                     {item.component}
                   </DisclosurePanel>

@@ -1,8 +1,15 @@
 "use client";
-import {Provider, defaultTheme, Slider, Button, Flex, Header, ComboBox, Item, ToggleButton, RangeSlider} from '@adobe/react-spectrum'
+import { Annotation, MultiVariateTimeSeriesData } from '@/types';
+import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, RangeSlider} from '@adobe/react-spectrum'
 import { useEffect, useState } from 'react';
 
-export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
+type FindPeaksType = {
+    project_id: string;
+    sample_id: string;
+    data: MultiVariateTimeSeriesData;
+    setAnnotations: (annotations: Annotation[]) => void;
+};
+export function FindPeaksTool({ project_id, sample_id, data, setAnnotations } : FindPeaksType) {
     const [prominence, setProminance] = useState(0.1);
     const [distance, setDistance] = useState(1);
 
@@ -53,14 +60,13 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
 
     return (
         <Provider theme={defaultTheme}>
-            <Header>Find Peaks</Header>
             <div className='m-4'>
             <Flex direction="column">
                 <ComboBox defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true} placeholder="None selected">
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>
-                <Slider label="Prominence" minValue={0.01} maxValue={1} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
+                <Slider label="Prominence" minValue={0.01} maxValue={10} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
                 <Slider label="Distance" minValue={1} maxValue={1000} defaultValue={distance} onChangeEnd={setDistance}/>
                 <RangeSlider label="Time Range" defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChangeEnd={setTimeRange} step={0.001} minValue={timeMinDefault} maxValue={timeMaxDefault}/>
             </Flex>

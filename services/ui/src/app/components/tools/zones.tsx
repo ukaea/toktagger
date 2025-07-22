@@ -135,6 +135,7 @@ export const Zones = ({
                     .attr("width", x1 - x0)
                     .attr("height", height)
                     .attr("fill", zone.category.color)
+                    .attr("stroke", "black")
                     .attr("opacity", 0.5)
                     .attr("style", "pointer-events: all")
                     .style("cursor", "move")
