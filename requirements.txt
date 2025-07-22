@@ -14,4 +14,5 @@ numpy
 scikit-learn
 celery[redis]
 pillow
+ruptures
 uda

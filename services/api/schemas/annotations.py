@@ -4,6 +4,10 @@ from pydantic import Field, model_validator
 
 
 class AnnotationIn(ConfiguredModel):
+    label: str
+    validated: bool = False
+    uncertainty: Optional[float] = None
+
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
         if values.get("validated"):
@@ -12,10 +16,6 @@ class AnnotationIn(ConfiguredModel):
             values["uncertainty"] = 1
 
         return values
-
-    validated: bool = False
-    uncertainty: Optional[float] = None
-    label: str
 
 
 class TimePoint(AnnotationIn):
