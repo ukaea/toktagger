@@ -174,11 +174,13 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
 
     
     const zoneCategories: Category[] = [
-        { name: "ELM", color: 'rgb(233, 170, 98)' },
+        { name: "Peak", color: 'rgb(233, 170, 98)' },
+        { name: "Outlier", color: 'rgb(233, 170, 250)' },
         { name: "H-Mode", color: 'rgb(100, 170, 98)' },
     ]
 
     const convertRegionToZone = (item: TimeRegion) => {
+        console.log(item);
         const category = zoneCategories.find(x => x.name === item.label);
         return {x0: item.time_min, x1: item.time_max, category: category};
     };

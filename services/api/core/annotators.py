@@ -25,6 +25,8 @@ def binary_runs_to_tuples(arr):
     diff = np.diff(padded)
     starts = np.where(diff == 1)[0]
     ends = np.where(diff == -1)[0]
+    if ends[-1] == len(arr):
+        ends[-1] = ends[-1] - 1
     return list(zip(starts, ends))
 
 
@@ -43,6 +45,11 @@ class FindPeaksAnnotator(DataAnnotator):
         time = np.array(time)
         signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
+
+        signal = signal.reshape(-1, 1)
+        scaler = StandardScaler()
+        signal = scaler.fit_transform(signal)
+        signal = signal.flatten()
 
         tmin, tmax = self.params.time_min, self.params.time_max
         tmin = time.min() if tmin is None else tmin

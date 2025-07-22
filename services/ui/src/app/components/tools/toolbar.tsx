@@ -1,8 +1,9 @@
 "use client";
 import { useRouter } from 'next/navigation';
-import {Provider, defaultTheme,  ButtonGroup, ToastQueue, Button } from '@adobe/react-spectrum'
+import { Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
+import { IsoForestTool } from '@/app/components/isoforest';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
@@ -103,28 +104,52 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
 
   let tools = [];
   if (project.task == 'ELM') {
-    const findPeaksTool = (
+
+    tools.push({
+      name: 'Find Peaks',
+      component: (
         <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
-    );
-    tools.push(findPeaksTool); 
+    )}); 
+
+    tools.push({
+      name: 'IsoForest Outliers',
+      component: (
+        <IsoForestTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></IsoForestTool>
+    )});
+
   } else if (project.task == 'MHD') {
     let mhdData = data.values['mirnov'];
     const ampRangeTool = <AmplitudeSlider data={mhdData} viewParams={viewParams} setViewParams={setViewParams}/>
     tools.push(ampRangeTool);
   }
 
+  const clearAnnotations = () => {
+      setAnnotations([]);
+  };
+
   return (
         <Provider theme={defaultTheme}>
-        <div className='h-screen text-center'>
-          <div className='p-4'>
-            <ButtonGroup>
-              <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-              <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-            </ButtonGroup>
-          </div>
-          <hr className='m-4'/>
-          {tools.map((item, i) => <div  key={i}>{item}</div>)}
-        </div>
+          <Flex direction='column' gap='size-100'>
+            <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100">
+                <ButtonGroup>
+                  <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
+                  <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
+                  <Button variant="primary" onPress={clearAnnotations} >Clear</Button>
+                </ButtonGroup>
+            </Flex>
+            <Accordion>
+            {tools.map((item, i) => (
+                <Disclosure key={i}>
+                  <DisclosureTitle >
+                    {item.name}
+                  </DisclosureTitle>
+                  <DisclosurePanel>
+                    {item.component}
+                  </DisclosurePanel>
+                </Disclosure>
+            ))}
+            </Accordion>
+          </Flex>
         </Provider>
   );
 }

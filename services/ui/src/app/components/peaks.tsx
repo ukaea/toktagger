@@ -12,10 +12,6 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
     const [signalName, setSignalName] = useState(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
-    const clearPeaks = () => {
-        setAnnotations([]);
-    };
-
     useEffect(() => {
         if (data && (signalName in data.values)) {
             const time = data.values[signalName].time;
@@ -67,8 +63,6 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }) {
                 <Slider label="Prominence" minValue={0.01} maxValue={1} defaultValue={prominence} step={0.001} onChangeEnd={setProminance}/>
                 <Slider label="Distance" minValue={1} maxValue={1000} defaultValue={distance} onChangeEnd={setDistance}/>
                 <RangeSlider label="Time Range" defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChangeEnd={setTimeRange} step={0.001} minValue={timeMinDefault} maxValue={timeMaxDefault}/>
-                <br />
-                <Button variant="primary" onPress={clearPeaks} >Clear Peaks</Button>
             </Flex>
             </div>
         </Provider>
