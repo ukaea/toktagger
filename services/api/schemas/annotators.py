@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
 
@@ -40,8 +40,10 @@ class IsoforestOutliersParams(Annotator):
 
 class ChangePointDetectionParams(Annotator):
     signal_name: str
-    penalty: float
+    method: Literal["pelt", "hmm"]
     num_points: int
+    penalty: Optional[float] = None
+    num_components: Optional[int] = None  # Only used if method is 'hmm'
 
 
 class JumpDetectionParams(Annotator):

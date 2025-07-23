@@ -1,5 +1,6 @@
 import numpy as np
 import ruptures as rpt
+import hmmlearn.hmm as hmm
 from abc import ABC, abstractmethod
 from scipy.signal import find_peaks
 from scipy.ndimage import uniform_filter1d, gaussian_filter
@@ -20,8 +21,21 @@ from services.api.schemas.projects import Task
 from services.api.schemas.annotators import AnnotatorIds
 
 
-def binary_runs_to_tuples(arr):
-    """Convert a binary array to a list of tuples representing the start and end indices of runs of True values"""
+def binary_runs_to_tuples(arr: np.ndarray) -> list[tuple[int, int]]:
+    """
+    Convert a 1D binary array into a list of (start, end) index tuples for each contiguous run of 1s.
+
+    Parameters:
+        arr (np.ndarray): A 1D numpy array of binary values (0s and 1s).
+
+    Returns:
+        list[tuple[int, int]]: A list of tuples, where each tuple (start, end) represents the start (inclusive)
+        and end (exclusive) indices of a contiguous run of 1s in the input array.
+
+    Example:
+        >>> binary_runs_to_tuples(np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 1]))
+        [(1, 3), (4, 5), (7, 10)]
+    """
     arr = np.asarray(arr, dtype=bool)
     padded = np.pad(arr.astype(int), (1, 1), mode="constant")
     diff = np.diff(padded)
@@ -32,8 +46,44 @@ def binary_runs_to_tuples(arr):
     return list(zip(starts, ends))
 
 
-def downsample_time_series(time, signal, num_points=500):
-    """Downsample a time series to a specified number of points."""
+def extract_segments(arr: np.ndarray) -> list[tuple[int, int, int]]:
+    """
+    Convert a 1D array into a list of (start_index, end_index, label) tuples
+    representing contiguous segments of the same labels.
+
+    Parameters:
+        arr (np.ndarray or list): Input 1D array or list of labels.
+
+    Returns:
+        List[Tuple[int, int, int]]: List of (start, end, label) for each segment.
+    """
+    arr = np.asarray(arr)
+    if arr.ndim != 1:
+        raise ValueError("Input must be a 1D array or list.")
+
+    change_indices = np.where(np.diff(arr) != 0)[0] + 1
+    segment_starts = np.concatenate(([0], change_indices))
+    segment_ends = np.concatenate((change_indices, [len(arr) - 1]))
+
+    return [
+        (start, end, arr[start]) for start, end in zip(segment_starts, segment_ends)
+    ]
+
+
+def downsample_time_series(
+    time: np.ndarray, signal: np.ndarray, num_points=500
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Downsample a time series to a specified number of points using linear interpolation.
+
+    Parameters:
+        time (np.ndarray): 1D array of time values.
+        signal (np.ndarray): 1D array of signal values corresponding to the time array.
+        num_points (int, optional): Number of points to downsample to. Default is 500.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Tuple containing the downsampled time and signal arrays.
+    """
     if len(time) <= num_points:
         return time, signal
 
@@ -51,6 +101,22 @@ class DataAnnotator(ABC):
 
 
 class FindPeaksAnnotator(DataAnnotator):
+    """
+    Annotator class for detecting peaks in a multivariate time series signal.
+
+    This class uses signal normalization, detrending, and peak finding algorithms to identify
+    regions in the specified signal where peaks occur, based on configurable parameters.
+
+    Attributes:
+        params (FindPeaksParams): Configuration parameters for peak detection, including
+            signal name, prominence, distance, and optional time bounds.
+
+    Methods:
+        predict(data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
+            Detects peaks in the specified signal of the input time series data and returns
+            a list of TimeRegion objects corresponding to the detected peaks.
+    """
+
     def __init__(self, params: FindPeaksParams):
         self.params = params
 
@@ -96,6 +162,23 @@ class FindPeaksAnnotator(DataAnnotator):
 
 
 class MeanAbsoluteDeviationOutliersAnnotator(DataAnnotator):
+    """
+    Annotator that detects outliers in a univariate time series using the Median Absolute Deviation (MAD) method.
+
+    This annotator identifies regions in the input time series where the data points deviate significantly from the median,
+    as determined by a modified z-score based on the MAD. Outlier regions are returned as `TimeRegion` objects.
+
+    Parameters
+    ----------
+    params : MeanAbsoluteDeviationOutliersParams
+        Configuration parameters for the annotator, including the signal name and outlier threshold.
+
+    Methods
+    -------
+    predict(data: MultiVariateTimeSeriesData) -> list[TimeRegion]
+        Detects outlier regions in the specified signal of the input time series data and returns them as a list of `TimeRegion` objects.
+    """
+
     def __init__(self, params: MeanAbsoluteDeviationOutliersParams):
         self.params = params
 
@@ -125,6 +208,21 @@ class MeanAbsoluteDeviationOutliersAnnotator(DataAnnotator):
 
 
 class IsoforestOutliersAnnotator(DataAnnotator):
+    """
+    Annotator that detects outlier regions in multivariate time series data using the Isolation Forest algorithm.
+
+    Parameters
+    ----------
+    params : IsoforestOutliersParams
+        Configuration parameters for the annotator, including the signal name and contamination rate.
+
+    Methods
+    -------
+    predict(data: MultiVariateTimeSeriesData) -> list[TimeRegion]
+        Identifies contiguous time regions in the specified signal that are considered outliers by the Isolation Forest model.
+        Returns a list of TimeRegion objects marking the detected outlier intervals.
+    """
+
     def __init__(self, params: IsoforestOutliersParams):
         self.params = params
 
@@ -160,12 +258,25 @@ class ChangePointDetectionAnnotator(DataAnnotator):
 
         signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
+        signal = np.nan_to_num(signal, 0)
 
         # Downsample the time series to for performance
         time, signal = downsample_time_series(
             time, signal, num_points=self.params.num_points
         )
 
+        if self.params.method == "pelt":
+            bounds = self.pelt_changepoint(signal, time)
+        elif self.params.method == "hmm":
+            bounds = self.hmm_changepoint(signal, time)
+        else:
+            raise ValueError(
+                f"Unknown change point detection method: {self.params.method}"
+            )
+
+        return bounds
+
+    def pelt_changepoint(self, signal, time):
         time = time.reshape(-1, 1)
         signal = signal.reshape(-1, 1)
 
@@ -182,7 +293,6 @@ class ChangePointDetectionAnnotator(DataAnnotator):
 
         result = np.concatenate([[0], result])
         result[-1] -= 1
-
         time = time.flatten()
         bounds = [
             TimeRegion(time_min=time[imin], time_max=time[imax], label="Change Point")
@@ -190,8 +300,48 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         ]
         return bounds
 
+    def hmm_changepoint(self, signal, time):
+        time = time.reshape(-1, 1)
+        signal = signal.reshape(-1, 1)
+
+        scaler = StandardScaler()
+        signal = scaler.fit_transform(signal)
+
+        model = hmm.GaussianHMM(
+            n_components=self.params.num_components, covariance_type="full", n_iter=100
+        )
+        model.fit(signal)
+        hidden_states = model.predict(signal)
+        time = time.flatten()
+        bounds = extract_segments(hidden_states + 1)
+        bounds = [(time[imin], time[imax]) for (imin, imax, _) in bounds]
+        bounds = [
+            TimeRegion(time_min=tmin, time_max=tmax, label="Change Point")
+            for (tmin, tmax) in bounds
+        ]
+        return bounds
+
 
 class JumpDetectionAnnotator(DataAnnotator):
+    """
+    Annotator for detecting sharp jumps in a multivariate time series signal.
+
+    This annotator processes a specified signal from the input time series data,
+    applies smoothing and normalization, and identifies regions where the signal
+    exhibits sharp changes (jumps) based on the gradient exceeding a threshold.
+    Detected jumps are returned as time regions.
+
+    Attributes:
+        params (JumpDetectionParams): Parameters controlling the detection process,
+            including signal name, smoothing factor, number of downsample points,
+            detection threshold, and minimum distance between detections.
+
+    Methods:
+        predict(data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
+            Detects and returns a list of time regions where jumps are detected
+            in the specified signal.
+    """
+
     def __init__(self, params: JumpDetectionParams):
         self.params = params
 
