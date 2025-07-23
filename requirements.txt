@@ -16,3 +16,4 @@ celery[redis]
 pillow
 ruptures
 uda
+hmmlearn

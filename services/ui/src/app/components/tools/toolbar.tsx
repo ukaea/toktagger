@@ -1,6 +1,7 @@
 "use client";
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
+import { View, TextField, ListView, Item, Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { IsoForestTool } from '@/app/components/isoforest';
@@ -91,6 +92,70 @@ export function AmplitudeSlider({data, viewParams, setViewParams}: AmplitudeSlid
     return ampRangeTool;
 }
 
+
+function ShotLabels() {
+    const [newLabel, setNewLabel] = useState<string>('');
+    const [items, setItems] = useState<string[]>([]);
+    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+
+
+    const onRemove = () => {
+      setItems(prevItems => prevItems.filter(item => !selectedKeys.has(item.id.toString())));
+      setSelectedKeys(new Set());
+    }
+    const addLabel = () => {
+      if (newLabel !== '' && !items.find(item => item.name === newLabel)) {
+        setItems(prevItems => [...prevItems, {id: prevItems.length, name: newLabel}]);
+      }
+    }
+
+      // Listen for global key presses
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        const key = e.key.toLowerCase();
+        const matchedItem = items.find(item => item.id.toString() === key);
+        if (matchedItem) {
+          setSelectedKeys(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(matchedItem.id.toString())) {
+              newSet.delete(matchedItem.id.toString());
+            } else {
+              newSet.add(matchedItem.id.toString());
+            }
+            return newSet;
+          });
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [items]);
+
+    return (
+        <>
+        <Flex direction="row" alignItems="end" justifyContent="center" gap="size-100" marginBottom="size-100">
+          <TextField label="Add Label" width="size-2000" defaultInputValue={newLabel} onChange={setNewLabel} />
+          <Button variant="primary" marginTop="size-100" onPress={addLabel}>+</Button>
+          <Button variant="primary" marginTop="size-100" onPress={onRemove}>-</Button>
+        </Flex>
+        <ListView
+          items={items}
+          onSelectionChange={setSelectedKeys}
+          selectedKeys={selectedKeys}
+          selectionMode="multiple"
+          aria-label="Static ListView items example"
+          maxWidth="size-6000"
+        >
+          {item => (
+            <Item key={item.id} textValue={item.name}>
+              {`${item.id} | ${item.name}`}
+            </Item>
+          )}
+        </ListView>
+        </>
+    );
+}
+
 type ToolBarInfo = {
   project: Project
   sample: Sample
@@ -106,6 +171,13 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
 
 
   let tools = [];
+  tools.push({
+    name: 'Shot Labels',
+    component: (
+      <ShotLabels></ShotLabels>
+    )
+  });
+
   if (project.task == 'ELM') {
 
     tools.push({
@@ -151,33 +223,38 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
   };
 
   return (
-        <Provider theme={defaultTheme}>
-          <Flex direction='column' gap='size-100'>
-            <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100">
-                <ButtonGroup>
-                  <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-                  <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-                  <Button variant="primary" onPress={clearAnnotations} >Clear</Button>
-                </ButtonGroup>
+        <Provider theme={defaultTheme} height="100vh">
+          <View direction='column' gap='size-100' overflow="auto" height="100vh">
+            <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100" width="100%">
+              <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100">
+                  <Header height="size-300" marginBottom="size-100">
+                    <span style={{ fontSize: '1.2rem' }}>Controls</span>
+                  </Header>
+                  <ButtonGroup>
+                    <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
+                    <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
+                    <Button variant="primary" onPress={clearAnnotations} >Clear</Button>
+                  </ButtonGroup>
+              </Flex>
+              <Flex justifyContent="center" alignItems="center">
+                  <Header height="size-300" marginBottom="size-100">
+                    <span style={{ fontSize: '1.2rem' }}>Toolbox</span>
+                  </Header>
+              </Flex>
+              <Accordion allowsMultipleExpanded={true} width="100%">
+                {tools.map((item, i) => (
+                    <Disclosure key={i}>
+                        <DisclosureTitle>
+                        <span style={{ fontSize: '0.8rem' }}>{item.name}</span>
+                        </DisclosureTitle>
+                      <DisclosurePanel>
+                        {item.component}
+                      </DisclosurePanel>
+                    </Disclosure>
+                ))}
+              </Accordion>
             </Flex>
-            <Flex justifyContent="center" alignItems="center">
-                <Header height="size-300" marginBottom="size-100">
-                  <span style={{ fontSize: '1.5rem' }}>Toolbox</span>
-                </Header>
-            </Flex>
-            <Accordion>
-            {tools.map((item, i) => (
-                <Disclosure key={i}>
-                    <DisclosureTitle>
-                    <span style={{ fontSize: '0.8rem' }}>{item.name}</span>
-                    </DisclosureTitle>
-                  <DisclosurePanel>
-                    {item.component}
-                  </DisclosurePanel>
-                </Disclosure>
-            ))}
-            </Accordion>
-          </Flex>
+          </View>
         </Provider>
   );
 }
