@@ -41,12 +41,15 @@ class IsoforestOutliersParams(Annotator):
 class ChangePointDetectionParams(Annotator):
     signal_name: str
     penalty: float
+    num_points: int
 
 
 class JumpDetectionParams(Annotator):
     signal_name: str
     threshold: float
     min_distance: int
+    smoothing: float
+    num_points: int
 
 
 AnnotatorTypes = Union[

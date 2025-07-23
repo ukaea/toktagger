@@ -161,11 +161,6 @@ async def add_annotations(
         "sample_id": convert_to_objectid(sample_id, "samples"),
     }
 
-    print(annotations)
-    if len(annotations) == 0:
-        # Nothing to do!
-        return
-
     if not await request.app.state.db_client.get_document_by_id(
         "projects", ids["project_id"]
     ):

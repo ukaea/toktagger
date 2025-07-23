@@ -2,9 +2,10 @@ import numpy as np
 import ruptures as rpt
 from abc import ABC, abstractmethod
 from scipy.signal import find_peaks
-from scipy.ndimage import uniform_filter1d, median_filter
+from scipy.ndimage import uniform_filter1d, gaussian_filter
 from scipy.interpolate import interp1d
 
+from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from services.api.schemas.data import MultiVariateTimeSeriesData
 from services.api.schemas.annotators import (
@@ -128,8 +129,6 @@ class IsoforestOutliersAnnotator(DataAnnotator):
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
-        from sklearn.ensemble import IsolationForest
-
         time = data.values[self.params.signal_name].time
         time = np.array(time)
         values = data.values[self.params.signal_name].values
@@ -163,7 +162,9 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         signal = np.array(signal)
 
         # Downsample the time series to for performance
-        time, signal = downsample_time_series(time, signal, num_points=500)
+        time, signal = downsample_time_series(
+            time, signal, num_points=self.params.num_points
+        )
 
         time = time.reshape(-1, 1)
         signal = signal.reshape(-1, 1)
@@ -200,24 +201,25 @@ class JumpDetectionAnnotator(DataAnnotator):
 
         signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
+        signal = np.nan_to_num(signal, 0)
 
         # Downsample the time series to for performance
-        time, signal = downsample_time_series(time, signal, num_points=2000)
-
-        signal = signal.reshape(-1, 1)
-
-        scaler = StandardScaler()
-        signal = scaler.fit_transform(signal)
-        signal = signal.flatten()
+        time, signal = downsample_time_series(
+            time, signal, num_points=self.params.num_points
+        )
 
         # Smooth the signal to reduce noise
-        signal -= median_filter(signal, 100)
-        signal = median_filter(signal, 10)
-        signal = np.absolute(np.gradient(signal))
+        signal = gaussian_filter(signal, self.params.smoothing)
+        signal_grad = np.absolute(np.gradient(signal))
+
+        signal_grad = signal_grad.reshape(-1, 1)
+        scaler = StandardScaler()
+        signal_grad = scaler.fit_transform(signal_grad)
+        signal_grad = signal_grad.flatten()
 
         # Detect sharp drops (e.g., drops > 3 * std of normal fluctuations)
-        threshold = self.params.threshold * signal.std()
-        peak_idx = np.where(signal > threshold)[0]
+        threshold = self.params.threshold * signal_grad.std()
+        peak_idx = np.where(signal_grad > threshold)[0]
 
         # Filter detections which are too close
         peak_idx = peak_idx[np.diff(peak_idx, prepend=0) > self.params.min_distance]
@@ -227,8 +229,10 @@ class JumpDetectionAnnotator(DataAnnotator):
             wsize = 10
             window = signal[i - wsize : i + wsize]
             twindow = time[i - wsize : i + wsize]
-            tmin = twindow[np.argmin(window)]
-            tmax = twindow[np.argmax(window)]
+            tmin = twindow[0]
+            tmax = twindow[-1]
+            tmin = twindow[np.argmax(window)]
+            tmax = twindow[np.argmin(window)]
             bounds.append(TimeRegion(time_min=tmin, time_max=tmax, label="Jump"))
 
         return bounds

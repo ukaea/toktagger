@@ -13,6 +13,7 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
     const [signalName, setSignalName] = useState(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
     const [penalty, setPenalty] = useState(5);
+    const [numPoints, setNumPoints] = useState(500);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -27,7 +28,8 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
                 },
                 body: JSON.stringify({ 
                     signal_name: signalName,
-                    penalty: penalty
+                    penalty: penalty,
+                    num_points: numPoints
                 }),
             });
 
@@ -48,6 +50,8 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
                 </ComboBox>
                 <br/>
                 <Slider label="Penalty" minValue={0.01} maxValue={30} defaultValue={penalty} step={0.001} onChangeEnd={setPenalty}/>
+                <br/>
+                <Slider label="No. Points" minValue={100} maxValue={1000} defaultValue={numPoints} step={10} onChangeEnd={setNumPoints}/>
             </Flex>
             </div>
         </Provider>
