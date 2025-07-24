@@ -26,9 +26,6 @@ async def create_annotations(
     annotator_id: AnnotatorIds,
     params: AnnotatorTypes,
 ):
-    print(
-        f"Creating annotations for {annotator_id} on sample {sample_id} in project {project_id}"
-    )
     # Use the specified annotator to label this sample for this project
     # Would use the datapool to load and process the data
     # The pass it through the selected annotator within the Project to make predictions

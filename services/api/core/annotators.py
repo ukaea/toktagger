@@ -12,9 +12,8 @@ from services.api.schemas.data import MultiVariateTimeSeriesData
 from services.api.schemas.annotators import (
     ChangePointDetectionParams,
     FindPeaksParams,
-    IsoforestOutliersParams,
     JumpDetectionParams,
-    MeanAbsoluteDeviationOutliersParams,
+    OutlierDetectionParams,
 )
 from services.api.schemas.annotations import TimeRegion
 from services.api.schemas.projects import Task
@@ -161,69 +160,8 @@ class FindPeaksAnnotator(DataAnnotator):
         return regions
 
 
-class MeanAbsoluteDeviationOutliersAnnotator(DataAnnotator):
-    """
-    Annotator that detects outliers in a univariate time series using the Median Absolute Deviation (MAD) method.
-
-    This annotator identifies regions in the input time series where the data points deviate significantly from the median,
-    as determined by a modified z-score based on the MAD. Outlier regions are returned as `TimeRegion` objects.
-
-    Parameters
-    ----------
-    params : MeanAbsoluteDeviationOutliersParams
-        Configuration parameters for the annotator, including the signal name and outlier threshold.
-
-    Methods
-    -------
-    predict(data: MultiVariateTimeSeriesData) -> list[TimeRegion]
-        Detects outlier regions in the specified signal of the input time series data and returns them as a list of `TimeRegion` objects.
-    """
-
-    def __init__(self, params: MeanAbsoluteDeviationOutliersParams):
-        self.params = params
-
-    def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
-        time = data.values[self.params.signal_name].time
-        time = np.array(time)
-        data = data.values[self.params.signal_name].values
-        data = np.array(data)
-
-        median = np.median(data)
-        abs_deviation = np.abs(data - median)
-        mad = np.median(abs_deviation)
-
-        if mad == 0:
-            # Prevent division by zero; fallback to simple thresholding
-            return np.zeros_like(data, dtype=bool)
-
-        modified_z_scores = 0.6745 * (data - median) / mad
-        outliers = np.abs(modified_z_scores) > self.params.threshold
-
-        bounds = binary_runs_to_tuples(outliers)
-        bounds = [
-            TimeRegion(time_min=time[imin], time_max=time[imax], label="Outlier")
-            for imin, imax in bounds
-        ]
-        return bounds
-
-
-class IsoforestOutliersAnnotator(DataAnnotator):
-    """
-    Annotator that detects outlier regions in multivariate time series data using the Isolation Forest algorithm.
-
-    Parameters
-    ----------
-    params : IsoforestOutliersParams
-        Configuration parameters for the annotator, including the signal name and contamination rate.
-
-    Methods
-    -------
-    predict(data: MultiVariateTimeSeriesData) -> list[TimeRegion]
-        Identifies contiguous time regions in the specified signal that are considered outliers by the Isolation Forest model.
-        Returns a list of TimeRegion objects marking the detected outlier intervals.
-    """
-
-    def __init__(self, params: IsoforestOutliersParams):
+class OutlierDetectionAnnotator(DataAnnotator):
+    def __init__(self, params: OutlierDetectionParams):
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
@@ -231,7 +169,23 @@ class IsoforestOutliersAnnotator(DataAnnotator):
         time = np.array(time)
         values = data.values[self.params.signal_name].values
         values = np.array(values)
+
+        if self.params.method == "mad":
+            bounds = self.mad_outliers(time, values)
+        elif self.params.method == "isoforest":
+            bounds = self.isoforest_outliers(time, values)
+        else:
+            raise ValueError(f"Unknown outlier detection method: {self.params.method}")
+
+        return bounds
+
+    def isoforest_outliers(
+        self, time: np.ndarray, values: np.ndarray
+    ) -> list[TimeRegion]:
         values = values.reshape(-1, 1)
+
+        if self.params.contamination is None or self.params.contamination <= 0:
+            return []
 
         scaler = StandardScaler()
         np_scaled = scaler.fit_transform(values)
@@ -240,6 +194,27 @@ class IsoforestOutliersAnnotator(DataAnnotator):
         model.fit(np_scaled)
 
         outliers = model.predict(np_scaled) == -1
+        bounds = binary_runs_to_tuples(outliers)
+        bounds = [
+            TimeRegion(time_min=time[imin], time_max=time[imax], label="Outlier")
+            for imin, imax in bounds
+        ]
+        return bounds
+
+    def mad_outliers(self, time: np.ndarray, data: np.ndarray) -> list[TimeRegion]:
+        median = np.median(data)
+        abs_deviation = np.abs(data - median)
+        mad = np.median(abs_deviation)
+
+        if mad == 0:
+            return []
+
+        modified_z_scores = 0.6745 * (data - median) / mad
+        outliers = np.abs(modified_z_scores) > self.params.threshold
+
+        if not np.any(outliers):
+            return []
+
         bounds = binary_runs_to_tuples(outliers)
         bounds = [
             TimeRegion(time_min=time[imin], time_max=time[imax], label="Outlier")
@@ -390,8 +365,7 @@ class JumpDetectionAnnotator(DataAnnotator):
 
 ANNOTATORS = {
     AnnotatorIds.FIND_PEAKS: FindPeaksAnnotator,
-    AnnotatorIds.MEAN_ABSOLUTE_DEVIATION: MeanAbsoluteDeviationOutliersAnnotator,
-    AnnotatorIds.ISOFOREST_OUTLIERS: IsoforestOutliersAnnotator,
+    AnnotatorIds.OUTLIER_DETECTION: OutlierDetectionAnnotator,
     AnnotatorIds.CHANGE_POINT_DETECTION: ChangePointDetectionAnnotator,
     AnnotatorIds.JUMP_DETECTION: JumpDetectionAnnotator,
 }
@@ -400,15 +374,13 @@ ANNOTATORS = {
 ANNOTATORS_PER_TASK = {
     Task.ELM: [
         AnnotatorIds.FIND_PEAKS,
-        AnnotatorIds.MEAN_ABSOLUTE_DEVIATION,
-        AnnotatorIds.ISOFOREST_OUTLIERS,
+        AnnotatorIds.OUTLIER_DETECTION,
         AnnotatorIds.CHANGE_POINT_DETECTION,
         AnnotatorIds.JUMP_DETECTION,
     ],
     Task.DISRUPTION: [
         AnnotatorIds.FIND_PEAKS,
-        AnnotatorIds.MEAN_ABSOLUTE_DEVIATION,
-        AnnotatorIds.ISOFOREST_OUTLIERS,
+        AnnotatorIds.OUTLIER_DETECTION,
         AnnotatorIds.CHANGE_POINT_DETECTION,
         AnnotatorIds.JUMP_DETECTION,
     ],

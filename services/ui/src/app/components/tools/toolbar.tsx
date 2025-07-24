@@ -6,7 +6,7 @@ import { Annotations, Data, Project, Sample } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { IsoForestTool } from '@/app/components/isoforest';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
-import { MeanAbsoluteDeviationOutliersTool } from '@/app/components/mad';
+import { OutlierDetectionTool } from '@/app/components/outliers';
 import { ChangePointDetectionTool } from '@/app/components/changepoints';
 import { JumpDetectionTool } from '@/app/components/jump';
 
@@ -187,15 +187,9 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
     )}); 
 
     tools.push({
-      name: 'IsoForest Outliers',
+      name: 'Outlier Detection',
       component: (
-        <IsoForestTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></IsoForestTool>
-    )});
-
-    tools.push({
-      name: 'MAD Outliers',
-      component: (
-        <MeanAbsoluteDeviationOutliersTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></MeanAbsoluteDeviationOutliersTool>
+        <OutlierDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></OutlierDetectionTool>
     )});
 
     tools.push({
@@ -215,7 +209,10 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
   } else if (project.task == 'MHD') {
     let mhdData = data.values['mirnov'];
     const ampRangeTool = <AmplitudeSlider data={mhdData} viewParams={viewParams} setViewParams={setViewParams}/>
-    tools.push(ampRangeTool);
+    tools.push({
+      name: 'Amplitude Range',
+      component: ampRangeTool
+    });
   }
 
   const clearAnnotations = () => {

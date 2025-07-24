@@ -5,8 +5,7 @@ from enum import Enum
 
 class AnnotatorIds(str, Enum):
     FIND_PEAKS = "find_peaks"
-    MEAN_ABSOLUTE_DEVIATION = "mean_absolute_deviation"
-    ISOFOREST_OUTLIERS = "isoforest_outliers"
+    OUTLIER_DETECTION = "outlier_detection"
     CHANGE_POINT_DETECTION = "change_point_detection"
     JUMP_DETECTION = "jump_detection"
 
@@ -28,14 +27,11 @@ class FindPeaksParams(Annotator):
     time_max: Optional[float]
 
 
-class MeanAbsoluteDeviationOutliersParams(Annotator):
+class OutlierDetectionParams(Annotator):
     signal_name: str
-    threshold: float
-
-
-class IsoforestOutliersParams(Annotator):
-    signal_name: str
-    contamination: float
+    method: Literal["mad", "isoforest"]
+    threshold: Optional[float] = None
+    contamination: Optional[float] = None
 
 
 class ChangePointDetectionParams(Annotator):
@@ -56,8 +52,7 @@ class JumpDetectionParams(Annotator):
 
 AnnotatorTypes = Union[
     FindPeaksParams,
-    MeanAbsoluteDeviationOutliersParams,
-    IsoforestOutliersParams,
+    OutlierDetectionParams,
     ChangePointDetectionParams,
     JumpDetectionParams,
 ]
