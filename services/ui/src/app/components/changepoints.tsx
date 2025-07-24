@@ -41,7 +41,13 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
             });
 
             const payload = await response.json();
-            setAnnotations(payload);
+            setAnnotations(previousAnnotations => {
+                let newAnnotations = previousAnnotations || [];
+                // Filter out existing peak annotations
+                newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'time_region');
+                newAnnotations = newAnnotations.concat(payload);
+                return newAnnotations;
+            });
         };
         fetchData();
     }, [signalName, penalty, method, numPoints, numComponents]);

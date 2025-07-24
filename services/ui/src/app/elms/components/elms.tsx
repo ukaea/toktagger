@@ -219,12 +219,19 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
 
     const updateAnnotations = (newZones: Array<Zone>) => {
         const zones = newZones.map(item => ({
+                type: 'time_region',
                 time_min: item.x0,
                 time_max: item.x1,
                 label: item.category.name
         }));
 
-        setAnnotations(zones);
+        setAnnotations(prevAnnotations => {
+            let newAnnotations = prevAnnotations || [];
+            newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'time_region');
+            console.log(newAnnotations);
+            newAnnotations.concat(zones);
+            return newAnnotations;
+        });
     }
 
     return (
