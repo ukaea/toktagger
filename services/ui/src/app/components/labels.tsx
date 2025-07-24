@@ -4,39 +4,31 @@ import { Annotation, Annotations } from '@/types';
 
 export type ShotLabelsType = {
     labels: string[];
-    annotations: Annotation[];
+    annotations: Annotations;
     setAnnotations: (annotations: Annotation[]) => void;
 };
 
 export function ShotLabels({labels = [], annotations, setAnnotations}: ShotLabelsType) {
-    const defaultAnnotations = annotations.filter(annotation => annotation.type === 'class_label');
-    const defaultSelectedKeys = new Set(defaultAnnotations.map(annotation => {
-        const index = labels.indexOf(annotation.label);
-        return index !== -1 ? index.toString() : null;
-    }).filter(key => key !== null));
 
     const defaultLabels = labels.map((label, index) => ({id: index, name: label}));
     const [items, setItems] = useState<string[]>(defaultLabels);
-    const [newLabel, setNewLabel] = useState<string>();
-    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set(defaultSelectedKeys));
-
-
-    const onRemove = () => {
-      setItems(prevItems => prevItems.filter(item => !selectedKeys.has(item.id.toString())));
-      setSelectedKeys(new Set());
-    }
-
-    const addLabel = () => {
-      if (newLabel !== '' && !items.find(item => item.name === newLabel)) {
-        setItems(prevItems => [...prevItems, {id: prevItems.length, name: newLabel}]);
-      }
-    }
+    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
     useEffect(() => {
+        const defaultAnnotations = annotations.filter((annotation: Annotation) => annotation.type === 'class_label');
+        const defaultSelectedKeys = defaultAnnotations.map((annotation: Annotation) => {
+            const index = labels.indexOf(annotation.label);
+            return index !== -1 ? index.toString() : null;
+        }).filter((key: number | null) => key !== null);
+        setSelectedKeys(new Set(defaultSelectedKeys));
+
+    }, [annotations]);
+
+    const onSelectionChange = (keys: Set<string>) => {
         setAnnotations((prevAnnotations: Annotations) => {
             let newAnnotations = prevAnnotations || [];
             newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'class_label');
-            selectedKeys.forEach((key: number) => {
+            keys.forEach((key: number) => {
                 let item = items.find(item => item.id.toString() === key) || null;
 
                 if (item === null) {
@@ -51,7 +43,7 @@ export function ShotLabels({labels = [], annotations, setAnnotations}: ShotLabel
             });
             return newAnnotations;
         });
-    }, [selectedKeys]);
+    }
 
     // Listen for global key presses
     useEffect(() => {
@@ -59,15 +51,13 @@ export function ShotLabels({labels = [], annotations, setAnnotations}: ShotLabel
         const key = e.key.toLowerCase();
         const matchedItem = items.find(item => item.id.toString() === key);
         if (matchedItem) {
-          setSelectedKeys(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(matchedItem.id.toString())) {
-              newSet.delete(matchedItem.id.toString());
-            } else {
-              newSet.add(matchedItem.id.toString());
+            if (selectedKeys.has(matchedItem.id.toString())) {
+                selectedKeys.delete(matchedItem.id.toString());
             }
-            return newSet;
-          });
+            else {
+                selectedKeys.add(matchedItem.id.toString());
+            }
+            onSelectionChange(selectedKeys);
         }
       };
 
@@ -81,15 +71,10 @@ export function ShotLabels({labels = [], annotations, setAnnotations}: ShotLabel
 
     return (
         <>
-        {/* <Flex direction="row" alignItems="end" justifyContent="center" gap="size-100" marginBottom="size-100">
-          <TextField label="Add Label" width="size-2000" defaultInputValue={newLabel} onChange={setNewLabel} />
-          <Button variant="primary" marginTop="size-100" onPress={addLabel}>+</Button>
-          <Button variant="primary" marginTop="size-100" onPress={onRemove}>-</Button>
-        </Flex> */}
         <ListView
           items={items}
-          onSelectionChange={setSelectedKeys}
           selectedKeys={selectedKeys}
+          onSelectionChange={onSelectionChange}
           selectionMode="multiple"
           aria-label="Static ListView items example"
           maxWidth="size-6000"
