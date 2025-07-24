@@ -38,7 +38,6 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
             });
 
             const payload = await response.json();
-            console.log(payload);
             setAnnotations(payload);
         };
         fetchData();
@@ -49,7 +48,7 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true} placeholder="None selected">
+                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

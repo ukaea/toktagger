@@ -211,10 +211,10 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
     ]
 
     const convertRegionToZone = (item: TimeRegion) => {
-        console.log(item);
         const category = zoneCategories.find(x => x.name === item.label);
         return {x0: item.time_min, x1: item.time_max, category: category};
     };
+    annotations = annotations.filter(item => item.type === 'time_region') as TimeRegion[];
     const zones = annotations.map(convertRegionToZone);
 
     const updateAnnotations = (newZones: Array<Zone>) => {

@@ -47,7 +47,7 @@ export function OutlierDetectionTool({ project_id, sample_id, data, setAnnotatio
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true} placeholder="None selected">
+                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

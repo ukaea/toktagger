@@ -173,6 +173,10 @@ async def add_annotations(
     await request.app.state.db_client.delete_filtered_documents(
         collection="annotations", filters=ids
     )
+
+    if len(annotations) == 0:
+        return []
+
     return await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids
     )

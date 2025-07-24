@@ -22,14 +22,7 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
 
     useEffect(() => {
         const fetchData = async () => {
-            console.log("Fetching change point detection data with params:", {
-                signalName,
-                method,
-                penalty,            
-                numPoints,
-                numComponents,
-            });
-            if (signalName == null && !(signalName in data.values)) {
+            if (signalName === null && !(signalName in data.values)) {
                 return;
             }
 
@@ -48,18 +41,16 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
             });
 
             const payload = await response.json();
-            console.log(payload);
             setAnnotations(payload);
         };
         fetchData();
     }, [signalName, penalty, method, numPoints, numComponents]);
 
-
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true} placeholder="None selected">
+                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

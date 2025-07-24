@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Union
+from typing import Literal, Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
 from pydantic import Field, model_validator
 
@@ -18,22 +18,30 @@ class AnnotationIn(ConfiguredModel):
         return values
 
 
+class ClassLabel(AnnotationIn):
+    type: Literal["class_label"] = "class_label"
+
+
 class TimePoint(AnnotationIn):
+    type: Literal["time_point"] = "time_point"
     time: float
 
 
 class TimeRegion(AnnotationIn):
+    type: Literal["time_region"] = "time_region"
     time_min: float
     time_max: float
 
 
 class BoundingBox(AnnotationIn):
+    type: Literal["bounding_box"] = "bounding_box"
     height: float = None
     width: float = None
     centre: Tuple[float, float] = None
 
 
 class VideoBoundingBox(BoundingBox):
+    type: Literal["video_bounding_box"] = "video_bounding_box"
     frame: int
 
 
@@ -47,4 +55,6 @@ class ModelAnnotation(AnnotationIn):
     uncertainty: float
 
 
-AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
+AnnotationTypes = Union[
+    ClassLabel, TimePoint, TimeRegion, BoundingBox, VideoBoundingBox
+]

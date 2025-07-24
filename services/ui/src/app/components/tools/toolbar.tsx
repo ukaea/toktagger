@@ -1,13 +1,13 @@
 "use client";
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { View, TextField, ListView, Item, Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
+import { View, Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from "@/types";
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 import { PeakDetectionTool } from '@/app/components/peaks';
 import { OutlierDetectionTool } from '@/app/components/outliers';
 import { ChangePointDetectionTool } from '@/app/components/changepoints';
 import { JumpDetectionTool } from '@/app/components/jump';
+import { ShotLabels } from '@/app/components/labels';
 
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
     const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
@@ -18,6 +18,9 @@ async function saveAnnotations(project_id: string, sample_id: string, annotation
         },
         body: JSON.stringify(annotations),
     });
+    if (!response.ok) {
+        throw new Error(`Failed to save annotations: ${response.statusText}`);
+    }
 }
 
 async function getNextSample(project_id: str) {
@@ -36,14 +39,10 @@ export function NextButton({project_id, sample_id, annotations} : NextButtonInfo
   const router = useRouter();
 
   const handleClick = async () => {
-    try {
       await saveAnnotations(project_id, sample_id, annotations);
       const sample = await getNextSample(project_id)
       const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
       router.push(NEXT_SAMPLE_URL);
-    } catch (err) {
-      console.error('Failed to fetch data:', err);
-    }
   };
 
   return <Button variant="primary" onPress={handleClick} >Next</Button>
@@ -62,7 +61,7 @@ export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo)
       await saveAnnotations(project_id, sample_id, annotations);
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {timeout: 5000})
     } catch (err) {
-      console.error('Failed to fetch data:', err);
+      ToastQueue.negative(`Failed to save annotations: ${err.message}`, {timeout: 5000});
     }
   };
 
@@ -92,69 +91,6 @@ export function AmplitudeSlider({data, viewParams, setViewParams}: AmplitudeSlid
 }
 
 
-function ShotLabels() {
-    const [newLabel, setNewLabel] = useState<string>('');
-    const [items, setItems] = useState<string[]>([]);
-    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-
-
-    const onRemove = () => {
-      setItems(prevItems => prevItems.filter(item => !selectedKeys.has(item.id.toString())));
-      setSelectedKeys(new Set());
-    }
-    const addLabel = () => {
-      if (newLabel !== '' && !items.find(item => item.name === newLabel)) {
-        setItems(prevItems => [...prevItems, {id: prevItems.length, name: newLabel}]);
-      }
-    }
-
-      // Listen for global key presses
-    useEffect(() => {
-      const handleKeyDown = (e) => {
-        const key = e.key.toLowerCase();
-        const matchedItem = items.find(item => item.id.toString() === key);
-        if (matchedItem) {
-          setSelectedKeys(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(matchedItem.id.toString())) {
-              newSet.delete(matchedItem.id.toString());
-            } else {
-              newSet.add(matchedItem.id.toString());
-            }
-            return newSet;
-          });
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [items]);
-
-    return (
-        <>
-        <Flex direction="row" alignItems="end" justifyContent="center" gap="size-100" marginBottom="size-100">
-          <TextField label="Add Label" width="size-2000" defaultInputValue={newLabel} onChange={setNewLabel} />
-          <Button variant="primary" marginTop="size-100" onPress={addLabel}>+</Button>
-          <Button variant="primary" marginTop="size-100" onPress={onRemove}>-</Button>
-        </Flex>
-        <ListView
-          items={items}
-          onSelectionChange={setSelectedKeys}
-          selectedKeys={selectedKeys}
-          selectionMode="multiple"
-          aria-label="Static ListView items example"
-          maxWidth="size-6000"
-        >
-          {item => (
-            <Item key={item.id} textValue={item.name}>
-              {`${item.id} | ${item.name}`}
-            </Item>
-          )}
-        </ListView>
-        </>
-    );
-}
-
 type ToolBarInfo = {
   project: Project
   sample: Sample
@@ -170,14 +106,16 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
 
 
   let tools = [];
-  tools.push({
-    name: 'Shot Labels',
-    component: (
-      <ShotLabels></ShotLabels>
-    )
-  });
 
   if (project.task == 'ELM') {
+    const labels = ['No ELMs', 'Type I', 'Type II', 'Type III'];
+    tools.push({
+      name: 'Shot Labels',
+      component: (
+        <ShotLabels labels={labels} annotations={annotations} setAnnotations={setAnnotations}></ShotLabels>
+      )
+    });
+
     tools.push({
       name: 'Peak Detection',
       component: (
