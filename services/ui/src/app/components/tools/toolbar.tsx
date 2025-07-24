@@ -3,9 +3,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { View, TextField, ListView, Item, Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from "@/types";
-import { FindPeaksTool } from '@/app/components/peaks';
-import { IsoForestTool } from '@/app/components/isoforest';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
+import { PeakDetectionTool } from '@/app/components/peaks';
 import { OutlierDetectionTool } from '@/app/components/outliers';
 import { ChangePointDetectionTool } from '@/app/components/changepoints';
 import { JumpDetectionTool } from '@/app/components/jump';
@@ -179,11 +178,10 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
   });
 
   if (project.task == 'ELM') {
-
     tools.push({
-      name: 'Find Peaks',
+      name: 'Peak Detection',
       component: (
-        <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
+        <PeakDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></PeakDetectionTool>
     )}); 
 
     tools.push({

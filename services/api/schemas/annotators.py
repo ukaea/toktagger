@@ -4,7 +4,7 @@ from enum import Enum
 
 
 class AnnotatorIds(str, Enum):
-    FIND_PEAKS = "find_peaks"
+    PEAK_DETECTION = "peak_detection"
     OUTLIER_DETECTION = "outlier_detection"
     CHANGE_POINT_DETECTION = "change_point_detection"
     JUMP_DETECTION = "jump_detection"
@@ -19,7 +19,7 @@ class Annotator(BaseModel):
     pass
 
 
-class FindPeaksParams(Annotator):
+class PeakDetectionParams(Annotator):
     signal_name: str
     prominence: float
     distance: int
@@ -51,7 +51,7 @@ class JumpDetectionParams(Annotator):
 
 
 AnnotatorTypes = Union[
-    FindPeaksParams,
+    PeakDetectionParams,
     OutlierDetectionParams,
     ChangePointDetectionParams,
     JumpDetectionParams,

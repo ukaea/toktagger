@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Request
-from services.api.core.annotators import FindPeaksAnnotator
+from services.api.core.annotators import PeakDetectionAnnotator
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
 from services.api.schemas.annotations import TimeRegion
-from services.api.schemas.annotators import Annotator, FindPeaksParams
+from services.api.schemas.annotators import Annotator, PeakDetectionParams
 from services.api.schemas.models import Model
 
 router = APIRouter(prefix="/projects/{project_id}/models", tags=["Models"])
@@ -76,7 +76,7 @@ async def predict_sample(
     project_id: str,
     model_id: str,
     sample_id: str,
-    params: FindPeaksParams,
+    params: PeakDetectionParams,
 ) -> list[TimeRegion]:
     db_client = request.app.state.db_client
 
@@ -86,7 +86,7 @@ async def predict_sample(
     data_loader = DATA_LOADERS[project.data_loader]()
     data_item = data_loader.get_sample(sample)
 
-    tagger = FindPeaksAnnotator(params)
+    tagger = PeakDetectionAnnotator(params)
     annotations = tagger.predict(data_item)
 
     return annotations

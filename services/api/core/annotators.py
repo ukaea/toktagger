@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from services.api.schemas.data import MultiVariateTimeSeriesData
 from services.api.schemas.annotators import (
     ChangePointDetectionParams,
-    FindPeaksParams,
+    PeakDetectionParams,
     JumpDetectionParams,
     OutlierDetectionParams,
 )
@@ -99,7 +99,7 @@ class DataAnnotator(ABC):
         pass
 
 
-class FindPeaksAnnotator(DataAnnotator):
+class PeakDetectionAnnotator(DataAnnotator):
     """
     Annotator class for detecting peaks in a multivariate time series signal.
 
@@ -116,7 +116,7 @@ class FindPeaksAnnotator(DataAnnotator):
             a list of TimeRegion objects corresponding to the detected peaks.
     """
 
-    def __init__(self, params: FindPeaksParams):
+    def __init__(self, params: PeakDetectionParams):
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
@@ -364,7 +364,7 @@ class JumpDetectionAnnotator(DataAnnotator):
 
 
 ANNOTATORS = {
-    AnnotatorIds.FIND_PEAKS: FindPeaksAnnotator,
+    AnnotatorIds.PEAK_DETECTION: PeakDetectionAnnotator,
     AnnotatorIds.OUTLIER_DETECTION: OutlierDetectionAnnotator,
     AnnotatorIds.CHANGE_POINT_DETECTION: ChangePointDetectionAnnotator,
     AnnotatorIds.JUMP_DETECTION: JumpDetectionAnnotator,
@@ -373,13 +373,13 @@ ANNOTATORS = {
 # Might want user to be able to specify a choice when making the project down the line?
 ANNOTATORS_PER_TASK = {
     Task.ELM: [
-        AnnotatorIds.FIND_PEAKS,
+        AnnotatorIds.PEAK_DETECTION,
         AnnotatorIds.OUTLIER_DETECTION,
         AnnotatorIds.CHANGE_POINT_DETECTION,
         AnnotatorIds.JUMP_DETECTION,
     ],
     Task.DISRUPTION: [
-        AnnotatorIds.FIND_PEAKS,
+        AnnotatorIds.PEAK_DETECTION,
         AnnotatorIds.OUTLIER_DETECTION,
         AnnotatorIds.CHANGE_POINT_DETECTION,
         AnnotatorIds.JUMP_DETECTION,

@@ -1,15 +1,15 @@
 "use client";
+import { useEffect, useState } from 'react';
 import { Annotation, MultiVariateTimeSeriesData } from '@/types';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, RangeSlider} from '@adobe/react-spectrum'
-import { useEffect, useState } from 'react';
 
-type FindPeaksType = {
+type PeakDetectionType = {
     project_id: string;
     sample_id: string;
     data: MultiVariateTimeSeriesData;
     setAnnotations: (annotations: Annotation[]) => void;
 };
-export function FindPeaksTool({ project_id, sample_id, data, setAnnotations } : FindPeaksType) {
+export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations } : PeakDetectionType) {
     const [prominence, setProminance] = useState(0.1);
     const [distance, setDistance] = useState(1);
 
@@ -35,7 +35,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations } : 
                 return;
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/find_peaks`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/peak_detection`, {
                 method: 'POST',
                 headers: {
                 'Content-Type': 'application/json',
