@@ -1,7 +1,7 @@
 
 from services.api.schemas.projects import Task
 from services.api.schemas.samples import Sample
-from services.api.schemas.annotations import Annotation, TimePoint
+from services.api.schemas.annotations import Annotation, AnnotationIn, TimePoint
 from services.api.schemas.projects import Project
 from services.api.schemas.data import Data, TimeSeriesData
 from services.api.core.data_loaders import DATA_LOADERS
@@ -81,13 +81,15 @@ class Model(ABC):
         pass
     
     @abstractmethod
-    def train(self, epochs: int):
+    def train(self, epochs: int) -> float:
         # pass in list of samples and list of annotations
+        # return some measure of accuracy
         pass
     
     @abstractmethod
-    def predict(self):
+    def predict(self, samples: list[Sample]) -> list[list[AnnotationIn]]:
         # pass in list of samples and list of annotations (could be size 1)
+        # returns list / array / tensor of predictions and uncertainties
         pass
     
     @abstractmethod
@@ -192,7 +194,7 @@ class DisruptionCNN(TorchModel):
             nn.Linear(32, 1) # TODO: what if not all annotations present for all samples?
         )
         
-    def train(self, num_epochs: int, batch_size: int, patience=40, threshold=1e-4, device='cpu'):
+    def train(self, num_epochs: int, batch_size: int, patience=20, threshold=1e-4, device='cpu') -> float:
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
         if not self.train_samples or not self.train_annotations:
@@ -268,15 +270,12 @@ class DisruptionCNN(TorchModel):
             if val_loss_avg < best_val_loss - threshold:
                 best_val_loss = val_loss_avg
                 epochs_since_improvement = 0
-
-                # If the model improved, save a checkpoint
-                # Save best model
-                self.save("best_model.pt")
-
+                self.best_model = self.model
             else:
                 epochs_since_improvement += 1
                 if epochs_since_improvement >= patience:
                     print(f"No validation improvement for {patience} epochs. Stopping early.")
+                    self.model = self.best_model
                     break
                 
         # --- Evaluation on test set ---
@@ -304,16 +303,17 @@ class DisruptionCNN(TorchModel):
             
             print("Test Accuracy:", (sum_correct / sum_total) * 100)
                 
-        return loss_history
+        return sum_correct / sum_total
     
-    def predict(self, samples: list[Sample], batch_size: int, device='cpu'):
+    def predict(self, samples: list[Sample], batch_size: int, device='cpu') -> list[list[TimePoint]]:
         dataset = self.dataset(self.project, samples, annotations=None)
         
         self.model.train() # Using dropout so has to be in train mode
         all_predictions: list[list[torch.tensor]] = []
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     
         for i in range(50): # Should let user choose num mc samples? TODO
+            print("we be predicting")
             predictions: list[torch.tensor] = []
             with torch.no_grad():
                 for batch_samples in dataloader:
@@ -326,7 +326,16 @@ class DisruptionCNN(TorchModel):
         stacked_predictions = torch.stack(all_predictions)
         # Because we've done 50x mc samples, just use the first lot of scaling values...
         scaling = torch.tensor(dataset.time_scaling[:int(len(dataset.time_scaling)/50)]).squeeze()
-        return stacked_predictions.mean(dim=0).squeeze() * scaling, stacked_predictions.std(dim=0).squeeze() * scaling
+        means = stacked_predictions.mean(dim=0).squeeze() * scaling
+        stds = stacked_predictions.std(dim=0).squeeze() * scaling
+        
+        return [
+            [TimePoint(
+                validated=False, 
+                uncertainty=stds[i], 
+                label="disruption",
+                time=means[i],)]
+            for i in range(len(samples))]
     
 
 MODELS = {

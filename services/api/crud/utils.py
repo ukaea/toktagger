@@ -5,7 +5,8 @@ from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
-
+from services.api.schemas.models import Model
+from bson.objectid import ObjectId
 
 async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     obj_id = convert_to_objectid(project_id, "projects")
@@ -44,7 +45,8 @@ async def get_annotations(
     start: int = 0,
     end: Optional[int] = None,
 ) -> list[Annotation]:
-    db_filters = {"project_id": project_id}
+    project_obj_id = convert_to_objectid(project_id, "samples")
+    db_filters = {"project_id": project_obj_id}
     if validated is not None:
         db_filters["validated"] = validated
 
@@ -77,3 +79,22 @@ async def get_samples(
         limit=end - start + 1 if end is not None else 0,
     )
     return samples
+
+async def get_models(
+    db_client: MongoDBClient, project_id: str, start: int = 0, end: Optional[int] = None
+) -> list[Model]:
+    # Return a list of all samples for this project and info about them
+    project_obj_id = convert_to_objectid(project_id, "projects")
+
+    if not await db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    models = await db_client.get_filtered_documents(
+        collection="models",
+        filters={"project_id": project_obj_id},
+        sort_by="version",
+        sort_direction=-1,
+        start=start,
+        limit=end - start + 1 if end is not None else 0,
+    )
+    return models

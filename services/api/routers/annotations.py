@@ -13,7 +13,7 @@ router = APIRouter(
 
 @router.get(
     "/annotations",
-    response_model=list[Annotation],
+    response_model=list[AnnotationTypes],
     responses={
         200: {"description": "Annotations for this project returned successfully."},
         404: {"description": "Project not found with that ID."},
@@ -36,7 +36,7 @@ async def get_all_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
-) -> list[Annotation]:
+) -> list[AnnotationTypes]:
     """
     Retrieve all annotations for this project, subject to specified filters.
     ------------------------------------------------------------------------

@@ -8,31 +8,33 @@ import asyncio
 from services.api.core.models import MODELS, DisruptionCNN
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.views import DATA_VIEWS
-from services.api.schemas.projects import Project
+from services.api.schemas.projects import Project, Task
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation, AnnotationTypes, TimePoint
-
+from services.api.schemas.models import ModelIn
+import pathlib
 import itertools
 
-# REDIS_HOST = os.environ["REDIS_HOST"]
+REDIS_HOST = os.environ["REDIS_HOST"]
 
-# app = Celery(
-#     "tasks",
-#     broker=f"redis://{REDIS_HOST}:6379/0",  # Redis as a message broker
-#     backend=f"redis://{REDIS_HOST}:6379/0",  # Redis as result backend
-# )
+app = Celery(
+    "tasks",
+    broker=f"redis://{REDIS_HOST}:6379/0",  # Redis as a message broker
+    backend=f"redis://{REDIS_HOST}:6379/0",  # Redis as result backend
+)
 
-# redis_client = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
-# # Flush client at start to remove any stale messages.
-# redis_client.flushdb()
+redis_client = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
+# Flush client at start to remove any stale messages.
+redis_client.flushdb()
 
-#mongo_url = os.environ["MONGO_URL"]
-mongo_url = "mongodb://root:example@localhost:27017"
+mongo_url = os.environ["MONGO_URL"]
+#mongo_url = "mongodb://root:example@localhost:27017"
 db_name = "annotate_db"
 
-# @app.task()
-async def run_training(project: Project): # TODO: do we want to support retraining where we only get annotations not previously put into model?
+async def train_model(project: Project): # TODO: do we want to support retraining where we only get annotations not previously put into model?
     print(f"Running model training for project {project.id}")
+    model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
+    model_dir.mkdir(exist_ok=True) # Do i need to do this every time?
     
     db_client = MongoDBClient(mongo_url, db_name)
     
@@ -58,23 +60,37 @@ async def run_training(project: Project): # TODO: do we want to support retraini
             annotations, key=lambda annotation: annotation['sample_id']
             )
         ]
-    print(len(annotations_2d))
-    print(len(samples))
     
     # Here down should have some flexibility for different models, model specific?
     
     # Get model
-    model = DisruptionCNN(project, samples, annotations_2d)
+    model = MODELS[Task(project.task)](project, samples, annotations_2d)
     # Train model
-    losses = model.train(num_epochs=100, batch_size=32)
-    print(losses)
+    accuracy = model.train(num_epochs=10, batch_size=32)
     
-    model.save("model.pt")
-    
-    # Evaluate model
+    # Save model somewhere?
+    # Try to get model for this project from database if it exists
+    db_models = await db_client.get_filtered_documents(
+        collection="models",
+        sort_by="version",
+        filters={"project_id": ObjectId(project.id)},
+        )
+    if len(db_models) == 0:
+        # This is the first time a model has been saved for this project, so version = 1
+        version = 1
+    else:
+        version = db_models[0]["version"] + 1
 
-#@app.task()
-async def run_inference(project: Project, sample_ids: list[str]):
+    # Add model to DB
+    model_id = await db_client.insert(
+        collection = "models",
+        model = ModelIn(type=model.__class__.__name__, version=version, accuracy=accuracy),
+        ids = {"project_id": ObjectId(project.id)}
+    )
+    # Save model with name equal to ID
+    model.save(model_dir.joinpath(f"{model_id}.model"))
+
+async def get_predictions(project: Project, samples: list[Sample]):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
     # Where inference is run on some batch of samples first
@@ -84,54 +100,34 @@ async def run_inference(project: Project, sample_ids: list[str]):
     db_client = MongoDBClient(mongo_url, db_name)
     
     # Find the latest created model for this project
-    # TODO get model from DB
-    # model = asyncio.run(
-    #     db_client.get_filtered_documents(
-    #     collection="models",
-    #     filters={"project_id": project.id},
-    #     sort_by="timestamp",
-    #     sort_direction=-1,
-    #     )
-    # )[0]
-    # Get samples
-    samples = [
-        Sample(**await db_client.get_document_by_id(collection="samples", object_id=ObjectId(sample_id)))
-        for sample_id in sample_ids
-        ]
+    db_models = await db_client.get_filtered_documents(
+        collection="models",
+        sort_by="version",
+        filters={"project_id": ObjectId(project.id)},
+        )
+    if len(db_models) == 0:
+        raise FileNotFoundError("No model found for this project!")
+    
+    model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{str(db_models[0]['_id'])}.model")
+    
     # Load the model
-    model = DisruptionCNN.load(project, "model.pt") # TODO should be from DB
+    model = MODELS[Task(project.task)].load(project, model_path) # TODO make
     
-    mean, uncertainty =  model.predict(samples, batch_size=32)
+    predictions = model.predict(samples, batch_size=32)
+    print(predictions)
     
-    annotations = []
-    for sample in samples:
-        annotation = await db_client.get_filtered_documents(
+    for i, sample in enumerate(samples):
+        await db_client.insert_many(
             collection="annotations",
-            filters={"sample_id": ObjectId(sample.id)},
-            )
-        annotations.append(annotation[0]['time'])
-        
-    print("mean=", mean)
-    print("uncertainty=", uncertainty)
-    print("annotations=", annotations)
-    return mean
+            models = predictions[i],
+            ids={"project_id": ObjectId(project.id), "sample_id": ObjectId(sample.id)}
+        )
     
-if __name__ == "__main__":
-    db_client = MongoDBClient(mongo_url, db_name)
+@app.task()
+def run_training(project: dict):
     
-    # Get project, this would come from API
-    PROJECT_ID = "687a6ebb5589c8a380cb76f4"
-    project = asyncio.run(db_client.get_document_by_id(collection="projects", object_id=ObjectId(PROJECT_ID)))
-    db_client = MongoDBClient(mongo_url, db_name)
+    asyncio.run(train_model(project=Project(**project)))
     
-    asyncio.run(run_training(project=Project(**project)))
-    
-    samples = [
-        "687a5aacd311e40b035a10cf",
-        "687a5aacd311e40b035a10d8",
-        "687a5aacd311e40b035a10dc",
-        "687a5aacd311e40b035a10fb",
-        "687a5aacd311e40b035a1105",
-    ]
-    
-    # mean= asyncio.run(run_inference(project=Project(**project), sample_ids=samples))
+@app.task()
+def run_inference(project: dict, samples: list[dict]):
+    asyncio.run(get_predictions(project=Project(**project), samples=[Sample(**sample) for sample in samples]))
