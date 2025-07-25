@@ -25,7 +25,6 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         name: 'Ip',
         x: data.values.ip.time,
         y: data.values.ip.values,
-        xaxis: "x2",
         yaxis: "y2",
         mode: 'lines',
     };
@@ -34,7 +33,6 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         name: 'NBI Power',
         x: data.values.power_nbi.time,
         y: data.values.power_nbi.values,
-        xaxis: "x3",
         yaxis: "y3",
         mode: 'lines',
     };
@@ -43,7 +41,6 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         name: 'Density Gradient',
         x: data.values.density_gradient.time,
         y: data.values.density_gradient.values,
-        xaxis: "x4",
         yaxis: "y4",
         mode: 'lines',
     };
@@ -52,7 +49,6 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         name: 'Te Core',
         x: data.values.t_e_core.time,
         y: data.values.t_e_core.values,
-        xaxis: "x5",
         yaxis: "y5",
         mode: 'lines',
     };
@@ -61,12 +57,11 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         name: 'Soft X-Ray',
         x: data.values.sxr.time,
         y: data.values.sxr.values,
-        xaxis: "x6",
         yaxis: "y6",
         mode: 'lines',
     };
 
-    const plotData: Plotly.Data[] = [dataTrace, ipTrace, densityGradientTrace, powerNBITrace, t_e_coreTrace, sxrTrace];
+    const plotData: Plotly.Data[] = [dataTrace, ipTrace]; //densityGradientTrace, powerNBITrace, t_e_coreTrace, sxrTrace];
 
 
     var plotLayout = {
@@ -76,6 +71,12 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         width: 1100,
         height: 800,
         xaxis: {
+            maxallowed: Math.max(...data.values.dalpha.time),
+            minallowed: Math.min(...data.values.dalpha.time),
+            range: [Math.min(...data.values.dalpha.time), Math.max(...data.values.dalpha.time)],
+            fixedrange: false,
+            autorange: false,
+            rangeslider: { visible: true },
             title: {
                 text: 'Time [s]',
                 font: {
@@ -84,8 +85,10 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
                 color: '#7f7f7f'
                 }
             },
-            },
+        },
         yaxis: {
+            domain: [0.5, 1],
+            fixedrange: true,
             title: {
                 text: 'Dalpha [V]',
                 font: {
@@ -95,18 +98,19 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
                 }
             },
         },
-        xaxis2: {
-            matches:'x',
-            title: {
-                text: 'Time [s]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
+        // xaxis2: {
+        //     matches:'x',
+        //     title: {
+        //         text: 'Time [s]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
         yaxis2: {
+            domain: [0, 0.5],
             title: {
                 text: 'Ip [kA]',
                 font: {
@@ -116,90 +120,90 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
                 }
             },
         },
-        xaxis3: {
-            matches:'x',
-            title: {
-                text: 'Time [s]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
-        yaxis3: {
-            title: {
-                text: 'NBI Power [W]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
-        xaxis4: {
-            matches:'x',
-            title: {
-                text: 'Time [s]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
-        yaxis4: {
-            title: {
-                text: 'Density Gradient []',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
-        xaxis5: {
-            matches:'x',
-            title: {
-                text: 'Time [s]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
-        yaxis5: {
-            title: {
-                text: 'T_e Core [eV]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
-        xaxis6: {
-            matches:'x',
-            title: {
-                text: 'Time [s]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
-        yaxis6: {
-            title: {
-                text: 'SXR [arb]',
-                font: {
-                family: 'Courier New, monospace',
-                size: 12,
-                color: '#7f7f7f'
-                }
-            },
-        },
+        // xaxis3: {
+        //     matches:'x',
+        //     title: {
+        //         text: 'Time [s]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
+        // yaxis3: {
+        //     title: {
+        //         text: 'NBI Power [W]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
+        // xaxis4: {
+        //     matches:'x',
+        //     title: {
+        //         text: 'Time [s]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
+        // yaxis4: {
+        //     title: {
+        //         text: 'Density Gradient []',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
+        // xaxis5: {
+        //     matches:'x',
+        //     title: {
+        //         text: 'Time [s]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
+        // yaxis5: {
+        //     title: {
+        //         text: 'T_e Core [eV]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
+        // xaxis6: {
+        //     matches:'x',
+        //     title: {
+        //         text: 'Time [s]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
+        // yaxis6: {
+        //     title: {
+        //         text: 'SXR [arb]',
+        //         font: {
+        //         family: 'Courier New, monospace',
+        //         size: 12,
+        //         color: '#7f7f7f'
+        //         }
+        //     },
+        // },
     };
 
     
