@@ -8,6 +8,7 @@ class AnnotatorIds(str, Enum):
     OUTLIER_DETECTION = "outlier_detection"
     CHANGE_POINT_DETECTION = "change_point_detection"
     JUMP_DETECTION = "jump_detection"
+    MANUAL_ANNOTATION = "manual"
 
 
 class DataTypes(Enum):

@@ -1,5 +1,5 @@
 'use client'
-import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category } from "@/types"
+import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
@@ -212,7 +212,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
 
     const convertRegionToZone = (item: TimeRegion) => {
         const category = zoneCategories.find(x => x.name === item.label);
-        return {x0: item.time_min, x1: item.time_max, category: category};
+        return {x0: item.time_min, x1: item.time_max, category: category, created_by: item.created_by} as Zone;
     };
     annotations = annotations.filter(item => item.type === 'time_region') as TimeRegion[];
     const zones = annotations.map(convertRegionToZone);
@@ -220,18 +220,13 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
     const updateAnnotations = (newZones: Array<Zone>) => {
         const zones = newZones.map(item => ({
                 type: 'time_region',
+                created_by: item.created_by,
                 time_min: item.x0,
                 time_max: item.x1,
                 label: item.category.name
         }));
 
-        setAnnotations(prevAnnotations => {
-            let newAnnotations = prevAnnotations || [];
-            newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'time_region');
-            console.log(newAnnotations);
-            newAnnotations.concat(zones);
-            return newAnnotations;
-        });
+        setAnnotations(zones);
     }
 
     return (

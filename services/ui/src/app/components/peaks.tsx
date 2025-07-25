@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { Annotation, MultiVariateTimeSeriesData } from '@/types';
+import { Annotation, Annotations, MultiVariateTimeSeriesData } from '@/types';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, RangeSlider} from '@adobe/react-spectrum'
 
 type PeakDetectionType = {
@@ -10,7 +10,7 @@ type PeakDetectionType = {
     setAnnotations: (annotations: Annotation[]) => void;
 };
 export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations } : PeakDetectionType) {
-    const [prominence, setProminance] = useState(0.1);
+    const [prominence, setProminance] = useState(5);
     const [distance, setDistance] = useState(1);
 
     const [timeMinDefault, setTimeMinDefault] = useState(null);
@@ -50,25 +50,21 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
             });
 
             const payload = await response.json();
-            setAnnotations(previousAnnotations => {
-                let newAnnotations = previousAnnotations || [];
-                // Filter out existing peak annotations
-                newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'time_region');
-                newAnnotations = newAnnotations.concat(payload);
-                return newAnnotations;
+            setAnnotations((previousAnnotations: Annotations) => {
+                const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'peak_detection');
+                return otherAnnotations.concat(payload);
             });
         };
 
         fetchData();
+        
     }, [prominence, distance, timeRange, signalName]);
-
-
 
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label='Signal Name' defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
+                <ComboBox label='Signal Name' defaultInputValue={signalName} defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

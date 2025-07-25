@@ -154,6 +154,7 @@ class PeakDetectionAnnotator(DataAnnotator):
                     label="Peak",
                     time_min=float(peak_time - width),
                     time_max=float(peak_time + width),
+                    created_by=AnnotatorIds.PEAK_DETECTION,
                 )
                 regions.append(region)
 
@@ -196,7 +197,12 @@ class OutlierDetectionAnnotator(DataAnnotator):
         outliers = model.predict(np_scaled) == -1
         bounds = binary_runs_to_tuples(outliers)
         bounds = [
-            TimeRegion(time_min=time[imin], time_max=time[imax], label="Outlier")
+            TimeRegion(
+                time_min=time[imin],
+                time_max=time[imax],
+                label="Outlier",
+                created_by=AnnotatorIds.OUTLIER_DETECTION,
+            )
             for imin, imax in bounds
         ]
         return bounds
@@ -217,7 +223,12 @@ class OutlierDetectionAnnotator(DataAnnotator):
 
         bounds = binary_runs_to_tuples(outliers)
         bounds = [
-            TimeRegion(time_min=time[imin], time_max=time[imax], label="Outlier")
+            TimeRegion(
+                time_min=time[imin],
+                time_max=time[imax],
+                label="Outlier",
+                created_by=AnnotatorIds.OUTLIER_DETECTION,
+            )
             for imin, imax in bounds
         ]
         return bounds
@@ -270,7 +281,12 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         result[-1] -= 1
         time = time.flatten()
         bounds = [
-            TimeRegion(time_min=time[imin], time_max=time[imax], label="Change Point")
+            TimeRegion(
+                time_min=time[imin],
+                time_max=time[imax],
+                label="Change Point",
+                created_by=AnnotatorIds.CHANGE_POINT_DETECTION,
+            )
             for imin, imax in zip(result, result[1:])
         ]
         return bounds
@@ -291,7 +307,12 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         bounds = extract_segments(hidden_states + 1)
         bounds = [(time[imin], time[imax]) for (imin, imax, _) in bounds]
         bounds = [
-            TimeRegion(time_min=tmin, time_max=tmax, label="Change Point")
+            TimeRegion(
+                time_min=tmin,
+                time_max=tmax,
+                label="Change Point",
+                created_by=AnnotatorIds.CHANGE_POINT_DETECTION,
+            )
             for (tmin, tmax) in bounds
         ]
         return bounds
@@ -358,7 +379,14 @@ class JumpDetectionAnnotator(DataAnnotator):
             tmax = twindow[-1]
             tmin = twindow[np.argmax(window)]
             tmax = twindow[np.argmin(window)]
-            bounds.append(TimeRegion(time_min=tmin, time_max=tmax, label="Jump"))
+            bounds.append(
+                TimeRegion(
+                    time_min=tmin,
+                    time_max=tmax,
+                    label="Jump",
+                    created_by=AnnotatorIds.JUMP_DETECTION,
+                )
+            )
 
         return bounds
 

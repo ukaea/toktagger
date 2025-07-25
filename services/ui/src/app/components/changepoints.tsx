@@ -42,11 +42,8 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
 
             const payload = await response.json();
             setAnnotations(previousAnnotations => {
-                let newAnnotations = previousAnnotations || [];
-                // Filter out existing peak annotations
-                newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'time_region');
-                newAnnotations = newAnnotations.concat(payload);
-                return newAnnotations;
+                const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'change_point_detection');
+                return otherAnnotations.concat(payload);
             });
         };
         fetchData();

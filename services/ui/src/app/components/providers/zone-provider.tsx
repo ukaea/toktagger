@@ -59,11 +59,13 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     }
 
     const addZone = (x0: number, x1: number, category: Category) => {
+        const created_by = 'manual';
         zones.current.push(
             {
                 category,
                 x0,
-                x1
+                x1,
+                created_by
             }
         )
         triggerZoneUpdate();

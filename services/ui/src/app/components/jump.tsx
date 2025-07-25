@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item } from '@adobe/react-spectrum'
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
 
 type JumpDetectionType = {
     project_id: string;
@@ -38,12 +38,9 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
             });
 
             const payload = await response.json();
-            setAnnotations(previousAnnotations => {
-                let newAnnotations = previousAnnotations || [];
-                // Filter out existing peak annotations
-                newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'time_region');
-                newAnnotations = newAnnotations.concat(payload);
-                return newAnnotations;
+            setAnnotations((previousAnnotations: Annotations) => {
+                const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'jump_detection');
+                return otherAnnotations.concat(payload);
             });
         };
         fetchData();

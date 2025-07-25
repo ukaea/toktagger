@@ -54,6 +54,7 @@ export const CategorySchema = z.object({
 export type Category = z.infer<typeof CategorySchema>;
 
 export const ZoneSchema = z.object({
+  created_by: z.string().default('manual'),
   category: CategorySchema,
   x0: z.number(),
   x1: z.number()
