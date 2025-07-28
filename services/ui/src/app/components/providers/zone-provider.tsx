@@ -114,7 +114,15 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
             const width = 0.05 * menu.xRange              // 5 % of span
             const x0 = menu.x
             const x1 = Math.min(x0 + width, menu.xLimits[1]) // clamp to upper limit
-            addZone(x0, x1, category)
+            zones.current.push(
+                {
+                    category,
+                    x0,
+                    x1
+                }
+            )
+            triggerZoneUpdate();
+            onModifyZone(zones.current);
             }
     
             const addZoneItems = categories.map((category, index) => {
@@ -147,7 +155,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
             registerMenuItem("zone", menuElement)
 
-        }, [addZone, categories, registerMenuItem])
+        }, [categories, onModifyZone, registerMenuItem])
 
     // Initialisation of data - this should only run once
     // Effect: run ONCE per mount to populate from initialData
