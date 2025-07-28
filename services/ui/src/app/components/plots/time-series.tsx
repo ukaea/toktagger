@@ -1,7 +1,7 @@
 "use client"
 
 import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { Config, Layout, Data } from "plotly.js"
+import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
 
 type InjectedProps = {
@@ -11,7 +11,7 @@ type InjectedProps = {
 }
 
 interface PlotConfiguration {
-    data: Data[],
+    data: Partial<PlotData>[],
     layout: Partial<Layout>,
     config?: Partial<Config>
 }
@@ -51,6 +51,8 @@ export const TimeSeries = ({
 
     const overplots: string[] = [];
 
+    let allowRelayout = true;
+
     const triggerToolUpdate = () => {
         setUpdateTools((current) => (current + 1) % 100)
     }
@@ -81,10 +83,76 @@ export const TimeSeries = ({
         
         setPlotReady(true)
 
-        const relayoutHandler = () => { // triggers re-render of overlay tools when axes change
+        // Sets the y axis range required for the current x range for each subplot
+        const rescale = (x0?: number, x1?: number, manualZoom = false) => {
+            if (!allowRelayout) return // Prevents relayout triggering itself
+            allowRelayout = false
+
+            // If no x range is passed, then the min/max is used
+            if (!x0) {
+                x0 = ((plot as any)._fullData[0]._extremes.x.min[0].val) as number;
+            }
+            if (!x1) {
+                x1 = ((plot as any)._fullData[0]._extremes.x.max[0].val) as number;
+            }
+            
+            // Ensure each data set is handled (ensures all subplots are zoomed correctly)
+            data.forEach((dataSet, index) => {
+                let yAxisID = ""
+
+                if (dataSet.yaxis) {
+                    // Find the y axis ID relating to this subplot
+                    const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
+                    if (locatedID) {
+                        yAxisID = locatedID
+                    }
+                }
+
+                const xArray = (dataSet as PlotData).x as number[];
+                const yArray = (dataSet as PlotData).y as number[];
+
+                // Find min and max y data values
+                const yValues: number[] = [];
+                for (let i = 0; i < xArray.length; i++) {
+                    const xVal = xArray[i];
+                    if (xVal >= x0 && xVal <= x1) {
+                        yValues.push(yArray[i]);
+                    }
+                }
+
+                if (yValues.length > 0) {
+                    const yMin = Math.min(...yValues)
+                    const yMax = Math.max(...yValues)
+
+                    const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`].range;
+                    
+                    // Only allow relayout if new yRange is smaller than previous one or if this isn't a manual zoom
+                    // This allows users to zoom in on bits of the graph accurately without it auto-scaling
+                    if (((yMax - yMin) < (previousRange[1] - previousRange[0]) || !manualZoom)) {
+                        relayout(plot, {
+                            [`yaxis${yAxisID}.range`]: [yMin, yMax]
+                        })
+                    }
+                }
+            })
+
+            // Debounce the relayout calls 
+            setTimeout(() => {
+                allowRelayout = true
+            }, 100)
+        }
+
+        const relayoutHandler = (eventData: PlotRelayoutEvent) => { // triggers re-render of overlay tools when axes change
             triggerToolUpdate()
+
+            // This makes use of the first graph displayed but this should be fine
+            const x0 = eventData["xaxis.range[0]"];
+            const x1 = eventData["xaxis.range[1]"];
+
+            rescale(x0, x1, true)
         } 
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
+        plot.on("plotly_doubleclick", rescale)
 
         document.addEventListener("keydown", (e) => {
             if (e.key === "Shift") {
@@ -159,36 +227,87 @@ export const TimeSeries = ({
             return
         }
 
-        function handleContextMenu(event, plot) {
-            const xaxis = plot._fullLayout.xaxis;
-            const bb = event.target.getBoundingClientRect();
-            const x0 = xaxis.p2d(event.clientX - bb.left);
-            const x1 = xaxis.p2d(event.clientX - bb.left + 100);
+        /* 
+        Context-menu dispatcher
 
+            Converts the mouse click (pixel-space) to data-space coordinates (x, y) using Plotly’s axis converters.
+
+            Derives the current axis ranges (xRange, yRange) so tools can size new elements as a fraction of the view, independent of zoom level.
+    
+            information delivered to the menu is  { x, y, xScale, yScale, xRange, yRange, xLimits: [xMin, xMax], yLimits: [yMin, yMax] }
+
+            The dispatcher now auto-detects which subplot was clicked (via the element data-subplot attribute or nearest .subplot group) and 
+            picks the matching xaxisN / yaxisN, so the props are correct for any subplot.
+        */
+        function handleContextMenu(event: MouseEvent, plot) {
+            let xaxis: any // will be assigned to the subplot-specific or primary x-axis below
+            let yaxis: any  // will be assigned to the subplot-specific or primary y-axis below
+
+            const bb = (event.target as HTMLElement).getBoundingClientRect()
+            const relX = event.clientX - bb.left    // click X in pixels, relative to plot
+            const relY = event.clientY - bb.top       // click Y in pixels, relative to plot
+
+            /* 
+            determine local axes for the subplot clicked
+            Prefer the data-subplot attribute available on drag layers;
+            */
+            let subplotId = (event.target as HTMLElement).dataset.subplot // e.g. "x2y2"         
+            if (subplotId) {
+                const m = subplotId.match(/^x(\d*)y(\d*)$/)               // ['', '2', '2']
+                // m[1]/m[2] hold numeric suffixes empty string -> primary axis
+                if (m) {
+                    const suffixX = m[1] ?? ""                            // '' -> xaxis
+                    const suffixY = m[2] ?? ""                            // '' -> yaxis
+                    // Swap to subplot-specific axes if they exist
+                    xaxis = plot._fullLayout[`xaxis${suffixX}`] ?? plot._fullLayout.xaxis
+                    yaxis = plot._fullLayout[`yaxis${suffixY}`] ?? plot._fullLayout.yaxis
+                }
+            }
+            // final catch-all fallback – runs whether or not we found a subplotId 
+            xaxis = xaxis ?? plot._fullLayout.xaxis
+            yaxis = yaxis ?? plot._fullLayout.yaxis
+
+            // Coordinates in data space
+            const x      = xaxis.p2d(relX)   // data-space X at click
+            const y      = yaxis.p2d(relY)     // data-space Y at click
+            
+            // compute full data range spans from axis.range 
+            const [xMin, xMax] = xaxis.range as [number, number]  // data-space limits on x
+            const [yMin, yMax] = yaxis.range as [number, number]  // data-space limits on y
+            const xRange       = xMax - xMin    // total span on x axis
+            const yRange       = yMax - yMin    // total span on y axis
+ 
             showContextMenuRef.current({
                 event,
                 props: {
-                    x0,
-                    x1
+                    // new generic props 
+                    x, y,   // generic data-space click position
+                    xRange, yRange,  // current axis spans
+                    xLimits: [xMin, xMax], yLimits: [yMin, yMax]  // explicit axis limits
                 }
             })
+
         }
 
-        const dragElement = plot.querySelector(".drag")
+        const dragElements = plot.querySelectorAll(".drag")
 
-        if (!dragElement) {
+        if (dragElements.length === 0) {
             console.error("Could not locate drag element to assign context menu")
             return
         }
 
-        const contextHandler = (event) => { //  wrap handler so we can remove it
+        const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
             handleContextMenu(event, plot)
         } 
 
-        dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
+        dragElements.forEach((dragElement) => {
+            dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
+        })
 
         return () => { // remove listener on effect cleanup
-            dragElement.removeEventListener("contextmenu", contextHandler) 
+            dragElements.forEach((dragElement) => {
+                dragElement.removeEventListener("contextmenu", contextHandler)
+            })
         }
 
     }, [plotId, plotReady])
