@@ -4,6 +4,7 @@ from services.api.schemas.annotations import Annotation, AnnotationIn, TimePoint
 from services.api.schemas.projects import Project
 from services.api.schemas.data import Data, TimeSeriesData
 from services.api.core.data_loaders import DATA_LOADERS
+from services.api.schemas.models import ModelUpdate
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
@@ -13,10 +14,14 @@ import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader, Dataset
 import typing
+from services.api.crud.db import MongoDBClient
+from bson.objectid import ObjectId
 
 class Model(ABC):
     def __init__(
-        self, 
+        self,
+        db_client: MongoDBClient,
+        db_id: ObjectId,
         project: Project, 
         samples: list[Sample], 
         annotations: list[list[Annotation]], 
@@ -30,6 +35,8 @@ class Model(ABC):
         if not train_val_test_split[0]:
             raise ValueError("Must be samples in the training set!")
         
+        self.db_client = db_client
+        self.db_id = db_id
         self.project = project
         self.model = self._define_model()
         
@@ -73,14 +80,17 @@ class Model(ABC):
                 val_test_annotations, 
                 test_size= train_val_test_split[2] / (train_val_test_split[1] + train_val_test_split[2])
                 )
-            
+    
+    async def _update_progress(self, progress: float):
+        updated_model = ModelUpdate(progress=progress)
+        await self.db_client.update(collection="models", model=updated_model, object_id=self.db_id)
                 
     @abstractmethod
     def _define_model(self):
         pass
     
     @abstractmethod
-    def train(self, epochs: int) -> float:
+    async def train(self, epochs: int) -> float:
         # pass in list of samples and list of annotations
         # return some measure of accuracy
         pass
@@ -117,13 +127,15 @@ class TorchDataset(ABC):
 class TorchModel(Model):
     def __init__(
         self, 
+        db_client: MongoDBClient,
+        db_id: ObjectId,
         project: Project, 
         dataset: TorchDataset,
         samples: list[Sample], 
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float] = (0.7, 0.2, 0.1),
     ) -> None:
-        super().__init__(project=project, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split)
+        super().__init__(db_client=db_client, db_id=db_id, project=project, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split)
         self.dataset = dataset
         self.train_dataset = dataset(project, self.train_samples, self.train_annotations)
         self.val_dataset = dataset(project, self.val_samples, self.val_annotations) if self.val_samples else None
@@ -168,13 +180,15 @@ class DisruptionDataset(TorchDataset):
         
 class DisruptionCNN(TorchModel):
     def __init__(
-        self, 
+        self,
+        db_client: MongoDBClient,
+        db_id: ObjectId,
         project: Project, 
         samples: list[Sample], 
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float] = (0.7, 0.2, 0.1),
     ) -> None:
-        super().__init__(project=project, dataset=DisruptionDataset, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split)
+        super().__init__(db_client=db_client, db_id=db_id, project=project, dataset=DisruptionDataset, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split)
         
     def _define_model(self):
         return nn.Sequential(
@@ -193,7 +207,7 @@ class DisruptionCNN(TorchModel):
             nn.Linear(32, 1) # TODO: what if not all annotations present for all samples?
         )
         
-    def train(self, num_epochs: int, batch_size: int, patience=20, threshold=1e-4, device='cpu') -> float:
+    async def train(self, num_epochs: int, batch_size: int, patience=20, threshold=1e-4, device='cpu') -> float:        
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
         if not self.train_samples or not self.train_annotations:
@@ -264,6 +278,7 @@ class DisruptionCNN(TorchModel):
                     print(f"Epoch [{epoch + 1}/{num_epochs}]")
                     print(f"  Train Loss: {train_loss_avg:.4f}, MAE: {train_mae:.4f}, RMSE: {train_rmse:.4f}")
                     print(f"  Val   Loss: {val_loss_avg:.4f}, MAE: {val_mae:.4f}, RMSE: {val_rmse:.4f}")
+                    await self._update_progress((epoch+1) / num_epochs * 100)
 
             # --- Early stopping ---
             if val_loss_avg < best_val_loss - threshold:
@@ -302,7 +317,7 @@ class DisruptionCNN(TorchModel):
             
             print("Test Accuracy:", (sum_correct / sum_total) * 100)
                 
-        return sum_correct / sum_total
+        return (sum_correct / sum_total) * 100
     
     def predict(self, samples: list[Sample], batch_size: int, device='cpu') -> list[list[TimePoint]]:
         dataset = self.dataset(self.project, samples, annotations=None)

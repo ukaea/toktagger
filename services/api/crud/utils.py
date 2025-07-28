@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
@@ -81,13 +81,14 @@ async def get_samples(
     return samples
 
 async def get_models(
-    db_client: MongoDBClient, project_id: str, model_type: str = None, start: int = 0, end: Optional[int] = None
+    db_client: MongoDBClient, project_id: str, model_type: Optional[str] = None, status: Optional[Literal["queued", "started", "failed", "completed"]] = None, start: int = 0, end: Optional[int] = None
 ) -> list[Model]:
-    # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
     if model_type:
         filters["type"] = model_type
+    if status:
+        filters["status"] = status
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
@@ -103,14 +104,14 @@ async def get_models(
     return models
 
 async def get_model(
-    db_client: MongoDBClient, project_id: str, model_type: str, version: int = None
+    db_client: MongoDBClient, project_id: str, model_type: str, version: int = None, status: Optional[Literal["queued", "started", "failed", "completed"]] = None
 ):
-    # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id, "type": model_type}
     if version:
         filters["version"] = version
-
+    if status:
+        filters["training_status"] = status
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
@@ -123,4 +124,4 @@ async def get_model(
     if not models:
         raise HTTPException(status_code=404, detail="No models found of that version and type for this project!")
 
-    return models[0]
+    return Model(**models[0])

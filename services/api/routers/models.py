@@ -6,7 +6,7 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
 from services.api.schemas.annotations import TimeRegion
 from services.api.schemas.annotators import Annotator, FindPeaksParams
-from services.api.schemas.models import Model, ModelType
+from services.api.schemas.models import Model, ModelType, ModelIn
 from services.api.schemas.samples import Sample
 from services.api.schemas import convert_to_objectid
 from services.api.worker import run_training, run_inference
@@ -66,10 +66,10 @@ async def delete_models(
         "projects", project_obj_id
     ):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    
+    models_to_delete = await utils.get_models(db_client, project_id, model_type)
     if version:
-        models_to_delete = [await utils.get_model(db_client, project_id, model_type, version)]
-            
-        models_to_delete = await utils.get_models(db_client, project_id, model_type)
+        models_to_delete = [model for model in models_to_delete if model["version"] != version]
     
     if not models_to_delete:
         return HTTPException(status_code=404, detail=f"Version {version} of model type {model_type} not found!")
@@ -85,10 +85,13 @@ async def delete_models(
         pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model['_id']}.model").unlink()
 
 @router.get("/{model_type}/train")
-async def get_training_info(project_id: str, model_type: str):
-    # Get current status of model training
-    pass
-
+async def get_training_info(request: Request, project_id: str, model_type: str) -> Model:
+    db_client = request.app.state.db_client
+    project = await utils.get_project(db_client, project_id)
+    latest_model = await utils.get_model(db_client, project_id, model_type)
+    if latest_model.training_status not in ("queued", "started"):
+        raise HTTPException(status_code=404, detail=f"No training in progress for {model_type}")
+    return latest_model
 
 @router.put("/{model_type}/train")
 async def train_model(request: Request, project_id: str, model_type: ModelType):
@@ -98,8 +101,29 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
     if model_type not in project.model_types:
         raise HTTPException(status_code=422, detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}")
     
+    # Create model
+    # Try to get model for this project from database if it exists
+    db_models = await utils.get_models(db_client, project_id, model_type)
+    
+    if len([db_model for db_model in db_models if db_model.get("training_status") in ["queued", "started"]]) > 0:
+        raise HTTPException(status_code=409, detail=f"Training of {model_type} already in progress for this project!")
+    
+    if len(db_models) == 0:
+        # This is the first time a model has been saved for this project, so version = 1
+        version = 1
+    else:
+        version = db_models[0]["version"] + 1
+    
+    model = {"type": model_type, "version": version, "training_status": "queued", "accuracy": 0, "progress": 0}
+    model_id = await db_client.insert(
+        collection = "models",
+        model = ModelIn(**model),
+        ids = {"project_id": ObjectId(project.id)}
+    )
+    model["project_id"] = project.id
+    model["id"] = model_id
     # Start task with ID of this project? How will we know whether training is running? dont want multiple trainings at once? TODO
-    run_training.delay(project.model_dump(mode="python"), model_type)
+    run_training.delay(project.model_dump(mode="python"), model)
     pass
 
 
@@ -129,6 +153,10 @@ async def predict(
     
     if model_type not in project.model_types:
         raise HTTPException(status_code=422, detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}")
+    
+    # Find the latest created model for this project
+    model = await utils.get_model(db_client, project_id, model_type, status="completed")
+
     # Create predictions using the given model for this project
     # Predict on samples as specified by filters
     # Stores results in the database with validated=False
@@ -155,7 +183,7 @@ async def predict(
     # Convert ObjectID to string
     sample_objs = [Sample(**sample) for sample in samples]
 
-    run_inference.delay(project.model_dump(mode="python"), model_type, [sample_obj.model_dump(mode="python") for sample_obj in sample_objs])
+    run_inference.delay(project.model_dump(mode="python"), model.model_dump(mode="python"), [sample_obj.model_dump(mode="python") for sample_obj in sample_objs])
 
 
 @router.post("/predict/{sample_id}")
