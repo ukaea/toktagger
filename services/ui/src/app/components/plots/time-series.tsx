@@ -1,7 +1,7 @@
 "use client"
 
 import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { Config, Layout, Data, relayout } from "plotly.js"
+import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
 
 type InjectedProps = {
@@ -11,7 +11,7 @@ type InjectedProps = {
 }
 
 interface PlotConfiguration {
-    data: Data[],
+    data: Partial<PlotData>[],
     layout: Partial<Layout>,
     config?: Partial<Config>
 }
@@ -53,6 +53,8 @@ export const TimeSeries = ({
 
     const overplots: string[] = [];
 
+    let allowRelayout = true;
+
     const triggerToolUpdate = () => {
         setUpdateTools((current) => (current + 1) % 100)
     }
@@ -83,10 +85,76 @@ export const TimeSeries = ({
         
         setPlotReady(true)
 
-        const relayoutHandler = () => { // triggers re-render of overlay tools when axes change
+        // Sets the y axis range required for the current x range for each subplot
+        const rescale = (x0?: number, x1?: number, manualZoom = false) => {
+            if (!allowRelayout) return // Prevents relayout triggering itself
+            allowRelayout = false
+
+            // If no x range is passed, then the min/max is used
+            if (!x0) {
+                x0 = ((plot as any)._fullData[0]._extremes.x.min[0].val) as number;
+            }
+            if (!x1) {
+                x1 = ((plot as any)._fullData[0]._extremes.x.max[0].val) as number;
+            }
+            
+            // Ensure each data set is handled (ensures all subplots are zoomed correctly)
+            data.forEach((dataSet, index) => {
+                let yAxisID = ""
+
+                if (dataSet.yaxis) {
+                    // Find the y axis ID relating to this subplot
+                    const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
+                    if (locatedID) {
+                        yAxisID = locatedID
+                    }
+                }
+
+                const xArray = (dataSet as PlotData).x as number[];
+                const yArray = (dataSet as PlotData).y as number[];
+
+                // Find min and max y data values
+                const yValues: number[] = [];
+                for (let i = 0; i < xArray.length; i++) {
+                    const xVal = xArray[i];
+                    if (xVal >= x0 && xVal <= x1) {
+                        yValues.push(yArray[i]);
+                    }
+                }
+
+                if (yValues.length > 0) {
+                    const yMin = Math.min(...yValues)
+                    const yMax = Math.max(...yValues)
+
+                    const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`].range;
+                    
+                    // Only allow relayout if new yRange is smaller than previous one or if this isn't a manual zoom
+                    // This allows users to zoom in on bits of the graph accurately without it auto-scaling
+                    if (((yMax - yMin) < (previousRange[1] - previousRange[0]) || !manualZoom)) {
+                        relayout(plot, {
+                            [`yaxis${yAxisID}.range`]: [yMin, yMax]
+                        })
+                    }
+                }
+            })
+
+            // Debounce the relayout calls 
+            setTimeout(() => {
+                allowRelayout = true
+            }, 100)
+        }
+
+        const relayoutHandler = (eventData: PlotRelayoutEvent) => { // triggers re-render of overlay tools when axes change
             triggerToolUpdate()
+
+            // This makes use of the first graph displayed but this should be fine
+            const x0 = eventData["xaxis.range[0]"];
+            const x1 = eventData["xaxis.range[1]"];
+
+            rescale(x0, x1, true)
         } 
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
+        plot.on("plotly_doubleclick", rescale)
     };
 
 
@@ -202,19 +270,41 @@ export const TimeSeries = ({
     
             information delivered to the menu is  { x, y, xScale, yScale, xRange, yRange, xLimits: [xMin, xMax], yLimits: [yMin, yMax] }
 
+            The dispatcher now auto-detects which subplot was clicked (via the element data-subplot attribute or nearest .subplot group) and 
+            picks the matching xaxisN / yaxisN, so the props are correct for any subplot.
         */
         function handleContextMenu(event: MouseEvent, plot) {
-            const xaxis = plot._fullLayout.xaxis  // x-axis descriptor
-            const yaxis = plot._fullLayout.yaxis  // y-axis descriptor
+            let xaxis: any // will be assigned to the subplot-specific or primary x-axis below
+            let yaxis: any  // will be assigned to the subplot-specific or primary y-axis below
 
             const bb = (event.target as HTMLElement).getBoundingClientRect()
             const relX = event.clientX - bb.left    // click X in pixels, relative to plot
             const relY = event.clientY - bb.top       // click Y in pixels, relative to plot
 
+            /* 
+            determine local axes for the subplot clicked
+            Prefer the data-subplot attribute available on drag layers;
+            */
+            let subplotId = (event.target as HTMLElement).dataset.subplot // e.g. "x2y2"         
+            if (subplotId) {
+                const m = subplotId.match(/^x(\d*)y(\d*)$/)               // ['', '2', '2']
+                // m[1]/m[2] hold numeric suffixes empty string -> primary axis
+                if (m) {
+                    const suffixX = m[1] ?? ""                            // '' -> xaxis
+                    const suffixY = m[2] ?? ""                            // '' -> yaxis
+                    // Swap to subplot-specific axes if they exist
+                    xaxis = plot._fullLayout[`xaxis${suffixX}`] ?? plot._fullLayout.xaxis
+                    yaxis = plot._fullLayout[`yaxis${suffixY}`] ?? plot._fullLayout.yaxis
+                }
+            }
+            // final catch-all fallback – runs whether or not we found a subplotId 
+            xaxis = xaxis ?? plot._fullLayout.xaxis
+            yaxis = yaxis ?? plot._fullLayout.yaxis
+
             // Coordinates in data space
             const x      = xaxis.p2d(relX)   // data-space X at click
             const y      = yaxis.p2d(relY)     // data-space Y at click
-           
+            
             // compute full data range spans from axis.range 
             const [xMin, xMax] = xaxis.range as [number, number]  // data-space limits on x
             const [yMin, yMax] = yaxis.range as [number, number]  // data-space limits on y

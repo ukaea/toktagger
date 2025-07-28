@@ -47,7 +47,7 @@ export const LockedMode = ({ data, annotations, setAnnotations }: {data: LockedM
     let ticktext = tickvals.map(x => Math.pow(10, x));
     ticktext = ticktext.map(x => Math.round(x * 10000) / 10000);
 
-    const plotData: Plotly.Data[] = [{
+    const plotData: Partial<Plotly.PlotData>[] = [{
         name: "Saddle Coil FFT",
         type: 'heatmap',
         x: data.time,

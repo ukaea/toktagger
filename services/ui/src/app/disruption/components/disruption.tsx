@@ -34,7 +34,7 @@ export const Disruption = ({ data }: DisruptionInfo) => {
         { x: 0.3, category: disruptionCategories[0] }
     ]
 
-    const plotData: Plotly.Data[] = [
+    const plotData: Partial<Plotly.PlotData>[] = [
         {
             x: data.values['ip'].time,
             y: data.values['ip'].values,
