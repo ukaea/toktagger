@@ -84,7 +84,7 @@ export const TimeSeries = ({
         setPlotReady(true)
 
         // Sets the y axis range required for the current x range for each subplot
-        const rescale = (x0?: number, x1?: number, manualZoom = false) => {
+        const rescale = (x0?: number, x1?: number) => {
             if (!allowRelayout) return // Prevents relayout triggering itself
             allowRelayout = false
 
@@ -135,18 +135,20 @@ export const TimeSeries = ({
             // Debounce the relayout calls 
             setTimeout(() => {
                 allowRelayout = true
-            }, 1000)
+            }, 100)
         }
 
         const relayoutHandler = (eventData: PlotRelayoutEvent) => { // triggers re-render of overlay tools when axes change
             triggerToolUpdate()
 
-            // This makes use of the first graph displayed but this should be fine
-            const x0 = eventData["xaxis.range[0]"];
-            const x1 = eventData["xaxis.range[1]"];
-
-            rescale(x0, x1, true)
-        } 
+            if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+                // for zoom and pan events
+                rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"])
+            } else if ("xaxis.range" in eventData) {
+                // for range slider events
+                rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
+            }
+        }
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
 
         document.addEventListener("keydown", (e) => {
