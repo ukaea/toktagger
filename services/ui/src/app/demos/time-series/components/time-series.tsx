@@ -39,7 +39,7 @@ export const TimeSeriesDemo = ({ data }: DisruptionInfo) => {
     const time = useRef(data.map(({ time }) => time));
     const value = useRef(data.map(({ value }) => value));
 
-    const plotData: Plotly.Data[] = [
+    const plotData: Partial<Plotly.PlotData>[] = [
         {
             x: time.current,
             y: value.current,

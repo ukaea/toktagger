@@ -38,7 +38,7 @@ export const DisruptionView = ({data, annotations, setAnnotations} : DisruptionV
     };
     const zones = annotations.filter((x: Annotation) => TimeRegionSchema.safeParse(x).success).map(convertTimeRegionToZone);
 
-    const plotData: Plotly.Data[] = [
+    const plotData: Partial<Plotly.PlotData>[] = [
         {
             x: data.values['ip'].time,
             y: data.values['ip'].values,
