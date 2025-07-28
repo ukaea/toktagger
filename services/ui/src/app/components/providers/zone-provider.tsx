@@ -40,14 +40,36 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     onAddZone: CallableFunction
 }) => {
     const zones = useRef<Zone[]>([])
+    const batchedUpdateTimeout = useRef<NodeJS.Timeout | null>(null)
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
 
     const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
 
-    
+    const cleanZoneData = () => {
+        for (const zone of zones.current) {
+            if (zone.x1 < zone.x0) {
+                const temp = zone.x0
+                zone.x0 = zone.x1
+                zone.x1 = temp
+            }
+        }
+    }
+
+    // Add any code in here that requires processing after a batch of updates - such as cleaning data and publishing
+    const batchedUpdate = () => {
+        cleanZoneData()
+        setTriggerUpdate((current) => (current+1)%10) // Ensures that if the batched update changes data it is passed to UI
+    }
+
     // It is necessary for the context to trigger child refreshes
     const triggerZoneUpdate = () => {
         setTriggerUpdate((current) => (current+1)%10)
+
+        if (batchedUpdateTimeout.current !== null) {
+            clearTimeout(batchedUpdateTimeout.current)
+            batchedUpdateTimeout.current = null
+        }
+        batchedUpdateTimeout.current = setTimeout(batchedUpdate, 1000)
     }
 
     // Provides a method for child components to trigger context refresh
