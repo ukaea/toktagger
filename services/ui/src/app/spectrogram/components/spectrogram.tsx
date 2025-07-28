@@ -73,7 +73,7 @@ export const SpectrogramView = ({data, annotations, setAnnotations}: Spectrogram
     let ticktext = tickvals.map((x: number) => Math.pow(10, x));
     ticktext = ticktext.map((x: number) => Math.round(x * 10000) / 10000);
 
-    const plotData: Plotly.Data[] = [{
+    const plotData: Partial<Plotly.PlotData>[] = [{
         name: "Saddle Coil FFT",
         type: 'heatmap',
         x: data.time,

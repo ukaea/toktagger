@@ -76,7 +76,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         mode: 'lines',
     };
 
-    const plotData: Plotly.Data[] = [dataTrace, ipTrace, densityGradientTrace, powerNBITrace, t_e_coreTrace];
+    const plotData: Partial<Plotly.PlotData>[] = [dataTrace, ipTrace, densityGradientTrace, powerNBITrace, t_e_coreTrace];
 
 
     var plotLayout = {
