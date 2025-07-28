@@ -66,7 +66,7 @@ export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations}: 
             range: [minTime, maxTime],
             fixedrange: false,
             autorange: false,
-            rangeslider: { visible: true },
+            rangeslider: { visible: true, thickness: 0.1},
             title: {
                 text: 'Time [s]',
                 font: {
