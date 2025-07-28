@@ -1,5 +1,4 @@
 
-from services.api.schemas.projects import Task
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation, AnnotationIn, TimePoint
 from services.api.schemas.projects import Project
@@ -336,8 +335,7 @@ class DisruptionCNN(TorchModel):
                 label="disruption",
                 time=means[i],)]
             for i in range(len(samples))]
-    
 
 MODELS = {
-    Task.DISRUPTION: DisruptionCNN,
+    "disruption_cnn": DisruptionCNN,
 }

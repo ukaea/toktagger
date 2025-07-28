@@ -1,14 +1,17 @@
-from pydantic import Field
+from pydantic import Field, computed_field
 from enum import Enum
 from services.api.schemas import ConfiguredModel
-
-
+from typing import List
+from services.api.schemas.models import ModelType
 class Task(Enum):
     ELM = "ELM"
     DISRUPTION = "disruption"
     MHD = "MHD"
     UFO = "UFO"
-
+    
+MODELS_PER_TASK = {
+    Task.DISRUPTION: ["disruption_cnn"]
+}
 
 class QueryStrategyType(str, Enum):
     RANDOM = "random"
@@ -35,6 +38,11 @@ class ProjectIn(ConfiguredModel):
         description="The type of data which will need to be loaded for this project.",
     )
 
+    @computed_field
+    @property
+    def model_types(self) -> List[ModelType]:
+        return MODELS_PER_TASK[Task(self.task)]
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
+    

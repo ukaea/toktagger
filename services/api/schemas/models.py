@@ -4,11 +4,11 @@ from enum import Enum
 from pydantic import Field
 from services.api.schemas import ConfiguredModel
 
-class ModelTypes(Enum): # Is this needed?
-    DisruptionCNN = "DisruptionCNN"
+class ModelType(str, Enum): # Is this needed?
+    DisruptionCNN = "disruption_cnn"
 
 class ModelIn(ConfiguredModel):
-    type: ModelTypes
+    type: ModelType
     version: int
     accuracy: float
     # and whatever else we need....

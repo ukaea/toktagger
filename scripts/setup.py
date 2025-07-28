@@ -7,7 +7,7 @@ def create_project(name: str, task: str, data_loader: str) -> str:
     project = {
         "name": name,
         "task": task,
-        "query_strategy": "random",
+        "query_strategy": "uncertainty",
         "data_loader": data_loader,
     }
 

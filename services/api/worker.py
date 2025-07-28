@@ -14,6 +14,7 @@ from services.api.schemas.annotations import Annotation, AnnotationTypes, TimePo
 from services.api.schemas.models import ModelIn
 import pathlib
 import itertools
+from pydantic import TypeAdapter
 
 REDIS_HOST = os.environ["REDIS_HOST"]
 
@@ -31,7 +32,7 @@ mongo_url = os.environ["MONGO_URL"]
 #mongo_url = "mongodb://root:example@localhost:27017"
 db_name = "annotate_db"
 
-async def train_model(project: Project): # TODO: do we want to support retraining where we only get annotations not previously put into model?
+async def train_model(project: Project, model_type: str): # TODO: do we want to support retraining where we only get annotations not previously put into model?
     print(f"Running model training for project {project.id}")
     model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
     model_dir.mkdir(exist_ok=True) # Do i need to do this every time?
@@ -53,9 +54,12 @@ async def train_model(project: Project): # TODO: do we want to support retrainin
         for sample_id in sample_ids
         ]
     
+    # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
+    annotator_model = TypeAdapter(AnnotationTypes)
+    
     # Split annotations into 2D list, so annotations[idx] is a list of annotations if samples[idx]
     annotations_2d = [
-        [TimePoint(**ann) for ann in group] # TODO how to make this generic for any anntoation type?
+        [annotator_model.validate_python(ann) for ann in group]
         for key, group in itertools.groupby(
             annotations, key=lambda annotation: annotation['sample_id']
             )
@@ -64,7 +68,7 @@ async def train_model(project: Project): # TODO: do we want to support retrainin
     # Here down should have some flexibility for different models, model specific?
     
     # Get model
-    model = MODELS[Task(project.task)](project, samples, annotations_2d)
+    model = MODELS[model_type](project, samples, annotations_2d)
     # Train model
     accuracy = model.train(num_epochs=10, batch_size=32)
     
@@ -84,13 +88,13 @@ async def train_model(project: Project): # TODO: do we want to support retrainin
     # Add model to DB
     model_id = await db_client.insert(
         collection = "models",
-        model = ModelIn(type=model.__class__.__name__, version=version, accuracy=accuracy),
+        model = ModelIn(type=model_type, version=version, accuracy=accuracy),
         ids = {"project_id": ObjectId(project.id)}
     )
     # Save model with name equal to ID
     model.save(model_dir.joinpath(f"{model_id}.model"))
 
-async def get_predictions(project: Project, samples: list[Sample]):
+async def get_predictions(project: Project, model_type: str, samples: list[Sample]):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
     # Where inference is run on some batch of samples first
@@ -103,15 +107,15 @@ async def get_predictions(project: Project, samples: list[Sample]):
     db_models = await db_client.get_filtered_documents(
         collection="models",
         sort_by="version",
-        filters={"project_id": ObjectId(project.id)},
+        filters={"type": model_type, "project_id": ObjectId(project.id)},
         )
     if len(db_models) == 0:
-        raise FileNotFoundError("No model found for this project!")
+        raise FileNotFoundError(f"No model of type {model_type} found for this project!")
     
     model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{str(db_models[0]['_id'])}.model")
     
     # Load the model
-    model = MODELS[Task(project.task)].load(project, model_path) # TODO make
+    model = MODELS[model_type].load(project, model_path) # TODO make
     
     predictions = model.predict(samples, batch_size=32)
     print(predictions)
@@ -124,10 +128,9 @@ async def get_predictions(project: Project, samples: list[Sample]):
         )
     
 @app.task()
-def run_training(project: dict):
-    
-    asyncio.run(train_model(project=Project(**project)))
+def run_training(project: dict, model_type: str):
+    asyncio.run(train_model(project=Project(**project), model_type=model_type))
     
 @app.task()
-def run_inference(project: dict, samples: list[dict]):
-    asyncio.run(get_predictions(project=Project(**project), samples=[Sample(**sample) for sample in samples]))
+def run_inference(project: dict, model_type: str, samples: list[dict]):
+    asyncio.run(get_predictions(project=Project(**project), model_type=model_type, samples=[Sample(**sample) for sample in samples]))

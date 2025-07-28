@@ -55,7 +55,7 @@ def main():
     num_samples = 200
     file_path = "/data/test/mock_data.json"
     data = create_mock_data(file_path, num_samples)
-    project_id = create_project("Mock Disruption Project", "disruption", "json")
+    project_id = create_project("New Mock Disruption Project", "disruption", "json")
     # Make annotations to add at same time as sample
     annotations = {shot_id: [{"validated": True, "label": "disruption", "time": item["annotations"]["disruption"]}] for shot_id, item in data.items()}
     create_local_samples(project_id, list(range(1, num_samples+1)), base_path=file_path, file_type="json", annotations=annotations, signals=["ip"])

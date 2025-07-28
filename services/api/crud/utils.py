@@ -81,20 +81,46 @@ async def get_samples(
     return samples
 
 async def get_models(
-    db_client: MongoDBClient, project_id: str, start: int = 0, end: Optional[int] = None
+    db_client: MongoDBClient, project_id: str, model_type: str = None, start: int = 0, end: Optional[int] = None
 ) -> list[Model]:
     # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
+    filters = {"project_id": project_obj_id}
+    if model_type:
+        filters["type"] = model_type
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
     models = await db_client.get_filtered_documents(
         collection="models",
-        filters={"project_id": project_obj_id},
+        filters=filters,
         sort_by="version",
         sort_direction=-1,
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
     return models
+
+async def get_model(
+    db_client: MongoDBClient, project_id: str, model_type: str, version: int = None
+):
+    # Return a list of all samples for this project and info about them
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    filters = {"project_id": project_obj_id, "type": model_type}
+    if version:
+        filters["version"] = version
+
+    if not await db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    models = await db_client.get_filtered_documents(
+        collection="models",
+        filters=filters,
+        sort_by="version",
+        sort_direction=-1,
+    )
+    if not models:
+        raise HTTPException(status_code=404, detail="No models found of that version and type for this project!")
+
+    return models[0]
