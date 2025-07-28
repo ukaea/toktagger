@@ -46,7 +46,7 @@ export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations}: 
     // Build yaxis layout object dynamically
     const yAxesLayout = yAxisDomains.reduce((acc, domain, idx) => {
         const axisNum = idx === 0 ? '' : idx + 1; // yaxis, yaxis2, yaxis3, ...
-        acc[`yaxis${axisNum}`] = { domain };
+        acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true};
         return acc;
     }, {} as Record<string, any>);
 

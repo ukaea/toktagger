@@ -126,13 +126,9 @@ export const TimeSeries = ({
 
                     const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`].range;
                     
-                    // Only allow relayout if new yRange is smaller than previous one or if this isn't a manual zoom
-                    // This allows users to zoom in on bits of the graph accurately without it auto-scaling
-                    if (((yMax - yMin) < (previousRange[1] - previousRange[0]) || !manualZoom)) {
-                        relayout(plot, {
-                            [`yaxis${yAxisID}.range`]: [yMin, yMax]
-                        })
-                    }
+                    relayout(plot, {
+                        [`yaxis${yAxisID}.range`]: [yMin, yMax]
+                    })
                 }
             })
 
@@ -152,7 +148,7 @@ export const TimeSeries = ({
             rescale(x0, x1, true)
         } 
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
-        plot.on("plotly_doubleclick", rescale)
+        // plot.on("plotly_doubleclick", rescale)
 
         document.addEventListener("keydown", (e) => {
             if (e.key === "Shift") {
