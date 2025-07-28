@@ -95,6 +95,8 @@ export const TimeSeries = ({
             if (!x1) {
                 x1 = ((plot as any)._fullData[0]._extremes.x.max[0].val) as number;
             }
+
+            let yAxesRanges = {};
             
             // Ensure each data set is handled (ensures all subplots are zoomed correctly)
             data.forEach((dataSet, index) => {
@@ -123,19 +125,17 @@ export const TimeSeries = ({
                 if (yValues.length > 0) {
                     const yMin = Math.min(...yValues)
                     const yMax = Math.max(...yValues)
+                    yAxesRanges = {...yAxesRanges, [`yaxis${yAxisID}.range`]: [yMin, yMax]}
 
-                    const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`].range;
-                    
-                    relayout(plot, {
-                        [`yaxis${yAxisID}.range`]: [yMin, yMax]
-                    })
                 }
             })
+            
+            relayout(plot, yAxesRanges);
 
             // Debounce the relayout calls 
             setTimeout(() => {
                 allowRelayout = true
-            }, 100)
+            }, 1000)
         }
 
         const relayoutHandler = (eventData: PlotRelayoutEvent) => { // triggers re-render of overlay tools when axes change
@@ -148,7 +148,6 @@ export const TimeSeries = ({
             rescale(x0, x1, true)
         } 
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
-        // plot.on("plotly_doubleclick", rescale)
 
         document.addEventListener("keydown", (e) => {
             if (e.key === "Shift") {
