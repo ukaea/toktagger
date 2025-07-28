@@ -2,7 +2,7 @@
 import { use, useState, useEffect } from 'react';
 import {Provider, defaultTheme, Breadcrumbs, Item, ToastContainer} from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample } from '@/types';
-import { ELMView } from '@/app/elms/components/elms';
+import { MultiVariateTimeSeriesView } from '@/app/time_series/components/time_series';
 import { SpectrogramView } from '@/app/spectrogram/components/spectrogram';
 import { DisruptionView } from '@/app/disruption/components/disruption';
 import ToolBar from '@/app/components/tools/toolbar';
@@ -32,9 +32,9 @@ type SampleViewInfo = {
 
 const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo) => {
   if (project.task == 'disruption') {
-    return (<DisruptionView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    return (<MultiVariateTimeSeriesView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'ELM') {
-    return (<ELMView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    return (<MultiVariateTimeSeriesView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'MHD') {
     return (<SpectrogramView data={data.values['mirnov']} annotations={annotations} setAnnotations={setAnnotations}/>);
   }

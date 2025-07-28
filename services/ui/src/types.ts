@@ -29,7 +29,7 @@ export const TimeSeriesDataSchema = z.object({
   time: z.array(z.number()),
   values: z.array(z.number())
 });
-export type TimeSeriesDataSchema = z.infer<typeof TimeSeriesDataSchema>;
+export type TimeSeriesData = z.infer<typeof TimeSeriesDataSchema>;
 
 
 export const MultiVariateTimeSeriesDataSchema = z.object({

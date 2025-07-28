@@ -107,8 +107,9 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
 
   let tools = [];
 
-  if (project.task == 'ELM') {
-    const labels = ['No ELMs', 'Type I', 'Type II', 'Type III'];
+  if (project.task == 'ELM' || project.task == 'disruption') {
+
+    const labels = (project.task == 'ELM') ? ['No ELMs', 'Type I', 'Type II', 'Type III'] : ['No Disruptions', 'Disruption'];
     tools.push({
       name: 'Shot Labels',
       component: (
