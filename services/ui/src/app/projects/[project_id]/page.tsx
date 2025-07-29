@@ -14,11 +14,7 @@ export const SampleBreadCrumbs = (info) => {
   );
 };
 
-type SampleTableInfo = {
-  project_id: Promise<string>;
-};
-
-export const SamplesTable = ({project_id}: SampleTableInfo) => {
+export const SamplesTable = ({project_id}: {project_id: string}) => {
   const samples = getSamples(project_id);
 
   if (!samples) {
@@ -33,6 +29,7 @@ export const SamplesTable = ({project_id}: SampleTableInfo) => {
   return (
     <Provider theme={defaultTheme}>
       <TableView
+      aria-label="Samples"
       selectionMode="none"
       selectionStyle="highlight"
       >
@@ -59,6 +56,7 @@ type ProjectViewInfo = {
 
 export default function ProjectView({params} : ProjectViewInfo) {
   const project_id = use(params).project_id;
+  console.log('Project ID:', project_id);
   const project = getProject(project_id);
 
   if (!project) {

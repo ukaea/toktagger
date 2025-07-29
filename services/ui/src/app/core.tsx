@@ -1,9 +1,10 @@
 "use client";
+import { Data, Project, Sample, ViewParams } from '@/types';
 import { useEffect, useState } from 'react';
 
 
 export const getURL = (url: string) => {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Data | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -18,8 +19,8 @@ export const getURL = (url: string) => {
   return data;
 }
 
-export const getSamples = (project_id: string) => {
-  const [samples, setSamples] = useState<any>(null);
+export const getSamples = (project_id: string): Sample[] | null => {
+  const [samples, setSamples] = useState<Sample[] | null>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,8 +35,8 @@ export const getSamples = (project_id: string) => {
   return samples;
 } 
 
-export const getSample = (project_id: string, sample_id: string) => {
-  const [sample, setSample] = useState<any>(null);
+export const getSample = (project_id: string, sample_id: string): Sample | null => {
+  const [sample, setSample] = useState<Sample | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,8 +51,8 @@ export const getSample = (project_id: string, sample_id: string) => {
   return sample;
 } 
 
-export const getProjects = (project_id: string) => {
-  const [projects, setProjects] = useState<any>(null);
+export const getProjects = (): Project[] | null => {
+  const [projects, setProjects] = useState<Project[] | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,8 +67,8 @@ export const getProjects = (project_id: string) => {
   return projects;
 } 
 
-export const getProject = (project_id: string) => {
-  const [project, setProject] = useState<any>(null);
+export const getProject = (project_id: string): Project | null => {
+  const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -82,8 +83,8 @@ export const getProject = (project_id: string) => {
   return project;
 } 
 
-export const getSampleData = (project_id: string, sample_id: string, viewParams) => {
-  const [sampleData, setSampleData] = useState<any>(null);
+export const getSampleData = (project_id: string, sample_id: string, viewParams: ViewParams): Sample | null => {
+  const [sampleData, setSampleData] = useState<Sample | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {

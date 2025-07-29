@@ -89,7 +89,7 @@ export const SampleSchema = z.object({
   _id: z.string(),
   project_id: z.string(),
   shot_id: z.number(),
-  data: z.record(DataSchema)
+  data: z.record(z.string(), DataSchema)
 }); 
 export type Sample = z.infer<typeof SampleSchema>;
 

@@ -25,7 +25,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }: F
     };
 
     useEffect(() => {
-        if (data && (signalName in data.values)) {
+        if (data && (!signalName && signalName in data.values)) {
             const time = data.values[signalName].time;
             const tmin = Math.min(...time);
             const tmax = Math.max(...time)
@@ -36,7 +36,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }: F
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null && !(signalName in data.values)) {
+            if (signalName === null || !(signalName in data.values)) {
                 return;
             }
 
@@ -59,7 +59,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }: F
         };
 
         fetchData();
-    }, [prominence, distance, timeRange, signalName]);
+    }, [project_id, sample_id, prominence, distance, timeRange, signalName]);
 
 
 
@@ -68,7 +68,7 @@ export function FindPeaksTool({ project_id, sample_id, data, setAnnotations }: F
             <Header>Find Peaks</Header>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true} placeholder="None selected">
+                <ComboBox defaultItems={signalOptions} onInputChange={setSignalName} label="Signal Name">
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

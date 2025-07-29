@@ -1,7 +1,7 @@
 "use client";
 import { use, useState, useEffect } from 'react';
 import {Provider, defaultTheme, Breadcrumbs, Item, ToastContainer} from '@adobe/react-spectrum'
-import { Annotations, CompositeDataSchema, Data, MultiVariateTimeSeriesDataSchema, Project, Sample, SpectrogramDataSchema, ViewParams } from '@/types';
+import { Annotations, CompositeDataSchema, Data, MultiVariateTimeSeriesDataSchema, Project, Sample, SpectrogramDataSchema, SpectrogramViewParams, ViewParams } from '@/types';
 import { ELMView } from '@/app/elms/components/elms';
 import { SpectrogramView } from '@/app/spectrogram/components/spectrogram';
 import { DisruptionView } from '@/app/disruption/components/disruption';
@@ -32,41 +32,53 @@ type SampleViewInfo = {
 
 const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo) => {
   if (project.task == 'disruption') {
-    data = MultiVariateTimeSeriesDataSchema.parse(data);
-    return (<DisruptionView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    data = MultiVariateTimeSeriesDataSchema.safeParse(data);
+    if (!data.success) {
+      throw new Error('Invalid data for disruption view');
+    }
+    return (<DisruptionView data={data.data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'ELM') {
-    data = MultiVariateTimeSeriesDataSchema.parse(data);
-    return (<ELMView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    data = MultiVariateTimeSeriesDataSchema.safeParse(data);
+    if (!data.success) {
+      throw new Error('Invalid data for ELM view');
+    }
+    return (<ELMView data={data.data} annotations={annotations} setAnnotations={setAnnotations} />);
   } else if (project.task == 'MHD') {
-    data = CompositeDataSchema.parse(data)
-    let mhdData = SpectrogramDataSchema.parse(data.values['mirnov']);
-    return (<SpectrogramView data={mhdData} annotations={annotations} setAnnotations={setAnnotations}/>);
+    data = CompositeDataSchema.safeParse(data);
+    if (!data.success) {
+      throw new Error('Invalid data for MHD view');
+    }
+    const mhdData = SpectrogramDataSchema.safeParse(data.data.values['mirnov']);
+    if (!mhdData.success) {
+      throw new Error('Invalid data for MHD view');
+    }
+    return (<SpectrogramView data={mhdData.data} annotations={annotations} setAnnotations={setAnnotations} />);
   }
 }
 
-export async function getData(url: string): Promise<Data> {
-    const response = await fetch(url);
-    const payload = await response.json();
-    return payload;
+export async function getData<T>(url: string): T {
+  const response = await fetch(url);
+  const payload = await response.json();
+  return payload as T;
 }
 
-async function getSample(project_id: string, sample_id: string): Promise<Sample> {
-    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
+async function getSample(project_id: string, sample_id: string): Sample {
+  return await getData<Sample>(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
 }
 
-async function getProject(project_id: string):  Promise<Project> {
-    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+async function getProject(project_id: string):  Project {
+  return await getData<Project>(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
 }
 
-async function getAnnotations(project_id: string, sample_id: string): Promise<Annotations> {
-    return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
+async function getAnnotations(project_id: string, sample_id: string): Annotations {
+  return await getData<Annotations>(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`);
 }
 
 type SamplePageInfo = {
-  params: Promise<{ project_id: string, sample_id: string }>;
+  params: { project_id: string, sample_id: string };
 };
 
-export default function SamplePage({ params }: SamplePageInfo) {
+export default function SamplePage({ params }: Promise<SamplePageInfo>) {
   const props = use(params);
   const project_id = props.project_id;
   const sample_id = props.sample_id;
@@ -75,9 +87,9 @@ export default function SamplePage({ params }: SamplePageInfo) {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
-  const [viewParams, setViewParams] = useState<ViewParams>({name: 'identity'});
+  const viewParams = {name: 'identity'} as ViewParams;
 
-  const refreshData = async ( viewParams: ViewParams ) => {
+  const refreshData = async ( params: ViewParams ) => {
     const project = await getProject(project_id);
     setProject(project);
 
@@ -88,8 +100,7 @@ export default function SamplePage({ params }: SamplePageInfo) {
     setAnnotations(dbAnnotations);
     
     if (project.task == 'MHD') {
-      viewParams.name = 'spectrogram';
-      viewParams.nperseg = 256;
+      params = {...params, name: 'spectrogram', nperseg: 256} as SpectrogramViewParams;
     }
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
@@ -97,7 +108,7 @@ export default function SamplePage({ params }: SamplePageInfo) {
         headers: {
         'Content-Type': 'application/json',
         },
-        body: JSON.stringify(viewParams),
+        body: JSON.stringify(params),
     });
     const data: Data = await response.json();
     setData(data);
@@ -108,9 +119,9 @@ export default function SamplePage({ params }: SamplePageInfo) {
       await refreshData(viewParams);
     }
     run();
-  }, [viewParams]);
+  }, []);
 
-  if (!data) {
+  if (!data || !project || !sample) {
     return;
   }
 

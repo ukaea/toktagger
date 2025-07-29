@@ -1,6 +1,7 @@
 "use client";
 import { ViewParams } from '@/types';
-import { RangeSlider, RangeValue } from '@adobe/react-spectrum'
+import { RangeSlider } from '@adobe/react-spectrum'
+import { RangeValue } from '@react-types/shared';
 import { useEffect, useState } from 'react';
 
 type DataRangeSliderInfo = {
@@ -28,8 +29,8 @@ export function DataRangeSlider({ name, data, onChange, getValueLabel}: DataRang
 
     return (
         <div className='m-4'>
-            <RangeSlider label={name} defaultValue={{ start: timeMinDefault, end: timeMaxDefault }} value={timeRange} onChange={setTimeRange} onChangeEnd={onChange} step={0.001} 
-            minValue={timeMinDefault} maxValue={timeMaxDefault} getValueLabel={getValueLabel}/>
+            <RangeSlider label={name} defaultValue={{ start: timeMinDefault || 0, end: timeMaxDefault || 0}} value={timeRange} onChange={setTimeRange} onChangeEnd={onChange} step={0.001} 
+                minValue={timeMinDefault} maxValue={timeMaxDefault} getValueLabel={getValueLabel}/>
         </div>
     );
 }

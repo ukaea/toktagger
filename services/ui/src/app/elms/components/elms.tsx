@@ -1,5 +1,5 @@
 'use client'
-import { MultiVariateTimeSeriesData, Zone, Category, DisplayAnnotation, ZoneSchema, TimeRegionSchema, Annotation } from "@/types"
+import { MultiVariateTimeSeriesData, Zone, Category, DisplayAnnotation, ZoneSchema, TimeRegionSchema, Annotations } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
@@ -20,8 +20,8 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>((acc, c
 
 type ELMViewInfo = {
     data: MultiVariateTimeSeriesData, 
-    annotations: Annotation, 
-    setAnnotations: (annotations: Annotation) => void
+    annotations: Annotations, 
+    setAnnotations: (annotations: Annotations) => void
 };
 
 export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
@@ -33,14 +33,14 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
     }
 
-    var dataTrace = {
+    const dataTrace: Partial<Plotly.PlotData> = {
         name: 'Dalpha',
         x: data.values.dalpha.time,
         y: data.values.dalpha.values,
         mode: 'lines',
     };
 
-    var ipTrace = {
+    const ipTrace: Partial<Plotly.PlotData> = {
         name: 'Ip',
         x: data.values.ip.time,
         y: data.values.ip.values,
@@ -49,7 +49,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         mode: 'lines',
     };
 
-    var powerNBITrace = {
+    const powerNBITrace: Partial<Plotly.PlotData> = {
         name: 'NBI Power',
         x: data.values.power_nbi.time,
         y: data.values.power_nbi.values,
@@ -58,7 +58,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         mode: 'lines',
     };
 
-    var densityGradientTrace = {
+    const densityGradientTrace: Partial<Plotly.PlotData> = {
         name: 'Density Gradient',
         x: data.values.density_gradient.time,
         y: data.values.density_gradient.values,
@@ -67,7 +67,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         mode: 'lines',
     };
 
-    var t_e_coreTrace = {
+    const t_e_coreTrace: Partial<Plotly.PlotData> = {
         name: 'Te Core',
         x: data.values.t_e_core.time,
         y: data.values.t_e_core.values,
@@ -79,7 +79,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
     const plotData: Partial<Plotly.PlotData>[] = [dataTrace, ipTrace, densityGradientTrace, powerNBITrace, t_e_coreTrace];
 
 
-    var plotLayout = {
+    const plotLayout: Partial<Plotly.Layout> = {
         uirevision: 'true',
         grid: {rows: 5, columns: 1, pattern: 'independent'},
         dragmode: false,  // Disable default drag behavior
@@ -199,7 +199,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
                 <ContextMenuProvider menuId="elm-menu">
                     <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
                         <TimeSeries plotId="ELMs" plotConfig={{data: plotData, layout: plotLayout}}>
-                            <Zones />
+                            <Zones onZoneUpdate={updateZones}/>
                         </TimeSeries>
                     </ZoneProvider>
                 </ContextMenuProvider>

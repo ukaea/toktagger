@@ -9,16 +9,7 @@ import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import { VSpans } from "@/app/components/tools/vspans"
 import * as d3 from "d3"
-import { createAnnotationToDisplayAnnotationFunc, updateAnnotations } from "@/app/utils"
-
-const linspace = (start: number, end: number, num: number) => {
-    const step = (end - start) / (num - 1)
-    const arr = []
-    for (let i = 0; i < num; i++) {
-        arr.push(start + step * i)
-    }
-    return arr
-}
+import { createAnnotationToDisplayAnnotationFunc, updateAnnotations, linspace } from "@/app/utils"
 
 const lockedModeCategories: Category[] = [
     { name: "Locked Mode", color: "rgb(255, 0, 0)" },
@@ -132,7 +123,7 @@ export const SpectrogramView = ({data, annotations, setAnnotations}: Spectrogram
         displaylogo: false,
         displayModeBar: true,
         scrollZoom: false,
-        modeBarButtonsToRemove: ['pan'],
+        modeBarButtonsToRemove: ['pan2d'],
     }
 
 
@@ -142,8 +133,8 @@ export const SpectrogramView = ({data, annotations, setAnnotations}: Spectrogram
                 <VSpanProvider categories={lockedModeCategories} initialData={vspans} onModifyVSpan={updateVSpans}>
                     <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
                         <TimeSeries plotId="LockedMode" plotConfig={{ data: plotData, config: plotConfig, layout: plotLayout }} >
-                            <Zones />
-                            <VSpans />
+                            <Zones onZoneUpdate={updateZones} />
+                            <VSpans onZoneUpdate={updateVSpans} />
                         </TimeSeries>
                         <SpectrogramViewTable />
                     </ZoneProvider>
