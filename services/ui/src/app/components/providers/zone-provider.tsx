@@ -130,7 +130,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
             registerMenuItem("zone", menuElement)
 
-        }, [categories, registerMenuItem])
+        }, [addZone, categories, registerMenuItem])
 
     // Initialisation of data - this should only run once
     // Effect: run ONCE per mount to populate from initialData

@@ -88,7 +88,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
                     const x = xaxis.p2d(newX); // The context provider stores the decimal value rather than pixel
                     d.x = x;
                     handleVSpanUpdate() // Global refresh must be triggered to update all linked plots
-                }).on("end", function(event, d) {
+                }).on("end", function(_event, _d) {
                     handleVSpanDragFinish();  
                 })
 

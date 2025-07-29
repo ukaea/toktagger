@@ -116,7 +116,7 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
                     </Submenu>
                 )
         registerMenuItem("vspan", menuElement)
-    }, [categories, registerMenuItem])
+    }, [categories, onModifyVSpan, registerMenuItem])
 
     // Initialisation of data - this should only run once
     useEffect(() => {

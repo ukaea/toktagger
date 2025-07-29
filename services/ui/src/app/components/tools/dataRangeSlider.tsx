@@ -24,7 +24,7 @@ export function DataRangeSlider({ name, data, onChange, getValueLabel}: DataRang
             setTimeMaxDefault(tmax);
             setTimeRange({start: tmin, end: tmax});
         }
-    }, [data]);
+    }, [data, timeMinDefault]);
 
     return (
         <div className='m-4'>
