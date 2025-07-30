@@ -88,5 +88,6 @@ export type ToolingProps = {
   plotId?: string;
   plotReady?: boolean;
   forceUpdate?: number;
+  selectedXRange?: { start: number; end: number } | null;
   onZoneUpdate: CallableFunction;
 };

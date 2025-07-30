@@ -1,8 +1,10 @@
 "use client"
 
 import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
+import { Config, Layout, PlotData, relayout, PlotRelayoutEvent, restyle, update } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
+import { set } from "zod/v4"
+import { tr } from "zod/v4/locales"
 
 type InjectedProps = {
     plotId: string;
@@ -34,6 +36,7 @@ export const TimeSeries = ({
         data,
         layout,
         config = {
+            modeBarButtons: [['toImage', 'zoom2d', 'select2d', 'pan2d','autoScale2d', 'resetScale2d']],
             displaylogo: false,
             displayModeBar: true,
             scrollZoom: true
@@ -41,6 +44,7 @@ export const TimeSeries = ({
     }, 
     children
 } : DisruptionPlotProps) => {
+    const [selectedXRange, setSelectedXRange] = useState<{ start: number; end: number } | null>(null)
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
 
@@ -150,6 +154,18 @@ export const TimeSeries = ({
             }
         }
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
+        plot.on('plotly_selected', function(eventData) {
+            if (eventData && eventData.range) {
+                console.log("Selected range:", eventData.range);
+                const [start, end] = eventData.range.x;
+                setSelectedXRange({ start, end });
+                setUpdateTools(undefined);
+                relayout(plot, {selections: []});
+            }
+        });
+        plot.on('plotly_deselect', function(eventData) {
+            setSelectedXRange(null);
+        });
 
         document.addEventListener("keydown", (e) => {
             if (e.key === "Shift") {
@@ -309,6 +325,8 @@ export const TimeSeries = ({
 
     }, [plotId, plotReady])
 
+    console.log(selectedXRange, "Selected X Range");
+
     return (
         <div className="w-full px-6 py-3 space-y-3 flex-col">
             {/* Div where plot is inserted */}
@@ -317,7 +335,7 @@ export const TimeSeries = ({
                 {React.Children.map(children, child => {
                     return (
                         React.isValidElement(child)
-                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools })
+                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools, selectedXRange})
                         : child
                     )
                 })}

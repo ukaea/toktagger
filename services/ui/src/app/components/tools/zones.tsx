@@ -15,6 +15,7 @@ export const Zones = ({
     plotId,  
     plotReady, 
     forceUpdate,
+    selectedXRange,
 } : ToolingProps) => {
     const dragOffset = useRef(0)
 
@@ -126,8 +127,15 @@ export const Zones = ({
 
             // Create the zone and transparent handles on each boundary
             for (const zone of zones) {
+                let opacity = 0.5;
+                
                 const x0 = xaxis.d2p(zone.x0);
                 const x1 = xaxis.d2p(zone.x1);
+
+                if (selectedXRange && (zone.x0 > selectedXRange.start && zone.x1 < selectedXRange.end)) {
+                    opacity = 1.0;
+                }
+
                 graphGroup.append("rect")
                     .attr("class", "zone span cursor-grab disable-on-shift")
                     .attr("x", x0)
@@ -136,7 +144,7 @@ export const Zones = ({
                     .attr("height", height)
                     .attr("fill", zone.category.color)
                     .attr("stroke", "black")
-                    .attr("opacity", 0.5)
+                    .attr("opacity", opacity)
                     .attr("style", "pointer-events: all")
                     .style("cursor", "move")
                     .datum(zone)
@@ -169,7 +177,7 @@ export const Zones = ({
             }
         }))
         
-    }, [handleZoneUpdate, plotId, plotReady, showZoneMenu, zones, triggerUpdate, forceUpdate])
+    }, [handleZoneUpdate, plotId, plotReady, showZoneMenu, zones, triggerUpdate, forceUpdate, selectedXRange])
 
     return (
         <div />
