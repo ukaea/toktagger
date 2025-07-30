@@ -4,7 +4,7 @@ export const BaseAnnotationSchema = z.object({
   timestamp: z.string().optional(),
   validated: z.boolean().optional(),
   uncertainty: z.number().optional(),
-  label: z.string()
+  label: z.string(),
 });
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 
@@ -13,7 +13,6 @@ export const TimeRegionSchema = BaseAnnotationSchema.extend({
   time_max: z.number(),
 });
 export type TimeRegion = z.infer<typeof TimeRegionSchema>;
-
 
 export const TimePointSchema = BaseAnnotationSchema.extend({
   time: z.number(),
@@ -26,31 +25,35 @@ export type Annotation = z.infer<typeof AnnotationSchema>;
 export const AnnotationsSchema = z.array(AnnotationSchema);
 export type Annotations = z.infer<typeof AnnotationsSchema>;
 
-
 export const TimeSeriesDataSchema = z.object({
   time: z.array(z.number()),
-  values: z.array(z.number())
+  values: z.array(z.number()),
 });
 export type TimeSeriesData = z.infer<typeof TimeSeriesDataSchema>;
 
-
 export const MultiVariateTimeSeriesDataSchema = z.object({
-  values: z.record(z.string(), TimeSeriesDataSchema)
+  values: z.record(z.string(), TimeSeriesDataSchema),
 });
-export type MultiVariateTimeSeriesData = z.infer<typeof MultiVariateTimeSeriesDataSchema>;
+export type MultiVariateTimeSeriesData = z.infer<
+  typeof MultiVariateTimeSeriesDataSchema
+>;
 
 export const SpectrogramDataSchema = z.object({
   time: z.array(z.number()),
   frequency: z.array(z.number()),
-  amplitude: z.array(z.array(z.number()))
+  amplitude: z.array(z.array(z.number())),
 });
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 
-export const DataSchema = z.union([TimeSeriesDataSchema, MultiVariateTimeSeriesDataSchema, SpectrogramDataSchema]);
+export const DataSchema = z.union([
+  TimeSeriesDataSchema,
+  MultiVariateTimeSeriesDataSchema,
+  SpectrogramDataSchema,
+]);
 export type Data = z.infer<typeof DataSchema>;
 
 export const CompositeDataSchema = z.object({
-  values: z.record(z.string(), DataSchema)
+  values: z.record(z.string(), DataSchema),
 });
 export type CompositeData = z.infer<typeof CompositeDataSchema>;
 
@@ -63,7 +66,7 @@ export type Category = z.infer<typeof CategorySchema>;
 export const ZoneSchema = z.object({
   category: CategorySchema,
   x0: z.number(),
-  x1: z.number()
+  x1: z.number(),
 });
 export type Zone = z.infer<typeof ZoneSchema>;
 
@@ -81,20 +84,22 @@ export const ProjectSchema = z.object({
   name: z.string(),
   task: z.string(),
   query_strategy: z.string(),
-  data_loader: z.string()
-}); 
+  data_loader: z.string(),
+  timestamp: z.string(),
+});
 export type Project = z.infer<typeof ProjectSchema>;
 
 export const SampleSchema = z.object({
   _id: z.string(),
+  timestamp: z.string(),
   project_id: z.string(),
   shot_id: z.number(),
-  data: z.record(z.string(), DataSchema)
-}); 
+  data: z.record(z.string(), DataSchema),
+});
 export type Sample = z.infer<typeof SampleSchema>;
 
 export const ViewParamsSchema = z.object({
-  name: z.string()
+  name: z.string(),
 });
 export type ViewParams = z.infer<typeof ViewParamsSchema>;
 
