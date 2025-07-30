@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from services.api.crud import utils
-from services.api.schemas.samples import Sample
-from services.api.schemas.annotators import Annotator
-from services.api.schemas.annotations import AnnotationIn, Annotation, AnnotationTypes
+from services.api.schemas.annotations import AnnotationTypes
 from services.api.schemas import convert_to_objectid
 
 router = APIRouter(
@@ -13,7 +11,7 @@ router = APIRouter(
 
 @router.get(
     "/annotations",
-    response_model=list[Annotation],
+    response_model=list[AnnotationTypes],
     responses={
         200: {"description": "Annotations for this project returned successfully."},
         404: {"description": "Project not found with that ID."},
@@ -36,7 +34,7 @@ async def get_all_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
-) -> list[Annotation]:
+) -> list[AnnotationTypes]:
     """
     Retrieve all annotations for this project, subject to specified filters.
     ------------------------------------------------------------------------
@@ -45,7 +43,9 @@ async def get_all_annotations(
     annotations = await utils.get_annotations(
         db_client, project_id, validated, start, end
     )
-    print(annotations)
+    for annotation in annotations:
+        print(annotation)
+
     return annotations
 
 
@@ -101,7 +101,7 @@ async def get_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
-) -> list[Annotation]:
+) -> list[AnnotationTypes]:
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
     # Should return whether these are validated as a boolean
@@ -129,7 +129,6 @@ async def get_annotations(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
-    print(_annotations)
 
     return _annotations
 
@@ -176,6 +175,14 @@ async def add_annotations(
 
     if len(annotations) == 0:
         return []
+
+    for annotation in annotations:
+        if annotation.project_id is None:
+            annotation.project_id = project_id
+        if annotation.sample_id is None:
+            annotation.sample_id = sample_id
+
+    print(annotations)
 
     return await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids

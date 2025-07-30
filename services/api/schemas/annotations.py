@@ -9,6 +9,8 @@ class AnnotationIn(ConfiguredModel):
     created_by: AnnotatorIds
     validated: bool = False
     uncertainty: Optional[float] = None
+    project_id: Optional[str] = None
+    sample_id: Optional[str] = None
 
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
@@ -18,6 +20,10 @@ class AnnotationIn(ConfiguredModel):
             values["uncertainty"] = 1
 
         return values
+
+
+class Annotation(AnnotationIn):
+    id: str = Field(..., alias="_id")
 
 
 class ClassLabel(AnnotationIn):
@@ -45,12 +51,6 @@ class BoundingBox(AnnotationIn):
 class VideoBoundingBox(BoundingBox):
     type: Literal["video_bounding_box"] = "video_bounding_box"
     frame: int
-
-
-class Annotation(AnnotationIn):
-    id: str = Field(..., alias="_id")
-    project_id: str
-    sample_id: str
 
 
 class ModelAnnotation(AnnotationIn):
