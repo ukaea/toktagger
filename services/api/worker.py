@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from services.api.crud.db import MongoDBClient
 from bson.objectid import ObjectId
 import asyncio
+from services.api.crud import utils
 from services.api.core.models import MODELS, DisruptionCNN
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.views import DATA_VIEWS
@@ -40,28 +41,23 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         
         db_client = MongoDBClient(mongo_url, db_name)
         
-        # Wrap these db queries into a helper function?
         # Get all annotations for this project
-        annotations = await db_client.get_filtered_documents(
-            collection="annotations",
-            sort_by="sample_id",
-            filters={"project_id": ObjectId(project.id), "validated": True},
-            )
+        annotations = await utils.get_annotations(db_client, project.id, validated=True)
             
         # Get list of samples which these annotations correspond to
         sample_ids = set([annotation["sample_id"] for annotation in annotations])
         samples = [
-            Sample(**await db_client.get_document_by_id(collection="samples", object_id=ObjectId(sample_id)))
+            await utils.get_sample(db_client, sample_id)
             for sample_id in sample_ids
             ]
         
         # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
         annotator_model = TypeAdapter(AnnotationTypes)
         
-        # Split annotations into 2D list, so annotations[idx] is a list of annotations if samples[idx]
+        # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
         annotations_2d = [
             [annotator_model.validate_python(ann) for ann in group]
-            for key, group in itertools.groupby(
+            for _, group in itertools.groupby(
                 annotations, key=lambda annotation: annotation['sample_id']
                 )
             ]
@@ -69,16 +65,21 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         # Get model
         ml_model = MODELS[model.type](db_client, ObjectId(model.id), project, samples, annotations_2d)
         
-        await db_client.update(collection="models", model=ModelUpdate(training_status="started"), object_id=ObjectId(model.id))
+        # Set DB entry to show job has left the celery queue, and training has started
+        await utils.update_model(db_client, model.id, ModelUpdate(training_status="started"))
+        
         # Train model
         accuracy = await ml_model.train(num_epochs=10, batch_size=32)
         
-        # Save model with name equal to ID
+        # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
         ml_model.save(model_dir.joinpath(f"{model.id}.model"))
-        await db_client.update(collection="models", model=ModelUpdate(training_status="completed", accuracy=accuracy, progress=100), object_id=ObjectId(model.id))
+        await utils.update_model(db_client, model.id, ModelUpdate(training_status="completed", accuracy=accuracy, progress=100))
     
     except Exception as e:
-        await db_client.update(collection="models", model=ModelUpdate(training_status="failed"), object_id=ObjectId(model.id))
+        # If anything goes wrong, update model to failed status
+        # This is important as if this does not happen, your model will be stuck in 'training' forever,
+        # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
+        await utils.update_model(db_client, model.id, ModelUpdate(training_status="failed"))
         raise e
 
 async def get_predictions(project: Project, model: Model, samples: list[Sample]):
@@ -90,15 +91,15 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
     # Create db connection - TODO should this be here or at a per worker / per session level?
     db_client = MongoDBClient(mongo_url, db_name)
     
+    # Load the model from the weights stored during training
     model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{str(model.id)}.model")
-    
-    # Load the model
     ml_model = MODELS[model.type].load(project, model_path)
     
     predictions = ml_model.predict(samples, batch_size=32)
-    print(predictions)
+    
     
     for i, sample in enumerate(samples):
+        # Insert prediction annotations for each sample into the database
         await db_client.insert_many(
             collection="annotations",
             models = predictions[i],

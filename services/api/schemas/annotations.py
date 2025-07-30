@@ -1,5 +1,6 @@
 from typing import Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
+from services.api.schemas.models import ModelType
 from pydantic import Field, model_validator
 
 
@@ -16,6 +17,7 @@ class AnnotationIn(ConfiguredModel):
     validated: bool = False
     uncertainty: Optional[float] = None
     label: str
+    created_by: ModelType # TODO: this should also contain annotators
 
 
 class TimePoint(AnnotationIn):

@@ -185,43 +185,29 @@ async def predict(
 
     run_inference.delay(project.model_dump(mode="python"), model.model_dump(mode="python"), [sample_obj.model_dump(mode="python") for sample_obj in sample_objs])
 
-
-@router.post("/predict/{sample_id}")
-async def predict_sample(
+@router.delete("/{model_type}/predict")
+async def delete_predictions(
     request: Request,
-    project_id: str,
-    model_id: str,
-    sample_id: str,
-    params: FindPeaksParams,
-) -> list[TimeRegion]:
+    project_id: str = Path(description="The ID of the project to get models for."),
+    model_type: ModelType = Path(description="The type of model to delete predictions from."),
+    ):
     db_client = request.app.state.db_client
-
-    project = await utils.get_project(db_client, project_id)
-    sample = await utils.get_sample(db_client, sample_id)
-
-    data_loader = DATA_LOADERS[project.data_loader]()
-    data_item = data_loader.get_sample(sample)
-
-    tagger = FindPeaksAnnotator(params)
-    annotations = tagger.predict(data_item)
-
-    return annotations
-
-
-@router.get("/{model_id}/predict")
-async def get_predictions(
-    request: Request, project_id: str, model_id: str, params: Annotator
-):
-    # Get predictions made using the given model for this project
-    # Predict on samples as specified by filters
-    pass
-
-
-@router.delete("/{model_id}/predict")
-async def delete_predictions(project_id: str, model_id: str):
     # Delete predictions using the given model for this project
     # Predict on samples as specified by filters
-    pass
+    project = await utils.get_project(db_client, project_id)
+    
+    if model_type not in project.model_types:
+        raise HTTPException(status_code=422, detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}")
+    
+    result = await request.app.state.db_client.delete_filtered_documents(
+        collection="annotations",
+        filters={"project_id": ObjectId(project.id), "created_by": model_type},
+    )
+
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=404, detail=f"No annotations produced by {model_type} could be found for this Project."
+        )
 
 
 @router.get("/{model_id}/evaluate")

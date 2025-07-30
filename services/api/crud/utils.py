@@ -5,7 +5,7 @@ from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
-from services.api.schemas.models import Model
+from services.api.schemas.models import Model, ModelUpdate
 from bson.objectid import ObjectId
 
 async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
@@ -125,3 +125,21 @@ async def get_model(
         raise HTTPException(status_code=404, detail="No models found of that version and type for this project!")
 
     return Model(**models[0])
+
+
+async def update_model(
+    db_client: MongoDBClient, 
+    model_id: str,
+    updates: ModelUpdate
+):
+    model_obj_id = convert_to_objectid(model_id, "models")
+    
+    # Check model already exists
+    if not await db_client.get_document_by_id(collection="models", object_id=model_obj_id):
+        raise HTTPException(status_code=404, detail="Tried to update a model which does not exist!")
+    
+    # Update model
+    result = await db_client.update(collection="models", model=updates, object_id=model_obj_id)
+    
+    if result.modified_count != 1:
+        raise HTTPException(status_code=500, detail="Failed to update model")

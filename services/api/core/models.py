@@ -140,20 +140,6 @@ class TorchModel(Model):
         self.train_dataset = dataset(project, self.train_samples, self.train_annotations)
         self.val_dataset = dataset(project, self.val_samples, self.val_annotations) if self.val_samples else None
         self.test_dataset = dataset(project, self.test_samples, self.test_annotations) if self.test_samples else None
-        
-    def save(self, file_path: str):
-        torch.save(self.model.state_dict(), file_path)
-
-    @classmethod
-    def load(cls, project: Project, file_path: str):
-        instance = cls.__new__(cls)
-        instance.project = project
-        instance.train_samples = None
-        instance.train_annotations = None
-        instance.dataset = DisruptionDataset
-        instance.model = instance._define_model()
-        instance.model.load_state_dict(torch.load(file_path))
-        return instance
     
 class DisruptionDataset(TorchDataset):
     def __init__(self, project, samples, annotations):
@@ -188,6 +174,7 @@ class DisruptionCNN(TorchModel):
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float] = (0.7, 0.2, 0.1),
     ) -> None:
+        self.type = "disruption_cnn"
         super().__init__(db_client=db_client, db_id=db_id, project=project, dataset=DisruptionDataset, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split)
         
     def _define_model(self):
@@ -326,8 +313,7 @@ class DisruptionCNN(TorchModel):
         all_predictions: list[list[torch.tensor]] = []
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     
-        for i in range(50): # Should let user choose num mc samples? TODO
-            print("we be predicting")
+        for i in range(20): # Should let user choose num mc samples? TODO
             predictions: list[torch.tensor] = []
             with torch.no_grad():
                 for batch_samples in dataloader:
@@ -348,8 +334,26 @@ class DisruptionCNN(TorchModel):
                 validated=False, 
                 uncertainty=stds[i], 
                 label="disruption",
-                time=means[i],)]
+                time=means[i],
+                created_by=self.type
+                )
+             ]
             for i in range(len(samples))]
+        
+    def save(self, file_path: str):
+        torch.save(self.model.state_dict(), file_path)
+
+    @classmethod
+    def load(cls, project: Project, file_path: str):
+        instance = cls.__new__(cls)
+        instance.type = "disruption_cnn"
+        instance.project = project
+        instance.train_samples = None
+        instance.train_annotations = None
+        instance.dataset = DisruptionDataset
+        instance.model = instance._define_model()
+        instance.model.load_state_dict(torch.load(file_path))
+        return instance
 
 MODELS = {
     "disruption_cnn": DisruptionCNN,
