@@ -147,7 +147,7 @@ class PeakDetectionAnnotator(DataAnnotator):
         dt = np.abs(time[1] - time[0])
         regions = []
         for w, idx in zip(params["widths"], peak_idx):
-            width = w * 3 * dt
+            width = w * 1 * dt
             peak_time = time[idx]
             if peak_time >= tmin and peak_time <= tmax:
                 region = TimeRegion(
