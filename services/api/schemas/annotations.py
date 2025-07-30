@@ -17,7 +17,7 @@ class AnnotationIn(ConfiguredModel):
     validated: bool = False
     uncertainty: Optional[float] = None
     label: str
-    created_by: ModelType # TODO: this should also contain annotators
+    created_by: Optional[ModelType] = None # TODO: this should also contain annotators
 
 
 class TimePoint(AnnotationIn):
@@ -47,6 +47,7 @@ class Annotation(AnnotationIn):
 
 class ModelAnnotation(AnnotationIn):
     uncertainty: float
+    created_by: ModelType
 
 
 AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]

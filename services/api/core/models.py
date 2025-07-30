@@ -307,13 +307,14 @@ class DisruptionCNN(TorchModel):
         return (sum_correct / sum_total) * 100
     
     def predict(self, samples: list[Sample], batch_size: int, device='cpu') -> list[list[TimePoint]]:
+        num_mc_samples = 20 # Should let user choose num mc samples? TODO
         dataset = self.dataset(self.project, samples, annotations=None)
         
         self.model.train() # Using dropout so has to be in train mode
         all_predictions: list[list[torch.tensor]] = []
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     
-        for i in range(20): # Should let user choose num mc samples? TODO
+        for i in range(num_mc_samples):
             predictions: list[torch.tensor] = []
             with torch.no_grad():
                 for batch_samples in dataloader:
@@ -325,10 +326,9 @@ class DisruptionCNN(TorchModel):
             
         stacked_predictions = torch.stack(all_predictions)
         # Because we've done 50x mc samples, just use the first lot of scaling values...
-        scaling = torch.tensor(dataset.time_scaling[:int(len(dataset.time_scaling)/50)]).squeeze()
-        means = stacked_predictions.mean(dim=0).squeeze() * scaling
-        stds = stacked_predictions.std(dim=0).squeeze() * scaling
-        
+        scaling = torch.tensor(dataset.time_scaling[:int(len(dataset.time_scaling)/num_mc_samples)]).squeeze()
+        means = stacked_predictions.mean(dim=0).squeeze(dim=1) * scaling
+        stds = stacked_predictions.std(dim=0).squeeze(dim=1) * scaling
         return [
             [TimePoint(
                 validated=False, 

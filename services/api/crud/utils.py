@@ -45,7 +45,7 @@ async def get_annotations(
     start: int = 0,
     end: Optional[int] = None,
 ) -> list[Annotation]:
-    project_obj_id = convert_to_objectid(project_id, "samples")
+    project_obj_id = convert_to_objectid(project_id, "projects")
     db_filters = {"project_id": project_obj_id}
     if validated is not None:
         db_filters["validated"] = validated

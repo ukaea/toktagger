@@ -4,18 +4,19 @@ import os
 from services.api.core.annotators import FindPeaksAnnotator
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
-from services.api.schemas.annotations import TimeRegion
+from services.api.schemas.annotations import TimeRegion, AnnotationTypes
 from services.api.schemas.annotators import Annotator, FindPeaksParams
 from services.api.schemas.models import Model, ModelType, ModelIn
 from services.api.schemas.samples import Sample
 from services.api.schemas import convert_to_objectid
-from services.api.worker import run_training, run_inference
+from services.api.worker import run_training, run_inference, get_predictions
 import random
+import asyncio
 from bson.objectid import ObjectId
-router = APIRouter(prefix="/projects/{project_id}/models", tags=["Models"])
+router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 
 
-@router.get("")
+@router.get("/models")
 async def get_models(
     request: Request, 
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -34,7 +35,7 @@ async def get_models(
     models = await utils.get_models(db_client=db_client, project_id=project_id, model_type=None, start=start, end=end)
     return models
 
-@router.get("/{model_type}")
+@router.get("/models/{model_type}")
 async def get_model(
     request: Request, 
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -49,7 +50,7 @@ async def get_model(
     return model
 
 
-@router.delete("/{model_type}")
+@router.delete("/models/{model_type}")
 async def delete_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -84,7 +85,7 @@ async def delete_models(
         # And delete file from storage
         pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model['_id']}.model").unlink()
 
-@router.get("/{model_type}/train")
+@router.get("/models/{model_type}/train")
 async def get_training_info(request: Request, project_id: str, model_type: str) -> Model:
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
@@ -93,7 +94,7 @@ async def get_training_info(request: Request, project_id: str, model_type: str) 
         raise HTTPException(status_code=404, detail=f"No training in progress for {model_type}")
     return latest_model
 
-@router.put("/{model_type}/train")
+@router.put("/models/{model_type}/train")
 async def train_model(request: Request, project_id: str, model_type: ModelType):
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
@@ -127,13 +128,13 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
     pass
 
 
-@router.delete("/{model_type}/train")
+@router.delete("/models/{model_type}/train")
 async def stop_model_training(project_id: str, model_id: str):
     # Stop training of this model
     pass
 
 
-@router.post("/{model_type}/predict")
+@router.post("/models/{model_type}/predict")
 async def predict(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -169,7 +170,7 @@ async def predict(
         selected_samples = [sample for sample in all_samples if sample["_id"] not in annotated_sample_ids]
     else:
         selected_samples = [
-            await db_client.get_document_by_id(collection="samples", object_id=ObjectId(sample_id))
+            await utils.get_sample(db_client, sample_id)
             for sample_id in sample_ids
             ]
         if None in selected_samples:
@@ -185,7 +186,7 @@ async def predict(
 
     run_inference.delay(project.model_dump(mode="python"), model.model_dump(mode="python"), [sample_obj.model_dump(mode="python") for sample_obj in sample_objs])
 
-@router.delete("/{model_type}/predict")
+@router.delete("/models/{model_type}/predict")
 async def delete_predictions(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -209,8 +210,30 @@ async def delete_predictions(
             status_code=404, detail=f"No annotations produced by {model_type} could be found for this Project."
         )
 
+@router.post("/samples/{sample_id}/models/{model_type}/predict")
+async def get_sample_predictions(
+    request: Request,
+    project_id: str = Path(description="The ID of the project to make model predictions for."),
+    sample_id: str = Path(description="The ID of the sample to make model predictions for."),
+    model_type: ModelType = Path(description="The type of model to make predictions from."),
+    ) -> list[AnnotationTypes]:
+    db_client = request.app.state.db_client
+    project = await utils.get_project(db_client, project_id)
+    
+    if model_type not in project.model_types:
+        raise HTTPException(status_code=422, detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}")
+    
+    # Find the latest created model for this project
+    model = await utils.get_model(db_client, project.id, model_type, status="completed")
+    
+    sample = await utils.get_sample(db_client, sample_id)
+    
+    annotations = await get_predictions(project, model, [sample,])
+    
+    return annotations[0]
+    
 
-@router.get("/{model_id}/evaluate")
+@router.get("/models/{model_id}/evaluate")
 async def evaluate(project_id: str, model_id: str):
     # Get evaluation of model by comparing model predictions to human evaluations
     # Specify samples to use via filters

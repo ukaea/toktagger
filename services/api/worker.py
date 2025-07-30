@@ -105,6 +105,7 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
             models = predictions[i],
             ids={"project_id": ObjectId(project.id), "sample_id": ObjectId(sample.id)}
         )
+    return predictions
     
 @app.task()
 def run_training(project: dict, model: dict):
