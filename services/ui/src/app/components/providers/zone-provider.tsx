@@ -159,9 +159,8 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         )
     })
 
-    // Handle keyboard events
+    // Handle keyboard event
     document.addEventListener("keydown", (e) => {
-        console.log("Key pressed:", e.key);
         if ((e.key === "Delete" || e.key == "Backspace")) {
             e.preventDefault(); // Prevent default delete behavior
             const selectedZones = zones.current.filter(zone => zone.selected);

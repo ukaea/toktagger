@@ -42,6 +42,7 @@ export const TimeSeries = ({
     }, 
     children
 } : DisruptionPlotProps) => {
+    const editMode = useRef(true);
     const [selectedXRange, setSelectedXRange] = useState<{ start: number; end: number } | null>(null)
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
@@ -140,6 +141,19 @@ export const TimeSeries = ({
             }, 100)
         }
 
+        const updateEditMode = (mode: boolean) => {
+            const elements = plot.querySelectorAll(".disable-on-shift")
+            if (!mode) {
+                elements.forEach((element) => {
+                    element.setAttribute("style", "pointer-events: none")
+                });
+            } else {
+                elements.forEach((element) => {
+                    element.setAttribute("style", "pointer-events: all")
+                });
+            }
+        }
+
         const relayoutHandler = (eventData: PlotRelayoutEvent) => { // triggers re-render of overlay tools when axes change
             triggerToolUpdate()
 
@@ -150,7 +164,10 @@ export const TimeSeries = ({
                 // for range slider events
                 rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
             }
+
+            updateEditMode(editMode.current);
         }
+
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
         plot.on('plotly_selected', function(eventData) {
             if (eventData && eventData.range) {
@@ -160,25 +177,21 @@ export const TimeSeries = ({
                 relayout(plot, {selections: []});
             }
         });
-        plot.on('plotly_deselect', function(eventData) {
+        plot.on('plotly_deselect', function() {
             setSelectedXRange(null);
         });
 
         document.addEventListener("keydown", (e) => {
             if (e.key === "Shift") {
-                const elements = plot.querySelectorAll(".disable-on-shift")
-                elements.forEach((element) => {
-                    element.setAttribute("style", "pointer-events: none")
-                })
+                editMode.current = false;
+                updateEditMode(editMode.current);
             }
         })
 
         document.addEventListener("keyup", (e) => {
             if (e.key === "Shift") {
-                const elements = plot.querySelectorAll(".disable-on-shift")
-                elements.forEach((element) => {
-                    element.setAttribute("style", "pointer-events: all")
-                })
+                editMode.current = true;
+                updateEditMode(editMode.current);
             }
         })
     };
@@ -330,7 +343,7 @@ export const TimeSeries = ({
                 {React.Children.map(children, child => {
                     return (
                         React.isValidElement(child)
-                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools, selectedXRange})
+                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools, selectedXRange, editMode: editMode.current })
                         : child
                     )
                 })}

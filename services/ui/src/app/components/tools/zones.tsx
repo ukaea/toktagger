@@ -16,6 +16,7 @@ export const Zones = ({
     plotReady, 
     forceUpdate,
     selectedXRange,
+    editMode,
 } : ToolingProps) => {
     const dragOffset = useRef(0)
 
@@ -138,6 +139,7 @@ export const Zones = ({
                     opacity = 0.8;
                 }
 
+                const pointerEvents = editMode ? "all" : "none";
                 graphGroup.append("rect")
                     .attr("class", "zone span cursor-grab disable-on-shift")
                     .attr("x", x0)
@@ -147,7 +149,7 @@ export const Zones = ({
                     .attr("fill", zone.category.color)
                     .attr("stroke", "black")
                     .attr("opacity", opacity)
-                    .attr("style", "pointer-events: all")
+                    .attr("style", `pointer-events: ${pointerEvents}`)
                     .style("cursor", "move")
                     .datum(zone)
                     .call(drag)
@@ -160,7 +162,7 @@ export const Zones = ({
                     .attr("width", 20)
                     .attr("height", height)
                     .attr("fill", "transparent")
-                    .attr("style", "pointer-events: all")
+                    .attr("style", `pointer-events: ${pointerEvents}`)
                     .style("cursor", "move")
                     .datum(zone)
                     .call(getBoundaryHandler(true))
@@ -172,7 +174,7 @@ export const Zones = ({
                     .attr("width", 20)
                     .attr("height", height)
                     .attr("fill", "transparent")
-                    .attr("style", "pointer-events: all")
+                    .attr("style", `pointer-events: ${pointerEvents}`)
                     .style("cursor", "move")
                     .datum(zone)
                     .call(getBoundaryHandler(false))
