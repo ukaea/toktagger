@@ -8,6 +8,7 @@ import { useContextMenuProvider } from "./context-menu-provider";
 interface VSpanContextInfo {
     vspans: VSpan[];
     handleVSpanUpdate: () => void;
+    handleVspanDragFinish: () => void;
     addVSpan: (x: number, category: Category) => void;
     triggerUpdate: number;
 }
@@ -30,10 +31,11 @@ export const VSPAN_MENU_ID = "vspan-provider"
  * @param categories Array of categories that the vspans provided by this context can be
  * @param initialData Array of vspans that should be added when initialised
  */
-export const VSpanProvider = ({categories, initialData, children} : {
+export const VSpanProvider = ({categories, initialData, children, onModifyVspan} : {
     categories: Category[],
     initialData?: VSpan[],
-    children: React.ReactNode
+    children: React.ReactNode,
+    onModifyVspan: CallableFunction
 }) => {
     const spans = useRef<VSpan[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
@@ -48,6 +50,11 @@ export const VSpanProvider = ({categories, initialData, children} : {
     // Provides a method for child components to trigger context refresh
     const handleVSpanUpdate = () => {
         triggerVSpanUpdate()
+
+    }
+
+    const handleVspanDragFinish = () => {
+        onModifyVspan(spans.current);
     }
 
     const addVSpan = (x: number, category: Category) => {
@@ -56,11 +63,14 @@ export const VSpanProvider = ({categories, initialData, children} : {
             x
         })
         triggerVSpanUpdate()
+        onModifyVspan(spans.current)
     }
 
     const handleDelete = (input: unknown) => {
         spans.current = spans.current.filter(span => span !== input)
         triggerVSpanUpdate()
+        onModifyVspan(spans.current)
+
     }
 
     const handleTypeSetting = ({props}: ItemParams, targetCategory: Category) => {
@@ -142,7 +152,7 @@ export const VSpanProvider = ({categories, initialData, children} : {
 
     // The context provider is responsible for rendering the context menu relating to VSpans
     return (
-        <VSpanContext.Provider value={{vspans: spans.current, handleVSpanUpdate, addVSpan, triggerUpdate}}>
+        <VSpanContext.Provider value={{vspans: spans.current, handleVSpanUpdate, handleVspanDragFinish, addVSpan, triggerUpdate}}>
             {children}
             <Menu id={`${VSPAN_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {

@@ -6,9 +6,9 @@ import random
 import json
 from setup import create_project, create_local_samples
 
-def create_mock_data(file_path: str, num_samples: int):
+def create_mock_data(file_path: str, shot_ids: list):
     data = {}
-    for shot_id in range(1, num_samples+1):
+    for shot_id in shot_ids:
         t_ramp_start = random.randint(20, 40)
         t_ramp_end = random.randint(140, 240)
         t_disrupt_start = random.randint(400, 500)
@@ -54,13 +54,14 @@ def create_mock_data(file_path: str, num_samples: int):
 def main():
     num_samples = 200
     file_path = "/data/test/mock_data.json"
-    data = create_mock_data(file_path, num_samples)
+    non_annotated_file_path = "/data/test/non_annotated_data.json"
+    data = create_mock_data(file_path, list(range(1, num_samples+1)))
     project_id = create_project("New Mock Disruption Project", "disruption", "json")
     # Make annotations to add at same time as sample
     annotations = {shot_id: [{"validated": True, "label": "disruption", "time": item["annotations"]["disruption"]}] for shot_id, item in data.items()}
     create_local_samples(project_id, list(range(1, num_samples+1)), base_path=file_path, file_type="json", annotations=annotations, signals=["ip"])
 
-    non_annotated = create_mock_data("/data/test/non_annotated_data.json", num_samples)
-    create_local_samples(project_id, list(range(num_samples + 1, (2*num_samples)+1)), base_path=file_path, file_type="json", signals=["ip"])
+    non_annotated = create_mock_data(non_annotated_file_path, list(range(num_samples + 1, (2*num_samples)+1)))
+    create_local_samples(project_id, list(range(num_samples + 1, (2*num_samples)+1)), base_path=non_annotated_file_path, file_type="json", signals=["ip"])
 if __name__ == "__main__":
     main()

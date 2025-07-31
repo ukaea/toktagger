@@ -24,8 +24,9 @@ export const SampleDataBreadCrumbs = (info) => {
 };
 
 const SampleView = (args) => {
+  if (!args.project) return null;
   if (args.project.task == 'disruption') {
-    return (<Disruption data={args.data} annotations={args.annotations}/>);
+    return (<Disruption data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations} />);
   } else if (args.project.task == 'ELM') {
     return (<ElmGraph data={args.data} annotations={args.annotations} setAnnotations={args.setAnnotations} />);
   } else if (args.project.task == 'MHD') {
@@ -46,6 +47,7 @@ async function saveAnnotations(project_id: string, sample_id: string, annotation
         },
         body: JSON.stringify(annotations),
     });
+    return response
 }
 
 async function getNextSample(project_id: str) {
@@ -76,11 +78,12 @@ export function SaveButton({project_id, sample_id, annotations}) {
   const router = useRouter();
 
   const handleClick = async () => {
-    try {
-      await saveAnnotations(project_id, sample_id, annotations);
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {timeout: 5000})
-    } catch (err) {
-      console.error('Failed to fetch data:', err);
+    const response = await saveAnnotations(project_id, sample_id, annotations);
+    if (response.ok) {
+        ToastQueue.positive(`Saved ${annotations.length} annotations!`, {timeout: 5000})
+    } else {
+        const payload = await response.json();
+        ToastQueue.negative(`Failed to save ${annotations.length} annotations - ${payload.detail}`, {timeout: 5000})
     }
   };
 

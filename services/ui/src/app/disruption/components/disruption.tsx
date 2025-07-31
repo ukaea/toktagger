@@ -10,12 +10,15 @@ import { Zones } from "@/app/components/tools/zones"
 import { VSpans } from "@/app/components/tools/vspans"
 
 type DisruptionInfo = {
-    time: Array<number>,
-    values: Record<string, Array<number>>,
-    annotations: Record<string, Array<Record<string, any>>>
+    data: {
+        time: Array<number>,
+        values: Record<string, { time: number[]; values: number[] }>
+    },
+    annotations: any[],
+    setAnnotations: (annotations: any[]) => void
 }
 
-export const Disruption = ({ data, annotations }: DisruptionInfo) => {
+export const Disruption = ({ data, annotations, setAnnotations }: DisruptionInfo) => {
     const zoneCategories: Category[] = [
             { name: "RampUp", color: 'rgb(233, 170, 98)' },
             { name: "FlatTop", color: 'rgb(120, 167, 85)' },
@@ -28,7 +31,7 @@ export const Disruption = ({ data, annotations }: DisruptionInfo) => {
     ]
 
     const disruptionCategories: Category[] = [
-            { name: "Disruption", color: 'rgb(255, 0, 0)' },
+            { name: "disruption", color: 'rgb(255, 0, 0)' },
         ]
 
     console.log("Annotations:", annotations);
@@ -88,10 +91,19 @@ export const Disruption = ({ data, annotations }: DisruptionInfo) => {
         dragmode: 'pan',
     };
 
+    const updateAnnotations = (newSpans) => {
+        const spans = newSpans.map(item => ({
+                time: item.x,
+                label: item.category.name,
+                validated: true
+        }));
+
+        setAnnotations(spans);
+    }
     return (
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="disruption-menu">
-                <VSpanProvider categories={disruptionCategories} initialData={initialDisruption}>
+                <VSpanProvider categories={disruptionCategories} initialData={initialDisruption} onModifyVspan={updateAnnotations}>
                     <ZoneProvider categories={zoneCategories} initialData={initialZones}>
                         <TimeSeries plotId="Disruption" plotConfig={{data: plotData, layout: plotLayout}}>
                             <Zones />
