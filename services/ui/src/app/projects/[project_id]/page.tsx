@@ -2,7 +2,7 @@
 import { use } from 'react';
 import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
-import { TrainModelTool } from '@/app/components/tools/trainModel';
+import { TrainModelTool } from '@/app/components/tools/modelTrain';
 
 export const SampleBreadCrumbs = (info) => {
   return (

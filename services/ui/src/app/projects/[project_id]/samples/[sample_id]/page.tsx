@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 import { LockedMode } from '@/app/locked-mode/components/locked-mode';
-import { TrainModelTool } from '@/app/components/tools/trainModel';
+import { TrainModelTool } from '@/app/components/tools/modelTrain';
 
 export const SampleDataBreadCrumbs = (info) => {
   return (
