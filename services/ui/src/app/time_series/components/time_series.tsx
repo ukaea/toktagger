@@ -11,8 +11,9 @@ type MultiVariateTimeSeriesViewInfo = {
     data: MultiVariateTimeSeriesData, 
     annotations: Annotations, 
     setAnnotations: (annotations: Annotations) => void
+    zoneNames?: string[]
 };
-export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations}: MultiVariateTimeSeriesViewInfo) => {
+export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations, zoneNames = []}: MultiVariateTimeSeriesViewInfo) => {
 
     let plotData: Plotly.Data[] = Object.entries(data.values).map(([key, value]: [string, TimeSeriesData]) => {
         return {
@@ -80,15 +81,30 @@ export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations}: 
     };
 
     
-    const zoneCategories: Category[] = [
-        { name: "Peak", color: 'rgb(233, 170, 98)' },
-        { name: "Outlier", color: 'rgb(233, 170, 250)' },
-        { name: "Jump", color: 'rgb(1, 250, 1)' },
-        { name: "Change Point", color: 'rgb(133, 170, 250)' },
-    ]
+    // Generate a random color with a fixed seed
+    function seededRandom(seed: number) {
+        let x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
+    }
+
+    function randomColor(seed: number = 42) {
+        // Generate RGB values based on seed
+        const r = Math.floor(seededRandom(seed) * 256);
+        const g = Math.floor(seededRandom(seed + 1) * 256);
+        const b = Math.floor(seededRandom(seed + 2) * 256);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    const zoneCategories = zoneNames.map((x, index) => ({
+        name: x,
+        color: randomColor(index + 1)
+    }));
 
     const convertRegionToZone = (item: TimeRegion) => {
-        const category = zoneCategories.find(x => x.name === item.label);
+        let category = zoneCategories.find(x => x.name === item.label);
+        if (!category) {
+            category = { name: item.label, color: randomColor(-1) };
+        }
         return {x0: item.time_min, x1: item.time_max, category: category, created_by: item.created_by} as Zone;
     };
     annotations = annotations.filter(item => item.type === 'time_region') as TimeRegion[];

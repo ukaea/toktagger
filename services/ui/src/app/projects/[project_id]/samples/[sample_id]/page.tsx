@@ -32,9 +32,11 @@ type SampleViewInfo = {
 
 const SampleView = ({project, data, annotations, setAnnotations}: SampleViewInfo) => {
   if (project.task == 'disruption') {
-    return (<MultiVariateTimeSeriesView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    const zoneNames: string[] = ['Disruption'];
+    return (<MultiVariateTimeSeriesView data={data} annotations={annotations} setAnnotations={setAnnotations} zoneNames={zoneNames} />);
   } else if (project.task == 'ELM') {
-    return (<MultiVariateTimeSeriesView data={data} annotations={annotations} setAnnotations={setAnnotations} />);
+    const zoneNames: string[] = ['ELM', 'H-Mode', 'Sawtooth', 'Ramp-up', 'Ramp-down', 'Flat-top'];
+    return (<MultiVariateTimeSeriesView data={data} annotations={annotations} setAnnotations={setAnnotations} zoneNames={zoneNames} />);
   } else if (project.task == 'MHD') {
     return (<SpectrogramView data={data.values['mirnov']} annotations={annotations} setAnnotations={setAnnotations}/>);
   }

@@ -173,7 +173,7 @@ export const TimeSeries = ({
             if (eventData && eventData.range) {
                 const [start, end] = eventData.range.x;
                 setSelectedXRange({ start, end });
-                relayout(plot, {selections: []});
+                relayout(plot, {});
             }
         });
         plot.on('plotly_deselect', function() {
