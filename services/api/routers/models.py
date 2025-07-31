@@ -9,7 +9,7 @@ from services.api.schemas.annotators import Annotator, FindPeaksParams
 from services.api.schemas.models import Model, ModelType, ModelIn
 from services.api.schemas.samples import Sample
 from services.api.schemas import convert_to_objectid
-from services.api.worker import run_training, run_inference, get_predictions
+from services.api.worker import run_training, run_inference
 import random
 import asyncio
 from bson.objectid import ObjectId
@@ -162,12 +162,8 @@ async def predict(
     # Predict on samples as specified by filters
     # Stores results in the database with validated=False
     if not sample_ids:
-        # Get samples with no existing annotations
-        # TODO: Would it be easier to update samples with annotated: True/False when annotations are made? Would also simplify life in training method
-        annotations = await utils.get_annotations(db_client, project.id, validated=False)
-        annotated_sample_ids = set([annotation["sample_id"] for annotation in annotations])
-        all_samples = await utils.get_samples(db_client, project.id)
-        selected_samples = [sample for sample in all_samples if sample["_id"] not in annotated_sample_ids]
+        # Get samples with no human annotations
+        selected_samples = await utils.get_samples(db_client, project.id, annotated=False)
     else:
         selected_samples = [
             await utils.get_sample(db_client, sample_id)
@@ -217,6 +213,7 @@ async def get_sample_predictions(
     sample_id: str = Path(description="The ID of the sample to make model predictions for."),
     model_type: ModelType = Path(description="The type of model to make predictions from."),
     ) -> list[AnnotationTypes]:
+    ###### this is a blocking endpoint!
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
     
@@ -228,7 +225,12 @@ async def get_sample_predictions(
     
     sample = await utils.get_sample(db_client, sample_id)
     
-    annotations = await get_predictions(project, model, [sample,])
+    inference = run_inference.delay(project.model_dump(mode="python"), model.model_dump(mode="python"), [sample.model_dump(mode="python")])
+    
+    try:
+        annotations = inference.get(timeout=10) # do we want to have a timeout here? Is 10s appropriate?
+    except TimeoutError():
+        raise HTTPException(status_code=408, detail="Prediction request timed out!") # How should we handle this? Because the task will still complete and get added to the databse, will it be added to the UI on a refesh?
     
     return annotations[0]
     

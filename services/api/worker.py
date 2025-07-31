@@ -41,15 +41,9 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         
         db_client = MongoDBClient(mongo_url, db_name)
         
-        # Get all annotations for this project
+        # Get all validated samples and annotations for this project
         annotations = await utils.get_annotations(db_client, project.id, validated=True)
-            
-        # Get list of samples which these annotations correspond to
-        sample_ids = set([annotation["sample_id"] for annotation in annotations])
-        samples = [
-            await utils.get_sample(db_client, sample_id)
-            for sample_id in sample_ids
-            ]
+        samples = await utils.get_annotations(db_client, project.id, validated=True)
         
         # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
         annotator_model = TypeAdapter(AnnotationTypes)
@@ -113,4 +107,5 @@ def run_training(project: dict, model: dict):
     
 @app.task()
 def run_inference(project: dict, model: dict, samples: list[dict]):
-    asyncio.run(get_predictions(project=Project(**project), model=Model(**model), samples=[Sample(**sample) for sample in samples]))
+    predictions = asyncio.run(get_predictions(project=Project(**project), model=Model(**model), samples=[Sample(**sample) for sample in samples]))
+    return [[annotation.model_dump(mode="python") for annotation in annotations] for annotations in predictions]

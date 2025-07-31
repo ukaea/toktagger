@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from services.api.crud import utils
-from services.api.schemas.samples import Sample
+from services.api.schemas.samples import Sample, SampleUpdate
 from services.api.schemas.annotators import Annotator
 from services.api.schemas.annotations import AnnotationIn, Annotation, AnnotationTypes
 from services.api.schemas import convert_to_objectid
@@ -74,6 +74,10 @@ async def delete_all_annotations(
     await request.app.state.db_client.delete_filtered_documents(
         collection="annotations", filters={"project_id": project_id}
     )
+    # Get all samples for this project and set validated samples to False
+    samples = await utils.get_samples(request.app.state.db_client, project_id)
+    for sample in samples:
+        utils.update_sample(request.app.state.db_client, sample.id, SampleUpdate(validated_annotations=False))
 
 
 @router.get(
@@ -177,9 +181,12 @@ async def add_annotations(
     await request.app.state.db_client.delete_filtered_documents(
         collection="annotations", filters=ids
     )
-    return await request.app.state.db_client.insert_many(
+    await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids
     )
+    await utils.update_sample(request.app.state.db_client, sample_id, SampleUpdate(validated_annotations=True))
+    return
+    
 
 
 @router.delete(
@@ -219,3 +226,4 @@ async def remove_annotations(
     await request.app.state.db_client.delete_filtered_documents(
         collection="annotations", filters=ids
     )
+    await utils.update_sample(request.app.state.db_client, sample_id, SampleUpdate(validated_annotations=False))
