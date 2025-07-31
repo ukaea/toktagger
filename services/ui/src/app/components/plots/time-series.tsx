@@ -171,7 +171,6 @@ export const TimeSeries = ({
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
         plot.on('plotly_selected', function(eventData) {
             if (eventData && eventData.range) {
-                console.log("Selected range:", eventData.range);
                 const [start, end] = eventData.range.x;
                 setSelectedXRange({ start, end });
                 relayout(plot, {selections: []});

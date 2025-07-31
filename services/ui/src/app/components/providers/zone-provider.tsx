@@ -66,14 +66,17 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     }
 
     const handleZoneDelete = (input: Zone) => {
+        // Remove the current zone and all selected zones
         zones.current = zones.current.filter(zone => zone !== input)
+        zones.current = zones.current.filter(zone => !zone.selected);
         triggerZoneUpdate()
         onModifyZone(zones.current);
     }
 
     const handleTypeSetting = ({props}: ItemParams, targetCategory: Category) => {
+        // Update the category of the zone or all selected zones
         zones.current = zones.current.map((zone) => {
-            if (zone === props.zone) {
+            if (zone === props.zone || zone.selected) {
                 zone.category = targetCategory
             }
             return zone
