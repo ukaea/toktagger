@@ -1,6 +1,15 @@
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item } from '@adobe/react-spectrum'
 import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
+import { loadAnnotatorProps } from '../core';
+
+type OutlierDetectionAnnotatorProps = {
+    threshold: number;
+    contamination: number;
+    method: string;
+    signalName: string | null;
+}
+
 
 type OutlierDetectionType = {
     project_id: string;
@@ -10,12 +19,14 @@ type OutlierDetectionType = {
 };
 
 export function OutlierDetectionTool({ project_id, sample_id, data, setAnnotations }: OutlierDetectionType) {
+    // Load previously saved annotator props from sessionStorage
+    const outlierToolProps: OutlierDetectionAnnotatorProps | null = loadAnnotatorProps<OutlierDetectionAnnotatorProps>(`outlierToolProps_${project_id}`);
     const methodOptions = [{id: 0, name: "mad"}, {id: 1, name: "isoforest"}];
-    const [signalName, setSignalName] = useState(null);
+    const [signalName, setSignalName] = useState(outlierToolProps?.signalName || null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
-    const [threshold, setThreshold] = useState(3);
-    const [contamination, setContamination] = useState(0);
-    const [method, setMethod] = useState("mad");
+    const [threshold, setThreshold] = useState(outlierToolProps?.threshold || 3);
+    const [contamination, setContamination] = useState(outlierToolProps?.contamination || 0);
+    const [method, setMethod] = useState(outlierToolProps?.method || "mad");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -45,12 +56,22 @@ export function OutlierDetectionTool({ project_id, sample_id, data, setAnnotatio
         fetchData();
     }, [signalName, threshold, contamination, method]);
 
+    useEffect(() => {
+        const toolProps: OutlierDetectionAnnotatorProps = {
+            threshold,
+            contamination,
+            method,
+            signalName
+        };
+        // Save annotator props to sessionStorage
+        sessionStorage.setItem(`outlierToolProps_${project_id}`, JSON.stringify(toolProps));
+    }, [threshold, contamination, method, signalName]);
 
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
+                <ComboBox label="Signal Name" defaultInputValue={signalName} defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

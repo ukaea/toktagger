@@ -103,3 +103,12 @@ export const getSampleData = (project_id: string, sample_id: string, viewParams)
 
   return sampleData;
 } 
+
+export function saveAnnotatorProps<T>(name: string, props: T) {
+    sessionStorage.setItem(name, JSON.stringify(props));
+}
+
+export function loadAnnotatorProps<T>(name: string): T | null {
+    const props = sessionStorage.getItem(name);
+    return props ? JSON.parse(props) as T : null;
+}

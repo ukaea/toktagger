@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item } from '@adobe/react-spectrum'
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { loadAnnotatorProps } from '../core';
 
+type ChangePointDetectionAnnotatorProps = {
+    signalName: string | null;
+    method: string;
+    penalty: number;
+    numPoints: number;
+    numComponents: number;
+}
 
 type ChangePointDetectionType = {
     project_id: string;
@@ -11,14 +19,15 @@ type ChangePointDetectionType = {
 };
 
 export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnotations }: ChangePointDetectionType) {
+    const changePointToolProps: ChangePointDetectionAnnotatorProps | null = loadAnnotatorProps<ChangePointDetectionAnnotatorProps>(`changePointToolProps_${project_id}`);
     const methodOptions = [{id: 0, name: "pelt"}, {id: 1, name: "hmm"}];
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
-    const [signalName, setSignalName] = useState(null);
-    const [penalty, setPenalty] = useState(5);
-    const [numPoints, setNumPoints] = useState(500);
-    const [method, setMethod] = useState("pelt");
-    const [numComponents, setNumComponents] = useState(3);
+    const [signalName, setSignalName] = useState(changePointToolProps?.signalName || null);
+    const [penalty, setPenalty] = useState(changePointToolProps?.penalty || 5);
+    const [numPoints, setNumPoints] = useState(changePointToolProps?.numPoints || 500);
+    const [method, setMethod] = useState(changePointToolProps?.method || "pelt");
+    const [numComponents, setNumComponents] = useState(changePointToolProps?.numComponents || 3);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -49,11 +58,23 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
         fetchData();
     }, [signalName, penalty, method, numPoints, numComponents]);
 
+    useEffect(() => {
+        const toolProps: ChangePointDetectionAnnotatorProps = {
+            signalName,
+            method,
+            penalty,
+            numPoints,
+            numComponents
+        };
+        // Save annotator props to sessionStorage
+        sessionStorage.setItem(`changePointToolProps_${project_id}`, JSON.stringify(toolProps));
+    }, [signalName, penalty, method, numPoints, numComponents]);
+
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
+                <ComboBox label="Signal Name" defaultInputValue={signalName} defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

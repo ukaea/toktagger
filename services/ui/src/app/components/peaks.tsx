@@ -2,6 +2,14 @@
 import { useEffect, useState } from 'react';
 import { Annotation, Annotations, MultiVariateTimeSeriesData } from '@/types';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, RangeSlider} from '@adobe/react-spectrum'
+import { saveAnnotatorProps, loadAnnotatorProps } from '@/app/core';
+
+type PeakDetectionAnnotatorProps = {
+    prominence: number;
+    distance: number;
+    timeRange: { start: number; end: number };
+    signalName: string | null;
+}
 
 type PeakDetectionType = {
     project_id: string;
@@ -10,13 +18,16 @@ type PeakDetectionType = {
     setAnnotations: (annotations: Annotation[]) => void;
 };
 export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations } : PeakDetectionType) {
-    const [prominence, setProminance] = useState(5);
-    const [distance, setDistance] = useState(1);
+    // Load previously saved annotator props from sessionStorage
+    const peakToolProps: PeakDetectionAnnotatorProps | null = loadAnnotatorProps<PeakDetectionAnnotatorProps>(`peakToolProps_${project_id}`);
+
+    const [prominence, setProminance] = useState(peakToolProps?.prominence || 5);
+    const [distance, setDistance] = useState(peakToolProps?.distance || 1);
 
     const [timeMinDefault, setTimeMinDefault] = useState(null);
     const [timeMaxDefault, setTimeMaxDefault] = useState(null);
-    const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
-    const [signalName, setSignalName] = useState(null);
+    const [timeRange, setTimeRange] = useState(peakToolProps?.timeRange || {start: 0, end: 100}); 
+    const [signalName, setSignalName] = useState(peakToolProps?.signalName || null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
     useEffect(() => {
@@ -58,6 +69,17 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
 
         fetchData();
         
+    }, [prominence, distance, timeRange, signalName]);
+
+
+    useEffect(() => {
+        const toolProps: PeakDetectionAnnotatorProps = {
+            prominence,
+            distance,
+            timeRange,
+            signalName
+        };
+        saveAnnotatorProps(`peakToolProps_${project_id}`, toolProps);
     }, [prominence, distance, timeRange, signalName]);
 
     return (

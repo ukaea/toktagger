@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item } from '@adobe/react-spectrum'
 import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
+import { loadAnnotatorProps } from '../core';
+
+type JumpDetectionAnnotatorProps = {
+    threshold: number;
+    minDistance: number;
+    smoothing: number;
+    numPoints: number;
+    signalName: string | null;
+}
 
 type JumpDetectionType = {
     project_id: string;
@@ -10,12 +19,15 @@ type JumpDetectionType = {
 };
 
 export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations }: JumpDetectionType) {
-    const [signalName, setSignalName] = useState(null);
+    // Load previously saved annotator props from sessionStorage
+    const jumpToolProps: JumpDetectionAnnotatorProps | null = loadAnnotatorProps<JumpDetectionAnnotatorProps>(`jumpToolProps_${project_id}`);
+
+    const [signalName, setSignalName] = useState(jumpToolProps?.signalName || null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
-    const [threshold, setThreshold] = useState(2);
-    const [minDistance, setMinDistance] = useState(5);
-    const [smoothingValue, setSmoothingValue] = useState(2);
-    const [numPoints, setNumPoints] = useState(2000);
+    const [threshold, setThreshold] = useState(jumpToolProps?.threshold || 2);
+    const [minDistance, setMinDistance] = useState(jumpToolProps?.minDistance || 5);
+    const [smoothingValue, setSmoothingValue] = useState(jumpToolProps?.smoothing || 2);
+    const [numPoints, setNumPoints] = useState(jumpToolProps?.numPoints || 2000);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -46,12 +58,23 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
         fetchData();
     }, [signalName, minDistance, threshold, smoothingValue, numPoints]);
 
+    useEffect(() => {
+        const toolProps: JumpDetectionAnnotatorProps = {
+            threshold,
+            minDistance,
+            smoothing: smoothingValue,
+            numPoints,
+            signalName
+        };
+        // Save annotator props to sessionStorage
+        sessionStorage.setItem(`jumpToolProps_${project_id}`, JSON.stringify(toolProps));
+    }, [threshold, minDistance, smoothingValue, numPoints, signalName]);    
 
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
+                <ComboBox label="Signal Name" defaultInputValue={signalName} defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

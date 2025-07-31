@@ -8,6 +8,8 @@ import { OutlierDetectionTool } from '@/app/components/outliers';
 import { ChangePointDetectionTool } from '@/app/components/changepoints';
 import { JumpDetectionTool } from '@/app/components/jump';
 import { ShotLabels } from '@/app/components/labels';
+import { use, useEffect, useState } from 'react';
+import {Key} from '@react-types/shared';
 
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
     const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
@@ -91,6 +93,11 @@ export function AmplitudeSlider({data, viewParams, setViewParams}: AmplitudeSlid
 }
 
 
+const loadToolbarProps = (name: string): Set<string> => {
+    const props = sessionStorage.getItem(name);
+    return props ? new Set(JSON.parse(props)) : new Set([]);
+}
+
 type ToolBarInfo = {
   project: Project
   sample: Sample
@@ -103,12 +110,12 @@ type ToolBarInfo = {
 export default function ToolBar({ project, sample, data, annotations, setAnnotations, viewParams, setViewParams} : ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
-
+  const toolBarProps = loadToolbarProps(`toolbarProps_${project_id}`);
+  const [expandedKeys, setExpandedKeys] = useState<Set<Key>>(toolBarProps);
 
   let tools = [];
 
   if (project.task == 'ELM' || project.task == 'disruption') {
-
     const labels = (project.task == 'ELM') ? ['No ELMs', 'Type I', 'Type II', 'Type III'] : ['No Disruptions', 'Disruption'];
     tools.push({
       name: 'Shot Labels',
@@ -156,6 +163,10 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
       setAnnotations([]);
   };
 
+  useEffect(() => {
+    sessionStorage.setItem(`toolbarProps_${project_id}`, JSON.stringify(Array.from(expandedKeys)));
+  }, [expandedKeys]);
+
   return (
         <Provider theme={defaultTheme} height="100vh">
           <View direction='column' gap='size-100' overflow="auto" height="100vh">
@@ -175,9 +186,9 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
                     <span style={{ fontSize: '1.2rem' }}>Toolbox</span>
                   </Header>
               </Flex>
-              <Accordion allowsMultipleExpanded={true} width="100%">
+              <Accordion allowsMultipleExpanded={true} defaultExpandedKeys={expandedKeys} onExpandedChange={setExpandedKeys} width="100%">
                 {tools.map((item, i) => (
-                    <Disclosure key={i}>
+                    <Disclosure key={i} id={item.name}>
                         <DisclosureTitle>
                         <span style={{ fontSize: '0.8rem' }}>{item.name}</span>
                         </DisclosureTitle>
