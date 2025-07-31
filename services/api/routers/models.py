@@ -107,7 +107,7 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
     db_models = await utils.get_models(db_client, project_id, model_type)
     
     if len([db_model for db_model in db_models if db_model.get("training_status") in ["queued", "started"]]) > 0:
-        raise HTTPException(status_code=409, detail=f"Training of {model_type} already in progress for this project!")
+        raise HTTPException(status_code=409, detail=f"Training of {model_type} model already in progress!")
     
     if len(db_models) == 0:
         # This is the first time a model has been saved for this project, so version = 1

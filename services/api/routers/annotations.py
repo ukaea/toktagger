@@ -184,7 +184,9 @@ async def add_annotations(
     await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids
     )
+    print("here 2")
     await utils.update_sample(request.app.state.db_client, sample_id, SampleUpdate(validated_annotations=True))
+    print("Here 3")
     return
     
 

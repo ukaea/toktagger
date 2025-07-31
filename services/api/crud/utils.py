@@ -92,14 +92,14 @@ async def update_sample(
 ):
     sample_obj_id = convert_to_objectid(sample_id, "samples")
     
-    # Check model already exists
+    # Check sample already exists
     if not await db_client.get_document_by_id(collection="samples", object_id=sample_obj_id):
-        raise HTTPException(status_code=404, detail="Tried to update a model which does not exist!")
+        raise HTTPException(status_code=404, detail="Tried to update a sample which does not exist!")
     
-    # Update model
+    # Update sample
     result = await db_client.update(collection="samples", model=updates, object_id=sample_obj_id)
     
-    if result.modified_count != 1:
+    if result.matched_count != 1:
         raise HTTPException(status_code=500, detail="Failed to update sample")
 
 async def get_models(
@@ -163,5 +163,5 @@ async def update_model(
     # Update model
     result = await db_client.update(collection="models", model=updates, object_id=model_obj_id)
     
-    if result.modified_count != 1:
+    if result.matched_count != 1:
         raise HTTPException(status_code=500, detail="Failed to update model")
