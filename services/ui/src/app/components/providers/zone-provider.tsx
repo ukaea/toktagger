@@ -10,7 +10,8 @@ interface ZoneContextInfo {
     zones: Zone[];
     handleZoneUpdate: () => void;
     handleZoneDragFinish: () => void;
-    addZone: (x0: number, x1: number, category: Category) => void;
+    handleZoneAdd: (zone: Zone) => void;
+    handleZoneDelete: (zone: Zone) => void;
     triggerUpdate: number;
 }
 
@@ -58,21 +59,13 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         onModifyZone(zones.current);
     }
 
-    const addZone = (x0: number, x1: number, category: Category) => {
-        const created_by = 'manual';
-        zones.current.push(
-            {
-                category,
-                x0,
-                x1,
-                created_by
-            }
-        )
+    const handleZoneAdd = (zone: Zone) => {
+        zones.current.push(zone);
         triggerZoneUpdate();
         onModifyZone(zones.current);
     }
 
-    const handleDelete = (input: unknown) => {
+    const handleZoneDelete = (input: Zone) => {
         zones.current = zones.current.filter(zone => zone !== input)
         triggerZoneUpdate()
         onModifyZone(zones.current);
@@ -100,7 +93,14 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
             const width = 0.05 * menu.xRange              // 5 % of span
             const x0 = menu.x
             const x1 = Math.min(x0 + width, menu.xLimits[1]) // clamp to upper limit
-            addZone(x0, x1, category)
+            const zone = {
+                category,
+                x0,
+                x1,
+                created_by: 'manual',
+                selected: false
+            }
+            handleZoneAdd(zone);
             }
     
             const addZoneItems = categories.map((category, index) => {
@@ -159,13 +159,25 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         )
     })
 
+    // Handle keyboard events
+    document.addEventListener("keydown", (e) => {
+        console.log("Key pressed:", e.key);
+        if ((e.key === "Delete" || e.key == "Backspace")) {
+            e.preventDefault(); // Prevent default delete behavior
+            const selectedZones = zones.current.filter(zone => zone.selected);
+            for (const zone of selectedZones) {
+                handleZoneDelete(zone);
+            }
+        }
+    });
+
     // The context provider is responsible for rendering the context menu relating to zones
     return(
-        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, triggerUpdate}}>
+        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, handleZoneAdd, handleZoneDelete, triggerUpdate}}>
             {children}
             <Menu id={`${ZONE_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {
-                    handleDelete(props.zone)
+                    handleZoneDelete(props.zone)
                 }}>
                     Delete
                 </Item>

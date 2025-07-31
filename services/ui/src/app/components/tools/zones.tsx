@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useContextMenu } from "react-contexify";
 
 import * as d3 from "d3"
@@ -132,8 +132,10 @@ export const Zones = ({
                 const x0 = xaxis.d2p(zone.x0);
                 const x1 = xaxis.d2p(zone.x1);
 
+                // change opacity if the zone is selected
                 if (selectedXRange && (zone.x0 > selectedXRange.start && zone.x1 < selectedXRange.end)) {
-                    opacity = 1.0;
+                    zone.selected = true;
+                    opacity = 0.8;
                 }
 
                 graphGroup.append("rect")
@@ -175,6 +177,7 @@ export const Zones = ({
                     .datum(zone)
                     .call(getBoundaryHandler(false))
             }
+
         }))
         
     }, [handleZoneUpdate, plotId, plotReady, showZoneMenu, zones, triggerUpdate, forceUpdate, selectedXRange])

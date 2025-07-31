@@ -1,10 +1,8 @@
 "use client"
 
 import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { Config, Layout, PlotData, relayout, PlotRelayoutEvent, restyle, update } from "plotly.js"
+import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
-import { set } from "zod/v4"
-import { tr } from "zod/v4/locales"
 
 type InjectedProps = {
     plotId: string;
@@ -159,7 +157,6 @@ export const TimeSeries = ({
                 console.log("Selected range:", eventData.range);
                 const [start, end] = eventData.range.x;
                 setSelectedXRange({ start, end });
-                setUpdateTools(undefined);
                 relayout(plot, {selections: []});
             }
         });
@@ -324,8 +321,6 @@ export const TimeSeries = ({
         }
 
     }, [plotId, plotReady])
-
-    console.log(selectedXRange, "Selected X Range");
 
     return (
         <div className="w-full px-6 py-3 space-y-3 flex-col">
