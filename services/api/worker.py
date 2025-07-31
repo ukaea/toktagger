@@ -43,7 +43,7 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         
         # Get all validated samples and annotations for this project
         annotations = await utils.get_annotations(db_client, project.id, validated=True)
-        samples = await utils.get_annotations(db_client, project.id, validated=True)
+        samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project.id, validated=True)]
         
         # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
         annotator_model = TypeAdapter(AnnotationTypes)
