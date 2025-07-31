@@ -8,7 +8,8 @@ import { useRouter } from 'next/navigation';
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 import { LockedMode } from '@/app/locked-mode/components/locked-mode';
-import { TrainModelTool } from '@/app/components/tools/modelTrain';
+import { ModelTrainTool } from '@/app/components/tools/modelTrain';
+import { ModelPredictTool } from '@/app/components/tools/modelPredict';
 
 export const SampleDataBreadCrumbs = (info) => {
   return (
@@ -92,6 +93,10 @@ function ToolBar({ project, sample_id, data, annotations, setAnnotations, viewPa
 
 
   let tools = [];
+  const modelPredictTool = (
+    <ModelPredictTool project={project} sample_id={sample_id} setAnnotations={setAnnotations}></ModelPredictTool>
+  )
+  tools.push(modelPredictTool);
   if (project.task == 'ELM') {
     const findPeaksTool = (
         <FindPeaksTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></FindPeaksTool>
@@ -204,7 +209,7 @@ export default function SamplePage({ params }: Props) {
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
-        <TrainModelTool project={project}></TrainModelTool>
+        <ModelTrainTool project={project}></ModelTrainTool>
 
           <div className='flex'>
             <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={refreshData}/>
