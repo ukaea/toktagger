@@ -61,6 +61,6 @@ def main():
     create_local_samples(project_id, list(range(1, num_samples+1)), base_path=file_path, file_type="json", annotations=annotations, signals=["ip"])
 
     non_annotated = create_mock_data("/data/test/non_annotated_data.json", num_samples)
-    create_local_samples(project_id, list(range(1, num_samples+1)), base_path=file_path, file_type="json", signals=["ip"])
+    create_local_samples(project_id, list(range(num_samples + 1, (2*num_samples)+1)), base_path=file_path, file_type="json", signals=["ip"])
 if __name__ == "__main__":
     main()

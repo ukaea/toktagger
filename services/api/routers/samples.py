@@ -35,7 +35,7 @@ async def get_samples(
     --------------------------------------------------------
     """
     db_client = request.app.state.db_client
-    samples = await utils.get_samples(db_client, project_id, start, end)
+    samples = await utils.get_samples(db_client, project_id, start=start, end=end)
     return samples
 
 
@@ -63,6 +63,7 @@ async def add_samples(
     # I'm assuming these will be shot/pulse numbers, hence int, but could be unique ID strings instead
     # Depends if for us a 'sample' will always be a shot/pulse, or if it could be a subset eg a single frame of video
     # Do we also want to allow a single value, or list of specific value?
+    print(samples[0])
     project_obj_id = convert_to_objectid(project_id, "projects")
     if not await request.app.state.db_client.get_document_by_id(
         "projects", project_obj_id
@@ -173,8 +174,9 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
-    print(samples)
+    
+    # Only consider samples that have not been human annotated
+    samples = await utils.get_samples(db_client, project_id, validated=False)
     annotations = await utils.get_annotations(db_client, project_id, validated=False)
 
     data_pool = DataPool(

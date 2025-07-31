@@ -162,12 +162,8 @@ async def predict(
     # Predict on samples as specified by filters
     # Stores results in the database with validated=False
     if not sample_ids:
-        # Get samples with no existing annotations
-        # TODO: Would it be easier to update samples with annotated: True/False when annotations are made? Would also simplify life in training method
-        annotations = await utils.get_annotations(db_client, project.id, validated=False)
-        annotated_sample_ids = set([annotation["sample_id"] for annotation in annotations])
-        all_samples = await utils.get_samples(db_client, project.id)
-        selected_samples = [sample for sample in all_samples if sample["_id"] not in annotated_sample_ids]
+        # Get samples with no human annotations
+        selected_samples = await utils.get_samples(db_client, project.id, annotated=False)
     else:
         selected_samples = [
             await utils.get_sample(db_client, sample_id)
