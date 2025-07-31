@@ -147,6 +147,8 @@ export const TimeSeries = ({
             } else if ("xaxis.range" in eventData) {
                 // for range slider events
                 rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
+            } else {
+                rescale(); // for initial load & autoscale
             }
         }
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
