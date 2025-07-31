@@ -173,11 +173,12 @@ export const TimeSeries = ({
             if (eventData && eventData.range) {
                 const [start, end] = eventData.range.x;
                 setSelectedXRange({ start, end });
-                relayout(plot, {});
+                relayout(plot, {selections: []}); // clear selection
             }
         });
         plot.on('plotly_deselect', function() {
             setSelectedXRange(null);
+            relayout(plot, {selections: []}); // clear selection
         });
 
         document.addEventListener("keydown", (e) => {

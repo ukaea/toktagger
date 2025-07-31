@@ -127,6 +127,7 @@ export const Zones = ({
             }
 
             // Create the zone and transparent handles on each boundary
+            console.log("Selected X Range", selectedXRange);
             for (const zone of zones) {
                 let opacity = 0.5;
                 
@@ -137,6 +138,8 @@ export const Zones = ({
                 if (selectedXRange && (zone.x0 > selectedXRange.start && zone.x1 < selectedXRange.end)) {
                     zone.selected = true;
                     opacity = 0.8;
+                } else {
+                    zone.selected = false;
                 }
 
                 const pointerEvents = editMode ? "all" : "none";

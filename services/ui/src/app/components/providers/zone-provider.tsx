@@ -79,9 +79,11 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
             if (zone === props.zone || zone.selected) {
                 zone.category = targetCategory
             }
+            zone.selected = false; // Deselect after type change
             return zone
         })
         triggerZoneUpdate()
+        onModifyZone(zones.current);
     }
 
     // On initialisation the tool registers a menu item with the general context menu
