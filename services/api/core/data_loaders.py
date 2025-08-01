@@ -75,8 +75,6 @@ class JsonDataLoader(DataLoader):
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         # Open the file which contains the data, getting the path from sample.data
-        # TODO: TEMP FIX FOR WHEWN RUNNING LCALLY
-        #with open(sample.data.file_name, "r") as json_file:
         with open(sample.data.file_name, "r") as json_file:
             # Load in the data, and extract only the data for the shot relevant to this sample
             shot_data = json.load(json_file)[str(sample.shot_id)]["data"]
