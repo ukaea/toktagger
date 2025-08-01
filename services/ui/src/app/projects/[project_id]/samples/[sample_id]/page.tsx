@@ -8,8 +8,9 @@ import { useRouter } from 'next/navigation';
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 import { LockedMode } from '@/app/locked-mode/components/locked-mode';
-import { ModelTrainTool } from '@/app/components/tools/modelTrain';
-import { ModelPredictTool } from '@/app/components/tools/modelPredict';
+import { ModelTrainModal } from '@/app/components/tools/modelTrain';
+import { ModelPredictModal } from '@/app/components/tools/modelPredict';
+import { ModelPredictTool } from '@/app/components/tools/modelPredictSample';
 
 export const SampleDataBreadCrumbs = (info) => {
   return (
@@ -212,7 +213,8 @@ export default function SamplePage({ params }: Props) {
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample}></SampleDataBreadCrumbs>
-        <ModelTrainTool project={project}></ModelTrainTool>
+        <ModelTrainModal project={project}></ModelTrainModal>
+        <ModelPredictModal project={project}></ModelPredictModal>
 
           <div className='flex'>
             <ToolBar project={project} sample_id={sample_id} data={data} annotations={annotations} setAnnotations={setAnnotations} viewParams={viewParams} setViewParams={refreshData}/>

@@ -5,7 +5,7 @@ import CheckmarkCircle from '@spectrum-icons/workflow/CheckmarkCircle';
 import Alert from '@spectrum-icons/workflow/Alert';
 
 
-export function ModelTrainTool({project}) { // Project should be typed somewhere
+export function ModelTrainModal({project}) { // Project should be typed somewhere
     const [message, setMessage] = useState<string | null>(null);
     const [messageColour, setMessageColour] = useState<string>("primary");
     const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
@@ -13,7 +13,7 @@ export function ModelTrainTool({project}) { // Project should be typed somewhere
     const buttonStyle = {
         position: 'fixed',
         top: 10,
-        right: 10,
+        right: 50,
         zIndex: 1000
     };
 

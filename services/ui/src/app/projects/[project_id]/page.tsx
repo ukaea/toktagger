@@ -2,7 +2,8 @@
 import { use } from 'react';
 import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
-import { ModelTrainTool } from '@/app/components/tools/modelTrain';
+import { ModelTrainModal } from '@/app/components/tools/modelTrain';
+import { ModelPredictModal } from '@/app/components/tools/modelPredict';
 
 export const SampleBreadCrumbs = (info) => {
   return (
@@ -69,7 +70,8 @@ export default function ProjectView({params} : Props) {
   return (
     <div>
     <SampleBreadCrumbs project={project} />
-    <ModelTrainTool project={project}></ModelTrainTool>
+    <ModelTrainModal project={project}></ModelTrainModal>
+    <ModelPredictModal project={project}></ModelPredictModal>
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
       <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
         <h1 className="text-2xl font-bold mb-4">
