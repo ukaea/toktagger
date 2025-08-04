@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
+from typing import Literal
 from services.api.schemas.projects import ProjectIn, Project
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.samples import Sample
@@ -20,29 +21,47 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 )
 async def get_projects(
     request: Request,
+    sort_by: str = Query(
+        "_id", 
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "descending", 
+        description="Direction to sort responses, by default 'descending'",
+    ),
     start: int = Query(
         0,
-        description="Index of the first project you want returned when sorted newest - oldest",
+        description="Index of the first project you want returned when sorted by above parameter",
     ),
-    end: int = Query(
+    count: int | None = Query(
         None,
-        description="Index of the last project you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="Number of projects you want returned, leave blank to return all entries",
     ),
+    name: str | None = Query(
+        None,
+        description="Name of a project to search for, by default None"
+    )
 ) -> list[Project]:
     """
     Get a list of all available projects.
     -------------------------------------
     """
-    if start > 0 and end is not None and start > end:
-        raise HTTPException(status_code=400, detail="Invalid parameters - end must be higher than start, or leave one bound unspecified.")
+    filters = {}
+    if name:
+        # Search with regex, return any projects which start with the searched for string, case insensitive
+        filters['name'] = {
+            "$regex": f"{name}",
+            "$options": "i"
+        }
         
     # Return a list of all projects and info about them
     _projects = await request.app.state.db_client.get_filtered_documents(
         collection="projects",
-        sort_by="timestamp",
-        sort_direction=-1,
+        filters=filters,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
         start=start,
-        limit=end - start + 1 if end is not None else 0,
+        limit=count if count is not None else 0,
     )
 
     return _projects

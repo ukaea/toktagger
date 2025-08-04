@@ -7,12 +7,8 @@ import numpy as np
 from services.api.schemas.data import MultiVariateTimeSeriesData
 from services.api.schemas.annotators import FindPeaksParams
 from services.api.schemas.annotations import TimeRegion
-
-
-class AnnotatorType(str, Enum):  # noqa: F821
-    CLASSIC = "classic"
-    UNET = "unet"
-
+from services.api.schemas.projects import Task
+from services.api.schemas.annotators import AnnotatorIds
 
 class DataAnnotator(ABC):
     @abstractmethod
@@ -25,8 +21,8 @@ class FindPeaksAnnotator:
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
-        time = np.array(data.values["dalpha"].time)
-        signal = data.values["dalpha"].values
+        time = np.array(data.values[self.params.signal_name].time)
+        signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
 
         tmin, tmax = self.params.time_min, self.params.time_max
@@ -57,3 +53,15 @@ class FindPeaksAnnotator:
                 regions.append(region)
 
         return regions
+
+ANNOTATORS = {
+    AnnotatorIds.FIND_PEAKS: FindPeaksAnnotator,
+}
+# Currently only allowing these annotators to task mapping
+# Might want user to be able to specify a choice when making the project down the line?
+ANNOTATORS_PER_TASK = {
+    Task.ELM: [AnnotatorIds.FIND_PEAKS,],
+    Task.DISRUPTION: [],
+    Task.MHD: [],
+    Task.UFO: []
+}

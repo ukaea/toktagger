@@ -1,7 +1,7 @@
 "use client"
 
 import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { Config, Layout, Data } from "plotly.js"
+import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
 
 type InjectedProps = {
@@ -11,7 +11,7 @@ type InjectedProps = {
 }
 
 interface PlotConfiguration {
-    data: Data[],
+    data: Partial<PlotData>[],
     layout: Partial<Layout>,
     config?: Partial<Config>
 }
@@ -51,6 +51,8 @@ export const TimeSeries = ({
 
     const overplots: string[] = [];
 
+    let allowRelayout = true;
+
     const triggerToolUpdate = () => {
         setUpdateTools((current) => (current + 1) % 100)
     }
@@ -81,10 +83,76 @@ export const TimeSeries = ({
         
         setPlotReady(true)
 
-        const relayoutHandler = () => { // triggers re-render of overlay tools when axes change
+        // Sets the y axis range required for the current x range for each subplot
+        const rescale = (x0?: number, x1?: number, manualZoom = false) => {
+            if (!allowRelayout) return // Prevents relayout triggering itself
+            allowRelayout = false
+
+            // If no x range is passed, then the min/max is used
+            if (!x0) {
+                x0 = ((plot as any)._fullData[0]._extremes.x.min[0].val) as number;
+            }
+            if (!x1) {
+                x1 = ((plot as any)._fullData[0]._extremes.x.max[0].val) as number;
+            }
+            
+            // Ensure each data set is handled (ensures all subplots are zoomed correctly)
+            data.forEach((dataSet, index) => {
+                let yAxisID = ""
+
+                if (dataSet.yaxis) {
+                    // Find the y axis ID relating to this subplot
+                    const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
+                    if (locatedID) {
+                        yAxisID = locatedID
+                    }
+                }
+
+                const xArray = (dataSet as PlotData).x as number[];
+                const yArray = (dataSet as PlotData).y as number[];
+
+                // Find min and max y data values
+                const yValues: number[] = [];
+                for (let i = 0; i < xArray.length; i++) {
+                    const xVal = xArray[i];
+                    if (xVal >= x0 && xVal <= x1) {
+                        yValues.push(yArray[i]);
+                    }
+                }
+
+                if (yValues.length > 0) {
+                    const yMin = Math.min(...yValues)
+                    const yMax = Math.max(...yValues)
+
+                    const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`].range;
+                    
+                    // Only allow relayout if new yRange is smaller than previous one or if this isn't a manual zoom
+                    // This allows users to zoom in on bits of the graph accurately without it auto-scaling
+                    if (((yMax - yMin) < (previousRange[1] - previousRange[0]) || !manualZoom)) {
+                        relayout(plot, {
+                            [`yaxis${yAxisID}.range`]: [yMin, yMax]
+                        })
+                    }
+                }
+            })
+
+            // Debounce the relayout calls 
+            setTimeout(() => {
+                allowRelayout = true
+            }, 100)
+        }
+
+        const relayoutHandler = (eventData: PlotRelayoutEvent) => { // triggers re-render of overlay tools when axes change
             triggerToolUpdate()
+
+            // This makes use of the first graph displayed but this should be fine
+            const x0 = eventData["xaxis.range[0]"];
+            const x1 = eventData["xaxis.range[1]"];
+
+            rescale(x0, x1, true)
         } 
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
+        plot.on("plotly_doubleclick", rescale)
 
         document.addEventListener("keydown", (e) => {
             if (e.key === "Shift") {

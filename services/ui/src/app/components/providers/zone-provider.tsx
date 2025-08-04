@@ -10,7 +10,6 @@ interface ZoneContextInfo {
     zones: Zone[];
     handleZoneUpdate: () => void;
     handleZoneDragFinish: () => void;
-    addZone: (x0: number, x1: number, category: Category) => void;
     triggerUpdate: number;
 }
 
@@ -36,7 +35,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     categories: Category[],
     initialData?: Zone[],
     children: React.ReactNode,
-    onAddZone: CallableFunction
+    onModifyZone: (newZones: Zone[]) => void
 }) => {
     const zones = useRef<Zone[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
@@ -99,17 +98,17 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
             const x0 = menu.x
             const x1 = Math.min(x0 + width, menu.xLimits[1]) // clamp to upper limit
             addZone(x0, x1, category)
-            }
+        }
     
-            const addZoneItems = categories.map((category, index) => {
-                return (
-                    <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
-                        addFromClick(props as MenuProps, category)
-                    }}>
-                        {category.name}
-                    </Item>
-                )
-            })
+        const addZoneItems = categories.map((category, index) => {
+            return (
+                <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
+                    addFromClick(props as MenuProps, category)
+                }}>
+                    {category.name}
+                </Item>
+            )
+        })
             
             /* Decide what to register in the main context‑menu:
            – Single category → direct “Add <Category>” item.
@@ -131,7 +130,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
             registerMenuItem("zone", menuElement)
 
-        }, [categories, registerMenuItem])
+        }, [addZone, categories, registerMenuItem])
 
     // Initialisation of data - this should only run once
     // Effect: run ONCE per mount to populate from initialData
@@ -159,7 +158,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
     // The context provider is responsible for rendering the context menu relating to zones
     return(
-        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, triggerUpdate}}>
+        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, triggerUpdate}}>
             {children}
             <Menu id={`${ZONE_MENU_ID}`}>
                 <Item id="delete" onClick={({props}: ItemParams) => {

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
+from typing import Literal
 from services.api.crud import utils
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotators import Annotator
@@ -24,13 +25,21 @@ async def get_all_annotations(
     project_id: str = Path(
         description="The ID of the project to retrieve annotations for"
     ),
+    sort_by: str = Query(
+        "_id", 
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "descending", 
+        description="Direction to sort responses, by default 'descending'",
+    ),
     start: int = Query(
         0,
-        description="Index of the first annotation you want returned when sorted newest - oldest",
+        description="Index of the first annotation you want returned when sorted by above parameter",
     ),
-    end: int = Query(
+    count: int = Query(
         None,
-        description="Index of the last annotation you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="The number of annotations to return, leave blank to return all entries",
     ),
     validated: bool = Query(
         None,
@@ -43,8 +52,9 @@ async def get_all_annotations(
     """
     db_client = request.app.state.db_client
     annotations = await utils.get_annotations(
-        db_client, project_id, validated, start, end
+        db_client, project_id, validated, sort_by, sort_direction, start, count
     )
+    print(annotations)
     return annotations
 
 
@@ -92,9 +102,9 @@ async def get_annotations(
         0,
         description="Index of the first annotation you want returned when sorted newest - oldest",
     ),
-    end: int = Query(
+    count: int = Query(
         None,
-        description="Index of the last annotation you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="The number of annotations to return, leave blank to return all entries",
     ),
     validated: bool = Query(
         None,
@@ -123,10 +133,10 @@ async def get_annotations(
     _annotations = await request.app.state.db_client.get_filtered_documents(
         collection="annotations",
         filters=db_filters,
-        sort_by="timestamp",
+        sort_by="_id",
         sort_direction=-1,
         start=start,
-        limit=end - start + 1 if end is not None else 0,
+        limit=count if count is not None else 0,
     )
     print(_annotations)
 
