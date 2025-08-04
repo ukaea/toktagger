@@ -93,9 +93,9 @@ export const Zones = ({
                     .on("drag", function (event, d) {
                         const x = xaxis.p2d(event.x);
                         if (isLeft) {
-                            d.x0 = x
+                            d.x0 = Math.min(x, d.x1 - minWidth)
                         } else {
-                            d.x1 = x
+                            d.x1 = Math.max(x, d.x0 + minWidth)
                         }
                         handleZoneUpdate()
                     })
