@@ -4,15 +4,26 @@ from bson.objectid import ObjectId
 
 @pytest.mark.asyncio
 async def test_get_all_projects(api_client, setup_db):
-    response = await api_client.get("/projects")
+    response = await api_client.get("/projects?sort_direction=ascending")
     assert response.status_code == 200
     returned_projects = response.json()
     assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_1", "test_project_2"]
-    assert [project['_id'] for project in returned_projects] == [setup_db["project_id_1"], setup_db["project_id_2", setup_db["project_id_3"]]]
+    assert [project['_id'] for project in returned_projects] == [setup_db["project_id_1"], setup_db["project_id_2"], setup_db["project_id_3"]]
+    
+@pytest.mark.asyncio
+async def test_get_all_projects_sortby(api_client, setup_db):
+    response = await api_client.get("/projects?sort_by=task")
+    # Should sort alphabetically by task
+    # Sorts by case first (all uppers before any lowers)
+    # So ELM (project 0), then UFO (project 2), then disruption (project 1)
+    # Default sort direction is descending, so will return the opposite of this: 1, 2, 0
+    assert response.status_code == 200
+    returned_projects = response.json()
+    assert [project['name'] for project in returned_projects] == ["test_project_1", "test_project_2", "test_project_0"]
     
 @pytest.mark.asyncio
 async def test_get_projects_start(api_client, setup_db):
-    response = await api_client.get("/projects?start=1")
+    response = await api_client.get("/projects?sort_direction=ascending&start=1")
     # Should return 2 projects
     assert response.status_code == 200
     returned_projects = response.json()
@@ -20,8 +31,8 @@ async def test_get_projects_start(api_client, setup_db):
     assert [project['name'] for project in returned_projects] == ["test_project_1", "test_project_2"]
     
 @pytest.mark.asyncio
-async def test_get_projects_end(api_client, setup_db):
-    response = await api_client.get("/projects?end=1")
+async def test_get_projects_count(api_client, setup_db):
+    response = await api_client.get("/projects?sort_direction=ascending&count=2")
     # Should return 2 projects
     assert response.status_code == 200
     returned_projects = response.json()
@@ -29,8 +40,8 @@ async def test_get_projects_end(api_client, setup_db):
     assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_1"]
     
 @pytest.mark.asyncio
-async def test_get_projects_start_end(api_client, setup_db):
-    response = await api_client.get("/projects?start=1&end=1")
+async def test_get_projects_start_count(api_client, setup_db):
+    response = await api_client.get("/projects?sort_direction=ascending&start=1&count=1")
     # Should return 1 project
     assert response.status_code == 200
     returned_projects = response.json()
@@ -44,14 +55,7 @@ async def test_get_projects_invalid_start(api_client, setup_db):
     assert response.status_code == 200
     returned_projects = response.json()
     assert len(returned_projects) == 0
-    
-@pytest.mark.asyncio
-async def test_get_projects_invalid_start_lessthan_end(api_client, setup_db):
-    response = await api_client.get("/projects?start=2&end=1")
-    # Should raise a bad request exception
-    assert response.status_code == 400
-    assert 'Invalid parameters - end must be higher than start' in response.json().get("detail")
-    
+
 @pytest.mark.asyncio
 async def test_get_project_id(api_client, setup_db):
     response = await api_client.get(f"/projects/{setup_db['project_id_1']}")

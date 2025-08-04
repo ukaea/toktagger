@@ -53,13 +53,13 @@ async def setup_db(db_client):
     project_1 = PROJECT
     project_2 = ProjectIn(
         name="test_project_1",
-        task="UFO",
+        task="disruption",
         query_strategy="sequential",
         data_loader="image"
     )
     project_3 = ProjectIn(
         name="test_project_2",
-        task="disruption",
+        task="UFO",
         query_strategy="uncertainty",
         data_loader="parquet"
     )
@@ -84,25 +84,25 @@ async def setup_db(db_client):
     annotation_3 = TimeRegion(time_min=0.1, time_max=0.2, label="ramp_up", validated=True)
     annotation_4 = TimePoint(time=0.3, label="disruption", validated=False)
     project_id_1 = await db_client.insert('projects', project_1)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     project_id_2 = await db_client.insert('projects', project_2)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     project_id_3 = await db_client.insert('projects', project_3)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     sample_id_1 = await db_client.insert('samples', sample_1, ids={"project_id": project_id_1})
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     sample_id_2 = await db_client.insert('samples', sample_2, ids={"project_id": project_id_1})
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     sample_id_3 = await db_client.insert('samples', sample_3, ids={"project_id": project_id_1})
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     sample_id_4 = await db_client.insert('samples', sample_4, ids={"project_id": project_id_2})
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     annotation_id_1 = await db_client.insert('annotations', annotation_1, ids={"project_id": project_id_1, "sample_id": sample_id_1})
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     annotation_id_2 = await db_client.insert('annotations', annotation_2, ids={"project_id": project_id_1, "sample_id": sample_id_1})
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     annotation_id_3 = await db_client.insert('annotations', annotation_3, ids={"project_id": project_id_1, "sample_id": sample_id_1})
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.1)
     annotation_id_4 = await db_client.insert('annotations', annotation_4, ids={"project_id": project_id_2, "sample_id": sample_id_4})
     yield {
            "project_id_1": project_id_1,
@@ -118,45 +118,6 @@ async def setup_db(db_client):
            "annotation_id_4": annotation_id_4,
            }
     await db_client.delete_filtered_documents('projects')
-    
-@pytest_asyncio.fixture(scope="function")
-async def db_samples(db_client):
-    project_id_1 = await db_client.insert('projects', PROJECT)
-    project_id_2 = await db_client.insert('projects', PROJECT)
-    
-    sample_2 = SampleIn(
-        shot_id=1,
-        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="file", column_names=["Ip"]),
-        annotations=None
-    ) 
-    sample_3 = SampleIn(
-        shot_id=2,
-        data=TimeSeriesFileData(file_name="test.parquet", type="parquet", protocol="s3", column_names=["Ip"]),
-        annotations=None
-    ) 
-    sample_4 = SampleIn(
-        shot_id=3,
-        data=ShotData(protocol="sal", column_names=["Ip"]),
-        annotations=None
-    )
-    await asyncio.sleep(0.5)
-    id_1 = await db_client.insert('samples', SAMPLE, ids={"project_id": project_id_1})
-    await asyncio.sleep(0.5)
-    id_2 = await db_client.insert('samples', sample_2, ids={"project_id": project_id_1})
-    await asyncio.sleep(0.5)
-    id_3 = await db_client.insert('samples', sample_3, ids={"project_id": project_id_1})
-    await asyncio.sleep(0.5)
-    id_4 = await db_client.insert('samples', sample_4, ids={"project_id": project_id_2})
-    yield {
-           "project_id_1": project_id_1,
-           "project_id_2": project_id_2,
-           "sample_id_1": id_1,
-           "sample_id_2": id_2,
-           "sample_id_3": id_3,
-           "sample_id_4": id_4,
-           }
-    await db_client.delete_filtered_documents('projects')
-    await db_client.delete_filtered_documents('samples')
     
 @pytest_asyncio.fixture(scope="function")
 async def db_all(db_client):
