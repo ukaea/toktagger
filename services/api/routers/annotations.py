@@ -164,7 +164,7 @@ async def add_annotations(
         "sample_id": convert_to_objectid(sample_id, "samples"),
     }
 
-    print(annotations)
+    print("anns are", annotations)
     if len(annotations) == 0:
         # Nothing to do!
         return
