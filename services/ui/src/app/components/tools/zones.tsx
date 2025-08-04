@@ -158,6 +158,7 @@ export const Zones = ({
                     .style("cursor", "move")
                     .datum(zone)
                     .call(getBoundaryHandler(true))
+                    .on("contextmenu", handleContextMenu)
 
                 graphGroup.append("rect")
                     .attr("class", "zone rightHandle disable-on-shift")
@@ -170,6 +171,7 @@ export const Zones = ({
                     .style("cursor", "move")
                     .datum(zone)
                     .call(getBoundaryHandler(false))
+                    .on("contextmenu", handleContextMenu)
             }
         }))
         
