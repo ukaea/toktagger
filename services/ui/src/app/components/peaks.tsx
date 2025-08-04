@@ -42,23 +42,25 @@ export function FindPeaksTool({
     name: value,
   }));
 
+  const validSignal = signalName !== null && (signalName in data.values)
+
   const clearPeaks = () => {
     setAnnotations([]);
   };
 
   useEffect(() => {
-    if (data && signalName && signalName in data.values) {
+    if (data && validSignal) {
       const time = data.values[signalName].time;
       const tmin = Math.min(...time);
       const tmax = Math.max(...time);
       setTimeMinDefault(tmin);
       setTimeMaxDefault(tmax);
     }
-  }, [data, signalName]);
+  }, [data, signalName, validSignal]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (signalName === null || !(signalName in data.values)) {
+      if (!validSignal) {
         return;
       }
 
@@ -84,7 +86,7 @@ export function FindPeaksTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, prominence, distance, timeRange, signalName]);
+  }, [project_id, sample_id, prominence, distance, timeRange, signalName, setAnnotations, validSignal]);
 
   return (
     <Provider theme={defaultTheme}>

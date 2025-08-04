@@ -115,7 +115,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           d.x1 = x1;
           handleZoneUpdate();
         })
-        .on("end", function (event, d) {
+        .on("end", function (_event, _d) {
           handleZoneDragFinish();
         });
 
@@ -174,15 +174,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .call(getBoundaryHandler(false));
       }
     });
-  }, [
-    handleZoneUpdate,
-    plotId,
-    plotReady,
-    showZoneMenu,
-    zones,
-    triggerUpdate,
-    forceUpdate,
-  ]);
+  }, [handleZoneUpdate, plotId, plotReady, showZoneMenu, zones, triggerUpdate, forceUpdate, handleZoneDragFinish]);
 
   return <div />;
 };

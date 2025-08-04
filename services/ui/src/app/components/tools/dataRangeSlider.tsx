@@ -1,5 +1,4 @@
 "use client";
-import { ViewParams } from "@/types";
 import { RangeSlider } from "@adobe/react-spectrum";
 import { RangeValue } from "@react-types/shared";
 import { useEffect, useState } from "react";
@@ -24,8 +23,8 @@ export function DataRangeSlider({
   useEffect(() => {
     if (data && (timeMinDefault === null || timeMinDefault === null)) {
       const time = data;
-      let tmin = Math.min(...time);
-      let tmax = Math.max(...time);
+      const tmin = Math.min(...time);
+      const tmax = Math.max(...time);
       setTimeMinDefault(tmin);
       setTimeMaxDefault(tmax);
       setTimeRange({ start: tmin, end: tmax });

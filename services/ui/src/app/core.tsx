@@ -13,7 +13,7 @@ export const getURL = (url: string) => {
     };
 
     fetchData();
-  }, []);
+  }, [url]);
 
   return data;
 };
@@ -31,7 +31,7 @@ export const getSamples = (project_id: string): Sample[] | null => {
     };
 
     fetchData();
-  }, []);
+  }, [project_id]);
 
   return samples;
 };
@@ -52,7 +52,7 @@ export const getSample = (
     };
 
     fetchData();
-  }, []);
+  }, [project_id, sample_id]);
 
   return sample;
 };
@@ -88,7 +88,7 @@ export const getProject = (project_id: string): Project | null => {
     };
 
     fetchData();
-  }, []);
+  }, [project_id]);
 
   return project;
 };
@@ -117,7 +117,7 @@ export const getSampleData = (
     };
 
     fetchData();
-  }, []);
+  }, [project_id, sample_id, viewParams]);
 
   return sampleData;
 };
