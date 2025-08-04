@@ -146,15 +146,19 @@ export const Zones = ({
                     .datum(zone)
                     .call(drag)
                     .on("contextmenu", handleContextMenu)
+                
+                // dynamic handle width: min(20px, half the span) so handles never cover entire zone
+                const spanWidth = x1 - x0
+                const handleWidth = Math.min(20, spanWidth / 2)
 
                 graphGroup.append("rect")
                     .attr("class", "zone leftHandle disable-on-shift")
-                    .attr("x", x0-10)
+                    .attr("x", x0 - handleWidth/2)
                     .attr("y", upperLimit)
-                    .attr("width", 20)
+                    .attr("width", handleWidth)
                     .attr("height", height)
                     .attr("fill", "transparent")
-                    .attr("style", "pointer-events: all")
+                    .style("pointer-events", "all") 
                     .style("cursor", "move")
                     .datum(zone)
                     .call(getBoundaryHandler(true))
@@ -162,12 +166,12 @@ export const Zones = ({
 
                 graphGroup.append("rect")
                     .attr("class", "zone rightHandle disable-on-shift")
-                    .attr("x", x1-10)
+                    .attr("x", x1 - handleWidth/2)
                     .attr("y", upperLimit)
-                    .attr("width", 20)
+                    .attr("width", handleWidth)
                     .attr("height", height)
                     .attr("fill", "transparent")
-                    .attr("style", "pointer-events: all")
+                    .style("pointer-events", "all")
                     .style("cursor", "move")
                     .datum(zone)
                     .call(getBoundaryHandler(false))
