@@ -161,6 +161,8 @@ async def predict(
     
     # Find the latest created model for this project
     model = await utils.get_model(db_client, project_id, model_type, status="completed", version=version)
+    if model.training_status != "completed":
+        raise HTTPException(status_code=409, detail="Cannot make predictions using a model version which has not successfully finished training.")
 
     # Create predictions using the given model for this project
     # Predict on samples as specified by filters

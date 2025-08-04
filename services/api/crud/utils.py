@@ -63,7 +63,7 @@ async def get_annotations(
 
 
 async def get_samples(
-    db_client: MongoDBClient, project_id: str, validated: Optional[bool] = None, start: int = 0, end: Optional[int] = None
+    db_client: MongoDBClient, project_id: str, validated: Optional[bool] = None, start: int = 0, end: Optional[int] = None, sort_by: str = "timestamp"
 ) -> list[Sample]:
     # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -79,7 +79,7 @@ async def get_samples(
     samples = await db_client.get_filtered_documents(
         collection="samples",
         filters=filters,
-        sort_by="timestamp",
+        sort_by=sort_by,
         sort_direction=-1,
         start=start,
         limit=end - start + 1 if end is not None else 0,
