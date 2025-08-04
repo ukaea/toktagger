@@ -19,8 +19,8 @@ export const SampleBreadCrumbs = (info) => {
 type SamplesTableProps = {
   project_id: string;
   samples: Sample[];
-  sortDescriptor: SortDescriptor<Sample>;
-  onSortChange: (sort: SortDescriptor<Sample>) => void;
+  sortDescriptor: SortDescriptor;
+  onSortChange: (sort: SortDescriptor) => void;
 }
 
 export const SamplesTable = ({project_id, samples, sortDescriptor, onSortChange}: SamplesTableProps) => {
@@ -63,7 +63,7 @@ export default function ProjectView({params} : ProjectViewInfo) {
 
   const [samplesPerPage, setSamplesPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor<Sample>>({ column: 'shot_id', direction: 'ascending' });
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: 'shot_id', direction: 'ascending' });
 
   
   const project_id = use(params).project_id;
@@ -78,7 +78,7 @@ export default function ProjectView({params} : ProjectViewInfo) {
     return;
   }
 
-  const onSortChange = (newSortDescriptor: SortDescriptor<Sample>) => {
+  const onSortChange = (newSortDescriptor: SortDescriptor) => {
     setSortDescriptor(newSortDescriptor);
   };
 
@@ -98,7 +98,15 @@ export default function ProjectView({params} : ProjectViewInfo) {
             </Button>
             <div className="flex items-center justify-center gap-8 pb-2">
               <p> Page: {currentPage} </p>
-            <Picker label="Samples per Page:" onSelectionChange={(selected) => {setSamplesPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
+            <Picker 
+              label="Samples per Page:" 
+              onSelectionChange={(selected) => {
+                if (selected != null) {
+                  setSamplesPerPage(selected); 
+                  setCurrentPage(1);
+                }
+                }} 
+              defaultSelectedKey="5">
               <Item key="2">2</Item>
               <Item key="5">5</Item>
               <Item key="10">10</Item>

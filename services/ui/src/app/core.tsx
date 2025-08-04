@@ -19,7 +19,7 @@ export const getURL = (url: string) => {
   return data;
 }
 
-export const getSamples = (sortDescriptor: SortDescriptor<Sample>, project_id: string, page: number, samplesPerPage: number): Sample[] | null => {
+export const getSamples = (sortDescriptor: SortDescriptor, project_id: string, page: number, samplesPerPage: number): Sample[] | null => {
   const [samples, setSamples] = useState<any>(null);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export const getSample = (project_id: string, sample_id: string) => {
   return sample;
 } 
 
-export const getProjects = (sortDescriptor: SortDescriptor<Project>, page: number, projectsPerPage: number): Project[] | null => {
+export const getProjects = (sortDescriptor: SortDescriptor, page: number, projectsPerPage: number): Project[] | null => {
   const [projects, setProjects] = useState<any>(null);
 
   useEffect(() => {
