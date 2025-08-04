@@ -1,14 +1,14 @@
 "use client";
 import { getProjects } from '@/app/core';
-import { use, useState, useEffect } from 'react';
+import { useState } from 'react';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker, SearchField} from '@adobe/react-spectrum'
 import type { SortDescriptor } from '@react-types/shared';
 import type { Project } from '@/types';
 
 type ProjectsTableProps = {
   projects: Project[];
-  sortDescriptor: SortDescriptor<Project>;
-  onSortChange: (sort: SortDescriptor<Project>) => void;
+  sortDescriptor: SortDescriptor;
+  onSortChange: (sort: SortDescriptor) => void;
 }
 
 export const ProjectsBreadCrumbs = () => {
@@ -30,6 +30,7 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange}: Projects
   return (
     <Provider theme={defaultTheme}>
       <TableView
+      aria-label="Projects"
       selectionMode="none"
       selectionStyle="highlight"
       sortDescriptor={sortDescriptor}
@@ -60,14 +61,14 @@ export default function Projects() {
   const [projectsPerPage, setProjectsPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [projectName, setProjectName] = useState<string>("");
-  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor<Project>>({ column: '_id', direction: 'descending' });
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: '_id', direction: 'descending' });
   
   const projects = getProjects(sortDescriptor, currentPage, projectsPerPage, projectName);
   if (!projects) {
     return;
   }
 
-  const onSortChange = (newSortDescriptor: SortDescriptor<Project>) => {
+  const onSortChange = (newSortDescriptor: SortDescriptor) => {
     setSortDescriptor(newSortDescriptor);
   };
 
@@ -90,7 +91,15 @@ export default function Projects() {
               </Button>
               <div className="flex items-center justify-center gap-8 pb-2">
                 <p> Page: {currentPage} </p>
-              <Picker label="Projects per Page:" onSelectionChange={(selected) => {setProjectsPerPage(selected); setCurrentPage(1)}} defaultSelectedKey="5">
+              <Picker 
+              label="Projects per Page:" 
+              onSelectionChange={(selected) => {
+                if (selected != null) {
+                  setProjectsPerPage(selected); 
+                  setCurrentPage(1);
+                  }
+                }} 
+              defaultSelectedKey="5">
                 <Item key="2">2</Item>
                 <Item key="5">5</Item>
                 <Item key="10">10</Item>

@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from 'react';
 import type { SortDescriptor } from '@react-types/shared';
-import type { Project, Sample } from '@/types';
+import type { Data, Project, Sample, ViewParams } from '@/types';
 
 export const getURL = (url: string) => {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Data | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -14,12 +14,12 @@ export const getURL = (url: string) => {
     };
 
     fetchData();
-  }, []);
+  }, [url]);
 
   return data;
-}
+};
 
-export const getSamples = (sortDescriptor: SortDescriptor<Sample>, project_id: string, page: number, samplesPerPage: number, shotId: string): Sample[] | null => {
+export const getSamples = (sortDescriptor: SortDescriptor, project_id: string, page: number, samplesPerPage: number): Sample[] | null => {
   const [samples, setSamples] = useState<any>(null);
 
   useEffect(() => {
@@ -41,25 +41,30 @@ export const getSamples = (sortDescriptor: SortDescriptor<Sample>, project_id: s
   }, [sortDescriptor, project_id, page, samplesPerPage, shotId]);
 
   return samples;
-} 
+};
 
-export const getSample = (project_id: string, sample_id: string) => {
-  const [sample, setSample] = useState<any>(null);
+export const getSample = (
+  project_id: string,
+  sample_id: string
+): Sample | null => {
+  const [sample, setSample] = useState<Sample | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`
+      );
       const data = await response.json();
       setSample(data);
     };
 
     fetchData();
-  }, []);
+  }, [project_id, sample_id]);
 
   return sample;
-} 
+};
 
-export const getProjects = (sortDescriptor: SortDescriptor<Project>, page: number, projectsPerPage: number, name: string): Project[] | null => {
+export const getProjects = (sortDescriptor: SortDescriptor, page: number, projectsPerPage: number): Project[] | null => {
   const [projects, setProjects] = useState<any>(null);
 
   useEffect(() => {
@@ -82,14 +87,16 @@ export const getProjects = (sortDescriptor: SortDescriptor<Project>, page: numbe
   }, [sortDescriptor, page, projectsPerPage, name]);
 
   return projects;
-} 
+};
 
 export const getProject = (project_id: string): Project | null => {
-  const [project, setProject] = useState<any>(null);
+  const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`
+      );
       const data = await response.json();
       setProject(data);
     };
@@ -98,26 +105,33 @@ export const getProject = (project_id: string): Project | null => {
   }, [project_id]);
 
   return project;
-} 
+};
 
-export const getSampleData = (project_id: string, sample_id: string, viewParams) => {
-  const [sampleData, setSampleData] = useState<any>(null);
+export const getSampleData = (
+  project_id: string,
+  sample_id: string,
+  viewParams: ViewParams
+): Sample | null => {
+  const [sampleData, setSampleData] = useState<Sample | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
-        method: 'POST',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(viewParams),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(viewParams),
+        }
+      );
       const data = await response.json();
       setSampleData(data);
     };
 
     fetchData();
-  }, []);
+  }, [project_id, sample_id, viewParams]);
 
   return sampleData;
-} 
+};
