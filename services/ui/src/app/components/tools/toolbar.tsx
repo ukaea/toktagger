@@ -122,7 +122,7 @@ export function ShotSearch({project_id, sample_id, annotations} : SaveInfo) {
   return  <SearchField 
             label="Jump to Shot" 
             onSubmit={onSearchSubmit}
-            validationState={errorMessage ? 'invalid' : ''}
+            validationState={errorMessage ? 'invalid' : undefined}
             errorMessage={errorMessage} >
           </SearchField>
 }

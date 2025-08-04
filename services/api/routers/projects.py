@@ -50,7 +50,7 @@ async def get_projects(
     if name:
         # Search with regex, return any projects which start with the searched for string, case insensitive
         filters['name'] = {
-            "$regex": f"^{name}",
+            "$regex": f"{name}",
             "$options": "i"
         }
         

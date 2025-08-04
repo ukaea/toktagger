@@ -123,9 +123,8 @@ export default function ProjectView({
           // SearchField should be able to do validation when provided a 'pattern' inside a Form element
           // But I could not for the life of me get that to work, so will do it manually...
           onSubmit={onSearchSubmit}
-          validationState={errorMessage ? 'invalid' : ''}
-          errorMessage={errorMessage} >
-          </SearchField>
+          validationState={errorMessage ? 'invalid' : undefined}
+          errorMessage={errorMessage} />
         </div>
         <SamplesTable project_id={project_id} samples={samples} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></SamplesTable>
           <div className="flex items-center justify-between pl-4 pr-4">

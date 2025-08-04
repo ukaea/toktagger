@@ -82,7 +82,13 @@ export default function Projects() {
           </h1>
           <Provider theme={defaultTheme}>
           <div className="pl-4">
-            <SearchField label="Search By Name" onSubmit={(name) => {setProjectName(name); setCurrentPage(1)}}></SearchField>
+            <SearchField label="Search By Name" onSubmit={
+              (name) => {
+                if (name != null) {
+                  setProjectName(name); 
+                  setCurrentPage(1);
+                }
+              }}/>
           </div>
           <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
             <div className="flex items-center justify-between pl-4 pr-4">
