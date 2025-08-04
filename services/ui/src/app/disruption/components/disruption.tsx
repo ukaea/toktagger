@@ -8,6 +8,7 @@ import { ContextMenuProvider } from "@/app/components/providers/context-menu-pro
 import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import { VSpans } from "@/app/components/tools/vspans"
+import React, { useEffect } from "react"
 
 type DisruptionInfo = {
     data: {
@@ -100,6 +101,11 @@ export const Disruption = ({ data, annotations, setAnnotations }: DisruptionInfo
 
         setAnnotations(spans);
     }
+
+    useEffect(() => {
+        updateAnnotations(initialDisruption);
+    }, [initialDisruption]);
+
     return (
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="disruption-menu">

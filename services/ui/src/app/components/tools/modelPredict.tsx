@@ -12,6 +12,7 @@ export function ModelPredictModal({project}) { // Project should be typed somewh
     let [numPredictions, setNumPredictions] = useState<string>("20");
     const [message, setMessage] = useState<string | null>(null);
     const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
+    const [refresh, setRefresh] = useState(0)
     const buttonStyle = {
         position: 'fixed',
         top: 10,
@@ -19,18 +20,34 @@ export function ModelPredictModal({project}) { // Project should be typed somewh
         zIndex: 1000
     };
 
+    const fetchData = async () => {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models`);
+        const data = await response.json();
+        setModels(data);
+        };
+
     useEffect( () => {
-        const fetchData = async () => {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models`);
-            const data = await response.json();
-            setModels(data);
-            };
         fetchData();
         setMessage(null);
         setMessageIcon(null);
         setSelectedKeys(new Set([]))
 
-    }, [modalOpen, project._id]);
+    }, [modalOpen]);
+
+    useEffect( () => {
+        let timer: ReturnType<typeof setInterval>;
+
+        if (modalOpen) {
+            timer = setInterval(() => {
+                setRefresh((last) => last + 1)
+            }, 5000);
+        }
+        return () => clearInterval(timer);
+    }, [modalOpen])
+
+    useEffect( () => {
+        fetchData();
+    }, [refresh]);
 
     if (!models) {
         return;

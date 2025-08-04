@@ -41,6 +41,7 @@ type Props = {
 
 async function saveAnnotations(project_id: string, sample_id: string, annotations) {
     const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+    annotations.validated = true;
     const response = await fetch(ANNOTATIONS_URL, {
         method: 'PUT',
         headers: {
