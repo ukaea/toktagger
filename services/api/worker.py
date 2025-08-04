@@ -10,7 +10,7 @@ from services.api.core.models import MODELS, DisruptionCNN
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.views import DATA_VIEWS
 from services.api.schemas.projects import Project, Task
-from services.api.schemas.samples import Sample
+from services.api.schemas.samples import Sample, SampleUpdate
 from services.api.schemas.annotations import Annotation, AnnotationTypes, TimePoint
 from services.api.schemas.models import ModelIn, Model, ModelUpdate
 import pathlib
@@ -43,8 +43,9 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         
         # Get all validated samples and annotations for this project
         annotations = await utils.get_annotations(db_client, project.id, validated=True)
+        print(f"Collected {len(annotations)} annotations.")
         samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project.id, validated=True)]
-        
+        print(f"Collected {len(samples)} samples.")
         # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
         annotator_model = TypeAdapter(AnnotationTypes)
         
@@ -80,7 +81,7 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
     # Where inference is run on some batch of samples first
-    print(f"Creating predictions for project {project.id}")
+    print(f"Creating predictions for project {project.id} on {len(samples)} samples.")
     
     # Create db connection - TODO should this be here or at a per worker / per session level?
     db_client = MongoDBClient(mongo_url, db_name)
@@ -99,6 +100,8 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
             models = predictions[i],
             ids={"project_id": ObjectId(project.id), "sample_id": ObjectId(sample.id)}
         )
+        await utils.update_sample(db_client, sample.id, updates=SampleUpdate(validated_annotations=False))
+    print("Predictions complete!")
     return predictions
     
 @app.task()

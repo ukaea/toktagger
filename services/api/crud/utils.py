@@ -44,6 +44,7 @@ async def get_annotations(
     validated: Optional[bool] = None,
     start: int = 0,
     end: Optional[int] = None,
+    sort_by: str = "timestamp"
 ) -> list[Annotation]:
     project_obj_id = convert_to_objectid(project_id, "projects")
     db_filters = {"project_id": project_obj_id}
@@ -53,7 +54,7 @@ async def get_annotations(
     annotations = await db_client.get_filtered_documents(
         collection="annotations",
         filters=db_filters,
-        sort_by="timestamp",
+        sort_by=sort_by,
         sort_direction=-1,
         start=start,
         limit=end - start + 1 if end is not None else 0,

@@ -7,8 +7,8 @@ from services.api.schemas.projects import QueryStrategyType
 
 class QueryStrategy(ABC):
     def __init__(self, samples: list[Sample], annotations: list[Annotation]):
-        # Samples should be listed by shot ID - low to high
-        # Annotations should be listed by uncertaity, low to high (for consistency?)
+        # Samples should be listed by timestamp, high to low
+        # Annotations should be listed by uncertaity, high to low
         self.samples = samples
         self.annotations = annotations
     
@@ -51,10 +51,15 @@ class UncertaintyQueryStrategy(QueryStrategy):
         if len(self.annotations) == 0:
             print("Warning: No unvalidated annotations available - falling back to random sample selection.")
             index = random.randint(0, len(self.samples) - 1)
+            return self.samples.pop(index)
         else:
-            index = -1
-        
-        return self.samples.pop(index)
+            sample_id = self.annotations.pop(0).sample_id
+            next_sample = next((sample for sample in self.samples if sample.id == sample_id), None)
+            if not next_sample:
+                print("Error: Most uncertain annotation does not link to a sample")
+                index = random.randint(0, len(self.samples) - 1)
+                return self.samples.pop(index)
+            return next_sample
         
         
     
