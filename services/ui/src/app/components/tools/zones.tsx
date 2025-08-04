@@ -78,6 +78,11 @@ export const Zones = ({
 
             const xaxis = plot._fullLayout.xaxis;
 
+            // Minimum width in data units: 1% of current x-range
+            const [xMin, xMax] = xaxis.range as [number, number];
+            const MIN_WIDTH_FRACTION = 0.01;
+            const minWidth = (xMax - xMin) * MIN_WIDTH_FRACTION;
+
             const graphGroup = d3.select(overplot)
             graphGroup.selectAll(".zone").remove() // All zones are removed each render cycle
 
