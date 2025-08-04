@@ -176,7 +176,7 @@ async def get_next_sample(
     project = await utils.get_project(db_client, project_id)
     
     # Only consider samples that have not been human annotated
-    samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project_id, validated=False)]
+    samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project_id, validated=False, sort_by="shot_id")]
     annotations = [Annotation(**annotation) for annotation in await utils.get_annotations(db_client, project_id, validated=False, sort_by="uncertainty")]
     print(f"found {len(samples)} non validated samples")
     print(f"found {len(annotations)} non validated annotations")

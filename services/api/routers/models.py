@@ -139,6 +139,10 @@ async def predict(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
     model_type: ModelType = Path(description="The type of model to use for predictions."),
+    version: int = Query(
+        None,
+        description="Version of model to use, leave blank for latest version"
+    ),
     num_predictions: int = Query(
         20,
         description="The maximum number of samples to make predictions for, default is 20."
@@ -156,14 +160,16 @@ async def predict(
         raise HTTPException(status_code=422, detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}")
     
     # Find the latest created model for this project
-    model = await utils.get_model(db_client, project_id, model_type, status="completed")
+    model = await utils.get_model(db_client, project_id, model_type, status="completed", version=version)
+    if model.training_status != "completed":
+        raise HTTPException(status_code=409, detail="Cannot make predictions using a model version which has not successfully finished training.")
 
     # Create predictions using the given model for this project
     # Predict on samples as specified by filters
     # Stores results in the database with validated=False
     if not sample_ids:
         # Get samples with no human annotations
-        selected_samples = await utils.get_samples(db_client, project.id, annotated=False)
+        selected_samples = await utils.get_samples(db_client, project.id, validated=False)
     else:
         selected_samples = [
             await utils.get_sample(db_client, sample_id)
