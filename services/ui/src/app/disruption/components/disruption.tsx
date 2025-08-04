@@ -101,11 +101,6 @@ export const Disruption = ({ data, annotations, setAnnotations }: DisruptionInfo
 
         setAnnotations(spans);
     }
-
-    useEffect(() => {
-        updateAnnotations(initialDisruption);
-    }, [initialDisruption]);
-
     return (
         <div className="flex flex-col items-center space-y-3">
             <ContextMenuProvider menuId="disruption-menu">
