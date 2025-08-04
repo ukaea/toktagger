@@ -10,11 +10,12 @@ PROJECT = ProjectIn(
         data_loader="uda"
     )
 SAMPLE = SampleIn(
-        shot_id=1,
+        shot_id=0,
         data=ShotData(protocol="uda", signal_names=["Ip"]),
         annotations=None
     ) 
 
 ANNOTATION = AnnotationIn(
-    label="annotation"
+    label="annotation",
+    validated=True
 )

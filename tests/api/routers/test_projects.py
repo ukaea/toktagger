@@ -3,12 +3,12 @@ import asyncio
 from bson.objectid import ObjectId
 
 @pytest.mark.asyncio
-async def test_get_all_projects(api_client, db_projects):
+async def test_get_all_projects(api_client, setup_db):
     response = await api_client.get("/projects")
     assert response.status_code == 200
     returned_projects = response.json()
     assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_1", "test_project_2"]
-    assert [project['_id'] for project in returned_projects] == db_projects
+    assert [project['_id'] for project in returned_projects] == [setup_db["project_id_1"], setup_db["project_id_2", setup_db["project_id_3"]]]
     
 @pytest.mark.asyncio
 async def test_get_projects_start(api_client, setup_db):
@@ -20,7 +20,7 @@ async def test_get_projects_start(api_client, setup_db):
     assert [project['name'] for project in returned_projects] == ["test_project_1", "test_project_2"]
     
 @pytest.mark.asyncio
-async def test_get_projects_end(api_client, db_projects):
+async def test_get_projects_end(api_client, setup_db):
     response = await api_client.get("/projects?end=1")
     # Should return 2 projects
     assert response.status_code == 200
@@ -29,33 +29,32 @@ async def test_get_projects_end(api_client, db_projects):
     assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_1"]
     
 @pytest.mark.asyncio
-async def test_get_projects_start_end(api_client, db_projects):
+async def test_get_projects_start_end(api_client, setup_db):
     response = await api_client.get("/projects?start=1&end=1")
-    # Should return 2 projects
+    # Should return 1 project
     assert response.status_code == 200
     returned_projects = response.json()
     assert len(returned_projects) == 1
     assert [project['name'] for project in returned_projects] == ["test_project_1"]
     
 @pytest.mark.asyncio
-async def test_get_projects_invalid_start(api_client, db_projects):
+async def test_get_projects_invalid_start(api_client, setup_db):
     response = await api_client.get("/projects?start=10")
-    # Should return 2 projects
+    # Should return 0 projects
     assert response.status_code == 200
     returned_projects = response.json()
     assert len(returned_projects) == 0
     
 @pytest.mark.asyncio
-async def test_get_projects_invalid_start_lessthan_end(api_client, db_projects):
+async def test_get_projects_invalid_start_lessthan_end(api_client, setup_db):
     response = await api_client.get("/projects?start=2&end=1")
     # Should raise a bad request exception
     assert response.status_code == 400
     assert 'Invalid parameters - end must be higher than start' in response.json().get("detail")
     
 @pytest.mark.asyncio
-async def test_get_project_id(api_client, db_projects):
-    project_id = db_projects[0]
-    response = await api_client.get(f"/projects/{project_id}")
+async def test_get_project_id(api_client, setup_db):
+    response = await api_client.get(f"/projects/{setup_db['project_id_1']}")
     assert response.status_code == 200
     returned_project = response.json()
     # Check info matches what we created the entry with
@@ -65,21 +64,31 @@ async def test_get_project_id(api_client, db_projects):
     assert returned_project.get("data_loader") == "uda"
     
     # Then also check ID and timestamp are returned - should have been added automatically
-    assert returned_project.get("_id") == project_id
+    assert returned_project.get("_id") == setup_db['project_id_1']
     assert returned_project.get("timestamp")
     
 @pytest.mark.asyncio
-async def test_delete_project(api_client, db_projects, db_client):
-    project_id = db_projects[0]
-    response = await api_client.delete(f"/projects/{project_id}")
+async def test_delete_project(api_client, setup_db, db_client):
+    response = await api_client.delete(f"/projects/{setup_db['project_id_2']}")
     assert response.status_code == 200
     
     # Check there are two projects left in the database
     projects = await db_client.get_all_documents("projects")
     assert len(projects) == 2
-    
     # Check project with above ID no longer in database
-    assert project_id not in [project.get("_id") for project in projects]
+    assert setup_db['project_id_1'] not in [project.get("_id") for project in projects]
+    
+    # Check samples associated with this project have been deleted
+    samples = await db_client.get_all_documents("projects")
+    assert len(samples) == 3
+    # Check sample associated with above project no longer in database
+    assert setup_db['sample_id_4'] not in [sample.get("_id") for sample in samples]
+    
+    # Check annotations associated with this project have been deleted
+    annotations = await db_client.get_all_documents("annotations")
+    assert len(annotations) == 3
+    # Check annotation associated with above project no longer in database
+    assert setup_db['annotation_id_4'] not in [annotation.get("_id") for annotation in annotations]
     
     
 @pytest.mark.asyncio

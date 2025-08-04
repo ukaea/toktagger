@@ -6,7 +6,8 @@ from services.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
 from contextlib import asynccontextmanager
 from services.api.schemas.projects import ProjectIn
-from services.api.schemas.samples import SampleIn, ShotData
+from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
+from services.api.schemas.annotations import TimePoint, TimeRegion
 from tests.db_definitions import PROJECT, SAMPLE, ANNOTATION
 
 import time
@@ -48,7 +49,7 @@ async def api_client(mongo_container):
     await lifespan_ctx.__aexit__(None, None, None)
 
 @pytest_asyncio.fixture(scope="function")
-async def db_projects(db_client):
+async def setup_db(db_client):
     project_1 = PROJECT
     project_2 = ProjectIn(
         name="test_project_1",
@@ -62,13 +63,100 @@ async def db_projects(db_client):
         query_strategy="uncertainty",
         data_loader="parquet"
     )
-    id_1 = await db_client.insert('projects', project_1)
+    sample_1 = SAMPLE
+    sample_2 = SampleIn(
+        shot_id=1,
+        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="file", column_names=["Ip"]),
+        annotations=None
+    ) 
+    sample_3 = SampleIn(
+        shot_id=2,
+        data=TimeSeriesFileData(file_name="test.parquet", type="parquet", protocol="s3", column_names=["Ip"]),
+        annotations=None
+    ) 
+    sample_4 = SampleIn(
+        shot_id=3,
+        data=ShotData(protocol="sal", signal_names=["Ip"]),
+        annotations=None
+    )
+    annotation_1 = ANNOTATION
+    annotation_2 = TimePoint(time=0.1, label="disruption", validated=True)
+    annotation_3 = TimeRegion(time_min=0.1, time_max=0.2, label="ramp_up", validated=True)
+    annotation_4 = TimePoint(time=0.3, label="disruption", validated=False)
+    project_id_1 = await db_client.insert('projects', project_1)
     await asyncio.sleep(0.5)
-    id_2 = await db_client.insert('projects', project_2)
+    project_id_2 = await db_client.insert('projects', project_2)
     await asyncio.sleep(0.5)
-    id_3 = await db_client.insert('projects', project_3)
-    yield [id_1, id_2, id_3]
+    project_id_3 = await db_client.insert('projects', project_3)
+    await asyncio.sleep(0.5)
+    sample_id_1 = await db_client.insert('samples', sample_1, ids={"project_id": project_id_1})
+    await asyncio.sleep(0.5)
+    sample_id_2 = await db_client.insert('samples', sample_2, ids={"project_id": project_id_1})
+    await asyncio.sleep(0.5)
+    sample_id_3 = await db_client.insert('samples', sample_3, ids={"project_id": project_id_1})
+    await asyncio.sleep(0.5)
+    sample_id_4 = await db_client.insert('samples', sample_4, ids={"project_id": project_id_2})
+    await asyncio.sleep(0.5)
+    annotation_id_1 = await db_client.insert('annotations', annotation_1, ids={"project_id": project_id_1, "sample_id": sample_id_1})
+    await asyncio.sleep(0.5)
+    annotation_id_2 = await db_client.insert('annotations', annotation_2, ids={"project_id": project_id_1, "sample_id": sample_id_1})
+    await asyncio.sleep(0.5)
+    annotation_id_3 = await db_client.insert('annotations', annotation_3, ids={"project_id": project_id_1, "sample_id": sample_id_1})
+    await asyncio.sleep(0.5)
+    annotation_id_4 = await db_client.insert('annotations', annotation_4, ids={"project_id": project_id_2, "sample_id": sample_id_4})
+    yield {
+           "project_id_1": project_id_1,
+           "project_id_2": project_id_2,
+           "project_id_3": project_id_3,
+           "sample_id_1": sample_id_1,
+           "sample_id_2": sample_id_2,
+           "sample_id_3": sample_id_3,
+           "sample_id_4": sample_id_4,
+           "annotation_id_1": annotation_id_1,
+           "annotation_id_2": annotation_id_2,
+           "annotation_id_3": annotation_id_3,
+           "annotation_id_4": annotation_id_4,
+           }
     await db_client.delete_filtered_documents('projects')
+    
+@pytest_asyncio.fixture(scope="function")
+async def db_samples(db_client):
+    project_id_1 = await db_client.insert('projects', PROJECT)
+    project_id_2 = await db_client.insert('projects', PROJECT)
+    
+    sample_2 = SampleIn(
+        shot_id=1,
+        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="file", column_names=["Ip"]),
+        annotations=None
+    ) 
+    sample_3 = SampleIn(
+        shot_id=2,
+        data=TimeSeriesFileData(file_name="test.parquet", type="parquet", protocol="s3", column_names=["Ip"]),
+        annotations=None
+    ) 
+    sample_4 = SampleIn(
+        shot_id=3,
+        data=ShotData(protocol="sal", column_names=["Ip"]),
+        annotations=None
+    )
+    await asyncio.sleep(0.5)
+    id_1 = await db_client.insert('samples', SAMPLE, ids={"project_id": project_id_1})
+    await asyncio.sleep(0.5)
+    id_2 = await db_client.insert('samples', sample_2, ids={"project_id": project_id_1})
+    await asyncio.sleep(0.5)
+    id_3 = await db_client.insert('samples', sample_3, ids={"project_id": project_id_1})
+    await asyncio.sleep(0.5)
+    id_4 = await db_client.insert('samples', sample_4, ids={"project_id": project_id_2})
+    yield {
+           "project_id_1": project_id_1,
+           "project_id_2": project_id_2,
+           "sample_id_1": id_1,
+           "sample_id_2": id_2,
+           "sample_id_3": id_3,
+           "sample_id_4": id_4,
+           }
+    await db_client.delete_filtered_documents('projects')
+    await db_client.delete_filtered_documents('samples')
     
 @pytest_asyncio.fixture(scope="function")
 async def db_all(db_client):
