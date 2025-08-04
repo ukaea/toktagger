@@ -3,16 +3,26 @@ import { use, useState } from 'react';
 import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item} from '@adobe/react-spectrum'
 import { SortDescriptor } from '@react-types/shared';
-import type { Sample } from '@/types';
+import type { Project, Sample } from '@/types';
 
-export const SampleBreadCrumbs = (info) => {
+export const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   return (
-      <Provider theme={defaultTheme}>
-        <Breadcrumbs>
-          <Item key="projects" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}>Projects</Item>
-          <Item key="project" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${info.project.project_id}`}>Project: {info.project.name}</Item>
-        </Breadcrumbs>
-      </Provider>
+    <Provider theme={defaultTheme}>
+      <Breadcrumbs>
+        <Item
+          key="projects"
+          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}
+        >
+          Projects
+        </Item>
+        <Item
+          key="project"
+          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project._id}`}
+        >
+          Project: {project.name}
+        </Item>
+      </Breadcrumbs>
+    </Provider>
   );
 };
 
@@ -27,12 +37,13 @@ export const SamplesTable = ({project_id, samples, sortDescriptor, onSortChange}
 
   const rows = samples.map(({ _id, ...rest }) => ({
     ...rest,
-    id: _id
+    id: _id,
   }));
 
   return (
     <Provider theme={defaultTheme}>
       <TableView
+      aria-label="Samples"
       selectionMode="none"
       selectionStyle="highlight"
       sortDescriptor={sortDescriptor}
@@ -43,30 +54,33 @@ export const SamplesTable = ({project_id, samples, sortDescriptor, onSortChange}
           <Column key="_id" allowsSorting>Date Created</Column>
         </TableHeader>
         <TableBody items={rows}>
-          {item => (
-            <Row href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${item['id']}`}>
-              <Cell>{item['shot_id']}</Cell>
-              <Cell>{item['timestamp']}</Cell>
+          {(item) => (
+            <Row
+              href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${item["id"]}`}
+            >
+              <Cell>{item["shot_id"]}</Cell>
+              <Cell>{item["timestamp"]}</Cell>
             </Row>
           )}
         </TableBody>
       </TableView>
     </Provider>
-  )
-}
-
-type ProjectViewInfo = {
-  params: { project_id: string };
+  );
 };
 
-export default function ProjectView({params} : ProjectViewInfo) {
-
+type ProjectViewProps = {
+  project_id: string;
+};
+export default function ProjectView({
+  params,
+}: {
+  params: Promise<ProjectViewProps>;
+}) {
   const [samplesPerPage, setSamplesPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: 'shot_id', direction: 'ascending' });
-
   
-  const project_id = use(params).project_id;
+  const { project_id } = use(params);
   const project = getProject(project_id);
   const samples = getSamples(sortDescriptor, project_id, currentPage, samplesPerPage);
 
@@ -120,6 +134,6 @@ export default function ProjectView({params} : ProjectViewInfo) {
           </Provider>
       </div>
     </div>
-  </div>
-  )
+    </div>
+  );
 }

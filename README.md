@@ -1,4 +1,6 @@
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # Overview
 
 Below is a high level overview of the project structure:
@@ -22,21 +24,6 @@ Below is a high level overview of the project structure:
 1. Install `docker` and `docker compose`: https://docs.docker.com/engine/install/
 2. Install and setup `git lfs`: https://git-lfs.com/
 
-## Setup local data
-Configure git LFS and pull the model
-```sh
-git lfs install
-git lfs pull
-```
-
-Build the relevant dataset for the ML model locally
-```sh
-uv venv --python 3.12.6 
-source .venv/bin/activate
-uv pip install -r ./scripts/requirements.txt
-python -m scripts.setup scripts/shots.csv
-```
-
 ## Run
 
 Run the application by running the following command:
@@ -52,3 +39,20 @@ This will start the following services:
 | `http://localhost:3001/`        | User Interface             |
 | `http://localhost:8002/`        | Backend API                |
 | `http://localhost:8081/`        | MongoExpress Admin Panel   |
+
+## Setup local data
+Once the application is running, the following setup script can be used to automatically set up a basic model
+
+Configure git LFS and pull the model
+```sh
+git lfs install
+git lfs pull
+```
+
+Build the relevant dataset for the ML model locally
+```sh
+uv venv --python 3.12.6 
+source .venv/bin/activate
+uv pip install -r ./scripts/requirements.txt
+python -m scripts.setup 
+```

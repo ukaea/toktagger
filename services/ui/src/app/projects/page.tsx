@@ -30,6 +30,7 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange}: Projects
   return (
     <Provider theme={defaultTheme}>
       <TableView
+      aria-label="Projects"
       selectionMode="none"
       selectionStyle="highlight"
       sortDescriptor={sortDescriptor}
