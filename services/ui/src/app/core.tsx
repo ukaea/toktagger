@@ -1,5 +1,5 @@
 "use client";
-import { Annotations, Data, Project, Sample, ViewParams } from '@/types';
+import { Annotations, Data, Project, Sample, SamplesSummary, ViewParams } from '@/types';
 import { useEffect, useState } from 'react';
 
 
@@ -85,7 +85,7 @@ export async function getSample(project_id: string, sample_id: string): Promise<
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
 }
 
-export async function getSamplesSummary(project_id: string): Promise<Sample[]> {
+export async function getSamplesSummary(project_id: string): Promise<SamplesSummary> {
     return await getData(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/summary`);
 }
 

@@ -28,7 +28,7 @@ type ProjectEditInfo = {
 export default function ProjectEdit({params}: ProjectEditInfo) {
   const projectId = use(params).project_id;
   const [project, setProject] = useState<Project | null>(null);
-  const [samplesSummary, setSamplesSummary] = useState<SamplesSummary[]>([]);
+  const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(null);
 
   useEffect(() => {
     const run = async () => {

@@ -1,3 +1,4 @@
+import exp from "constants";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
@@ -89,12 +90,29 @@ export const ProjectSchema = z.object({
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
+export const FileDataSchema = z.object({
+  file_name: z.string(),
+  type: z.string(),
+  protocol: z.string(),
+  column_names: z.array(z.string()),
+});
+export type FileData = z.infer<typeof FileDataSchema>;
+
+export const ShotDataSchema = z.object({
+  protocol: z.string(),
+  signal_names: z.array(z.string()),
+});
+export type ShotData = z.infer<typeof ShotDataSchema>;
+
+export const SampleDataSchema = z.union([FileDataSchema, ShotDataSchema]);
+export type SampleData = z.infer<typeof SampleDataSchema>;
+
 export const SampleSchema = z.object({
   _id: z.string().optional(),
   timestamp: z.string(),
   project_id: z.string(),
   shot_id: z.number(),
-  data: z.record(z.string(), DataSchema),
+  data: SampleDataSchema,
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
@@ -102,7 +120,7 @@ export const SamplesSummarySchema = z.object({
   total: z.number(),
   shot_min: z.number().optional(),
   shot_max: z.number().optional(),
-  data: DataSchema.optional()
+  data: SampleDataSchema
 });
 export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
 

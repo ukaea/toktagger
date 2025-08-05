@@ -3,7 +3,7 @@ import { z } from "zod/v4";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {Form, Flex, Button, ToastQueue, ListView, View, TextField, Text, ComboBox, RadioGroup, NumberField, Radio, Item} from '@adobe/react-spectrum'
-import { Project, Sample, SamplesSummary } from '@/types';
+import { Project, Sample, SamplesSummary, FileData, ShotData } from '@/types';
 
 const Tasks = [
   {'key': 'ELM', 'value': 'ELM'},
@@ -213,7 +213,7 @@ const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {da
   );
 }
 
-const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: DataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
+const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: DataLoaderOptions | null, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
   const name = dataLoaderOptions?.name ? dataLoaderOptions.name : null;
   const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
 
@@ -242,7 +242,7 @@ const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderO
   );
 }
 
-const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string, setTaskName: (selection: string) => void}) => {
+const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string | null, setTaskName: (selection: string) => void}) => {
   const handleSelectionChange = (key: React.Key | null) => {
     setTaskName(key ? String(key) : "");
   };
@@ -255,6 +255,132 @@ const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string, setTaskName
     </>
   );
 }
+
+
+const editProject = async (projectId: string, project: Project): Promise<string | null> => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(project),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    ToastQueue.negative(`Error editing project ${projectId}: ${error}`, {timeout: 3000})
+    return null;
+  }
+
+  return projectId;
+}
+
+const makeProject = async (project: Project): Promise<string | null> => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(project),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    ToastQueue.negative(`Error creating project: ${error}`, {timeout: 3000})
+    return null;
+  }
+
+  const projectId = (await response.json())["_id"];
+  return projectId;
+}
+
+const createSamples = (projectId: string, dataLoaderOptions: DataLoaderOptions): Sample[] | null => {
+  const fileTypes = FileTypes.map((item) => item.key);
+
+  if (dataLoaderOptions.name === 'uda') {
+    return createUDASamples(projectId, dataLoaderOptions);
+  } else if (fileTypes.includes(dataLoaderOptions.name)) {
+    return createFileSamples(projectId, dataLoaderOptions);
+  } else {
+    ToastQueue.negative(`Unknown data loader ${dataLoaderOptions.name}`, {timeout: 3000});
+    return null;
+  }
+}
+
+const createUDASamples = (projectId: string, dataLoaderOptions: DataLoaderOptions) => {
+    const { shot_min, shot_max } = dataLoaderOptions as UDADataLoaderOptions;
+    
+    const shots = Array.from({length: shot_max - shot_min + 1}, (_, i) => i + shot_min);
+    const shotData = {
+      signal_names: dataLoaderOptions.signal_names,
+      protocol: 'uda',
+    } as ShotData;
+
+    const samples: Sample[] = shots.map((shot_id: number) => ({
+      project_id: projectId,
+      timestamp: new Date().toISOString(),
+      shot_id: shot_id,
+      data: shotData
+    }));
+    return samples;
+}
+
+const createFileSamples = (projectId: string, dataLoaderOptions: DataLoaderOptions) => {
+    const options = dataLoaderOptions as FileDataLoaderOptions;
+    const fileNames = options.file_names;
+
+    // Assumption!: the file name must be the shot number.
+    const shots = fileNames.map((name: string) => {
+      const lastDotIndex = name.lastIndexOf('.');
+      const lastSlashIndex = name.lastIndexOf('/');
+      let shotName = name.substring(lastSlashIndex+1, lastDotIndex);
+      const shotId = parseInt(shotName, 10);
+      return shotId;
+    });
+
+    const dataInfo = {
+      file_name: fileNames[0],
+      type: options.file_type,
+      protocol: options.protocol || 'file',
+      column_names: options.signal_names,
+    } as FileData;
+
+    const samples: Sample[] = shots.map((shot_id: number, index: number) => ({
+      project_id: projectId,
+      shot_id: shot_id,
+      timestamp: new Date().toISOString(),
+      data: dataInfo,
+    }));
+
+    return samples;
+};
+
+const makeSamples = async (projectId: string, samples: Sample[]) => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}/samples`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(samples),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    ToastQueue.negative(`Error creating samples: ${error}`, {timeout: 3000})
+  }
+}
+
+const createProject = (projectName: string, dataLoaderName: string, task: string, queryStrategy: string): Project => {
+  const project: Project = {
+    name: projectName,
+    data_loader: dataLoaderName,
+    task: task,
+    query_strategy: queryStrategy,
+    timestamp: new Date().toISOString(),
+  };
+  return project;
+}
+
 
 export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project | null, samplesSummary?: SamplesSummary | null}) => {
   const editMode = project !== undefined && project !== null;
@@ -272,21 +398,26 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
       console.log(`Data loader name`, samplesSummary);
 
       if (dataLoaderName === 'uda') {
+        // UDA data loader
+        const dataInfo = samplesSummary.data as ShotData;
         setDataLoaderOptions({
           name: dataLoaderName,
-          signal_names: samplesSummary.data.signal_names || [],
+          signal_names: dataInfo.signal_names || [],
           shot_min: samplesSummary.shot_min || null,
           shot_max: samplesSummary.shot_max || null,
         } as UDADataLoaderOptions);
       } else if (dataLoaderName === 'file') {
+        // File data loader
+        const dataInfo = samplesSummary.data as FileData;
         setDataLoaderOptions({
           name: dataLoaderName,
-          signal_names: samplesSummary.data.column_names || [],
+          signal_names: dataInfo.column_names || [],
           file_type: dataLoaderName,
           file_names: [],
-          file_name: samplesSummary.data.file_name || [],
+          file_name: dataInfo.file_name || [],
         } as FileDataLoaderOptions);
       } else {
+        // Unknown data loader
         setDataLoaderOptions(null);
       }
 
@@ -306,16 +437,28 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
     if (editMode && project?._id) {
       // Edit existing project
       const projectId = project._id;
-      let updatedProject = createProject();
+      let updatedProject = createProject(projectName, dataLoaderOptions.name, taskSelection || '', queryStrategy);
       updatedProject.data_loader = project.data_loader;
       updatedProject.task = project.task;
       console.log(`Editing project ${projectId}`, updatedProject);
       await editProject(projectId, updatedProject);
     } else {
       // Create new project
-      const project = createProject();
+      const project = createProject(projectName, dataLoaderOptions.name, taskSelection || '', queryStrategy);
       const projectId = await makeProject(project);
+
+      if (projectId === null) {
+        ToastQueue.negative(`Error creating project!`, {timeout: 3000});
+        return;
+      }
+
       const samples = createSamples(projectId, dataLoaderOptions);
+
+      if (samples === null) {
+        ToastQueue.negative(`Error creating samples for project ${projectId}!`, {timeout: 3000});
+        return;
+      }
+
       await makeSamples(projectId, samples);
     }
     
@@ -323,158 +466,20 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
     router.push(url);
   }
 
-  const createProject = (): Project => {
-    const project: Project = {
-      name: projectName,
-      data_loader: dataLoaderOptions.name,
-      task: taskSelection,
-      query_strategy: queryStrategy,
-    };
-    return project;
-  }
 
-  const makeProject = async (project: Project): Promise<string | null> => {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(project),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      ToastQueue.negative(`Error creating project: ${error}`, {timeout: 3000})
-      return null;
-    }
-
-    const projectId = (await response.json())["_id"];
-    return projectId;
-  }
-
-  const editProject = async (projectId: string, project: Project): Promise<string | null> => {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(project),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      ToastQueue.negative(`Error editing project ${projectId}: ${error}`, {timeout: 3000})
-      return null;
-    }
-
-    return projectId;
-  }
-
-  const createSamples = (projectId: string | null, dataLoaderOptions: DataLoaderOptions): Sample[] | null => {
-    if (projectId === null) {
-      ToastQueue.negative(`Project ID is null`, {timeout: 3000});
-      return null;
-    }
-
-    const fileTypes = FileTypes.map((item) => item.key);
-
-    if (dataLoaderOptions.name === 'uda') {
-      return createUDASamples(projectId);
-    } else if (fileTypes.includes(dataLoaderOptions.name)) {
-      return createFileSamples(projectId);
-    } else {
-      ToastQueue.negative(`Unknown data loader ${dataLoaderOptions.name}`, {timeout: 3000});
-      return null;
-    }
-  }
-
-  const createUDASamples = (projectId: string) => {
-      if (!dataLoaderOptions) {
-        ToastQueue.negative(`UDA data loader options are not valid`, {timeout: 3000});
-        return null;
-      }
-
-      const { shot_min, shot_max } = dataLoaderOptions as UDADataLoaderOptions;
-      
-      const shots = Array.from({length: shot_max - shot_min + 1}, (_, i) => i + shot_min);
-      const samples: Sample[] = shots.map((shot_id: number) => ({
-        project_id: projectId,
-        shot_id: shot_id,
-        data: {
-          signal_names: dataLoaderOptions.signal_names,
-          protocol: 'uda',
-        }
-      }));
-      return samples;
-  }
-
-  const createFileSamples = (projectId: string) => {
-      if (!dataLoaderOptions || !('file_names' in dataLoaderOptions)) {
-        ToastQueue.negative(`File data loader options are not valid`, {timeout: 3000});
-        return null;
-      }
-
-      const options = dataLoaderOptions as FileDataLoaderOptions;
-      const fileNames = options.file_names;
-
-      // Assumption!: the file name must be the shot number.
-      const shots = fileNames.map((name: string) => {
-        const lastDotIndex = name.lastIndexOf('.');
-        const lastSlashIndex = name.lastIndexOf('/');
-        let shotName = name.substring(lastSlashIndex+1, lastDotIndex);
-        const shotId = parseInt(shotName, 10);
-        return shotId;
-      });
-
-      const samples: Sample[] = shots.map((shot_id: number, index: number) => ({
-        project_id: projectId,
-        shot_id: shot_id,
-        data: {
-          file_name: fileNames[index],
-          type: options.file_type,
-          protocol: 'file',
-          column_names: dataLoaderOptions.signal_names,
-        }
-      }));
-
-      return samples;
-  };
-
-  const makeSamples = async (projectId: string | null, samples: Sample[] | null) => {
-    if (projectId === null) {
-      ToastQueue.negative(`Project ID is null`, {timeout: 3000});
-      return;
-    }
-
-    if (samples === null || samples.length === 0) {
-      ToastQueue.negative(`No samples to create`, {timeout: 3000});
-      return;
-    }
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}/samples`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(samples),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      ToastQueue.negative(`Error creating samples: ${error}`, {timeout: 3000})
-    }
-  }
 
   return (
     <Form maxWidth="size-6000" onSubmit={setupProject}>
       <TextField label="Project Name" isRequired value={projectName} onChange={setProjectName} />
 
-      {!editMode && (
-        <>
-        <DataLoaderForm dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions}/>
-        <TaskLoaderForm taskName={taskSelection} setTaskName={setTaskSelection}/>
-        </>
-      )}
+      <>
+        {!editMode && (
+          <>
+            <DataLoaderForm dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions}/>
+            <TaskLoaderForm taskName={taskSelection} setTaskName={setTaskSelection}/>
+          </>
+        )}
+      </>
 
       <RadioGroup label="Query Strategy" isRequired value={queryStrategy} onChange={setQueryStrategy}>
         {QueryStrategies.map((item: Record<string, string>) => <Radio key={item.key} value={item.key}>{item.value}</Radio>)}
