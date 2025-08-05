@@ -1,7 +1,7 @@
 "use client";
 import { getProjects } from '@/app/core';
 import { useState } from 'react';
-import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker, Flex} from '@adobe/react-spectrum'
 import type { SortDescriptor } from '@react-types/shared';
 import type { Project } from '@/types';
 
@@ -29,30 +29,33 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange}: Projects
 
   return (
     <Provider theme={defaultTheme}>
-      <TableView
-      aria-label="Projects"
-      selectionMode="none"
-      selectionStyle="highlight"
-      sortDescriptor={sortDescriptor}
-      onSortChange={onSortChange}
-      >
-        <TableHeader>
-          <Column key="name" allowsSorting>Name</Column>
-          <Column key="task" allowsSorting>Task</Column>
-          <Column key="_id" allowsSorting>Date Created</Column>
-          <Column key="data_loader" allowsSorting>Loader</Column>
-        </TableHeader>
-        <TableBody items={rows}>
-          {item => (
-            <Row href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['id']}`}>
-              <Cell>{item['name']}</Cell>
-              <Cell>{item['task']}</Cell>
-              <Cell>{item['timestamp']}</Cell>
-              <Cell>{item['data_loader']}</Cell>
-            </Row>
-          )}
-        </TableBody>
-      </TableView>
+      <Flex height="size-5000" width="100%" direction="column">
+        <TableView
+        flex
+        aria-label="Projects"
+        selectionMode="none"
+        selectionStyle="highlight"
+        sortDescriptor={sortDescriptor}
+        onSortChange={onSortChange}
+        >
+          <TableHeader>
+            <Column key="name" allowsSorting>Name</Column>
+            <Column key="task" allowsSorting>Task</Column>
+            <Column key="_id" allowsSorting>Date Created</Column>
+            <Column key="data_loader" allowsSorting>Loader</Column>
+          </TableHeader>
+          <TableBody items={rows}>
+            {item => (
+              <Row href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['id']}`}>
+                <Cell>{item['name']}</Cell>
+                <Cell>{item['task']}</Cell>
+                <Cell>{item['timestamp']}</Cell>
+                <Cell>{item['data_loader']}</Cell>
+              </Row>
+            )}
+          </TableBody>
+        </TableView>
+      </Flex>
     </Provider>
   )
 }
@@ -89,9 +92,9 @@ export default function Projects() {
                 <p> Page: {currentPage} </p>
               <Picker 
               label="Projects per Page:" 
-              onSelectionChange={(selected) => {
-                if (selected != null) {
-                  setProjectsPerPage(selected); 
+              onSelectionChange={(selectedKey) => {
+                if (selectedKey != null) {
+                  setProjectsPerPage(Number(selectedKey)); 
                   setCurrentPage(1);
                   }
                 }} 
