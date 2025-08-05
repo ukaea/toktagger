@@ -48,14 +48,21 @@ class MongoDBClient:
     async def update(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        object_id: ObjectId,
         model: pydantic.BaseModel,
+        object_id: ObjectId,
     ):
-        document = model.model_dump(mode="python")
-        result = await self.db[collection].update_one(
-            {"_id": object_id}, {"$set": document}
+        # Retrieve existing entry:
+        document = await self.db[collection].find_one({"_id": object_id})
+
+        # Add updates to db entry
+        updated_document = {
+            **document,
+            **model.model_dump(mode="python", exclude_unset=True),
+        }
+
+        return await self.db[collection].update_one(
+            {"_id": object_id}, {"$set": updated_document}
         )
-        return result
 
     async def get_document_by_id(
         self,

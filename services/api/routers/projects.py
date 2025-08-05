@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
-from services.api.schemas.projects import ProjectIn, Project
+from services.api.schemas.projects import ProjectIn, Project, ProjectUpdate
 from services.api.schemas import convert_to_objectid
 from services.api.crud import utils
 from services.api.crud.db import MongoDBClient
@@ -97,7 +97,7 @@ async def get_project(
 )
 async def update_project(
     request: Request,
-    project: ProjectIn,
+    project: ProjectUpdate,
     project_id: str = Path(description="The ID of the project to activate"),
 ):
     db_client: MongoDBClient = request.app.state.db_client

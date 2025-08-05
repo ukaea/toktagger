@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import AnnotationTypeAdapter, AnnotationTypes
-from services.api.schemas.projects import Project
+from services.api.schemas.projects import Project, ProjectUpdate
 from services.api.schemas.samples import Sample
 
 
@@ -85,16 +85,11 @@ async def get_samples(
 
 
 async def update_project(
-    db_client: MongoDBClient, project_id: str, project: Project
+    db_client: MongoDBClient, project_id: str, project: ProjectUpdate
 ) -> None:
     project_id = convert_to_objectid(project_id, "projects")
-    previousProject = await db_client.get_document_by_id("projects", project_id)
-    previousProject = Project(**previousProject)
 
-    if previousProject == project:
-        return  # No changes to update
-
-    result = await db_client.update("projects", project_id, project)
+    result = await db_client.update("projects", project, project_id)
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
