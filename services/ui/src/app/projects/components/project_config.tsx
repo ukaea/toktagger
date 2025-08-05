@@ -40,6 +40,8 @@ type UDADataLoaderOptions = z.infer<typeof UDADataLoaderOptionsSchema>;
 const FileDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   file_type: z.string(),
   file_names: z.array(z.string()),
+  dir_name: z.string().optional(),
+  protocol: z.string().optional(),
 });
 type FileDataLoaderOptions = z.infer<typeof FileDataLoaderOptionsSchema>;
 
@@ -92,7 +94,7 @@ const SignalNamesUI = ({displayName, signalNames, setSignalNames} : {displayName
                 <Text>{item}</Text>              
                 <Button
                   variant="negative"
-                  onClick={() => handleRemoveItem(index)}
+                  onPress={() => handleRemoveItem(index)}
                 >
                   Remove
                 </Button>
@@ -126,15 +128,14 @@ const UDADataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dat
 
   return (
     <View
-      label="UDA Data Loader Options"
       borderWidth="thin"
       borderColor="dark"
       borderRadius="medium"
       padding="size-250">
         <Flex direction='column'>
           <Flex direction="row" gap="size-200" alignItems="center">
-            <NumberField label="Shot Min" isRequired value={shotMin} onChange={setShotMin}/>
-            <NumberField label="Shot Max" isRequired value={shotMax} onChange={setShotMax} />
+            <NumberField label="Shot Min" isRequired value={shotMin ?? undefined} onChange={setShotMin}/>
+            <NumberField label="Shot Max" isRequired value={shotMax ?? undefined} onChange={setShotMax} />
           </Flex>
         <SignalNamesUI displayName={'UDA Signal Names'} signalNames={signalNames} setSignalNames={setSignalNames} />
         </Flex>
@@ -143,7 +144,7 @@ const UDADataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dat
 }
 
 const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: FileDataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
-  const [filePath, setFilePath] = useState<string>(dataLoaderOptions?.file_name || '' );
+  const [filePath, setFilePath] = useState<string>(dataLoaderOptions?.dir_name || '' );
   const [fileType, setFileType] = useState<string>(dataLoaderOptions?.protocol || FileTypes[0].key);
   const [signalNames, setSignalNames] = useState<string[]>(dataLoaderOptions?.signal_names || []);
   const [fileNames, setFileNames] = useState<string[]>([]);
@@ -165,7 +166,7 @@ const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {da
     async function fetchFileList() { 
       if (filePath) {
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/files?file_path=${filePath}&file_type=${fileType}`);
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/files?dir_path=${filePath}&file_type=${fileType}`);
           if (response.ok) {
             const fileList = await response.json();
             setFileNames(fileList);
@@ -182,13 +183,18 @@ const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {da
 
   return (
     <View
-      label="File Data Loader Options"
       borderWidth="thin"
       borderColor="dark"
       borderRadius="medium"
       padding="size-250">
       <Flex direction="column" gap="size-200">
-        <ComboBox label="File Type" items={FileTypes} selectedKey={fileType} onSelectionChange={setFileType} isRequired>
+        <ComboBox
+          label="File Type"
+          items={FileTypes}
+          selectedKey={fileType}
+          onSelectionChange={(key) => setFileType(key ? String(key) : '')}
+          isRequired
+        >
           {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
         </ComboBox>
         <Flex direction="row" gap="size-200" alignItems="end">
@@ -209,23 +215,41 @@ const FileDataLoaderOptionsUI = ({dataLoaderOptions, setDataLoaderOptions} : {da
 
 const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderOptions: DataLoaderOptions, setDataLoaderOptions: (options: DataLoaderOptions) => void}) => {
   const name = dataLoaderOptions?.name ? dataLoaderOptions.name : null;
-  const [selectedKey, setSelectedKey] = useState<string | null>(name | null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
+
+  let ui = null;
+  if (selectedKey === 'uda') {
+    const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
+    ui = <UDADataLoaderOptionsUI dataLoaderOptions={udaOptions} setDataLoaderOptions={setDataLoaderOptions} />;
+  } else if (selectedKey === 'file') {
+    const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
+    ui = <FileDataLoaderOptionsUI dataLoaderOptions={fileOptions} setDataLoaderOptions={setDataLoaderOptions} />;
+  }
 
   return (
     <>
-      <ComboBox label="Data Loader" items={DataLoaders} isRequired onSelectionChange={setSelectedKey} selectedKey={selectedKey}>
+      <ComboBox
+        label="Data Loader"
+        items={DataLoaders}
+        isRequired
+        onSelectionChange={(key) => setSelectedKey(key ? String(key) : null)}
+        selectedKey={selectedKey}
+      >
         {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
       </ComboBox>
-      {selectedKey === 'uda' && (<UDADataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
-      {selectedKey === 'file' && (<FileDataLoaderOptionsUI dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions} />)}
+      {ui}
     </>
   );
 }
 
 const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string, setTaskName: (selection: string) => void}) => {
+  const handleSelectionChange = (key: React.Key | null) => {
+    setTaskName(key ? String(key) : "");
+  };
+
   return (
     <>
-      <ComboBox label="Task" items={Tasks} onSelectionChange={setTaskName} isRequired selectedKey={taskName}>
+      <ComboBox label="Task" items={Tasks} onSelectionChange={handleSelectionChange} isRequired selectedKey={taskName}>
         {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
       </ComboBox>
     </>
@@ -279,8 +303,8 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
       return;
     }
 
-
-    if (editMode) {
+    if (editMode && project?._id) {
+      // Edit existing project
       const projectId = project._id;
       let updatedProject = createProject();
       updatedProject.data_loader = project.data_loader;
@@ -288,6 +312,7 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
       console.log(`Editing project ${projectId}`, updatedProject);
       await editProject(projectId, updatedProject);
     } else {
+      // Create new project
       const project = createProject();
       const projectId = await makeProject(project);
       const samples = createSamples(projectId, dataLoaderOptions);
@@ -347,25 +372,33 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
 
   const createSamples = (projectId: string | null, dataLoaderOptions: DataLoaderOptions): Sample[] | null => {
     if (projectId === null) {
+      ToastQueue.negative(`Project ID is null`, {timeout: 3000});
       return null;
     }
 
     const fileTypes = FileTypes.map((item) => item.key);
 
     if (dataLoaderOptions.name === 'uda') {
-      return createUDASamples();
+      return createUDASamples(projectId);
     } else if (fileTypes.includes(dataLoaderOptions.name)) {
-      return createFileSamples();
+      return createFileSamples(projectId);
     } else {
       ToastQueue.negative(`Unknown data loader ${dataLoaderOptions.name}`, {timeout: 3000});
       return null;
     }
   }
 
-  const createUDASamples = () => {
+  const createUDASamples = (projectId: string) => {
+      if (!dataLoaderOptions) {
+        ToastQueue.negative(`UDA data loader options are not valid`, {timeout: 3000});
+        return null;
+      }
+
       const { shot_min, shot_max } = dataLoaderOptions as UDADataLoaderOptions;
+      
       const shots = Array.from({length: shot_max - shot_min + 1}, (_, i) => i + shot_min);
       const samples: Sample[] = shots.map((shot_id: number) => ({
+        project_id: projectId,
         shot_id: shot_id,
         data: {
           signal_names: dataLoaderOptions.signal_names,
@@ -374,7 +407,13 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
       }));
       return samples;
   }
-  const createFileSamples = () => {
+
+  const createFileSamples = (projectId: string) => {
+      if (!dataLoaderOptions || !('file_names' in dataLoaderOptions)) {
+        ToastQueue.negative(`File data loader options are not valid`, {timeout: 3000});
+        return null;
+      }
+
       const options = dataLoaderOptions as FileDataLoaderOptions;
       const fileNames = options.file_names;
 
@@ -388,6 +427,7 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
       });
 
       const samples: Sample[] = shots.map((shot_id: number, index: number) => ({
+        project_id: projectId,
         shot_id: shot_id,
         data: {
           file_name: fileNames[index],
@@ -396,15 +436,18 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
           column_names: dataLoaderOptions.signal_names,
         }
       }));
+
       return samples;
   };
 
   const makeSamples = async (projectId: string | null, samples: Sample[] | null) => {
     if (projectId === null) {
+      ToastQueue.negative(`Project ID is null`, {timeout: 3000});
       return;
     }
 
     if (samples === null || samples.length === 0) {
+      ToastQueue.negative(`No samples to create`, {timeout: 3000});
       return;
     }
 

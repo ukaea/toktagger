@@ -194,7 +194,7 @@ async def get_sample_summary(
     project_id: str = Path(
         description="The ID of the project to get a summary of samples from."
     ),
-):
+) -> SampleSummary:
     db_client = request.app.state.db_client
     samples = await utils.get_samples(db_client, project_id)
 

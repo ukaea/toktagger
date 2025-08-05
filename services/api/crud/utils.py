@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import Annotation
+from services.api.schemas.annotations import Annotation, AnnotationTypes
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
 
@@ -43,7 +43,7 @@ async def get_annotations(
     validated: Optional[bool] = None,
     start: int = 0,
     end: Optional[int] = None,
-) -> list[Annotation]:
+) -> list[AnnotationTypes]:
     db_filters = {"project_id": project_id}
     if validated is not None:
         db_filters["validated"] = validated
@@ -56,6 +56,9 @@ async def get_annotations(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
+    annotations = [
+        AnnotationTypes.model_validate(annotation) for annotation in annotations
+    ]
     return annotations
 
 
@@ -78,3 +81,40 @@ async def get_samples(
     )
     samples = [Sample(**sample) for sample in samples]
     return samples
+
+
+async def update_project(
+    db_client: MongoDBClient, project_id: str, project: Project
+) -> None:
+    project_id = convert_to_objectid(project_id, "projects")
+    previousProject = await db_client.get_document_by_id("projects", project_id)
+    previousProject = Project(**previousProject)
+
+    if previousProject == project:
+        return  # No changes to update
+
+    result = await db_client.update("projects", project_id, project)
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+
+async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
+    project_id = convert_to_objectid(project_id, "projects")
+
+    # Clean up all associated samples
+    await db_client.delete_filtered_documents(
+        collection="samples", filters={"project_id": project_id}
+    )
+
+    # Clean up all associated annotations
+    await db_client.delete_filtered_documents(
+        collection="annotations", filters={"project_id": project_id}
+    )
+
+    # Delete this specific project
+    result = await db_client.delete_filtered_documents(
+        collection="projects", filters={"_id": project_id}
+    )
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")

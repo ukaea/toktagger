@@ -137,7 +137,6 @@ const UDADataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions: 
 
   return (
     <View
-      label="UDA Data Loader Options"
       borderWidth="thin"
       borderColor="dark"
       borderRadius="medium"
@@ -193,7 +192,6 @@ const FileDataLoaderOptionsUI = ({setDataLoaderOptions} : {setDataLoaderOptions:
 
   return (
     <View
-      label="File Data Loader Options"
       borderWidth="thin"
       borderColor="dark"
       borderRadius="medium"

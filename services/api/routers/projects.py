@@ -95,16 +95,13 @@ async def get_project(
         404: {"description": "Project not found with that ID."},
     },
 )
-async def set_project(
+async def update_project(
     request: Request,
     project: ProjectIn,
     project_id: str = Path(description="The ID of the project to activate"),
 ):
-    project_id = convert_to_objectid(project_id, "projects")
     db_client: MongoDBClient = request.app.state.db_client
-    result = await db_client.update("projects", project_id, project)
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    await utils.update_project(db_client, project_id, project)
 
 
 @router.delete(
@@ -122,23 +119,5 @@ async def delete_project(
     Permanently delete a project.
     -----------------------------
     """
-    obj_id = convert_to_objectid(project_id, "projects")
     db_client: MongoDBClient = request.app.state.db_client
-
-    # Clean up all associated samples
-    await db_client.delete_filtered_documents(
-        collection="samples", filters={"project_id": project_id}
-    )
-
-    # Clean up all associated annotations
-    await db_client.delete_filtered_documents(
-        collection="annotations", filters={"project_id": project_id}
-    )
-
-    # Delete this specific project
-    result = await db_client.delete_filtered_documents(
-        collection="projects", filters={"_id": obj_id}
-    )
-
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    await utils.delete_project(db_client, project_id)

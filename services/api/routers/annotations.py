@@ -36,7 +36,7 @@ async def get_all_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
-) -> list[Annotation]:
+) -> list[AnnotationTypes]:
     """
     Retrieve all annotations for this project, subject to specified filters.
     ------------------------------------------------------------------------
@@ -45,7 +45,6 @@ async def get_all_annotations(
     annotations = await utils.get_annotations(
         db_client, project_id, validated, start, end
     )
-    print(annotations)
     return annotations
 
 
