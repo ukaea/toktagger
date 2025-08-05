@@ -13,8 +13,7 @@ const ProjectCreateBreadCrumbs = () => {
   );
 };
 
-export const ProjectCreateForm = () => {
-
+export default function ProjectCreateForm() {
   return (
     <div>
       <ProjectCreateBreadCrumbs />

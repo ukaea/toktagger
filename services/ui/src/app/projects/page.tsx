@@ -2,6 +2,10 @@
 import { useState, useEffect } from 'react';
 import { getProjects } from '@/app/core';
 import {ButtonGroup, Flex, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import { Project } from '@/types';
+import Edit from '@spectrum-icons/workflow/Edit';
+import AddCircle from '@spectrum-icons/workflow/AddCircle';
+import RemoveCircle from '@spectrum-icons/workflow/RemoveCircle';
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -13,45 +17,55 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
+const deleteProjects = async (project_ids: string[]) => {
+  for (const project_id of project_ids) {
+    console.log(`Deleting project ${project_id}`);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok && response.status !== 404) {
+      ToastQueue.negative(`Error deleting project ${project_id}`, {timeout: 3000});
+    }
+  }
+};
+
 export const ProjectsTable = () => {
   const [selectedKeys, setSelectedKeys] = useState<Set<string> | string>(new Set<string>());
-  const [rows, setRows] = useState<any>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
     const run = async () => {
       const projects = await getProjects();
-      const rows = projects.map(({ _id, ...rest }) => ({
-        ...rest,
-        id: _id
-      }));
-      setRows(rows);
+
+      if (!projects) {
+        ToastQueue.negative('Error fetching projects', {timeout: 3000});
+        return;
+      }
+
+      setProjects(projects);
     }
     run();
   }, []);
 
   const deleteSelectedRows = () => {
-    let keys = (selectedKeys === 'all') ? new Set(rows) : selectedKeys;
-    let deleteRows = Array.from(keys);
-    console.log('Deleting selected rows', deleteRows);
-    deleteRows.map(async (row) => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${row}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        ToastQueue.negative(`Error deleting project ${row}`, {timeout: 3000});
-      }
+    setProjects((prevProjects) => {
+        const project_ids = prevProjects.map((project) => project._id).filter((id): id is string => typeof id === 'string');
+        const keys: Set<string> = (selectedKeys === 'all') ? new Set(project_ids) : new Set(selectedKeys);
+        let deleteRows = Array.from(keys);
+
+        deleteProjects(deleteRows);
+
+        const projects = prevProjects.filter((row) => typeof row._id === 'string' && !keys.has(row._id));
+        return projects;
     });
 
-    setRows((prevRows) => {
-        return prevRows.filter((row) => !keys.has(row.id))
-    });
     setSelectedKeys(new Set<string>());
   };
 
-  if (rows.length === 0) {
+  if (projects.length === 0) {
     return (
       <Flex alignItems="center" justifyContent="center" height="100%">
         <span style={{ color: '#6E6E6E' }}>No projects available.</span>
@@ -63,11 +77,21 @@ export const ProjectsTable = () => {
     <>
       <Flex direction='row' margin='size-100' gap="size-100"  alignItems="end">
         <ButtonGroup UNSAFE_className="py-2">
-          <Button elementType="a" href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}>Create</Button>
-          <Button elementType='a' variant='negative' onPress={deleteSelectedRows} isDisabled={selectedKeys.size === 0}>Delete</Button>
+          <Button elementType="a" variant='primary' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}><AddCircle/></Button>
+          <Button
+            elementType='a'
+            variant='negative'
+            onPress={deleteSelectedRows}
+            isDisabled={
+              (selectedKeys === 'all')
+                ? false
+                : (selectedKeys instanceof Set ? selectedKeys.size === 0 : true)
+            }
+          ><RemoveCircle/></Button>
         </ButtonGroup>
       </Flex>
       <TableView
+        aria-label='Projects'
         selectionMode="multiple"
         selectedKeys={selectedKeys}
         onSelectionChange={(keys) => {
@@ -88,16 +112,16 @@ export const ProjectsTable = () => {
           <Column>Controls</Column>
         </TableHeader>
         <TableBody>
-          {rows.map((item) => (
-            <Row key={item['id']}>
+          {projects.map((item) => (
+            <Row key={item['_id']}>
               <Cell>{item['name']}</Cell>
               <Cell>{item['task']}</Cell>
               <Cell>{item['timestamp']}</Cell>
               <Cell>{item['data_loader']}</Cell>
               <Cell>
                 <Flex direction="row" gap="size-100">
-                  <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['id']}`}>View</Button>
-                  <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['id']}/edit`}>Edit</Button>
+                  <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}`}>View</Button>
+                  <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}/edit`}><Edit/></Button>
                 </Flex>
               </Cell>
             </Row>

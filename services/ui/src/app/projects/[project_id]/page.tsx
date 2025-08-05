@@ -1,6 +1,6 @@
 "use client";
 import { getSamples, getProject } from "@/app/core";
-import { Project } from "@/types";
+import { Project, Sample } from "@/types";
 import {
   Provider,
   defaultTheme,
@@ -37,7 +37,15 @@ export const SampleBreadCrumbs = ({ project }: { project: Project }) => {
 };
 
 export const SamplesTable = ({ project_id }: { project_id: string }) => {
-  const samples = getSamples(project_id);
+  const [samples, setSamples] = useState<Sample[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const samplesData = await getSamples(project_id);
+      setSamples(samplesData);
+    };
+    fetchData();
+  }, [project_id]);
 
   if (!samples) {
     return;
