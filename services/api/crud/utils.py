@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import Annotation, AnnotationTypes
+from services.api.schemas.annotations import AnnotationTypeAdapter, AnnotationTypes
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
 
@@ -56,8 +56,9 @@ async def get_annotations(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
+
     annotations = [
-        AnnotationTypes.model_validate(annotation) for annotation in annotations
+        AnnotationTypeAdapter.validate_python(annotation) for annotation in annotations
     ]
     return annotations
 

@@ -1,6 +1,6 @@
 from typing import Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
-from pydantic import Field, model_validator
+from pydantic import Field, TypeAdapter, model_validator
 
 
 class AnnotationIn(ConfiguredModel):
@@ -48,3 +48,4 @@ class ModelAnnotation(AnnotationIn):
 
 
 AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
+AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
