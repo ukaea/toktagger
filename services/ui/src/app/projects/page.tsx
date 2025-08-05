@@ -109,18 +109,17 @@ export const ProjectsTable = () => {
           <Column>Task</Column>
           <Column>Date Created</Column>
           <Column>Loader</Column>
-          <Column>Controls</Column>
+          <Column>Edit</Column>
         </TableHeader>
         <TableBody>
           {projects.map((item) => (
-            <Row key={item['_id']}>
+            <Row key={item['_id']} href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}`}>
               <Cell>{item['name']}</Cell>
               <Cell>{item['task']}</Cell>
               <Cell>{item['timestamp']}</Cell>
               <Cell>{item['data_loader']}</Cell>
               <Cell>
                 <Flex direction="row" gap="size-100">
-                  <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}`}>View</Button>
                   <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}/edit`}><Edit/></Button>
                 </Flex>
               </Cell>
