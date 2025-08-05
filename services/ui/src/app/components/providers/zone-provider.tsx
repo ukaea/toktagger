@@ -57,18 +57,6 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         onModifyZone(zones.current);
     }
 
-    const addZone = (x0: number, x1: number, category: Category) => {
-        zones.current.push(
-            {
-                category,
-                x0,
-                x1
-            }
-        )
-        triggerZoneUpdate();
-        onModifyZone(zones.current);
-    }
-
     const handleDelete = (input: unknown) => {
         zones.current = zones.current.filter(zone => zone !== input)
         triggerZoneUpdate()
@@ -87,6 +75,19 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
     // On initialisation the tool registers a menu item with the general context menu
     useEffect(() => {
+
+        const addZone = (x0: number, x1: number, category: Category) => {
+            zones.current.push(
+                {
+                    category,
+                    x0,
+                    x1
+                }
+            )
+            triggerZoneUpdate();
+            onModifyZone(zones.current);
+        }
+
         /**
          * Converts generic props into a new zone.
          * Uses 5 % of the current x-range as default width – avoids pixel scaling.

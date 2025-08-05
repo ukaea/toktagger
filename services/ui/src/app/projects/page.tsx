@@ -70,7 +70,15 @@ export const ProjectsTable = () => {
       <TableView
         selectionMode="multiple"
         selectedKeys={selectedKeys}
-        onSelectionChange={setSelectedKeys}
+        onSelectionChange={(keys) => {
+          // keys can be 'all' or a Set<Key>
+          if (keys === 'all') {
+            setSelectedKeys('all');
+          } else {
+            // Convert Set<Key> to Set<string>
+            setSelectedKeys(new Set(Array.from(keys).map(String)));
+          }
+        }}
       >
         <TableHeader>
           <Column>Name</Column>
