@@ -227,7 +227,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
     Parameters
     ----------
     params : OutlierDetectionParams
-        Configuration parameters for outlier detection, including method, signal name, threshold, and contamination.
+        Configuration parameters for outlier detection, including method, signal name, and threshold.
 
     Methods
     -------
