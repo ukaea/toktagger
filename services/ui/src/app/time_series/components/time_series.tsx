@@ -1,18 +1,49 @@
 'use client'
-import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, TimeSeriesData } from "@/types"
+import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, TimeSeriesData, DisplayAnnotation, ZoneSchema, TimeRegionSchema } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
+import { createAnnotationToDisplayAnnotationFunc, updateAnnotations } from "@/app/utils"
+
+const zoneCategories: Category[] = [
+    { name: "Peak", color: 'rgb(233, 170, 98)' },
+    { name: "Outlier", color: 'rgb(233, 170, 250)' },
+    { name: "Jump", color: 'rgb(1, 250, 1)' },
+    { name: "Change Point", color: 'rgb(133, 170, 250)' },
+]
+
+const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
+  (acc, curr) => {
+    acc[curr.name] = curr.color;
+    return acc;
+  },
+  {}
+);
 
 type MultiVariateTimeSeriesViewInfo = {
     data: MultiVariateTimeSeriesData, 
     annotations: Annotations, 
-    setAnnotations: (annotations: Annotations) => void
+    setAnnotations: (
+        updater: (annotations: Annotations) => Annotations | Annotations
+    ) => void;
 };
 export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations}: MultiVariateTimeSeriesViewInfo) => {
+    const convertAnnotationToDisplayAnnotation =
+        createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
+    const displayAnnotations: DisplayAnnotation[] = annotations.map(
+        convertAnnotationToDisplayAnnotation
+    );
+    const zones: Zone[] = displayAnnotations
+        .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
+        .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+
+    const updateZones = (newZones: Array<Zone>) => {
+        updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
+    };
+
 
     let plotData: Plotly.Data[] = Object.entries(data.values).map(([key, value]: [string, TimeSeriesData]) => {
         return {
@@ -54,7 +85,7 @@ export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations}: 
     const maxTime = plotData.reduce((max, trace) => Math.max(max, Math.max(...trace.x)), -Infinity);
     const minTime = plotData.reduce((min, trace) => Math.min(min, Math.min(...trace.x)), Infinity);
 
-    var plotLayout = {
+    var plotLayout: Partial<Plotly.Layout> = {
         uirevision: 'true',
         grid: { rows: 1, columns: 1, pattern: 'independent' },
         dragmode: 'pan',
@@ -80,39 +111,13 @@ export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations}: 
     };
 
     
-    const zoneCategories: Category[] = [
-        { name: "Peak", color: 'rgb(233, 170, 98)' },
-        { name: "Outlier", color: 'rgb(233, 170, 250)' },
-        { name: "Jump", color: 'rgb(1, 250, 1)' },
-        { name: "Change Point", color: 'rgb(133, 170, 250)' },
-    ]
-
-    const convertRegionToZone = (item: TimeRegion) => {
-        const category = zoneCategories.find(x => x.name === item.label);
-        return {x0: item.time_min, x1: item.time_max, category: category, created_by: item.created_by} as Zone;
-    };
-    annotations = annotations.filter(item => item.type === 'time_region') as TimeRegion[];
-    const zones = annotations.map(convertRegionToZone);
-
-    const updateAnnotations = (newZones: Array<Zone>) => {
-        const zones = newZones.map(item => ({
-                type: 'time_region',
-                created_by: item.created_by,
-                time_min: item.x0,
-                time_max: item.x1,
-                label: item.category.name
-        }));
-
-        setAnnotations(zones);
-    }
-
     return (
         <div className="flex space-y-3">
             <div className="flex-1 text-center items-center">
                 <ContextMenuProvider menuId="elm-menu">
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
                         <TimeSeries plotId="TimeSeriesPlot" plotConfig={{data: plotData, layout: plotLayout}}>
-                            <Zones />
+                            <Zones onZoneUpdate={updateZones}/>
                         </TimeSeries>
                     </ZoneProvider>
                 </ContextMenuProvider>

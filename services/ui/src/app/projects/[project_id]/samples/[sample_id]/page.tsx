@@ -22,6 +22,8 @@ import { ELMView } from "@/app/elms/components/elms";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
+import { TimeSeries } from "@/app/components/plots/time-series";
+import { MultiVariateTimeSeriesView } from "@/app/time_series/components/time_series";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -85,7 +87,7 @@ const SampleView = ({
       throw new Error("Invalid data for ELM view");
     }
     return (
-      <ELMView
+      <MultiVariateTimeSeriesView
         data={result.data}
         annotations={annotations}
         setAnnotations={setAnnotations}
