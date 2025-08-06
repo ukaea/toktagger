@@ -97,6 +97,9 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
               d.x1 = x;
             }
             handleZoneUpdate();
+          })
+          .on("end", function (_event, _d) {
+            handleZoneDragFinish();
           });
         return resize;
       };

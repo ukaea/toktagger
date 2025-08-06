@@ -40,7 +40,6 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     onModifyZone: (newZones: Zone[]) => void
 }) => {
     const zones = useRef<Zone[]>([])
-    const batchedUpdateTimeout = useRef<NodeJS.Timeout | null>(null)
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
 
     const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
@@ -53,23 +52,12 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                 zone.x1 = temp
             }
         }
-    }
-
-    // Add any code in here that requires processing after a batch of updates - such as cleaning data and publishing
-    const batchedUpdate = () => {
-        cleanZoneData()
-        setTriggerUpdate((current) => (current+1)%10) // Ensures that if the batched update changes data it is passed to UI
+        triggerZoneUpdate()
     }
 
     // It is necessary for the context to trigger child refreshes
     const triggerZoneUpdate = () => {
         setTriggerUpdate((current) => (current+1)%10)
-
-        if (batchedUpdateTimeout.current !== null) {
-            clearTimeout(batchedUpdateTimeout.current)
-            batchedUpdateTimeout.current = null
-        }
-        batchedUpdateTimeout.current = setTimeout(batchedUpdate, 1000)
     }
 
     // Provides a method for child components to trigger context refresh
@@ -78,6 +66,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     }
 
     const handleZoneDragFinish = () => {
+        cleanZoneData()
         onModifyZone(zones.current);
     }
 
@@ -119,7 +108,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
             },
             end: (x, _y) => {
                 zones.current[zones.current.length-1].x1 = x;
-                triggerZoneUpdate()
+                handleZoneDragFinish()
             },
         })
     }
@@ -182,7 +171,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
         registerMenuItem("zone", menuElement)
 
-        }, [categories, onModifyZone, registerMenuItem, triggerZoneUpdate])
+        }, [categories, onModifyZone, registerMenuItem])
 
     // Initialisation of data - this should only run once
     // Effect: run ONCE per mount to populate from initialData
@@ -197,7 +186,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         return () => {
           zones.current = [];
         };
-      }, [initialData, triggerZoneUpdate]);
+      }, [initialData]);
 
     // Provides an array of the categories for the context menu
     const updateTypeItems = categories.map((category, index) => {

@@ -92,6 +92,7 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
             },
             end: (x, _y) => {
                 spans.current[spans.current.length-1].x = x;
+                handleVSpanDragFinish()
                 triggerVSpanUpdate()
             },
         })

@@ -333,6 +333,7 @@ export const TimeSeries = ({
         const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
             handleContextMenu(event, plot)
         }
+
         const startToolCreation = (event: MouseEvent) => {
             if (toolingCallbacks && event.ctrlKey) {
                 isDraggingRef.current = true
