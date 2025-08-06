@@ -43,8 +43,6 @@ async def get_all_annotations(
     annotations = await utils.get_annotations(
         db_client, project_id, validated, start, end
     )
-    for annotation in annotations:
-        print(annotation)
 
     return annotations
 
@@ -181,8 +179,6 @@ async def add_annotations(
             annotation.project_id = project_id
         if annotation.sample_id is None:
             annotation.sample_id = sample_id
-
-    print(annotations)
 
     return await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids
