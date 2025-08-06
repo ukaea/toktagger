@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { ListView, Item } from '@adobe/react-spectrum';
 import { Annotation, Annotations } from '@/types';
+import { Selection } from '@react-types/shared';
 
 export type ShotLabelsType = {
     labels: string[];
     annotations: Annotations;
-    setAnnotations: (annotations: Annotation[]) => void;
+    setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
 };
 
 export function ShotLabels({labels = [], annotations, setAnnotations}: ShotLabelsType) {
 
-    const defaultLabels = labels.map((label, index) => ({id: index, name: label}));
-    const [items, setItems] = useState<string[]>(defaultLabels);
+    const items: {id: number, name: string}[] = labels.map((label, index) => ({id: index, name: label}));
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
     useEffect(() => {
@@ -19,16 +19,24 @@ export function ShotLabels({labels = [], annotations, setAnnotations}: ShotLabel
         const defaultSelectedKeys = defaultAnnotations.map((annotation: Annotation) => {
             const index = labels.indexOf(annotation.label);
             return index !== -1 ? index.toString() : null;
-        }).filter((key: number | null) => key !== null);
+        }).filter((key: string | null) => key !== null) as string[];
         setSelectedKeys(new Set(defaultSelectedKeys));
 
     }, [annotations]);
 
-    const onSelectionChange = (keys: Set<string>) => {
+    const onSelectionChange = (keys: Selection) => {
+
+        let newKeys = new Set<string>();
+        if (keys === 'all') {
+          newKeys = new Set(items.map(item => item.id.toString()));
+        } else {
+          newKeys = new Set(Array.from(keys).map(key => key.toString()));
+        }
+
         setAnnotations((prevAnnotations: Annotations) => {
             let newAnnotations = prevAnnotations || [];
             newAnnotations = newAnnotations.filter(annotation => annotation.type !== 'class_label');
-            keys.forEach((key: number) => {
+            newKeys.forEach((key: string) => {
                 let item = items.find(item => item.id.toString() === key) || null;
 
                 if (item === null) {
@@ -39,7 +47,9 @@ export function ShotLabels({labels = [], annotations, setAnnotations}: ShotLabel
                 newAnnotations.push({
                     type: 'class_label',
                     label: item.name,
-                });
+                    selected: false,
+                    created_by: 'manual',
+                } as Annotation);
             });
             return newAnnotations;
         });

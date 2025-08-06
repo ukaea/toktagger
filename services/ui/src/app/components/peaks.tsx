@@ -1,5 +1,5 @@
 "use client";
-import { Annotations, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
 import {
   Provider,
   defaultTheme,
@@ -18,7 +18,7 @@ type PeakDetectionToolInfo = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (annotations: Annotations) => void;
+  setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
 };
 
 export function PeakDetectionTool({
@@ -82,7 +82,10 @@ export function PeakDetectionTool({
       );
 
       const payload = await response.json();
-      setAnnotations(payload);
+      setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'peak_detection');
+          return otherAnnotations.concat(payload);
+      });
     };
 
     fetchData();

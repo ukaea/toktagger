@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import {Provider, defaultTheme, Slider, Flex, ComboBox, Item } from '@adobe/react-spectrum'
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
 
 
 type ChangePointDetectionType = {
     project_id: string;
     sample_id: string;
     data: MultiVariateTimeSeriesData;
-    setAnnotations: (annotations: Annotation[]) => void;
+    setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
 };
 
 export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnotations }: ChangePointDetectionType) {
@@ -22,7 +22,7 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName === null && !(signalName in data.values)) {
+            if (signalName === null || !(signalName in data.values)) {
                 return;
             }
 

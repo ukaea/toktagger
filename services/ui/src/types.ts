@@ -1,9 +1,11 @@
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
+  created_by: z.string().default('manual'),
   timestamp: z.string().optional(),
   validated: z.boolean().optional(),
   uncertainty: z.number().optional(),
+  type: z.string(),
   label: z.string(),
 });
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
@@ -75,6 +77,8 @@ export const ZoneSchema = z.object({
 export type Zone = z.infer<typeof ZoneSchema>;
 
 export const VSpanSchema = z.object({
+  created_by: z.string().default('manual'),
+  selected: z.boolean().default(false),
   category: CategorySchema,
   x: z.number(),
 });

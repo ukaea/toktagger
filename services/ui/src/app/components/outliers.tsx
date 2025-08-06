@@ -6,7 +6,7 @@ type OutlierDetectionType = {
     project_id: string;
     sample_id: string;
     data: MultiVariateTimeSeriesData;
-    setAnnotations: (annotations: Annotation[]) => void;
+    setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
 };
 
 export function OutlierDetectionTool({ project_id, sample_id, data, setAnnotations }: OutlierDetectionType) {
@@ -19,7 +19,7 @@ export function OutlierDetectionTool({ project_id, sample_id, data, setAnnotatio
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null && !(signalName in data.values)) {
+            if (signalName == null || !(signalName in data.values)) {
                 return;
             }
 

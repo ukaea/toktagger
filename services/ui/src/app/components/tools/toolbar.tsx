@@ -126,7 +126,7 @@ type ToolBarInfo = {
   sample: Sample;
   data: Data;
   annotations: Annotations;
-  setAnnotations: (annotations: Annotations) => void;
+  setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
 };

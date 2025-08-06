@@ -1,5 +1,5 @@
 'use client'
-import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, TimeSeriesData, DisplayAnnotation, ZoneSchema, TimeRegionSchema } from "@/types"
+import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, TimeSeriesData, DisplayAnnotation, ZoneSchema, TimeRegionSchema, VSpanSchema } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
@@ -47,7 +47,10 @@ export const MultiVariateTimeSeriesView = ({data, zoneNames, annotations, setAnn
 
     const convertAnnotationToDisplayAnnotation =
         createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
-    const displayAnnotations: DisplayAnnotation[] = annotations.map(
+
+    const displayAnnotations: DisplayAnnotation[] = annotations.filter((annotation) => {
+        return TimeRegionSchema.safeParse(annotation).success || VSpanSchema.safeParse(annotation).success;
+    }).map(
         convertAnnotationToDisplayAnnotation
     );
 
@@ -125,7 +128,6 @@ export const MultiVariateTimeSeriesView = ({data, zoneNames, annotations, setAnn
         ...yAxesLayout,
     };
 
-    
     return (
         <div className="flex space-y-3">
             <div className="flex-1 text-center items-center">

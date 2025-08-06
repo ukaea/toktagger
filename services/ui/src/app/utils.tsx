@@ -52,16 +52,20 @@ export const createAnnotationToDisplayAnnotationFunc = (
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
+        created_by: timeRegion.created_by,
+        selected: false,
         x0: timeRegion.time_min,
         x1: timeRegion.time_max,
-        category: { name: timeRegion.label, color: colors[timeRegion.label] },
+        category: { name: timeRegion.label, color: colors[timeRegion.label] || 'lightblue' },
       };
       return zone;
     } else if (TimePointSchema.safeParse(item).success) {
       const timePoint = TimePointSchema.parse(item);
       const vspan: VSpan = {
         x: timePoint.time,
-        category: { name: timePoint.label, color: colors[timePoint.label] },
+        created_by: timePoint.created_by,
+        selected: false,
+        category: { name: timePoint.label, color: colors[timePoint.label] || 'red' },
       };
       return vspan;
     } else {

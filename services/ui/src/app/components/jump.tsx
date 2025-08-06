@@ -6,7 +6,7 @@ type JumpDetectionType = {
     project_id: string;
     sample_id: string;
     data: MultiVariateTimeSeriesData;
-    setAnnotations: (annotations: Annotation[]) => void;
+    setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
 };
 
 export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations }: JumpDetectionType) {
@@ -19,7 +19,7 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null && !(signalName in data.values)) {
+            if (signalName == null || !(signalName in data.values)) {
                 return;
             }
 
