@@ -6,20 +6,20 @@ type JumpDetectionType = {
     project_id: string;
     sample_id: string;
     data: MultiVariateTimeSeriesData;
-    setAnnotations: (annotations: Annotation[]) => void;
+    setAnnotations: (annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])) => void;
 };
 
 export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations }: JumpDetectionType) {
-    const [signalName, setSignalName] = useState(null);
+    const [signalName, setSignalName] = useState<string| null>(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
-    const [threshold, setThreshold] = useState(2);
-    const [minDistance, setMinDistance] = useState(5);
-    const [smoothingValue, setSmoothingValue] = useState(2);
-    const [numPoints, setNumPoints] = useState(2000);
+    const [threshold, setThreshold] = useState<number>(2);
+    const [minDistance, setMinDistance] = useState<number>(5);
+    const [smoothingValue, setSmoothingValue] = useState<number>(2);
+    const [numPoints, setNumPoints] = useState<number>(2000);
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null && !(signalName in data.values)) {
+            if (signalName == null || !(signalName in data.values)) {
                 return;
             }
 
@@ -37,8 +37,8 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
                 }),
             });
 
-            const payload = await response.json();
-            setAnnotations((previousAnnotations: Annotations) => {
+            const payload: Annotation[] = await response.json();
+            setAnnotations((previousAnnotations: Annotation[]) => {
                 const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'jump_detection');
                 return otherAnnotations.concat(payload);
             });
@@ -51,7 +51,7 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
+                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

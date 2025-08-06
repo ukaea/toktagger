@@ -1,12 +1,12 @@
 from typing import Literal, Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
-from services.api.schemas.annotators import AnnotatorIds
+from services.api.schemas.annotators import AnnotatorTypes
 from pydantic import Field, model_validator
 
 
 class AnnotationIn(ConfiguredModel):
     label: str
-    created_by: AnnotatorIds
+    created_by: AnnotatorTypes
     validated: bool = False
     uncertainty: Optional[float] = None
     project_id: Optional[str] = None

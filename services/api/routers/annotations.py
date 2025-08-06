@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from services.api.crud import utils
-from services.api.schemas.annotations import AnnotationTypes
+from services.api.schemas.annotations import AnnotationTypes, TimeRegion
 from services.api.schemas import convert_to_objectid
 
 router = APIRouter(
@@ -173,12 +173,6 @@ async def add_annotations(
 
     if len(annotations) == 0:
         return []
-
-    for annotation in annotations:
-        if annotation.project_id is None:
-            annotation.project_id = project_id
-        if annotation.sample_id is None:
-            annotation.sample_id = sample_id
 
     return await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids

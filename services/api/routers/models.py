@@ -3,7 +3,7 @@ from services.api.core.annotators import PeakDetectionAnnotator
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
 from services.api.schemas.annotations import TimeRegion
-from services.api.schemas.annotators import Annotator, PeakDetectionParams
+from services.api.schemas.annotators import AnnotatorParams, PeakDetectionParams
 from services.api.schemas.models import Model
 
 router = APIRouter(prefix="/projects/{project_id}/models", tags=["Models"])
@@ -94,7 +94,7 @@ async def predict_sample(
 
 @router.get("/{model_id}/predict")
 async def get_predictions(
-    request: Request, project_id: str, model_id: str, params: Annotator
+    request: Request, project_id: str, model_id: str, params: AnnotatorParams
 ):
     # Get predictions made using the given model for this project
     # Predict on samples as specified by filters

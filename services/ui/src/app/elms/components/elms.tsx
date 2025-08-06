@@ -39,14 +39,14 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         mode: 'lines',
     };
 
-    var densityGradientTrace = {
-        name: 'Density Gradient',
-        x: data.values.density_gradient.time,
-        y: data.values.density_gradient.values,
-        xaxis: "x4",
-        yaxis: "y4",
-        mode: 'lines',
-    };
+    // var densityGradientTrace = {
+    //     name: 'Density Gradient',
+    //     x: data.values.density_gradient.time,
+    //     y: data.values.density_gradient.values,
+    //     xaxis: "x4",
+    //     yaxis: "y4",
+    //     mode: 'lines',
+    // };
 
     var t_e_coreTrace = {
         name: 'Te Core',
@@ -66,7 +66,7 @@ export const ELMView = ({data, annotations, setAnnotations}: ELMViewInfo) => {
         mode: 'lines',
     };
 
-    const plotData: Partial<Plotly.PlotData>[] = [dataTrace, ipTrace, densityGradientTrace, powerNBITrace, t_e_coreTrace, sxrTrace];
+    const plotData: Partial<Plotly.PlotData>[] = [dataTrace, ipTrace, powerNBITrace, t_e_coreTrace, sxrTrace];
 
 
     var plotLayout = {

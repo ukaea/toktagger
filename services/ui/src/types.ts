@@ -1,10 +1,12 @@
 import { z } from "zod/v4";
 
 export const AnnotationSchema = z.object({
+  created_by: z.string().default('manual'),
   timestamp: z.string().optional(),
   validated: z.boolean().optional(),
   uncertainty: z.number().optional(),
-  label: z.string()
+  label: z.string(),
+  type: z.string()
 });
 export type Annotation = z.infer<typeof AnnotationSchema>;
 export type ClassLabel = z.infer<typeof AnnotationSchema>;
@@ -33,7 +35,7 @@ export type TimeSeriesDataSchema = z.infer<typeof TimeSeriesDataSchema>;
 
 
 export const MultiVariateTimeSeriesDataSchema = z.object({
-  values: z.record(TimeSeriesDataSchema)
+  values: z.record(z.string(), TimeSeriesDataSchema)
 });
 export type MultiVariateTimeSeriesData = z.infer<typeof MultiVariateTimeSeriesDataSchema>;
 
@@ -80,7 +82,7 @@ export const SampleSchema = z.object({
   _id: z.string(),
   project_id: z.string(),
   shot_id: z.number(),
-  data: z.record(z.any())
+  data: z.record(z.string(), z.any())
 }); 
 export type Sample = z.infer<typeof SampleSchema>;
 

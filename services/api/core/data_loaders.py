@@ -1,4 +1,3 @@
-from typing import Union
 import pandas as pd
 
 from abc import ABC, abstractmethod
@@ -30,19 +29,6 @@ class ImageDataLoader(DataLoader):
         )  # TODO: Get rid of this temp resizing
         arr = np.asarray(im)
         return ImageData(data=arr.tolist())
-
-
-def downsample_time_series(time, signal, num_points=500):
-    """Downsample a time series to a specified number of points."""
-    from scipy.interpolate import interp1d
-
-    if len(time) <= num_points:
-        return time, signal
-
-    time_coarse = np.linspace(time.min(), time.max(), num_points)
-    interpolator = interp1d(time, signal, kind="linear")
-    signal = interpolator(time_coarse)
-    return time_coarse, signal
 
 
 class ParquetDataLoader(DataLoader):

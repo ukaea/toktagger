@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from enum import Enum
 
 
-class AnnotatorIds(str, Enum):
+class AnnotatorTypes(str, Enum):
     PEAK_DETECTION = "peak_detection"
     OUTLIER_DETECTION = "outlier_detection"
     CHANGE_POINT_DETECTION = "change_point_detection"
@@ -16,11 +16,11 @@ class DataTypes(Enum):
     IMAGE = "image"
 
 
-class Annotator(BaseModel):
+class AnnotatorParams(BaseModel):
     pass
 
 
-class PeakDetectionParams(Annotator):
+class PeakDetectionParams(AnnotatorParams):
     signal_name: str
     prominence: float
     distance: int
@@ -28,14 +28,14 @@ class PeakDetectionParams(Annotator):
     time_max: Optional[float]
 
 
-class OutlierDetectionParams(Annotator):
+class OutlierDetectionParams(AnnotatorParams):
     signal_name: str
     method: Literal["mad", "isoforest"]
     threshold: Optional[float] = None
     contamination: Optional[float] = None
 
 
-class ChangePointDetectionParams(Annotator):
+class ChangePointDetectionParams(AnnotatorParams):
     signal_name: str
     method: Literal["pelt", "hmm"]
     num_points: int
@@ -43,7 +43,7 @@ class ChangePointDetectionParams(Annotator):
     num_components: Optional[int] = None  # Only used if method is 'hmm'
 
 
-class JumpDetectionParams(Annotator):
+class JumpDetectionParams(AnnotatorParams):
     signal_name: str
     threshold: float
     min_distance: int
@@ -51,7 +51,7 @@ class JumpDetectionParams(Annotator):
     num_points: int
 
 
-AnnotatorTypes = Union[
+AnnotatorParamTypes = Union[
     PeakDetectionParams,
     OutlierDetectionParams,
     ChangePointDetectionParams,

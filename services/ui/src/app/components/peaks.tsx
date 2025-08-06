@@ -7,20 +7,20 @@ type PeakDetectionType = {
     project_id: string;
     sample_id: string;
     data: MultiVariateTimeSeriesData;
-    setAnnotations: (annotations: Annotation[]) => void;
+    setAnnotations: (annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])) => void;
 };
 export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations } : PeakDetectionType) {
-    const [prominence, setProminance] = useState(5);
-    const [distance, setDistance] = useState(1);
+    const [prominence, setProminance] = useState<number>(5);
+    const [distance, setDistance] = useState<number>(1);
 
-    const [timeMinDefault, setTimeMinDefault] = useState(null);
-    const [timeMaxDefault, setTimeMaxDefault] = useState(null);
-    const [timeRange, setTimeRange] = useState({start: 0, end: 100}); 
-    const [signalName, setSignalName] = useState(null);
+    const [timeMinDefault, setTimeMinDefault] = useState<number | null>(null);
+    const [timeMaxDefault, setTimeMaxDefault] = useState<number | null>(null);
+    const [timeRange, setTimeRange] = useState<{start: number, end: number}>({start: 0, end: 100}); 
+    const [signalName, setSignalName] = useState<string | null>(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
     useEffect(() => {
-        if (data && (signalName in data.values)) {
+        if (data && signalName !== null && (signalName in data.values)) {
             const time = data.values[signalName].time;
             const tmin = Math.min(...time);
             const tmax = Math.max(...time)
@@ -31,7 +31,7 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null && !(signalName in data.values)) {
+            if (signalName == null || !(signalName in data.values)) {
                 return;
             }
 
@@ -49,8 +49,8 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
                 }),
             });
 
-            const payload = await response.json();
-            setAnnotations((previousAnnotations: Annotations) => {
+            const payload: Annotation[] = await response.json();
+            setAnnotations((previousAnnotations: Annotation[]) => {
                 const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'peak_detection');
                 return otherAnnotations.concat(payload);
             });
@@ -60,11 +60,15 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
         
     }, [prominence, distance, timeRange, signalName]);
 
+    if (timeMinDefault === null || timeMaxDefault === null) {
+        return <div>Loading...</div>;
+    }
+
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label='Signal Name' defaultInputValue={signalName} defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
+                <ComboBox label='Signal Name' defaultInputValue={signalName ?? undefined} defaultItems={signalOptions} onInputChange={setSignalName}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>

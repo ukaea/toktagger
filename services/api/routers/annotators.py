@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas.projects import Project, Task
 from services.api.schemas.samples import Sample
-from services.api.schemas.annotators import AnnotatorIds, AnnotatorTypes
+from services.api.schemas.annotators import AnnotatorParamTypes, AnnotatorParamTypes
 from services.api.crud.utils import get_project, get_sample
 from services.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from services.api.core.data_loaders import DATA_LOADERS
@@ -23,8 +23,8 @@ async def create_annotations(
     request: Request,
     project_id: str,
     sample_id: str,
-    annotator_id: AnnotatorIds,
-    params: AnnotatorTypes,
+    annotator_type: AnnotatorParamTypes,
+    params: AnnotatorParamTypes,
 ):
     # Use the specified annotator to label this sample for this project
     # Would use the datapool to load and process the data
@@ -33,13 +33,13 @@ async def create_annotations(
     # Can be passed a set of annotator params and sample params?
     db_client = request.app.state.db_client
     project: Project = await get_project(db_client, project_id)
-    annotator_cls = ANNOTATORS[annotator_id]
+    annotator_cls = ANNOTATORS[annotator_type]
 
     if not annotator_cls:
         raise HTTPException(
             status_code=404, detail="No annotator found for this project type."
         )
-    if annotator_id not in ANNOTATORS_PER_TASK[Task(project.task)]:
+    if annotator_type not in ANNOTATORS_PER_TASK[Task(project.task)]:
         raise HTTPException(
             status_code=409,
             detail=f"The selected annotator cannot be used for {project.task} labelling projects.",

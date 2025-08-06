@@ -7,22 +7,22 @@ type ChangePointDetectionType = {
     project_id: string;
     sample_id: string;
     data: MultiVariateTimeSeriesData;
-    setAnnotations: (annotations: Annotation[]) => void;
+    setAnnotations: (annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])) => void;
 };
 
 export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnotations }: ChangePointDetectionType) {
     const methodOptions = [{id: 0, name: "pelt"}, {id: 1, name: "hmm"}];
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
-    const [signalName, setSignalName] = useState(null);
-    const [penalty, setPenalty] = useState(5);
-    const [numPoints, setNumPoints] = useState(500);
-    const [method, setMethod] = useState("pelt");
-    const [numComponents, setNumComponents] = useState(3);
+    const [signalName, setSignalName] = useState<string | null>(null);
+    const [penalty, setPenalty] = useState<number>(5);
+    const [numPoints, setNumPoints] = useState<number>(500);
+    const [method, setMethod] = useState<string>("pelt");
+    const [numComponents, setNumComponents] = useState<number>(3);
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName === null && !(signalName in data.values)) {
+            if (signalName === null || !(signalName in data.values)) {
                 return;
             }
 
@@ -40,7 +40,7 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
                 }),
             });
 
-            const payload = await response.json();
+            const payload: Annotation[] = await response.json();
             setAnnotations(previousAnnotations => {
                 const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'change_point_detection');
                 return otherAnnotations.concat(payload);
@@ -53,7 +53,7 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
-                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName} allowsEmptyCollection={true}>
+                <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
                 <br/>
