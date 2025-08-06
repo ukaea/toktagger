@@ -157,46 +157,49 @@ export default function SamplePage({
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
-  const viewParams = { name: "identity" } as ViewParams;
-
-  const refreshData = async (params: ViewParams) => {
-    const project = await getProject(project_id);
-    setProject(project);
-
-    const sample = await getSample(project_id, sample_id);
-    setSample(sample);
-
-    const dbAnnotations = await getAnnotations(project_id, sample_id);
-    setAnnotations(dbAnnotations);
-
-    if (project.task == "MHD") {
-      params = {
-        ...params,
-        name: "spectrogram",
-        nperseg: 256,
-      } as SpectrogramViewParams;
-    }
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(params),
-      }
-    );
-    const data: Data = await response.json();
-    setData(data);
-  };
+  const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
 
   useEffect(() => {
-    const run = async () => {
+
+    const refreshData = async (params: ViewParams) => {
+      const project = await getProject(project_id);
+      setProject(project);
+
+      const sample = await getSample(project_id, sample_id);
+      setSample(sample);
+
+      const dbAnnotations = await getAnnotations(project_id, sample_id);
+      setAnnotations(dbAnnotations);
+
+      if (project.task == "MHD") {
+        params = {
+          ...params,
+          name: "spectrogram",
+          nperseg: 256,
+        } as SpectrogramViewParams;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(params),
+        }
+      );
+      const data: Data = await response.json();
+      setData(data);
+    };
+
+    const run = async (viewParams: ViewParams) => {
       await refreshData(viewParams);
     };
-    run();
-  }, []);
+
+    run(viewParams);
+
+  }, [project_id, sample_id, viewParams]);
 
   if (!data || !project || !sample) {
     return;
@@ -218,7 +221,7 @@ export default function SamplePage({
             annotations={annotations}
             setAnnotations={setAnnotations}
             viewParams={viewParams}
-            setViewParams={refreshData}
+            setViewParams={setViewParams}
           />
           <div className="flex-1 justify-center">
             <SampleView

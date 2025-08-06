@@ -15,3 +15,5 @@ scikit-learn
 celery[redis]
 pillow
 uda
+mkdocs
+mkdocs-material
