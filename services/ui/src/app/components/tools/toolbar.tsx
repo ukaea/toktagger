@@ -115,7 +115,7 @@ function AmplitudeSlider({
   };
 
   let ampValues = data.amplitude.flat();
-  ampValues = ampValues.map((x: number) => Math.log10(Math.max(x, 1e-6)));
+  ampValues = ampValues.map((x: number) => Math.log10(Math.max(x, 1e-4)));
 
   const displayAmplitudeValues = (val: number) => {
     // Convert the log10 amplitude value back to linear scale and round to 4 decimal places

@@ -23,7 +23,6 @@ import * as d3 from "d3";
 import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
-  linspace,
 } from "@/app/utils";
 
 const lockedModeCategories: Category[] = [
