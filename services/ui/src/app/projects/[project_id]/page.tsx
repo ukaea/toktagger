@@ -79,7 +79,7 @@ export default function ProjectView({
 }: {
   params: Promise<ProjectViewProps>;
 }) {
-  const [samplesPerPage, setSamplesPerPage] = useState<number>(5);
+  const [samplesPerPage, setSamplesPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: 'shot_id', direction: 'ascending' });
   
@@ -123,11 +123,11 @@ export default function ProjectView({
                   setCurrentPage(1);
                 }
                 }} 
-              defaultSelectedKey="5">
-              <Item key="2">2</Item>
+              defaultSelectedKey="10">
               <Item key="5">5</Item>
               <Item key="10">10</Item>
               <Item key="25">25</Item>
+              <Item key="50">50</Item>
             </Picker>
             </div>
             <Button variant="primary" onPress={() => setCurrentPage((p) => p + 1)} isDisabled={samples.length < samplesPerPage}>

@@ -61,7 +61,7 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange}: Projects
 }
 
 export default function Projects() {
-  const [projectsPerPage, setProjectsPerPage] = useState<number>(5);
+  const [projectsPerPage, setProjectsPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: '_id', direction: 'descending' });
   
@@ -98,11 +98,11 @@ export default function Projects() {
                   setCurrentPage(1);
                   }
                 }} 
-              defaultSelectedKey="5">
-                <Item key="2">2</Item>
+              defaultSelectedKey="10">
                 <Item key="5">5</Item>
                 <Item key="10">10</Item>
                 <Item key="25">25</Item>
+                <Item key="50">50</Item>
               </Picker>
               </div>
               <Button variant="primary" onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
