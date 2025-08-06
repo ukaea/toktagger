@@ -17,3 +17,5 @@ pillow
 ruptures
 uda
 hmmlearn
+mkdocs
+mkdocs-material
