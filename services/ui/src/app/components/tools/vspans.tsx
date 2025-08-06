@@ -22,7 +22,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
     const {disableToolingInteraction} = useContextMenuProvider()
 
     // Hook to pull in data from context provider
-    const {vspans, handleVSpanUpdate, triggerUpdate} = useVSpanContext()
+    const {vspans, handleVSpanUpdate, handleVSpanDragFinish, triggerUpdate} = useVSpanContext()
 
     // Main rendering effect
     useEffect(() => {
@@ -90,6 +90,8 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
                     const x = xaxis.p2d(newX); // The context provider stores the decimal value rather than pixel
                     d.x = x;
                     handleVSpanUpdate() // Global refresh must be triggered to update all linked plots
+                }).on("end", function(_event, _d) {
+                    handleVSpanDragFinish();  
                 })
 
             function handleContextMenu(event, vspan: VSpan) {

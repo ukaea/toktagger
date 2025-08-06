@@ -26,6 +26,7 @@ export const ProjectsTable = () => {
   return (
     <Provider theme={defaultTheme}>
       <TableView
+      aria-label="Projects"
       selectionMode="none"
       selectionStyle="highlight"
       >
