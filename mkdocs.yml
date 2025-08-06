@@ -1,0 +1,19 @@
+site_name: Viz Annotation
+theme:
+  name: material
+  palette:
+    scheme: default
+nav:
+  - Home: index.md
+  - Developer Documentation: 
+    - Getting Started: dev/developer-setup.md
+    - Building the Docs: dev/building-the-docs.md
+    - API Design: dev/API-Design.md
+    - System Architecture: dev/System-Architecture.md
+    - User Interface:
+      - Overall Design: dev/User-Interface-Overall-Design.md
+      - Planning: dev/User-Interface-Planning.md
+      - UI Details: dev/User-Interface-Details.md
+      - Providers: dev/Providers.md
+      - Context Menu: dev/Context-Menu-Provider.md
+

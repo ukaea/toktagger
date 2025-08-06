@@ -1,19 +1,64 @@
 'use client'
-import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, TimeSeriesData } from "@/types"
+import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, TimeSeriesData, DisplayAnnotation, ZoneSchema, TimeRegionSchema } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
 import { Zones } from "@/app/components/tools/zones"
 import 'react-contexify/ReactContexify.css';
 import Plotly from "plotly.js-dist";
+import { createAnnotationToDisplayAnnotationFunc, updateAnnotations } from "@/app/utils"
+
+// Generate a random color with a fixed seed
+function seededRandom(seed: number) {
+    let x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+}
+
+function randomColor(seed: number = 42) {
+    // Generate RGB values based on seed
+    const r = Math.floor(seededRandom(seed) * 256);
+    const g = Math.floor(seededRandom(seed + 1) * 256);
+    const b = Math.floor(seededRandom(seed + 2) * 256);
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
 
 type MultiVariateTimeSeriesViewInfo = {
     data: MultiVariateTimeSeriesData, 
+    zoneNames: string[],
     annotations: Annotations, 
-    setAnnotations: (annotations: Annotations) => void
-    zoneNames?: string[]
+    setAnnotations: (
+        updater: (annotations: Annotations) => Annotations | Annotations
+    ) => void;
 };
-export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations, zoneNames = []}: MultiVariateTimeSeriesViewInfo) => {
+export const MultiVariateTimeSeriesView = ({data, zoneNames, annotations, setAnnotations}: MultiVariateTimeSeriesViewInfo) => {
+    const zoneCategories = zoneNames.map((x, index) => ({
+        name: x,
+        color: randomColor(index + 1)
+    }));
+
+    const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
+    (acc, curr) => {
+        acc[curr.name] = curr.color;
+        return acc;
+    },
+    {}
+    );
+
+    const convertAnnotationToDisplayAnnotation =
+        createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
+    const displayAnnotations: DisplayAnnotation[] = annotations.map(
+        convertAnnotationToDisplayAnnotation
+    );
+
+    const zones: Zone[] = displayAnnotations
+        .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
+        .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+
+    const updateZones = (newZones: Array<Zone>) => {
+        updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
+    };
+
 
     let plotData: Plotly.Data[] = Object.entries(data.values).map(([key, value]: [string, TimeSeriesData]) => {
         return {
@@ -55,7 +100,7 @@ export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations, z
     const maxTime = plotData.reduce((max, trace) => Math.max(max, Math.max(...trace.x)), -Infinity);
     const minTime = plotData.reduce((min, trace) => Math.min(min, Math.min(...trace.x)), Infinity);
 
-    var plotLayout = {
+    var plotLayout: Partial<Plotly.Layout> = {
         uirevision: 'true',
         grid: { rows: 1, columns: 1, pattern: 'independent' },
         dragmode: 'pan',
@@ -81,54 +126,13 @@ export const MultiVariateTimeSeriesView = ({data, annotations, setAnnotations, z
     };
 
     
-    // Generate a random color with a fixed seed
-    function seededRandom(seed: number) {
-        let x = Math.sin(seed) * 10000;
-        return x - Math.floor(x);
-    }
-
-    function randomColor(seed: number = 42) {
-        // Generate RGB values based on seed
-        const r = Math.floor(seededRandom(seed) * 256);
-        const g = Math.floor(seededRandom(seed + 1) * 256);
-        const b = Math.floor(seededRandom(seed + 2) * 256);
-        return `rgb(${r}, ${g}, ${b})`;
-    }
-
-    const zoneCategories = zoneNames.map((x, index) => ({
-        name: x,
-        color: randomColor(index + 1)
-    }));
-
-    const convertRegionToZone = (item: TimeRegion) => {
-        let category = zoneCategories.find(x => x.name === item.label);
-        if (!category) {
-            category = { name: item.label, color: randomColor(-1) };
-        }
-        return {x0: item.time_min, x1: item.time_max, category: category, created_by: item.created_by} as Zone;
-    };
-    annotations = annotations.filter(item => item.type === 'time_region') as TimeRegion[];
-    const zones = annotations.map(convertRegionToZone);
-
-    const updateAnnotations = (newZones: Array<Zone>) => {
-        const zones = newZones.map(item => ({
-                type: 'time_region',
-                created_by: item.created_by,
-                time_min: item.x0,
-                time_max: item.x1,
-                label: item.category.name
-        }));
-
-        setAnnotations(zones);
-    }
-
     return (
         <div className="flex space-y-3">
             <div className="flex-1 text-center items-center">
                 <ContextMenuProvider menuId="elm-menu">
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateAnnotations}>
+                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
                         <TimeSeries plotId="TimeSeriesPlot" plotConfig={{data: plotData, layout: plotLayout}}>
-                            <Zones />
+                            <Zones onZoneUpdate={updateZones}/>
                         </TimeSeries>
                     </ZoneProvider>
                 </ContextMenuProvider>
