@@ -199,7 +199,7 @@ export default function SamplePage({
 
     run(viewParams);
 
-  }, [viewParams]);
+  }, [project_id, sample_id, viewParams]);
 
   if (!data || !project || !sample) {
     return;

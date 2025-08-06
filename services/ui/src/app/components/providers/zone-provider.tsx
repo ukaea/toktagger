@@ -111,27 +111,27 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
             )
         })
             
-            /* Decide what to register in the main context‑menu:
-           – Single category → direct “Add <Category>” item.
-           – Multiple categories → keep existing submenu.
-            */
-            const menuElement =
-                categories.length === 1
-                    ? (
-                        <Item key="add-zone-single" id="add-zone-single" onClick={({props}) => {
-                            addFromClick(props as MenuProps, categories[0])
-                        }}>
-                            {`Add ${categories[0].name}`}
-                        </Item>
-                    ) : (
-                        <Submenu key="zone-submenu" label="Add zone">
-                            {addZoneItems}
-                        </Submenu>
-                    )
+        /* Decide what to register in the main context‑menu:
+        – Single category → direct “Add <Category>” item.
+        – Multiple categories → keep existing submenu.
+        */
+        const menuElement =
+            categories.length === 1
+                ? (
+                    <Item key="add-zone-single" id="add-zone-single" onClick={({props}) => {
+                        addFromClick(props as MenuProps, categories[0])
+                    }}>
+                        {`Add ${categories[0].name}`}
+                    </Item>
+                ) : (
+                    <Submenu key="zone-submenu" label="Add zone">
+                        {addZoneItems}
+                    </Submenu>
+                )
 
-            registerMenuItem("zone", menuElement)
+        registerMenuItem("zone", menuElement)
 
-        }, [categories, registerMenuItem])
+    }, [categories, onModifyZone, registerMenuItem])
 
     // Initialisation of data - this should only run once
     // Effect: run ONCE per mount to populate from initialData
