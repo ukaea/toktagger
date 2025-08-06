@@ -120,3 +120,7 @@ export type ToolingProps = {
   forceUpdate?: number;
   onZoneUpdate: CallableFunction;
 };
+
+export type PlotProps = {
+  color_map?: string;
+}

@@ -6,12 +6,16 @@ import {
   ButtonGroup,
   ToastQueue,
   Button,
+  ComboBox,
+  Item,
+  Key,
 } from "@adobe/react-spectrum";
 import {
   Annotations,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
+  PlotProps,
   Project,
   Sample,
   SpectrogramData,
@@ -137,6 +141,43 @@ function AmplitudeSlider({
   return ampRangeTool;
 }
 
+type ColorMapPickerInfo = {
+  plotProps: PlotProps;
+  setPlotProps: (props: PlotProps) => void;
+};
+function ColorMapPicker({
+  plotProps,
+  setPlotProps,
+}: ColorMapPickerInfo) {
+
+  const options = [
+    { id: 1, name: "Viridis" },
+    { id: 2, name: "Plasma" },
+    { id: 3, name: "Inferno" },
+    { id: 4, name: "Magma" },
+    { id: 5, name: "Cividis" }
+  ];
+
+  const onColorMapChange = (key: Key | null) => {
+    if (key) {
+      const selectedColorMap = Number(key.toString());
+      const value = options.find((item) => item.id === selectedColorMap);
+      setPlotProps({ ...plotProps, color_map: value?.name || "Cividis" });
+    }
+  }
+
+
+  return (
+    <ComboBox
+      label="Color Map"
+      defaultItems={options}
+      inputValue={plotProps.color_map || "Cividis"}
+      onSelectionChange={onColorMapChange}>
+      {item => <Item key={item.id}>{item.name}</Item>}
+    </ComboBox>
+  )
+}
+
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
@@ -145,6 +186,8 @@ type ToolBarInfo = {
   setAnnotations: (annotations: Annotations) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
+  plotProps: PlotProps;
+  setPlotProps: (props: PlotProps) => void;
 };
 export default function ToolBar({
   project,
@@ -154,6 +197,8 @@ export default function ToolBar({
   setAnnotations,
   viewParams,
   setViewParams,
+  plotProps,
+  setPlotProps,
 }: ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
@@ -194,11 +239,18 @@ export default function ToolBar({
     }
 
     const ampRangeTool = (
-      <AmplitudeSlider
-        data={mhdData.data}
-        viewParams={viewParams}
-        setViewParams={setViewParams}
-      />
+      <>
+        <ColorMapPicker
+          plotProps={plotProps}
+          setPlotProps={setPlotProps}
+        />
+        <hr className="m-4 h-px opacity-30 border-gray-200" />
+        <AmplitudeSlider
+          data={mhdData.data}
+          viewParams={viewParams}
+          setViewParams={setViewParams}
+        />
+      </>
     );
     tools.push(ampRangeTool);
   }

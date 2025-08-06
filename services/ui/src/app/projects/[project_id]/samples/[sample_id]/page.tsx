@@ -16,6 +16,7 @@ import {
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
+  PlotProps,
   ViewParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
@@ -59,6 +60,7 @@ type SampleViewInfo = {
   setAnnotations: (
     updater: (annotations: Annotations) => Annotations | Annotations
   ) => void;
+  plotProps: PlotProps;
 };
 
 const SampleView = ({
@@ -66,6 +68,7 @@ const SampleView = ({
   data,
   annotations,
   setAnnotations,
+  plotProps,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -107,6 +110,7 @@ const SampleView = ({
         data={mhdData.data}
         annotations={annotations}
         setAnnotations={setAnnotations}
+        plotProps={plotProps}
       />
     );
   }
@@ -158,6 +162,7 @@ export default function SamplePage({
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
   const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
+  const [plotProps, setPlotProps] = useState<PlotProps>({ color_map: "Cividis" });
 
   useEffect(() => {
 
@@ -201,6 +206,10 @@ export default function SamplePage({
 
   }, [viewParams]);
 
+  useEffect(() => {
+
+  }, [plotProps])
+
   if (!data || !project || !sample) {
     return;
   }
@@ -222,6 +231,8 @@ export default function SamplePage({
             setAnnotations={setAnnotations}
             viewParams={viewParams}
             setViewParams={setViewParams}
+            plotProps={plotProps}
+            setPlotProps={setPlotProps}
           />
           <div className="flex-1 justify-center">
             <SampleView
@@ -229,6 +240,7 @@ export default function SamplePage({
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
+              plotProps={plotProps}
             />
           </div>
         </div>

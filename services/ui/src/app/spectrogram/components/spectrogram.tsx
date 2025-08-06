@@ -12,6 +12,7 @@ import {
   ZoneSchema,
   VSpanSchema,
   VSpan,
+  PlotProps,
 } from "@/types";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider";
@@ -57,12 +58,14 @@ type SpectrogramViewInfo = {
   setAnnotations: (
     updater: (annotations: Annotations) => Annotations | Annotations
   ) => void;
+  plotProps: PlotProps;
 };
 
 export const SpectrogramView = ({
   data,
   annotations,
   setAnnotations,
+  plotProps,
 }: SpectrogramViewInfo) => {
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
@@ -156,7 +159,24 @@ export const SpectrogramView = ({
     },
   ];
 
-  const interpFunc = d3.interpolateCividis;
+  const interpFunc = (value: number) => {
+    if (plotProps.color_map === "Viridis") {
+      return d3.interpolateViridis(value);
+    }
+    if (plotProps.color_map === "Plasma") {
+      return d3.interpolatePlasma(value);
+    }
+    if (plotProps.color_map === "Inferno") {
+      return d3.interpolateInferno(value);
+    }
+    if (plotProps.color_map === "Magma") {
+      return d3.interpolateMagma(value);
+    }
+    if (plotProps.color_map === "Cividis") {
+      return d3.interpolateCividis(value);
+    }
+    return d3.interpolateCividis(value); // Default to Cividis if no match
+  };
 
   const plotLayout: Partial<Plotly.Layout> = {
     height: 600,
