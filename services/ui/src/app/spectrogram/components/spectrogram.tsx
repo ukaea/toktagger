@@ -97,9 +97,51 @@ export const SpectrogramView = ({
   const logAmpMin = Math.min(...logAmplitude.flat());
   const logAmpMax = Math.max(...logAmplitude.flat());
 
-  const tickvals = linspace(ampMin, ampMax, 6).map((x) => Math.log10(x));
-  let ticktext = tickvals.map((x: number) => Math.pow(10, x));
-  ticktext = ticktext.map((x: number) => Math.round(x * 10000) / 10000);
+  const generateLogTicks = (min: number, max: number) => {
+    const minPower = Math.floor(Math.log10(min));
+    const maxPower = Math.ceil(Math.log10(max));
+
+    const tickvals: number[] = [];
+    const ticktext: string[] = [];
+
+    // Add major ticks (powers of 10) and minor ticks (2,3,4,5,6,7,8,9 × 10^n)
+    for (let power = minPower; power <= maxPower; power++) {
+      const baseValue = Math.pow(10, power);
+
+      // Add major tick (power of 10)
+      if (baseValue >= min && baseValue <= max) {
+        tickvals.push(Math.log10(baseValue));
+        ticktext.push(formatTickLabel(baseValue));
+      }
+
+      // Add minor ticks (2-9 × 10^power)
+      for (let multiplier = 2; multiplier <= 9; multiplier++) {
+        const subValue = baseValue * multiplier;
+        if (subValue >= min && subValue <= max && subValue < Math.pow(10, maxPower + 1)) {
+          tickvals.push(Math.log10(subValue));
+          ticktext.push(""); // Empty labels for minor ticks
+        }
+      }
+    }
+
+    // Add min and max if they're not already included
+    if (!tickvals.some(val => Math.abs(val - Math.log10(min)) < 1e-10)) {
+      tickvals.unshift(Math.log10(min));
+      ticktext.unshift(formatTickLabel(min));
+    }
+    if (!tickvals.some(val => Math.abs(val - Math.log10(max)) < 1e-10)) {
+      tickvals.push(Math.log10(max));
+      ticktext.push(formatTickLabel(max));
+    }
+
+    return { tickvals, ticktext };
+  };
+
+  const formatTickLabel = (value: number) => {
+    return value.toExponential(0);
+  };
+
+  const { tickvals, ticktext } = generateLogTicks(ampMin, ampMax);
 
   const plotData: Partial<Plotly.PlotData>[] = [
     {
@@ -146,6 +188,7 @@ export const SpectrogramView = ({
         [1, interpFunc(1)],
       ],
       colorbar: {
+        ticks: "outside",
         tickmode: "array",
         ticktext: ticktext,
         tickvals: tickvals,
