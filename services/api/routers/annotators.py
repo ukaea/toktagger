@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Request, HTTPException
 from services.api.schemas.projects import Project, Task
 from services.api.schemas.samples import Sample
-from services.api.schemas.annotators import AnnotatorParamTypes, AnnotatorParamTypes
+from services.api.schemas.annotators import (
+    AnnotatorParamTypes,
+    AnnotatorTypes,
+)
 from services.api.crud.utils import get_project, get_sample
 from services.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from services.api.core.data_loaders import DATA_LOADERS
@@ -23,7 +26,7 @@ async def create_annotations(
     request: Request,
     project_id: str,
     sample_id: str,
-    annotator_type: AnnotatorParamTypes,
+    annotator_type: AnnotatorTypes,
     params: AnnotatorParamTypes,
 ):
     # Use the specified annotator to label this sample for this project

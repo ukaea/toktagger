@@ -13,8 +13,8 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
     const [prominence, setProminance] = useState<number>(5);
     const [distance, setDistance] = useState<number>(1);
 
-    const [timeMinDefault, setTimeMinDefault] = useState<number | null>(null);
-    const [timeMaxDefault, setTimeMaxDefault] = useState<number | null>(null);
+    const [timeMinDefault, setTimeMinDefault] = useState<number>(0);
+    const [timeMaxDefault, setTimeMaxDefault] = useState<number>(0);
     const [timeRange, setTimeRange] = useState<{start: number, end: number}>({start: 0, end: 100}); 
     const [signalName, setSignalName] = useState<string | null>(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
@@ -50,6 +50,7 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
             });
 
             const payload: Annotation[] = await response.json();
+            console.log("Peak detection response:", payload);
             setAnnotations((previousAnnotations: Annotation[]) => {
                 const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'peak_detection');
                 return otherAnnotations.concat(payload);
@@ -59,10 +60,6 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
         fetchData();
         
     }, [prominence, distance, timeRange, signalName]);
-
-    if (timeMinDefault === null || timeMaxDefault === null) {
-        return <div>Loading...</div>;
-    }
 
     return (
         <Provider theme={defaultTheme}>
