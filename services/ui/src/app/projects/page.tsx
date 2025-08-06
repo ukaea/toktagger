@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { getProjects } from '@/app/core';
-import {ButtonGroup, Flex, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import {ButtonGroup, ActionButton, Flex, Text, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
 import { Project } from '@/types';
 import Edit from '@spectrum-icons/workflow/Edit';
 import AddCircle from '@spectrum-icons/workflow/AddCircle';
-import RemoveCircle from '@spectrum-icons/workflow/RemoveCircle';
+import Delete from '@spectrum-icons/workflow/Delete';
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -77,7 +77,7 @@ export const ProjectsTable = () => {
     <>
       <Flex direction='row' margin='size-100' gap="size-100"  alignItems="end">
         <ButtonGroup UNSAFE_className="py-2">
-          <Button elementType="a" variant='primary' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}><AddCircle/></Button>
+          <Button elementType="a" variant='primary' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}><AddCircle/><Text>Create</Text></Button>
           <Button
             elementType='a'
             variant='negative'
@@ -87,7 +87,7 @@ export const ProjectsTable = () => {
                 ? false
                 : (selectedKeys instanceof Set ? selectedKeys.size === 0 : true)
             }
-          ><RemoveCircle/></Button>
+          ><Delete/><Text>Delete</Text></Button>
         </ButtonGroup>
       </Flex>
       <TableView
