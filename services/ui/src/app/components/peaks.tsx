@@ -50,7 +50,6 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
             });
 
             const payload: Annotation[] = await response.json();
-            console.log("Peak detection response:", payload);
             setAnnotations((previousAnnotations: Annotation[]) => {
                 const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'peak_detection');
                 return otherAnnotations.concat(payload);

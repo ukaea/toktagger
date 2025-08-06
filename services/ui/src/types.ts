@@ -9,7 +9,8 @@ export const BaseAnnotationSchema = z.object({
   type: z.string()
 });
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
-export type ClassLabel = z.infer<typeof BaseAnnotationSchema>;
+export const ClassLabelSchema = BaseAnnotationSchema;
+export type ClassLabel = z.infer<typeof ClassLabelSchema>;
 
 export const TimeRegionSchema = BaseAnnotationSchema.extend({
   time_min: z.number(),

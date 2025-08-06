@@ -213,7 +213,7 @@ class PeakDetectionAnnotator(DataAnnotator):
                     label="Peak",
                     time_min=float(peak_time - width),
                     time_max=float(peak_time + width),
-                    created_by=AnnotatorParamTypes.PEAK_DETECTION,
+                    created_by=AnnotatorTypes.PEAK_DETECTION,
                 )
                 regions.append(region)
 
@@ -285,7 +285,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Outlier",
-                created_by=AnnotatorParamTypes.OUTLIER_DETECTION,
+                created_by=AnnotatorTypes.OUTLIER_DETECTION,
             )
             for imin, imax in bounds
         ]
@@ -312,7 +312,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Outlier",
-                created_by=AnnotatorParamTypes.OUTLIER_DETECTION,
+                created_by=AnnotatorTypes.OUTLIER_DETECTION,
             )
             for imin, imax in bounds
         ]
@@ -397,7 +397,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Change Point",
-                created_by=AnnotatorParamTypes.CHANGE_POINT_DETECTION,
+                created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
             )
             for imin, imax in zip(result, result[1:])
         ]
@@ -423,7 +423,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 time_min=tmin,
                 time_max=tmax,
                 label="Change Point",
-                created_by=AnnotatorParamTypes.CHANGE_POINT_DETECTION,
+                created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
             )
             for (tmin, tmax) in bounds
         ]
@@ -507,7 +507,7 @@ class JumpDetectionAnnotator(DataAnnotator):
                     time_min=tmin,
                     time_max=tmax,
                     label="Jump",
-                    created_by=AnnotatorParamTypes.JUMP_DETECTION,
+                    created_by=AnnotatorTypes.JUMP_DETECTION,
                 )
             )
 

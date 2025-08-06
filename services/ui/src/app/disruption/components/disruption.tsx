@@ -11,6 +11,8 @@ import {
   ZoneSchema,
   VSpanSchema,
   DisplayAnnotation,
+  Annotation,
+  ClassLabelSchema,
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
@@ -67,7 +69,7 @@ export const DisruptionView = ({
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
-  const displayAnnotations: DisplayAnnotation[] = annotations.map(
+  const displayAnnotations: DisplayAnnotation[] = annotations.filter((x: Annotation) => x.type !== 'class_label').map(
     convertAnnotationToDisplayAnnotation
   );
 

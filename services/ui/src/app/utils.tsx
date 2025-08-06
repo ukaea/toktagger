@@ -11,6 +11,7 @@ import {
   Zone,
   TimePoint,
   TimeRegion,
+  ClassLabelSchema,
 } from "@/types";
 import { time } from "console";
 

@@ -12,6 +12,8 @@ import {
   ZoneSchema,
   VSpanSchema,
   VSpan,
+  Annotation,
+  ClassLabelSchema,
 } from "@/types";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider";
@@ -68,7 +70,7 @@ export const SpectrogramView = ({
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
-  const displayAnnotations: DisplayAnnotation[] = annotations.map(
+  const displayAnnotations: DisplayAnnotation[] = annotations.filter((x: Annotation) => x.type !== 'class_label').map(
     convertAnnotationToDisplayAnnotation
   );
 

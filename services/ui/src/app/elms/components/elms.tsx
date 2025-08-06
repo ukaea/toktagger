@@ -1,5 +1,5 @@
 'use client'
-import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, DisplayAnnotation, ZoneSchema, TimeRegionSchema } from "@/types"
+import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, DisplayAnnotation, ZoneSchema, TimeRegionSchema, ClassLabelSchema } from "@/types"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
 import { TimeSeries } from "@/app/components/plots/time-series"
@@ -35,9 +35,11 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     const convertAnnotationToDisplayAnnotation =
       createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
 
-    const displayAnnotations: DisplayAnnotation[] = annotations.map(
+    
+    const displayAnnotations: DisplayAnnotation[] = annotations.filter((x: Annotation) => x.type !== 'class_label').map(
       convertAnnotationToDisplayAnnotation
     );
+
     const zones: Zone[] = displayAnnotations
       .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
       .map((x: DisplayAnnotation) => ZoneSchema.parse(x));

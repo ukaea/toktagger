@@ -21,7 +21,7 @@ async def get_annotators(request: Request, project_id: str):
     pass
 
 
-@router.post("/samples/{sample_id}/annotator/{annotator_id}")
+@router.post("/samples/{sample_id}/annotator/{annotator_type}")
 async def create_annotations(
     request: Request,
     project_id: str,
