@@ -9,6 +9,9 @@ import {
   ComboBox,
   Item,
   Key,
+  Switch,
+  Slider,
+  Text,
 } from "@adobe/react-spectrum";
 import {
   Annotations,
@@ -25,6 +28,7 @@ import {
 } from "@/types";
 import { FindPeaksTool } from "@/app/components/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+import { useState } from "react";
 
 async function saveAnnotations(
   project_id: string,
@@ -178,6 +182,57 @@ function ColorMapPicker({
   )
 }
 
+type ThresholdToolInfo = {
+  data: SpectrogramData;
+  viewParams: ViewParams;
+  setViewParams: (viewParams: ViewParams) => void;
+  plotProps: PlotProps;
+  setPlotProps: (props: PlotProps) => void;
+};
+function ThresholdTool({
+  data,
+  viewParams,
+  setViewParams,
+  plotProps,
+  setPlotProps,
+}: ThresholdToolInfo) {
+  const [active, setActive] = useState(false);
+  const [value, setValue] = useState(0);
+
+  const onThresholdChange = (value: boolean) => {
+    setActive(value);
+    setPlotProps({ ...plotProps, threshold_active: value });
+  }
+
+  const onThresholdApply = async (value: number) => {
+    const params = SpectrogramViewParamsSchema.parse(viewParams);
+    params.threshold_value = value;
+    setViewParams(params);
+  };
+
+  return (
+    <>
+      <Switch isSelected={active} onChange={onThresholdChange}>
+        Use thresholding
+      </Switch>
+      {active && (
+        <>
+          <Slider
+            label="Threshold percentile"
+            value={value}
+            onChange={setValue}
+            minValue={0}
+            maxValue={100}
+          />
+          <Button variant="secondary" onPress={() => { onThresholdApply(value) }} >
+            <Text>Apply</Text>
+          </Button>
+        </>
+      )}
+    </>
+  )
+}
+
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
@@ -249,6 +304,14 @@ export default function ToolBar({
           data={mhdData.data}
           viewParams={viewParams}
           setViewParams={setViewParams}
+        />
+        <hr className="m-4 h-px opacity-30 border-gray-200" />
+        <ThresholdTool
+          data={mhdData.data}
+          viewParams={viewParams}
+          setViewParams={setViewParams}
+          plotProps={plotProps}
+          setPlotProps={setPlotProps}
         />
       </>
     );

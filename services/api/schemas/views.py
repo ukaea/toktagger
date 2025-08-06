@@ -20,6 +20,7 @@ class SpectrogramViewParams(ViewParams):
     frequency_max: Optional[float] = None
     amplitude_min: Optional[float] = None
     amplitude_max: Optional[float] = None
+    threshold_value: Optional[float] = None
 
 
 ViewParamTypes = Union[ViewParams, SpectrogramViewParams]

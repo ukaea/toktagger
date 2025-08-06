@@ -90,6 +90,9 @@ class SpectrogramView:
             time=ds.time.values.tolist(),
             frequency=ds.frequency.values.tolist(),
             amplitude=ds.values.tolist(),
+            threshold_time=ds.time.values.tolist(),
+            threshold_frequency=ds.frequency.values.tolist(),
+            threshold_amplitude=ds.values.tolist(),
         )
 
 

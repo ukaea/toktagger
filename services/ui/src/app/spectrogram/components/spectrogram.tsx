@@ -251,10 +251,22 @@ export const SpectrogramView = ({
               <Zones onZoneUpdate={updateZones} />
               <VSpans onZoneUpdate={updateVSpans} />
             </TimeSeries>
+            {plotProps.threshold_active && (
+              <TimeSeries
+                plotId="SpectrogramThreshold"
+                plotConfig={{
+                  data: plotData,
+                  config: plotConfig,
+                  layout: plotLayout,
+                }}>
+                <Zones onZoneUpdate={updateZones} />
+                <VSpans onZoneUpdate={updateVSpans} />
+              </TimeSeries>
+            )}
             <SpectrogramViewTable />
           </ZoneProvider>
         </VSpanProvider>
       </ContextMenuProvider>
-    </div>
+    </div >
   );
 };

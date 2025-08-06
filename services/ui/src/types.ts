@@ -42,6 +42,9 @@ export const SpectrogramDataSchema = z.object({
   time: z.array(z.number()),
   frequency: z.array(z.number()),
   amplitude: z.array(z.array(z.number())),
+  threshold_time: z.array(z.number()).optional(),
+  threshold_frequency: z.array(z.number()).optional(),
+  threshold_amplitude: z.array(z.array(z.number())).optional(),
 });
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 
@@ -111,6 +114,7 @@ export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
   frequency_max: z.number().optional(),
   amplitude_min: z.number().optional(),
   amplitude_max: z.number().optional(),
+  threshold_value: z.number().optional(),
 });
 export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
 
@@ -123,4 +127,5 @@ export type ToolingProps = {
 
 export type PlotProps = {
   color_map?: string;
+  threshold_active?: boolean;
 }
