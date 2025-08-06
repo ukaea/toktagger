@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from 'next/navigation';
 import { View, Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
-import { Annotations, Data, Project, Sample } from "@/types";
+import { Annotations, Data, Project, Sample, SpectrogramData, SpectrogramViewParamsSchema, ViewParams, MultiVariateTimeSeriesData, CompositeData } from "@/types";
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 import { PeakDetectionTool } from '@/app/components/peaks';
 import { OutlierDetectionTool } from '@/app/components/outliers';
@@ -25,71 +25,101 @@ async function saveAnnotations(project_id: string, sample_id: string, annotation
     }
 }
 
-async function getNextSample(project_id: str) {
+async function getNextSample(project_id: string) {
     const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
     const sampleResult = await fetch(NEXT_URL);
     const sample = await sampleResult.json();
     return sample;
 }
 
-type NextButtonInfo = {
-  project_id: string
-  sample_id: string
-  annotations: Annotations
+
+type ButtonInfo = {
+  project_id: string;
+  sample_id: string;
+  annotations: Annotations;
 };
-export function NextButton({project_id, sample_id, annotations} : NextButtonInfo) {
+
+function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
   const router = useRouter();
 
   const handleClick = async () => {
       await saveAnnotations(project_id, sample_id, annotations);
-      const sample = await getNextSample(project_id)
+      const sample = await getNextSample(project_id);
       const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
       router.push(NEXT_SAMPLE_URL);
   };
 
-  return <Button variant="primary" onPress={handleClick} >Next</Button>
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Next
+    </Button>
+  );
 }
 
-type SaveButtonInfo = {
-  project_id: string
-  sample_id: string
-  annotations: Annotations
-};
-export function SaveButton({project_id, sample_id, annotations}: SaveButtonInfo) {
-  const router = useRouter();
-
+function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
   const handleClick = async () => {
     try {
       await saveAnnotations(project_id, sample_id, annotations);
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {timeout: 5000})
+      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
+        timeout: 5000,
+      });
     } catch (err) {
       ToastQueue.negative(`Failed to save annotations: ${err.message}`, {timeout: 5000});
     }
   };
 
-  return <Button variant="primary" onPress={handleClick} >Save</Button>
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Save
+    </Button>
+  );
 }
 
 type AmplitudeSliderInfo = {
-  data: Data,
-  viewParams: any,
-  setViewParams: (viewParams: any) => void
-}
+  data: SpectrogramData;
+  viewParams: ViewParams;
+  setViewParams: (viewParams: ViewParams) => void;
+};
 
-export function AmplitudeSlider({data, viewParams, setViewParams}: AmplitudeSliderInfo) {
-    const onAmplitudeRangeChange = async (ampRange) => {
-        viewParams.amplitude_min = Math.pow(10, ampRange.start);
-        viewParams.amplitude_max = Math.pow(10, ampRange.end);
-        setViewParams(viewParams);
-    };
+function AmplitudeSlider({
+  data,
+  viewParams,
+  setViewParams,
+}: AmplitudeSliderInfo) {
+  const onAmplitudeRangeChange = async ({
+    start,
+    end,
+  }: {
+    start: number;
+    end: number;
+  }) => {
+    const params = SpectrogramViewParamsSchema.parse(viewParams);
+    params.amplitude_min = Math.pow(10, start);
+    params.amplitude_max = Math.pow(10, end);
+    setViewParams(params);
+  };
 
-    let ampValues = data.amplitude.flat();
-    ampValues = ampValues.map(x => Math.log10(Math.max(x, 1e-6)));
-    const ampRangeTool = (
-        <DataRangeSlider name={'Amplitude Range'} data={ampValues} onChange={onAmplitudeRangeChange} 
-        getValueLabel={val => `${Math.round(Math.pow(10, val.start)*10000, 2)/10000} - ${Math.round(Math.pow(10, val.end)*10000, 2)/10000}`}/>
-    );
-    return ampRangeTool;
+  let ampValues = data.amplitude.flat();
+  ampValues = ampValues.map((x: number) => Math.log10(Math.max(x, 1e-6)));
+
+  const displayAmplitudeValues = (val: number) => {
+    // Convert the log10 amplitude value back to linear scale and round to 4 decimal places
+    return `${Math.round(Math.pow(10, val) * 10000) / 10000}`;
+  };
+
+  const ampRangeTool = (
+    <DataRangeSlider
+      name={"Amplitude Range"}
+      data={ampValues}
+      onChange={onAmplitudeRangeChange}
+      getValueLabel={(val) =>
+        `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
+          val.end
+        )}`
+      }
+    />
+  );
+  return ampRangeTool;
 }
 
 
@@ -99,23 +129,32 @@ const loadToolbarProps = (name: string): Set<string> => {
 }
 
 type ToolBarInfo = {
-  project: Project
-  sample: Sample
-  data: Data,
-  annotations: Annotations,
-  setAnnotations: (annotations: Annotations) => void,
-  viewParams: any,
-  setViewParams: (viewParams: any) => void
-}
-export default function ToolBar({ project, sample, data, annotations, setAnnotations, viewParams, setViewParams} : ToolBarInfo) {
+  project: Project;
+  sample: Sample;
+  data: Data;
+  annotations: Annotations;
+  setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
+  viewParams: ViewParams;
+  setViewParams: (viewParams: ViewParams) => void;
+};
+export default function ToolBar({
+  project,
+  sample,
+  data,
+  annotations,
+  setAnnotations,
+  viewParams,
+  setViewParams,
+}: ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
   const toolBarProps = loadToolbarProps(`toolbarProps_${project_id}`);
   const [expandedKeys, setExpandedKeys] = useState<Set<Key>>(toolBarProps);
-
-  let tools = [];
+  const tools: { name: string; component: React.ReactNode }[] = [];
 
   if (project.task == 'ELM' || project.task == 'disruption') {
+    const tsData = data as MultiVariateTimeSeriesData;
+
     const labels = (project.task == 'ELM') ? ['No ELMs', 'Type I', 'Type II', 'Type III'] : ['No Disruptions', 'Disruption'];
     tools.push({
       name: 'Shot Labels',
@@ -127,31 +166,32 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
     tools.push({
       name: 'Peak Detection',
       component: (
-        <PeakDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></PeakDetectionTool>
+        <PeakDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></PeakDetectionTool>
     )}); 
 
     tools.push({
       name: 'Outlier Detection',
       component: (
-        <OutlierDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></OutlierDetectionTool>
+        <OutlierDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></OutlierDetectionTool>
     )});
 
     tools.push({
       name: 'Change Point Detection',
       component: (
-        <ChangePointDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></ChangePointDetectionTool>
+        <ChangePointDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></ChangePointDetectionTool>
       )
     })
 
     tools.push({
       name: 'Jump Detection',
       component: (
-        <JumpDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></JumpDetectionTool>
+        <JumpDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></JumpDetectionTool>
       )
     });
 
   } else if (project.task == 'MHD') {
-    let mhdData = data.values['mirnov'];
+    const compositeData = data as CompositeData;
+    const mhdData = compositeData.values['mhd'] as SpectrogramData;
     const ampRangeTool = <AmplitudeSlider data={mhdData} viewParams={viewParams} setViewParams={setViewParams}/>
     tools.push({
       name: 'Amplitude Range',
@@ -169,7 +209,7 @@ export default function ToolBar({ project, sample, data, annotations, setAnnotat
 
   return (
         <Provider theme={defaultTheme} height="100vh">
-          <View direction='column' gap='size-100' overflow="auto" height="100vh">
+          <View overflow="auto" height="100vh">
             <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100" width="100%">
               <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100">
                   <Header height="size-300" marginBottom="size-100">

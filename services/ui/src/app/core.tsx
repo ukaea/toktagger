@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from 'react';
-
+import { Data, Project, Sample, ViewParams } from "@/types";
+import { useEffect, useState } from "react";
 
 export const getURL = (url: string) => {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Data | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -13,49 +13,58 @@ export const getURL = (url: string) => {
     };
 
     fetchData();
-  }, []);
+  }, [url]);
 
   return data;
-}
+};
 
-export const getSamples = (project_id: string) => {
-  const [samples, setSamples] = useState<any>(null);
+export const getSamples = (project_id: string): Sample[] | null => {
+  const [samples, setSamples] = useState<Sample[] | null>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples`
+      );
       const data = await response.json();
       setSamples(data);
     };
 
     fetchData();
-  }, []);
+  }, [project_id]);
 
   return samples;
-} 
+};
 
-export const getSample = (project_id: string, sample_id: string) => {
-  const [sample, setSample] = useState<any>(null);
+export const getSample = (
+  project_id: string,
+  sample_id: string
+): Sample | null => {
+  const [sample, setSample] = useState<Sample | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`
+      );
       const data = await response.json();
       setSample(data);
     };
 
     fetchData();
-  }, []);
+  }, [project_id, sample_id]);
 
   return sample;
-} 
+};
 
-export const getProjects = (project_id: string) => {
-  const [projects, setProjects] = useState<any>(null);
+export const getProjects = (): Project[] | null => {
+  const [projects, setProjects] = useState<Project[] | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`
+      );
       const data = await response.json();
       setProjects(data);
     };
@@ -64,42 +73,51 @@ export const getProjects = (project_id: string) => {
   }, []);
 
   return projects;
-} 
+};
 
-export const getProject = (project_id: string) => {
-  const [project, setProject] = useState<any>(null);
+export const getProject = (project_id: string): Project | null => {
+  const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`
+      );
       const data = await response.json();
       setProject(data);
     };
 
     fetchData();
-  }, []);
+  }, [project_id]);
 
   return project;
-} 
+};
 
-export const getSampleData = (project_id: string, sample_id: string, viewParams) => {
-  const [sampleData, setSampleData] = useState<any>(null);
+export const getSampleData = (
+  project_id: string,
+  sample_id: string,
+  viewParams: ViewParams
+): Sample | null => {
+  const [sampleData, setSampleData] = useState<Sample | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`, {
-        method: 'POST',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(viewParams),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(viewParams),
+        }
+      );
       const data = await response.json();
       setSampleData(data);
     };
 
     fetchData();
-  }, []);
+  }, [project_id, sample_id, viewParams]);
 
   return sampleData;
 } 
