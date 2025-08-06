@@ -10,7 +10,10 @@ class Task(Enum):
     UFO = "UFO"
     
 MODELS_PER_TASK = {
-    Task.DISRUPTION: ["disruption_cnn"]
+    Task.DISRUPTION: ["disruption_cnn"],
+    Task.UFO: [],
+    Task.MHD: [],
+    Task.ELM: []
 }
 
 class QueryStrategyType(str, Enum):
