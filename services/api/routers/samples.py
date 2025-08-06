@@ -63,7 +63,6 @@ async def add_samples(
     # I'm assuming these will be shot/pulse numbers, hence int, but could be unique ID strings instead
     # Depends if for us a 'sample' will always be a shot/pulse, or if it could be a subset eg a single frame of video
     # Do we also want to allow a single value, or list of specific value?
-    print(samples[0])
     project_obj_id = convert_to_objectid(project_id, "projects")
     if not await request.app.state.db_client.get_document_by_id(
         "projects", project_obj_id
@@ -88,7 +87,6 @@ async def add_samples(
 
     annotations = []
     annotation_ids = []
-    print(all_annotations)
     for _ann_list, _id in zip(all_annotations, all_ids):
 
         if _ann_list is not None:

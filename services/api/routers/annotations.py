@@ -132,7 +132,6 @@ async def get_annotations(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
-    print(_annotations)
 
     return _annotations
 
@@ -164,7 +163,6 @@ async def add_annotations(
         "sample_id": convert_to_objectid(sample_id, "samples"),
     }
 
-    print("anns are", annotations)
     if len(annotations) == 0:
         # Nothing to do!
         return
@@ -184,9 +182,7 @@ async def add_annotations(
     await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids
     )
-    print("here 2")
     await utils.update_sample(request.app.state.db_client, sample_id, SampleUpdate(validated_annotations=True))
-    print("Here 3")
     return
     
 
