@@ -1,7 +1,7 @@
 "use client";
 import { use, useState } from 'react';
 import { getSamples, getProject } from '@/app/core';
-import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item, SearchField} from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item, Flex, SearchField} from '@adobe/react-spectrum'
 import { SortDescriptor } from '@react-types/shared';
 import type { Project, Sample } from '@/types';
 
@@ -42,28 +42,31 @@ export const SamplesTable = ({project_id, samples, sortDescriptor, onSortChange}
 
   return (
     <Provider theme={defaultTheme}>
-      <TableView
-      aria-label="Samples"
-      selectionMode="none"
-      selectionStyle="highlight"
-      sortDescriptor={sortDescriptor}
-      onSortChange={onSortChange}
-      >
-        <TableHeader>
-          <Column key="shot_id" allowsSorting>Shot ID</Column>
-          <Column key="_id" allowsSorting>Date Created</Column>
-        </TableHeader>
-        <TableBody items={rows}>
-          {(item) => (
-            <Row
-              href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${item["id"]}`}
-            >
-              <Cell>{item["shot_id"]}</Cell>
-              <Cell>{item["timestamp"]}</Cell>
-            </Row>
-          )}
-        </TableBody>
-      </TableView>
+      <Flex height="size-5000" width="100%" direction="column">
+        <TableView
+        flex
+        aria-label="Samples"
+        selectionMode="none"
+        selectionStyle="highlight"
+        sortDescriptor={sortDescriptor}
+        onSortChange={onSortChange}
+        >
+          <TableHeader>
+            <Column key="shot_id" allowsSorting>Shot ID</Column>
+            <Column key="_id" allowsSorting>Date Created</Column>
+          </TableHeader>
+          <TableBody items={rows}>
+            {(item) => (
+              <Row
+                href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${item["id"]}`}
+              >
+                <Cell>{item["shot_id"]}</Cell>
+                <Cell>{item["timestamp"]}</Cell>
+              </Row>
+            )}
+          </TableBody>
+        </TableView>
+      </Flex>
     </Provider>
   );
 };
@@ -76,7 +79,7 @@ export default function ProjectView({
 }: {
   params: Promise<ProjectViewProps>;
 }) {
-  const [samplesPerPage, setSamplesPerPage] = useState<number>(5);
+  const [samplesPerPage, setSamplesPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [shotId, setShotId] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -135,17 +138,17 @@ export default function ProjectView({
               <p> Page: {currentPage} </p>
             <Picker 
               label="Samples per Page:" 
-              onSelectionChange={(selected) => {
-                if (selected != null) {
-                  setSamplesPerPage(selected); 
+              onSelectionChange={(selectedKey) => {
+                if (selectedKey != null) {
+                  setSamplesPerPage(Number(selectedKey) || 10); 
                   setCurrentPage(1);
                 }
                 }} 
-              defaultSelectedKey="5">
-              <Item key="2">2</Item>
+              defaultSelectedKey="10">
               <Item key="5">5</Item>
               <Item key="10">10</Item>
               <Item key="25">25</Item>
+              <Item key="50">50</Item>
             </Picker>
             </div>
             <Button variant="primary" onPress={() => setCurrentPage((p) => p + 1)} isDisabled={samples.length < samplesPerPage}>

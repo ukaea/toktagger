@@ -16,3 +16,5 @@ celery[redis]
 pillow
 uda
 pytest
+mkdocs
+mkdocs-material
