@@ -8,7 +8,8 @@ import { OutlierDetectionTool } from '@/app/components/outliers';
 import { ChangePointDetectionTool } from '@/app/components/changepoints';
 import { JumpDetectionTool } from '@/app/components/jump';
 import { ShotLabels } from '@/app/components/labels';
-import { use, useEffect, useState } from 'react';
+import { ExportTool } from '@/app/components/export';
+import { useEffect, useState } from 'react';
 import {Key} from '@react-types/shared';
 
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
@@ -221,6 +222,16 @@ export default function ToolBar({
                     <Button variant="primary" onPress={clearAnnotations} >Clear</Button>
                   </ButtonGroup>
               </Flex>
+              <Accordion allowsMultipleExpanded={true} width="100%">
+                  <Disclosure>
+                      <DisclosureTitle>
+                        <span style={{ fontSize: '0.8rem' }}>Export Annotations</span>
+                      </DisclosureTitle>
+                    <DisclosurePanel>
+                      <ExportTool project={project} sample={sample} current_annotations={annotations}/>
+                    </DisclosurePanel>
+                  </Disclosure>
+              </Accordion>
               <Flex justifyContent="center" alignItems="center">
                   <Header height="size-300" marginBottom="size-100">
                     <span style={{ fontSize: '1.2rem' }}>Toolbox</span>

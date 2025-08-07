@@ -1,5 +1,5 @@
 "use client";
-import { Data, Project, Sample, ViewParams } from "@/types";
+import { Annotations, Data, Project, Sample, ViewParams } from "@/types";
 import { useEffect, useState } from "react";
 
 export const getURL = (url: string) => {
@@ -129,4 +129,24 @@ export function saveAnnotatorProps<T>(name: string, props: T) {
 export function loadAnnotatorProps<T>(name: string): T | null {
     const props = sessionStorage.getItem(name);
     return props ? JSON.parse(props) as T : null;
+}
+
+export async function getAnnotationsForSample(project_id: string, sample_id: string): Promise<Annotations> {
+    const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+    const response = await fetch(ANNOTATIONS_URL);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch annotations: ${response.statusText}`);
+    }
+    const annotations = await response.json();
+    return annotations;
+}
+
+export async function getAnnotations(project_id: string): Promise<Annotations> {
+    const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/annotations`;
+    const response = await fetch(ANNOTATIONS_URL);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch annotations: ${response.statusText}`);
+    }
+    const annotations = await response.json();
+    return annotations;
 }

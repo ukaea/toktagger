@@ -1,4 +1,3 @@
-import { ZodSchema } from "zod/v4";
 import {
   DisplayAnnotation,
   Annotation,
@@ -92,4 +91,15 @@ export function updateAnnotations<T>(
     newAnnotations = newAnnotations.concat(otherAnnotations);
     return newAnnotations;
   });
+}
+
+export function saveJSONToFile(data: object, filename: string) {
+  const jsonStr = JSON.stringify(data, null, 2); // pretty print with 2 spaces
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url); // Clean up
 }
