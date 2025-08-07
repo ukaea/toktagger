@@ -38,13 +38,17 @@ async def get_samples(
         None,
         description="The number of samples to return, leave blank to return all entries",
     ),
+    shot_id: int | None = Query(
+        None,
+        description="The shot ID to search for, by default None"
+    )
 ) -> list[Sample]:
     """
     Get the full list of samples available for this project.
     --------------------------------------------------------
     """
     db_client = request.app.state.db_client
-    samples = await utils.get_samples(db_client, project_id, sort_by, sort_direction, start, count)
+    samples = await utils.get_samples(db_client, project_id, shot_id, sort_by, sort_direction, start, count)
     return samples
 
 
