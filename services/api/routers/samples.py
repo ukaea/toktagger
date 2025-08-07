@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, Query, Path
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
@@ -161,6 +162,9 @@ async def add_samples(
 async def get_next_sample(
     request: Request,
     project_id: str = Path(description="The project to return the next sample from."),
+    current_sample_id: Optional[str] = Query(
+        None, description="The ID of the current sample being annotated."
+    ),
 ) -> Sample:
     """
     Get the next sample to annotate for this project, according to query strategy.
@@ -171,18 +175,53 @@ async def get_next_sample(
     # This should then be passed in to the /data endpoint to get required data for visualisation
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
-    project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
-    print(samples)
-    annotations = await utils.get_annotations(db_client, project_id, validated=False)
+    data_pool = await utils.get_data_pool(db_client, project_id)
 
-    data_pool = DataPool(
-        data_loader=DATA_LOADERS[project.data_loader](),
-        query_strategy=QUERY_STRATEGIES[project.query_strategy](samples, annotations),
-    )
     try:
-        sample = data_pool.query_strategy.get_next_sample()
+        sample = data_pool.query_strategy.get_next_sample(current_sample_id)
     except RuntimeError as e:
+        print(e)
+        raise HTTPException(status_code=204, detail="No more samples available!")
+
+    return sample
+
+
+@router.get(
+    "/previous",
+    response_model=Sample,
+    responses={
+        200: {
+            "description": "The previous sample to annotate has been returned, according to the project's query strategy."
+        },
+        204: {
+            "description": "No more samples are available to annotate for this project."
+        },
+        409: {"description": "Server is not setup to use the selected project."},
+    },
+)
+async def get_previous_sample(
+    request: Request,
+    project_id: str = Path(
+        description="The project to return the previous sample from."
+    ),
+    current_sample_id: Optional[str] = Query(
+        None, description="The ID of the current sample being annotated."
+    ),
+) -> Sample:
+    """
+    Get the next sample to annotate for this project, according to query strategy.
+    ------------------------------------------------------------------------------
+    """
+    # Return the previous sample for human validation for this project
+    # Should use the query strategy, which access the database to determine the previous sample to annotate
+    # This should then be passed in to the /data endpoint to get required data for visualisation
+    # And the /annotation endpoint to get initial prediction (if available)
+    db_client = request.app.state.db_client
+    data_pool = await utils.get_data_pool(db_client, project_id)
+
+    try:
+        sample = data_pool.query_strategy.get_previous_sample(current_sample_id)
+    except RuntimeError:
         raise HTTPException(status_code=204, detail="No more samples available!")
 
     return sample

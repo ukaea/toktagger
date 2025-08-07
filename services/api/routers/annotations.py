@@ -95,6 +95,8 @@ async def delete_all_annotations(
         collection="annotations", filters={"project_id": project_id}
     )
 
+    return {"detail": "All annotations deleted successfully."}
+
 
 @router.get(
     "/samples/{sample_id}/annotations",

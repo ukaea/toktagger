@@ -1,6 +1,5 @@
 "use client";
-import { useRouter } from 'next/navigation';
-import { View, Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel } from '@adobe/react-spectrum'
+import { View, Header, Flex, Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, Disclosure, Accordion, DisclosureTitle, DisclosurePanel, Text } from '@adobe/react-spectrum'
 import { Annotations, Data, Project, Sample, SpectrogramData, SpectrogramViewParamsSchema, ViewParams, MultiVariateTimeSeriesData, CompositeData } from "@/types";
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 import { PeakDetectionTool } from '@/app/components/peaks';
@@ -11,57 +10,9 @@ import { ShotLabels } from '@/app/components/labels';
 import { ExportTool } from '@/app/components/export';
 import { useEffect, useState } from 'react';
 import {Key} from '@react-types/shared';
-import { getAnnotations, getAnnotationsForSample, saveSampleAnnotations } from '@/app/core';
+import { getAnnotationsForSample } from '@/app/core';
 import { ImportTool } from '../import';
-
-async function getNextSample(project_id: string) {
-    const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
-    const sampleResult = await fetch(NEXT_URL);
-    const sample = await sampleResult.json();
-    return sample;
-}
-
-type ButtonInfo = {
-  project_id: string;
-  sample_id: string;
-  annotations: Annotations;
-};
-
-function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
-  const router = useRouter();
-
-  const handleClick = async () => {
-      await saveSampleAnnotations(project_id, sample_id, annotations);
-      const sample = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
-      router.push(NEXT_SAMPLE_URL);
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Next
-    </Button>
-  );
-}
-
-function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
-  const handleClick = async () => {
-    try {
-      await saveSampleAnnotations(project_id, sample_id, annotations);
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
-        timeout: 5000,
-      });
-    } catch (err) {
-      ToastQueue.negative(`Failed to save annotations: ${err.message}`, {timeout: 5000});
-    }
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Save
-    </Button>
-  );
-}
+import { NavigationBar } from '../nav';
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -187,9 +138,6 @@ export default function ToolBar({
     });
   }
 
-  const clearAnnotations = () => {
-      setAnnotations([]);
-  };
 
   const refreshAnnotations = async () => {
     const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
@@ -210,11 +158,7 @@ export default function ToolBar({
                   <Header height="size-300" marginBottom="size-100">
                     <span style={{ fontSize: '1.2rem' }}>Controls</span>
                   </Header>
-                  <ButtonGroup>
-                    <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-                    <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-                    <Button variant="primary" onPress={clearAnnotations} >Clear</Button>
-                  </ButtonGroup>
+                  <NavigationBar project_id={project_id} sample_id={sample_id} annotations={annotations} setAnnotations={setAnnotations} />
               </Flex>
               <Accordion allowsMultipleExpanded={true} width="100%">
                   <Disclosure>

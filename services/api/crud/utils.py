@@ -1,6 +1,9 @@
 from collections import defaultdict
 from typing import Optional
 from fastapi import HTTPException
+from services.api.core.data_loaders import DATA_LOADERS
+from services.api.core.data_pool import DataPool
+from services.api.core.query_strategy import QUERY_STRATEGIES
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import Annotation, AnnotationTypes
@@ -72,11 +75,12 @@ async def get_samples(
     samples = await db_client.get_filtered_documents(
         collection="samples",
         filters={"project_id": project_obj_id},
-        sort_by="timestamp",
+        sort_by="shot_id",
         sort_direction=-1,
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
+    samples = [Sample(**sample) for sample in samples]
     return samples
 
 
@@ -112,3 +116,16 @@ async def import_annotations(
         await db_client.insert_many(
             collection="annotations", models=sample_annotations, ids=ids
         )
+
+
+async def get_data_pool(db_client: MongoDBClient, project_id: str) -> DataPool:
+    project = await get_project(db_client, project_id)
+    samples = await get_samples(db_client, project_id)
+    annotations = await get_annotations(db_client, project_id)
+
+    data_pool = DataPool(
+        data_loader=DATA_LOADERS[project.data_loader](),
+        query_strategy=QUERY_STRATEGIES[project.query_strategy](samples, annotations),
+    )
+
+    return data_pool
