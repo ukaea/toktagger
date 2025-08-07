@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { deleteProject, getProjects } from '@/app/core';
-import {ButtonGroup, Flex, Text, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, SearchField, Picker} from '@adobe/react-spectrum'
+import {ButtonGroup, Flex, Text, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, SearchField, Picker, DialogTrigger, Dialog, Divider, Heading, Content} from '@adobe/react-spectrum'
 import { Project } from '@/types';
 import Edit from '@spectrum-icons/workflow/Edit';
-import AddCircle from '@spectrum-icons/workflow/AddCircle';
 import Delete from '@spectrum-icons/workflow/Delete';
 import type { SortDescriptor } from '@react-types/shared';
+import { ProjectConfigEditor } from './components/project_config';
 
 type ProjectsTableProps = {
   projects: Project[];
@@ -60,19 +60,19 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange} : Project
           <Column>Edit</Column>
         </TableHeader>
         <TableBody>
-          {projects.map((item) => (
-            <Row key={item['_id']} href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}`}>
-              <Cell>{item['name']}</Cell>
-              <Cell>{item['task']}</Cell>
-              <Cell>{item['timestamp']}</Cell>
-              <Cell>{item['data_loader']}</Cell>
+          {projects.map((project) => (
+            <Row key={project['_id']} href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project['_id']}`}>
+              <Cell>{project['name']}</Cell>
+              <Cell>{project['task']}</Cell>
+              <Cell>{project['timestamp']}</Cell>
+              <Cell>{project['data_loader']}</Cell>
               <Cell>
                 <Flex direction="row" gap="size-100">
-                  <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}/edit`}><Edit/></Button>
+                  <ProjectConfigEditor project={project} />
                   <Button
                     variant='negative'
                     onPress={() => {
-                      if (item['_id']) handleDelete(item['_id']);
+                      if (project['_id']) handleDelete(project['_id']);
                     }}
                   ><Delete/></Button>
                 </Flex>
@@ -125,7 +125,7 @@ export default function Projects() {
           <Provider theme={defaultTheme}>
           <ToastContainer placement="top"  />
           <Flex direction='row' margin='size-100' gap="size-100"  alignItems="center" justifyContent="space-between">
-              <Button elementType="a" variant='primary' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}><AddCircle/><Text>Create</Text></Button>
+              <ProjectConfigEditor />
               <SearchField label="Search By Name" onSubmit={
                 (name) => {
                   if (name != null) {

@@ -2,8 +2,11 @@
 import { z } from "zod/v4";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {Form, Flex, Button, ToastQueue, ListView, View, TextField, Text, ComboBox, RadioGroup, NumberField, Radio, Item} from '@adobe/react-spectrum'
+import {Form, Flex, Button, ToastQueue, ListView, View, TextField, Text, ComboBox, RadioGroup, NumberField, Radio, Item, DialogTrigger, Dialog, Divider, Heading, Content, ButtonGroup} from '@adobe/react-spectrum'
 import { Project, Sample, SamplesSummary, FileData, ShotData } from '@/types';
+import AddCircle from '@spectrum-icons/workflow/AddCircle';
+import Edit from '@spectrum-icons/workflow/EditCircle';
+import { getSamplesSummary } from "@/app/core";
 
 const Tasks = [
   {'key': 'ELM', 'value': 'ELM'},
@@ -385,8 +388,8 @@ const createProject = (projectName: string, dataLoaderName: string, task: string
 export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project | null, samplesSummary?: SamplesSummary | null}) => {
   const editMode = project !== undefined && project !== null;
   const router = useRouter();
-  const [projectName, setProjectName] = useState<string>('');
-  const [queryStrategy, setQueryStrategy] = useState<string>(QueryStrategies[0].key);
+  const [projectName, setProjectName] = useState<string>(project?.name || '');
+  const [queryStrategy, setQueryStrategy] = useState<string>(project?.query_strategy || QueryStrategies[0].key);
   const [taskSelection, setTaskSelection] = useState<string | null>(null);
   const [dataLoaderOptions, setDataLoaderOptions] = useState<DataLoaderOptions | null>(null);
 
@@ -466,8 +469,6 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
     router.push(url);
   }
 
-
-
   return (
     <Form maxWidth="size-6000" onSubmit={setupProject}>
       <TextField label="Project Name" isRequired value={projectName} onChange={setProjectName} />
@@ -484,9 +485,43 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
       <RadioGroup label="Query Strategy" isRequired value={queryStrategy} onChange={setQueryStrategy}>
         {QueryStrategies.map((item: Record<string, string>) => <Radio key={item.key} value={item.key}>{item.value}</Radio>)}
       </RadioGroup>
-      <Button variant="primary" type="submit">{
-        project ? 'Edit' : 'Create'  
-      }</Button>
     </Form>
   );
+}
+export function ProjectConfigEditor({ project }: { project?: Project }) {
+  const editMode = project !== undefined && project !== null;
+  const text = editMode ? 'Edit' : 'Create';
+  const icon = editMode ? (<Edit />) : (<AddCircle />);
+
+  const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+        if (!project || !project._id) {
+          return;
+        }
+        const summary = await getSamplesSummary(project._id);
+        setSamplesSummary(summary);
+    }
+    run();
+  }, []);
+
+  return (
+      <DialogTrigger>
+        <Button variant={editMode ? "accent" : "primary"}>{icon}{!editMode ? <Text>{text}</Text> : <></>}</Button>
+        {(close) => (
+          <Dialog>
+            <Heading>{text} Project</Heading>
+            <Divider />
+            <Content>
+              <ProjectConfigForm project={project} samplesSummary={samplesSummary} />
+            </Content>
+            <ButtonGroup>
+              <Button variant="primary" onPress={close}>Close</Button>
+              <Button variant="primary" type="submit">{text}</Button>
+            </ButtonGroup>
+          </Dialog>
+        )}
+      </DialogTrigger>
+  )
 }
