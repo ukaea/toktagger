@@ -23,9 +23,7 @@ class SpectrogramData(Data):
     time: list[float]
     frequency: list[float]
     amplitude: list[list[float]]
-    threshold_time: list[float]
-    threshold_frequency: list[float]
-    threshold_amplitude: list[list[float]]
+    threshold_mask: list[list[float]]
 
 
 class ImageData(Data):

@@ -227,6 +227,47 @@ export const SpectrogramView = ({
     modeBarButtonsToRemove: ["pan2d"],
   };
 
+  const thresholdPlotData: Partial<Plotly.PlotData>[] = [
+    {
+      name: "Spectrogram threshold",
+      type: "heatmap",
+      x: data.time,
+      y: data.frequency,
+      z: data.threshold_mask,
+      customdata: data.threshold_mask,
+      hovertemplate:
+        "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
+      colorscale: [
+        [0, interpFunc(0)],
+        [1, interpFunc(1)],
+      ],
+      showscale: false
+    }
+  ];
+
+  const thresholdPlotLayout: Partial<Plotly.Layout> = {
+    height: 600,
+    xaxis: {
+      title: {
+        text: "Time [s]",
+      },
+    },
+    yaxis: {
+      title: {
+        text: "Frequency [Hz]",
+      },
+    },
+    showlegend: true,
+    dragmode: "zoom",
+  };
+
+  const thresholdPlotConfig: Partial<Plotly.Config> = {
+    displaylogo: false,
+    displayModeBar: true,
+    scrollZoom: false,
+    modeBarButtonsToRemove: ["pan2d"],
+  };
+
   return (
     <div className="flex flex-col items-center space-y-3">
       <ContextMenuProvider menuId="locked-mode-menu">
@@ -255,9 +296,9 @@ export const SpectrogramView = ({
               <TimeSeries
                 plotId="SpectrogramThreshold"
                 plotConfig={{
-                  data: plotData,
-                  config: plotConfig,
-                  layout: plotLayout,
+                  data: thresholdPlotData,
+                  config: thresholdPlotConfig,
+                  layout: thresholdPlotLayout,
                 }}>
                 <Zones onZoneUpdate={updateZones} />
                 <VSpans onZoneUpdate={updateVSpans} />

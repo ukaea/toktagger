@@ -48,6 +48,12 @@ class SpectrogramView:
             noverlap=self.params.nperseg // 2,
         )
         values = np.absolute(values)
+        if self.params.threshold_value is None:
+            threshold_values = values > np.percentile(values, 50.0)
+        else:
+            threshold_values = values > np.percentile(
+                values, self.params.threshold_value
+            )
         freq /= 1000
         time = ts + time[0]
 
@@ -86,13 +92,18 @@ class SpectrogramView:
         ds = ds.sel(frequency=slice(frequency_min, frequency_max))
         ds = ds.clip(amplitude_min, amplitude_max)
 
+        ds_threshold = xr.DataArray(
+            threshold_values, coords=dict(frequency=freq, time=time)
+        )
+        ds_threshold = ds_threshold.sel(time=slice(time_min, time_max))
+        ds_threshold = ds_threshold.sel(frequency=slice(frequency_min, frequency_max))
+        ds_threshold = ds_threshold.clip(0, 1)
+
         return SpectrogramData(
             time=ds.time.values.tolist(),
             frequency=ds.frequency.values.tolist(),
             amplitude=ds.values.tolist(),
-            threshold_time=ds.time.values.tolist(),
-            threshold_frequency=ds.frequency.values.tolist(),
-            threshold_amplitude=ds.values.tolist(),
+            threshold_mask=ds_threshold.values.tolist(),
         )
 
 

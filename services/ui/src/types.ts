@@ -42,9 +42,7 @@ export const SpectrogramDataSchema = z.object({
   time: z.array(z.number()),
   frequency: z.array(z.number()),
   amplitude: z.array(z.array(z.number())),
-  threshold_time: z.array(z.number()).optional(),
-  threshold_frequency: z.array(z.number()).optional(),
-  threshold_amplitude: z.array(z.array(z.number())).optional(),
+  threshold_mask: z.array(z.array(z.number())).optional(),
 });
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 

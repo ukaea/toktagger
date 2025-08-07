@@ -12,6 +12,7 @@ import {
   Switch,
   Slider,
   Text,
+  Flex,
 } from "@adobe/react-spectrum";
 import {
   Annotations,
@@ -197,7 +198,7 @@ function ThresholdTool({
   setPlotProps,
 }: ThresholdToolInfo) {
   const [active, setActive] = useState(false);
-  const [value, setValue] = useState(0);
+  const [value, setValue] = useState(50);
 
   const onThresholdChange = (value: boolean) => {
     setActive(value);
@@ -213,21 +214,22 @@ function ThresholdTool({
   return (
     <>
       <Switch isSelected={active} onChange={onThresholdChange}>
-        Use thresholding
+        Thresholding
       </Switch>
       {active && (
-        <>
+        <Flex direction="column" gap="size-100" margin={"size-200"}>
           <Slider
             label="Threshold percentile"
             value={value}
             onChange={setValue}
             minValue={0}
             maxValue={100}
+            step={0.01}
           />
           <Button variant="secondary" onPress={() => { onThresholdApply(value) }} >
             <Text>Apply</Text>
           </Button>
-        </>
+        </Flex>
       )}
     </>
   )
