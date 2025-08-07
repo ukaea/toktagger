@@ -94,7 +94,7 @@ export default function Projects() {
               label="Projects per Page:" 
               onSelectionChange={(selectedKey) => {
                 if (selectedKey != null) {
-                  setProjectsPerPage(Number(selectedKey)); 
+                  setProjectsPerPage(Number(selectedKey) || 10); 
                   setCurrentPage(1);
                   }
                 }} 

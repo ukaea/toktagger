@@ -119,7 +119,7 @@ export default function ProjectView({
               label="Samples per Page:" 
               onSelectionChange={(selectedKey) => {
                 if (selectedKey != null) {
-                  setSamplesPerPage(Number(selectedKey)); 
+                  setSamplesPerPage(Number(selectedKey) || 10); 
                   setCurrentPage(1);
                 }
                 }} 
