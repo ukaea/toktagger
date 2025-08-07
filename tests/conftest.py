@@ -9,6 +9,7 @@ from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
 from services.api.schemas.annotations import TimePoint, TimeRegion
 from tests.db_definitions import PROJECT, SAMPLE, ANNOTATION
+from bson.objectid import ObjectId
 
 import time
 import asyncio
@@ -89,21 +90,21 @@ async def setup_db(db_client):
     await asyncio.sleep(0.1)
     project_id_3 = await db_client.insert('projects', project_3)
     await asyncio.sleep(0.1)
-    sample_id_1 = await db_client.insert('samples', sample_1, ids={"project_id": project_id_1})
+    sample_id_1 = await db_client.insert('samples', sample_1, ids={"project_id": ObjectId(project_id_1)})
     await asyncio.sleep(0.1)
-    sample_id_2 = await db_client.insert('samples', sample_2, ids={"project_id": project_id_1})
+    sample_id_2 = await db_client.insert('samples', sample_2, ids={"project_id": ObjectId(project_id_1)})
     await asyncio.sleep(0.1)
-    sample_id_3 = await db_client.insert('samples', sample_3, ids={"project_id": project_id_1})
+    sample_id_3 = await db_client.insert('samples', sample_3, ids={"project_id": ObjectId(project_id_1)})
     await asyncio.sleep(0.1)
-    sample_id_4 = await db_client.insert('samples', sample_4, ids={"project_id": project_id_2})
+    sample_id_4 = await db_client.insert('samples', sample_4, ids={"project_id": ObjectId(project_id_2)})
     await asyncio.sleep(0.1)
-    annotation_id_1 = await db_client.insert('annotations', annotation_1, ids={"project_id": project_id_1, "sample_id": sample_id_1})
+    annotation_id_1 = await db_client.insert('annotations', annotation_1, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
     await asyncio.sleep(0.1)
-    annotation_id_2 = await db_client.insert('annotations', annotation_2, ids={"project_id": project_id_1, "sample_id": sample_id_1})
+    annotation_id_2 = await db_client.insert('annotations', annotation_2, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
     await asyncio.sleep(0.1)
-    annotation_id_3 = await db_client.insert('annotations', annotation_3, ids={"project_id": project_id_1, "sample_id": sample_id_1})
+    annotation_id_3 = await db_client.insert('annotations', annotation_3, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
     await asyncio.sleep(0.1)
-    annotation_id_4 = await db_client.insert('annotations', annotation_4, ids={"project_id": project_id_2, "sample_id": sample_id_4})
+    annotation_id_4 = await db_client.insert('annotations', annotation_4, ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)})
     yield {
            "project_id_1": project_id_1,
            "project_id_2": project_id_2,

@@ -64,7 +64,7 @@ async def test_get_project_id(api_client, setup_db):
     # Check info matches what we created the entry with
     assert returned_project.get("name") == "test_project_0"
     assert returned_project.get("task") == 'ELM'
-    assert returned_project.get("query_strategy") == "random"
+    assert returned_project.get("query_strategy") == "sequential"
     assert returned_project.get("data_loader") == "uda"
     
     # Then also check ID and timestamp are returned - should have been added automatically

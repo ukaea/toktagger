@@ -6,7 +6,7 @@ from services.api.schemas.samples import SampleIn, ShotData
 PROJECT = ProjectIn(
         name="test_project_0",
         task="ELM",
-        query_strategy="random",
+        query_strategy="sequential",
         data_loader="uda"
     )
 SAMPLE = SampleIn(
