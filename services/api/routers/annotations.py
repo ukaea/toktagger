@@ -46,6 +46,28 @@ async def get_all_annotations(
     return annotations
 
 
+@router.put(
+    "/annotations",
+    responses={
+        200: {"description": "Annotations for this project updated successfully."},
+        404: {"description": "Project not found with that ID."},
+    },
+)
+async def import_annotations(
+    request: Request,
+    annotations: list[AnnotationTypes],
+    project_id: str = Path(
+        description="The ID of the project to update annotations for"
+    ),
+) -> None:
+    """
+    Update or add annotations for this project.
+    -------------------------------------------
+    """
+    db_client = request.app.state.db_client
+    await utils.import_annotations(db_client, project_id, annotations)
+
+
 @router.delete(
     "/annotations",
     responses={
@@ -172,14 +194,6 @@ async def add_annotations(
 
     if len(annotations) == 0:
         return []
-
-    for annotation in annotations:
-        if annotation.project_id is None:
-            annotation.project_id = project_id
-        if annotation.sample_id is None:
-            annotation.sample_id = sample_id
-
-    print(annotations)
 
     return await request.app.state.db_client.insert_many(
         collection="annotations", models=annotations, ids=ids

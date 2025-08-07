@@ -1,8 +1,9 @@
+from collections import defaultdict
 from typing import Optional
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import Annotation
+from services.api.schemas.annotations import Annotation, AnnotationTypes
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
 
@@ -77,3 +78,37 @@ async def get_samples(
         limit=end - start + 1 if end is not None else 0,
     )
     return samples
+
+
+async def import_annotations(
+    db_client: MongoDBClient,
+    project_id: str,
+    annotations: list[AnnotationTypes],
+) -> None:
+    ids = {
+        "project_id": convert_to_objectid(project_id, "projects"),
+    }
+
+    if not await db_client.get_document_by_id("projects", ids["project_id"]):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    if len(annotations) == 0:
+        return
+
+    sample_groups = defaultdict(list)
+    for annotation in annotations:
+        sample_groups[annotation.sample_id].append(annotation)
+
+    for sample_id, sample_annotations in sample_groups.items():
+        sample_obj_id = convert_to_objectid(sample_id, "samples")
+
+        if not await db_client.get_document_by_id("samples", sample_obj_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Sample not found with ID {sample_id} belonging to specified Project.",
+            )
+
+        ids["sample_id"] = sample_obj_id
+        await db_client.insert_many(
+            collection="annotations", models=sample_annotations, ids=ids
+        )

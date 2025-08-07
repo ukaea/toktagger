@@ -1,9 +1,18 @@
 import { Text, Button, Flex, Item, ComboBox, ContextualHelp, Content} from '@adobe/react-spectrum'
 import { useState } from 'react';
-import { getAnnotations, getAnnotationsForSample } from '../core';
+import Export from '@spectrum-icons/workflow/Export';
+import { exportAnnotations } from '../core';
 import { saveJSONToFile } from '../utils';
 import { Annotations, Project, Sample } from '@/types';
 
+export function ExportButton({project} : { project: Project }) {
+    return (
+        <Button variant="primary" onPress={() => exportAnnotations(project)}>
+            <Export />
+            <Text>Export Annotations</Text>
+        </Button>
+    );
+}
 type ExportToolInfo = {
   project: Project;
   sample: Sample;
@@ -15,9 +24,7 @@ export function ExportTool({ project, sample, current_annotations }: ExportToolI
 
     const handleExport = () => {
         if (exportOption === 'All') {
-            getAnnotations(project._id).then((annotations) => {
-                saveJSONToFile(annotations, `${project.name}_annotations.json`);
-            });
+            exportAnnotations(project);
         } else {
             saveJSONToFile(current_annotations, `${project.name}_${sample.shot_id}_annotations.json`);
         }
@@ -37,7 +44,9 @@ export function ExportTool({ project, sample, current_annotations }: ExportToolI
                     </ContextualHelp>
                 </Flex>
                 <br/>
-                <Button variant='primary' onPress={handleExport}><Text>Export</Text></Button>
+                <Flex justifyContent="center">
+                    <Button variant='primary' onPress={handleExport}><Export /><Text>Export</Text></Button>
+                </Flex>
             </Flex>
         </div>
     );

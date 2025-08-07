@@ -1,4 +1,6 @@
 "use client";
+import { ExportButton } from "@/app/components/export";
+import { ImportTool } from "@/app/components/import";
 import { getSamples, getProject } from "@/app/core";
 import { Project } from "@/types";
 import {
@@ -12,6 +14,11 @@ import {
   TableHeader,
   Breadcrumbs,
   Item,
+  Text,
+  Flex,
+  ButtonGroup,
+  ToastContainer,
+  View,
 } from "@adobe/react-spectrum";
 import { use } from "react";
 
@@ -37,9 +44,10 @@ export const SampleBreadCrumbs = ({ project }: { project: Project }) => {
 };
 
 export const SamplesTable = ({ project_id }: { project_id: string }) => {
+  const project = getProject(project_id);
   const samples = getSamples(project_id);
 
-  if (!samples) {
+  if (!samples || !project) {
     return;
   }
 
@@ -48,8 +56,14 @@ export const SamplesTable = ({ project_id }: { project_id: string }) => {
     id: _id,
   }));
 
+
   return (
     <Provider theme={defaultTheme}>
+      <ToastContainer placement="top"/>
+      <Flex direction="row" margin='size-100' gap="size-100" alignItems="end" justifyContent="left">
+        <View paddingEnd='size-10' marginTop='size-100'><ImportTool project_id={project_id} /></View>
+        <View paddingEnd='size-10' marginTop='size-100'><ExportButton project={project} /></View>
+      </Flex>
       <TableView
         aria-label="Samples"
         selectionMode="none"

@@ -11,20 +11,8 @@ import { ShotLabels } from '@/app/components/labels';
 import { ExportTool } from '@/app/components/export';
 import { useEffect, useState } from 'react';
 import {Key} from '@react-types/shared';
-
-async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
-    const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
-    const response = await fetch(ANNOTATIONS_URL, {
-        method: 'PUT',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(annotations),
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to save annotations: ${response.statusText}`);
-    }
-}
+import { getAnnotations, getAnnotationsForSample, saveSampleAnnotations } from '@/app/core';
+import { ImportTool } from '../import';
 
 async function getNextSample(project_id: string) {
     const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
@@ -32,7 +20,6 @@ async function getNextSample(project_id: string) {
     const sample = await sampleResult.json();
     return sample;
 }
-
 
 type ButtonInfo = {
   project_id: string;
@@ -44,7 +31,7 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
   const router = useRouter();
 
   const handleClick = async () => {
-      await saveAnnotations(project_id, sample_id, annotations);
+      await saveSampleAnnotations(project_id, sample_id, annotations);
       const sample = await getNextSample(project_id);
       const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
       router.push(NEXT_SAMPLE_URL);
@@ -60,7 +47,7 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
 function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
   const handleClick = async () => {
     try {
-      await saveAnnotations(project_id, sample_id, annotations);
+      await saveSampleAnnotations(project_id, sample_id, annotations);
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
         timeout: 5000,
       });
@@ -204,9 +191,16 @@ export default function ToolBar({
       setAnnotations([]);
   };
 
+  const refreshAnnotations = async () => {
+    const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
+    console.log('Refreshed Annotations:', dbAnnotations);
+    setAnnotations(dbAnnotations);
+  }
+
   useEffect(() => {
     sessionStorage.setItem(`toolbarProps_${project_id}`, JSON.stringify(Array.from(expandedKeys)));
   }, [expandedKeys]);
+
 
   return (
         <Provider theme={defaultTheme} height="100vh">
@@ -229,6 +223,14 @@ export default function ToolBar({
                       </DisclosureTitle>
                     <DisclosurePanel>
                       <ExportTool project={project} sample={sample} current_annotations={annotations}/>
+                    </DisclosurePanel>
+                  </Disclosure>
+                  <Disclosure>
+                      <DisclosureTitle>
+                        <span style={{ fontSize: '0.8rem' }}>Import Annotations</span>
+                      </DisclosureTitle>
+                    <DisclosurePanel>
+                      <ImportTool project_id={project_id} refreshAnnotations={refreshAnnotations}/>
                     </DisclosurePanel>
                   </Disclosure>
               </Accordion>
