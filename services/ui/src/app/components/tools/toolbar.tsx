@@ -13,14 +13,17 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
+  SearchField,
 } from "@adobe/react-spectrum";
 import {
   Annotations,
+  CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
   Project,
   Sample,
   SpectrogramData,
+  SpectrogramDataSchema,
   SpectrogramViewParamsSchema,
   ViewParams,
 } from "@/types";
@@ -30,36 +33,44 @@ import { ShotLabels } from "../labels";
 import { OutlierDetectionTool } from "../outliers";
 import { ChangePointDetectionTool } from "../changepoints";
 import { JumpDetectionTool } from "../jump";
+import { useState } from "react";
 
-async function saveAnnotations(
-  project_id: string,
-  sample_id: string,
-  annotations: Annotations
-) {
-  const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
-  await fetch(ANNOTATIONS_URL, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(annotations),
-  });
+async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
+    const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+    const response = await fetch(ANNOTATIONS_URL, {
+        method: 'PUT',
+        headers: {
+        'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(annotations),
+    });
 }
 
 async function getNextSample(project_id: string) {
-  const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
-  const sampleResult = await fetch(NEXT_URL);
-  const sample = await sampleResult.json();
-  return sample;
+    const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
+    const sampleResult = await fetch(NEXT_URL);
+    const sample = await sampleResult.json();
+    return sample;
 }
 
-type ButtonInfo = {
+async function getShotSample(project_id: string, shot_id: string) {
+    const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?shot_id=${shot_id}`;
+    const sampleResult = await fetch(NEXT_URL);
+    const sampleArray = await sampleResult.json();
+    let sample = null
+    if (sampleArray.length > 0) {
+      sample = sampleArray[0];
+    }
+    return sample;
+}
+
+type SaveInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotations;
 };
 
-function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
   const router = useRouter();
 
   const handleClick = async () => {
@@ -76,7 +87,7 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
   );
 }
 
-function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   const handleClick = async () => {
     try {
       await saveAnnotations(project_id, sample_id, annotations);
@@ -93,6 +104,41 @@ function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
       Save
     </Button>
   );
+}
+
+export function ShotSearch({project_id, sample_id, annotations} : SaveInfo) {
+  const router = useRouter();
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  
+  const onSearchSubmit = async (newValue: string) => {
+    if (newValue == '') {
+      setErrorMessage("")
+    } else if (/^[0-9]*$/.test(newValue)) {
+      setErrorMessage("")
+      const shot_id = newValue 
+      try {
+        await saveAnnotations(project_id, sample_id, annotations);
+        const sample = await getShotSample(project_id, shot_id);
+        if (sample !== null) {
+          const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
+          router.push(NEXT_SAMPLE_URL);
+        } else {
+          setErrorMessage("Shot not found!");
+        }
+      } catch (err) {
+        console.error('Failed to fetch data:', err);
+      }
+    } else {
+      setErrorMessage("Please enter a number.");
+    }
+  }
+
+  return  <SearchField 
+            label="Jump to Shot" 
+            onSubmit={onSearchSubmit}
+            validationState={errorMessage ? 'invalid' : undefined}
+            errorMessage={errorMessage} >
+          </SearchField>
 }
 
 type AmplitudeSliderInfo = {
@@ -148,7 +194,7 @@ type ToolBarInfo = {
   sample: Sample;
   data: Data;
   annotations: Annotations;
-  setAnnotations: (annotations: Annotations) => void;
+  setAnnotations: (annotations: Annotations | ((prev: Annotations) => Annotations)) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
 };
@@ -173,6 +219,8 @@ export default function ToolBar({
       return;
     }
 
+    const tsData = result.data;
+
     const labels = ['No ELMs', 'Type I', 'Type II', 'Type III'];
     tools.push({
       name: 'Shot Labels',
@@ -184,31 +232,43 @@ export default function ToolBar({
     tools.push({
       name: 'Peak Detection',
       component: (
-        <PeakDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></PeakDetectionTool>
+        <PeakDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></PeakDetectionTool>
     )}); 
 
     tools.push({
       name: 'Outlier Detection',
       component: (
-        <OutlierDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></OutlierDetectionTool>
+        <OutlierDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></OutlierDetectionTool>
     )});
 
     tools.push({
       name: 'Change Point Detection',
       component: (
-        <ChangePointDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></ChangePointDetectionTool>
+        <ChangePointDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></ChangePointDetectionTool>
       )
     })
 
     tools.push({
       name: 'Jump Detection',
       component: (
-        <JumpDetectionTool project_id={project_id} sample_id={sample_id} data={data} setAnnotations={setAnnotations}></JumpDetectionTool>
+        <JumpDetectionTool project_id={project_id} sample_id={sample_id} data={tsData} setAnnotations={setAnnotations}></JumpDetectionTool>
       )
     });
 
   } else if (project.task == 'MHD') {
-    let mhdData = data.values['mirnov'];
+    const resultComposite = CompositeDataSchema.safeParse(data);
+    if (!resultComposite.success) {
+      console.warn("MHD data is not available");
+      return;
+    }
+
+    const resultSpec = SpectrogramDataSchema.safeParse(resultComposite.data.values['mirnov']);
+    if (!resultSpec.success) {
+      console.warn("MHD spectrogram data is not available");
+      return;
+    }
+
+    let mhdData = resultSpec.data;
     const ampRangeTool = <AmplitudeSlider data={mhdData} viewParams={viewParams} setViewParams={setViewParams}/>
     tools.push({
       name: 'Amplitude Range',
@@ -222,7 +282,7 @@ export default function ToolBar({
 
   return (
         <Provider theme={defaultTheme} height="100vh">
-          <View direction='column' gap='size-100' overflow="auto" height="100vh">
+          <View overflow="auto" height="100vh">
             <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100" width="100%">
               <Flex direction='column' alignItems="center" justifyContent="center" gap="size-100">
                   <Header height="size-300" marginBottom="size-100">
@@ -233,6 +293,7 @@ export default function ToolBar({
                     <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
                     <Button variant="primary" onPress={clearAnnotations} >Clear</Button>
                   </ButtonGroup>
+                  <ShotSearch project_id={project_id} sample_id={sample_id} annotations={annotations}/>
               </Flex>
               <Flex justifyContent="center" alignItems="center">
                   <Header height="size-300" marginBottom="size-100">
