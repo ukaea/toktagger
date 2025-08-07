@@ -1,11 +1,18 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { getProjects } from '@/app/core';
-import {ButtonGroup, ActionButton, Flex, Text, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item} from '@adobe/react-spectrum'
+import { deleteProject, getProjects } from '@/app/core';
+import {ButtonGroup, Flex, Text, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, SearchField, Picker} from '@adobe/react-spectrum'
 import { Project } from '@/types';
 import Edit from '@spectrum-icons/workflow/Edit';
 import AddCircle from '@spectrum-icons/workflow/AddCircle';
 import Delete from '@spectrum-icons/workflow/Delete';
+import type { SortDescriptor } from '@react-types/shared';
+
+type ProjectsTableProps = {
+  projects: Project[];
+  sortDescriptor: SortDescriptor;
+  onSortChange: (sort: SortDescriptor) => void;
+}
 
 export const ProjectsBreadCrumbs = () => {
   return (
@@ -17,53 +24,7 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-const deleteProjects = async (project_ids: string[]) => {
-  for (const project_id of project_ids) {
-    console.log(`Deleting project ${project_id}`);
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!response.ok && response.status !== 404) {
-      ToastQueue.negative(`Error deleting project ${project_id}`, {timeout: 3000});
-    }
-  }
-};
-
-export const ProjectsTable = () => {
-  const [selectedKeys, setSelectedKeys] = useState<Set<string> | string>(new Set<string>());
-  const [projects, setProjects] = useState<Project[]>([]);
-
-  useEffect(() => {
-    const run = async () => {
-      const projects = await getProjects();
-
-      if (!projects) {
-        ToastQueue.negative('Error fetching projects', {timeout: 3000});
-        return;
-      }
-
-      setProjects(projects);
-    }
-    run();
-  }, []);
-
-  const deleteSelectedRows = () => {
-    setProjects((prevProjects) => {
-        const project_ids = prevProjects.map((project) => project._id).filter((id): id is string => typeof id === 'string');
-        const keys: Set<string> = (selectedKeys === 'all') ? new Set(project_ids) : new Set(selectedKeys);
-        let deleteRows = Array.from(keys);
-
-        deleteProjects(deleteRows);
-
-        const projects = prevProjects.filter((row) => typeof row._id === 'string' && !keys.has(row._id));
-        return projects;
-    });
-
-    setSelectedKeys(new Set<string>());
-  };
+export const ProjectsTable = ({projects, sortDescriptor, onSortChange} : ProjectsTableProps) => {
 
   if (projects.length === 0) {
     return (
@@ -73,36 +34,23 @@ export const ProjectsTable = () => {
     );
   }
 
+  const handleDelete = async (project_id: string) => {
+    try {
+      await deleteProject(project_id);
+      ToastQueue.positive('Project deleted successfully', {timeout: 3000});
+    } catch (error) {
+      ToastQueue.negative('Error deleting project', {timeout: 3000});
+    }
+  }
+
+
   return (
     <>
-      <Flex direction='row' margin='size-100' gap="size-100"  alignItems="end">
-        <ButtonGroup UNSAFE_className="py-2">
-          <Button elementType="a" variant='primary' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}><AddCircle/><Text>Create</Text></Button>
-          <Button
-            elementType='a'
-            variant='negative'
-            onPress={deleteSelectedRows}
-            isDisabled={
-              (selectedKeys === 'all')
-                ? false
-                : (selectedKeys instanceof Set ? selectedKeys.size === 0 : true)
-            }
-          ><Delete/><Text>Delete</Text></Button>
-        </ButtonGroup>
-      </Flex>
       <TableView
         aria-label='Projects'
-        selectionMode="multiple"
-        selectedKeys={selectedKeys}
-        onSelectionChange={(keys) => {
-          // keys can be 'all' or a Set<Key>
-          if (keys === 'all') {
-            setSelectedKeys('all');
-          } else {
-            // Convert Set<Key> to Set<string>
-            setSelectedKeys(new Set(Array.from(keys).map(String)));
-          }
-        }}
+        sortDescriptor={sortDescriptor}
+        onSortChange={onSortChange}
+        selectionMode="none"
       >
         <TableHeader>
           <Column>Name</Column>
@@ -121,6 +69,12 @@ export const ProjectsTable = () => {
               <Cell>
                 <Flex direction="row" gap="size-100">
                   <Button variant='accent' elementType='a' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item['_id']}/edit`}><Edit/></Button>
+                  <Button
+                    variant='negative'
+                    onPress={() => {
+                      if (item['_id']) handleDelete(item['_id']);
+                    }}
+                  ><Delete/></Button>
                 </Flex>
               </Cell>
             </Row>
@@ -128,10 +82,38 @@ export const ProjectsTable = () => {
         </TableBody>
       </TableView>
       </>
-  )
+);
 }
 
 export default function Projects() {
+  const [projectsPerPage, setProjectsPerPage] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [projectName, setProjectName] = useState<string>("");
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: '_id', direction: 'descending' });
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    const run = async () => {
+      const projects = await getProjects(sortDescriptor, currentPage, projectsPerPage, projectName);
+
+      if (!projects) {
+        ToastQueue.negative('Error fetching projects', {timeout: 3000});
+        return;
+      }
+
+      setProjects(projects);
+    }
+    run();
+  }, [sortDescriptor, currentPage, projectsPerPage, projectName]);
+
+  if (!projects) {
+    return;
+  }
+
+  const onSortChange = (newSortDescriptor: SortDescriptor) => {
+    setSortDescriptor(newSortDescriptor);
+  };
+
   return (
     <div>
       <ProjectsBreadCrumbs />
@@ -141,8 +123,43 @@ export default function Projects() {
             Projects
           </h1>
           <Provider theme={defaultTheme}>
-            <ToastContainer placement="top"  />
-            <ProjectsTable></ProjectsTable>
+          <ToastContainer placement="top"  />
+          <Flex direction='row' margin='size-100' gap="size-100"  alignItems="center" justifyContent="space-between">
+              <Button elementType="a" variant='primary' href={`${process.env.NEXT_PUBLIC_API_URL}/projects/create`}><AddCircle/><Text>Create</Text></Button>
+              <SearchField label="Search By Name" onSubmit={
+                (name) => {
+                  if (name != null) {
+                    setProjectName(name); 
+                    setCurrentPage(1);
+                  }
+                }}/>
+          </Flex>
+          <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
+            <div className="flex items-center justify-between pl-4 pr-4">
+              <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
+                Previous
+              </Button>
+              <div className="flex items-center justify-center gap-8 pb-2">
+                <p> Page: {currentPage} </p>
+              <Picker 
+              label="Projects per Page:" 
+              onSelectionChange={(selectedKey) => {
+                if (selectedKey != null) {
+                  setProjectsPerPage(Number(selectedKey) || 10); 
+                  setCurrentPage(1);
+                  }
+                }} 
+              defaultSelectedKey="10">
+                <Item key="5">5</Item>
+                <Item key="10">10</Item>
+                <Item key="25">25</Item>
+                <Item key="50">50</Item>
+              </Picker>
+              </div>
+              <Button variant="primary" onPress={() => setCurrentPage((p) => p + 1)} isDisabled={projects.length < projectsPerPage}>
+                Next
+              </Button>
+            </div>
           </Provider>
         </div>
       </div>
