@@ -6,6 +6,7 @@ from services.api.crud import utils
 from services.api.schemas.samples import SampleIn, Sample
 from services.api.schemas.annotations import Annotation
 from services.api.schemas import convert_to_objectid
+from typing import Literal
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
@@ -21,21 +22,33 @@ router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 async def get_samples(
     request: Request,
     project_id: str = Path(description="The ID of the project to get samples for."),
+    sort_by: str = Query(
+        "_id", 
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "descending", 
+        description="Direction to sort responses, by default 'descending'",
+    ),
     start: int = Query(
         0,
-        description="Index of the first sample you want returned when sorted newest - oldest",
+        description="Index of the first sample you want returned when sorted by above parameter",
     ),
-    end: int = Query(
+    count: int = Query(
         None,
-        description="Index of the last sample you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="The number of samples to return, leave blank to return all entries",
     ),
+    shot_id: int | None = Query(
+        None,
+        description="The shot ID to search for, by default None"
+    )
 ) -> list[Sample]:
     """
     Get the full list of samples available for this project.
     --------------------------------------------------------
     """
     db_client = request.app.state.db_client
-    samples = await utils.get_samples(db_client, project_id, start, end)
+    samples = await utils.get_samples(db_client, project_id, shot_id, sort_by, sort_direction, start, count)
     return samples
 
 

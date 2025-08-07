@@ -204,7 +204,7 @@ export default function SamplePage({
 
     run(viewParams);
 
-  }, [viewParams]);
+  }, [project_id, sample_id, viewParams]);
 
   useEffect(() => {
 
