@@ -75,7 +75,7 @@ class MongoDBClient():
         collection: typing.Literal["projects", "annotations", "models", "samples"],
         filters: dict = {},
     ):
-        await self.db[collection].delete_many(filters)
+        return await self.db[collection].delete_many(filters)
     
 # Notes to self
 # I am planning on doing a collection per route

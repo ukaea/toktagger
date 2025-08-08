@@ -10,7 +10,7 @@ PROJECT = ProjectIn(
         data_loader="uda"
     )
 SAMPLE = SampleIn(
-        shot_id=0,
+        shot_id=1,
         data=ShotData(protocol="uda", signal_names=["Ip"]),
         annotations=None
     ) 

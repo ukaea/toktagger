@@ -57,6 +57,15 @@ async def test_get_projects_invalid_start(api_client, setup_db):
     assert len(returned_projects) == 0
 
 @pytest.mark.asyncio
+async def test_get_projects_name(api_client, setup_db):
+    response = await api_client.get("/projects?name=test_project_1")
+    # Should return 1 project
+    assert response.status_code == 200
+    returned_projects = response.json()
+    assert len(returned_projects) == 1
+    assert returned_projects[0]["name"] == "test_project_1"
+
+@pytest.mark.asyncio
 async def test_get_project_id(api_client, setup_db):
     response = await api_client.get(f"/projects/{setup_db['project_id_1']}")
     assert response.status_code == 200
@@ -80,17 +89,17 @@ async def test_delete_project(api_client, setup_db, db_client):
     projects = await db_client.get_all_documents("projects")
     assert len(projects) == 2
     # Check project with above ID no longer in database
-    assert setup_db['project_id_1'] not in [project.get("_id") for project in projects]
+    assert setup_db['project_id_2'] not in [project.get("_id") for project in projects]
     
     # Check samples associated with this project have been deleted
-    samples = await db_client.get_all_documents("projects")
-    assert len(samples) == 3
+    samples = await db_client.get_all_documents("samples")
+    assert len(samples) == 3 # Samples associated with project 1 still exist
     # Check sample associated with above project no longer in database
     assert setup_db['sample_id_4'] not in [sample.get("_id") for sample in samples]
     
     # Check annotations associated with this project have been deleted
     annotations = await db_client.get_all_documents("annotations")
-    assert len(annotations) == 3
+    assert len(annotations) == 3 # Annotations associated with project 1 still exist
     # Check annotation associated with above project no longer in database
     assert setup_db['annotation_id_4'] not in [annotation.get("_id") for annotation in annotations]
     
