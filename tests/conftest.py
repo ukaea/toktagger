@@ -10,6 +10,7 @@ from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
 from services.api.schemas.annotations import TimePoint, TimeRegion
 from tests.db_definitions import PROJECT, SAMPLE, ANNOTATION
 from bson.objectid import ObjectId
+import pathlib
 
 import time
 import asyncio
@@ -61,28 +62,28 @@ async def setup_db(db_client):
         name="test_project_1",
         task="disruption",
         query_strategy="sequential",
-        data_loader="image"
+        data_loader="parquet"
     )
     project_3 = ProjectIn(
         name="test_project_2",
         task="UFO",
         query_strategy="uncertainty",
-        data_loader="parquet"
+        data_loader="image"
     )
     sample_1 = SAMPLE
     sample_2 = SampleIn(
         shot_id=3,
-        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="file", column_names=["Ip"]),
+        data=ShotData(protocol="sal", signal_names=["Ip"]),
         annotations=None
     ) 
     sample_3 = SampleIn(
         shot_id=2,
-        data=TimeSeriesFileData(file_name="test.parquet", type="parquet", protocol="s3", column_names=["Ip"]),
+        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="s3", column_names=["Ip"]),
         annotations=None
     ) 
     sample_4 = SampleIn(
         shot_id=4,
-        data=ShotData(protocol="sal", signal_names=["Ip"]),
+        data=TimeSeriesFileData(file_name=str(pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()), type="parquet", protocol="file", column_names=["Ip"]),
         annotations=None
     )
     annotation_1 = ANNOTATION

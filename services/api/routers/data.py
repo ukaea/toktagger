@@ -26,7 +26,10 @@ async def get_data(
     sample = await utils.get_sample(db_client, sample_id)
 
     data_loader = DATA_LOADERS[project.data_loader]()
-    data = data_loader.get_sample(sample)
+    try:
+        data = data_loader.get_sample(sample)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
 
     data_view = DATA_VIEWS[view.name](view)
     data = data_view(data)

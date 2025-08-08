@@ -1,6 +1,6 @@
 from typing import Union
 import pandas as pd
-
+import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
 import numpy as np
@@ -25,6 +25,8 @@ class ImageDataLoader(DataLoader):
 
     def get_sample(self, sample: Sample) -> ImageData:
         item: FileData = sample.data
+        if not pathlib.Path(item.file_name).exists():
+            raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
         im = Image.open(item.file_name).resize(
             (20, 10)
         )  # TODO: Get rid of this temp resizing
@@ -37,8 +39,9 @@ class ParquetDataLoader(DataLoader):
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         item: TimeSeriesFileData = sample.data
+        if not pathlib.Path(item.file_name).exists():
+            raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
         df = pd.read_parquet(item.file_name, columns=item.column_names)
-        # df = df[item.column_names]
         df = df.fillna(0)
         data = df.to_dict("list")
         time = df.index.values
