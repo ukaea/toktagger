@@ -3,7 +3,7 @@ from typing import Literal
 from services.api.crud import utils
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotators import Annotator
-from services.api.schemas.annotations import AnnotationIn, Annotation, AnnotationTypes
+from services.api.schemas.annotations import AnnotationIn, Annotation, AnnotationTypes, AnnotationOutTypes
 from services.api.schemas import convert_to_objectid
 
 router = APIRouter(
@@ -14,7 +14,7 @@ router = APIRouter(
 
 @router.get(
     "/annotations",
-    response_model=list[Annotation],
+    response_model=list[AnnotationOutTypes],
     responses={
         200: {"description": "Annotations for this project returned successfully."},
         404: {"description": "Project not found with that ID."},
@@ -45,7 +45,7 @@ async def get_all_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
-) -> list[Annotation]:
+) -> list[AnnotationOutTypes]:
     """
     Retrieve all annotations for this project, subject to specified filters.
     ------------------------------------------------------------------------
@@ -75,20 +75,20 @@ async def delete_all_annotations(
     Delete ALL annotations for the given project.
     ---------------------------------------------
     """
-    # Delete annotations available for this project across all samples
+    project_obj_id = convert_to_objectid(project_id, "projects")
     if not await request.app.state.db_client.get_document_by_id(
         "projects", convert_to_objectid(project_id, "projects")
     ):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
     await request.app.state.db_client.delete_filtered_documents(
-        collection="annotations", filters={"project_id": project_id}
+        collection="annotations", filters={"project_id": project_obj_id}
     )
 
 
 @router.get(
     "/samples/{sample_id}/annotations",
-    response_model=list[AnnotationTypes],
+    response_model=list[AnnotationOutTypes],
     responses={
         200: {"description": "Annotations for this sample retrieved successfully."},
         404: {"description": "Project or Sample not found with that ID."},
@@ -98,6 +98,14 @@ async def get_annotations(
     request: Request,
     project_id: str = Path(description="The ID of the project to get samples from."),
     sample_id: str = Path(description="The ID of the sample to get annotations from."),
+    sort_by: str = Query(
+        "_id", 
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "descending", 
+        description="Direction to sort responses, by default 'descending'",
+    ),
     start: int = Query(
         0,
         description="Index of the first annotation you want returned when sorted newest - oldest",
@@ -110,7 +118,7 @@ async def get_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
-) -> list[Annotation]:
+) -> list[AnnotationOutTypes]:
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
     # Should return whether these are validated as a boolean
@@ -133,8 +141,8 @@ async def get_annotations(
     _annotations = await request.app.state.db_client.get_filtered_documents(
         collection="annotations",
         filters=db_filters,
-        sort_by="_id",
-        sort_direction=-1,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
         start=start,
         limit=count if count is not None else 0,
     )

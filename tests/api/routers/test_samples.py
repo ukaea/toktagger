@@ -95,7 +95,7 @@ async def test_delete_sample(api_client, setup_db, db_client):
     assert response.status_code == 200
     
     # Check there are three samples left in the database
-    samples = await db_client.get_all_documents("projects")
+    samples = await db_client.get_all_documents("samples")
     assert len(samples) == 3
     # Check sample with above ID no longer in database
     assert setup_db['sample_id_4'] not in [sample.get("_id") for sample in samples]
@@ -149,7 +149,7 @@ async def test_create_samples(api_client, setup_db, db_client):
             }
         }
     ]
-    response = await api_client.put(f"/projects/{setup_db['project_id_1']}/samples", json=in_samples)
+    response = await api_client.post(f"/projects/{setup_db['project_id_1']}/samples", json=in_samples)
     assert response.status_code == 200
         
     # Check they have been added to database
@@ -179,7 +179,7 @@ async def test_create_sample_invalid(api_client, setup_db, db_client):
             "some_other_key": 10
         },
     ]
-    response = await api_client.put(f"/projects/{setup_db['project_id_1']}/samples", json=in_samples)
+    response = await api_client.post(f"/projects/{setup_db['project_id_1']}/samples", json=in_samples)
     assert response.status_code == 422
     errors = response.json().get('detail', [])
     # Should flag that shot_id and signal_names are wrong type, extra key specified
