@@ -1,21 +1,52 @@
 from services.api.schemas.projects import ProjectIn
-from services.api.schemas.annotations import AnnotationIn
-from services.api.schemas.samples import SampleIn, ShotData
-
+from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
+from services.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
+import pathlib
 # Define some common things to add to db
-PROJECT = ProjectIn(
+PROJECT_1 = ProjectIn(
         name="test_project_0",
         task="disruption",
         query_strategy="sequential",
         data_loader="uda"
     )
-SAMPLE = SampleIn(
+PROJECT_2 = ProjectIn(
+        name="test_project_1",
+        task="ELM",
+        query_strategy="sequential",
+        data_loader="parquet"
+    )
+PROJECT_3 = ProjectIn(
+        name="test_project_2",
+        task="UFO",
+        query_strategy="uncertainty",
+        data_loader="image"
+    )
+
+
+SAMPLE_1 = SampleIn(
         shot_id=1,
         data=ShotData(protocol="uda", signal_names=["Ip"]),
         annotations=None
     ) 
+SAMPLE_2 = SampleIn(
+        shot_id=3,
+        data=ShotData(protocol="sal", signal_names=["Ip"]),
+        annotations=None
+    ) 
+SAMPLE_3 = SampleIn(
+        shot_id=2,
+        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="s3", column_names=["Ip"]),
+        annotations=None
+    ) 
+SAMPLE_4 = SampleIn(
+        shot_id=4,
+        data=TimeSeriesFileData(file_name=str(pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()), type="parquet", protocol="file", column_names=["Ip"]),
+        annotations=None
+    )
 
-ANNOTATION = AnnotationIn(
-    label="annotation",
-    validated=True
-)
+
+ANNOTATION_1 = AnnotationIn(label="annotation", validated=True)
+ANNOTATION_2 = TimeRegion(time_min=0.1, time_max=0.2, label="ramp_up", validated=True)
+ANNOTATION_3 = TimePoint(time=0.1, label="disruption", validated=True)
+ANNOTATION_4 = TimePoint(time=0.3, label="disruption", validated=False, uncertainty=0.4)
+ANNOTATION_5 = TimePoint(time=0.4, label="disruption", validated=False, uncertainty=0.8)

@@ -3,7 +3,7 @@
 import pytest
 import pytest_asyncio
 from bson.objectid import ObjectId
-from tests.db_definitions import SAMPLE, ANNOTATION
+from tests.db_definitions import SAMPLE_1, ANNOTATION_1
 
 def create_endpoint(endpoint: str, test_component: str, db_ids: dict, invalid_obj_id: bool):
     """Create valid endpoint by inserting either valid or invalid IDs into their relevant positions."""
@@ -50,13 +50,13 @@ async def make_request(api_client, request_method, endpoint, request_body):
         ("/projects/id/samples/id/annotations", "sample", "get", {}),
         ("/projects/id/samples/id/annotations", "project", "delete", {}),
         ("/projects/id/samples/id/annotations", "sample", "delete", {}),
-        ("/projects/id/samples/id/annotations", "project", "put", [ANNOTATION.model_dump(mode='json'),]),
-        ("/projects/id/samples/id/annotations", "sample", "put", [ANNOTATION.model_dump(mode='json'),]),
+        ("/projects/id/samples/id/annotations", "project", "put", [ANNOTATION_1.model_dump(mode='json'),]),
+        ("/projects/id/samples/id/annotations", "sample", "put", [ANNOTATION_1.model_dump(mode='json'),]),
         ("/projects/id/samples/id/data", "project", "post", {}),
         ("/projects/id/samples/id/data", "sample", "post", {}),
         ("/projects/id", "project", "get", {}),
         ("/projects/id/samples", "project", "get", {}),
-        ("/projects/id/samples", "project", "post", [SAMPLE.model_dump(mode='json'),]),
+        ("/projects/id/samples", "project", "post", [SAMPLE_1.model_dump(mode='json'),]),
         ("/projects/id/samples/next", "project", "get", {}),
         ("/projects/id/samples/id", "project", "get", {}),
         ("/projects/id/samples/id", "sample", "get", {}),

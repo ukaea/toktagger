@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
 from services.api.schemas.annotations import TimePoint, TimeRegion
-from tests.db_definitions import PROJECT, SAMPLE, ANNOTATION
+import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
 import pathlib
 
@@ -57,62 +57,29 @@ async def api_client(mongo_container):
 
 @pytest_asyncio.fixture(scope="function")
 async def setup_db(db_client):
-    project_1 = PROJECT
-    project_2 = ProjectIn(
-        name="test_project_1",
-        task="ELM",
-        query_strategy="sequential",
-        data_loader="parquet"
-    )
-    project_3 = ProjectIn(
-        name="test_project_2",
-        task="UFO",
-        query_strategy="uncertainty",
-        data_loader="image"
-    )
-    sample_1 = SAMPLE
-    sample_2 = SampleIn(
-        shot_id=3,
-        data=ShotData(protocol="sal", signal_names=["Ip"]),
-        annotations=None
-    ) 
-    sample_3 = SampleIn(
-        shot_id=2,
-        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="s3", column_names=["Ip"]),
-        annotations=None
-    ) 
-    sample_4 = SampleIn(
-        shot_id=4,
-        data=TimeSeriesFileData(file_name=str(pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()), type="parquet", protocol="file", column_names=["Ip"]),
-        annotations=None
-    )
-    annotation_1 = ANNOTATION
-    annotation_2 = TimeRegion(time_min=0.1, time_max=0.2, label="ramp_up", validated=True)
-    annotation_3 = TimePoint(time=0.1, label="disruption", validated=False)
-    annotation_4 = TimePoint(time=0.3, label="disruption", validated=False)
-    project_id_1 = await db_client.insert('projects', project_1)
+    project_id_1 = await db_client.insert('projects', db_definitions.PROJECT_1)
     await asyncio.sleep(0.01)
-    project_id_2 = await db_client.insert('projects', project_2)
+    project_id_2 = await db_client.insert('projects', db_definitions.PROJECT_2)
     await asyncio.sleep(0.01)
-    project_id_3 = await db_client.insert('projects', project_3)
+    project_id_3 = await db_client.insert('projects', db_definitions.PROJECT_3)
     await asyncio.sleep(0.01)
-    sample_id_1 = await db_client.insert('samples', sample_1, ids={"project_id": ObjectId(project_id_1)})
+    sample_id_1 = await db_client.insert('samples', db_definitions.SAMPLE_1, ids={"project_id": ObjectId(project_id_1)})
     await asyncio.sleep(0.01)
-    sample_id_2 = await db_client.insert('samples', sample_2, ids={"project_id": ObjectId(project_id_1)})
+    sample_id_2 = await db_client.insert('samples', db_definitions.SAMPLE_2, ids={"project_id": ObjectId(project_id_1)})
     await asyncio.sleep(0.01)
-    sample_id_3 = await db_client.insert('samples', sample_3, ids={"project_id": ObjectId(project_id_1)})
+    sample_id_3 = await db_client.insert('samples', db_definitions.SAMPLE_3, ids={"project_id": ObjectId(project_id_1)})
     await asyncio.sleep(0.01)
-    sample_id_4 = await db_client.insert('samples', sample_4, ids={"project_id": ObjectId(project_id_2)})
+    sample_id_4 = await db_client.insert('samples', db_definitions.SAMPLE_4, ids={"project_id": ObjectId(project_id_2)})
     await asyncio.sleep(0.01)
-    annotation_id_1 = await db_client.insert('annotations', annotation_1, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
+    annotation_id_1 = await db_client.insert('annotations', db_definitions.ANNOTATION_1, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
     await asyncio.sleep(0.01)
-    annotation_id_2 = await db_client.insert('annotations', annotation_2, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
+    annotation_id_2 = await db_client.insert('annotations', db_definitions.ANNOTATION_2, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
     await asyncio.sleep(0.01)
-    annotation_id_3 = await db_client.insert('annotations', annotation_3, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
+    annotation_id_3 = await db_client.insert('annotations', db_definitions.ANNOTATION_3, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_1)})
     await asyncio.sleep(0.01)
-    annotation_id_4 = await db_client.insert('annotations', annotation_4, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_2)})
+    annotation_id_4 = await db_client.insert('annotations', db_definitions.ANNOTATION_4, ids={"project_id": ObjectId(project_id_1), "sample_id": ObjectId(sample_id_2)})
     await asyncio.sleep(0.01)
-    annotation_id_5 = await db_client.insert('annotations', annotation_4, ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)})
+    annotation_id_5 = await db_client.insert('annotations', db_definitions.ANNOTATION_5, ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)})
     yield {
            "project_id_1": project_id_1,
            "project_id_2": project_id_2,
@@ -132,9 +99,9 @@ async def setup_db(db_client):
 @pytest_asyncio.fixture(scope="function")
 async def setup_db_small(db_client):
     ids = {}
-    ids['projects'] = await db_client.insert('projects', PROJECT)
-    ids['samples'] = await db_client.insert('samples', SAMPLE, ids={"project_id": ObjectId(ids['projects'])})
-    ids['annotations'] = await db_client.insert('annotations', ANNOTATION, ids={"project_id": ObjectId(ids['projects']), "sample_id": ObjectId(ids['samples'])})
+    ids['projects'] = await db_client.insert('projects', db_definitions.PROJECT_1)
+    ids['samples'] = await db_client.insert('samples', db_definitions.SAMPLE_1, ids={"project_id": ObjectId(ids['projects'])})
+    ids['annotations'] = await db_client.insert('annotations', db_definitions.ANNOTATION_1, ids={"project_id": ObjectId(ids['projects']), "sample_id": ObjectId(ids['samples'])})
     
     yield ids
     
