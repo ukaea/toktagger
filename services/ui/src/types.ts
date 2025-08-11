@@ -86,7 +86,7 @@ export const ProjectSchema = z.object({
   task: z.string(),
   query_strategy: z.string(),
   data_loader: z.string(),
-  timestamp: z.string(),
+  timestamp: z.string().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -110,7 +110,7 @@ export type SampleData = z.infer<typeof SampleDataSchema>;
 export const SampleSchema = z.object({
   _id: z.string().optional(),
   timestamp: z.string(),
-  project_id: z.string(),
+  project_id: z.string().optional(),
   shot_id: z.number(),
   data: SampleDataSchema,
 });

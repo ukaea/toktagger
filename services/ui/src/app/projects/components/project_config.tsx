@@ -6,7 +6,6 @@ import { Project, Sample, SamplesSummary, FileData, ShotData } from '@/types';
 import AddCircle from '@spectrum-icons/workflow/AddCircle';
 import Edit from '@spectrum-icons/workflow/EditCircle';
 import { getSamplesSummary } from "@/app/core";
-import { on } from "events";
 
 const Tasks = [
   {'key': 'ELM', 'value': 'ELM'},
@@ -245,14 +244,14 @@ const DataLoaderForm = ({dataLoaderOptions, setDataLoaderOptions} : {dataLoaderO
   );
 }
 
-const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string | null, setTaskName: (selection: string) => void}) => {
+const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string, setTaskName: (selection: string) => void}) => {
   const handleSelectionChange = (key: React.Key | null) => {
-    setTaskName(key ? String(key) : "");
+    setTaskName(key ? String(key) : Tasks[0].key);
   };
 
   return (
     <>
-      <ComboBox label="Task" items={Tasks} onSelectionChange={handleSelectionChange} isRequired selectedKey={taskName}>
+      <ComboBox label="Task" items={Tasks} defaultInputValue={taskName} onSelectionChange={handleSelectionChange} isRequired selectedKey={taskName}>
         {(item: Record<string, string>) => <Item key={item.key}>{item.value}</Item>}
       </ComboBox>
     </>
@@ -260,7 +259,7 @@ const TaskLoaderForm = ({taskName, setTaskName} : {taskName: string | null, setT
 }
 
 
-const editProject = async (projectId: string, project: Project): Promise<string | null> => {
+const editProject = async (projectId: string, project: Project): Promise<string> => {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}`, {
     method: 'PUT',
     headers: {
@@ -271,14 +270,14 @@ const editProject = async (projectId: string, project: Project): Promise<string 
 
   if (!response.ok) {
     const error = await response.json();
-    ToastQueue.negative(`Error editing project ${projectId}: ${error}`, {timeout: 3000})
-    return null;
+    throw new Error(`Error editing project ${projectId}: ${error.message}`);
   }
 
   return projectId;
 }
 
-const makeProject = async (project: Project): Promise<string | null> => {
+const createProject = async (project: Project): Promise<string> => {
+  console.log(project);
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`, {
     method: 'POST',
     headers: {
@@ -289,28 +288,24 @@ const makeProject = async (project: Project): Promise<string | null> => {
 
   if (!response.ok) {
     const error = await response.json();
-    ToastQueue.negative(`Error creating project: ${error}`, {timeout: 3000})
-    return null;
+    throw new Error(`Error creating project: ${error.message}`);
   }
 
   const projectId = (await response.json())["_id"];
   return projectId;
 }
 
-const createSamples = (projectId: string, dataLoaderOptions: DataLoaderOptions): Sample[] | null => {
-  const fileTypes = FileTypes.map((item) => item.key);
-
+const buildSamples = (dataLoaderOptions: DataLoaderOptions): Sample[] => {
   if (dataLoaderOptions.name === 'uda') {
-    return createUDASamples(projectId, dataLoaderOptions);
-  } else if (fileTypes.includes(dataLoaderOptions.name)) {
-    return createFileSamples(projectId, dataLoaderOptions);
+    return createUDASamples(dataLoaderOptions);
+  } else if (dataLoaderOptions.name === 'file') {
+    return createFileSamples(dataLoaderOptions);
   } else {
-    ToastQueue.negative(`Unknown data loader ${dataLoaderOptions.name}`, {timeout: 3000});
-    return null;
+    throw new Error(`Unknown data loader ${dataLoaderOptions.name}`);
   }
 }
 
-const createUDASamples = (projectId: string, dataLoaderOptions: DataLoaderOptions) => {
+const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
     const { shot_min, shot_max } = dataLoaderOptions as UDADataLoaderOptions;
     
     const shots = Array.from({length: shot_max - shot_min + 1}, (_, i) => i + shot_min);
@@ -320,7 +315,6 @@ const createUDASamples = (projectId: string, dataLoaderOptions: DataLoaderOption
     } as ShotData;
 
     const samples: Sample[] = shots.map((shot_id: number) => ({
-      project_id: projectId,
       timestamp: new Date().toISOString(),
       shot_id: shot_id,
       data: shotData
@@ -328,9 +322,13 @@ const createUDASamples = (projectId: string, dataLoaderOptions: DataLoaderOption
     return samples;
 }
 
-const createFileSamples = (projectId: string, dataLoaderOptions: DataLoaderOptions) => {
+const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
     const options = dataLoaderOptions as FileDataLoaderOptions;
     const fileNames = options.file_names;
+
+    if (!fileNames || fileNames.length === 0) {
+      throw new Error('Directory must contain at least one file.');
+    }
 
     // Assumption!: the file name must be the shot number.
     const shots = fileNames.map((name: string) => {
@@ -349,7 +347,6 @@ const createFileSamples = (projectId: string, dataLoaderOptions: DataLoaderOptio
     } as FileData;
 
     const samples: Sample[] = shots.map((shot_id: number, index: number) => ({
-      project_id: projectId,
       shot_id: shot_id,
       timestamp: new Date().toISOString(),
       data: dataInfo,
@@ -358,7 +355,7 @@ const createFileSamples = (projectId: string, dataLoaderOptions: DataLoaderOptio
     return samples;
 };
 
-const makeSamples = async (projectId: string, samples: Sample[]) => {
+const createSamples = async (projectId: string, samples: Sample[]) => {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}/samples`, {
     method: 'PUT',
     headers: {
@@ -369,18 +366,37 @@ const makeSamples = async (projectId: string, samples: Sample[]) => {
 
   if (!response.ok) {
     const error = await response.json();
-    ToastQueue.negative(`Error creating samples: ${error}`, {timeout: 3000})
+    throw new Error(`Error creating samples: ${error.message}`);
   }
 }
 
-const createProject = (projectName: string, dataLoaderName: string, task: string, queryStrategy: string): Project => {
+const buildProject = (projectName: string, dataLoaderOptions: DataLoaderOptions, task: string, queryStrategy: string): Project => {
+
+  if (projectName === '') {
+    throw new Error('Project name cannot be empty');
+  }
+
+  if (dataLoaderOptions.name === '') {
+    throw new Error('Data loader name cannot be empty');
+  }
+
+  if (task === '') {
+    throw new Error('Task cannot be empty');
+  }
+
+  let dataLoaderType = dataLoaderOptions.name;
+  if (dataLoaderOptions.name === 'file') {
+    const options = dataLoaderOptions as FileDataLoaderOptions;
+    dataLoaderType = options.protocol ?? 'parquet';
+  }
   const project: Project = {
     name: projectName,
-    data_loader: dataLoaderName,
+    data_loader: dataLoaderType,
     task: task,
     query_strategy: queryStrategy,
     timestamp: new Date().toISOString(),
   };
+
   return project;
 }
 
@@ -391,7 +407,7 @@ export const ProjectConfigEditor = ({project, onModify = (project: Project) => {
   const icon = editMode ? (<Edit />) : (<AddCircle />);
   const [projectName, setProjectName] = useState<string>(project?.name || '');
   const [queryStrategy, setQueryStrategy] = useState<string>(project?.query_strategy || QueryStrategies[0].key);
-  const [taskSelection, setTaskSelection] = useState<string | null>(null);
+  const [taskSelection, setTaskSelection] = useState<string>(Tasks[0].key);
   const [dataLoaderOptions, setDataLoaderOptions] = useState<DataLoaderOptions | null>(null);
   const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(null);
 
@@ -406,10 +422,32 @@ export const ProjectConfigEditor = ({project, onModify = (project: Project) => {
     run();
   }, []);
 
-  useEffect(() => {
-    if (project && samplesSummary !== null) {
+  const doEditProject = async (project: Project, dataLoaderOptions: DataLoaderOptions) => {
+      const projectId = project._id;
+
+      if (!projectId) { 
+        throw new Error(`Cannot edit a project with missing Project ID.`);
+      }
+
+
+      let updatedProject = buildProject(projectName, dataLoaderOptions, taskSelection || '', queryStrategy);
+      updatedProject.data_loader = project.data_loader;
+      updatedProject.task = project.task;
+      await editProject(projectId, updatedProject);
+      onModify(updatedProject);
+  }
+
+  const doCreateProject = async (dataLoaderOptions: DataLoaderOptions) => {
+      const project = buildProject(projectName, dataLoaderOptions, taskSelection || '', queryStrategy);
+      const samples = buildSamples(dataLoaderOptions);
+
+      const projectId = await createProject(project);
+      await createSamples(projectId, samples);
+      onModify(project);
+  };
+
+  const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {
       const dataLoaderName = samplesSummary?.data?.protocol;
-      console.log(`Data loader name`, samplesSummary);
 
       if (dataLoaderName === 'uda') {
         // UDA data loader
@@ -434,7 +472,11 @@ export const ProjectConfigEditor = ({project, onModify = (project: Project) => {
         // Unknown data loader
         setDataLoaderOptions(null);
       }
+  }
 
+  useEffect(() => {
+    if (project && samplesSummary !== null) {
+      updateDataLoaderOptions(samplesSummary);
       setProjectName(project.name);
       setQueryStrategy(project.query_strategy);
       setTaskSelection(project.task);
@@ -447,35 +489,21 @@ export const ProjectConfigEditor = ({project, onModify = (project: Project) => {
     }
 
     if (editMode && project?._id) {
-      // Edit existing project
-      const projectId = project._id;
-      let updatedProject = createProject(projectName, dataLoaderOptions.name, taskSelection || '', queryStrategy);
-      updatedProject.data_loader = project.data_loader;
-      updatedProject.task = project.task;
-      console.log(`Editing project ${projectId}`, updatedProject);
-      await editProject(projectId, updatedProject);
-      onModify(updatedProject);
+      try {
+        await doEditProject(project, dataLoaderOptions);
+        close();
+      } catch (error) {
+        ToastQueue.negative(`${error}`, {timeout: 3000});
+      }
     } else {
-      // Create new project
-      const project = createProject(projectName, dataLoaderOptions.name, taskSelection || '', queryStrategy);
-      const projectId = await makeProject(project);
-
-      if (projectId === null) {
-        ToastQueue.negative(`Error creating project!`, {timeout: 3000});
-        return;
+      try {
+        await doCreateProject(dataLoaderOptions);
+        close();
+      } catch (error) {
+        ToastQueue.negative(`${error}`, {timeout: 3000});
       }
-
-      const samples = createSamples(projectId, dataLoaderOptions);
-
-      if (samples === null) {
-        ToastQueue.negative(`Error creating samples for project ${projectId}!`, {timeout: 3000});
-        return;
-      }
-
-      await makeSamples(projectId, samples);
-      onModify(project);
     }
-    close();
+
   }
 
   return (

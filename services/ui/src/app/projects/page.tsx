@@ -1,13 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { deleteProject, getProjects } from '@/app/core';
-import {ButtonGroup, Flex, Text, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, SearchField, Picker, DialogTrigger, Dialog, Divider, Heading, Content} from '@adobe/react-spectrum'
+import {Flex, Provider, defaultTheme, Button, ToastContainer, ToastQueue, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, SearchField, Picker, DialogTrigger, Dialog, Divider, Heading, Content} from '@adobe/react-spectrum'
 import { Project } from '@/types';
-import Edit from '@spectrum-icons/workflow/Edit';
 import Delete from '@spectrum-icons/workflow/Delete';
 import type { SortDescriptor } from '@react-types/shared';
 import { ProjectConfigEditor } from './components/project_config';
-import { on } from 'events';
 
 type ProjectsTableProps = {
   projects: Project[];
