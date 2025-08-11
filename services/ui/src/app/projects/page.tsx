@@ -7,11 +7,13 @@ import Edit from '@spectrum-icons/workflow/Edit';
 import Delete from '@spectrum-icons/workflow/Delete';
 import type { SortDescriptor } from '@react-types/shared';
 import { ProjectConfigEditor } from './components/project_config';
+import { on } from 'events';
 
 type ProjectsTableProps = {
   projects: Project[];
   sortDescriptor: SortDescriptor;
   onSortChange: (sort: SortDescriptor) => void;
+  onModify?: (project: Project) => void;
 }
 
 export const ProjectsBreadCrumbs = () => {
@@ -24,7 +26,7 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = ({projects, sortDescriptor, onSortChange} : ProjectsTableProps) => {
+export const ProjectsTable = ({projects, sortDescriptor, onSortChange, onModify = () => {}} : ProjectsTableProps) => {
 
   if (projects.length === 0) {
     return (
@@ -37,6 +39,8 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange} : Project
   const handleDelete = async (project_id: string) => {
     try {
       await deleteProject(project_id);
+      const project = projects.find(project => project['_id'] === project_id) as Project;
+      onModify(project);
       ToastQueue.positive('Project deleted successfully', {timeout: 3000});
     } catch (error) {
       ToastQueue.negative('Error deleting project', {timeout: 3000});
@@ -68,7 +72,7 @@ export const ProjectsTable = ({projects, sortDescriptor, onSortChange} : Project
               <Cell>{project['data_loader']}</Cell>
               <Cell>
                 <Flex direction="row" gap="size-100">
-                  <ProjectConfigEditor project={project} />
+                  <ProjectConfigEditor project={project} onModify={onModify} />
                   <Button
                     variant='negative'
                     onPress={() => {
@@ -92,18 +96,19 @@ export default function Projects() {
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: '_id', direction: 'descending' });
   const [projects, setProjects] = useState<Project[]>([]);
 
-  useEffect(() => {
-    const run = async () => {
-      const projects = await getProjects(sortDescriptor, currentPage, projectsPerPage, projectName);
+  const refreshProjects = async (project?: Project | null) => {
+    const projects = await getProjects(sortDescriptor, currentPage, projectsPerPage, projectName);
 
-      if (!projects) {
-        ToastQueue.negative('Error fetching projects', {timeout: 3000});
-        return;
-      }
-
-      setProjects(projects);
+    if (!projects) {
+      ToastQueue.negative('Error fetching projects', {timeout: 3000});
+      return;
     }
-    run();
+
+    setProjects(projects);
+  }
+
+  useEffect(() => {
+    refreshProjects();
   }, [sortDescriptor, currentPage, projectsPerPage, projectName]);
 
   if (!projects) {
@@ -125,7 +130,7 @@ export default function Projects() {
           <Provider theme={defaultTheme}>
           <ToastContainer placement="top"  />
           <Flex direction='row' margin='size-100' gap="size-100"  alignItems="center" justifyContent="space-between">
-              <ProjectConfigEditor />
+              <ProjectConfigEditor onModify={refreshProjects} />
               <SearchField label="Search By Name" onSubmit={
                 (name) => {
                   if (name != null) {
@@ -134,7 +139,7 @@ export default function Projects() {
                   }
                 }}/>
           </Flex>
-          <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange}></ProjectsTable>
+          <ProjectsTable projects={projects} sortDescriptor={sortDescriptor} onSortChange={onSortChange} onModify={refreshProjects}></ProjectsTable>
             <div className="flex items-center justify-between pl-4 pr-4">
               <Button variant="primary" onPress={() => setCurrentPage((p) => p - 1)} isDisabled={currentPage === 1}>
                 Previous

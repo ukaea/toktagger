@@ -6,6 +6,7 @@ import { Project, Sample, SamplesSummary, FileData, ShotData } from '@/types';
 import AddCircle from '@spectrum-icons/workflow/AddCircle';
 import Edit from '@spectrum-icons/workflow/EditCircle';
 import { getSamplesSummary } from "@/app/core";
+import { on } from "events";
 
 const Tasks = [
   {'key': 'ELM', 'value': 'ELM'},
@@ -384,7 +385,7 @@ const createProject = (projectName: string, dataLoaderName: string, task: string
 }
 
 
-export const ProjectConfigForm = ({project} : {project?: Project | null}) => {
+export const ProjectConfigEditor = ({project, onModify = (project: Project) => {}} : {project?: Project | null, onModify?: (project: Project) => void}) => {
   const editMode = project !== undefined && project !== null;
   const text = editMode ? 'Edit' : 'Create';
   const icon = editMode ? (<Edit />) : (<AddCircle />);
@@ -453,6 +454,7 @@ export const ProjectConfigForm = ({project} : {project?: Project | null}) => {
       updatedProject.task = project.task;
       console.log(`Editing project ${projectId}`, updatedProject);
       await editProject(projectId, updatedProject);
+      onModify(updatedProject);
     } else {
       // Create new project
       const project = createProject(projectName, dataLoaderOptions.name, taskSelection || '', queryStrategy);
@@ -471,6 +473,7 @@ export const ProjectConfigForm = ({project} : {project?: Project | null}) => {
       }
 
       await makeSamples(projectId, samples);
+      onModify(project);
     }
     close();
   }
@@ -507,10 +510,5 @@ export const ProjectConfigForm = ({project} : {project?: Project | null}) => {
           </Dialog>
         )}
     </DialogTrigger>
-  );
-}
-export function ProjectConfigEditor({ project }: { project?: Project }) {
-  return (
-    <ProjectConfigForm project={project} />
   );
 }
