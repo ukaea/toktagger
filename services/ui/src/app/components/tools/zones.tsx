@@ -4,7 +4,7 @@ import { useContextMenu } from "react-contexify";
 import * as d3 from "d3";
 import { useZoneContext, ZONE_MENU_ID } from "../providers/zone-provider";
 import { ToolingProps, Zone } from "@/types";
-import { useContextMenuProvider } from "../providers/context-menu-provider";
+import { useContextMenuProvider } from "../providers/annotation-provider";
 
 /**
  * Handles the rendering of zones onto a specific plot

@@ -1,6 +1,6 @@
 "use client"
 
-import { useContextMenuProvider } from '@/app/components/providers/context-menu-provider'
+import { useContextMenuProvider } from '@/app/components/providers/annotation-provider'
 import { VSpans } from '@/app/components/tools/vspans'
 import { Zones } from '@/app/components/tools/zones'
 import { useEffect, useRef, useState } from 'react'

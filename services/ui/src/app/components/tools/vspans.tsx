@@ -4,7 +4,7 @@ import { useContextMenu } from "react-contexify";
 import * as d3 from "d3"
 import { useVSpanContext, VSPAN_MENU_ID } from "../providers/vpsan-provider";
 import { ToolingProps, VSpan } from "@/types";
-import { useContextMenuProvider } from "../providers/context-menu-provider";
+import { useContextMenuProvider } from "../providers/annotation-provider";
 
 /**
  * Handles the rendering of VSpans onto a specific plot

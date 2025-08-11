@@ -1,6 +1,6 @@
 "use client"
 
-import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
+import { useContextMenuProvider } from "@/app/components/providers/annotation-provider"
 import { useVSpanContext } from "@/app/components/providers/vpsan-provider"
 import { useZoneContext } from "@/app/components/providers/zone-provider"
 import { ToolingTypes } from "@/types"

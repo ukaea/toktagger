@@ -71,6 +71,7 @@ export const ContextMenuProvider = ({menuId, children} : {
         document.addEventListener("keydown", disableInteraction)
         document.addEventListener("keyup", enableInteraction)
 
+
         return () => {
             document.removeEventListener("keydown", disableInteraction)
             document.removeEventListener("keyup", enableInteraction)

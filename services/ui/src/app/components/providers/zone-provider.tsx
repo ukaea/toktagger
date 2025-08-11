@@ -4,7 +4,7 @@ import { Zone, Category, ToolingTypes } from "@/types";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 import 'react-contexify/ReactContexify.css'
-import { useContextMenuProvider } from "./context-menu-provider";
+import { useContextMenuProvider } from "./annotation-provider";
 
 interface ZoneContextInfo {
     zones: Zone[];

@@ -1,7 +1,7 @@
 "use client"
 
 import { TimeSeries } from "@/app/components/plots/time-series"
-import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { VSpans } from "@/app/components/tools/vspans"

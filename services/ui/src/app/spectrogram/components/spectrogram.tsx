@@ -14,7 +14,7 @@ import {
   VSpan,
 } from "@/types";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
-import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider";
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { TimeSeries } from "@/app/components/plots/time-series";
 import { Zones } from "@/app/components/tools/zones";

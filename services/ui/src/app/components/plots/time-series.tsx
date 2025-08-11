@@ -1,6 +1,6 @@
 "use client"
 
-import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
+import { useContextMenuProvider } from "@/app/components/providers/annotation-provider"
 import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
 
