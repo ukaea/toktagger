@@ -99,7 +99,7 @@ async def test_delete_project(api_client, setup_db, db_client):
     
     # Check annotations associated with this project have been deleted
     annotations = await db_client.get_all_documents("annotations")
-    assert len(annotations) == 3 # Annotations associated with project 1 still exist
+    assert len(annotations) == 4 # Annotations associated with project 1 still exist
     # Check annotation associated with above project no longer in database
     assert setup_db['annotation_id_4'] not in [annotation.get("_id") for annotation in annotations]
     

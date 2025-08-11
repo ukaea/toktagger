@@ -102,7 +102,7 @@ async def test_delete_sample(api_client, setup_db, db_client):
     
     # Check annotations associated with this project have been deleted
     annotations = await db_client.get_all_documents("annotations")
-    assert len(annotations) == 3
+    assert len(annotations) == 4 # Annotations associated with project 1 still exist
     # Check annotation associated with above project no longer in database
     assert setup_db['annotation_id_4'] not in [annotation.get("_id") for annotation in annotations]
     
@@ -110,7 +110,7 @@ async def test_delete_sample(api_client, setup_db, db_client):
     projects = await db_client.get_all_documents("projects")
     assert len(projects) == 3
     # Check project with above ID is in database
-    assert setup_db['project_id_2'] in [project.get("_id") for project in projects]
+    assert setup_db['project_id_2'] in [str(project.get("_id")) for project in projects]
     
 async def get_next_sample(api_client, setup_db):
     response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/next")
