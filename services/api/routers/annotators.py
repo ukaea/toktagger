@@ -28,7 +28,7 @@ async def create_annotations(request: Request, project_id: str, sample_id: str, 
     annotator_cls = ANNOTATORS[annotator_id]
 
     if not annotator_cls:
-        raise HTTPException(status_code=404, detail="No annotator found for this project type.")
+        raise HTTPException(status_code=404, detail="Specified annotator not found.")
     if annotator_id not in ANNOTATORS_PER_TASK[Task(project.task)]:
         raise HTTPException(status_code=409, detail=f"The selected annotator cannot be used for {project.task} labelling projects.")
     

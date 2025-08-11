@@ -15,11 +15,11 @@ async def test_get_all_projects_sortby(api_client, setup_db):
     response = await api_client.get("/projects?sort_by=task")
     # Should sort alphabetically by task
     # Sorts by case first (all uppers before any lowers)
-    # So ELM (project 0), then UFO (project 2), then disruption (project 1)
-    # Default sort direction is descending, so will return the opposite of this: 1, 2, 0
+    # So ELM (project 1), then UFO (project 2), then disruption (project 0)
+    # Default sort direction is descending, so will return the opposite of this: 0, 2, 1
     assert response.status_code == 200
     returned_projects = response.json()
-    assert [project['name'] for project in returned_projects] == ["test_project_1", "test_project_2", "test_project_0"]
+    assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_2", "test_project_1"]
     
 @pytest.mark.asyncio
 async def test_get_projects_start(api_client, setup_db):
@@ -72,7 +72,7 @@ async def test_get_project_id(api_client, setup_db):
     returned_project = response.json()
     # Check info matches what we created the entry with
     assert returned_project.get("name") == "test_project_0"
-    assert returned_project.get("task") == 'ELM'
+    assert returned_project.get("task") == 'disruption'
     assert returned_project.get("query_strategy") == "sequential"
     assert returned_project.get("data_loader") == "uda"
     

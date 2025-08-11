@@ -60,7 +60,7 @@ async def setup_db(db_client):
     project_1 = PROJECT
     project_2 = ProjectIn(
         name="test_project_1",
-        task="disruption",
+        task="ELM",
         query_strategy="sequential",
         data_loader="parquet"
     )

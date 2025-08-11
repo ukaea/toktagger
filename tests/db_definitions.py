@@ -5,7 +5,7 @@ from services.api.schemas.samples import SampleIn, ShotData
 # Define some common things to add to db
 PROJECT = ProjectIn(
         name="test_project_0",
-        task="ELM",
+        task="disruption",
         query_strategy="sequential",
         data_loader="uda"
     )
