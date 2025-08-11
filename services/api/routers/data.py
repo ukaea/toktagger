@@ -23,7 +23,7 @@ async def get_data(
     """Get data, e.g. time trace, about the given sample required for the given project"""
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    sample = await utils.get_sample(db_client, sample_id)
+    sample = await utils.get_sample(db_client, project_id, sample_id)
 
     data_loader = DATA_LOADERS[project.data_loader]()
     try:

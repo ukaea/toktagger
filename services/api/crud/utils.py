@@ -5,6 +5,7 @@ from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
+from bson.objectid import ObjectId
 
 async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     obj_id = convert_to_objectid(project_id, "projects")
@@ -19,12 +20,15 @@ async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     return Project(**projects[0])
 
 
-async def get_sample(db_client: MongoDBClient, sample_id: str) -> Sample:
+async def get_sample(db_client: MongoDBClient, project_id: str, sample_id: str) -> Sample:
+    # Convert project ID to ObhectID
+    project_obj_id = convert_to_objectid(project_id, "projects")
+
     # Get sample with this ID
     sample_obj_id = convert_to_objectid(sample_id, "samples")
 
     samples = await db_client.get_filtered_documents(
-        collection="samples", filters={"_id": sample_obj_id}
+        collection="samples", filters={"_id": sample_obj_id, "project_id": project_obj_id}
     )
 
     if len(samples) == 0:

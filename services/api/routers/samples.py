@@ -220,9 +220,11 @@ async def get_sample(
     Get the specified sample from this project.
     --------------------------------------------
     """
-    # Get sample with this ID
     db_client = request.app.state.db_client
-    sample = await utils.get_sample(db_client, sample_id)
+    # Check project exists
+    project = await utils.get_project(db_client, project_id)
+    # Get specified sample
+    sample = await utils.get_sample(db_client, project.id, sample_id)
     return sample
 
 
