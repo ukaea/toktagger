@@ -94,13 +94,17 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
                     handleVSpanDragFinish();  
                 })
 
-            function handleContextMenu(event, vspan: VSpan) {
-                showVSpanMenu({
-                    event,
-                    props: {
-                        vspan
-                    }
-                })
+            function handleContextMenu(event: MouseEvent, vspan: VSpan) {
+                event.preventDefault(); // Prevent default context menu
+                const isRightClickEvent = (event.button === 2 && !event.ctrlKey);
+                if (isRightClickEvent) {
+                    showVSpanMenu({
+                        event,
+                        props: {
+                            vspan
+                        }
+                    })
+                }
             }
 
             // Create a line and a transparent drag handle for each VSpan

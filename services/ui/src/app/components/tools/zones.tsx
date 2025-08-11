@@ -127,12 +127,16 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         });
 
       function handleContextMenu(event: MouseEvent, zone: Zone) {
-        showZoneMenu({
-          event,
-          props: {
-            zone,
-          },
-        });
+          event.preventDefault(); // Prevent default context menu
+          const isRightClickEvent = (event.button === 2 && !event.ctrlKey);
+          if (isRightClickEvent) {
+              showZoneMenu({
+                  event,
+                  props: {
+                      zone,
+                  },
+              });
+          }
       }
 
       // Create the zone and transparent handles on each boundary

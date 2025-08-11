@@ -140,16 +140,19 @@ export const LinkedPlot = () => {
             return
         }
 
-        const plot = document.getElementById(plotId)
+        const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
 
         if (!plot) {
             console.error("Could not locate plot to assign context menu")
             return
         }
 
-        function handleContextMenu(event, plot) {
+        function handleContextMenu(event: MouseEvent, plot: Plotly.PlotlyHTMLElement) {
             const xaxis = plot._fullLayout.xaxis;
-            const bb = event.target.getBoundingClientRect();
+            if (!event.target) {
+                return;
+            }
+            const bb = (event.target as Element).getBoundingClientRect();
             const x0 = xaxis.p2d(event.clientX - bb.left);
             const x1 = xaxis.p2d(event.clientX - bb.left + 100);
 
@@ -162,9 +165,13 @@ export const LinkedPlot = () => {
             })
         }
 
-        const contextHandler = (event) => { //  wrap handler so we can remove it
-            handleContextMenu(event, plot)
-        } 
+        const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
+            event.preventDefault(); // Prevent default context menu
+            const isRightClickEvent = (event.button === 2 && !event.ctrlKey);
+            if (isRightClickEvent) {
+                handleContextMenu(event, plot)
+            }
+        }
 
         // Following code gets all subplots and adds the listener
         const dragLayer = plot.querySelector(".draglayer")

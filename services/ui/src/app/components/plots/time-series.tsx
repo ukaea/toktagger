@@ -331,7 +331,11 @@ export const TimeSeries = ({
         }
 
         const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
-            handleContextMenu(event, plot)
+            event.preventDefault(); // Prevent default context menu
+            const isRightClickEvent = (event.button === 2 && !event.ctrlKey);
+            if (isRightClickEvent) {
+                handleContextMenu(event, plot)
+            }
         }
 
         const startToolCreation = (event: MouseEvent) => {
