@@ -64,7 +64,7 @@ async def get_annotations(
 async def get_samples(
     db_client: MongoDBClient,
     project_id: str,
-    shot_id: int,
+    shot_id: Optional[int] = None,
     sort_by: str = "_id",
     sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
@@ -78,7 +78,7 @@ async def get_samples(
 
     filters = {"project_id": project_obj_id}
 
-    if shot_id:
+    if shot_id is not None:
         filters["shot_id"] = shot_id
 
     samples = await db_client.get_filtered_documents(
@@ -89,6 +89,8 @@ async def get_samples(
         start=start,
         limit=count if count is not None else 0,
     )
+
+    samples = [Sample(**sample) for sample in samples]
     return samples
 
 

@@ -1,7 +1,6 @@
 "use client";
 import { z } from "zod/v4";
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import {Form, Flex, Button, ToastQueue, ListView, View, TextField, Text, ComboBox, RadioGroup, NumberField, Radio, Item, DialogTrigger, Dialog, Divider, Heading, Content, ButtonGroup} from '@adobe/react-spectrum'
 import { Project, Sample, SamplesSummary, FileData, ShotData } from '@/types';
 import AddCircle from '@spectrum-icons/workflow/AddCircle';
@@ -385,18 +384,29 @@ const createProject = (projectName: string, dataLoaderName: string, task: string
 }
 
 
-export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project | null, samplesSummary?: SamplesSummary | null}) => {
+export const ProjectConfigForm = ({project} : {project?: Project | null}) => {
   const editMode = project !== undefined && project !== null;
-  const router = useRouter();
+  const text = editMode ? 'Edit' : 'Create';
+  const icon = editMode ? (<Edit />) : (<AddCircle />);
   const [projectName, setProjectName] = useState<string>(project?.name || '');
   const [queryStrategy, setQueryStrategy] = useState<string>(project?.query_strategy || QueryStrategies[0].key);
   const [taskSelection, setTaskSelection] = useState<string | null>(null);
   const [dataLoaderOptions, setDataLoaderOptions] = useState<DataLoaderOptions | null>(null);
+  const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+        if (!project || !project._id) {
+          return;
+        }
+        const summary = await getSamplesSummary(project._id);
+        setSamplesSummary(summary);
+    }
+    run();
+  }, []);
 
   useEffect(() => {
     if (project && samplesSummary !== null) {
-      samplesSummary = samplesSummary as SamplesSummary;
-
       const dataLoaderName = samplesSummary?.data?.protocol;
       console.log(`Data loader name`, samplesSummary);
 
@@ -430,9 +440,7 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
     }
   }, [project, samplesSummary]);
 
-  const setupProject = async (e) => {
-    e.preventDefault();
-
+  const onCreatePress = async (close: () => void) => {
     if (dataLoaderOptions === null) {
       return;
     }
@@ -464,47 +472,8 @@ export const ProjectConfigForm = ({project, samplesSummary} : {project?: Project
 
       await makeSamples(projectId, samples);
     }
-    
-    const url = `${process.env.NEXT_PUBLIC_API_URL}/projects`;
-    router.push(url);
+    close();
   }
-
-  return (
-    <Form maxWidth="size-6000" onSubmit={setupProject}>
-      <TextField label="Project Name" isRequired value={projectName} onChange={setProjectName} />
-
-      <>
-        {!editMode && (
-          <>
-            <DataLoaderForm dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions}/>
-            <TaskLoaderForm taskName={taskSelection} setTaskName={setTaskSelection}/>
-          </>
-        )}
-      </>
-
-      <RadioGroup label="Query Strategy" isRequired value={queryStrategy} onChange={setQueryStrategy}>
-        {QueryStrategies.map((item: Record<string, string>) => <Radio key={item.key} value={item.key}>{item.value}</Radio>)}
-      </RadioGroup>
-    </Form>
-  );
-}
-export function ProjectConfigEditor({ project }: { project?: Project }) {
-  const editMode = project !== undefined && project !== null;
-  const text = editMode ? 'Edit' : 'Create';
-  const icon = editMode ? (<Edit />) : (<AddCircle />);
-
-  const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(null);
-
-  useEffect(() => {
-    const run = async () => {
-        if (!project || !project._id) {
-          return;
-        }
-        const summary = await getSamplesSummary(project._id);
-        setSamplesSummary(summary);
-    }
-    run();
-  }, []);
 
   return (
       <DialogTrigger>
@@ -514,14 +483,34 @@ export function ProjectConfigEditor({ project }: { project?: Project }) {
             <Heading>{text} Project</Heading>
             <Divider />
             <Content>
-              <ProjectConfigForm project={project} samplesSummary={samplesSummary} />
+              <Form maxWidth="size-6000">
+                <TextField label="Project Name" isRequired value={projectName} onChange={setProjectName} />
+
+                <>
+                  {!editMode && (
+                    <>
+                      <DataLoaderForm dataLoaderOptions={dataLoaderOptions} setDataLoaderOptions={setDataLoaderOptions}/>
+                      <TaskLoaderForm taskName={taskSelection} setTaskName={setTaskSelection}/>
+                    </>
+                  )}
+                </>
+
+                <RadioGroup label="Query Strategy" isRequired value={queryStrategy} onChange={setQueryStrategy}>
+                  {QueryStrategies.map((item: Record<string, string>) => <Radio key={item.key} value={item.key}>{item.value}</Radio>)}
+                </RadioGroup>
+              </Form>
             </Content>
             <ButtonGroup>
               <Button variant="primary" onPress={close}>Close</Button>
-              <Button variant="primary" type="submit">{text}</Button>
+              <Button variant="primary" onPress={() => onCreatePress(close)}>{text}</Button>
             </ButtonGroup>
           </Dialog>
         )}
-      </DialogTrigger>
-  )
+    </DialogTrigger>
+  );
+}
+export function ProjectConfigEditor({ project }: { project?: Project }) {
+  return (
+    <ProjectConfigForm project={project} />
+  );
 }
