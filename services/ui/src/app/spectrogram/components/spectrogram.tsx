@@ -25,6 +25,7 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
+import { useEffect } from "react";
 
 const lockedModeCategories: Category[] = [
   { name: "Locked Mode", color: "rgb(255, 0, 0)" },
@@ -67,6 +68,11 @@ export const SpectrogramView = ({
   setAnnotations,
   plotProps,
 }: SpectrogramViewInfo) => {
+  useEffect(() => {
+    console.log('SpectrogramView plotProps updated:', plotProps);
+    console.log('Threshold active:', plotProps.thresholdActive);
+  }, [plotProps]);
+
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
@@ -89,12 +95,29 @@ export const SpectrogramView = ({
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
   };
 
-  const amplitude = data.amplitude;
-  const ampMin = Math.max(1e-4, Math.min(...amplitude.flat()));
+  const numDigits = plotProps.numSignificantDigits || 4;
+  const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
+
+  let amplitude: Array<Array<number>> = [];
+  if (plotProps.thresholdActive) {
+    console.log("Applying threshold mask to amplitude data");
+    amplitude = data.amplitude.map((row: Array<number>, rowIndex: number) =>
+      row.map((value: number, colIndex: number) => {
+        let maskValue = data.threshold_mask?.[rowIndex]?.[colIndex];
+        if (maskValue === undefined || maskValue === null) {
+          maskValue = 1; // Default to 1 if mask value is undefined
+        }
+        return value * maskValue;
+      }));
+  } else {
+    amplitude = data.amplitude;
+  }
+  const ampMin = Math.max(smallPrecisionFactor, Math.min(...amplitude.flat()));
   const ampMax = Math.max(...amplitude.flat());
 
+
   const logAmplitude = amplitude.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, 1e-4)))
+    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
   );
   const logAmpMin = Math.min(...logAmplitude.flat());
   const logAmpMax = Math.max(...logAmplitude.flat());
@@ -160,19 +183,19 @@ export const SpectrogramView = ({
   ];
 
   const interpFunc = (value: number) => {
-    if (plotProps.color_map === "Viridis") {
+    if (plotProps.colorMap === "Viridis") {
       return d3.interpolateViridis(value);
     }
-    if (plotProps.color_map === "Plasma") {
+    if (plotProps.colorMap === "Plasma") {
       return d3.interpolatePlasma(value);
     }
-    if (plotProps.color_map === "Inferno") {
+    if (plotProps.colorMap === "Inferno") {
       return d3.interpolateInferno(value);
     }
-    if (plotProps.color_map === "Magma") {
+    if (plotProps.colorMap === "Magma") {
       return d3.interpolateMagma(value);
     }
-    if (plotProps.color_map === "Cividis") {
+    if (plotProps.colorMap === "Cividis") {
       return d3.interpolateCividis(value);
     }
     return d3.interpolateCividis(value); // Default to Cividis if no match
@@ -227,47 +250,6 @@ export const SpectrogramView = ({
     modeBarButtonsToRemove: ["pan2d"],
   };
 
-  const thresholdPlotData: Partial<Plotly.PlotData>[] = [
-    {
-      name: "Spectrogram threshold",
-      type: "heatmap",
-      x: data.time,
-      y: data.frequency,
-      z: data.threshold_mask,
-      customdata: data.threshold_mask,
-      hovertemplate:
-        "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
-      colorscale: [
-        [0, interpFunc(0)],
-        [1, interpFunc(1)],
-      ],
-      showscale: false
-    }
-  ];
-
-  const thresholdPlotLayout: Partial<Plotly.Layout> = {
-    height: 600,
-    xaxis: {
-      title: {
-        text: "Time [s]",
-      },
-    },
-    yaxis: {
-      title: {
-        text: "Frequency [Hz]",
-      },
-    },
-    showlegend: true,
-    dragmode: "zoom",
-  };
-
-  const thresholdPlotConfig: Partial<Plotly.Config> = {
-    displaylogo: false,
-    displayModeBar: true,
-    scrollZoom: false,
-    modeBarButtonsToRemove: ["pan2d"],
-  };
-
   return (
     <div className="flex flex-col items-center space-y-3">
       <ContextMenuProvider menuId="locked-mode-menu">
@@ -292,18 +274,6 @@ export const SpectrogramView = ({
               <Zones onZoneUpdate={updateZones} />
               <VSpans onZoneUpdate={updateVSpans} />
             </TimeSeries>
-            {plotProps.threshold_active && (
-              <TimeSeries
-                plotId="SpectrogramThreshold"
-                plotConfig={{
-                  data: thresholdPlotData,
-                  config: thresholdPlotConfig,
-                  layout: thresholdPlotLayout,
-                }}>
-                <Zones onZoneUpdate={updateZones} />
-                <VSpans onZoneUpdate={updateVSpans} />
-              </TimeSeries>
-            )}
             <SpectrogramViewTable />
           </ZoneProvider>
         </VSpanProvider>

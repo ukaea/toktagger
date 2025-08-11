@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Provider,
@@ -15,6 +15,9 @@ import {
   Slider,
   Text,
   Flex,
+  TextField,
+  NumberField,
+  ActionButton,
 } from '@adobe/react-spectrum'
 import {
   Annotations,
@@ -31,6 +34,7 @@ import {
 } from "@/types";
 import { FindPeaksTool } from '@/app/components/peaks';
 import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
+import { set } from 'zod/v4';
 
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
@@ -146,12 +150,16 @@ type AmplitudeSliderInfo = {
   data: SpectrogramData;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
+  plotProps: PlotProps;
+  setPlotProps: (props: PlotProps) => void;
 };
 
 function AmplitudeSlider({
   data,
   viewParams,
   setViewParams,
+  plotProps,
+  setPlotProps,
 }: AmplitudeSliderInfo) {
   const onAmplitudeRangeChange = async ({
     start,
@@ -166,12 +174,16 @@ function AmplitudeSlider({
     setViewParams(params);
   };
 
+  const numDigits = plotProps.numSignificantDigits || 4;
+  const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
+  const largePrecisionFactor = Math.pow(10, numDigits);
+
   let ampValues = data.amplitude.flat();
-  ampValues = ampValues.map((x: number) => Math.log10(Math.max(x, 1e-4)));
+  ampValues = ampValues.map((x: number) => Math.log10(Math.max(x, smallPrecisionFactor)));
 
   const displayAmplitudeValues = (val: number) => {
-    // Convert the log10 amplitude value back to linear scale and round to 4 decimal places
-    return `${Math.round(Math.pow(10, val) * 10000) / 10000}`;
+    // Convert the log10 amplitude value back to linear scale and round to the specified number of significant digits
+    return `${Math.round(Math.pow(10, val) * largePrecisionFactor) / largePrecisionFactor}`;
   };
 
   const ampRangeTool = (
@@ -210,7 +222,7 @@ function ColorMapPicker({
     if (key) {
       const selectedColorMap = Number(key.toString());
       const value = options.find((item) => item.id === selectedColorMap);
-      setPlotProps({ ...plotProps, color_map: value?.name || "Cividis" });
+      setPlotProps({ ...plotProps, colorMap: value?.name || "Cividis" });
     }
   }
 
@@ -219,7 +231,7 @@ function ColorMapPicker({
     <ComboBox
       label="Color Map"
       defaultItems={options}
-      inputValue={plotProps.color_map || "Cividis"}
+      inputValue={plotProps.colorMap || "Cividis"}
       onSelectionChange={onColorMapChange}>
       {item => <Item key={item.id}>{item.name}</Item>}
     </ComboBox>
@@ -241,18 +253,29 @@ function ThresholdTool({
   setPlotProps,
 }: ThresholdToolInfo) {
   const [active, setActive] = useState(false);
-  const [value, setValue] = useState(50);
+  const [value, setValue] = useState(95);
 
   const onThresholdChange = (value: boolean) => {
     setActive(value);
-    setPlotProps({ ...plotProps, threshold_active: value });
+    setPlotProps({ ...plotProps, thresholdActive: value });
   }
 
-  const onThresholdApply = async (value: number) => {
-    const params = SpectrogramViewParamsSchema.parse(viewParams);
-    params.threshold_value = value;
-    setViewParams(params);
-  };
+  const incrementValue = (increment: number) => {
+    setValue((prevValue) => {
+      const newValue = prevValue + increment;
+      if (newValue < 0) return 0;
+      if (newValue > 99) return 99;
+      return newValue;
+    });
+  }
+
+  useEffect(() => {
+    if (active) {
+      const params = SpectrogramViewParamsSchema.parse(viewParams);
+      params.threshold_value = value;
+      setViewParams(params);
+    }
+  }, [value, active])
 
   return (
     <>
@@ -260,18 +283,14 @@ function ThresholdTool({
         Thresholding
       </Switch>
       {active && (
-        <Flex direction="column" gap="size-100" margin={"size-200"}>
-          <Slider
-            label="Threshold percentile"
-            value={value}
-            onChange={setValue}
-            minValue={0}
-            maxValue={100}
-            step={0.01}
-          />
-          <Button variant="secondary" onPress={() => { onThresholdApply(value) }} >
-            <Text>Apply</Text>
-          </Button>
+        <Flex direction="column" gap="size-100" margin={"size-200"} alignItems={"center"}>
+          <NumberField label="Percentile" value={value} onChange={setValue} minValue={0} maxValue={99} hideStepper={true} />
+          <Flex direction="row" gap="size-100">
+            <ActionButton onPress={() => { incrementValue(-5) }}>-5</ActionButton>
+            <ActionButton onPress={() => { incrementValue(-1) }}>-1</ActionButton>
+            <ActionButton onPress={() => { incrementValue(1) }}>+1</ActionButton>
+            <ActionButton onPress={() => { incrementValue(5) }}>+5</ActionButton>
+          </Flex>
         </Flex>
       )}
     </>
@@ -349,6 +368,8 @@ export default function ToolBar({
           data={mhdData.data}
           viewParams={viewParams}
           setViewParams={setViewParams}
+          plotProps={plotProps}
+          setPlotProps={setPlotProps}
         />
         <hr className="m-4 h-px opacity-30 border-gray-200" />
         <ThresholdTool

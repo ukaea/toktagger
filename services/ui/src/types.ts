@@ -124,6 +124,7 @@ export type ToolingProps = {
 };
 
 export type PlotProps = {
-  color_map?: string;
-  threshold_active?: boolean;
+  colorMap?: string;
+  numSignificantDigits?: number;
+  thresholdActive?: boolean;
 }

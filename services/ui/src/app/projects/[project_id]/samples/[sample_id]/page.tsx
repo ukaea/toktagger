@@ -162,7 +162,7 @@ export default function SamplePage({
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
   const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
-  const [plotProps, setPlotProps] = useState<PlotProps>({ color_map: "Cividis" }); // Set default color map
+  const [plotProps, setPlotProps] = useState<PlotProps>({ colorMap: "Cividis" }); // Set default color map
 
   useEffect(() => {
 
