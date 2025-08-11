@@ -52,11 +52,11 @@ async def make_request(api_client, request_method, endpoint, request_body):
         ("/projects/id/samples/id/annotations", "sample", "delete", {}),
         ("/projects/id/samples/id/annotations", "project", "put", [ANNOTATION.model_dump(mode='json'),]),
         ("/projects/id/samples/id/annotations", "sample", "put", [ANNOTATION.model_dump(mode='json'),]),
-        ("/projects/id/samples/id/data", "project", "get", {}),
-        ("/projects/id/samples/id/data", "sample", "get", {}),
+        ("/projects/id/samples/id/data", "project", "post", {}),
+        ("/projects/id/samples/id/data", "sample", "post", {}),
         ("/projects/id", "project", "get", {}),
         ("/projects/id/samples", "project", "get", {}),
-        ("/projects/id/samples", "project", "put", [SAMPLE.model_dump(mode='json'),]),
+        ("/projects/id/samples", "project", "post", [SAMPLE.model_dump(mode='json'),]),
         ("/projects/id/samples/next", "project", "get", {}),
         ("/projects/id/samples/id", "project", "get", {}),
         ("/projects/id/samples/id", "sample", "get", {}),
@@ -87,9 +87,9 @@ async def make_request(api_client, request_method, endpoint, request_body):
     )
 @pytest.mark.parametrize("invalid_obj_id", (True, False), ids=["invalid_obj_id", "valid_obj_id"])
 @pytest.mark.asyncio
-async def test_invalid_id(api_client, db_all, endpoint, test_component, request_method, request_body, invalid_obj_id):
+async def test_invalid_id(api_client, setup_db_small, endpoint, test_component, request_method, request_body, invalid_obj_id):
     
-    endpoint_with_ids = create_endpoint(endpoint, test_component, db_all, invalid_obj_id)
+    endpoint_with_ids = create_endpoint(endpoint, test_component, setup_db_small, invalid_obj_id)
     response = await make_request(api_client, request_method, endpoint_with_ids, request_body)
     if not response:
         pytest.fail("Test setup failed: invalid request method.")

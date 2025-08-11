@@ -52,7 +52,7 @@ async def get_samples(
     return samples
 
 
-@router.put(
+@router.post(
     "",
     responses={
         200: {

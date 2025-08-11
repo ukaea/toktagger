@@ -130,11 +130,11 @@ async def setup_db(db_client):
 
     
 @pytest_asyncio.fixture(scope="function")
-async def db_all(db_client):
+async def setup_db_small(db_client):
     ids = {}
     ids['projects'] = await db_client.insert('projects', PROJECT)
-    ids['samples'] = await db_client.insert('samples', SAMPLE)
-    ids['annotations'] = await db_client.insert('annotations', ANNOTATION)
+    ids['samples'] = await db_client.insert('samples', SAMPLE, ids={"project_id": ObjectId(ids['projects'])})
+    ids['annotations'] = await db_client.insert('annotations', ANNOTATION, ids={"project_id": ObjectId(ids['projects']), "sample_id": ObjectId(ids['samples'])})
     
     yield ids
     
