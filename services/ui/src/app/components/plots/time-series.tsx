@@ -38,15 +38,15 @@ export const TimeSeries = ({
             displayModeBar: true,
             scrollZoom: false
         }
-    }, 
+    },
     children
-} : DisruptionPlotProps) => {
+}: DisruptionPlotProps) => {
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
 
-    const plotId =  externalId || "disruption" // Facilitate an external or default ID
+    const plotId = externalId || "disruption" // Facilitate an external or default ID
 
-    const {show: showContextMenu} = useContextMenuProvider()
+    const { show: showContextMenu } = useContextMenuProvider()
     const showContextMenuRef = useRef(showContextMenu)
 
     const overplots: string[] = [];
@@ -57,10 +57,39 @@ export const TimeSeries = ({
         setUpdateTools((current) => (current + 1) % 100)
     }
 
-    const renderZones = (plot: Plotly.PlotlyHTMLElement) =>  {
+    const applyGlobalStyle = (layout: Partial<Layout>) => {
+        // Handle dark mode styling
+        // We should probably move all the styling to this central component
+        const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (isDarkMode) {
+            layout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+            layout.xaxis!.linecolor = "rgb(255, 255, 255)";
+            layout.xaxis!.zerolinecolor = "rgb(255, 255, 255)";
+            layout.xaxis!.tickcolor = "rgb(255, 255, 255)";
+            layout.xaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+            layout.yaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+            layout.yaxis!.linecolor = "rgb(255, 255, 255)";
+            layout.yaxis!.zerolinecolor = "rgb(255, 255, 255)";
+            layout.yaxis!.tickcolor = "rgb(255, 255, 255)";
+            layout.yaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+            if (layout.coloraxis && layout.coloraxis.colorbar) {
+                layout.coloraxis!.colorbar!.tickcolor = "rgb(255, 255, 255)";
+                layout.coloraxis!.colorbar!.tickfont = { color: "rgb(255, 255, 255)" };
+                layout.coloraxis!.colorbar!.outlinecolor = "rgb(255, 255, 255)";
+            }
+
+            layout.paper_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of area around the plot
+            layout.plot_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of the plot area
+        }
+        return layout;
+    }
+
+    const renderZones = (plot: Plotly.PlotlyHTMLElement) => {
         // Get all subplot elements and extract the subplot name (xy for example) from the class list
         const subplots = plot.querySelectorAll(".subplot")
-        const subplotNames = [...subplots].map(el => 
+        const subplotNames = [...subplots].map(el =>
             [...el.classList].find(cls => cls !== "subplot")
         )
 
@@ -80,7 +109,7 @@ export const TimeSeries = ({
                 overplots.push(`${plotId}-overplot-${coordinateSystem}`) // Store overplots for removal
             }
         });
-        
+
         setPlotReady(true)
 
         // Sets the y axis range required for the current x range for each subplot
@@ -95,7 +124,7 @@ export const TimeSeries = ({
             if (!x1) {
                 x1 = ((plot as any)._fullData[0]._extremes.x.max[0].val) as number;
             }
-            
+
             // Ensure each data set is handled (ensures all subplots are zoomed correctly)
             data.forEach((dataSet, index) => {
                 let yAxisID = ""
@@ -125,7 +154,7 @@ export const TimeSeries = ({
                     const yMax = Math.max(...yValues)
 
                     const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`].range;
-                    
+
                     // Only allow relayout if new yRange is smaller than previous one or if this isn't a manual zoom
                     // This allows users to zoom in on bits of the graph accurately without it auto-scaling
                     if (((yMax - yMin) < (previousRange[1] - previousRange[0]) || !manualZoom)) {
@@ -150,7 +179,7 @@ export const TimeSeries = ({
             const x1 = eventData["xaxis.range[1]"];
 
             rescale(x0, x1, true)
-        } 
+        }
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
         plot.on("plotly_doubleclick", rescale)
 
@@ -187,7 +216,7 @@ export const TimeSeries = ({
 
         const initGraph = async () => {
             const { react } = await import('plotly.js') // Annoyingly there seems to be an issue with plotly so dynamic import is needed
-            react(root, data, layout, config).then(renderZones);
+            react(root, data, applyGlobalStyle(layout), config).then(renderZones);
         }
         initGraph()
         return () => { // cleanup on unmount / Fast-Refresh
@@ -201,14 +230,14 @@ export const TimeSeries = ({
                 root?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
             })
             setPlotReady(false); // reset ready state
-        } 
+        }
     }, [plotId])
 
     useEffect(() => {
         const reload = async () => {
             const { react } = await import('plotly.js') // Annoyingly there seems to be an issue with plotly so dynamic import is needed
             const root = document.getElementById(plotId)
-            react(root, data, layout, config);
+            react(root, data, applyGlobalStyle(layout), config);
         };
         reload();
     }, [plotId, data]);
@@ -268,15 +297,15 @@ export const TimeSeries = ({
             yaxis = yaxis ?? plot._fullLayout.yaxis
 
             // Coordinates in data space
-            const x      = xaxis.p2d(relX)   // data-space X at click
-            const y      = yaxis.p2d(relY)     // data-space Y at click
-            
+            const x = xaxis.p2d(relX)   // data-space X at click
+            const y = yaxis.p2d(relY)     // data-space Y at click
+
             // compute full data range spans from axis.range 
             const [xMin, xMax] = xaxis.range as [number, number]  // data-space limits on x
             const [yMin, yMax] = yaxis.range as [number, number]  // data-space limits on y
-            const xRange       = xMax - xMin    // total span on x axis
-            const yRange       = yMax - yMin    // total span on y axis
- 
+            const xRange = xMax - xMin    // total span on x axis
+            const yRange = yMax - yMin    // total span on y axis
+
             showContextMenuRef.current({
                 event,
                 props: {
@@ -298,7 +327,7 @@ export const TimeSeries = ({
 
         const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
             handleContextMenu(event, plot)
-        } 
+        }
 
         dragElements.forEach((dragElement) => {
             dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
@@ -320,8 +349,8 @@ export const TimeSeries = ({
                 {React.Children.map(children, child => {
                     return (
                         React.isValidElement(child)
-                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools })
-                        : child
+                            ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools })
+                            : child
                     )
                 })}
             </>

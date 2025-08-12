@@ -268,8 +268,6 @@ export const SpectrogramView = ({
     },
     showlegend: true,
     dragmode: "zoom",
-    paper_bgcolor: "rgba(0, 0, 0, 0)",
-    plot_bgcolor: "rgba(0, 0, 0, 0)",
   };
 
   const plotConfig: Partial<Plotly.Config> = {
@@ -279,24 +277,6 @@ export const SpectrogramView = ({
     modeBarButtonsToRemove: ["pan2d"],
   };
 
-  const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  if (isDarkMode) {
-    plotLayout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };
-    plotLayout.xaxis!.linecolor = "rgb(255, 255, 255)";
-    plotLayout.xaxis!.zerolinecolor = "rgb(255, 255, 255)";
-    plotLayout.xaxis!.tickcolor = "rgb(255, 255, 255)";
-    plotLayout.xaxis!.tickfont = { color: "rgb(255, 255, 255)" };
-
-    plotLayout.yaxis!.title!.font = { color: "rgb(255, 255, 255)" };
-    plotLayout.yaxis!.linecolor = "rgb(255, 255, 255)";
-    plotLayout.yaxis!.zerolinecolor = "rgb(255, 255, 255)";
-    plotLayout.yaxis!.tickcolor = "rgb(255, 255, 255)";
-    plotLayout.yaxis!.tickfont = { color: "rgb(255, 255, 255)" };
-
-    plotLayout.coloraxis!.colorbar!.tickcolor = "rgb(255, 255, 255)";
-    plotLayout.coloraxis!.colorbar!.tickfont = { color: "rgb(255, 255, 255)" };
-    plotLayout.coloraxis!.colorbar!.outlinecolor = "rgb(255, 255, 255)";
-  }
 
   return (
     <div className="flex flex-col items-center space-y-3">
