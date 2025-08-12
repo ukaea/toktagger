@@ -98,6 +98,7 @@ export const SpectrogramView = ({
   const numDigits = plotProps.numSignificantDigits || 4;
   const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
 
+  const amplitude_og = data.amplitude;
   let amplitude: Array<Array<number>> = [];
   if (plotProps.thresholdActive) {
     console.log("Applying threshold mask to amplitude data");
@@ -116,11 +117,15 @@ export const SpectrogramView = ({
   const ampMax = Math.max(...amplitude.flat());
 
 
+  const logAmplitude_og = amplitude_og.map((row: Array<number>) =>
+    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
+  );
+  const logAmpMin = Math.min(...logAmplitude_og.flat());
+  const logAmpMax = Math.max(...logAmplitude_og.flat());
+
   const logAmplitude = amplitude.map((row: Array<number>) =>
     row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
   );
-  const logAmpMin = Math.min(...logAmplitude.flat());
-  const logAmpMax = Math.max(...logAmplitude.flat());
 
   const generateLogTicks = (min: number, max: number) => {
     const minPower = Math.floor(Math.log10(min));
@@ -174,13 +179,27 @@ export const SpectrogramView = ({
       type: "heatmap",
       x: data.time,
       y: data.frequency,
-      z: logAmplitude,
+      z: logAmplitude_og,
       customdata: data.amplitude,
       hovertemplate:
         "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
       coloraxis: "coloraxis",
+      opacity: plotProps.thresholdActive ? 0.4 : 1,
     },
   ];
+
+  if (plotProps.thresholdActive) {
+    plotData.push({
+      name: "Threshold Mask",
+      type: "heatmap",
+      x: data.time,
+      y: data.frequency,
+      z: logAmplitude,
+      hoverinfo: "skip",
+      coloraxis: "coloraxis",
+      showscale: false,
+    });
+  }
 
 
   const interpFunc = (value: number) => {
@@ -224,8 +243,8 @@ export const SpectrogramView = ({
       cmin: logAmpMin,
       cmax: logAmpMax,
       colorscale: [
-        [0, plotProps.thresholdActive ? "rgba(0, 0, 0, 0)" : interpFunc(0)],
-        [smallPrecisionFactor * 1.05, plotProps.thresholdActive ? interpFunc(0) : interpFunc(smallPrecisionFactor * 1.05)],
+        [0, "rgba(0, 0, 0, 0)"], // Transparent color for lowest values
+        [smallPrecisionFactor * 1.001, interpFunc(0)], // Smallest non-zero value just above the precision factor
         [0.1, interpFunc(0.1)],
         [0.2, interpFunc(0.2)],
         [0.3, interpFunc(0.3)],
