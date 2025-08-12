@@ -182,6 +182,7 @@ export const SpectrogramView = ({
     },
   ];
 
+
   const interpFunc = (value: number) => {
     if (plotProps.colorMap === "Viridis") {
       return d3.interpolateViridis(value);
@@ -201,23 +202,30 @@ export const SpectrogramView = ({
     return d3.interpolateCividis(value); // Default to Cividis if no match
   };
 
-  const plotLayout: Partial<Plotly.Layout> = {
+  let plotLayout: Partial<Plotly.Layout> = {
     height: 600,
     xaxis: {
       title: {
         text: "Time [s]",
       },
+      linewidth: 1,
+      zerolinewidth: 1,
+      showgrid: false,
     },
     yaxis: {
       title: {
         text: "Frequency [Hz]",
       },
+      linewidth: 1,
+      zerolinewidth: 1,
+      showgrid: false,
     },
     coloraxis: {
       cmin: logAmpMin,
       cmax: logAmpMax,
       colorscale: [
-        [0, interpFunc(0)],
+        [0, plotProps.thresholdActive ? "rgba(0, 0, 0, 0)" : interpFunc(0)],
+        [smallPrecisionFactor * 1.05, plotProps.thresholdActive ? interpFunc(0) : interpFunc(smallPrecisionFactor * 1.05)],
         [0.1, interpFunc(0.1)],
         [0.2, interpFunc(0.2)],
         [0.3, interpFunc(0.3)],
@@ -241,6 +249,8 @@ export const SpectrogramView = ({
     },
     showlegend: true,
     dragmode: "zoom",
+    paper_bgcolor: "rgba(0, 0, 0, 0)",
+    plot_bgcolor: "rgba(0, 0, 0, 0)",
   };
 
   const plotConfig: Partial<Plotly.Config> = {
@@ -249,6 +259,25 @@ export const SpectrogramView = ({
     scrollZoom: false,
     modeBarButtonsToRemove: ["pan2d"],
   };
+
+  const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (isDarkMode) {
+    plotLayout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+    plotLayout.xaxis!.linecolor = "rgb(255, 255, 255)";
+    plotLayout.xaxis!.zerolinecolor = "rgb(255, 255, 255)";
+    plotLayout.xaxis!.tickcolor = "rgb(255, 255, 255)";
+    plotLayout.xaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+    plotLayout.yaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+    plotLayout.yaxis!.linecolor = "rgb(255, 255, 255)";
+    plotLayout.yaxis!.zerolinecolor = "rgb(255, 255, 255)";
+    plotLayout.yaxis!.tickcolor = "rgb(255, 255, 255)";
+    plotLayout.yaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+    plotLayout.coloraxis!.colorbar!.tickcolor = "rgb(255, 255, 255)";
+    plotLayout.coloraxis!.colorbar!.tickfont = { color: "rgb(255, 255, 255)" };
+    plotLayout.coloraxis!.colorbar!.outlinecolor = "rgb(255, 255, 255)";
+  }
 
   return (
     <div className="flex flex-col items-center space-y-3">
