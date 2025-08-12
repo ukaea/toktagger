@@ -52,6 +52,22 @@ def create_sal_samples(project_id: str, shot_ids: list[int]):
     requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
+def create_toksearch_samples(project_id: str, shot_ids: list[int]):
+    samples = []
+    for shot_id in shot_ids:
+        sample = {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "signal_names": ["magnetics/ip"],
+                "protocol": "toksearch",
+            },
+        }
+        samples.append(sample)
+
+    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+
+
 def create_local_samples(
     project_id: str,
     shot_ids: list[int],
@@ -112,6 +128,13 @@ def main():
     project_id = create_project("SAL Disruption Project", "disruption", "sal")
     shot_ids = [87737]
     create_sal_samples(project_id, shot_ids)
+
+    # Toksearch - FAIR MAST
+    project_id = create_project("Toksearch MAST Project", "disruption", "toksearch")
+    shot_ids = [30421]
+    create_toksearch_samples(project_id, shot_ids)
+
+    print("Projects and samples created successfully.")
 
 
 if __name__ == "__main__":

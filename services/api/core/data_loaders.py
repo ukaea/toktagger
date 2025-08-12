@@ -1,4 +1,7 @@
+import sys
+import types
 import os
+import s3fs
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
@@ -12,6 +15,13 @@ from services.api.schemas.data import (
 )
 from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 from services.api.schemas.projects import DataLoaderType
+
+
+# Toksearch specific patch
+# Create a Fake MDS plus module to avoid the need to install MDSPlus on the system.
+mds = types.ModuleType("MDSplus")
+mds.Connection = None
+sys.modules["MDSplus"] = mds
 
 
 class DataLoader(ABC):
@@ -87,6 +97,7 @@ class SALDataLoader(DataLoader):
 
         host = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
         self.client = SALClient(host)
+        self.base_path = "s3://mast/level2/shots/"
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         item: ShotData = sample.data
@@ -103,9 +114,36 @@ class SALDataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+class TokSearchDataLoader(DataLoader):
+    def __init__(self):
+        super().__init__()
+        self.endpoint = "https://echo.stfc.ac.uk"
+        self.base_path = "s3://mast/level2/shots/"
+        self.fs = s3fs.S3FileSystem(
+            anon=True, endpoint_url=self.endpoint, asynchronous=True
+        )
+
+    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        item: ShotData = sample.data
+
+        from toksearch.signal.zarr import ZarrSignal
+
+        results = {}
+        for name in item.signal_names:
+            signal = ZarrSignal(self.base_path, name, fs=self.fs)
+            ds = signal.fetch_as_xarray(sample.shot_id)
+            data = ds.data
+            time = ds.times.data
+            item = TimeSeriesData(time=time, values=data)
+            results[name] = item
+
+        return MultiVariateTimeSeriesData(values=results)
+
+
 DATA_LOADERS = {
     DataLoaderType.PARQUET: ParquetDataLoader,
+    DataLoaderType.IMAGE: ImageDataLoader,
     DataLoaderType.UDA: UDADataLoader,
     DataLoaderType.SAL: SALDataLoader,
-    DataLoaderType.IMAGE: ImageDataLoader,
+    DataLoaderType.TOKSEARCH: TokSearchDataLoader,
 }

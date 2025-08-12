@@ -21,6 +21,7 @@ class FileProtocol(str, Enum):
 class ShotProtocol(str, Enum):
     UDA = "uda"
     SAL = "sal"
+    TOKSEARCH = "toksearch"
 
 
 class FileData(BaseModel):

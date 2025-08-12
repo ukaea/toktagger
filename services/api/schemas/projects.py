@@ -18,9 +18,10 @@ class QueryStrategyType(str, Enum):
 
 class DataLoaderType(str, Enum):
     PARQUET = "parquet"
-    UDA = "uda"
-    SAL = "sal"
     IMAGE = "image"
+    SAL = "sal"
+    UDA = "uda"
+    TOKSEARCH = "toksearch"
 
 
 class ProjectIn(ConfiguredModel):

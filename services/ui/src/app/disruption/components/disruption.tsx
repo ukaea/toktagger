@@ -87,10 +87,12 @@ export const DisruptionView = ({
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
   };
 
+  console.log(data)
+
   const plotData: Partial<Plotly.PlotData>[] = [
     {
-      x: data.values["/pulse/87737/ppf/signal/jetppf/magn/ipla"].time,
-      y: data.values["/pulse/87737/ppf/signal/jetppf/magn/ipla"].values,
+      x: data.values["magnetics/ip"].time,
+      y: data.values["magnetics/ip"].values,
       line: {
         color: "black",
       },
