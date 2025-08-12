@@ -119,7 +119,7 @@ def main():
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
-    project_id = create_project("Local MHD Project", "MHD", "parquet")
+    project_id = create_project("Local MHD Project", "MHD", "tabular")
     create_local_samples(
         project_id, shot_ids, base_path=base_path / "mhd", columns=["mirnov"]
     )

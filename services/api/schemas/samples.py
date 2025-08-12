@@ -7,7 +7,11 @@ from services.api.schemas.annotations import AnnotationIn
 
 class FileType(str, Enum):
     CSV = "csv"
+    TSV = "tsv"
     PARQUET = "parquet"
+    FEATHER = "feather"
+    JSON = "json"
+    XLSX = "xlsx"
     MP4 = "mp4"
     PNG = "png"
     JPG = "jpg"

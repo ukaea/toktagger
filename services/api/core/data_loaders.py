@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import types
 import os
@@ -44,8 +45,8 @@ class ImageDataLoader(DataLoader):
         return ImageData(data=arr.tolist())
 
 
-class ParquetDataLoader(DataLoader):
-    """DataLoader for retrieving data using a folder of Parquet files"""
+class TabularDataLoader(DataLoader):
+    """DataLoader for retrieving data from a tabular file format (e.g., CSV, Parquet)"""
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         item: TimeSeriesFileData = sample.data
@@ -53,7 +54,24 @@ class ParquetDataLoader(DataLoader):
             raise FileNotFoundError(
                 f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
             )
-        df = pd.read_parquet(item.file_name, columns=item.column_names)
+
+        if item.file_name.endswith(".csv"):
+            df = pd.read_csv(item.file_name, usecols=item.column_names)
+        elif item.file_name.endswith(".tsv"):
+            df = pd.read_csv(item.file_name, sep="\t", usecols=item.column_names)
+        elif item.file_name.endswith(".parquet"):
+            df = pd.read_parquet(item.file_name, columns=item.column_names)
+        elif item.file_name.endswith(".json"):
+            df = pd.read_json(item.file_name, columns=item.column_names)
+        elif item.file_name.endswith(".xlsx"):
+            df = pd.read_excel(item.file_name, usecols=item.column_names)
+        elif item.file_name.endswith(".feather"):
+            df = pd.read_feather(item.file_name, columns=item.column_names)
+        else:
+            raise ValueError(
+                "Unsupported file format {}".format(Path(item.file_name).suffix)
+            )
+
         df = df.fillna(0)
         data = df.to_dict("list")
         time = df.index.values
@@ -141,7 +159,7 @@ class TokSearchDataLoader(DataLoader):
 
 
 DATA_LOADERS = {
-    DataLoaderType.PARQUET: ParquetDataLoader,
+    DataLoaderType.TABULAR: TabularDataLoader,
     DataLoaderType.IMAGE: ImageDataLoader,
     DataLoaderType.UDA: UDADataLoader,
     DataLoaderType.SAL: SALDataLoader,
