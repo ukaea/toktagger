@@ -4,6 +4,7 @@ import { useContextMenu } from "react-contexify";
 import * as d3 from "d3";
 import { useZoneContext, ZONE_MENU_ID } from "../providers/zone-provider";
 import { ToolingProps, Zone } from "@/types";
+import { useContextMenuProvider } from "../providers/annotation-provider";
 
 /**
  * Handles the rendering of zones onto a specific plot
@@ -22,6 +23,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
   // Hook to pull in data from context provider
   const { zones, handleZoneUpdate, handleZoneDragFinish, triggerUpdate } =
     useZoneContext();
+    const {disableToolingInteraction} = useContextMenuProvider()
 
   // Main rendering effect
   useEffect(() => {
@@ -95,6 +97,9 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
               d.x1 = x;
             }
             handleZoneUpdate();
+          })
+          .on("end", function (_event, _d) {
+            handleZoneDragFinish();
           });
         return resize;
       };
@@ -103,16 +108,18 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       const drag = d3
         .drag<SVGRectElement, Zone>()
         .on("start", function (event, d) {
-          dragOffset.current = xaxis.d2p(d.x0) - event.x;
+          const leftBoundary = Math.min(d.x0, d.x1)
+          dragOffset.current = xaxis.d2p(leftBoundary) - event.x;
         })
         .on("drag", function (event, d) {
           const newX = event.x + dragOffset.current;
           d3.select(this).attr("x", newX);
 
           const x0 = xaxis.p2d(newX);
-          const x1 = xaxis.p2d(newX + xaxis.d2p(d.x1) - xaxis.d2p(d.x0));
-          d.x0 = x0;
-          d.x1 = x1;
+          const x1 = xaxis.p2d(newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0)));
+                    const x0Left = d.x0 < d.x1
+          d.x0 = x0Left ? x0 : x1;
+          d.x1 = x0Left ? x1 : x0;
           handleZoneUpdate();
         })
         .on("end", function (_event, _d) {
@@ -120,28 +127,34 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         });
 
       function handleContextMenu(event: MouseEvent, zone: Zone) {
-        showZoneMenu({
-          event,
-          props: {
-            zone,
-          },
-        });
+          event.preventDefault(); // Prevent default context menu
+          const isRightClickEvent = (event.button === 2 && !event.ctrlKey);
+          if (isRightClickEvent) {
+              showZoneMenu({
+                  event,
+                  props: {
+                      zone,
+                  },
+              });
+          }
       }
 
       // Create the zone and transparent handles on each boundary
       for (const zone of zones) {
         const x0 = xaxis.d2p(zone.x0);
         const x1 = xaxis.d2p(zone.x1);
+                const x = Math.min(x0, x1)
+                const pointerEvent = disableToolingInteraction ? "none" : "all"
         graphGroup
           .append("rect")
-          .attr("class", "zone span cursor-grab disable-on-shift")
-          .attr("x", x0)
+          .attr("class", "zone span cursor-grab disable-on-modifier")
+          .attr("x", x)
           .attr("y", upperLimit)
-          .attr("width", x1 - x0)
+          .attr("width", Math.abs(x1 - x0))
           .attr("height", height)
           .attr("fill", zone.category.color)
           .attr("opacity", 0.5)
-          .attr("style", "pointer-events: all")
+          .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
           .datum(zone)
           .call(drag)
@@ -149,32 +162,32 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
         graphGroup
           .append("rect")
-          .attr("class", "zone leftHandle disable-on-shift")
+          .attr("class", "zone leftHandle disable-on-modifier")
           .attr("x", x0 - 10)
           .attr("y", upperLimit)
           .attr("width", 20)
           .attr("height", height)
           .attr("fill", "transparent")
-          .attr("style", "pointer-events: all")
+          .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
           .datum(zone)
           .call(getBoundaryHandler(true));
 
-        graphGroup
-          .append("rect")
-          .attr("class", "zone rightHandle disable-on-shift")
+        graphGroup.append("rect")
+          .attr("class", "zone rightHandle disable-on-modifier")
           .attr("x", x1 - 10)
           .attr("y", upperLimit)
           .attr("width", 20)
           .attr("height", height)
           .attr("fill", "transparent")
-          .attr("style", "pointer-events: all")
+          .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
           .datum(zone)
-          .call(getBoundaryHandler(false));
+          .call(getBoundaryHandler(false))
       }
     });
-  }, [handleZoneUpdate, plotId, plotReady, showZoneMenu, zones, triggerUpdate, forceUpdate, handleZoneDragFinish]);
+        
+  }, [handleZoneUpdate, plotId, plotReady, showZoneMenu, zones, triggerUpdate, forceUpdate, handleZoneDragFinish, disableToolingInteraction]);
 
-  return <div />;
-};
+    return <div />;
+}
