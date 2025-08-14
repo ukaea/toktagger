@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union
 from pydantic import BaseModel
 
 
@@ -23,7 +23,6 @@ class SpectrogramData(Data):
     time: list[float]
     frequency: list[float]
     amplitude: list[list[float]]
-    threshold_mask: list[list[float]]
 
 
 class ImageData(Data):

@@ -77,7 +77,12 @@ export const VSpanSchema = z.object({
 });
 export type VSpan = z.infer<typeof VSpanSchema>;
 
-export const DisplayAnnotationSchema = z.union([ZoneSchema, VSpanSchema]);
+export const SpectrogramMaskSchema = z.object({
+  values: z.array(z.array(z.number())),
+});
+export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
+
+export const DisplayAnnotationSchema = z.union([ZoneSchema, VSpanSchema, SpectrogramMaskSchema]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export const ProjectSchema = z.object({

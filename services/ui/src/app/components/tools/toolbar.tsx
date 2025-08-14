@@ -12,10 +12,7 @@ import {
   Item,
   Key,
   Switch,
-  Slider,
-  Text,
   Flex,
-  TextField,
   NumberField,
   ActionButton,
 } from '@adobe/react-spectrum'
@@ -205,6 +202,7 @@ type ColorMapPickerInfo = {
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
 };
+
 function ColorMapPicker({
   plotProps,
   setPlotProps,
@@ -239,18 +237,19 @@ function ColorMapPicker({
 }
 
 type ThresholdToolInfo = {
-  data: SpectrogramData;
-  viewParams: ViewParams;
-  setViewParams: (viewParams: ViewParams) => void;
+  project_id: string;
+  sample_id: string;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
+  setAnnotations: (annotations: Annotations) => void;
 };
+
 function ThresholdTool({
-  data,
-  viewParams,
-  setViewParams,
+  project_id,
+  sample_id,
   plotProps,
   setPlotProps,
+  setAnnotations,
 }: ThresholdToolInfo) {
   const [active, setActive] = useState(false);
   const [value, setValue] = useState(95);
@@ -270,12 +269,31 @@ function ThresholdTool({
   }
 
   useEffect(() => {
-    if (active) {
-      const params = SpectrogramViewParamsSchema.parse(viewParams);
-      params.threshold_value = value;
-      setViewParams(params);
-    }
-  }, [value, active])
+    const fetchData = async () => {
+      if (!active) {
+        setAnnotations([]);
+        return;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/threshold`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            percentile: value,
+          }),
+        }
+      );
+
+      const payload = await response.json();
+      setAnnotations(payload);
+    };
+
+    fetchData();
+  }, [project_id, sample_id, active, value]);
 
   return (
     <>
@@ -373,11 +391,11 @@ export default function ToolBar({
         />
         <hr className="m-4 h-px opacity-30 border-gray-200" />
         <ThresholdTool
-          data={mhdData.data}
-          viewParams={viewParams}
-          setViewParams={setViewParams}
+          project_id={project_id}
+          sample_id={sample_id}
           plotProps={plotProps}
           setPlotProps={setPlotProps}
+          setAnnotations={setAnnotations}
         />
       </>
     );

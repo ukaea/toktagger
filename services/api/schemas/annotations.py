@@ -47,4 +47,14 @@ class ModelAnnotation(AnnotationIn):
     uncertainty: float
 
 
-AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
+class SpectrogramMask(AnnotationIn):
+    values: list[list[float]]
+
+
+AnnotationTypes = Union[
+    TimePoint,
+    TimeRegion,
+    BoundingBox,
+    VideoBoundingBox,
+    SpectrogramMask,
+]

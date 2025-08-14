@@ -12,6 +12,8 @@ import {
   ZoneSchema,
   VSpanSchema,
   VSpan,
+  SpectrogramMaskSchema,
+  SpectrogramMask,
   PlotProps,
 } from "@/types";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
@@ -73,6 +75,8 @@ export const SpectrogramView = ({
     console.log('Threshold active:', plotProps.thresholdActive);
   }, [plotProps]);
 
+  console.log(annotations);
+
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
@@ -86,6 +90,9 @@ export const SpectrogramView = ({
   const vspans: VSpan[] = displayAnnotations
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
+  const mask: SpectrogramMask = displayAnnotations
+    .filter((x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success)
+    .map((x: DisplayAnnotation) => SpectrogramMaskSchema.parse(x))[0];
 
   const updateZones = (newZones: Array<Zone>) => {
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
@@ -104,7 +111,7 @@ export const SpectrogramView = ({
     console.log("Applying threshold mask to amplitude data");
     amplitude = data.amplitude.map((row: Array<number>, rowIndex: number) =>
       row.map((value: number, colIndex: number) => {
-        let maskValue = data.threshold_mask?.[rowIndex]?.[colIndex];
+        let maskValue = mask?.values[rowIndex]?.[colIndex];
         if (maskValue === undefined || maskValue === null) {
           maskValue = 1; // Default to 1 if mask value is undefined
         }

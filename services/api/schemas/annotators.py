@@ -2,8 +2,11 @@ from typing import List, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
 
+
 class AnnotatorIds(str, Enum):
     FIND_PEAKS = "find_peaks"
+    THRESHOLD = "threshold"
+
 
 class DataTypes(Enum):
     TIME_SERIES = "time_series"
@@ -25,4 +28,13 @@ class FindPeaksParams(Annotator):
 class TimeSeriesChangepoints(Annotator):
     penalty: int
 
-AnnotatorTypes = Union[FindPeaksParams, TimeSeriesChangepoints]
+
+class ThresholdParams(Annotator):
+    percentile: float
+
+
+AnnotatorTypes = Union[
+    FindPeaksParams,
+    TimeSeriesChangepoints,
+    ThresholdParams,
+]
