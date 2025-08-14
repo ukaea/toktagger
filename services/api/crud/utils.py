@@ -6,6 +6,7 @@ from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
 
+
 async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     obj_id = convert_to_objectid(project_id, "projects")
 
@@ -41,8 +42,7 @@ async def get_annotations(
     project_id: str,
     validated: Optional[bool] = None,
     sort_by: str = "_id",
-    sort_direction: Literal["ascending", "descending"] = "descending", 
-
+    sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
     count: Optional[int] = None,
 ) -> list[Annotation]:
@@ -62,22 +62,22 @@ async def get_annotations(
 
 
 async def get_samples(
-    db_client: MongoDBClient, 
-    project_id: str, 
-    shot_id: int,
-    sort_by: str = "_id", 
-    sort_direction: Literal["ascending", "descending"] = "descending", 
-    start: int = 0, 
-    count: Optional[int] = None
+    db_client: MongoDBClient,
+    project_id: str,
+    shot_id: Optional[int] = None,
+    sort_by: str = "_id",
+    sort_direction: Literal["ascending", "descending"] = "descending",
+    start: int = 0,
+    count: Optional[int] = None,
 ) -> list[Sample]:
     # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
-    
+
     filters = {"project_id": project_obj_id}
-    
+
     if shot_id:
         filters["shot_id"] = shot_id
 
