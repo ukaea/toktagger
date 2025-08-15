@@ -30,6 +30,8 @@ export const convertDisplayAnnotationToAnnotation = (
     const timeRegion: TimeRegion = {
       time_min: zone.x0,
       time_max: zone.x1,
+      created_by: zone.created_by,
+      type: "time_region",
       label: zone.category.name,
     };
     return timeRegion;
@@ -37,6 +39,8 @@ export const convertDisplayAnnotationToAnnotation = (
     const vspan = VSpanSchema.parse(annotation);
     const timePoint: TimePoint = {
       time: vspan.x,
+      created_by: vspan.created_by,
+      type: "time_point",
       label: vspan.category.name,
     };
     return timePoint;

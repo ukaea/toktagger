@@ -345,7 +345,7 @@ export const TimeSeries = ({
                 {React.Children.map(children, child => {
                     return (
                         React.isValidElement(child)
-                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools, selectedXRange, editMode: editMode.current })
+                        ? React.cloneElement(child, { plotId, plotReady, forceUpdate: updateTools, selectedXRange: selectedXRange, editMode: editMode.current })
                         : child
                     )
                 })}

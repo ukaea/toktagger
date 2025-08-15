@@ -104,6 +104,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                 x0,
                 x1,
                 created_by: 'manual',
+                type: 'time_region',
                 selected: false
             }
             handleZoneAdd(zone);
