@@ -1,8 +1,9 @@
 "use client";
 import { Annotations } from "@/types";
-import { ActionButton, Button, ButtonGroup, ToastQueue, Text, View } from "@adobe/react-spectrum";
+import { ActionButton, ButtonGroup, ToastQueue, Text, View } from "@adobe/react-spectrum";
 import { saveSampleAnnotations } from "../core";
 import { useRouter } from 'next/navigation';
+import { useEffect } from "react";
 import StepForward from '@spectrum-icons/workflow/StepForward';
 import StepBackward from '@spectrum-icons/workflow/StepBackward';
 import SaveFloppy from '@spectrum-icons/workflow/SaveFloppy';
@@ -37,7 +38,7 @@ type ButtonInfo = {
 function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
   const router = useRouter();
 
-  const handleClick = async () => {
+  const moveNextShot = async () => {
       await saveSampleAnnotations(project_id, sample_id, annotations);
       const sample = await getNextSample(project_id, sample_id);
       if (!sample) {
@@ -48,9 +49,22 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
       router.push(NEXT_SAMPLE_URL);
   };
 
+  useEffect(() => {
+    function handleKeyDown(e) {
+      // Check for Shift + Right Arrow
+      if (e.shiftKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        moveNextShot();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={handleClick}>
+      <ActionButton onPress={moveNextShot}>
         <StepForward />
       </ActionButton>
     </View>
@@ -60,7 +74,7 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
 function PreviousButton({ project_id, sample_id, annotations }: ButtonInfo) {
   const router = useRouter();
 
-  const handleClick = async () => {
+  const movePreviousShot = async () => {
       await saveSampleAnnotations(project_id, sample_id, annotations);
       const sample = await getPreviousSample(project_id, sample_id);
       if (!sample) {
@@ -71,9 +85,22 @@ function PreviousButton({ project_id, sample_id, annotations }: ButtonInfo) {
       router.push(NEXT_SAMPLE_URL);
   };
 
+  useEffect(() => {
+    function handleKeyDown(e) {
+      // Check for Shift + Left Arrow
+      if (e.shiftKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        movePreviousShot();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={handleClick}>
+      <ActionButton onPress={movePreviousShot}>
         <StepBackward />
       </ActionButton>
     </View>
