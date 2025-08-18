@@ -7,9 +7,9 @@ import pytest_asyncio
 @pytest_asyncio.fixture(scope="function")
 async def setup_db_for_filtering(db_client):
     await db_client.db["projects"].insert_one({"idx":1, "number": 10, "local": True})
-    asyncio.sleep(0.1)
+    await asyncio.sleep(0.1)
     await db_client.db["projects"].insert_one({"idx":2, "number": 30, "local": False})
-    asyncio.sleep(0.1)
+    await asyncio.sleep(0.1)
     await db_client.db["projects"].insert_one({"idx":3, "number": 20, "local": True})
     
 @pytest.mark.asyncio
