@@ -17,12 +17,12 @@ import asyncio
 from httpx import AsyncClient, ASGITransport
 import os
 
-# @pytest.fixture(scope="session")
-# def event_loop():
-#     loop = asyncio.new_event_loop()
-#     yield loop
-#     loop.close()
-
+@pytest.fixture(scope="function")
+def uda_env_vars():
+    os.environ.setdefault("UDA_HOST", "uda2.mast.l")
+    os.environ.setdefault("UDA_META_PLUGINNAME", "MASTU_DB")
+    os.environ.setdefault("UDA_METANEW_PLUGINNAME", "MAST_DB")
+    
 @pytest.fixture(scope="session")
 def mongo_container():
     with MongoDbContainer("mongo:latest") as mongo:

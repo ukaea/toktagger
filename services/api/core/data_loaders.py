@@ -63,11 +63,14 @@ class UDADataLoader(DataLoader):
 
         results = {}
         for name in item.signal_names:
-            signal = self.client.get(name, sample.shot_id)
-            data = signal.data
-            time = signal.time.data
-            item = TimeSeriesData(time=time, values=data)
-            results[name] = item
+            try:
+                signal = self.client.get(name, sample.shot_id)
+                data = signal.data
+                time = signal.time.data
+                item = TimeSeriesData(time=time, values=data)
+                results[name] = item
+            except Exception as e:
+                results[name] = None
 
         return MultiVariateTimeSeriesData(values=results)
 

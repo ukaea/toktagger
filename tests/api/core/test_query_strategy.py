@@ -38,7 +38,6 @@ async def test_random_strategy(setup_db, db_client):
     with pytest.raises(RuntimeError, match="No more samples to label!"):
         strategy_1.get_next_sample()
     
-    random.seed(43)
     strategy_2 = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
     returned_samples_2 = [strategy_2.get_next_sample() for i in range(len(samples))]
     
