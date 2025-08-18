@@ -61,7 +61,7 @@ async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
 async def get_samples(
     db_client: MongoDBClient, 
     project_id: str, 
-    shot_id: int,
+    shot_id: int = None,
     sort_by: str = "_id", 
     sort_direction: Literal["ascending", "descending"] = "descending", 
     start: int = 0, 

@@ -16,7 +16,7 @@ PROJECT_2 = ProjectIn(
         data_loader="parquet"
     )
 PROJECT_3 = ProjectIn(
-        name="test_project_2",
+        name="project_2",
         task="UFO",
         query_strategy="uncertainty",
         data_loader="image"

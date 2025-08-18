@@ -43,7 +43,7 @@ async def test_uncertainty_strategy(setup_db, db_client):
     samples = await db_client.get_filtered_documents("samples", sort_by="shot_id", sort_direction="ascending")
     annotations = await db_client.get_filtered_documents("annotations", sort_by="uncertainty", sort_direction="descending")
     
-    strategy = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
+    strategy = query_strategy.UncertaintyQueryStrategy(samples.copy(), annotations.copy())
     
     # Should return annotations 3, 5, 4 in that order
     # These correspond to samples 1, 4, 2

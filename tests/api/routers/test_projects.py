@@ -7,7 +7,7 @@ async def test_get_all_projects(api_client, setup_db):
     response = await api_client.get("/projects?sort_direction=ascending")
     assert response.status_code == 200
     returned_projects = response.json()
-    assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_1", "test_project_2"]
+    assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_1", "project_2"]
     assert [project['_id'] for project in returned_projects] == [setup_db["project_id_1"], setup_db["project_id_2"], setup_db["project_id_3"]]
     
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_get_all_projects_sortby(api_client, setup_db):
     # Default sort direction is descending, so will return the opposite of this: 0, 2, 1
     assert response.status_code == 200
     returned_projects = response.json()
-    assert [project['name'] for project in returned_projects] == ["test_project_0", "test_project_2", "test_project_1"]
+    assert [project['name'] for project in returned_projects] == ["test_project_0", "project_2", "test_project_1"]
     
 @pytest.mark.asyncio
 async def test_get_projects_start(api_client, setup_db):
@@ -28,7 +28,7 @@ async def test_get_projects_start(api_client, setup_db):
     assert response.status_code == 200
     returned_projects = response.json()
     assert len(returned_projects) == 2
-    assert [project['name'] for project in returned_projects] == ["test_project_1", "test_project_2"]
+    assert [project['name'] for project in returned_projects] == ["test_project_1", "project_2"]
     
 @pytest.mark.asyncio
 async def test_get_projects_count(api_client, setup_db):
