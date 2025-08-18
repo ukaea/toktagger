@@ -19,8 +19,9 @@ class MongoDBClient():
         self, 
         collection: typing.Literal["projects", "annotations", "models", "samples"], 
         model: pydantic.BaseModel, 
-        ids: dict = {}
+        ids: dict[str, ObjectId] | None = None
     ):
+        ids = ids or {}
         document = model.model_dump(mode="python")
         document.update(ids)
         result = await self.db[collection].insert_one(document)
@@ -30,8 +31,9 @@ class MongoDBClient():
         self, 
         collection: typing.Literal["projects", "annotations", "models", "samples"], 
         models: list[pydantic.BaseModel], 
-        ids: typing.Union[dict, list[dict]] = None
+        ids: typing.Union[dict, list[dict]] | None = None
     ):
+        ids = ids or {}
         documents = [model.model_dump(mode="python") for model in models]
         
         if type(ids) is list:
@@ -62,13 +64,13 @@ class MongoDBClient():
         self, 
         collection: typing.Literal["projects", "annotations", "models", "samples"], 
         filters: dict = {}, 
-        sort_by: str = "timestamp", 
+        sort_by: str = "_id", 
         sort_direction: typing.Literal["ascending", "descending"] = "descending", 
         start=0, 
         limit=0
     ):
-        project_documents = self.db[collection].find(filters).sort(sort_by, pymongo.ASCENDING if sort_direction == "ascending" else pymongo.DESCENDING).skip(start).limit(limit)
-        return await project_documents.to_list()
+        documents = self.db[collection].find(filters).sort(sort_by, pymongo.ASCENDING if sort_direction == "ascending" else pymongo.DESCENDING).skip(start).limit(limit)
+        return await documents.to_list()
     
     async def delete_filtered_documents(
         self, 
