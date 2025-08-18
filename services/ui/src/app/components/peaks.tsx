@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { Annotation, Annotations, MultiVariateTimeSeriesData } from '@/types';
-import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, RangeSlider} from '@adobe/react-spectrum'
+import { Annotation, MultiVariateTimeSeriesData } from '@/types';
+import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, RangeSlider, Switch} from '@adobe/react-spectrum'
 
 type PeakDetectionType = {
     project_id: string;
@@ -10,6 +10,7 @@ type PeakDetectionType = {
     setAnnotations: (annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])) => void;
 };
 export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations } : PeakDetectionType) {
+    const [isEnabled, setIsEnabled] = useState<boolean>(false);
     const [prominence, setProminance] = useState<number>(5);
     const [distance, setDistance] = useState<number>(1);
 
@@ -31,7 +32,7 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null || !(signalName in data.values)) {
+            if (signalName == null || !(signalName in data.values) || !isEnabled) {
                 return;
             }
 
@@ -58,12 +59,22 @@ export function PeakDetectionTool({ project_id, sample_id, data, setAnnotations 
 
         fetchData();
         
-    }, [prominence, distance, timeRange, signalName]);
+    }, [prominence, distance, timeRange, signalName, isEnabled]);
+
+    useEffect(() => {
+        if (!isEnabled) {
+            setAnnotations((previousAnnotations: Annotation[]) => {
+                const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'peak_detection');
+                return otherAnnotations;
+            });
+        }
+    }, [isEnabled]);
 
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
+                <Switch isSelected={isEnabled} onChange={setIsEnabled}>Enable Tool</Switch>
                 <ComboBox label='Signal Name' defaultInputValue={signalName ?? undefined} defaultItems={signalOptions} onInputChange={setSignalName}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>

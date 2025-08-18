@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import {Provider, defaultTheme, Slider, Flex, ComboBox, Item } from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, Switch } from '@adobe/react-spectrum'
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 
 
@@ -14,6 +14,7 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
     const methodOptions = [{id: 0, name: "pelt"}, {id: 1, name: "hmm"}];
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
 
+    const [isEnabled, setIsEnabled] = useState<boolean>(false);
     const [signalName, setSignalName] = useState<string | null>(null);
     const [penalty, setPenalty] = useState<number>(5);
     const [numPoints, setNumPoints] = useState<number>(500);
@@ -47,12 +48,23 @@ export function ChangePointDetectionTool({ project_id, sample_id, data, setAnnot
             });
         };
         fetchData();
-    }, [signalName, penalty, method, numPoints, numComponents]);
+    }, [signalName, penalty, method, numPoints, numComponents, isEnabled]);
+
+    useEffect(() => {
+        if (!isEnabled) {
+            setAnnotations((previousAnnotations: Annotation[]) => {
+                const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'change_point_detection');
+                return otherAnnotations;
+            });
+        }
+    }, [isEnabled]);
+
 
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
+                <Switch isSelected={isEnabled} onChange={setIsEnabled}>Enable Tool</Switch>
                 <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>

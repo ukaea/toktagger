@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import {Provider, defaultTheme, Slider, Flex, ComboBox, Item } from '@adobe/react-spectrum'
+import {Provider, defaultTheme, Slider, Flex, ComboBox, Item, Switch } from '@adobe/react-spectrum'
 import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
 
 type JumpDetectionType = {
@@ -10,6 +10,7 @@ type JumpDetectionType = {
 };
 
 export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations }: JumpDetectionType) {
+    const [isEnabled, setIsEnabled] = useState<boolean>(false);
     const [signalName, setSignalName] = useState<string| null>(null);
     const signalOptions = Object.keys(data.values).map((value, index)=> ({id: index, name: value}));
     const [threshold, setThreshold] = useState<number>(2);
@@ -19,7 +20,7 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
 
     useEffect(() => {
         const fetchData = async () => {
-            if (signalName == null || !(signalName in data.values)) {
+            if (signalName == null || !(signalName in data.values) || !isEnabled) {
                 return;
             }
 
@@ -44,13 +45,23 @@ export function JumpDetectionTool({ project_id, sample_id, data, setAnnotations 
             });
         };
         fetchData();
-    }, [signalName, minDistance, threshold, smoothingValue, numPoints]);
+    }, [signalName, minDistance, threshold, smoothingValue, numPoints, isEnabled]);
+
+    useEffect(() => {
+        if (!isEnabled) {
+            setAnnotations((previousAnnotations: Annotation[]) => {
+                const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== 'jump_detection');
+                return otherAnnotations;
+            });
+        }
+    }, [isEnabled]);
 
 
     return (
         <Provider theme={defaultTheme}>
             <div className='m-4'>
             <Flex direction="column">
+                <Switch isSelected={isEnabled} onChange={setIsEnabled}>Enable Tool</Switch>
                 <ComboBox label="Signal Name" defaultItems={signalOptions} onInputChange={setSignalName}>
                     {x => <Item>{x.name}</Item>}
                 </ComboBox>
