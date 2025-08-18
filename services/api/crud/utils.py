@@ -58,6 +58,8 @@ async def get_annotations(
         start=start,
         limit=count if count is not None else 0,
     )
+
+    annotations = [AnnotationTypes(**annotation) for annotation in annotations]
     return annotations
 
 

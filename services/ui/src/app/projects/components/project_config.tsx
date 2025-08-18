@@ -339,6 +339,13 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
       return shotId;
     });
 
+    for (let i = 0; i < shots.length; i++) {
+      const shot = shots[i];
+      if (Number.isNaN(shot)) {
+        throw new Error(`Invalid shot ID: ${shot} for file ${fileNames[i]}`);
+      }
+    }
+
     const dataInfo = {
       file_name: fileNames[0],
       type: options.file_type,
@@ -442,6 +449,7 @@ export const ProjectConfigEditor = ({project, onModify = (project: Project) => {
       const samples = buildSamples(dataLoaderOptions);
 
       const projectId = await createProject(project);
+      console.log(samples)
       await createSamples(projectId, samples);
       onModify(project);
   };
