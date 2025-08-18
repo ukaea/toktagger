@@ -2,7 +2,7 @@ import numpy as np
 import ruptures as rpt
 import hmmlearn.hmm as hmm
 from abc import ABC, abstractmethod
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, peak_widths
 from scipy.ndimage import uniform_filter1d, gaussian_filter
 from scipy.interpolate import interp1d
 
@@ -203,10 +203,12 @@ class PeakDetectionAnnotator(DataAnnotator):
             distance=self.params.distance,
         )
 
+        widths, _, _, _ = peak_widths(dalpha_detrend, peak_idx, rel_height=0.9)
+
         dt = np.abs(time[1] - time[0])
         regions = []
-        for w, idx in zip(params["widths"], peak_idx):
-            width = w * 3 * dt
+        for w, idx in zip(widths, peak_idx):
+            width = w * dt
             peak_time = time[idx]
             if peak_time >= tmin and peak_time <= tmax:
                 region = TimeRegion(
