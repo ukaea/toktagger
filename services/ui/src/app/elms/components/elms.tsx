@@ -1,12 +1,25 @@
-'use client'
-import { Annotations, MultiVariateTimeSeriesData, TimeRegion, Zone, Category, Annotation, DisplayAnnotation, ZoneSchema, TimeRegionSchema, ClassLabelSchema } from "@/types"
-import { ZoneProvider } from "@/app/components/providers/zone-provider"
-import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
-import { TimeSeries } from "@/app/components/plots/time-series"
-import { Zones } from "@/app/components/tools/zones"
-import 'react-contexify/ReactContexify.css';
-import Plotly from "plotly.js-dist";
-import { createAnnotationToDisplayAnnotationFunc, updateAnnotations } from "@/app/utils"
+"use client";
+import {
+  MultiVariateTimeSeriesData,
+  Zone,
+  Category,
+  DisplayAnnotation,
+  ZoneSchema,
+  TimeRegionSchema,
+  Annotations,
+  Annotation,
+} from "@/types";
+import { Plotly } from "react-plotly.js";
+import { ZoneProvider } from "@/app/components/providers/zone-provider";
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { TimeSeries } from "@/app/components/plots/time-series";
+import { Zones } from "@/app/components/tools/zones";
+import "react-contexify/ReactContexify.css";
+
+import {
+  createAnnotationToDisplayAnnotationFunc,
+  updateAnnotations,
+} from "@/app/utils";
 
 const zoneCategories: Category[] = [
     { name: "Peak", color: 'rgb(233, 170, 98)' },
