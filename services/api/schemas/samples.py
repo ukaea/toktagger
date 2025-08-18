@@ -10,6 +10,7 @@ class FileType(str, Enum):
     PARQUET = "parquet"
     MP4 = "mp4"
     PNG = "png"
+    JPG = "jpg"
 
 
 class FileProtocol(str, Enum):
@@ -34,7 +35,7 @@ class TimeSeriesFileData(FileData):
 
 class ImageFileData(FileData):
     frame: int
-    time: int
+    time: float
 
 
 class ShotData(BaseModel):

@@ -27,9 +27,7 @@ class ImageDataLoader(DataLoader):
         item: FileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
-        im = Image.open(item.file_name).resize(
-            (20, 10)
-        )  # TODO: Get rid of this temp resizing
+        im = Image.open(item.file_name)
         arr = np.asarray(im)
         return ImageData(data=arr.tolist())
 

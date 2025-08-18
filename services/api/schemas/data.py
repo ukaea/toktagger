@@ -33,7 +33,6 @@ DataResponseType = Union[
     Data,
     ImageData,
     MultiVariateTimeSeriesData,
-    ImageData,
     CompositeData,
     SpectrogramData,
 ]
