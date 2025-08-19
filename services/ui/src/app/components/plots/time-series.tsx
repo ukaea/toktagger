@@ -1,6 +1,6 @@
 "use client"
 
-import { useContextMenuProvider } from "@/app/components/providers/context-menu-provider"
+import { useContextMenuProvider } from "@/app/components/providers/annotation-provider"
 import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
 
@@ -43,10 +43,12 @@ export const TimeSeries = ({
 } : DisruptionPlotProps) => {
     const [updateTools, setUpdateTools] = useState(0)
     const [plotReady, setPlotReady] = useState(false)
+    const isDraggingRef = useRef(false)
+    const controlHeldRef = useRef(false);
 
     const plotId =  externalId || "disruption" // Facilitate an external or default ID
 
-    const {show: showContextMenu} = useContextMenuProvider()
+    const {show: showContextMenu, toolingCallbacks} = useContextMenuProvider()
     const showContextMenuRef = useRef(showContextMenu)
 
     const overplots: string[] = [];
@@ -153,24 +155,6 @@ export const TimeSeries = ({
         } 
         plot.on("plotly_relayout", relayoutHandler) // attach listener so it can be removed
         plot.on("plotly_doubleclick", rescale)
-
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Shift") {
-                const elements = plot.querySelectorAll(".disable-on-shift")
-                elements.forEach((element) => {
-                    element.setAttribute("style", "pointer-events: none")
-                })
-            }
-        })
-
-        document.addEventListener("keyup", (e) => {
-            if (e.key === "Shift") {
-                const elements = plot.querySelectorAll(".disable-on-shift")
-                elements.forEach((element) => {
-                    element.setAttribute("style", "pointer-events: all")
-                })
-            }
-        })
     };
 
 
@@ -193,10 +177,6 @@ export const TimeSeries = ({
         return () => { // cleanup on unmount / Fast-Refresh
             plotElement?.removeAllListeners?.("plotly_relayout"); // detach relayout listener
 
-            // detach key press listeners
-            plotElement?.removeAllListeners?.("keydown");
-            plotElement?.removeAllListeners?.("keyup");
-
             overplots.forEach(overplot => {
                 root?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
             })
@@ -213,6 +193,45 @@ export const TimeSeries = ({
         reload();
     }, [plotId, data]);
 
+    // Change drag mode based on tooling interactability
+    useEffect(() => {
+        if (!plotReady) {
+            // Plot may not have loaded yet - this will rerun after loading
+            return
+        }
+
+        const plot = document.getElementById(plotId)
+
+        if (!plot) {
+            console.error("Could not locate plot to set drag mode")
+            return
+        }
+
+        const disableInteraction = (event: KeyboardEvent) => {
+            if (event.key === "Control") {
+                if (!controlHeldRef.current) {
+                    controlHeldRef.current = true
+                    relayout(plot, {dragmode: false})
+                }
+            }
+        }
+
+        const enableInteraction = (event: KeyboardEvent) => {
+            if (event.key === "Control") {
+                controlHeldRef.current = false
+                relayout(plot, {dragmode: "pan"})
+            }
+        }
+
+        document.addEventListener("keydown", disableInteraction)
+        document.addEventListener("keyup", enableInteraction)
+
+        return () => {
+            document.removeEventListener("keydown", disableInteraction)
+            document.removeEventListener("keyup", enableInteraction)
+        }
+    }, [plotId, plotReady])
+
     // Handles context menu creation
     useEffect(() => {
         if (!plotReady) {
@@ -225,6 +244,21 @@ export const TimeSeries = ({
         if (!plot) {
             console.error("Could not locate plot to assign context menu")
             return
+        }
+
+        function getClickData(event: MouseEvent, plot): [number, number] {
+            const xaxis = plot._fullLayout.xaxis  // x-axis descriptor
+            const yaxis = plot._fullLayout.yaxis  // y-axis descriptor
+
+            const bb = (event.target as HTMLElement).getBoundingClientRect()
+            const relX = event.clientX - bb.left    // click X in pixels, relative to plot
+            const relY = event.clientY - bb.top       // click Y in pixels, relative to plot
+
+            // Coordinates in data space
+            const x      = xaxis.p2d(relX)   // data-space X at click
+            const y      = yaxis.p2d(relY)     // data-space Y at click
+
+            return [x, y]
         }
 
         /* 
@@ -289,7 +323,7 @@ export const TimeSeries = ({
 
         }
 
-        const dragElements = plot.querySelectorAll(".drag")
+        const dragElements = plot.querySelectorAll<HTMLDivElement>(".drag")
 
         if (dragElements.length === 0) {
             console.error("Could not locate drag element to assign context menu")
@@ -297,20 +331,63 @@ export const TimeSeries = ({
         }
 
         const contextHandler = (event: MouseEvent) => { //  wrap handler so we can remove it
-            handleContextMenu(event, plot)
-        } 
+            event.preventDefault(); // Prevent default context menu
+            const isRightClickEvent = (event.button === 2 && !event.ctrlKey);
+            if (isRightClickEvent) {
+                handleContextMenu(event, plot)
+            }
+        }
+
+        const startToolCreation = (event: MouseEvent) => {
+            if (toolingCallbacks && event.ctrlKey) {
+                isDraggingRef.current = true
+                const [x, y] = getClickData(event, plot)
+                toolingCallbacks.start(x, y)
+            }
+        }
+
+        // This is a backup listener in case the user lifts the control key first - this isn't ideal as a final update won't be sent
+        const cancelToolCreation = (event: KeyboardEvent) => {
+            if (event.key === "Control" && toolingCallbacks && isDraggingRef.current) {
+                isDraggingRef.current = false
+            }
+        }
+
+        const finishToolCreation = (event: MouseEvent) => {
+            if (toolingCallbacks && isDraggingRef.current) {
+                isDraggingRef.current = false
+                const [x, y] = getClickData(event, plot)
+                toolingCallbacks.end(x, y)
+            }
+        }
+
+        const updateTool = (event: MouseEvent) => {
+            if (toolingCallbacks && isDraggingRef.current) {
+                const [x, y] = getClickData(event, plot)
+                toolingCallbacks.move(x, y)
+            }
+        }
 
         dragElements.forEach((dragElement) => {
             dragElement.addEventListener("contextmenu", contextHandler) // add context-menu listener
+            dragElement.addEventListener("mousedown", startToolCreation)
+            dragElement.addEventListener("mouseup", finishToolCreation)
+            dragElement.addEventListener("mousemove", updateTool)
         })
+
+        document.addEventListener("keyup", cancelToolCreation)
 
         return () => { // remove listener on effect cleanup
             dragElements.forEach((dragElement) => {
                 dragElement.removeEventListener("contextmenu", contextHandler)
+                dragElement.removeEventListener("mousedown", startToolCreation)
+                dragElement.removeEventListener("mouseup", finishToolCreation)
+                dragElement.removeEventListener("mousemove", updateTool)
             })
+            document.removeEventListener("keyup", cancelToolCreation)
         }
 
-    }, [plotId, plotReady])
+    }, [plotId, plotReady, toolingCallbacks])
 
     return (
         <div className="w-full px-6 py-3 space-y-3 flex-col">

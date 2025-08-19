@@ -35,6 +35,7 @@ async def get_projects(
     
     return projects
 
+
 async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     obj_id = convert_to_objectid(project_id, "projects")
 
@@ -61,7 +62,7 @@ async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
 async def get_samples(
     db_client: MongoDBClient, 
     project_id: str, 
-    shot_id: int = None,
+    shot_id: Optional[int] = None,
     sort_by: str = "_id", 
     sort_direction: Literal["ascending", "descending"] = "descending", 
     start: int = 0, 
@@ -72,9 +73,9 @@ async def get_samples(
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
-    
+
     filters = {"project_id": project_obj_id}
-    
+
     if shot_id:
         filters["shot_id"] = shot_id
 

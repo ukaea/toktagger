@@ -10,7 +10,7 @@ import {
 } from "@/types";
 import { Plotly } from "react-plotly.js";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
-import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider";
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { TimeSeries } from "@/app/components/plots/time-series";
 import { Zones } from "@/app/components/tools/zones";
 import "react-contexify/ReactContexify.css";
