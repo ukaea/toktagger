@@ -32,7 +32,7 @@ jobs:
         run: uv sync
 
       - name: Run Ruff
-        run: uv run ruff check .
+        run: uv run ruff check services tests
 
   test:
     name: Pytest
