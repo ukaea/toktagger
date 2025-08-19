@@ -93,7 +93,7 @@ services:
       PORT: 3001
       NODE_ENV: development
       DATA_API_URL: "http://api_app:8002"
-      NEXT_PUBLIC_API_URL: "http://localhost:3001"
+      NEXT_PUBLIC_API_URL: ""
     volumes:
       - ./services/ui:/app
       - /app/node_modules

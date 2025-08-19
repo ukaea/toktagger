@@ -5,7 +5,7 @@ import { useZoneContext } from "@/app/components/providers/zone-provider"
 import { Category } from "@/types"
 import { JSX, useEffect, useState } from "react"
 
-export const LockedModeTable = () => {
+export const SpectrogramViewTable = () => {
     const [entries, setEntries] = useState<JSX.Element[]>([])
 
     const { zones, triggerUpdate: triggerZoneUpdate } = useZoneContext()

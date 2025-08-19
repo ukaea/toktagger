@@ -1,7 +1,7 @@
 "use client"
 
 import { TimeSeries } from "@/app/components/plots/time-series"
-import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider"
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { VSpans } from "@/app/components/tools/vspans"
@@ -39,7 +39,7 @@ export const TimeSeriesDemo = ({ data }: DisruptionInfo) => {
     const time = useRef(data.map(({ time }) => time));
     const value = useRef(data.map(({ value }) => value));
 
-    const plotData: Plotly.Data[] = [
+    const plotData: Partial<Plotly.PlotData>[] = [
         {
             x: time.current,
             y: value.current,

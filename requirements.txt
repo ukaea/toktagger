@@ -8,10 +8,12 @@ scipy
 pyarrow
 pymongo
 requests
-torch
-torchmetrics
+# torch
+# torchmetrics
 numpy
 scikit-learn
 celery[redis]
 pillow
 uda
+mkdocs
+mkdocs-material

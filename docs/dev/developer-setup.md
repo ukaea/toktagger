@@ -1,22 +1,3 @@
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-# Overview
-
-Below is a high level overview of the project structure:
-```
-.
-├── data                # Sample experimental data
-├── active_learning     # Experiments in active learning
-├── notebooks           # Notebooks for exploring data
-├── services            # Implementations of different apis/services
-│   ├── api             # API: backend for pulling data, annotations, running models.
-│   └── ui              # UI: the react front end of the application
-├── README.md           # This README doc
-└── docker-compose.yml  # Master docker compose for running the application
-```
-
-
 # Development Setup
 
 ## Installation
