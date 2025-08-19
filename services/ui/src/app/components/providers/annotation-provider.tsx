@@ -12,11 +12,12 @@ interface ContextMenuContextType {
     show: (params: MakeOptional<ShowContextMenuParams<unknown>, "id">) => void
     toolingCallbacks: ToolingCallbacks | null;
     disableToolingInteraction: boolean;
+    editMode: boolean;
 }
 
 const ContextMenuContext = createContext<ContextMenuContextType | null>(null);
 
-export const useContextMenuProvider = () => {
+export const useAnnotationProvider = () => {
     const context = useContext(ContextMenuContext);
     if (!context) {
         throw new Error("useRegisterContextMenuItem must be used within a ContextMenuProvider")
@@ -37,6 +38,7 @@ export const ContextMenuProvider = ({menuId, children} : {
     const {show} = useContextMenu({ id:  menuId})
     const [toolingCallbacksState, setToolingCallbacksState] = useState<ToolingCallbacks | null>(null);
     const [disableToolingInteraction, setDisableToolInteraction] = useState(false)
+    const [editMode, setEditMode] = useState(false)
 
     const keyHeldRef = useRef(false);
 
@@ -54,7 +56,7 @@ export const ContextMenuProvider = ({menuId, children} : {
     useEffect(() => {
         const disableInteraction = (event: KeyboardEvent) => {
             if (event.key === "Shift" || event.key === "Control") {
-                if (!keyHeldRef.current) {
+                if (!keyHeldRef.current || !disableToolingInteraction) {
                     keyHeldRef.current = true
                     setDisableToolInteraction(true)
                 }
@@ -64,19 +66,31 @@ export const ContextMenuProvider = ({menuId, children} : {
         const enableInteraction = (event: KeyboardEvent) => {
             if (event.key === "Shift" || event.key === "Control") {
                 keyHeldRef.current = false
+                if (editMode) {
                 setDisableToolInteraction(false)
+                }
+            }
+        }
+
+        const toggleEditMode = (event: KeyboardEvent) => {
+            if (event.key === "e") {
+                setDisableToolInteraction(editMode)
+                setEditMode((prev) => !prev)
             }
         }
 
         document.addEventListener("keydown", disableInteraction)
         document.addEventListener("keyup", enableInteraction)
 
+        document.addEventListener("keyup", toggleEditMode)
 
         return () => {
             document.removeEventListener("keydown", disableInteraction)
             document.removeEventListener("keyup", enableInteraction)
+
+            document.removeEventListener("keyup", toggleEditMode)
         }
-    }, [])
+    }, [disableToolingInteraction, editMode])
 
     const setToolingCallbacks = (callbacks: ToolingCallbacks) => {
 
