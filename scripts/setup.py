@@ -3,7 +3,7 @@ from typing import Optional
 import requests
 
 
-def create_project(name: str, task: str, data_loader: str) -> str:
+def create_project(name: str, task: str, data_loader: str, query_strategy: str) -> str:
     project = {
         "name": name,
         "task": task,
@@ -71,16 +71,16 @@ def main():
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
 
-    project_id = create_project("UDA Disruption Project", "disruption", "uda")
+    project_id = create_project("UDA Disruption Project", "disruption", "uda", "random")
     create_uda_samples(project_id, shot_ids)
 
-    project_id = create_project("Local ELM Project", "ELM", "parquet")
+    project_id = create_project("Local ELM Project", "ELM", "parquet", "random")
     create_local_samples(project_id, shot_ids, base_path="/data/test/summary", file_type="parquet")
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
-    project_id = create_project("Local MHD Project", "MHD", "parquet")
+    project_id = create_project("Local MHD Project", "MHD", "parquet", "random")
     create_local_samples(
         project_id, shot_ids, base_path="/data/test/mhd", file_type="parquet", signals=["mirnov"]
     )

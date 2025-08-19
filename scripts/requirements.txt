@@ -8,3 +8,4 @@ netCDF4
 pyarrow
 scipy
 requests
+torch
