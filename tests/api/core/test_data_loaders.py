@@ -47,6 +47,11 @@ def test_parquet_file_loader():
     assert len(numpy.where(numpy.isclose(ip_values, 1000))[0]) == 4
     
 def test_uda_loader(uda_env_vars):
+    try:
+        import pyuda
+        pyuda.Client().get("help::help()")
+    except Exception:
+        pytest.skip("Could not contact UDA server")
 
     uda_shot = ShotData(protocol="uda", signal_names=["ip", "ANE_DENSITY"])
     sample = Sample(shot_id=14892, data=uda_shot, _id="test", project_id="test")
@@ -65,6 +70,12 @@ def test_uda_loader(uda_env_vars):
     assert numpy.max(times) < 1.5
     
 def test_uda_loader_data_doesnt_exist(uda_env_vars):
+    try:
+        import pyuda
+        pyuda.Client().get("help::help()")
+    except Exception:
+        pytest.skip("Could not contact UDA server")
+        
     uda_shot = ShotData(protocol="uda", signal_names=["doesnt_exist"])
     sample = Sample(shot_id=10000, data=uda_shot, _id="test", project_id="test")
     data_loader = data_loaders.UDADataLoader()
