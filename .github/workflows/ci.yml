@@ -8,7 +8,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  lint:
+    name: Ruff Lint
     runs-on: ubuntu-latest
 
     strategy:
@@ -16,21 +17,45 @@ jobs:
         python-version: [3.11]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+      - name: Install uv
+        run: pip install uv
 
-    - name: Run Ruff
-      run: ruff check .
+      - name: Install dependencies (with dev extras)
+        run: uv sync
 
-    - name: Run tests
-      run: pytest --maxfail=1 --disable-warnings -q
+      - name: Run Ruff
+        run: ruff check .
+
+  test:
+    name: Pytest
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies (with dev extras)
+        run: uv sync
+
+      - name: Run tests
+        run: pytest
