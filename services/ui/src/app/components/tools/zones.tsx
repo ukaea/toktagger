@@ -92,7 +92,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       // Prevents a little bit of repetition by auto-configuring the resize handler
       const getBoundaryHandler = (isLeft: boolean) => {
         // Handles the dragging of the boundaries of the zone
-                const resize = d3
+        const resize = d3
           .drag<SVGRectElement, Zone>()
           .on("drag", function (event, d) {
             // allow wrapping while dragging (no clamp here)
