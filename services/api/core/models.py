@@ -2,7 +2,7 @@
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation, AnnotationIn, TimePoint
 from services.api.schemas.projects import Project
-from services.api.schemas.data import Data, TimeSeriesData
+from services.api.schemas.data import TimeSeriesData
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.schemas.models import ModelUpdate
 
@@ -12,10 +12,11 @@ from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 from abc import ABC, abstractmethod
 import torch.nn as nn
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 import typing
 from services.api.crud.db import MongoDBClient
 from bson.objectid import ObjectId
+import math
 
 class Model(ABC):
     def __init__(
@@ -30,9 +31,12 @@ class Model(ABC):
         
         if len(samples) != len(annotations):
             raise ValueError("Annotations missing for some samples!")
-        if not abs(sum(train_val_test_split) - 1) < 1e-8:
+        if not math.isclose(sum(train_val_test_split), 1):
             raise ValueError("Ratios in train_val_test split must sum to 1!")
-        if not train_val_test_split[0]:
+        
+        train_fraction, val_fraction, test_fraction = train_val_test_split
+        
+        if train_fraction == 0:
             raise ValueError("Must be samples in the training set!")
         
         self.db_client = db_client
@@ -41,7 +45,7 @@ class Model(ABC):
         self.model = self._define_model()
         
         # If train ratio is 1, no splitting required, just set train sets and return
-        if train_val_test_split[0] == 1:
+        if train_fraction == 1:
             self.train_samples = samples
             self.train_annotations = annotations
             self.val_samples = None
@@ -54,20 +58,20 @@ class Model(ABC):
         train_samples, val_test_samples, train_annotations, val_test_annotations = train_test_split(
             samples, 
             annotations, 
-            test_size=train_val_test_split[1] + train_val_test_split[2]
+            test_size=val_fraction + test_fraction
             )
         self.train_samples = train_samples
         self.train_annotations = train_annotations
         
         # If no validation split requested, return test set
-        if not train_val_test_split[1]:
+        if not val_fraction:
             self.val_samples = None
             self.val_annotations = None
             self.test_samples = val_test_samples
             self.test_annotations = val_test_annotations
         
         # If no test split requested, return val set
-        elif not train_val_test_split[2]:
+        elif not test_fraction:
             self.val_samples = val_test_samples
             self.val_annotations = val_test_samples
             self.test_samples = None
@@ -78,7 +82,7 @@ class Model(ABC):
             self.val_samples, self.test_samples, self.val_annotations, self.test_annotations = train_test_split(
                 val_test_samples, 
                 val_test_annotations, 
-                test_size= train_val_test_split[2] / (train_val_test_split[1] + train_val_test_split[2])
+                test_size= test_fraction / (val_fraction + test_fraction)
                 )
     
     async def _update_progress(self, progress: float):
