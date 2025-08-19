@@ -31,7 +31,8 @@ Tests that functionality such as the annotators, data loaders and query strategi
 
  You can get a smaller version of the database which is useful for some tests by using the fixture `setup_db_small`. This just instantiates one project, sample and annotation.
 
- ### API Code
+### API Code
+
  Tests are written which check the functionality of each API endpoint. These use a test API client provided by `httpx`. Note that we cannot use `fastapi`'s `TestClient` as this does not work properly in asynchronous mode which is required for the `MongoDBClient` to work.
 
  To use this, add the fixture `api_client` to your tests. Use this in the same way you would use the `requests` library, eg by using `api_client.post(url=..., json=...)`. This will automatically connect to the database client so that queries work correctly. You can still also use the fixtures `setup_db` or `setup_db_small` to create objects in the database for the API to query.
