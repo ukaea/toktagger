@@ -23,6 +23,7 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
+import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 const disruptionCategories: Category[] = [
   { name: "Disruption", color: "rgb(255, 0, 0)" },
@@ -137,7 +138,6 @@ export const DisruptionView = ({
   };
 
   return (
-    <div className="flex flex-col items-center space-y-3">
       <ContextMenuProvider menuId="disruption-menu">
         <VSpanProvider
           categories={disruptionCategories}
@@ -149,17 +149,21 @@ export const DisruptionView = ({
             initialData={zones}
             onModifyZone={updateZones}
           >
-            <TimeSeries
-              plotId="Disruption"
-              plotConfig={{ data: plotData, layout: plotLayout }}
-            >
-              <Zones onZoneUpdate={updateZones} />
-              <VSpans onZoneUpdate={updateVSpans} />
-            </TimeSeries>
-            <DisruptionTable />
+            <div className="flex gap-4">
+              <div className="flex-1 flex-col items-center space-y-3">
+                <TimeSeries
+                  plotId="Disruption"
+                  plotConfig={{ data: plotData, layout: plotLayout }}
+                >
+                  <Zones onZoneUpdate={updateZones} />
+                  <VSpans onZoneUpdate={updateVSpans} />
+                </TimeSeries>
+                <DisruptionTable />
+              </div>
+              <AnnotationToolbar />
+            </div>
           </ZoneProvider>
         </VSpanProvider>
       </ContextMenuProvider>
-    </div>
   );
 };

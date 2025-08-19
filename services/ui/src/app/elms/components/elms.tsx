@@ -19,6 +19,7 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
+import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 const zoneCategories: Category[] = [
   { name: "ELM", color: "rgb(233, 170, 98)" },
@@ -227,12 +228,15 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
             initialData={zones}
             onModifyZone={updateZones}
           >
-            <TimeSeries
-              plotId="ELMs"
-              plotConfig={{ data: plotData, layout: plotLayout }}
-            >
-              <Zones onZoneUpdate={updateZones} />
-            </TimeSeries>
+            <div className="flex gap-4">
+              <TimeSeries
+                plotId="ELMs"
+                plotConfig={{ data: plotData, layout: plotLayout }}
+              >
+                <Zones onZoneUpdate={updateZones} />
+              </TimeSeries>
+              <AnnotationToolbar />
+            </div>
           </ZoneProvider>
         </ContextMenuProvider>
       </div>
