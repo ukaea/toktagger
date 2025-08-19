@@ -1,18 +1,15 @@
 import os
 import redis
 from celery import Celery
-from sklearn.model_selection import train_test_split
 from services.api.crud.db import MongoDBClient
 from bson.objectid import ObjectId
 import asyncio
 from services.api.crud import utils
-from services.api.core.models import MODELS, DisruptionCNN
-from services.api.core.data_loaders import DATA_LOADERS
-from services.api.core.views import DATA_VIEWS
-from services.api.schemas.projects import Project, Task
+from services.api.core.models import MODELS
+from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate
-from services.api.schemas.annotations import Annotation, AnnotationTypes, TimePoint
-from services.api.schemas.models import ModelIn, Model, ModelUpdate
+from services.api.schemas.annotations import AnnotationTypes
+from services.api.schemas.models import Model, ModelUpdate
 import pathlib
 import itertools
 from pydantic import TypeAdapter
