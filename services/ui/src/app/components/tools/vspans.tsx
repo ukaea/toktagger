@@ -4,7 +4,7 @@ import { useContextMenu } from "react-contexify";
 import * as d3 from "d3"
 import { useVSpanContext, VSPAN_MENU_ID } from "../providers/vpsan-provider";
 import { ToolingProps, VSpan } from "@/types";
-import { useContextMenuProvider } from "../providers/annotation-provider";
+import { useAnnotationProvider } from "../providers/annotation-provider";
 
 /**
  * Handles the rendering of VSpans onto a specific plot
@@ -19,7 +19,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
     const {show: showVSpanMenu} = useContextMenu({
         id: VSPAN_MENU_ID
     })
-    const {disableToolingInteraction} = useContextMenuProvider()
+    const {disableToolingInteraction} = useAnnotationProvider()
 
     // Hook to pull in data from context provider
     const {vspans, handleVSpanUpdate, handleVSpanDragFinish, triggerUpdate} = useVSpanContext()

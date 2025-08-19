@@ -4,7 +4,7 @@ import { useContextMenu } from "react-contexify";
 import * as d3 from "d3";
 import { useZoneContext, ZONE_MENU_ID } from "../providers/zone-provider";
 import { ToolingProps, Zone } from "@/types";
-import { useContextMenuProvider } from "../providers/annotation-provider";
+import { useAnnotationProvider } from "../providers/annotation-provider";
 
 /**
  * Handles the rendering of zones onto a specific plot
@@ -23,7 +23,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
   // Hook to pull in data from context provider
   const { zones, handleZoneUpdate, handleZoneDragFinish, triggerUpdate } =
     useZoneContext();
-    const {disableToolingInteraction} = useContextMenuProvider()
+    const {disableToolingInteraction} = useAnnotationProvider()
 
   // Main rendering effect
   useEffect(() => {

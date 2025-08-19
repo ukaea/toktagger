@@ -1,6 +1,6 @@
 "use client"
 
-import { useContextMenuProvider } from "@/app/components/providers/annotation-provider"
+import { useAnnotationProvider } from "@/app/components/providers/annotation-provider"
 import { Config, Layout, PlotData, relayout, PlotRelayoutEvent } from "plotly.js"
 import React, { useEffect, useRef, useState } from "react"
 
@@ -48,7 +48,7 @@ export const TimeSeries = ({
 
     const plotId =  externalId || "disruption" // Facilitate an external or default ID
 
-    const {show: showContextMenu, toolingCallbacks} = useContextMenuProvider()
+    const {show: showContextMenu, toolingCallbacks} = useAnnotationProvider()
     const showContextMenuRef = useRef(showContextMenu)
 
     const overplots: string[] = [];

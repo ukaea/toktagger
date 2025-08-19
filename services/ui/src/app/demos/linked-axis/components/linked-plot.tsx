@@ -1,6 +1,6 @@
 "use client"
 
-import { useContextMenuProvider } from '@/app/components/providers/annotation-provider'
+import { useAnnotationProvider } from '@/app/components/providers/annotation-provider'
 import { VSpans } from '@/app/components/tools/vspans'
 import { Zones } from '@/app/components/tools/zones'
 import { useEffect, useRef, useState } from 'react'
@@ -16,7 +16,7 @@ export const LinkedPlot = () => {
 
     const plotId = "linked"
 
-    const {show: showContextMenu} = useContextMenuProvider()
+    const {show: showContextMenu} = useAnnotationProvider()
     const showContextMenuRef = useRef(showContextMenu)
 
     const triggerToolUpdate = () => {
