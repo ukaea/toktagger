@@ -1,6 +1,4 @@
 import pytest
-import asyncio
-from bson.objectid import ObjectId
 
 @pytest.mark.asyncio
 async def test_get_all_projects(api_client, setup_db):

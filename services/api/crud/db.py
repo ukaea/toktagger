@@ -1,5 +1,4 @@
 import pymongo
-import os
 import pydantic
 import typing
 from bson.objectid import ObjectId

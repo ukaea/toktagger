@@ -1,200 +1,254 @@
 import pytest
-import asyncio
 from bson.objectid import ObjectId
+
 
 @pytest.mark.asyncio
 async def test_get_all_annotations(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?sort_direction=ascending")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?sort_direction=ascending"
+    )
     assert response.status_code == 200
     returned_annotations = response.json()
-    assert [annotation['_id'] for annotation in returned_annotations] == [setup_db["annotation_id_1"], setup_db["annotation_id_2"], setup_db["annotation_id_3"]]
-    
+    assert [annotation["_id"] for annotation in returned_annotations] == [
+        setup_db["annotation_id_1"],
+        setup_db["annotation_id_2"],
+        setup_db["annotation_id_3"],
+    ]
+
+
 @pytest.mark.asyncio
 async def test_get_all_annotations_sortby(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?sort_by=label")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?sort_by=label"
+    )
     # Should sort by label
     # So 'annotation' (annotation 1), then 'disruption' (annotation 3) then 'ramp_up' (annotation 2)
     # Default sort direction is descending, so will return the opposite of this: 2, 3, 1
     assert response.status_code == 200
     returned_annotations = response.json()
-    assert [annotation['label'] for annotation in returned_annotations] == ['ramp_up', 'disruption', 'annotation']
-    assert [annotation['_id'] for annotation in returned_annotations] == [setup_db["annotation_id_2"], setup_db["annotation_id_3"], setup_db["annotation_id_1"]]
-    
+    assert [annotation["label"] for annotation in returned_annotations] == [
+        "ramp_up",
+        "disruption",
+        "annotation",
+    ]
+    assert [annotation["_id"] for annotation in returned_annotations] == [
+        setup_db["annotation_id_2"],
+        setup_db["annotation_id_3"],
+        setup_db["annotation_id_1"],
+    ]
+
+
 @pytest.mark.asyncio
 async def test_get_annotations_start(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=1&sort_direction=ascending")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=1&sort_direction=ascending"
+    )
     # Should return 2 annotations
     assert response.status_code == 200
     returned_annotations = response.json()
     assert len(returned_annotations) == 2
-    assert [sample['_id'] for sample in returned_annotations] == [setup_db["annotation_id_2"], setup_db["annotation_id_3"]]
-    
+    assert [sample["_id"] for sample in returned_annotations] == [
+        setup_db["annotation_id_2"],
+        setup_db["annotation_id_3"],
+    ]
+
+
 @pytest.mark.asyncio
 async def test_get_annotations_count(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?count=2&sort_direction=ascending")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?count=2&sort_direction=ascending"
+    )
     # Should return 2 samples
     assert response.status_code == 200
     returned_annotations = response.json()
     assert len(returned_annotations) == 2
-    assert [annotation['_id'] for annotation in returned_annotations] == [setup_db["annotation_id_1"], setup_db["annotation_id_2"]]
-    
+    assert [annotation["_id"] for annotation in returned_annotations] == [
+        setup_db["annotation_id_1"],
+        setup_db["annotation_id_2"],
+    ]
+
+
 @pytest.mark.asyncio
 async def test_get_annotations_start_count(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=1&count=1&sort_direction=ascending")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=1&count=1&sort_direction=ascending"
+    )
     # Should return 1 annotation
     assert response.status_code == 200
     returned_annotations = response.json()
     assert len(returned_annotations) == 1
-    assert [annotation['_id'] for annotation in returned_annotations] == [setup_db["annotation_id_2"]]
-    
+    assert [annotation["_id"] for annotation in returned_annotations] == [
+        setup_db["annotation_id_2"]
+    ]
+
+
 @pytest.mark.asyncio
 async def test_get_annotations_invalid_start(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=10")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=10"
+    )
     # Should return 0 projects
     assert response.status_code == 200
     returned_annotations = response.json()
     assert len(returned_annotations) == 0
-    
+
+
 @pytest.mark.asyncio
 async def test_get_annotations_validated(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?validated=true&sort_direction=ascending")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?validated=true&sort_direction=ascending"
+    )
     # Should return 2 annotations
     assert response.status_code == 200
     returned_annotations = response.json()
     assert len(returned_annotations) == 2
-    assert [annotation['_id'] for annotation in returned_annotations] == [setup_db["annotation_id_1"], setup_db["annotation_id_2"]]
-    assert all([annotation['validated'] for annotation in returned_annotations])
-    
+    assert [annotation["_id"] for annotation in returned_annotations] == [
+        setup_db["annotation_id_1"],
+        setup_db["annotation_id_2"],
+    ]
+    assert all([annotation["validated"] for annotation in returned_annotations])
+
+
 @pytest.mark.asyncio
 async def test_get_annotations_unvalidated(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?validated=false&sort_direction=ascending")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?validated=false&sort_direction=ascending"
+    )
     # Should return 1 annotation
     assert response.status_code == 200
     returned_annotations = response.json()
     assert len(returned_annotations) == 1
-    assert returned_annotations[0]['_id'] == setup_db["annotation_id_3"]
-    assert returned_annotations[0]['validated'] == False
-    
+    assert returned_annotations[0]["_id"] == setup_db["annotation_id_3"]
+    assert not returned_annotations[0]["validated"]
+
+
 @pytest.mark.asyncio
 async def test_get_annotation(api_client, setup_db):
-    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=1&count=1&sort_direction=ascending")
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?start=1&count=1&sort_direction=ascending"
+    )
     assert response.status_code == 200
     returned_annotation = response.json()[0]
     # Check info matches what we created the entry with
     assert returned_annotation.get("time_min") == 0.1
     assert returned_annotation.get("time_max") == 0.2
     assert returned_annotation.get("label") == "ramp_up"
-    assert returned_annotation.get("validated") == True
-    
+    assert returned_annotation.get("validated")
+
     # Then also check ID and timestamp are returned - should have been added automatically
-    assert returned_annotation.get("_id") == setup_db['annotation_id_2']
-    assert returned_annotation.get("project_id") == setup_db['project_id_1']
-    assert returned_annotation.get("sample_id") == setup_db['sample_id_1']
+    assert returned_annotation.get("_id") == setup_db["annotation_id_2"]
+    assert returned_annotation.get("project_id") == setup_db["project_id_1"]
+    assert returned_annotation.get("sample_id") == setup_db["sample_id_1"]
     assert returned_annotation.get("timestamp")
-    
+
+
 @pytest.mark.asyncio
 async def test_delete_all_annotations(api_client, setup_db, db_client):
-    response = await api_client.delete(f"/projects/{setup_db['project_id_1']}/annotations")
+    response = await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/annotations"
+    )
     assert response.status_code == 200
-    
+
     # Check annotations for this project have ALL been deleted
     # But annotations for other samples and projects still exist
     annotations = await db_client.get_all_documents("annotations")
     assert len(annotations) == 1
-    assert str(annotations[0]["project_id"]) == setup_db['project_id_2']
-    
+    assert str(annotations[0]["project_id"]) == setup_db["project_id_2"]
+
     # Check that sample associated with these annotations has NOT been deleted
     samples = await db_client.get_all_documents("samples")
     assert len(samples) == 4
     # Check sample with above ID is in database
-    assert setup_db['sample_id_1'] in [str(sample.get("_id")) for sample in samples]
-    
+    assert setup_db["sample_id_1"] in [str(sample.get("_id")) for sample in samples]
+
     # Check that project assocaited with these annotations has NOT been deleted
     projects = await db_client.get_all_documents("projects")
     assert len(projects) == 3
     # Check project with above ID is in database
-    assert setup_db['project_id_1'] in [str(project.get("_id")) for project in projects]
-    
+    assert setup_db["project_id_1"] in [str(project.get("_id")) for project in projects]
+
+
 @pytest.mark.asyncio
 async def test_delete_sample_annotations(api_client, setup_db, db_client):
-    response = await api_client.delete(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations")
+    response = await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations"
+    )
     assert response.status_code == 200
-    
+
     # Check annotations for this sample have been deleted
     # But annotations for other samples and projects still exist
     annotations = await db_client.get_all_documents("annotations")
     assert len(annotations) == 2
-    assert setup_db['sample_id_1'] not in [annotation.get("sample_id") for annotation in annotations]
-    
+    assert setup_db["sample_id_1"] not in [
+        annotation.get("sample_id") for annotation in annotations
+    ]
+
     # Check that sample associated with these annotations has NOT been deleted
     samples = await db_client.get_all_documents("samples")
     assert len(samples) == 4
     # Check sample with above ID is in database
-    assert setup_db['sample_id_1'] in [str(sample.get("_id")) for sample in samples]
-    
+    assert setup_db["sample_id_1"] in [str(sample.get("_id")) for sample in samples]
+
     # Check that project assocaited with these annotations has NOT been deleted
     projects = await db_client.get_all_documents("projects")
     assert len(projects) == 3
     # Check project with above ID is in database
-    assert setup_db['project_id_1'] in [str(project.get("_id")) for project in projects]
+    assert setup_db["project_id_1"] in [str(project.get("_id")) for project in projects]
 
 
 @pytest.mark.asyncio
 async def test_create_annotations(api_client, setup_db, db_client):
     in_annotations = [
-        {
-            "label": "ramp_up",
-            "time_min": 0.1,
-            "time_max": 0.2,
-            "validated": True
-        },
-        {
-            "label": "flat_top",
-            "time_min": 0.2,
-            "time_max": 0.5,
-            "validated": True
-        },
-        {
-            "label": "disruption",
-            "time": 0.5,
-            "validated": True
-        }
+        {"label": "ramp_up", "time_min": 0.1, "time_max": 0.2, "validated": True},
+        {"label": "flat_top", "time_min": 0.2, "time_max": 0.5, "validated": True},
+        {"label": "disruption", "time": 0.5, "validated": True},
     ]
-    response = await api_client.put(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_3']}/annotations", json=in_annotations)
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_3']}/annotations",
+        json=in_annotations,
+    )
     assert response.status_code == 200
-        
+
     # Check they have been added to database
     annotations = await db_client.get_all_documents("annotations")
     assert len(annotations) == 8
-    db_annotations = await db_client.get_filtered_documents("annotations", filters={"sample_id": ObjectId(setup_db['sample_id_3'])})
+    db_annotations = await db_client.get_filtered_documents(
+        "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_3"])}
+    )
     for in_annotation in in_annotations:
         # Find annotation with that label
-        db_annotation = next(annotation for annotation in db_annotations if annotation['label'] == in_annotation['label'])
+        db_annotation = next(
+            annotation
+            for annotation in db_annotations
+            if annotation["label"] == in_annotation["label"]
+        )
         for key, value in in_annotation.items():
             assert db_annotation[key] == value
-        
+
         assert db_annotation.get("timestamp")
         assert db_annotation.get("_id")
-        assert str(db_annotation.get("project_id")) == setup_db['project_id_1']
-        assert str(db_annotation.get("sample_id")) == setup_db['sample_id_3']
+        assert str(db_annotation.get("project_id")) == setup_db["project_id_1"]
+        assert str(db_annotation.get("sample_id")) == setup_db["sample_id_3"]
+
 
 @pytest.mark.asyncio
 async def test_create_annotation_invalid(api_client, setup_db, db_client):
     in_annotations = [
-        {
-            "time": 5.2,
-            "validated": "validated"
-        },
+        {"time": 5.2, "validated": "validated"},
     ]
-    response = await api_client.put(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_3']}/annotations", json=in_annotations)
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_3']}/annotations",
+        json=in_annotations,
+    )
     assert response.status_code == 422
-    errors = response.json().get('detail', [])
+    errors = response.json().get("detail", [])
     # Should flag that label is missing, validated is wrong type
     # It will also flag validation errors from all other possible 'annotation' schemas since none validated correctly...
     assert len(errors) >= 2
-    
+
     # Check it has not been added to database
     annotations = await db_client.get_all_documents("annotations")
     assert len(annotations) == 5
-    assert setup_db["sample_id_3"] not in [annotation["sample_id"] for annotation in annotations]
-    
+    assert setup_db["sample_id_3"] not in [
+        annotation["sample_id"] for annotation in annotations
+    ]

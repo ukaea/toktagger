@@ -1,6 +1,4 @@
 import pytest
-import asyncio
-from bson.objectid import ObjectId
 
 @pytest.mark.asyncio
 async def test_annotators_invalid_type(api_client, setup_db):

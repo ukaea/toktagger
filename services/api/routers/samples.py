@@ -194,7 +194,7 @@ async def get_next_sample(
     )
     try:
         sample = data_pool.query_strategy.get_next_sample()
-    except RuntimeError as e:
+    except RuntimeError:
         raise HTTPException(status_code=204, detail="No more samples available!")
 
     return sample

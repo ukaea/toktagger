@@ -1,4 +1,3 @@
-from typing import Union
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
@@ -69,7 +68,7 @@ class UDADataLoader(DataLoader):
                 time = signal.time.data
                 item = TimeSeriesData(time=time, values=data)
                 results[name] = item
-            except Exception as e:
+            except Exception:
                 results[name] = None
 
         return MultiVariateTimeSeriesData(values=results)

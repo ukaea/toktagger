@@ -5,7 +5,6 @@ from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import Annotation, AnnotationIn
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
-from bson.objectid import ObjectId
 
 async def get_projects(
     db_client: MongoDBClient, 

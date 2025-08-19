@@ -3,7 +3,6 @@ import pytest
 import random
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import TimePointOut
-from pydantic import TypeAdapter
 import tests.db_definitions as db_definitions
 
 @pytest.fixture

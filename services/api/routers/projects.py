@@ -8,7 +8,6 @@ from services.api.crud import utils
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.query_strategy import QUERY_STRATEGIES
-from fastapi import HTTPException
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 

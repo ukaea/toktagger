@@ -1,7 +1,6 @@
 """Tests which are common to multiple endpoints which can be parametrized.
 """
 import pytest
-import pytest_asyncio
 from bson.objectid import ObjectId
 from tests.db_definitions import SAMPLE_1, ANNOTATION_1
 
