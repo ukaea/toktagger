@@ -51,10 +51,14 @@ class UncertaintyQueryStrategy(QueryStrategy):
         if len(self.annotations) == 0:
             print("Warning: No unvalidated annotations available - falling back to random sample selection.")
             index = random.randint(0, len(self.samples) - 1)
+            return self.samples.pop(index)
         else:
-            index = -1
-        
-        return self.samples.pop(index)
+            sample_id = self.annotations.pop(0).sample_id
+            index = next((index for index, sample in enumerate(self.samples) if sample.id == sample_id), None)
+            if index is None:
+                print("Error: Most uncertain annotation does not link to a sample")
+                index = random.randint(0, len(self.samples) - 1)
+            return self.samples.pop(index)
         
         
     
