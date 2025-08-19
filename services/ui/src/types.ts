@@ -122,12 +122,21 @@ export type ToolingProps = {
 };
 
 export enum ToolingTypes {
-  ZONE,
-  VSPAN
+  ZONE = "ZONE",
+  VSPAN = "VSPAN"
+}
+
+export type ToolingInfo = {
+  id: ToolingTypes
+  categories: Category[]
+  start: (x: number, y: number, category: Category) => void
+  move: (x: number, y: number) => void
+  end: (x: number, y: number) => void
 }
 
 export type ToolingCallbacks = {
   id: ToolingTypes
+  category: Category
   start: (x: number, y: number) => void
   move: (x: number, y: number) => void
   end: (x: number, y: number) => void

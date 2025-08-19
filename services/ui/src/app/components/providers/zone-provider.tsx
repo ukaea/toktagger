@@ -1,17 +1,17 @@
 "use client"
 
-import { Zone, Category, ToolingTypes } from "@/types";
+import { Zone, Category, ToolingTypes, ToolingInfo } from "@/types";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 import 'react-contexify/ReactContexify.css'
-import { useContextMenuProvider } from "./annotation-provider";
+import { useAnnotationProvider } from "./annotation-provider";
 
 interface ZoneContextInfo {
     zones: Zone[];
     handleZoneUpdate: () => void;
     handleZoneDragFinish: () => void;
     addZone: (x0: number, x1: number, category: Category) => void;
-    activateTooling: () => void
+    activateTooling: (category?: Category) => void
     triggerUpdate: number;
 }
 
@@ -19,10 +19,10 @@ const ZoneContext = createContext<ZoneContextInfo | null>(null)
 
 export const useZoneContext = () => {
     const context = useContext(ZoneContext)
-        if (!context) {
-            throw new Error("useZoneContext must be used within a ZoneProvider")
-        }
-        return context
+    if (!context) {
+        throw new Error("useZoneContext must be used within a ZoneProvider")
+    }
+    return context
 }
 
 export const ZONE_MENU_ID = "zone-provider"
@@ -33,7 +33,7 @@ export const ZONE_MENU_ID = "zone-provider"
  * @param categories Array of categories that the zones provided by this context can be
  * @param initialData Array of zones that should be added when initialised
  */
-export const ZoneProvider = ({categories, initialData, children, onModifyZone} : {
+export const ZoneProvider = ({ categories, initialData, children, onModifyZone }: {
     categories: Category[],
     initialData?: Zone[],
     children: React.ReactNode,
@@ -42,7 +42,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     const zones = useRef<Zone[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
 
-    const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
+    const { setToolingCallbacks, registerTooling } = useAnnotationProvider()
 
     const cleanZoneData = () => {
         for (const zone of zones.current) {
@@ -57,7 +57,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
     // It is necessary for the context to trigger child refreshes
     const triggerZoneUpdate = () => {
-        setTriggerUpdate((current) => (current+1)%10)
+        setTriggerUpdate((current) => (current + 1) % 10)
     }
 
     // Provides a method for child components to trigger context refresh
@@ -76,7 +76,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         onModifyZone(zones.current);
     }
 
-    const handleTypeSetting = ({props}: ItemParams, targetCategory: Category) => {
+    const handleTypeSetting = ({ props }: ItemParams, targetCategory: Category) => {
         zones.current = zones.current.map((zone) => {
             if (zone === props.zone) {
                 zone.category = targetCategory
@@ -98,19 +98,9 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         onModifyZone(zones.current);
     }
 
-    const activateTooling = () => {
-        setToolingCallbacks({
-            id: ToolingTypes.ZONE,
-            start: (x, _y) => {addZone(x, x, categories[0])},
-            move: (x, _y) => {
-                zones.current[zones.current.length-1].x1 = x;
-                triggerZoneUpdate()
-            },
-            end: (x, _y) => {
-                zones.current[zones.current.length-1].x1 = x;
-                handleZoneDragFinish()
-            },
-        })
+    const activateTooling = (category?: Category) => {
+        console.log(category)
+        setToolingCallbacks(ToolingTypes.ZONE, category)
     }
 
     // On initialisation the tool registers a menu item with the general context menu
@@ -140,17 +130,17 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
             const x1 = Math.min(x0 + width, menu.xLimits[1]) // clamp to upper limit
             addZone(x0, x1, category)
         }
-    
+
         const addZoneItems = categories.map((category, index) => {
             return (
-                <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
+                <Item key={`add${index}`} id={`add${index}`} onClick={({ props }) => {
                     addFromClick(props as MenuProps, category)
                 }}>
                     {category.name}
                 </Item>
             )
         })
-            
+
         /* Decide what to register in the main context‑menu:
         – Single category → direct “Add <Category>” item.
         – Multiple categories → keep existing submenu.
@@ -158,7 +148,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
         const menuElement =
             categories.length === 1
                 ? (
-                    <Item key="add-zone-single" id="add-zone-single" onClick={({props}) => {
+                    <Item key="add-zone-single" id="add-zone-single" onClick={({ props }) => {
                         addFromClick(props as MenuProps, categories[0])
                     }}>
                         {`Add ${categories[0].name}`}
@@ -169,40 +159,62 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                     </Submenu>
                 )
 
-        registerMenuItem("zone", menuElement)
+        const toolingCallbacks: ToolingInfo = {
+            id: ToolingTypes.ZONE,
+            categories,
+            start: (x, _y, category) => { addZone(x, x, category) },
+            move: (x, _y) => {
+                zones.current[zones.current.length - 1].x1 = x;
+                triggerZoneUpdate()
+            },
+            end: (x, _y) => {
+                zones.current[zones.current.length - 1].x1 = x;
+                for (const zone of zones.current) {
+                    if (zone.x1 < zone.x0) {
+                        const temp = zone.x0
+                        zone.x0 = zone.x1
+                        zone.x1 = temp
+                    }
+                }
+                triggerZoneUpdate()
+                onModifyZone(zones.current);
+            },
+        }
 
-        }, [categories, onModifyZone, registerMenuItem])
+        registerTooling("zone", toolingCallbacks, menuElement)
+
+    }, [categories, onModifyZone, registerTooling])
 
     // Initialisation of data - this should only run once
     // Effect: run ONCE per mount to populate from initialData
     // – overwrites instead of pushing; cleans on unmount
     useEffect(() => {
         if (!initialData) return;
-    
-        zones.current = [...initialData]; 
+
+        zones.current = [...initialData];
         triggerZoneUpdate();
-    
+
         /* remove stale copy when Strict-Mode unmounts the first render */
         return () => {
-          zones.current = [];
+            zones.current = [];
         };
-      }, [initialData]);
+    }, [initialData]);
 
     // Provides an array of the categories for the context menu
     const updateTypeItems = categories.map((category, index) => {
         return (
-            <Item key={`update${index}`} id={`update${index}`} onClick={(props) => {handleTypeSetting(props, category)}}>
+            <Item key={`update${index}`} id={`update${index}`} onClick={(props) => { handleTypeSetting(props, category) }}>
                 {category.name}
             </Item>
         )
     })
 
     // The context provider is responsible for rendering the context menu relating to zones
-    return(
-        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, activateTooling, triggerUpdate}}>
+    return (
+        <ZoneContext.Provider value={{ zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, activateTooling, triggerUpdate }}>
             {children}
             <Menu id={`${ZONE_MENU_ID}`}>
-                <Item id="delete" onClick={({props}: ItemParams) => {
+                <Item id="delete" onClick={({ props }: ItemParams) => {
                     handleDelete(props.zone)
                 }}>
                     Delete

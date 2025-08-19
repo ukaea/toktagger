@@ -1,16 +1,16 @@
 "use client"
 
-import { Category, ToolingTypes, VSpan } from "@/types"
+import { Category, ToolingInfo, ToolingTypes, VSpan } from "@/types"
 import React, { createContext, useContext, useEffect, useRef, useState } from "react"
 import { Item, ItemParams, Menu, Submenu } from "react-contexify"
-import { useContextMenuProvider } from "./annotation-provider";
+import { useAnnotationProvider } from "./annotation-provider";
 
 interface VSpanContextInfo {
     vspans: VSpan[];
     handleVSpanUpdate: () => void;
     handleVSpanDragFinish: () => void;
     addVSpan: (x: number, category: Category) => void;
-    activateTooling: () => void
+    activateTooling: (category?: Category) => void
     triggerUpdate: number;
 }
 
@@ -32,7 +32,7 @@ export const VSPAN_MENU_ID = "vspan-provider"
  * @param categories Array of categories that the vspans provided by this context can be
  * @param initialData Array of vspans that should be added when initialised
  */
-export const VSpanProvider = ({categories, initialData, children, onModifyVSpan} : {
+export const VSpanProvider = ({ categories, initialData, children, onModifyVSpan }: {
     categories: Category[],
     initialData?: VSpan[],
     children: React.ReactNode,
@@ -41,11 +41,11 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
     const spans = useRef<VSpan[]>([])
     const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
 
-    const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
+    const { setToolingCallbacks, registerTooling } = useAnnotationProvider()
 
     // It is necessary for the context to trigger child refreshes
     const triggerVSpanUpdate = () => {
-        setTriggerUpdate((current) => (current+1)%10)
+        setTriggerUpdate((current) => (current + 1) % 10)
     }
 
     // Provides a method for child components to trigger context refresh
@@ -64,7 +64,7 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
         onModifyVSpan(spans.current);
     }
 
-    const handleTypeSetting = ({props}: ItemParams, targetCategory: Category) => {
+    const handleTypeSetting = ({ props }: ItemParams, targetCategory: Category) => {
         spans.current = spans.current.map((span) => {
             if (span === props.vspan) {
                 span.category = targetCategory
@@ -82,20 +82,8 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
         triggerVSpanUpdate()
     }
 
-    const activateTooling = () => {
-        setToolingCallbacks({
-            id: ToolingTypes.VSPAN,
-            start: (x, _y) => {addVSpan(x, categories[0])},
-            move: (x, _y) => {
-                spans.current[spans.current.length-1].x = x;
-                triggerVSpanUpdate()
-            },
-            end: (x, _y) => {
-                spans.current[spans.current.length-1].x = x;
-                handleVSpanDragFinish()
-                triggerVSpanUpdate()
-            },
-        })
+    const activateTooling = (category?: Category) => {
+        setToolingCallbacks(ToolingTypes.VSPAN, category)
     }
 
     // On initialisation the tool registers a menu item with the general context menu
@@ -111,7 +99,7 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
 
         const addVSpanItems = categories.map((category, index) => {
             return (
-                <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
+                <Item key={`add${index}`} id={`add${index}`} onClick={({ props }) => {
                     add(props.x, category)
                 }}>
                     {category.name}
@@ -130,8 +118,8 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
                     <Item
                         key="add-vspan-single"
                         id="add-vspan-single"
-                        onClick={({props}) => {
-                            add(props.x, categories[0]) 
+                        onClick={({ props }) => {
+                            add(props.x, categories[0])
                         }}
                     >
                         {`Add ${categories[0].name}`}
@@ -141,26 +129,48 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
                         {addVSpanItems}
                     </Submenu>
                 )
-        registerMenuItem("vspan", menuElement)
-    }, [categories, onModifyVSpan, registerMenuItem])
+
+        const toolingCallbacks: ToolingInfo = {
+            id: ToolingTypes.VSPAN,
+            categories,
+            start: (x, _y, category) => {
+                spans.current.push({
+                    x,
+                    category
+                })
+                triggerVSpanUpdate()
+            },
+            move: (x, _y) => {
+                spans.current[spans.current.length - 1].x = x;
+                triggerVSpanUpdate()
+            },
+            end: (x, _y) => {
+                spans.current[spans.current.length - 1].x = x;
+                onModifyVSpan(spans.current);
+                triggerVSpanUpdate()
+            },
+        }
+
+        registerTooling("vspan", toolingCallbacks, menuElement)
+    }, [categories, onModifyVSpan, registerTooling])
 
     // Initialisation of data - this should only run once
     useEffect(() => {
         if (!initialData) return;
-    
-        spans.current = [...initialData]; 
+
+        spans.current = [...initialData];
         triggerVSpanUpdate();
-    
+
         /* cleanup runs when the first (discarded) mount unmounts */
         return () => {
-          spans.current = [];
+            spans.current = [];
         };
-      }, [initialData]);
+    }, [initialData]);
 
     // Provides an array of the categories for the context menu
     const updateTypeItems = categories.map((category, index) => {
         return (
-            <Item key={`update${index}`} id={`update${index}`} onClick={(props) => {handleTypeSetting(props, category)}}>
+            <Item key={`update${index}`} id={`update${index}`} onClick={(props) => { handleTypeSetting(props, category) }}>
                 {category.name}
             </Item>
         )
@@ -168,10 +178,10 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
 
     // The context provider is responsible for rendering the context menu relating to VSpans
     return (
-        <VSpanContext.Provider value={{vspans: spans.current, handleVSpanUpdate, handleVSpanDragFinish, addVSpan, activateTooling, triggerUpdate}}>
+        <VSpanContext.Provider value={{ vspans: spans.current, handleVSpanUpdate, handleVSpanDragFinish, addVSpan, activateTooling, triggerUpdate }}>
             {children}
             <Menu id={`${VSPAN_MENU_ID}`}>
-                <Item id="delete" onClick={({props}: ItemParams) => {
+                <Item id="delete" onClick={({ props }: ItemParams) => {
                     handleDelete(props.vspan)
                 }}>
                     Delete
@@ -181,7 +191,7 @@ export const VSpanProvider = ({categories, initialData, children, onModifyVSpan}
                         {updateTypeItems}
                     </Submenu>
                 )}
-                
+
             </Menu>
         </VSpanContext.Provider>
     )
