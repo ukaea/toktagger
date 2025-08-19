@@ -23,9 +23,9 @@ def annotations():
     annotation_ins = [db_definitions.ANNOTATION_5, db_definitions.ANNOTATION_3, db_definitions.ANNOTATION_4]
     annotations = [TimePointOut(**annotation_in.model_dump(), project_id="test", sample_id="test", _id="test") for annotation_in in annotation_ins]
     # Attach sample IDs to these which would normally be done by the database
-    annotations[0].id = "sample_4"
-    annotations[1].id = "sample_1"
-    annotations[2].id = "sample_2"
+    annotations[0].sample_id = "sample_4"
+    annotations[1].sample_id = "sample_1"
+    annotations[2].sample_id = "sample_2"
     return annotations    
 
 def test_sequential_strategy(samples, annotations):
@@ -59,13 +59,13 @@ def test_uncertainty_strategy(samples, annotations):
     # These correspond to samples number 4, 1, 2
     # It should then fallback to random selection of remaining samples - 3
     next_sample = strategy.get_next_sample()
-    assert next_sample.shot_id == 4
+    assert next_sample.id == "sample_4"
     next_sample = strategy.get_next_sample()
-    assert next_sample.shot_id == 1
+    assert next_sample.id == "sample_1"
     next_sample = strategy.get_next_sample()
-    assert next_sample.shot_id == 2
+    assert next_sample.id == "sample_2"
     next_sample = strategy.get_next_sample()
-    assert next_sample.shot_id == 3
+    assert next_sample.id == "sample_3"
     # Should raise an error when you get to the end
     with pytest.raises(RuntimeError, match="No more samples to label!"):
         strategy.get_next_sample()
