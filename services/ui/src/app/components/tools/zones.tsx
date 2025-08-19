@@ -81,24 +81,42 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
       const xaxis = plot._fullLayout.xaxis;
 
+      // Minimum width in data units: 1% of current x-range
+      const [xMin, xMax] = xaxis.range as [number, number];
+      const MIN_WIDTH_FRACTION = 0.001;
+      const minWidth = (xMax - xMin) * MIN_WIDTH_FRACTION;
+
       const graphGroup = d3.select(overplot);
       graphGroup.selectAll(".zone").remove(); // All zones are removed each render cycle
 
       // Prevents a little bit of repetition by auto-configuring the resize handler
       const getBoundaryHandler = (isLeft: boolean) => {
         // Handles the dragging of the boundaries of the zone
-        const resize = d3
+                const resize = d3
           .drag<SVGRectElement, Zone>()
           .on("drag", function (event, d) {
+            // allow wrapping while dragging (no clamp here)
             const x = xaxis.p2d(event.x);
-            if (isLeft) {
-              d.x0 = x;
-            } else {
-              d.x1 = x;
-            }
+            if (isLeft) d.x0 = x; else d.x1 = x;
             handleZoneUpdate();
           })
-          .on("end", function (_event, _d) {
+          .on("end", function (_event, d) {
+            // on end: enforce min width and normalize orientation
+            const width = Math.abs(d.x1 - d.x0);
+            if (width < minWidth) {
+              if (isLeft) {
+                const right = Math.max(d.x0, d.x1);
+                d.x1 = right;
+                d.x0 = right - minWidth;
+              } else {
+                const left = Math.min(d.x0, d.x1);
+                d.x0 = left;
+                d.x1 = left + minWidth;
+              }
+            } else if (d.x1 < d.x0) {
+              const t = d.x0; d.x0 = d.x1; d.x1 = t;
+            }
+            handleZoneUpdate();
             handleZoneDragFinish();
           });
         return resize;
@@ -145,12 +163,18 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         const x1 = xaxis.d2p(zone.x1);
                 const x = Math.min(x0, x1)
                 const pointerEvent = disableToolingInteraction ? "none" : "all"
+        // render span using left-most x and absolute width (shows correctly during wrap)
+        const spanLeft = Math.min(x0, x1);
+        const spanWidth = Math.abs(x1 - x0);
+        const handleWidth = Math.min(20, spanWidth / 2);
+
+        // Span (center drag target)
         graphGroup
           .append("rect")
-          .attr("class", "zone span cursor-grab disable-on-modifier")
+          .attr("class", "zone span cursor-grab disable-on-shift")
           .attr("x", x)
           .attr("y", upperLimit)
-          .attr("width", Math.abs(x1 - x0))
+          .attr("width", spanWidth)
           .attr("height", height)
           .attr("fill", zone.category.color)
           .attr("opacity", 0.5)
@@ -160,29 +184,31 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .call(drag)
           .on("contextmenu", handleContextMenu);
 
+        // Left handle
         graphGroup
           .append("rect")
           .attr("class", "zone leftHandle disable-on-modifier")
-          .attr("x", x0 - 10)
+          .attr("x", x0 - handleWidth/2)
           .attr("y", upperLimit)
-          .attr("width", 20)
+          .attr("width", handleWidth)
           .attr("height", height)
           .attr("fill", "transparent")
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
-          .datum(zone)
+          .datum(zone).on("contextmenu", handleContextMenu)
           .call(getBoundaryHandler(true));
 
+        // Right handle
         graphGroup.append("rect")
           .attr("class", "zone rightHandle disable-on-modifier")
-          .attr("x", x1 - 10)
+          .attr("x", x1 - handleWidth/2)
           .attr("y", upperLimit)
-          .attr("width", 20)
+          .attr("width", handleWidth)
           .attr("height", height)
           .attr("fill", "transparent")
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
-          .datum(zone)
+          .datum(zone).on("contextmenu", handleContextMenu)
           .call(getBoundaryHandler(false))
       }
     });
