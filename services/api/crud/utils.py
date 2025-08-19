@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
@@ -41,8 +41,10 @@ async def get_annotations(
     db_client: MongoDBClient,
     project_id: str,
     validated: Optional[bool] = None,
+    sort_by: str = "_id",
+    sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
-    end: Optional[int] = None,
+    count: Optional[int] = None,
 ) -> list[Annotation]:
     db_filters = {"project_id": project_id}
     if validated is not None:
@@ -51,16 +53,22 @@ async def get_annotations(
     annotations = await db_client.get_filtered_documents(
         collection="annotations",
         filters=db_filters,
-        sort_by="timestamp",
-        sort_direction=-1,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
         start=start,
-        limit=end - start + 1 if end is not None else 0,
+        limit=count if count is not None else 0,
     )
     return annotations
 
 
 async def get_samples(
-    db_client: MongoDBClient, project_id: str, start: int = 0, end: Optional[int] = None
+    db_client: MongoDBClient,
+    project_id: str,
+    shot_id: Optional[int] = None,
+    sort_by: str = "_id",
+    sort_direction: Literal["ascending", "descending"] = "descending",
+    start: int = 0,
+    count: Optional[int] = None,
 ) -> list[Sample]:
     # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -68,12 +76,17 @@ async def get_samples(
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
+    filters = {"project_id": project_obj_id}
+
+    if shot_id:
+        filters["shot_id"] = shot_id
+
     samples = await db_client.get_filtered_documents(
         collection="samples",
-        filters={"project_id": project_obj_id},
-        sort_by="timestamp",
-        sort_direction=-1,
+        filters=filters,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
         start=start,
-        limit=end - start + 1 if end is not None else 0,
+        limit=count if count is not None else 0,
     )
     return samples

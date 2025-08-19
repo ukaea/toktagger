@@ -8,26 +8,10 @@ export default function Home() {
         <ul className="list-none list-inside space-y-2">
           <li>
             <a
-              href="/elm"
+              href="/projects"
               className="inline-block px-4 py-2 bg-white/60 text-gray-800 font-semibold rounded hover:bg-white/80"
             >
-              ELM analysis
-            </a>
-          </li>
-          <li>
-            <a
-              href="/disruption"
-              className="inline-block px-4 py-2 bg-white/60 text-gray-800 font-semibold rounded hover:bg-white/80"
-            >
-              Disruption analysis
-            </a>
-          </li>
-          <li>
-            <a
-              href="/locked-mode"
-              className="inline-block px-4 py-2 bg-white/60 text-gray-800 font-semibold rounded hover:bg-white/80"
-            >
-              Locked mode analysis
+              Load Project
             </a>
           </li>
         </ul>
