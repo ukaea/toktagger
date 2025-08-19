@@ -1,18 +1,11 @@
 import pytest
 import pytest_asyncio
-from fastapi.testclient import TestClient
-from services.api.main import app, lifespan
+from services.api.main import app
 from services.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
-from contextlib import asynccontextmanager
-from services.api.schemas.projects import ProjectIn
-from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
-from services.api.schemas.annotations import TimePoint, TimeRegion
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
-import pathlib
 
-import time
 import asyncio
 from httpx import AsyncClient, ASGITransport
 import os

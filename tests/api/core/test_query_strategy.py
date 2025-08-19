@@ -1,20 +1,34 @@
 import services.api.core.query_strategy as query_strategy
-import tests.db_definitions as db_definitions
-import pymongo
 import pytest
 import random
-from fastapi import HTTPException
 from services.api.schemas.samples import Sample
-from services.api.schemas.annotations import AnnotationOutTypes
+from services.api.schemas.annotations import TimePointOut
 from pydantic import TypeAdapter
+import tests.db_definitions as db_definitions
 
-@pytest.mark.asyncio
-async def test_sequential_strategy(setup_db, db_client):
-    # Get samples from the database by their shot_id
-    annotator_model = TypeAdapter(AnnotationOutTypes)
-    samples = [Sample(**sample) for sample in await db_client.get_filtered_documents("samples", sort_by="shot_id", sort_direction="ascending")]
-    annotations = [annotator_model.validate_python(annotation) for annotation in await db_client.get_filtered_documents("annotations", sort_by="uncertainty", sort_direction="descending", filters={"validated": False})]
-    
+@pytest.fixture
+def samples():
+    # Samples, sorted by shot_id, ascending
+    sample_ins = [db_definitions.SAMPLE_1, db_definitions.SAMPLE_3, db_definitions.SAMPLE_1, db_definitions.SAMPLE_4]
+    samples = [Sample(**sample_in.model_dump(), project_id="test",_id="test") for sample_in in sample_ins]
+    # Attach IDs to these - this would normally be done by the database
+    for i in range(len(samples)):
+        samples[i].id = f"sample_{i + 1}"
+        
+    return samples
+
+@pytest.fixture
+def annotations():
+    # Annotations, sorted by uncertainty, descending. Only non-validated.
+    annotation_ins = [db_definitions.ANNOTATION_5, db_definitions.ANNOTATION_3, db_definitions.ANNOTATION_4]
+    annotations = [TimePointOut(**annotation_in.model_dump(), project_id="test", sample_id="test", _id="test") for annotation_in in annotation_ins]
+    # Attach sample IDs to these which would normally be done by the database
+    annotations[0].id = "sample_4"
+    annotations[1].id = "sample_1"
+    annotations[2].id = "sample_2"
+    return annotations    
+
+def test_sequential_strategy(samples, annotations):
     strategy = query_strategy.SequentialQueryStrategy(samples.copy(), annotations.copy())
     for i in range(len(samples)):
         next_sample = strategy.get_next_sample()
@@ -24,13 +38,7 @@ async def test_sequential_strategy(setup_db, db_client):
         strategy.get_next_sample()
         
 
-@pytest.mark.asyncio
-async def test_random_strategy(setup_db, db_client):
-    # Get samples from the database by their shot_id
-    annotator_model = TypeAdapter(AnnotationOutTypes)
-    samples = [Sample(**sample) for sample in await db_client.get_filtered_documents("samples", sort_by="shot_id", sort_direction="ascending")]
-    annotations = [annotator_model.validate_python(annotation) for annotation in await db_client.get_filtered_documents("annotations", sort_by="uncertainty", sort_direction="descending", filters={"validated": False})]
-    
+def test_random_strategy(samples, annotations):
     random.seed(42)
     strategy_1 = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
     returned_samples_1 = [strategy_1.get_next_sample() for i in range(len(samples))]
@@ -44,27 +52,20 @@ async def test_random_strategy(setup_db, db_client):
     # Check that two instances have not returned the same order of results
     assert returned_samples_1 != returned_samples_2
     
-    
-@pytest.mark.asyncio
-async def test_uncertainty_strategy(setup_db, db_client):
-    # Get samples from the database by their shot_id
-    annotator_model = TypeAdapter(AnnotationOutTypes)
-    samples = [Sample(**sample) for sample in await db_client.get_filtered_documents("samples", sort_by="shot_id", sort_direction="ascending")]
-    annotations = [annotator_model.validate_python(annotation) for annotation in await db_client.get_filtered_documents("annotations", sort_by="uncertainty", sort_direction="descending", filters={"validated": False})]
-    
+def test_uncertainty_strategy(samples, annotations):
     strategy = query_strategy.UncertaintyQueryStrategy(samples.copy(), annotations.copy())
     
     # Should return annotations 5, 3, 4 in that order
-    # These correspond to samples 4, 1, 2
+    # These correspond to samples number 4, 1, 2
     # It should then fallback to random selection of remaining samples - 3
     next_sample = strategy.get_next_sample()
-    assert next_sample.id == setup_db["sample_id_4"]
+    assert next_sample.shot_id == 4
     next_sample = strategy.get_next_sample()
-    assert next_sample.id == setup_db["sample_id_1"]
+    assert next_sample.shot_id == 1
     next_sample = strategy.get_next_sample()
-    assert next_sample.id == setup_db["sample_id_2"]
+    assert next_sample.shot_id == 2
     next_sample = strategy.get_next_sample()
-    assert next_sample.id == setup_db["sample_id_3"]
+    assert next_sample.shot_id == 3
     # Should raise an error when you get to the end
     with pytest.raises(RuntimeError, match="No more samples to label!"):
         strategy.get_next_sample()
