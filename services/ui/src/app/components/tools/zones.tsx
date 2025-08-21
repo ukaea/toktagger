@@ -171,7 +171,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         // Span (center drag target)
         graphGroup
           .append("rect")
-          .attr("class", "zone span cursor-grab disable-on-shift")
+          .attr("class", "zone span cursor-grab disable-on-modifier")
           .attr("x", x)
           .attr("y", upperLimit)
           .attr("width", spanWidth)
