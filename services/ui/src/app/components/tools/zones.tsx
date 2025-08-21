@@ -171,13 +171,29 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
       // Create the zone and transparent handles on each boundary
       for (const zone of zones) {
-        const x0 = xaxis.d2p(zone.x0);
-        const x1 = xaxis.d2p(zone.x1);
+        // pixel positions for the two data boundaries
+        const px0 = xaxis.d2p(zone.x0);
+        const px1 = xaxis.d2p(zone.x1);
         const pointerEvent = disableToolingInteraction ? "none" : "all"
-        // render span using left-most x and absolute width
-        const spanLeft = Math.min(x0, x1);
-        const spanWidth = Math.abs(x1 - x0);
-        const handleWidth = Math.min(20, spanWidth / 2);
+        
+        // render span using left-most x and absolute width, span in pixels
+        const spanLeft = Math.min(px0, px1);
+        const spanRight = Math.max(px0, px1);
+        const spanWidth = spanRight - spanLeft;
+
+        // handle layout: fixed outside strip + variable inside strip
+        const OUTER_HANDLE_PX = 20;         // fixed, always clickable outside the zone
+        const INNER_HANDLE_MAX_PX = 20;     // cap inside portion so handles don't dominate
+        const MIN_CENTER_DRAG_PX = 6;       // keep a gap so the middle stays draggable
+
+        // inside portion per side; shrink when zone is tiny to keep a center gap
+        const inner = Math.max(0, Math.min(
+          INNER_HANDLE_MAX_PX,
+          (spanWidth - MIN_CENTER_DRAG_PX) / 2
+        ));
+        const totalHandleWidth = OUTER_HANDLE_PX + inner;
+
+        const x0IsLeft = px0 <= px1;
 
         // Span (center drag target)
         graphGroup
@@ -195,13 +211,14 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .call(drag)
           .on("contextmenu", handleContextMenu);
 
-        // Left handle
+        // x0 handle (moves x0): outside is away from the zone, inside points toward the other end
+        const x0HandleX = x0IsLeft ? (px0 - OUTER_HANDLE_PX) : (px0 - inner);
         graphGroup
           .append("rect")
           .attr("class", "zone leftHandle disable-on-modifier")
-          .attr("x", x0 - handleWidth/2)
+          .attr("x", x0HandleX)
           .attr("y", upperLimit)
-          .attr("width", handleWidth)
+          .attr("width", totalHandleWidth)
           .attr("height", height)
           .attr("fill", "transparent")
           .attr("style", `pointer-events: ${pointerEvent}`)
@@ -209,12 +226,13 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .datum(zone).on("contextmenu", handleContextMenu)
           .call(getBoundaryHandler(true));
 
-        // Right handle
+        // x1 handle (moves x1)
+        const x1HandleX = x0IsLeft ? (px1 - inner) : (px1 - OUTER_HANDLE_PX);
         graphGroup.append("rect")
           .attr("class", "zone rightHandle disable-on-modifier")
-          .attr("x", x1 - handleWidth/2)
+          .attr("x", x1HandleX)
           .attr("y", upperLimit)
-          .attr("width", handleWidth)
+          .attr("width", totalHandleWidth)
           .attr("height", height)
           .attr("fill", "transparent")
           .attr("style", `pointer-events: ${pointerEvent}`)
