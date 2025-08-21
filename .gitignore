@@ -172,5 +172,3 @@ data/elm-events
 node_modules
 package-lock.json
 package.json
-
-services/ui/public/frames/
