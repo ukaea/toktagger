@@ -41,7 +41,7 @@ class ParquetDataLoader(DataLoader):
         item: TimeSeriesFileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
-        df = pd.read_parquet(item.file_name, columns=item.column_names)
+        df = pd.read_parquet(item.file_name, columns=item.signal_names)
         df = df.fillna(0)
         data = df.to_dict("list")
         time = df.index.values

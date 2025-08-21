@@ -10,7 +10,6 @@ pymongo
 requests
 torch
 torchmetrics
-tensorflow
 numpy
 scikit-learn
 celery[redis]

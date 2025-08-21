@@ -13,7 +13,6 @@ from services.api.schemas.models import Model, ModelUpdate
 import pathlib
 import itertools
 from pydantic import TypeAdapter
-from services.api.core.models.callbacks import DBCallback
 
 REDIS_HOST = os.environ["REDIS_HOST"]
 
@@ -44,6 +43,7 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         print(f"Collected {len(annotations)} annotations.")
         samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project.id, validated=True)]
         print(f"Collected {len(samples)} samples.")
+        
         # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
         annotator_model = TypeAdapter(AnnotationTypes)
         
@@ -54,18 +54,13 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
                 annotations, key=lambda annotation: annotation['sample_id']
                 )
             ]
-        print(len(annotations_2d))
-        print(len(samples))
+
         # TODO: Where should epochs, batch size be passed in???
         BATCH_SIZE = 32
         NUM_EPOCHS = 10
-        
-        # Define DBCallback
-        db_callback = DBCallback(db_client=db_client, model_id=model.id)
-        db_callback.set_params({"epochs": NUM_EPOCHS}) # TODO add params, steps?
             
         # Get model
-        ml_model = MODELS[model.type](project=project, samples=samples, annotations=annotations_2d, callbacks=[db_callback])
+        ml_model = MODELS[model.type](project=project, samples=samples, annotations=annotations_2d, callbacks=[])
         
         # Train model
         accuracy = ml_model.train(num_epochs=NUM_EPOCHS, batch_size=BATCH_SIZE)

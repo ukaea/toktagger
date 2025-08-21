@@ -35,17 +35,17 @@ SAMPLE_2 = SampleIn(
     ) 
 SAMPLE_3 = SampleIn(
         shot_id=2,
-        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="s3", column_names=["Ip"]),
+        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="s3", signal_names=["Ip"]),
         annotations=None
     ) 
 SAMPLE_4 = SampleIn(
         shot_id=4,
-        data=TimeSeriesFileData(file_name=str(pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()), type="parquet", protocol="file", column_names=["Ip"]),
+        data=TimeSeriesFileData(file_name=str(pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()), type="parquet", protocol="file", signal_names=["Ip"]),
         annotations=None
     )
 
 
-ANNOTATION_1 = AnnotationIn(label="annotation", validated=True)
+ANNOTATION_1 = TimeRegion(time_min=0.2, time_max=0.4, label="annotation", validated=True)
 ANNOTATION_2 = TimeRegion(time_min=0.1, time_max=0.2, label="ramp_up", validated=True)
 ANNOTATION_3 = TimePoint(time=0.1, label="disruption", validated=False, uncertainty=0.6)
 ANNOTATION_4 = TimePoint(time=0.3, label="disruption", validated=False, uncertainty=0.4)

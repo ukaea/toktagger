@@ -5,8 +5,6 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.schemas.models import ModelUpdate
 
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.callbacks import Callback
-from tensorflow.keras.callbacks import CallbackList
 from abc import ABC, abstractmethod
 import typing
 from services.api.crud.db import MongoDBClient
@@ -20,7 +18,7 @@ class Model(ABC):
         samples: list[Sample], 
         annotations: list[list[Annotation]], 
         train_val_test_split: typing.Tuple[float, float, float],
-        callbacks: list[Callback]
+        callbacks: list
         ) -> None:
         
         if len(samples) != len(annotations):
@@ -125,10 +123,9 @@ class TorchModel(Model):
         samples: list[Sample], 
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float],
-        callbacks: list[Callback]
+        callbacks: list
     ) -> None:
         super().__init__(project=project, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split, callbacks=callbacks)
-        self.callbacks = CallbackList(self.callbacks)
         self.dataset = dataset
         self.train_dataset = dataset(project, self.train_samples, self.train_annotations)
         self.val_dataset = dataset(project, self.val_samples, self.val_annotations) if self.val_samples else None

@@ -11,7 +11,6 @@ import typing
 from services.api.crud.db import MongoDBClient
 from bson.objectid import ObjectId
 from services.api.core.models.base import TorchDataset, TorchModel
-from tensorflow.keras.callbacks import Callback
 
 
 class DisruptionDataset(TorchDataset):
@@ -44,7 +43,7 @@ class DisruptionCNN(TorchModel):
         samples: list[Sample], 
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float] = (0.7, 0.2, 0.1),
-        callbacks: list[Callback] = []
+        callbacks: list = []
     ) -> None:
         self.type = "disruption_cnn"
         super().__init__(project=project, dataset=DisruptionDataset, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split, callbacks=callbacks)
