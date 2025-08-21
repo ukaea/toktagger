@@ -1,7 +1,7 @@
 from typing import Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
 from services.api.schemas.models import ModelType
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, BaseModel
 
 
 class AnnotationIn(ConfiguredModel):
@@ -39,11 +39,19 @@ class VideoBoundingBox(BoundingBox):
     frame: int
 
 
-class Annotation(AnnotationIn):
+class Annotation(BaseModel):
     id: str = Field(..., alias="_id")
     project_id: str
     sample_id: str
-
+    
+class TimePointOut(TimePoint, Annotation):
+    pass
+class TimeRegionOut(TimeRegion, Annotation):
+    pass
+class BoundingBoxOut(BoundingBox, Annotation):
+    pass
+class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
+    pass
 
 class ModelAnnotation(AnnotationIn):
     uncertainty: float
@@ -51,3 +59,4 @@ class ModelAnnotation(AnnotationIn):
 
 
 AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
+AnnotationOutTypes = Union[TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut]

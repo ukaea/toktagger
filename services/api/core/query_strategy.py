@@ -54,12 +54,11 @@ class UncertaintyQueryStrategy(QueryStrategy):
             return self.samples.pop(index)
         else:
             sample_id = self.annotations.pop(0).sample_id
-            next_sample = next((sample for sample in self.samples if sample.id == sample_id), None)
-            if not next_sample:
+            index = next((index for index, sample in enumerate(self.samples) if sample.id == sample_id), None)
+            if index is None:
                 print("Error: Most uncertain annotation does not link to a sample")
                 index = random.randint(0, len(self.samples) - 1)
-                return self.samples.pop(index)
-            return next_sample
+            return self.samples.pop(index)
         
         
     
