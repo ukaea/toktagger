@@ -24,20 +24,6 @@ import {
   updateAnnotations,
 } from "@/app/utils";
 
-<<<<<<< HEAD
-type DisruptionInfo = {
-    time: Array<number>,
-    values: Record<string, Array<number>>,
-    annotations: Record<string, Array<Record<string, any>>>
-}
-
-export const Disruption = ({ data, annotations }: DisruptionInfo) => {
-    const zoneCategories: Category[] = [
-            { name: "RampUp", color: 'rgb(233, 170, 98)' },
-            { name: "FlatTop", color: 'rgb(120, 167, 85)' },
-            { name: "RampDown", color: 'rgb(108, 189, 224)' }
-        ]
-=======
 const disruptionCategories: Category[] = [
   { name: "Disruption", color: "rgb(255, 0, 0)" },
 ];
@@ -47,7 +33,6 @@ const zoneCategories: Category[] = [
   { name: "FlatTop", color: "rgb(120, 167, 85)" },
   { name: "RampDown", color: "rgb(108, 189, 224)" },
 ];
->>>>>>> main
 
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
   (acc, curr) => {

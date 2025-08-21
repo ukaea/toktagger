@@ -5,7 +5,8 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.schemas.models import ModelUpdate
 
 from sklearn.model_selection import train_test_split
-
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.callbacks import CallbackList
 from abc import ABC, abstractmethod
 import typing
 from services.api.crud.db import MongoDBClient
@@ -15,12 +16,11 @@ import math
 class Model(ABC):
     def __init__(
         self,
-        db_client: MongoDBClient,
-        db_id: ObjectId,
         project: Project, 
         samples: list[Sample], 
         annotations: list[list[Annotation]], 
-        train_val_test_split: typing.Tuple[float, float, float]
+        train_val_test_split: typing.Tuple[float, float, float],
+        callbacks: list[Callback]
         ) -> None:
         
         if len(samples) != len(annotations):
@@ -33,10 +33,9 @@ class Model(ABC):
         if train_fraction == 0:
             raise ValueError("Must be samples in the training set!")
         
-        self.db_client = db_client
-        self.db_id = db_id
         self.project = project
         self.model = self._define_model()
+        self.callbacks = callbacks
         
         # If train ratio is 1, no splitting required, just set train sets and return
         if train_fraction == 1:
@@ -79,16 +78,12 @@ class Model(ABC):
                 test_size= test_fraction / (val_fraction + test_fraction)
                 )
     
-    async def _update_progress(self, progress: float):
-        updated_model = ModelUpdate(progress=progress)
-        await self.db_client.update(collection="models", model=updated_model, object_id=self.db_id)
-                
     @abstractmethod
     def _define_model(self):
         pass
     
     @abstractmethod
-    async def train(self, epochs: int) -> float:
+    def train(self, epochs: int) -> float:
         # pass in list of samples and list of annotations
         # return some measure of accuracy
         pass
@@ -125,15 +120,15 @@ class TorchDataset(ABC):
 class TorchModel(Model):
     def __init__(
         self, 
-        db_client: MongoDBClient,
-        db_id: ObjectId,
         project: Project, 
         dataset: TorchDataset,
         samples: list[Sample], 
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float] = (0.7, 0.2, 0.1),
+        train_val_test_split: typing.Tuple[float, float, float],
+        callbacks: list[Callback]
     ) -> None:
-        super().__init__(db_client=db_client, db_id=db_id, project=project, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split)
+        super().__init__(project=project, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split, callbacks=callbacks)
+        self.callbacks = CallbackList(self.callbacks)
         self.dataset = dataset
         self.train_dataset = dataset(project, self.train_samples, self.train_annotations)
         self.val_dataset = dataset(project, self.val_samples, self.val_annotations) if self.val_samples else None

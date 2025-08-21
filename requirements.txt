@@ -8,8 +8,9 @@ scipy
 pyarrow
 pymongo
 requests
-# torch
-# torchmetrics
+torch
+torchmetrics
+tensorflow
 numpy
 scikit-learn
 celery[redis]

@@ -84,8 +84,6 @@ async def get_samples(
     if validated is not None:
         filters["validated_annotations"] = validated
 
-    filters = {"project_id": project_obj_id}
-
     if shot_id:
         filters["shot_id"] = shot_id
 
