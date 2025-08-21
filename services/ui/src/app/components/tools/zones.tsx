@@ -161,9 +161,8 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       for (const zone of zones) {
         const x0 = xaxis.d2p(zone.x0);
         const x1 = xaxis.d2p(zone.x1);
-                const x = Math.min(x0, x1)
-                const pointerEvent = disableToolingInteraction ? "none" : "all"
-        // render span using left-most x and absolute width (shows correctly during wrap)
+        const pointerEvent = disableToolingInteraction ? "none" : "all"
+        // render span using left-most x and absolute width
         const spanLeft = Math.min(x0, x1);
         const spanWidth = Math.abs(x1 - x0);
         const handleWidth = Math.min(20, spanWidth / 2);
@@ -172,7 +171,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         graphGroup
           .append("rect")
           .attr("class", "zone span cursor-grab disable-on-modifier")
-          .attr("x", x)
+          .attr("x", spanLeft)
           .attr("y", upperLimit)
           .attr("width", spanWidth)
           .attr("height", height)
