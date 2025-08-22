@@ -53,10 +53,8 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     const handleZoneUpdate = () => {
         triggerZoneUpdate()
     }
-    // Orientation normalization is handled per-zone in the UI drag 'end' handler.
-    // Leave provider free of bulk normalization to avoid duplicate logic.
+    
     const handleZoneDragFinish = () => {
-        // No mutation here—UI already normalized/clamped on drag end.
         onModifyZone(zones.current);
     }
 
