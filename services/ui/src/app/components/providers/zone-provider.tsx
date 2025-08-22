@@ -53,7 +53,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     const handleZoneUpdate = () => {
         triggerZoneUpdate()
     }
-    
+
     const handleZoneDragFinish = () => {
         onModifyZone(zones.current);
     }
@@ -102,7 +102,7 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                   [z.x0, z.x1] = [z.x1, z.x0];
                 }
                 triggerZoneUpdate();
-                onModifyZone(zones.current);
+                handleZoneDragFinish();
             },
         })
     }
