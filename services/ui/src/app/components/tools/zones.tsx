@@ -104,31 +104,27 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
             // on end: enforce min width and normalize orientation
             let changed = false;
             const width = Math.abs(d.x1 - d.x0);
+
             if (width < minWidth) {
+              const left  = Math.min(d.x0, d.x1);
+              const right = Math.max(d.x0, d.x1);
+
               if (isLeft) {
-                const right = Math.max(d.x0, d.x1);
-                const newX0 = right - minWidth;
-                if (d.x1 !== right || d.x0 !== newX0) {
-                  d.x1 = right;
-                  d.x0 = newX0;
-                  changed = true;
-                }
+                d.x1 = right;
+                d.x0 = right - minWidth;
               } else {
-                const left = Math.min(d.x0, d.x1);
-                const newX1 = left + minWidth;
-                if (d.x0 !== left || d.x1 !== newX1) {
-                  d.x0 = left;
-                  d.x1 = newX1;
-                  changed = true;
-                }
+                d.x0 = left;
+                d.x1 = left + minWidth;
               }
+              changed = true; // clamping always changes something if width < minWidth
             } else if (d.x1 < d.x0) {
               const t = d.x0; d.x0 = d.x1; d.x1 = t;
               changed = true;
             }
+
             if (changed) {
               handleZoneUpdate();
-            }  
+            }
             handleZoneDragFinish();
           });
         return resize;
