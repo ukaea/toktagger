@@ -37,6 +37,9 @@ jobs:
   eslint:
     name: ESLint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/ui
 
     steps:
       - name: Checkout code
@@ -49,11 +52,31 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./services/ui
 
       - name: Run ESLint
         run: npx eslint .
+
+  prettier:
+    name: Prettier Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
         working-directory: ./services/ui
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20   # or your version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Prettier check
+        run: npx prettier --check .
 
   test:
     name: Pytest
