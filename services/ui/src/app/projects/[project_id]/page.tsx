@@ -1,5 +1,5 @@
 "use client";
-import { use, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { getSamples, getProject } from '@/app/core';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Button, Picker, Item, Flex, SearchField} from '@adobe/react-spectrum'
 import { SortDescriptor } from '@react-types/shared';
@@ -84,10 +84,20 @@ export default function ProjectView({
   const [shotId, setShotId] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: 'shot_id', direction: 'ascending' });
-  
+  const [samples, setSamples] = useState<Sample[]>([]);
+
   const { project_id } = use(params);
-  const project = getProject(project_id);
-  const samples = getSamples(sortDescriptor, project_id, currentPage, samplesPerPage, shotId);
+  const [project, setProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const samples = await getSamples(sortDescriptor, project_id, currentPage, samplesPerPage, shotId);
+      setSamples(samples);
+      const project = await getProject(project_id);
+      setProject(project);
+    };
+    fetchData();
+  }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor]);
 
   if (!project) {
     return;

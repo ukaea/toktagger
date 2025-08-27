@@ -1,6 +1,6 @@
 "use client";
 import { getProjects } from '@/app/core';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {Provider, defaultTheme, Cell, Column, Row, TableView, TableBody, TableHeader, Breadcrumbs, Item, Button, Picker, Flex, SearchField} from '@adobe/react-spectrum'
 import type { SortDescriptor } from '@react-types/shared';
 import type { Project } from '@/types';
@@ -65,11 +65,15 @@ export default function Projects() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [projectName, setProjectName] = useState<string>("");
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: '_id', direction: 'descending' });
-  
-  const projects = getProjects(sortDescriptor, currentPage, projectsPerPage, projectName);
-  if (!projects) {
-    return;
-  }
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const projects = await getProjects(sortDescriptor, currentPage, projectsPerPage, projectName);
+      setProjects(projects);
+    };
+    fetchData();
+  }, [currentPage, projectsPerPage, projectName, sortDescriptor]);
 
   const onSortChange = (newSortDescriptor: SortDescriptor) => {
     setSortDescriptor(newSortDescriptor);

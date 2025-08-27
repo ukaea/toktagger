@@ -136,7 +136,7 @@ export const VSpans = ({plotId, plotReady, forceUpdate} : ToolingProps) => {
                     .on("contextmenu", handleContextMenu)
             }
         }))
-    }, [handleVSpanUpdate, plotId, plotReady, showVSpanMenu, vspans, triggerUpdate, forceUpdate, disableToolingInteraction])
+    }, [handleVSpanUpdate, handleVSpanDragFinish, plotId, plotReady, showVSpanMenu, vspans, triggerUpdate, forceUpdate, disableToolingInteraction])
 
     return (
         <div />

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
@@ -7,12 +9,12 @@ export default function Home() {
         </h1>
         <ul className="list-none list-inside space-y-2">
           <li>
-            <a
+            <Link
               href="/projects"
               className="inline-block px-4 py-2 bg-white/60 text-gray-800 font-semibold rounded hover:bg-white/80"
             >
               Load Project
-            </a>
+            </Link>
           </li>
         </ul>
       </div>
