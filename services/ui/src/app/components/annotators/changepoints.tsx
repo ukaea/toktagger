@@ -9,6 +9,12 @@ import {
   Switch,
 } from "@adobe/react-spectrum";
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { AnnotatorTypes } from "./types";
+
+enum ChangePointMethod {
+  PELT = "pelt",
+  HMM = "hmm",
+}
 
 type ChangePointDetectionType = {
   project_id: string;
@@ -26,8 +32,8 @@ export function ChangePointDetectionTool({
   setAnnotations,
 }: ChangePointDetectionType) {
   const methodOptions = [
-    { id: 0, name: "pelt" },
-    { id: 1, name: "hmm" },
+    { id: 0, name: ChangePointMethod.PELT },
+    { id: 1, name: ChangePointMethod.HMM },
   ];
   const signalOptions = Object.keys(data.values).map((value, index) => ({
     id: index,
@@ -38,12 +44,13 @@ export function ChangePointDetectionTool({
   const [signalName, setSignalName] = useState<string | null>(null);
   const [penalty, setPenalty] = useState<number>(5);
   const [numPoints, setNumPoints] = useState<number>(500);
-  const [method, setMethod] = useState<string>("pelt");
+  const [method, setMethod] = useState<string>(ChangePointMethod.PELT);
   const [numComponents, setNumComponents] = useState<number>(3);
+  const validSignalName = signalName && signalName in data.values;
 
   useEffect(() => {
     const fetchData = async () => {
-      if (signalName === null || !(signalName in data.values)) {
+      if (!validSignalName || !isEnabled) {
         return;
       }
 
@@ -68,7 +75,7 @@ export function ChangePointDetectionTool({
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== "change_point_detection"
+            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
         );
         return otherAnnotations.concat(payload);
       });
@@ -83,21 +90,9 @@ export function ChangePointDetectionTool({
     numPoints,
     numComponents,
     isEnabled,
-    data,
+    validSignalName,
     setAnnotations,
   ]);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      setAnnotations((previousAnnotations: Annotation[]) => {
-        const otherAnnotations = previousAnnotations.filter(
-          (annotation: Annotation) =>
-            annotation.created_by !== "change_point_detection"
-        );
-        return otherAnnotations;
-      });
-    }
-  }, [isEnabled, setAnnotations]);
 
   return (
     <Provider theme={defaultTheme}>
@@ -123,7 +118,7 @@ export function ChangePointDetectionTool({
             {(x) => <Item>{x.name}</Item>}
           </ComboBox>
           <br />
-          {method === "pelt" && (
+          {method === ChangePointMethod.PELT && (
             <>
               <Slider
                 label="Penalty"
@@ -136,7 +131,7 @@ export function ChangePointDetectionTool({
               <br />
             </>
           )}
-          {method === "hmm" && (
+          {method === ChangePointMethod.HMM && (
             <>
               <Slider
                 label="No. Components"

@@ -11,7 +11,7 @@ import {
   RangeSlider,
   Switch,
 } from "@adobe/react-spectrum";
-import { set } from "zod/v4";
+import { AnnotatorTypes } from "./types";
 
 type PeakDetectionType = {
   project_id: string;
@@ -43,6 +43,8 @@ export function PeakDetectionTool({
     name: value,
   }));
 
+  const validSignalName = signalName && signalName in data.values;
+
   useEffect(() => {
     if (data && signalName !== null && signalName in data.values) {
       const time = data.values[signalName].time;
@@ -55,7 +57,7 @@ export function PeakDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (signalName == null || !(signalName in data.values) || !isEnabled) {
+      if (!validSignalName || !isEnabled) {
         return;
       }
 
@@ -79,7 +81,8 @@ export function PeakDetectionTool({
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
-          (annotation: Annotation) => annotation.created_by !== "peak_detection"
+          (annotation: Annotation) =>
+            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION
         );
         return otherAnnotations.concat(payload);
       });
@@ -92,22 +95,11 @@ export function PeakDetectionTool({
     prominence,
     distance,
     timeRange,
-    signalName,
     isEnabled,
-    data,
+    signalName,
+    validSignalName,
     setAnnotations,
   ]);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      setAnnotations((previousAnnotations: Annotation[]) => {
-        const otherAnnotations = previousAnnotations.filter(
-          (annotation: Annotation) => annotation.created_by !== "peak_detection"
-        );
-        return otherAnnotations;
-      });
-    }
-  }, [isEnabled, setAnnotations]);
 
   return (
     <Provider theme={defaultTheme}>

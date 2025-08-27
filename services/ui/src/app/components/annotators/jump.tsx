@@ -8,8 +8,8 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
-import { set } from "zod/v4";
+import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { AnnotatorTypes } from "./types";
 
 type JumpDetectionType = {
   project_id: string;
@@ -36,10 +36,11 @@ export function JumpDetectionTool({
   const [minDistance, setMinDistance] = useState<number>(5);
   const [smoothingValue, setSmoothingValue] = useState<number>(2);
   const [numPoints, setNumPoints] = useState<number>(2000);
+  const validSignalName = signalName && signalName in data.values;
 
   useEffect(() => {
     const fetchData = async () => {
-      if (signalName == null || !(signalName in data.values) || !isEnabled) {
+      if (!validSignalName || !isEnabled) {
         return;
       }
 
@@ -63,7 +64,8 @@ export function JumpDetectionTool({
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
-          (annotation: Annotation) => annotation.created_by !== "jump_detection"
+          (annotation: Annotation) =>
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
         );
         return otherAnnotations.concat(payload);
       });
@@ -78,20 +80,9 @@ export function JumpDetectionTool({
     smoothingValue,
     numPoints,
     isEnabled,
-    data,
+    validSignalName,
     setAnnotations,
   ]);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      setAnnotations((previousAnnotations: Annotation[]) => {
-        const otherAnnotations = previousAnnotations.filter(
-          (annotation: Annotation) => annotation.created_by !== "jump_detection"
-        );
-        return otherAnnotations;
-      });
-    }
-  }, [isEnabled, setAnnotations]);
 
   return (
     <Provider theme={defaultTheme}>

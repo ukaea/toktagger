@@ -16,7 +16,7 @@ import {
   SearchField,
 } from "@adobe/react-spectrum";
 import {
-  Annotations,
+  Annotation,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
@@ -38,7 +38,7 @@ import { useState } from "react";
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotations
+  annotations: Annotation[]
 ) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
@@ -48,6 +48,7 @@ async function saveAnnotations(
     },
     body: JSON.stringify(annotations),
   });
+  return response;
 }
 
 async function getNextSample(project_id: string) {
@@ -71,7 +72,7 @@ async function getShotSample(project_id: string, shot_id: string) {
 type SaveInfo = {
   project_id: string;
   sample_id: string;
-  annotations: Annotations;
+  annotations: Annotation[];
 };
 
 function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
@@ -94,14 +95,24 @@ function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
 function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   const handleClick = async () => {
     try {
-      await saveAnnotations(project_id, sample_id, annotations);
+      const response = await saveAnnotations(
+        project_id,
+        sample_id,
+        annotations
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to save annotations: ${response.statusText}`);
+      }
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
         timeout: 5000,
       });
     } catch (err) {
-      ToastQueue.negative(`Failed to save annotations: ${err.message}`, {
-        timeout: 5000,
-      });
+      if (err instanceof Error) {
+        ToastQueue.negative(`${err.message}`, {
+          timeout: 5000,
+        });
+      }
     }
   };
 
@@ -200,9 +211,9 @@ type ToolBarInfo = {
   project: Project;
   sample: Sample;
   data: Data;
-  annotations: Annotations;
+  annotations: Annotation[];
   setAnnotations: (
-    annotations: Annotations | ((prev: Annotations) => Annotations)
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
@@ -304,7 +315,7 @@ export default function ToolBar({
       return;
     }
 
-    let mhdData = resultSpec.data;
+    const mhdData = resultSpec.data;
     const ampRangeTool = (
       <AmplitudeSlider
         data={mhdData}

@@ -8,7 +8,8 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, Annotations, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { AnnotatorTypes } from "./types";
 
 type OutlierDetectionType = {
   project_id: string;
@@ -38,10 +39,11 @@ export function OutlierDetectionTool({
   const [threshold, setThreshold] = useState<number>(3);
   const [contamination, setContamination] = useState<number>(0);
   const [method, setMethod] = useState<string>("mad");
+  const validSignalName = signalName && signalName in data.values;
 
   useEffect(() => {
     const fetchData = async () => {
-      if (signalName == null || !(signalName in data.values) || !isEnabled) {
+      if (!validSignalName || !isEnabled) {
         return;
       }
 
@@ -65,7 +67,7 @@ export function OutlierDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== "outlier_detection"
+            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
         );
         return otherAnnotations.concat(payload);
       });
@@ -79,21 +81,9 @@ export function OutlierDetectionTool({
     contamination,
     method,
     isEnabled,
-    data,
+    validSignalName,
     setAnnotations,
   ]);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      setAnnotations((previousAnnotations: Annotation[]) => {
-        const otherAnnotations = previousAnnotations.filter(
-          (annotation: Annotation) =>
-            annotation.created_by !== "outlier_detection"
-        );
-        return otherAnnotations;
-      });
-    }
-  }, [isEnabled, setAnnotations]);
 
   return (
     <Provider theme={defaultTheme}>
