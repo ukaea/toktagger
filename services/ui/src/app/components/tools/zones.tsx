@@ -83,7 +83,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
       // Minimum width in data units: 0.1% of current x-range
       const [xMin, xMax] = xaxis.range as [number, number];
-      const MIN_WIDTH_FRACTION = 0.001; // 0.1%
+      const MIN_WIDTH_FRACTION = 0.1; // 0.1%
       const minWidth = (xMax - xMin) * MIN_WIDTH_FRACTION;
 
       const graphGroup = d3.select(overplot);
@@ -106,18 +106,15 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
             const width = Math.abs(d.x1 - d.x0);
 
             if (width < minWidth) {
-              const left  = Math.min(d.x0, d.x1);
-              const right = Math.max(d.x0, d.x1);
-
+              // Move the *dragged* handle; leave the other handle where it is
               if (isLeft) {
-                d.x1 = right;
-                d.x0 = right - minWidth;
+                d.x0 = d.x1 - minWidth;   // adjust left handle relative to fixed right
               } else {
-                d.x0 = left;
-                d.x1 = left + minWidth;
+                d.x1 = d.x0 + minWidth;   // adjust right handle relative to fixed left
               }
-              changed = true; // clamping always changes something if width < minWidth
+              changed = true;
             } else if (d.x1 < d.x0) {
+              // Normalize orientation only when not clamping
               const t = d.x0; d.x0 = d.x1; d.x1 = t;
               changed = true;
             }
@@ -127,6 +124,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
             }
             handleZoneDragFinish();
           });
+
         return resize;
       };
 
