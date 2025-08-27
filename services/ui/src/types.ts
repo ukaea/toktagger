@@ -1,12 +1,12 @@
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
-  created_by: z.string().default('manual'),
+  created_by: z.string().default("manual"),
   timestamp: z.string().optional(),
   validated: z.boolean().optional(),
   uncertainty: z.number().optional(),
   label: z.string(),
-  type: z.string()
+  type: z.string(),
 });
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 export const ClassLabelSchema = BaseAnnotationSchema;
@@ -23,7 +23,11 @@ export const TimePointSchema = BaseAnnotationSchema.extend({
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
 
-export const AnnotationSchema = z.union([TimePointSchema, TimeRegionSchema]);
+export const AnnotationSchema = z.union([
+  TimePointSchema,
+  TimeRegionSchema,
+  ClassLabelSchema,
+]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
 export const AnnotationsSchema = z.array(AnnotationSchema);
@@ -68,7 +72,7 @@ export const CategorySchema = z.object({
 export type Category = z.infer<typeof CategorySchema>;
 
 export const ZoneSchema = z.object({
-  created_by: z.string().default('manual'),
+  created_by: z.string().default("manual"),
   category: CategorySchema,
   x0: z.number(),
   x1: z.number(),
@@ -128,12 +132,12 @@ export type ToolingProps = {
 
 export enum ToolingTypes {
   ZONE,
-  VSPAN
+  VSPAN,
 }
 
 export type ToolingCallbacks = {
-  id: ToolingTypes
-  start: (x: number, y: number) => void
-  move: (x: number, y: number) => void
-  end: (x: number, y: number) => void
-}
+  id: ToolingTypes;
+  start: (x: number, y: number) => void;
+  move: (x: number, y: number) => void;
+  end: (x: number, y: number) => void;
+};
