@@ -23,7 +23,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
   // Hook to pull in data from context provider
   const { zones, handleZoneUpdate, handleZoneDragFinish, triggerUpdate } =
     useZoneContext();
-    const {disableToolingInteraction} = useContextMenuProvider()
+  const { disableToolingInteraction } = useContextMenuProvider();
 
   // Main rendering effect
   useEffect(() => {
@@ -44,7 +44,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
     // Get a reference to all subplots and find the name of the axis
     const subplots = plot.querySelectorAll(".subplot");
     const subplotNames = [...subplots].map((el) =>
-      [...el.classList].find((cls) => cls !== "subplot")
+      [...el.classList].find((cls) => cls !== "subplot"),
     );
 
     // For each subplot carry out the tooling generation
@@ -55,12 +55,12 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       }
 
       const overplot = document.getElementsByClassName(
-        `${plotId}-overplot-${subplotId}`
+        `${plotId}-overplot-${subplotId}`,
       )[0];
 
       if (!overplot) {
         console.error(
-          `Could not locate D3 overplot to generate zones: ${plotId}-overplot-${subplotId}`
+          `Could not locate D3 overplot to generate zones: ${plotId}-overplot-${subplotId}`,
         );
         handleZoneUpdate();
         return;
@@ -108,7 +108,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       const drag = d3
         .drag<SVGRectElement, Zone>()
         .on("start", function (event, d) {
-          const leftBoundary = Math.min(d.x0, d.x1)
+          const leftBoundary = Math.min(d.x0, d.x1);
           dragOffset.current = xaxis.d2p(leftBoundary) - event.x;
         })
         .on("drag", function (event, d) {
@@ -116,8 +116,10 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           d3.select(this).attr("x", newX);
 
           const x0 = xaxis.p2d(newX);
-          const x1 = xaxis.p2d(newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0)));
-                    const x0Left = d.x0 < d.x1
+          const x1 = xaxis.p2d(
+            newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0)),
+          );
+          const x0Left = d.x0 < d.x1;
           d.x0 = x0Left ? x0 : x1;
           d.x1 = x0Left ? x1 : x0;
           handleZoneUpdate();
@@ -127,24 +129,24 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         });
 
       function handleContextMenu(event: MouseEvent, zone: Zone) {
-          event.preventDefault(); // Prevent default context menu
-          const isRightClickEvent = (event.button === 2 && !event.ctrlKey);
-          if (isRightClickEvent) {
-              showZoneMenu({
-                  event,
-                  props: {
-                      zone,
-                  },
-              });
-          }
+        event.preventDefault(); // Prevent default context menu
+        const isRightClickEvent = event.button === 2 && !event.ctrlKey;
+        if (isRightClickEvent) {
+          showZoneMenu({
+            event,
+            props: {
+              zone,
+            },
+          });
+        }
       }
 
       // Create the zone and transparent handles on each boundary
       for (const zone of zones) {
         const x0 = xaxis.d2p(zone.x0);
         const x1 = xaxis.d2p(zone.x1);
-                const x = Math.min(x0, x1)
-                const pointerEvent = disableToolingInteraction ? "none" : "all"
+        const x = Math.min(x0, x1);
+        const pointerEvent = disableToolingInteraction ? "none" : "all";
         graphGroup
           .append("rect")
           .attr("class", "zone span cursor-grab disable-on-modifier")
@@ -173,7 +175,8 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .datum(zone)
           .call(getBoundaryHandler(true));
 
-        graphGroup.append("rect")
+        graphGroup
+          .append("rect")
           .attr("class", "zone rightHandle disable-on-modifier")
           .attr("x", x1 - 10)
           .attr("y", upperLimit)
@@ -183,11 +186,20 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
           .datum(zone)
-          .call(getBoundaryHandler(false))
+          .call(getBoundaryHandler(false));
       }
     });
-        
-  }, [handleZoneUpdate, plotId, plotReady, showZoneMenu, zones, triggerUpdate, forceUpdate, handleZoneDragFinish, disableToolingInteraction]);
+  }, [
+    handleZoneUpdate,
+    plotId,
+    plotReady,
+    showZoneMenu,
+    zones,
+    triggerUpdate,
+    forceUpdate,
+    handleZoneDragFinish,
+    disableToolingInteraction,
+  ]);
 
-    return <div />;
-}
+  return <div />;
+};

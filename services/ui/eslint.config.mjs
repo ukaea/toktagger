@@ -17,16 +17,19 @@ const eslintConfig = [
       "build/**",
       "coverage/**",
       "node_modules/**",
-      ".next/**"
-    ]
+      ".next/**",
+    ],
   },
   {
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", {
-        "argsIgnorePattern": "^_"
-      }]
-    }
-  }
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;
