@@ -95,36 +95,46 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         const resize = d3
           .drag<SVGRectElement, Zone>()
           .on("drag", function (event, d) {
-            // allow wrapping while dragging (no clamp here)
+            // Convert pointer X (pixels) → data units; allow wrap while dragging (no clamp here)
             const x = xaxis.p2d(event.x);
-            if (isLeft) d.x0 = x; else d.x1 = x;
-            handleZoneUpdate();
+            if (isLeft) d.x0 = x; else d.x1 = x; // live-update only the boundary being dragged
+            handleZoneUpdate();  
           })
           .on("end", function (_event, d) {
-            // on end: enforce min width and normalize orientation
+            // On drag end: enforce minimum width and normalize orientation
+            // minWidth is in data units (computed from current x-range above)
             let changed = false;
             const width = Math.abs(d.x1 - d.x0);
-
             if (width < minWidth) {
-              // Move the *dragged* handle; leave the other handle where it is
-              if (isLeft) {
-                d.x0 = d.x1 - minWidth;   // adjust left handle relative to fixed right
-              } else {
-                d.x1 = d.x0 + minWidth;   // adjust right handle relative to fixed left
-              }
+              // Clamp to min width by moving ONLY the boundary the user dragged.
+              // Keep the opposite boundary fixed so the zone’s "anchor"/center doesn’t jump.
               changed = true;
-            } else if (d.x1 < d.x0) {
-              // Normalize orientation only when not clamping
+              if (isLeft) {
+                // If the left boundary has crossed to the right of x1, place it to the right; otherwise to the left.
+                if (d.x0 > d.x1)
+                {
+                  d.x0 = d.x1 + minWidth; // wrapped past right → clamp on the right side of x1
+                } else {
+                  d.x0 = d.x1 - minWidth;  // normal case → clamp on the left side of x1
+                }
+              } else {
+                // Symmetric logic for right boundary relative to fixed left boundary (x0)
+                if (d.x1 < d.x0) {
+                  d.x1 = d.x0 - minWidth // wrapped past left → clamp on the left side of x0
+                  d.x1 = d.x0 + minWidth // normal case → clamp on the right side of x0
+                }
+              }
+            } 
+             // Always normalize so downstream logic sees x0 <= x1
+            if (d.x1 < d.x0) {
               const t = d.x0; d.x0 = d.x1; d.x1 = t;
               changed = true;
             }
-
             if (changed) {
-              handleZoneUpdate();
-            }
-            handleZoneDragFinish();
+              handleZoneUpdate();  
+            }  
+            handleZoneDragFinish();  
           });
-
         return resize;
       };
 
