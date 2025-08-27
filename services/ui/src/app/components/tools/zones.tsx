@@ -186,8 +186,8 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         const spanWidth = spanRight - spanLeft;
 
         // handle layout: fixed outside strip + variable inside strip
-        const OUTER_HANDLE_PX = 20;         // fixed, always clickable outside the zone
-        const INNER_HANDLE_MAX_PX = 20;     // cap inside portion so handles don't dominate
+        const OUTER_HANDLE_PX = 10;         // fixed, always clickable outside the zone
+        const INNER_HANDLE_MAX_PX = 10;     // cap inside portion so handles don't dominate
         const MIN_CENTER_DRAG_PX = 6;       // keep a gap so the middle stays draggable
 
         // inside portion per side; shrink when zone is tiny to keep a center gap
