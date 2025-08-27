@@ -49,9 +49,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: ./services/ui
 
       - name: Run ESLint
         run: npx eslint .
+        working-directory: ./services/ui
 
   test:
     name: Pytest
