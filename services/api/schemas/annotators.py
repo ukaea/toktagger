@@ -24,8 +24,8 @@ class PeakDetectionParams(AnnotatorParams):
     signal_name: str
     prominence: float
     distance: int
-    time_min: Optional[float]
-    time_max: Optional[float]
+    time_min: Optional[float] = None
+    time_max: Optional[float] = None
 
 
 class OutlierDetectionParams(AnnotatorParams):

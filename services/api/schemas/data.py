@@ -12,7 +12,7 @@ class TimeSeriesData(Data):
 
 
 class MultiVariateTimeSeriesData(Data):
-    values: dict[str, TimeSeriesData]
+    values: dict[str, TimeSeriesData | None]
 
 
 class CompositeData(Data):
@@ -33,7 +33,6 @@ DataResponseType = Union[
     Data,
     ImageData,
     MultiVariateTimeSeriesData,
-    ImageData,
     CompositeData,
     SpectrogramData,
 ]

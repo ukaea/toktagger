@@ -18,5 +18,6 @@ ruptures
 uda
 hmmlearn
 uda
+pytest
 mkdocs
 mkdocs-material

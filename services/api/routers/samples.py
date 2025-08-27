@@ -53,7 +53,7 @@ async def get_samples(
     return samples
 
 
-@router.put(
+@router.post(
     "",
     responses={
         200: {
@@ -187,7 +187,6 @@ async def get_next_sample(
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
     samples = await utils.get_samples(db_client, project_id)
-    print(samples)
     annotations = await utils.get_annotations(db_client, project_id, validated=False)
 
     data_pool = DataPool(
@@ -221,9 +220,11 @@ async def get_sample(
     Get the specified sample from this project.
     --------------------------------------------
     """
-    # Get sample with this ID
     db_client = request.app.state.db_client
-    sample = await utils.get_sample(db_client, sample_id)
+    # Check project exists
+    project = await utils.get_project(db_client, project_id)
+    # Get specified sample
+    sample = await utils.get_sample(db_client, project.id, sample_id)
     return sample
 
 
@@ -250,20 +251,13 @@ async def remove_sample(
     # Remove samples from the project
     # Dont envisage this actually deleting the data stored about these samples
     # But do we need a separate method for that?
-    project_obj_id = convert_to_objectid(project_id, "projects")
-    sample_obj_id = convert_to_objectid(sample_id, "samples")
-
-    if not await request.app.state.db_client.get_document_by_id(
-        "projects", project_obj_id
-    ):
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
-
-    result = await request.app.state.db_client.delete_filtered_documents(
-        collection="projects",
-        filters={"_id": sample_obj_id, "project_id": project_obj_id},
-    )
-
-    if result.deleted_count == 0:
-        raise HTTPException(
-            status_code=404, detail="Sample not found with that ID for this Project."
-        )
+    db_client = request.app.state.db_client
+    # Check project exists
+    await utils.get_project(db_client, project_id=project_id)
+    
+    # Delete sample
+    await utils.delete_samples(db_client, project_id=project_id, sample_id=sample_id)
+    
+    # Delete annotations associated with this sample
+    await utils.delete_annotations(db_client, project_id=project_id, sample_id=sample_id)
+    

@@ -38,7 +38,7 @@ import { useState } from "react";
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
     const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
     const response = await fetch(ANNOTATIONS_URL, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
         'Content-Type': 'application/json',
         },
