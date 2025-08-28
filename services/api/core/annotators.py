@@ -141,7 +141,7 @@ class DataAnnotator(ABC):
         pass
 
     @abstractmethod
-    def predict():
+    def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
         pass
 
 
@@ -213,8 +213,8 @@ class PeakDetectionAnnotator(DataAnnotator):
             if peak_time >= tmin and peak_time <= tmax:
                 region = TimeRegion(
                     label="Peak",
-                    time_min=float(peak_time - width),
-                    time_max=float(peak_time + width),
+                    time_min=max(float(peak_time - width), np.min(time)),
+                    time_max=min(float(peak_time + width), np.max(time)),
                     created_by=AnnotatorTypes.PEAK_DETECTION,
                 )
                 regions.append(region)

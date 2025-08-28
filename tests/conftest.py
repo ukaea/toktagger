@@ -60,7 +60,7 @@ async def setup_db(db_client):
     await asyncio.sleep(0.01)
     sample_id_2 = await db_client.insert('samples', db_definitions.SAMPLE_2, ids={"project_id": ObjectId(project_id_1)})
     await asyncio.sleep(0.01)
-    sample_id_3 = await db_client.insert('samples', db_definitions.SAMPLE_3, ids={"project_id": ObjectId(project_id_1)})
+    sample_id_3 = await db_client.insert('samples', db_definitions.SAMPLE_3, ids={"project_id": ObjectId(project_id_2)})
     await asyncio.sleep(0.01)
     sample_id_4 = await db_client.insert('samples', db_definitions.SAMPLE_4, ids={"project_id": ObjectId(project_id_2)})
     await asyncio.sleep(0.01)

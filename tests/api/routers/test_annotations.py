@@ -1,5 +1,4 @@
 import pytest
-import asyncio
 from bson.objectid import ObjectId
 
 @pytest.mark.asyncio
@@ -146,27 +145,36 @@ async def test_create_annotations(api_client, setup_db, db_client):
             "label": "ramp_up",
             "time_min": 0.1,
             "time_max": 0.2,
+            "created_by": "manual",
+            "type": "time_region",
             "validated": True
         },
         {
             "label": "flat_top",
             "time_min": 0.2,
             "time_max": 0.5,
+            "created_by": "manual",
+            "type": "time_region",
             "validated": True
         },
         {
             "label": "disruption",
             "time": 0.5,
+            "created_by": "manual",
+            "type": "time_point",
             "validated": True
         }
     ]
-    response = await api_client.put(f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_3']}/annotations", json=in_annotations)
+
+    project_id = 'project_id_1'
+    sample_id = 'sample_id_2'
+    response = await api_client.put(f"/projects/{setup_db[project_id]}/samples/{setup_db[sample_id]}/annotations", json=in_annotations)
     assert response.status_code == 200
         
     # Check they have been added to database
     annotations = await db_client.get_all_documents("annotations")
-    assert len(annotations) == 8
-    db_annotations = await db_client.get_filtered_documents("annotations", filters={"sample_id": ObjectId(setup_db['sample_id_3'])})
+    assert len(annotations) == 7
+    db_annotations = await db_client.get_filtered_documents("annotations", filters={"sample_id": ObjectId(setup_db[sample_id])})
     for in_annotation in in_annotations:
         # Find annotation with that label
         db_annotation = next(annotation for annotation in db_annotations if annotation['label'] == in_annotation['label'])
@@ -175,8 +183,8 @@ async def test_create_annotations(api_client, setup_db, db_client):
         
         assert db_annotation.get("timestamp")
         assert db_annotation.get("_id")
-        assert str(db_annotation.get("project_id")) == setup_db['project_id_1']
-        assert str(db_annotation.get("sample_id")) == setup_db['sample_id_3']
+        assert str(db_annotation.get("project_id")) == setup_db[project_id]
+        assert str(db_annotation.get("sample_id")) == setup_db[sample_id]
 
 @pytest.mark.asyncio
 async def test_create_annotation_invalid(api_client, setup_db, db_client):

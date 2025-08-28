@@ -11,11 +11,11 @@ requests
 # torch
 # torchmetrics
 numpy
+# install latest due to this issue: https://github.com/deepcharles/ruptures/issues/351
+ruptures @ git+https://github.com/deepcharles/ruptures.git@master
 scikit-learn
 celery[redis]
 pillow
-ruptures
-uda
 hmmlearn
 uda
 pytest

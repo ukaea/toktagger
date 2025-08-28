@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from typing import Literal
 from services.api.crud import utils
-from services.api.schemas.annotations import AnnotationOutTypes
+from services.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
 
 router = APIRouter(
     prefix="/projects/{project_id}",
@@ -143,6 +143,7 @@ async def get_annotations(
         start=start,
         count=count,
     )
+    print(annotations)
 
     return annotations
 
@@ -156,7 +157,7 @@ async def get_annotations(
 )
 async def update_annotations(
     request: Request,
-    annotations: list[AnnotationOutTypes],
+    annotations: list[AnnotationTypes],
     project_id: str = Path(
         description="The ID of the project to update annotations for."
     ),

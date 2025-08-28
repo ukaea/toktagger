@@ -1,3 +1,4 @@
+from typing import cast
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
@@ -23,6 +24,7 @@ class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
     def get_sample(self, sample: Sample) -> ImageData:
+        assert isinstance(sample.data, FileData)
         item: FileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
@@ -35,6 +37,7 @@ class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, TimeSeriesFileData)
         item: TimeSeriesFileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
@@ -58,6 +61,7 @@ class UDADataLoader(DataLoader):
         self.client = pyuda.Client()
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, ShotData)
         item: ShotData = sample.data
 
         results = {}
@@ -66,8 +70,8 @@ class UDADataLoader(DataLoader):
                 signal = self.client.get(name, sample.shot_id)
                 data = signal.data
                 time = signal.time.data
-                item = TimeSeriesData(time=time, values=data)
-                results[name] = item
+                signal = TimeSeriesData(time=time, values=data)
+                results[name] = signal
             except Exception as e:
                 results[name] = None
 
