@@ -297,9 +297,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
         median = np.median(data)
         abs_deviation = np.abs(data - median)
         mad = np.median(abs_deviation)
-
-        if mad == 0:
-            return []
+        mad = np.clip(mad, a_min=1e-10, a_max=None)
 
         MAD_CONSTANT = 0.6745  # Constant to convert MAD to standard Z-score
         modified_z_scores = MAD_CONSTANT * (data - median) / mad
@@ -412,11 +410,22 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         scaler = StandardScaler()
         signal = scaler.fit_transform(signal)
 
-        model = hmm.GaussianHMM(
-            n_components=self.params.num_components, covariance_type="full", n_iter=100
-        )
-        model.fit(signal)
-        hidden_states = model.predict(signal)
+
+        best_score = -1e-10
+        best_model = None
+        num_models = 10
+
+        # try a range of fits to find the best model for the data
+        for seed in range(num_models):
+            m = hmm.GaussianHMM(n_components=self.params.num_components, n_iter=200, random_state=seed)
+            m.fit(signal)
+            score = m.score(signal)
+            if score > best_score:
+                best_score = score
+                best_model = m
+
+        # use best model for hidden states
+        hidden_states = best_model.predict(signal)
         time = time.flatten()
         bounds = extract_segments(hidden_states + 1)
         bounds = [(time[imin], time[imax]) for (imin, imax, _) in bounds]
