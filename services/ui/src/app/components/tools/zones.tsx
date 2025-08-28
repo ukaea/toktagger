@@ -120,8 +120,9 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
               } else {
                 // Symmetric logic for right boundary relative to fixed left boundary (x0)
                 if (d.x1 < d.x0) {
-                  d.x1 = d.x0 - minWidth // wrapped past left → clamp on the left side of x0
-                  d.x1 = d.x0 + minWidth // normal case → clamp on the right side of x0
+                  d.x1 = d.x0 - minWidth; // wrapped past left → clamp on the left side of x0
+                } else {
+                  d.x1 = d.x0 + minWidth; // normal case → clamp on the right side of x0
                 }
               }
             } 
