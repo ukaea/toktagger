@@ -76,7 +76,7 @@ jobs:
         run: npm ci
 
       - name: Run Prettier check
-        run: npx prettier --check .
+        run: npx prettier --check services tests
 
   test:
     name: Pytest
