@@ -1,5 +1,5 @@
 "use client";
-import { getProjects } from "@/app/core";
+import { getProjects } from "../core";
 import { useEffect, useState } from "react";
 import {
   Provider,
@@ -30,10 +30,7 @@ const ProjectsBreadCrumbs = () => {
   return (
     <Provider theme={defaultTheme}>
       <Breadcrumbs>
-        <Item
-          key="projects"
-          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}
-        >
+        <Item key="projects" href={`/projects/`}>
           Projects
         </Item>
       </Breadcrumbs>
@@ -78,9 +75,7 @@ const ProjectsTable = ({
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row
-                href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item["id"]}`}
-              >
+              <Row href={`/projects/${item["id"]}`}>
                 <Cell>{item["name"]}</Cell>
                 <Cell>{item["task"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
