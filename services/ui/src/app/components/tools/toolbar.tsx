@@ -48,7 +48,7 @@ async function getNextSample(project_id: string) {
 }
 
 async function getShotSample(project_id: string, shot_id: string) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/?shot_id=${shot_id}`;
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
   const sampleResult = await fetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
   let sample = null;
@@ -115,9 +115,9 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
       setErrorMessage("");
       const shot_id = newValue;
       try {
-        await saveAnnotations(project_id, sample_id, annotations);
         const sample = await getShotSample(project_id, shot_id);
         if (sample !== null) {
+          await saveAnnotations(project_id, sample_id, annotations);
           const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
           navigate(NEXT_SAMPLE_URL);
         } else {

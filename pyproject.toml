@@ -39,7 +39,7 @@ where = ["services"]
 include = ["api*"]
 
 [tool.setuptools.package-data]
-"myapp" = ["services/api/static/**/*"]
+"vizannotation" = ["services/api/static/**/*"]
 
 [tool.ruff]
 exclude = [".venv", "notebooks"]
