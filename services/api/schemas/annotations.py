@@ -67,3 +67,5 @@ AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
 AnnotationOutTypes = Union[
     TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
 ]
+AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
+AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)
