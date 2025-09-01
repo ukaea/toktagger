@@ -44,4 +44,3 @@ class ProjectUpdate(ConfiguredModel):
     name: Optional[str]
     task: Optional[Task]
     query_strategy: Optional[QueryStrategyType]
-    data_loader: Optional[DataLoaderType]

@@ -22,7 +22,14 @@ import {
   Content,
   ButtonGroup,
 } from "@adobe/react-spectrum";
-import { Project, Sample, SamplesSummary, FileData, ShotData } from "@/types";
+import {
+  Project,
+  Sample,
+  SamplesSummary,
+  FileData,
+  ShotData,
+  ProjectUpdate,
+} from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { getSamplesSummary } from "@/app/core";
@@ -374,7 +381,7 @@ const TaskLoaderForm = ({
 
 const editProject = async (
   projectId: string,
-  project: Project
+  project: ProjectUpdate
 ): Promise<string> => {
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}`,
@@ -396,7 +403,6 @@ const editProject = async (
 };
 
 const createProject = async (project: Project): Promise<string> => {
-  console.log(project);
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`,
     {
@@ -571,26 +577,25 @@ export const ProjectConfigEditor = ({
     run();
   }, [project]);
 
-  const doEditProject = async (
-    project: Project,
-    dataLoaderOptions: DataLoaderOptions
-  ) => {
+  const doEditProject = async (project: Project) => {
     const projectId = project._id;
 
     if (!projectId) {
       throw new Error(`Cannot edit a project with missing Project ID.`);
     }
 
-    const updatedProject = buildProject(
-      projectName,
-      dataLoaderOptions,
-      taskSelection || "",
-      queryStrategy
-    );
-    updatedProject.data_loader = project.data_loader;
-    updatedProject.task = project.task;
+    project.name = projectName;
+    project.query_strategy = queryStrategy;
+    project.task = taskSelection || "";
+
+    const updatedProject = {
+      name: project.name,
+      query_strategy: project.query_strategy,
+      task: project.task,
+    };
+
     await editProject(projectId, updatedProject);
-    if (onModify) onModify(updatedProject);
+    if (onModify) onModify(project);
   };
 
   const doCreateProject = async (dataLoaderOptions: DataLoaderOptions) => {
@@ -603,7 +608,6 @@ export const ProjectConfigEditor = ({
     const samples = buildSamples(dataLoaderOptions);
 
     const projectId = await createProject(project);
-    console.log(samples);
     await createSamples(projectId, samples);
     if (onModify) onModify(project);
   };
@@ -646,19 +650,20 @@ export const ProjectConfigEditor = ({
   }, [project, samplesSummary]);
 
   const onCreatePress = async (close: () => void) => {
-    if (dataLoaderOptions === null) {
-      return;
-    }
+    console.log("Create/Edit project pressed");
 
     if (editMode && project?._id) {
       try {
-        await doEditProject(project, dataLoaderOptions);
+        await doEditProject(project);
         close();
       } catch (error) {
         ToastQueue.negative(`${error}`, { timeout: 3000 });
       }
     } else {
       try {
+        if (dataLoaderOptions === null) {
+          return;
+        }
         await doCreateProject(dataLoaderOptions);
         close();
       } catch (error) {

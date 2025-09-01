@@ -1,4 +1,3 @@
-import exp from "constants";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
@@ -90,6 +89,13 @@ export const ProjectSchema = z.object({
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
+export const ProjectUpdateSchema = z.object({
+  name: z.string().optional(),
+  task: z.string().optional(),
+  query_strategy: z.string().optional(),
+});
+export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
+
 export const FileDataSchema = z.object({
   file_name: z.string(),
   type: z.string(),
@@ -120,7 +126,7 @@ export const SamplesSummarySchema = z.object({
   total: z.number(),
   shot_min: z.number().optional(),
   shot_max: z.number().optional(),
-  data: SampleDataSchema
+  data: SampleDataSchema,
 });
 export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
 
@@ -149,12 +155,12 @@ export type ToolingProps = {
 
 export enum ToolingTypes {
   ZONE,
-  VSPAN
+  VSPAN,
 }
 
 export type ToolingCallbacks = {
-  id: ToolingTypes
-  start: (x: number, y: number) => void
-  move: (x: number, y: number) => void
-  end: (x: number, y: number) => void
-}
+  id: ToolingTypes;
+  start: (x: number, y: number) => void;
+  move: (x: number, y: number) => void;
+  end: (x: number, y: number) => void;
+};
