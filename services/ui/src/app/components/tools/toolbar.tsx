@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Provider,
   defaultTheme,
@@ -23,15 +22,17 @@ import {
 } from "@/types";
 import { FindPeaksTool } from "@/app/components/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+import { useNavigate } from "react-router-dom";
+import { BACKEND_API_URL } from "@/app/core";
 
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotations,
+  annotations: Annotations
 ) {
-  const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   await fetch(ANNOTATIONS_URL, {
-    method: "POST",
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
@@ -40,14 +41,14 @@ async function saveAnnotations(
 }
 
 async function getNextSample(project_id: string) {
-  const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
   const sampleResult = await fetch(NEXT_URL);
   const sample = await sampleResult.json();
   return sample;
 }
 
 async function getShotSample(project_id: string, shot_id: string) {
-  const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?shot_id=${shot_id}`;
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/?shot_id=${shot_id}`;
   const sampleResult = await fetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
   let sample = null;
@@ -64,14 +65,14 @@ type SaveInfo = {
 };
 
 function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handleClick = async () => {
     try {
       await saveAnnotations(project_id, sample_id, annotations);
       const sample = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
-      router.push(NEXT_SAMPLE_URL);
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -104,7 +105,7 @@ function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
 }
 
 export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   const onSearchSubmit = async (newValue: string) => {
@@ -117,8 +118,8 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
         await saveAnnotations(project_id, sample_id, annotations);
         const sample = await getShotSample(project_id, shot_id);
         if (sample !== null) {
-          const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
-          router.push(NEXT_SAMPLE_URL);
+          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+          navigate(NEXT_SAMPLE_URL);
         } else {
           setErrorMessage("Shot not found!");
         }
@@ -179,7 +180,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end,
+          val.end
         )}`
       }
     />
@@ -235,7 +236,7 @@ export default function ToolBar({
     }
 
     const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"],
+      result.data.values["mirnov"]
     );
 
     if (!mhdData.success) {

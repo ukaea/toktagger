@@ -32,7 +32,7 @@ def create_uda_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
 def create_local_samples(
@@ -57,26 +57,20 @@ def create_local_samples(
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
 def main():
-    shot_files = Path("./data/test/summary").glob("*.parquet")
+    shot_files = Path("./data/summary").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
 
-    project_id = create_project("UDA Disruption Project", "disruption", "uda")
-    create_uda_samples(project_id, shot_ids)
-
-    project_id = create_project("Local ELM Project", "ELM", "parquet")
-    create_local_samples(project_id, shot_ids, base_path="/data/test/summary")
-
-    shot_files = Path("./data/test/mhd").glob("*.parquet")
-    shot_files = list(shot_files)
-    shot_ids = [int(path.stem) for path in shot_files]
-    project_id = create_project("Local MHD Project", "MHD", "parquet")
+    project_id = create_project("Full ELM Project", "ELM", "parquet")
     create_local_samples(
-        project_id, shot_ids, base_path="/data/test/mhd", columns=["mirnov"]
+        project_id,
+        shot_ids,
+        base_path="/data/summary",
+        columns=["dalpha", "ip", "power_nbi", "t_e_core", "sxr", "n_e_line"],
     )
 
 

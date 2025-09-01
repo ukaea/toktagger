@@ -1,6 +1,5 @@
 "use client";
-import { use, useEffect, useState } from "react";
-import { getSamples, getProject } from "@/app/core";
+import { useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -18,22 +17,18 @@ import {
   SearchField,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
+import { getSamples, getProject } from "@/app/core";
 import type { Project, Sample } from "@/types";
+import { useHref, useNavigate, useParams } from "react-router-dom";
 
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   return (
     <Provider theme={defaultTheme}>
       <Breadcrumbs>
-        <Item
-          key="projects"
-          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}
-        >
+        <Item key="projects" href={`/ui/projects`}>
           Projects
         </Item>
-        <Item
-          key="project"
-          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project._id}`}
-        >
+        <Item key="project" href={`/ui/projects/${project._id}`}>
           Project: {project.name}
         </Item>
       </Breadcrumbs>
@@ -54,13 +49,14 @@ const SamplesTable = ({
   sortDescriptor,
   onSortChange,
 }: SamplesTableProps) => {
+  const navigate = useNavigate();
   const rows = samples.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id,
   }));
 
   return (
-    <Provider theme={defaultTheme}>
+    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
       <Flex height="size-5000" width="100%" direction="column">
         <TableView
           flex
@@ -80,9 +76,7 @@ const SamplesTable = ({
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row
-                href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${item["id"]}`}
-              >
+              <Row href={`/ui/projects/${project_id}/samples/${item["id"]}`}>
                 <Cell>{item["shot_id"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
               </Row>
@@ -94,14 +88,10 @@ const SamplesTable = ({
   );
 };
 
-type ProjectViewProps = {
-  project_id: string;
-};
-export default function ProjectView({
-  params,
-}: {
-  params: Promise<ProjectViewProps>;
-}) {
+export default function ProjectView() {
+  const { project_id } = useParams();
+  const hasId = project_id !== undefined;
+
   const [samplesPerPage, setSamplesPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [shotId, setShotId] = useState<string>("");
@@ -112,11 +102,13 @@ export default function ProjectView({
   });
   const [samples, setSamples] = useState<Sample[]>([]);
 
-  const { project_id } = use(params);
   const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!hasId) {
+        return;
+      }
       const samples = await getSamples(
         sortDescriptor,
         project_id,
@@ -129,9 +121,9 @@ export default function ProjectView({
       setProject(project);
     };
     fetchData();
-  }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor]);
+  }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
 
-  if (!project) {
+  if (!project || !hasId) {
     return;
   }
 

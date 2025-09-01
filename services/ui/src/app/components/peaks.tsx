@@ -13,6 +13,7 @@ import {
 } from "@adobe/react-spectrum";
 import { RangeValue } from "@react-types/shared";
 import { useEffect, useState } from "react";
+import { BACKEND_API_URL } from "../core";
 
 type FindPeaksToolInfo = {
   project_id: string;
@@ -65,7 +66,7 @@ export function FindPeaksTool({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/find_peaks`,
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/find_peaks`,
         {
           method: "POST",
           headers: {
@@ -78,7 +79,7 @@ export function FindPeaksTool({
             time_min: timeRange.start,
             time_max: timeRange.end,
           }),
-        },
+        }
       );
 
       const payload = await response.json();
