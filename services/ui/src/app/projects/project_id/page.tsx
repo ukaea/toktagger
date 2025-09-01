@@ -22,8 +22,9 @@ import type { Project, Sample } from "@/types";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
+  const navigate = useNavigate();
   return (
-    <Provider theme={defaultTheme}>
+    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
       <Breadcrumbs>
         <Item key="projects" href={`/ui/projects`}>
           Projects
