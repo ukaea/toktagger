@@ -77,7 +77,7 @@ export const VSpanProvider = ({
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     spans.current = spans.current.map((span) => {
       if (span === props.vspan) {

@@ -31,14 +31,14 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {},
+  {}
 );
 
 type ELMViewInfo = {
   data: MultiVariateTimeSeriesData;
   annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
 };
 

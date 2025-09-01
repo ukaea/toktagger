@@ -115,7 +115,7 @@ export default function ProjectView() {
         project_id,
         currentPage,
         samplesPerPage,
-        shotId,
+        shotId
       );
       setSamples(samples);
       const project = await getProject(project_id);
