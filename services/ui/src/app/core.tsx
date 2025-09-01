@@ -13,7 +13,7 @@ export const getSamples = async (
   project_id: string,
   page: number,
   samplesPerPage: number,
-  shotId: string,
+  shotId: string
 ): Promise<Sample[]> => {
   const params = new URLSearchParams();
   params.append("sort_by", sortDescriptor.column.toString());
@@ -26,7 +26,7 @@ export const getSamples = async (
   }
 
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?${params.toString()}`,
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?${params.toString()}`
   );
   const data = await response.json();
   const samples = data as Sample[];
@@ -35,10 +35,10 @@ export const getSamples = async (
 
 export const getSample = async (
   project_id: string,
-  sample_id: string,
+  sample_id: string
 ): Promise<Sample> => {
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`,
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`
   );
   const data = await response.json();
   const sample = data as Sample;
@@ -49,7 +49,7 @@ export const getProjects = async (
   sortDescriptor: SortDescriptor,
   page: number,
   projectsPerPage: number,
-  name: string,
+  name: string
 ): Promise<Project[]> => {
   const params = new URLSearchParams();
   params.append("sort_by", sortDescriptor.column.toString());
@@ -61,7 +61,7 @@ export const getProjects = async (
   }
 
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/?${params.toString()}`,
+    `http://localhost:8002/projects?${params.toString()}`
   );
   const data = await response.json();
   const projects = data as Project[];
@@ -69,10 +69,10 @@ export const getProjects = async (
 };
 
 export const getProject = async (
-  project_id: string,
+  project_id: string
 ): Promise<Project | null> => {
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`,
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`
   );
   const data = await response.json();
   const project = data as Project;
