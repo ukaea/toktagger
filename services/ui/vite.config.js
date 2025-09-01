@@ -5,14 +5,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: 'dist', // default folder for production build
+    outDir: path.resolve(__dirname, "../api/static"),
     commonjsOptions: {
       transformMixedEsModules: true,   // ✅ fixes CJS/ESM interop
     },
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "src"), // use ~ as alias for src/
+      "@": path.resolve(__dirname, "src"), // use @ as alias for src/
       stream: 'stream-browserify'
     },
   },

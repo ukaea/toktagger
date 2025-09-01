@@ -69,14 +69,14 @@ def main():
     create_uda_samples(project_id, shot_ids)
 
     project_id = create_project("Local ELM Project", "ELM", "parquet")
-    create_local_samples(project_id, shot_ids, base_path="/data/test/summary")
+    create_local_samples(project_id, shot_ids, base_path="./data/test/summary")
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
     project_id = create_project("Local MHD Project", "MHD", "parquet")
     create_local_samples(
-        project_id, shot_ids, base_path="/data/test/mhd", columns=["mirnov"]
+        project_id, shot_ids, base_path="./data/test/mhd", columns=["mirnov"]
     )
 
 
