@@ -491,7 +491,7 @@ const createSamples = async (projectId: string, samples: Sample[]) => {
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}/samples`,
     {
-      method: "PUT",
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
