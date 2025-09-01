@@ -49,19 +49,19 @@ export const ZoneProvider = ({
 
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
-    // It is necessary for the context to trigger child refreshes
-    const triggerZoneUpdate = () => {
-        setTriggerUpdate((current) => (current+1)%10)
-    }
+  // It is necessary for the context to trigger child refreshes
+  const triggerZoneUpdate = () => {
+    setTriggerUpdate((current) => (current + 1) % 10);
+  };
 
   // Provides a method for child components to trigger context refresh
   const handleZoneUpdate = () => {
     triggerZoneUpdate();
   };
 
-    const handleZoneDragFinish = () => {
-        onModifyZone(zones.current);
-    }
+  const handleZoneDragFinish = () => {
+    onModifyZone(zones.current);
+  };
 
   const handleDelete = (input: unknown) => {
     zones.current = zones.current.filter((zone) => zone !== input);
@@ -71,7 +71,7 @@ export const ZoneProvider = ({
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     zones.current = zones.current.map((zone) => {
       if (zone === props.zone) {
@@ -103,13 +103,18 @@ export const ZoneProvider = ({
         triggerZoneUpdate();
       },
       end: (x, _y) => {
-        zones.current[zones.current.length - 1].x1 = x;
+        const z = zones.current[zones.current.length - 1];
+        z.x1 = x;
+        // Normalize orientation on creation finish (provider has no min-width context).
+        if (z.x1 < z.x0) {
+          [z.x0, z.x1] = [z.x1, z.x0];
+        }
+        triggerZoneUpdate();
         handleZoneDragFinish();
       },
     });
   };
 
-<<<<<<< HEAD
   // On initialisation the tool registers a menu item with the general context menu
   useEffect(() => {
     const addZone = (x0: number, x1: number, category: Category) => {
@@ -121,29 +126,6 @@ export const ZoneProvider = ({
       triggerZoneUpdate();
       onModifyZone(zones.current);
     };
-=======
-    const activateTooling = () => {
-        setToolingCallbacks({
-            id: ToolingTypes.ZONE,
-            start: (x, _y) => {addZone(x, x, categories[0])},
-            move: (x, _y) => {
-                zones.current[zones.current.length-1].x1 = x;
-                triggerZoneUpdate()
-            },
-            end: (x, _y) => {
-                const z = zones.current[zones.current.length-1];
-                z.x1 = x;
-                // Normalize orientation on creation finish (provider has no min-width context).
-                if (z.x1 < z.x0) {
-                  [z.x0, z.x1] = [z.x1, z.x0];
-                }
-                triggerZoneUpdate();
-                handleZoneDragFinish();
-            },
-        })
-    }
->>>>>>> main
-
     /**
      * Converts generic props into a new zone.
      * Uses 5 % of the current x-range as default width – avoids pixel scaling.
