@@ -32,7 +32,7 @@ jobs:
         run: uv sync
 
       - name: Run Ruff
-        run: uv run ruff check services tests --ignore=C901 && uv ruff format --check services tests  
+        run: uv run ruff check services tests --ignore=C901 && uv run ruff format --check services tests  
 
   eslint:
     name: ESLint
