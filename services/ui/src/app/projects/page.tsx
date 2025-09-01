@@ -1,6 +1,7 @@
 "use client";
 import { getProjects } from "../core";
 import { useEffect, useState } from "react";
+import { useNavigate, useHref } from "react-router-dom";
 import {
   Provider,
   defaultTheme,
@@ -43,13 +44,14 @@ const ProjectsTable = ({
   sortDescriptor,
   onSortChange,
 }: ProjectsTableProps) => {
+  const navigate = useNavigate();
   const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id,
   }));
 
   return (
-    <Provider theme={defaultTheme}>
+    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
       <Flex height="size-5000" width="100%" direction="column">
         <TableView
           flex
@@ -75,7 +77,7 @@ const ProjectsTable = ({
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row href={`/projects/${item["id"]}`}>
+              <Row href={`/ui/projects/${item.id}`}>
                 <Cell>{item["name"]}</Cell>
                 <Cell>{item["task"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>

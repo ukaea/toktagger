@@ -1,5 +1,5 @@
 "use client";
-import { use, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Provider,
   defaultTheme,
@@ -23,6 +23,8 @@ import { ELMView } from "@/app/elms/components/elms";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
+import { useHref, useNavigate, useParams } from "react-router-dom";
+import { BACKEND_API_URL } from "@/app/core";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -32,19 +34,14 @@ const SampleDataBreadCrumbs = ({
   project,
   sample,
 }: SampleDataBreadCrumbsInfo) => {
+  const navigate = useNavigate();
   return (
-    <Provider theme={defaultTheme}>
+    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
       <Breadcrumbs>
-        <Item
-          key="projects"
-          href={`${process.env.NEXT_PUBLIC_API_URL}/projects`}
-        >
+        <Item key="projects" href={`/ui/projects`}>
           Projects
         </Item>
-        <Item
-          key="project"
-          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project._id}`}
-        >
+        <Item key="project" href={`/ui/projects/${project._id}`}>
           Project: {project.name}
         </Item>
         <Item key="samples">Shot: {sample.shot_id}</Item>
@@ -58,11 +55,7 @@ type SampleViewInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-<<<<<<< HEAD
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
-=======
-    updater: (annotations: Annotations) => Annotations | Annotations
->>>>>>> 613f2f5 (Get project UI building)
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
   plotProps: PlotProps;
 };
@@ -132,35 +125,26 @@ async function getSample(
   sample_id: string
 ): Promise<Sample> {
   return await getData<Sample>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`
   );
 }
 
 async function getProject(project_id: string): Promise<Project> {
-  return await getData<Project>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`
-  );
+  return await getData<Project>(`${BACKEND_API_URL}/projects/${project_id}`);
 }
 
 async function getAnnotations(
   project_id: string,
-  sample_id: string,
+  sample_id: string
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`
   );
 }
 
-type SampleViewProps = {
-  project_id: string;
-  sample_id: string;
-};
-export default function SamplePage({
-  params,
-}: {
-  params: Promise<SampleViewProps>;
-}) {
-  const { project_id, sample_id } = use(params);
+export default function SamplePage() {
+  const { project_id, sample_id } = useParams();
+  const hasIds = project_id !== undefined && sample_id !== undefined;
 
   const [project, setProject] = useState<Project | null>(null);
   const [sample, setSample] = useState<Sample | null>(null);
@@ -175,6 +159,10 @@ export default function SamplePage({
 
   useEffect(() => {
     const refreshData = async (params: ViewParams) => {
+      if (!hasIds) {
+        return;
+      }
+
       const project = await getProject(project_id);
       setProject(project);
 
@@ -193,7 +181,7 @@ export default function SamplePage({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`,
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
         {
           method: "POST",
           headers: {
@@ -211,11 +199,9 @@ export default function SamplePage({
     };
 
     run(viewParams);
-  }, [project_id, sample_id, viewParams]);
+  }, [project_id, sample_id, viewParams, hasIds]);
 
-  useEffect(() => {}, [plotProps]);
-
-  if (!data || !project || !sample) {
+  if (!data || !project || !sample || !hasIds) {
     return;
   }
 
