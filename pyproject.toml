@@ -31,6 +31,7 @@ dependencies = [
   "pytest",
   "mkdocs",
   "mkdocs-material",
+  "mongita>=1.2.0",
 ]
 
 [tool.setuptools.packages.find]

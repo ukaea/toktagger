@@ -3,15 +3,20 @@ import pydantic
 import typing
 from bson.objectid import ObjectId
 
-# MONGO_URL = os.environ["MONGO_URL"]
-MONGO_URL = "mongodb://root:example@localhost:27017"
+from services.api.crud.mongita_client import AsyncMongitaClient
+
 DATABASE_NAME = "event_db"
 COLLECTION_NAME = "shots"
 
 
 class MongoDBClient:
     def __init__(self, url: str, db_name: str):
-        self.client = pymongo.AsyncMongoClient(url)
+        if db_name.startswith("mongodb://"):
+            # Use mongodb (expects running instance of mongodb at this address)
+            self.client = pymongo.AsyncMongoClient(url)
+        else:
+            # Use local mongita db.
+            self.client = AsyncMongitaClient(db_name)
         self.db = self.client[db_name]
 
     async def insert(
@@ -69,17 +74,14 @@ class MongoDBClient:
         start=0,
         limit=0,
     ):
-        documents = (
-            self.db[collection]
-            .find(filters)
-            .sort(
-                sort_by,
-                pymongo.ASCENDING
-                if sort_direction == "ascending"
-                else pymongo.DESCENDING,
-            )
-            .skip(start)
-            .limit(limit)
+        direction = (
+            pymongo.ASCENDING if sort_direction == "ascending" else pymongo.DESCENDING
+        )
+        documents = self.db[collection].find(
+            filters,
+            sort=[(sort_by, direction)],
+            skip=start,
+            limit=limit,
         )
         return await documents.to_list()
 
