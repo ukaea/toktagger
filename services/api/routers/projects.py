@@ -4,7 +4,6 @@ from services.api.schemas.projects import ProjectIn, Project, ProjectUpdate
 from services.api.crud import utils
 from services.api.crud.db import MongoDBClient
 
-
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
@@ -40,22 +39,16 @@ async def get_projects(
     Get a list of all available projects.
     -------------------------------------
     """
-    filters = {}
-    if name:
-        # Search with regex, return any projects which start with the searched for string, case insensitive
-        filters["name"] = {"$regex": f"{name}", "$options": "i"}
-
-    # Return a list of all projects and info about them
-    _projects = await request.app.state.db_client.get_filtered_documents(
-        collection="projects",
-        filters=filters,
+    projects = await utils.get_projects(
+        db_client=request.app.state.db_client,
+        name=name,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
-        limit=count if count is not None else 0,
+        count=count,
     )
 
-    return _projects
+    return projects
 
 
 @router.post(
@@ -136,5 +129,12 @@ async def delete_project(
     Permanently delete a project.
     -----------------------------
     """
-    db_client: MongoDBClient = request.app.state.db_client
-    await utils.delete_project(db_client, project_id)
+    db_client = request.app.state.db_client
+    # Delete this specific project
+    await utils.delete_project(db_client=db_client, project_id=project_id)
+
+    # Delete samples associated with this project
+    await utils.delete_samples(db_client=db_client, project_id=project_id)
+
+    # Delete annotations associated with this project
+    await utils.delete_annotations(db_client=db_client, project_id=project_id)

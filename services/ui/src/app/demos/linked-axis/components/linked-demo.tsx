@@ -1,4 +1,4 @@
-import { ContextMenuProvider } from "@/app/components/providers/context-menu-provider"
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider"
 import { ZoneProvider } from "@/app/components/providers/zone-provider"
 import { LinkedPlot } from "./linked-plot"
 import { Category } from "@/types"

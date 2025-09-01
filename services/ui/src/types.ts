@@ -146,3 +146,15 @@ export type ToolingProps = {
   forceUpdate?: number;
   onZoneUpdate: CallableFunction;
 };
+
+export enum ToolingTypes {
+  ZONE,
+  VSPAN
+}
+
+export type ToolingCallbacks = {
+  id: ToolingTypes
+  start: (x: number, y: number) => void
+  move: (x: number, y: number) => void
+  end: (x: number, y: number) => void
+}
