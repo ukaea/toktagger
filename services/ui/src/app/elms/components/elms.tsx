@@ -8,7 +8,6 @@ import {
   TimeRegionSchema,
   Annotations,
 } from "@/types";
-import { Plotly } from "react-plotly.js";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { TimeSeries } from "@/app/components/plots/time-series";
@@ -30,14 +29,14 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {},
+  {}
 );
 
 type ELMViewInfo = {
   data: MultiVariateTimeSeriesData;
   annotations: Annotations;
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotations) => Annotations | Annotations
   ) => void;
 };
 
@@ -45,7 +44,7 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
   const displayAnnotations: DisplayAnnotation[] = annotations.map(
-    convertAnnotationToDisplayAnnotation,
+    convertAnnotationToDisplayAnnotation
   );
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)

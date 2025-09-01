@@ -40,7 +40,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {},
+  {}
 );
 
 const lockedModeCategoryColors = lockedModeCategories.reduce<
@@ -56,7 +56,7 @@ type SpectrogramViewInfo = {
   data: SpectrogramData;
   annotations: Annotations;
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotations) => Annotations | Annotations
   ) => void;
 };
 
@@ -69,7 +69,7 @@ export const SpectrogramView = ({
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
   const displayAnnotations: DisplayAnnotation[] = annotations.map(
-    convertAnnotationToDisplayAnnotation,
+    convertAnnotationToDisplayAnnotation
   );
 
   const zones: Zone[] = displayAnnotations
@@ -92,7 +92,7 @@ export const SpectrogramView = ({
   const ampMax = Math.max(...amplitude.flat());
 
   const logAmplitude = amplitude.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, 1e-4))),
+    row.map((x) => Math.log10(Math.max(x, 1e-4)))
   );
   const logAmpMin = Math.min(...logAmplitude.flat());
   const logAmpMax = Math.max(...logAmplitude.flat());
@@ -111,6 +111,7 @@ export const SpectrogramView = ({
       customdata: data.amplitude,
       hovertemplate:
         "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
+      // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
       coloraxis: "coloraxis",
     },
   ];
@@ -129,6 +130,7 @@ export const SpectrogramView = ({
         text: "Frequency [Hz]",
       },
     },
+    // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
     coloraxis: {
       cmin: logAmpMin,
       cmax: logAmpMax,

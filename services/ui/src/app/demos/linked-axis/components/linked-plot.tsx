@@ -96,7 +96,7 @@ export const LinkedPlot = () => {
           // Get all subplot elements and extract the subplot name (xy for example) from the class list
           const subplots = plot.querySelectorAll(".subplot");
           const subplotNames = [...subplots].map((el) =>
-            [...el.classList].find((cls) => cls !== "subplot"),
+            [...el.classList].find((cls) => cls !== "subplot")
           );
 
           // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
@@ -116,11 +116,11 @@ export const LinkedPlot = () => {
               // ensure only one custom overlay group is present
               const svg = document.createElementNS(
                 "http://www.w3.org/2000/svg",
-                "g",
+                "g"
               );
               svg.setAttribute(
                 "class",
-                `${plotId}-overplot-${coordinateSystem}`,
+                `${plotId}-overplot-${coordinateSystem}`
               );
               svg.setAttribute("fill", "none");
               subplot.appendChild(svg);
@@ -135,7 +135,7 @@ export const LinkedPlot = () => {
             triggerToolUpdate();
           };
           plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
-        },
+        }
       );
     };
     initGraph();
@@ -165,9 +165,10 @@ export const LinkedPlot = () => {
 
     function handleContextMenu(
       event: MouseEvent,
-      plot: Plotly.PlotlyHTMLElement,
+      plot: Plotly.PlotlyHTMLElement
     ) {
-      const xaxis = plot._fullLayout.xaxis;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const xaxis = (plot as any)._fullLayout.xaxis;
       if (!event.target) {
         return;
       }
@@ -184,12 +185,13 @@ export const LinkedPlot = () => {
       });
     }
 
-    const contextHandler = (event: MouseEvent) => {
+    const contextHandler = (event: Event) => {
       //  wrap handler so we can remove it
       event.preventDefault(); // Prevent default context menu
-      const isRightClickEvent = event.button === 2 && !event.ctrlKey;
+      const mouseEvent = event as MouseEvent;
+      const isRightClickEvent = mouseEvent.button === 2 && !mouseEvent.ctrlKey;
       if (isRightClickEvent) {
-        handleContextMenu(event, plot);
+        handleContextMenu(mouseEvent, plot);
       }
     };
 
