@@ -1,8 +1,10 @@
+from pathlib import Path
 import pymongo
 import pydantic
 import typing
 from bson.objectid import ObjectId
 
+from platformdirs import user_cache_dir
 from services.api.crud.mongita_client import AsyncMongitaClient
 
 DATABASE_NAME = "event_db"
@@ -15,8 +17,11 @@ class MongoDBClient:
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
-            # Use local mongita db.
-            self.client = AsyncMongitaClient(db_name)
+            cache_dir = user_cache_dir("viz-annotation", "ukaea")
+            cache_dir = Path(cache_dir)
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            file_name = cache_dir / db_name
+            self.client = AsyncMongitaClient(file_name)
         self.db = self.client[db_name]
 
     async def insert(
