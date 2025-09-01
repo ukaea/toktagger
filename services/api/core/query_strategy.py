@@ -5,13 +5,14 @@ from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import QueryStrategyType
 
+
 class QueryStrategy(ABC):
     def __init__(self, samples: list[Sample], annotations: list[Annotation]):
         # Samples should be listed by shot ID - low to high
         # Annotations should be listed by uncertaity, low to high (for consistency?)
         self.samples = samples
         self.annotations = annotations
-    
+
     @abstractmethod
     def get_next_sample(self) -> Sample:
         pass
@@ -43,27 +44,36 @@ class SequentialQueryStrategy(QueryStrategy):
 
         return self.samples.pop(0)
 
+
 class UncertaintyQueryStrategy(QueryStrategy):
     def get_next_sample(self) -> Sample:
         if len(self.samples) == 0:
             raise RuntimeError("No more samples to label!")
 
         if len(self.annotations) == 0:
-            print("Warning: No unvalidated annotations available - falling back to random sample selection.")
+            print(
+                "Warning: No unvalidated annotations available - falling back to random sample selection."
+            )
             index = random.randint(0, len(self.samples) - 1)
             return self.samples.pop(index)
         else:
             sample_id = self.annotations.pop(0).sample_id
-            index = next((index for index, sample in enumerate(self.samples) if sample.id == sample_id), None)
+            index = next(
+                (
+                    index
+                    for index, sample in enumerate(self.samples)
+                    if sample.id == sample_id
+                ),
+                None,
+            )
             if index is None:
                 print("Error: Most uncertain annotation does not link to a sample")
                 index = random.randint(0, len(self.samples) - 1)
             return self.samples.pop(index)
-        
-        
-    
+
+
 QUERY_STRATEGIES = {
     QueryStrategyType.RANDOM: RandomQueryStrategy,
     QueryStrategyType.SEQUENTIAL: SequentialQueryStrategy,
-    QueryStrategyType.UNCERTAINTY: UncertaintyQueryStrategy
+    QueryStrategyType.UNCERTAINTY: UncertaintyQueryStrategy,
 }

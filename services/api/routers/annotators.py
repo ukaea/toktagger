@@ -6,16 +6,26 @@ from services.api.crud.utils import get_project, get_sample
 from services.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from services.api.core.data_loaders import DATA_LOADERS
 
-router = APIRouter(prefix="/projects/{project_id}", tags=["Annotators"],
+router = APIRouter(
+    prefix="/projects/{project_id}",
+    tags=["Annotators"],
 )
+
 
 @router.get("/annotator")
 async def get_annotators(request: Request, project_id: str):
     # Dunno if this is of any use
     pass
 
+
 @router.post("/samples/{sample_id}/annotator/{annotator_id}")
-async def create_annotations(request: Request, project_id: str, sample_id: str, annotator_id: AnnotatorIds, params: AnnotatorTypes):
+async def create_annotations(
+    request: Request,
+    project_id: str,
+    sample_id: str,
+    annotator_id: AnnotatorIds,
+    params: AnnotatorTypes,
+):
     # Use the specified annotator to label this sample for this project
     # Would use the datapool to load and process the data
     # The pass it through the selected annotator within the Project to make predictions
@@ -28,10 +38,13 @@ async def create_annotations(request: Request, project_id: str, sample_id: str, 
     if not annotator_cls:
         raise HTTPException(status_code=404, detail="Specified annotator not found.")
     if annotator_id not in ANNOTATORS_PER_TASK[Task(project.task)]:
-        raise HTTPException(status_code=409, detail=f"The selected annotator cannot be used for {project.task} labelling projects.")
-    
+        raise HTTPException(
+            status_code=409,
+            detail=f"The selected annotator cannot be used for {project.task} labelling projects.",
+        )
+
     sample: Sample = await get_sample(db_client, project_id, sample_id)
-    
+
     data_loader = DATA_LOADERS[project.data_loader]()
     data_item = data_loader.get_sample(sample)
 

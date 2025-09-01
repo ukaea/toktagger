@@ -2,9 +2,12 @@ import pytest
 import pandas as pd
 import pathlib
 
+
 @pytest.mark.asyncio
 async def test_get_data(api_client, setup_db):
-    response = await api_client.post(f"/projects/{setup_db['project_id_2']}/samples/{setup_db['sample_id_4']}/data")
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_2']}/samples/{setup_db['sample_id_4']}/data"
+    )
     # Should collect data from 'test.parquet' file
     # Should only collect Ip, not dalpha
     assert response.status_code == 200
