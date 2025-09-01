@@ -44,7 +44,7 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
     // Get a reference to all subplots and find the name of the axis
     const subplots = plot.querySelectorAll(".subplot");
     const subplotNames = [...subplots].map((el) =>
-      [...el.classList].find((cls) => cls !== "subplot"),
+      [...el.classList].find((cls) => cls !== "subplot")
     );
 
     // For each subplot carry out the tooling generation
@@ -55,7 +55,7 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       }
 
       const overplot = document.getElementsByClassName(
-        `${plotId}-overplot-${subplotId}`,
+        `${plotId}-overplot-${subplotId}`
       )[0];
 
       if (!overplot) {
@@ -71,13 +71,15 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         return;
       }
       // Use the axis information to calculate the upper and lower limits of the zone
-      const axis = plot._fullLayout[`yaxis${yAxisID}`];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const axis = (plot as any)._fullLayout[`yaxis${yAxisID}`];
       const range = axis._tmax - axis._tmin;
       const upperLimit = axis.d2p(axis._tmax + 2 * range);
       const lowerLimit = axis.d2p(axis._tmin - 2 * range);
       const height = lowerLimit - upperLimit;
 
-      const xaxis = plot._fullLayout.xaxis;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const xaxis = (plot as any)._fullLayout.xaxis;
 
       const graphGroup = d3.select(overplot);
       graphGroup.selectAll(".vspan").remove(); // All VSpans are removed each render cycle

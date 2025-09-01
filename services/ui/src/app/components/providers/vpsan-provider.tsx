@@ -47,7 +47,7 @@ export const VSpanProvider = ({
   categories: Category[];
   initialData?: VSpan[];
   children: React.ReactNode;
-  onModifyVSpan: (newVSpans: VSpan[]) => void;
+  onModifyVSpan?: (newVSpans: VSpan[]) => void;
 }) => {
   const spans = useRef<VSpan[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
@@ -66,18 +66,18 @@ export const VSpanProvider = ({
 
   // Provides a method for child components to update on drag finish
   const handleVSpanDragFinish = () => {
-    onModifyVSpan(spans.current);
+    onModifyVSpan?.(spans.current);
   };
 
   const handleDelete = (input: unknown) => {
     spans.current = spans.current.filter((span) => span !== input);
     triggerVSpanUpdate();
-    onModifyVSpan(spans.current);
+    onModifyVSpan?.(spans.current);
   };
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     spans.current = spans.current.map((span) => {
       if (span === props.vspan) {
@@ -122,7 +122,7 @@ export const VSpanProvider = ({
         x,
       });
       triggerVSpanUpdate();
-      onModifyVSpan(spans.current);
+      onModifyVSpan?.(spans.current);
     };
 
     const addVSpanItems = categories.map((category, index) => {

@@ -20,7 +20,7 @@ import {
 import { SortDescriptor } from "@react-types/shared";
 import type { Project, Sample } from "@/types";
 
-export const SampleBreadCrumbs = ({ project }: { project: Project }) => {
+const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   return (
     <Provider theme={defaultTheme}>
       <Breadcrumbs>
@@ -48,7 +48,7 @@ type SamplesTableProps = {
   onSortChange: (sort: SortDescriptor) => void;
 };
 
-export const SamplesTable = ({
+const SamplesTable = ({
   project_id,
   samples,
   sortDescriptor,
@@ -122,7 +122,7 @@ export default function ProjectView({
         project_id,
         currentPage,
         samplesPerPage,
-        shotId,
+        shotId
       );
       setSamples(samples);
       const project = await getProject(project_id);

@@ -26,7 +26,7 @@ type ProjectsTableProps = {
   onSortChange: (sort: SortDescriptor) => void;
 };
 
-export const ProjectsBreadCrumbs = () => {
+const ProjectsBreadCrumbs = () => {
   return (
     <Provider theme={defaultTheme}>
       <Breadcrumbs>
@@ -41,7 +41,7 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = ({
+const ProjectsTable = ({
   projects,
   sortDescriptor,
   onSortChange,
@@ -110,7 +110,7 @@ export default function Projects() {
         sortDescriptor,
         currentPage,
         projectsPerPage,
-        projectName,
+        projectName
       );
       setProjects(projects);
     };

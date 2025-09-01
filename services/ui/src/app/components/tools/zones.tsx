@@ -44,7 +44,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
     // Get a reference to all subplots and find the name of the axis
     const subplots = plot.querySelectorAll(".subplot");
     const subplotNames = [...subplots].map((el) =>
-      [...el.classList].find((cls) => cls !== "subplot"),
+      [...el.classList].find((cls) => cls !== "subplot")
     );
 
     // For each subplot carry out the tooling generation
@@ -55,12 +55,12 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       }
 
       const overplot = document.getElementsByClassName(
-        `${plotId}-overplot-${subplotId}`,
+        `${plotId}-overplot-${subplotId}`
       )[0];
 
       if (!overplot) {
         console.error(
-          `Could not locate D3 overplot to generate zones: ${plotId}-overplot-${subplotId}`,
+          `Could not locate D3 overplot to generate zones: ${plotId}-overplot-${subplotId}`
         );
         handleZoneUpdate();
         return;
@@ -73,13 +73,15 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         return;
       }
       // Use the axis information to calculate the upper and lower limits of the zone
-      const axis = plot._fullLayout[`yaxis${yAxisID}`];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const axis = (plot as any)._fullLayout[`yaxis${yAxisID}`];
       const range = axis._tmax - axis._tmin;
       const upperLimit = axis.d2p(axis._tmax + 2 * range);
       const lowerLimit = axis.d2p(axis._tmin - 2 * range);
       const height = lowerLimit - upperLimit;
 
-      const xaxis = plot._fullLayout.xaxis;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const xaxis = (plot as any)._fullLayout.xaxis;
 
       // Minimum width in data units: 0.1% of current x-range
       const [xMin, xMax] = xaxis.range as [number, number];
@@ -154,7 +156,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
           const x0 = xaxis.p2d(newX);
           const x1 = xaxis.p2d(
-            newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0)),
+            newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0))
           );
           const x0Left = d.x0 < d.x1;
           d.x0 = x0Left ? x0 : x1;
@@ -198,7 +200,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         // inside portion per side; shrink when zone is tiny to keep a center gap
         const inner = Math.max(
           0,
-          Math.min(INNER_HANDLE_MAX_PX, (spanWidth - MIN_CENTER_DRAG_PX) / 2),
+          Math.min(INNER_HANDLE_MAX_PX, (spanWidth - MIN_CENTER_DRAG_PX) / 2)
         );
         const totalHandleWidth = OUTER_HANDLE_PX + inner;
 
