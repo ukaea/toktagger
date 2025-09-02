@@ -79,7 +79,7 @@ export function FindPeaksTool({
             time_min: timeRange.start,
             time_max: timeRange.end,
           }),
-        }
+        },
       );
 
       const payload = await response.json();
