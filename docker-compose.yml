@@ -53,23 +53,6 @@ services:
     networks:
       - app-network
 
-  ui:
-    container_name: ui_app
-    build: ./services/ui/
-    ports:
-      - "3001:3001"
-    environment:
-      PORT: 3001
-      NODE_ENV: development
-      DATA_API_URL: "http://api_app:8002"
-      NEXT_PUBLIC_API_URL: ""
-    volumes:
-      - ./services/ui:/app
-      - /app/node_modules
-    restart: always
-    networks:
-      - app-network
-
 networks:
   app-network:
     driver: bridge
