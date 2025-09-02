@@ -9,6 +9,14 @@ export default defineConfig({
     commonjsOptions: {
       transformMixedEsModules: true,   // ✅ fixes CJS/ESM interop
     },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react'],
+          plotly: ['plotly.js-dist-min']
+        }
+      }
+    }
   },
   resolve: {
     alias: {
