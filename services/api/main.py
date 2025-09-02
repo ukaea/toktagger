@@ -3,6 +3,7 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from services.api.routers.annotations import router as annotations_router
 from services.api.routers.annotators import router as annotators_router
 from services.api.routers.data import router as data_router
@@ -28,6 +29,21 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Allow requests from the frontend dev server
+origins = [
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # or ["*"] to allow all
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 app.include_router(annotations_router)
 app.include_router(data_router)
 app.include_router(models_router)
