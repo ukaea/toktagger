@@ -44,6 +44,7 @@ async def main():
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, Tuple
 
 from filelock import FileLock
@@ -143,10 +144,40 @@ class AsyncCollection:
     ) -> "AsyncCursor":
         async def _snapshot() -> List[Dict[str, Any]]:
             async with self._database._client._mutex:
+                mongo_filter = {}
+                regex_filters = []
+
+                # Separate regex conditions from normal filters
+                if filter:
+                    for field, condition in filter.items():
+                        if isinstance(condition, dict) and "$regex" in condition:
+                            pattern = condition["$regex"]
+                            flags = condition.get("$options", 0)
+                            if flags == "i":
+                                flags = re.IGNORECASE
+                            regex_filters.append((field, re.compile(pattern, flags)))
+                        else:
+                            mongo_filter[field] = condition
+
                 cursor = await asyncio.to_thread(
-                    self._sync_col.find, filter or {}, *args, **kwargs
+                    self._sync_col.find, mongo_filter or {}, *args, **kwargs
                 )
                 results = await asyncio.to_thread(lambda: list(cursor))
+
+                # Apply regex filters
+                if regex_filters:
+                    filtered = []
+                    for doc in results:
+                        match = True
+                        for field, regex in regex_filters:
+                            value = str(doc.get(field, ""))
+                            if not regex.search(value):
+                                match = False
+                                break
+                        if match:
+                            filtered.append(doc)
+                    results = filtered
+
                 if sort:
                     for key, direction in reversed(sort):
                         results.sort(key=lambda x: x.get(key), reverse=(direction < 0))
