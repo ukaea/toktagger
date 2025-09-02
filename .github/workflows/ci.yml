@@ -131,12 +131,13 @@ jobs:
       - name: Commit built files
         run: |
           BUILD_DIR=services/api/static   # <-- replace with your Vite outDir
+          TARGET_BRANCH=${GITHUB_REF#refs/heads/}
           git config user.name "Dr. CI Bot"
           git config user.email "ci-bot@example.com"
           git add $BUILD_DIR
           if ! git diff --cached --quiet; then
             git commit -m "chore: update build output [skip ci]" --force
-            git push origin HEAD:${GITHUB_REF#refs/heads/}
+            git push origin HEAD:$TARGET_BRANCH
           else
             echo "No changes to commit"
           fi
