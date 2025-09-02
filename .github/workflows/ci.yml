@@ -134,5 +134,9 @@ jobs:
           git config user.name "Dr. CI Bot"
           git config user.email "ci-bot@example.com"
           git add $BUILD_DIR
-          git commit -m "chore: update build output [skip ci]" || echo "No changes to commit"
-          git push origin HEAD:${GITHUB_REF#refs/heads/}
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update build output [skip ci]"
+            git push origin HEAD:${GITHUB_REF#refs/heads/}
+          else
+            echo "No changes to commit"
+          fi
