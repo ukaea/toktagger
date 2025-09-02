@@ -1,6 +1,7 @@
 import os
 import pathlib
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from services.api.routers.annotations import router as annotations_router
 from services.api.routers.annotators import router as annotators_router
@@ -34,6 +35,22 @@ app.include_router(projects_router)
 app.include_router(samples_router)
 app.include_router(annotators_router)
 
+
 # Static front end files
 frontend_path = pathlib.Path(__file__).parent / "static"
-app.mount("/", StaticFiles(directory=frontend_path, html=True), name="ui")
+index_file = frontend_path / "index.html"
+app.mount("/assets", StaticFiles(directory=frontend_path / "assets"), name="assets")
+
+
+@app.get("/")
+def get_app():
+    """Endpoint to serve the main SPA."""
+    return FileResponse(index_file)
+
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    """Fallback route to serve the SPA's index.html for any unmatched routes.
+    This ensures that refreshing pages on the frontend takes the user to the same place.
+    """
+    return FileResponse(index_file)
