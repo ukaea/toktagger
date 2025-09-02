@@ -20,7 +20,7 @@ import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
 async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
     const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
     const response = await fetch(ANNOTATIONS_URL, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
         'Content-Type': 'application/json',
         },
