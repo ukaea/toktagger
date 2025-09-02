@@ -115,7 +115,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # needed so we can push later
+          fetch-depth: 0               # needed so we can push later
+          ref: ${{ github.head_ref }}  # PR source branch
 
       - name: Set up Node.js (>=22.19.0)
         uses: actions/setup-node@v4
@@ -131,13 +132,12 @@ jobs:
       - name: Commit built files
         run: |
           BUILD_DIR=services/api/static   # <-- replace with your Vite outDir
-          TARGET_BRANCH=${GITHUB_REF#refs/heads/}
           git config user.name "Dr. CI Bot"
           git config user.email "ci-bot@example.com"
           git add $BUILD_DIR
           if ! git diff --cached --quiet; then
             git commit -m "chore: update build output [skip ci]"
-            git push origin HEAD:$TARGET_BRANCH --force
+            git push origin HEAD
           else
             echo "No changes to commit"
           fi
