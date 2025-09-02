@@ -134,6 +134,9 @@ jobs:
           BUILD_DIR=services/api/static   # <-- replace with your Vite outDir
           git config user.name "Dr. CI Bot"
           git config user.email "ci-bot@example.com"
+          git fetch origin main
+          # Merge main into current branch
+          git merge origin/main --no-edit
           git add $BUILD_DIR
           if ! git diff --cached --quiet; then
             git commit -m "chore: update build output [skip ci]"
