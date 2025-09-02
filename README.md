@@ -6,7 +6,7 @@
 You run the application locally through a simple pip install:
 
 ```sh
-pip install .
+GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/ukaea/viz-annotation.git
 viz-annot
 ```
 
