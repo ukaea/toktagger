@@ -9,9 +9,7 @@ A visual annotation tool for Tokamak data.
 You run the application locally through a simple pip install:
 
 ```sh
-git clone git@github.com:ukaea/viz-annotation.git
-cd viz-annotation
-pip install .
+GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/ukaea/viz-annotation.git
 viz-annot
 ```
 
