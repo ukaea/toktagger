@@ -289,6 +289,39 @@ export const SpectrogramView = ({
     modeBarButtonsToRemove: ["pan2d"],
   };
 
+  const applyGlobalStyle = (layout: Partial<Layout>) => {
+    // Handle dark mode styling
+    // We should probably move all the styling to this central component
+    const isDarkMode = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
+    if (isDarkMode) {
+      layout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+      layout.xaxis!.linecolor = "rgb(255, 255, 255)";
+      layout.xaxis!.zerolinecolor = "rgb(255, 255, 255)";
+      layout.xaxis!.tickcolor = "rgb(255, 255, 255)";
+      layout.xaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+      layout.yaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+      layout.yaxis!.linecolor = "rgb(255, 255, 255)";
+      layout.yaxis!.zerolinecolor = "rgb(255, 255, 255)";
+      layout.yaxis!.tickcolor = "rgb(255, 255, 255)";
+      layout.yaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+      if (layout.coloraxis && layout.coloraxis.colorbar) {
+        layout.coloraxis!.colorbar!.tickcolor = "rgb(255, 255, 255)";
+        layout.coloraxis!.colorbar!.tickfont = { color: "rgb(255, 255, 255)" };
+        layout.coloraxis!.colorbar!.outlinecolor = "rgb(255, 255, 255)";
+      }
+
+      layout.paper_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of area around the plot
+      layout.plot_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of the plot area
+    }
+    return layout;
+  };
+
+  plotLayout = applyGlobalStyle(plotLayout);
+
   return (
     <div className="flex flex-col items-center space-y-3">
       <ContextMenuProvider menuId="locked-mode-menu">
