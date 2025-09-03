@@ -14,7 +14,7 @@ PROJECT_2 = ProjectIn(
     name="test_project_1",
     task="ELM",
     query_strategy="sequential",
-    data_loader="parquet",
+    data_loader="tabular",
 )
 PROJECT_3 = ProjectIn(
     name="project_2", task="UFO", query_strategy="uncertainty", data_loader="image"

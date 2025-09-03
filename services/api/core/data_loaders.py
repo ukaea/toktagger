@@ -127,8 +127,8 @@ class SALDataLoader(DataLoader):
 
         results = {}
         for name in item.signal_names:
-            name = f"/pulse/{sample.shot_id}/{name}"
-            signal = self.client.get(name)
+            full_name = f"/pulse/{sample.shot_id}/{name}"
+            signal = self.client.get(full_name)
             data = signal.data
             time = signal.dimensions[0].data
             item = TimeSeriesData(time=time, values=data)

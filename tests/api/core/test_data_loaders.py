@@ -52,7 +52,7 @@ def test_parquet_file_loader():
         column_names=["Ip", "dalpha"],
     )
     sample = Sample(shot_id=10000, data=parquet_file, _id="test", project_id="test")
-    data_loader = data_loaders.ParquetDataLoader()
+    data_loader = data_loaders.TabularDataLoader()
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
@@ -110,3 +110,45 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
 
     # Check both columns requested are present, but filled with Nones
     assert data.values["doesnt_exist"] is None
+
+
+def test_sal_loader():
+    try:
+        from sal.client import SALClient
+
+        client = SALClient("https://sal.jetdata.eu")
+        client.prompt_for_password = False
+        client.authenticate()
+    except Exception:
+        pytest.skip("Could not contact SAL server")
+
+    sal_shot = ShotData(protocol="sal", signal_names=["ppf/signal/jetppf/magn/ipla"])
+    sample = Sample(shot_id=87737, data=sal_shot, _id="test", project_id="test")
+    data_loader = data_loaders.SALDataLoader()
+    data = data_loader.get_sample(sample)
+
+    ip_values = numpy.array(data.values.get("ppf/signal/jetppf/magn/ipla").values)
+    assert numpy.min(ip_values) == -1837277.75
+    assert numpy.max(ip_values) == 4664.5283203125
+
+
+def test_toksearch_loader():
+    toksearch_shot = data_loaders.ToksearchShotData(
+        protocol="toksearch",
+        signal_names=["magnetics/ip"],
+        backend_type="zarr",
+        base_path="s3://mast/level2/shots/",
+        endpoint="https://echo.stfc.ac.uk",
+    )
+    sample = Sample(shot_id=30421, data=toksearch_shot, _id="test", project_id="test")
+    data_loader = data_loaders.TokSearchDataLoader()
+    data = data_loader.get_sample(sample)
+    assert isinstance(data, MultiVariateTimeSeriesData)
+
+    # Check both columns requested are present
+    assert data.values.get("magnetics/ip")
+
+    # Check it contains values and times
+    ip_values = numpy.array(data.values.get("magnetics/ip").values)
+    assert numpy.min(ip_values) == -40806.55078125
+    assert numpy.max(ip_values) == 649008.875

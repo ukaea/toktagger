@@ -36,6 +36,8 @@ dependencies = [
   "mongita>=1.2.0",
   "filelock>=3.19.1",
   "psutil>=7.0.0",
+  "ray>=2.49.1",
+  "pyspark>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
