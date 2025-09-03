@@ -1,12 +1,22 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import type { Project, Sample } from "@/types";
+import type { Project, Sample, SamplesSummary } from "@/types";
 
 export const getURL = async (url: string) => {
   const response = await fetch(url);
   const payload = await response.json();
   return payload;
 };
+
+export async function getSamplesSummary(
+  project_id: string
+): Promise<SamplesSummary> {
+  const url = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/summary`;
+  const response = await fetch(url);
+  const data = await response.json();
+  const summary = data as SamplesSummary;
+  return summary;
+}
 
 export const getSamples = async (
   sortDescriptor: SortDescriptor,

@@ -550,7 +550,7 @@ export const ProjectConfigEditor = ({
   onModify,
 }: {
   project?: Project | null;
-  onModify?: (project: Project) => void;
+  onModify?: () => void;
 }) => {
   const editMode = project !== undefined && project !== null;
   const text = editMode ? "Edit" : "Create";
@@ -595,7 +595,7 @@ export const ProjectConfigEditor = ({
     };
 
     await editProject(projectId, updatedProject);
-    if (onModify) onModify(project);
+    if (onModify) onModify();
   };
 
   const doCreateProject = async (dataLoaderOptions: DataLoaderOptions) => {
@@ -609,7 +609,7 @@ export const ProjectConfigEditor = ({
 
     const projectId = await createProject(project);
     await createSamples(projectId, samples);
-    if (onModify) onModify(project);
+    if (onModify) onModify();
   };
 
   const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {

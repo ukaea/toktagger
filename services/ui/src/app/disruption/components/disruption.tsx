@@ -80,49 +80,66 @@ export const DisruptionView = ({
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
 
-    const plotData: Partial<Plotly.PlotData>[] = Object.entries(data.values).map(([signalName, item], index) => ({
-        x: (item as TimeSeriesData).time,
-        y: (item as TimeSeriesData).values,
-        name: signalName,
-        xaxis: `x${index + 1}`,
-        yaxis: `y${index + 1}`,
-    }));
-    
-    let axes = Object.entries(data.values).map((_, index) => {
-        const axName = `xaxis${index + 1}`;
-        return {[axName]: {matches: 'x'}};
-    });
-    axes = Object.assign({}, ...axes);
+  const plotData: Partial<Plotly.PlotData>[] = Object.entries(data.values).map(
+    ([signalName, item], index) => ({
+      x: (item as TimeSeriesData).time,
+      y: (item as TimeSeriesData).values,
+      name: signalName,
+      xaxis: `x${index + 1}`,
+      yaxis: `y${index + 1}`,
+    }),
+  );
 
-    const plotLayout: Partial<Plotly.Layout> = {
-        grid: {rows: Object.entries(data.values).length, columns: 1, pattern: 'independent'},
-        uirevision: 'true',
-        showlegend: true,
-        dragmode: 'pan',
-        ...axes
-    };
-    
-    const updateZones = (newZones: Array<Zone>) => {
-      updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-    };
+  let axes = Object.entries(data.values).map((_, index) => {
+    const axName = `xaxis${index + 1}`;
+    return { [axName]: { matches: "x" } };
+  });
+  axes = Object.assign({}, ...axes);
 
-    const updateVSpans = (newVSpans: Array<VSpan>) => {
-      updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
-    };
+  const plotLayout: Partial<Plotly.Layout> = {
+    grid: {
+      rows: Object.entries(data.values).length,
+      columns: 1,
+      pattern: "independent",
+    },
+    uirevision: "true",
+    showlegend: true,
+    dragmode: "pan",
+    ...axes,
+  };
 
-    return (
-        <div className="flex flex-col items-center space-y-3">
-            <ContextMenuProvider menuId="disruption-menu">
-                <VSpanProvider categories={disruptionCategories} initialData={vspans} onModifyVSpan={updateVSpans}>
-                    <ZoneProvider categories={zoneCategories} initialData={zones} onModifyZone={updateZones}>
-                        <TimeSeries plotId="Disruption" plotConfig={{data: plotData, layout: plotLayout}}>
-                            <Zones onZoneUpdate={updateZones}/>
-                            <VSpans onZoneUpdate={updateVSpans} />
-                        </TimeSeries>
-                        <DisruptionTable />
-                    </ZoneProvider>
-                </VSpanProvider>
-            </ContextMenuProvider>
-        </div>
-    )
-}
+  const updateZones = (newZones: Array<Zone>) => {
+    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
+  };
+
+  const updateVSpans = (newVSpans: Array<VSpan>) => {
+    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
+  };
+
+  return (
+    <div className="flex flex-col items-center space-y-3">
+      <ContextMenuProvider menuId="disruption-menu">
+        <VSpanProvider
+          categories={disruptionCategories}
+          initialData={vspans}
+          onModifyVSpan={updateVSpans}
+        >
+          <ZoneProvider
+            categories={zoneCategories}
+            initialData={zones}
+            onModifyZone={updateZones}
+          >
+            <TimeSeries
+              plotId="Disruption"
+              plotConfig={{ data: plotData, layout: plotLayout }}
+            >
+              <Zones onZoneUpdate={updateZones} />
+              <VSpans onZoneUpdate={updateVSpans} />
+            </TimeSeries>
+            <DisruptionTable />
+          </ZoneProvider>
+        </VSpanProvider>
+      </ContextMenuProvider>
+    </div>
+  );
+};

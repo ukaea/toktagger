@@ -129,24 +129,21 @@ export default function Projects() {
   });
   const [projects, setProjects] = useState<Project[]>([]);
 
-  const refreshProjects = useCallback(
-    async (project?: Project | null) => {
-      const projects = await getProjects(
-        sortDescriptor,
-        currentPage,
-        projectsPerPage,
-        projectName
-      );
+  const refreshProjects = useCallback(async () => {
+    const projects = await getProjects(
+      sortDescriptor,
+      currentPage,
+      projectsPerPage,
+      projectName
+    );
 
-      if (!projects) {
-        ToastQueue.negative("Error fetching projects", { timeout: 3000 });
-        return;
-      }
+    if (!projects) {
+      ToastQueue.negative("Error fetching projects", { timeout: 3000 });
+      return;
+    }
 
-      setProjects(projects);
-    },
-    [sortDescriptor, currentPage, projectsPerPage, projectName]
-  );
+    setProjects(projects);
+  }, [sortDescriptor, currentPage, projectsPerPage, projectName]);
 
   useEffect(() => {
     refreshProjects();
