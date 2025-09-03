@@ -39,7 +39,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {},
+  {}
 );
 
 const disruptionCategoryColors = disruptionCategories.reduce<
@@ -55,7 +55,7 @@ type DisruptionViewInfo = {
   data: MultiVariateTimeSeriesData;
   annotations: Annotations;
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotations) => Annotations | Annotations
   ) => void;
 };
 
@@ -68,7 +68,7 @@ export const DisruptionView = ({
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
   const displayAnnotations: DisplayAnnotation[] = annotations.map(
-    convertAnnotationToDisplayAnnotation,
+    convertAnnotationToDisplayAnnotation
   );
 
   const zones: Zone[] = displayAnnotations
@@ -87,18 +87,16 @@ export const DisruptionView = ({
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
   };
 
-  console.log(data)
-
-  const plotData: Partial<Plotly.PlotData>[] = [
-    {
-      x: data.values["magnetics/ip"].time,
-      y: data.values["magnetics/ip"].values,
+  const plotData: Partial<Plotly.PlotData>[] = Object.keys(data.values).map(
+    (signal) => ({
+      x: data.values[signal].time,
+      y: data.values[signal].values,
       line: {
         color: "black",
       },
       name: "ip",
-    },
-  ];
+    })
+  );
 
   const plotLayout: Partial<Plotly.Layout> = {
     uirevision: "true",

@@ -1,7 +1,7 @@
 [project]
 name = "viz-annotation"
 version = "2025.0.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
 ]
 maintainers = [
@@ -23,11 +23,13 @@ dependencies = [
   "pyarrow",
   "pymongo",
   "requests",
-  "numpy",
+  "numpy>=2.2.0,<=2.2.6",
   "scikit-learn",
   "celery[redis]",
   "pillow",
   "uda",
+  "sal",
+  "toksearch @ git+https://github.com/GA-FDP/toksearch",
   "pytest",
   "mkdocs",
   "mkdocs-material",

@@ -16,6 +16,7 @@ def create_project(name: str, task: str, data_loader: str) -> str:
         "http://localhost:8002/projects",
         json=project,
     )
+    print(name, response.json())
     project_id = response.json()["_id"]
     return project_id
 
@@ -113,7 +114,7 @@ def main():
     project_id = create_project("UDA Disruption Project", "disruption", "uda")
     create_uda_samples(project_id, shot_ids)
 
-    project_id = create_project("Local ELM Project", "ELM", "parquet")
+    project_id = create_project("Local ELM Project", "ELM", "tabular")
     create_local_samples(project_id, shot_ids, base_path=base_path / "summary")
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
