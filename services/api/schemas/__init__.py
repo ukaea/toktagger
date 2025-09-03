@@ -15,7 +15,7 @@ class ConfiguredModel(BaseModel):
     def convert_objectid(cls, values):
         for key in ("_id", "project_id", "sample_id"):
             if key in values:
-                values[key] = str(values.get("_id"))
+                values[key] = str(values.get(key))
         return values
 
     class Config:
