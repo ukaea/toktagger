@@ -35,7 +35,7 @@ import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotations
+  annotations: Annotations,
 ) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
   await fetch(ANNOTATIONS_URL, {
@@ -180,7 +180,7 @@ function AmplitudeSlider({
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor))
+    Math.log10(Math.max(x, smallPrecisionFactor)),
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -195,7 +195,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end
+          val.end,
         )}`
       }
     />
@@ -289,7 +289,7 @@ function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        }
+        },
       );
 
       const payload = await response.json();
@@ -407,7 +407,7 @@ export default function ToolBar({
     }
 
     const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"]
+      result.data.values["mirnov"],
     );
 
     if (!mhdData.success) {
