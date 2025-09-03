@@ -42,6 +42,7 @@ export const SpectrogramDataSchema = z.object({
   time: z.array(z.number()),
   frequency: z.array(z.number()),
   amplitude: z.array(z.array(z.number())),
+  threshold_mask: z.array(z.array(z.number())).optional(),
 });
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 
@@ -76,7 +77,16 @@ export const VSpanSchema = z.object({
 });
 export type VSpan = z.infer<typeof VSpanSchema>;
 
-export const DisplayAnnotationSchema = z.union([ZoneSchema, VSpanSchema]);
+export const SpectrogramMaskSchema = z.object({
+  values: z.array(z.array(z.number())),
+});
+export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
+
+export const DisplayAnnotationSchema = z.union([
+  ZoneSchema,
+  VSpanSchema,
+  SpectrogramMaskSchema,
+]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export const ProjectSchema = z.object({
@@ -143,6 +153,7 @@ export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
   frequency_max: z.number().optional(),
   amplitude_min: z.number().optional(),
   amplitude_max: z.number().optional(),
+  threshold_value: z.number().optional(),
 });
 export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
 
@@ -163,4 +174,10 @@ export type ToolingCallbacks = {
   start: (x: number, y: number) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
+};
+
+export type PlotProps = {
+  colorMap?: string;
+  numSignificantDigits?: number;
+  thresholdActive?: boolean;
 };

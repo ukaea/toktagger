@@ -1,7 +1,5 @@
-import {LinkedDemo} from "./components/linked-demo"
+import { LinkedDemo } from "./components/linked-demo";
 
 export default async function LinkedPage() {
-    return (
-        <LinkedDemo />
-    )
+  return <LinkedDemo />;
 }

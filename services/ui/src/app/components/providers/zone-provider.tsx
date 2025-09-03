@@ -1,218 +1,236 @@
-"use client"
+"use client";
 
 import { Zone, Category, ToolingTypes } from "@/types";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
-import 'react-contexify/ReactContexify.css'
+import "react-contexify/ReactContexify.css";
 import { useContextMenuProvider } from "./annotation-provider";
 
 interface ZoneContextInfo {
-    zones: Zone[];
-    handleZoneUpdate: () => void;
-    handleZoneDragFinish: () => void;
-    addZone: (x0: number, x1: number, category: Category) => void;
-    activateTooling: () => void
-    triggerUpdate: number;
+  zones: Zone[];
+  handleZoneUpdate: () => void;
+  handleZoneDragFinish: () => void;
+  addZone: (x0: number, x1: number, category: Category) => void;
+  activateTooling: () => void;
+  triggerUpdate: number;
 }
 
-const ZoneContext = createContext<ZoneContextInfo | null>(null)
+const ZoneContext = createContext<ZoneContextInfo | null>(null);
 
 export const useZoneContext = () => {
-    const context = useContext(ZoneContext)
-        if (!context) {
-            throw new Error("useZoneContext must be used within a ZoneProvider")
-        }
-        return context
-}
+  const context = useContext(ZoneContext);
+  if (!context) {
+    throw new Error("useZoneContext must be used within a ZoneProvider");
+  }
+  return context;
+};
 
-export const ZONE_MENU_ID = "zone-provider"
+export const ZONE_MENU_ID = "zone-provider";
 
 /**
  * Context provider that gives child components shared read/write to zone data
- * 
+ *
  * @param categories Array of categories that the zones provided by this context can be
  * @param initialData Array of zones that should be added when initialised
  */
-export const ZoneProvider = ({categories, initialData, children, onModifyZone} : {
-    categories: Category[],
-    initialData?: Zone[],
-    children: React.ReactNode,
-    onModifyZone: (newZones: Zone[]) => void
+export const ZoneProvider = ({
+  categories,
+  initialData,
+  children,
+  onModifyZone,
+}: {
+  categories: Category[];
+  initialData?: Zone[];
+  children: React.ReactNode;
+  onModifyZone: (newZones: Zone[]) => void;
 }) => {
-    const zones = useRef<Zone[]>([])
-    const [triggerUpdate, setTriggerUpdate] = useState(0) // Value should be changed to trigger refresh
+  const zones = useRef<Zone[]>([]);
+  const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
 
-    const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
+  const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
-    const cleanZoneData = () => {
-        for (const zone of zones.current) {
-            if (zone.x1 < zone.x0) {
-                const temp = zone.x0
-                zone.x0 = zone.x1
-                zone.x1 = temp
-            }
-        }
-        triggerZoneUpdate()
-    }
+  // It is necessary for the context to trigger child refreshes
+  const triggerZoneUpdate = () => {
+    setTriggerUpdate((current) => (current + 1) % 10);
+  };
 
-    // It is necessary for the context to trigger child refreshes
-    const triggerZoneUpdate = () => {
-        setTriggerUpdate((current) => (current+1)%10)
-    }
+  // Provides a method for child components to trigger context refresh
+  const handleZoneUpdate = () => {
+    triggerZoneUpdate();
+  };
 
-    // Provides a method for child components to trigger context refresh
-    const handleZoneUpdate = () => {
-        triggerZoneUpdate()
-    }
+  const handleZoneDragFinish = () => {
+    onModifyZone(zones.current);
+  };
 
-    const handleZoneDragFinish = () => {
-        cleanZoneData()
-        onModifyZone(zones.current);
-    }
+  const handleDelete = (input: unknown) => {
+    zones.current = zones.current.filter((zone) => zone !== input);
+    triggerZoneUpdate();
+    onModifyZone(zones.current);
+  };
 
-    const handleDelete = (input: unknown) => {
-        zones.current = zones.current.filter(zone => zone !== input)
-        triggerZoneUpdate()
-        onModifyZone(zones.current);
-    }
+  const handleTypeSetting = (
+    { props }: ItemParams,
+    targetCategory: Category,
+  ) => {
+    zones.current = zones.current.map((zone) => {
+      if (zone === props.zone) {
+        zone.category = targetCategory;
+      }
+      return zone;
+    });
+    triggerZoneUpdate();
+  };
 
-    const handleTypeSetting = ({props}: ItemParams, targetCategory: Category) => {
-        zones.current = zones.current.map((zone) => {
-            if (zone === props.zone) {
-                zone.category = targetCategory
-            }
-            return zone
-        })
-        triggerZoneUpdate()
-    }
+  const addZone = (x0: number, x1: number, category: Category) => {
+    zones.current.push({
+      category,
+      x0,
+      x1,
+    });
+    triggerZoneUpdate();
+    onModifyZone(zones.current);
+  };
 
-    const addZone = (x0: number, x1: number, category: Category) => {
-        zones.current.push(
-            {
-                category,
-                x0,
-                x1
-            }
-        )
+  const activateTooling = () => {
+    setToolingCallbacks({
+      id: ToolingTypes.ZONE,
+      start: (x, _y) => {
+        addZone(x, x, categories[0]);
+      },
+      move: (x, _y) => {
+        zones.current[zones.current.length - 1].x1 = x;
         triggerZoneUpdate();
-        onModifyZone(zones.current);
-    }
-
-    const activateTooling = () => {
-        setToolingCallbacks({
-            id: ToolingTypes.ZONE,
-            start: (x, _y) => {addZone(x, x, categories[0])},
-            move: (x, _y) => {
-                zones.current[zones.current.length-1].x1 = x;
-                triggerZoneUpdate()
-            },
-            end: (x, _y) => {
-                zones.current[zones.current.length-1].x1 = x;
-                handleZoneDragFinish()
-            },
-        })
-    }
-
-    // On initialisation the tool registers a menu item with the general context menu
-    useEffect(() => {
-
-        const addZone = (x0: number, x1: number, category: Category) => {
-            zones.current.push(
-                {
-                    category,
-                    x0,
-                    x1
-                }
-            )
-            triggerZoneUpdate();
-            onModifyZone(zones.current);
+      },
+      end: (x, _y) => {
+        const z = zones.current[zones.current.length - 1];
+        z.x1 = x;
+        // Normalize orientation on creation finish (provider has no min-width context).
+        if (z.x1 < z.x0) {
+          [z.x0, z.x1] = [z.x1, z.x0];
         }
+        triggerZoneUpdate();
+        handleZoneDragFinish();
+      },
+    });
+  };
 
-        /**
-         * Converts generic props into a new zone.
-         * Uses 5 % of the current x-range as default width – avoids pixel scaling.
-         */
-        type MenuProps = { x: number; xRange: number; xLimits: [number, number] };
+  // On initialisation the tool registers a menu item with the general context menu
+  useEffect(() => {
+    const addZone = (x0: number, x1: number, category: Category) => {
+      zones.current.push({
+        category,
+        x0,
+        x1,
+      });
+      triggerZoneUpdate();
+      onModifyZone(zones.current);
+    };
+    /**
+     * Converts generic props into a new zone.
+     * Uses 5 % of the current x-range as default width – avoids pixel scaling.
+     */
+    type MenuProps = { x: number; xRange: number; xLimits: [number, number] };
 
-        const addFromClick = (menu: MenuProps, category: Category) => {
-            const width = 0.05 * menu.xRange              // 5 % of span
-            const x0 = menu.x
-            const x1 = Math.min(x0 + width, menu.xLimits[1]) // clamp to upper limit
-            addZone(x0, x1, category)
-        }
-    
-        const addZoneItems = categories.map((category, index) => {
-            return (
-                <Item key={`add${index}`} id={`add${index}`} onClick={({props}) => {
-                    addFromClick(props as MenuProps, category)
-                }}>
-                    {category.name}
-                </Item>
-            )
-        })
-            
-        /* Decide what to register in the main context‑menu:
+    const addFromClick = (menu: MenuProps, category: Category) => {
+      const width = 0.05 * menu.xRange; // 5 % of span
+      const x0 = menu.x;
+      const x1 = Math.min(x0 + width, menu.xLimits[1]); // clamp to upper limit
+      addZone(x0, x1, category);
+    };
+
+    const addZoneItems = categories.map((category, index) => {
+      return (
+        <Item
+          key={`add${index}`}
+          id={`add${index}`}
+          onClick={({ props }) => {
+            addFromClick(props as MenuProps, category);
+          }}
+        >
+          {category.name}
+        </Item>
+      );
+    });
+
+    /* Decide what to register in the main context‑menu:
         – Single category → direct “Add <Category>” item.
         – Multiple categories → keep existing submenu.
         */
-        const menuElement =
-            categories.length === 1
-                ? (
-                    <Item key="add-zone-single" id="add-zone-single" onClick={({props}) => {
-                        addFromClick(props as MenuProps, categories[0])
-                    }}>
-                        {`Add ${categories[0].name}`}
-                    </Item>
-                ) : (
-                    <Submenu key="zone-submenu" label="Add zone">
-                        {addZoneItems}
-                    </Submenu>
-                )
+    const menuElement =
+      categories.length === 1 ? (
+        <Item
+          key="add-zone-single"
+          id="add-zone-single"
+          onClick={({ props }) => {
+            addFromClick(props as MenuProps, categories[0]);
+          }}
+        >
+          {`Add ${categories[0].name}`}
+        </Item>
+      ) : (
+        <Submenu key="zone-submenu" label="Add zone">
+          {addZoneItems}
+        </Submenu>
+      );
 
-        registerMenuItem("zone", menuElement)
+    registerMenuItem("zone", menuElement);
+  }, [categories, onModifyZone, registerMenuItem]);
 
-        }, [categories, onModifyZone, registerMenuItem])
+  // Initialisation of data - this should only run once
+  // Effect: run ONCE per mount to populate from initialData
+  // – overwrites instead of pushing; cleans on unmount
+  useEffect(() => {
+    if (!initialData) return;
 
-    // Initialisation of data - this should only run once
-    // Effect: run ONCE per mount to populate from initialData
-    // – overwrites instead of pushing; cleans on unmount
-    useEffect(() => {
-        if (!initialData) return;
-    
-        zones.current = [...initialData]; 
-        triggerZoneUpdate();
-    
-        /* remove stale copy when Strict-Mode unmounts the first render */
-        return () => {
-          zones.current = [];
-        };
-      }, [initialData]);
+    zones.current = [...initialData];
+    triggerZoneUpdate();
 
-    // Provides an array of the categories for the context menu
-    const updateTypeItems = categories.map((category, index) => {
-        return (
-            <Item key={`update${index}`} id={`update${index}`} onClick={(props) => {handleTypeSetting(props, category)}}>
-                {category.name}
-            </Item>
-        )
-    })
+    /* remove stale copy when Strict-Mode unmounts the first render */
+    return () => {
+      zones.current = [];
+    };
+  }, [initialData]);
 
-    // The context provider is responsible for rendering the context menu relating to zones
-    return(
-        <ZoneContext.Provider value={{zones: zones.current, handleZoneUpdate, handleZoneDragFinish, addZone, activateTooling, triggerUpdate}}>
-            {children}
-            <Menu id={`${ZONE_MENU_ID}`}>
-                <Item id="delete" onClick={({props}: ItemParams) => {
-                    handleDelete(props.zone)
-                }}>
-                    Delete
-                </Item>
-                <Submenu label="Set type">
-                    {updateTypeItems}
-                </Submenu>
-            </Menu>
-        </ZoneContext.Provider>
-    )
+  // Provides an array of the categories for the context menu
+  const updateTypeItems = categories.map((category, index) => {
+    return (
+      <Item
+        key={`update${index}`}
+        id={`update${index}`}
+        onClick={(props) => {
+          handleTypeSetting(props, category);
+        }}
+      >
+        {category.name}
+      </Item>
+    );
+  });
 
-}
-
+  // The context provider is responsible for rendering the context menu relating to zones
+  return (
+    <ZoneContext.Provider
+      value={{
+        zones: zones.current,
+        handleZoneUpdate,
+        handleZoneDragFinish,
+        addZone,
+        activateTooling,
+        triggerUpdate,
+      }}
+    >
+      {children}
+      <Menu id={`${ZONE_MENU_ID}`}>
+        <Item
+          id="delete"
+          onClick={({ props }: ItemParams) => {
+            handleDelete(props.zone);
+          }}
+        >
+          Delete
+        </Item>
+        <Submenu label="Set type">{updateTypeItems}</Submenu>
+      </Menu>
+    </ZoneContext.Provider>
+  );
+};

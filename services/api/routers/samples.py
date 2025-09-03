@@ -278,10 +278,11 @@ async def remove_sample(
     db_client = request.app.state.db_client
     # Check project exists
     await utils.get_project(db_client, project_id=project_id)
-    
+
     # Delete sample
     await utils.delete_samples(db_client, project_id=project_id, sample_id=sample_id)
-    
+
     # Delete annotations associated with this sample
-    await utils.delete_annotations(db_client, project_id=project_id, sample_id=sample_id)
-    
+    await utils.delete_annotations(
+        db_client, project_id=project_id, sample_id=sample_id
+    )
