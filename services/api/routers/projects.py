@@ -132,9 +132,3 @@ async def delete_project(
     db_client = request.app.state.db_client
     # Delete this specific project
     await utils.delete_project(db_client=db_client, project_id=project_id)
-
-    # Delete samples associated with this project
-    await utils.delete_samples(db_client=db_client, project_id=project_id)
-
-    # Delete annotations associated with this project
-    await utils.delete_annotations(db_client=db_client, project_id=project_id)

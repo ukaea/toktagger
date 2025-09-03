@@ -63,7 +63,7 @@ async def test_get_samples(db_client, setup_db):
     # Check three samples returned
     assert len(samples) == 3
     # Check returned in correct order - reverse order of created
-    assert [sample["shot_id"] for sample in samples] == [2, 3, 1]
+    assert [sample.shot_id for sample in samples] == [2, 3, 1]
 
 
 @pytest.mark.asyncio
@@ -73,7 +73,7 @@ async def test_get_samples_by_shot_id(db_client, setup_db):
     )
     # Should do an exact search for this shot_id
     assert len(samples) == 1
-    assert samples[0]["shot_id"] == 3
+    assert samples[0].shot_id == 3
 
 
 @pytest.mark.asyncio
@@ -108,7 +108,7 @@ async def test_delete_specific_sample(db_client, setup_db):
         project_id=setup_db["project_id_1"],
         sample_id=setup_db["sample_id_1"],
     )
-    # Should be three remaining sample
+    # Should be two remaining sample
     samples = await db_client.get_filtered_documents("samples")
     assert len(samples) == 3
     assert 1 not in [sample["shot_id"] for sample in samples]
@@ -122,7 +122,7 @@ async def test_get_annotations_in_project(db_client, setup_db):
     # Check four annotations returned
     assert len(annotations) == 4
     # Check returned in correct order - reverse order of created
-    assert [str(ann["_id"]) for ann in annotations] == [
+    assert [str(ann.id) for ann in annotations] == [
         setup_db["annotation_id_4"],
         setup_db["annotation_id_3"],
         setup_db["annotation_id_2"],
@@ -140,7 +140,7 @@ async def test_get_annotations_in_sample(db_client, setup_db):
     # Check three annotations returned
     assert len(annotations) == 3
     # Check returned in correct order - reverse order of created
-    assert [str(ann["_id"]) for ann in annotations] == [
+    assert [str(ann.id) for ann in annotations] == [
         setup_db["annotation_id_3"],
         setup_db["annotation_id_2"],
         setup_db["annotation_id_1"],
@@ -154,7 +154,7 @@ async def test_get_annotations_validated(db_client, setup_db):
     )
 
     assert len(annotations) == 2
-    assert [str(annotation["_id"]) for annotation in annotations] == [
+    assert [str(annotation.id) for annotation in annotations] == [
         setup_db["annotation_id_2"],
         setup_db["annotation_id_1"],
     ]

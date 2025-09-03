@@ -6,10 +6,11 @@ from pydantic import Field, TypeAdapter, model_validator, BaseModel
 class AnnotationIn(ConfiguredModel):
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
-        if values.get("validated"):
-            values["uncertainty"] = 0
-        elif not values.get("validated") and values.get("uncertainty") is None:
-            values["uncertainty"] = 1
+        if isinstance(values, dict):
+            if values.get("validated"):
+                values["uncertainty"] = 0
+            elif not values.get("validated") and values.get("uncertainty") is None:
+                values["uncertainty"] = 1
 
         return values
 
