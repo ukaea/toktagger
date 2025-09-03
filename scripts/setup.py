@@ -49,7 +49,7 @@ def create_sal_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
 def create_toksearch_samples(project_id: str, shot_ids: list[int]):
@@ -65,7 +65,7 @@ def create_toksearch_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
 def create_local_samples(

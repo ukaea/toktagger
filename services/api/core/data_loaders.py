@@ -115,7 +115,6 @@ class SALDataLoader(DataLoader):
 
         host = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
         self.client = SALClient(host)
-        self.base_path = "s3://mast/level2/shots/"
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         item: ShotData = sample.data
