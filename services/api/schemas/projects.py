@@ -19,6 +19,7 @@ class QueryStrategyType(str, Enum):
 class DataLoaderType(str, Enum):
     PARQUET = "parquet"
     UDA = "uda"
+    SAL = "sal"
     IMAGE = "image"
 
 

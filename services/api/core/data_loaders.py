@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
@@ -78,8 +79,33 @@ class UDADataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+class SALDataLoader(DataLoader):
+    """DataLoader for retrieving data using the SAL access layer"""
+
+    def __init__(self):
+        from sal.client import SALClient
+
+        host = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
+        self.client = SALClient(host)
+
+    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        item: ShotData = sample.data
+
+        results = {}
+        for name in item.signal_names:
+            name = f"/pulse/{sample.shot_id}/{name}"
+            signal = self.client.get(name)
+            data = signal.data
+            time = signal.dimensions[0].data
+            item = TimeSeriesData(time=time, values=data)
+            results[name] = item
+
+        return MultiVariateTimeSeriesData(values=results)
+
+
 DATA_LOADERS = {
     DataLoaderType.PARQUET: ParquetDataLoader,
     DataLoaderType.UDA: UDADataLoader,
+    DataLoaderType.SAL: SALDataLoader,
     DataLoaderType.IMAGE: ImageDataLoader,
 }

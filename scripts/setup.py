@@ -36,6 +36,22 @@ def create_uda_samples(project_id: str, shot_ids: list[int]):
     requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
+def create_sal_samples(project_id: str, shot_ids: list[int]):
+    samples = []
+    for shot_id in shot_ids:
+        sample = {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "signal_names": ["ppf/signal/jetppf/magn/ipla"],
+                "protocol": "sal",
+            },
+        }
+        samples.append(sample)
+
+    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+
+
 def create_local_samples(
     project_id: str,
     shot_ids: list[int],
@@ -91,6 +107,11 @@ def main():
     create_local_samples(
         project_id, shot_ids, base_path=base_path / "mhd", columns=["mirnov"]
     )
+
+    # JET data
+    project_id = create_project("SAL Disruption Project", "disruption", "sal")
+    shot_ids = [87737]
+    create_sal_samples(project_id, shot_ids)
 
 
 if __name__ == "__main__":

@@ -89,22 +89,12 @@ export const DisruptionView = ({
 
   const plotData: Partial<Plotly.PlotData>[] = [
     {
-      x: data.values["ip"].time,
-      y: data.values["ip"].values,
+      x: data.values["/pulse/87737/ppf/signal/jetppf/magn/ipla"].time,
+      y: data.values["/pulse/87737/ppf/signal/jetppf/magn/ipla"].values,
       line: {
         color: "black",
       },
       name: "ip",
-    },
-    {
-      x: data.values["ANE_DENSITY"].time,
-      y: data.values["ANE_DENSITY"].values,
-      line: {
-        color: "black",
-      },
-      name: "density",
-      xaxis: "x2",
-      yaxis: "y2",
     },
   ];
 
@@ -117,17 +107,6 @@ export const DisruptionView = ({
       },
     },
     yaxis: {
-      title: {
-        text: "Plasma current, ip [A]",
-      },
-    },
-    xaxis2: {
-      matches: "x",
-      title: {
-        text: "Time [s]",
-      },
-    },
-    yaxis2: {
       title: {
         text: "Plasma current, ip [A]",
       },
