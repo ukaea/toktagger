@@ -95,6 +95,7 @@ const SampleView = ({
       />
     );
   } else if (project.task == "MHD") {
+    console.log(data);
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
@@ -161,11 +162,14 @@ export default function SamplePage({
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
-  const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
-  const [plotProps, setPlotProps] = useState<PlotProps>({ colorMap: "Cividis" }); // Set default color map
+  const [viewParams, setViewParams] = useState<ViewParams>({
+    name: "identity",
+  });
+  const [plotProps, setPlotProps] = useState<PlotProps>({
+    colorMap: "Cividis",
+  }); // Set default color map
 
   useEffect(() => {
-
     const refreshData = async (params: ViewParams) => {
       const project = await getProject(project_id);
       setProject(project);
@@ -203,12 +207,9 @@ export default function SamplePage({
     };
 
     run(viewParams);
-
   }, [project_id, sample_id, viewParams]);
 
-  useEffect(() => {
-
-  }, [plotProps])
+  useEffect(() => {}, [plotProps]);
 
   if (!data || !project || !sample) {
     return;

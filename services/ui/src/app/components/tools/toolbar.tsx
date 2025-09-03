@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Provider,
   defaultTheme,
@@ -15,7 +15,7 @@ import {
   Flex,
   NumberField,
   ActionButton,
-} from '@adobe/react-spectrum'
+} from "@adobe/react-spectrum";
 import {
   Annotations,
   CompositeDataSchema,
@@ -29,16 +29,20 @@ import {
   SpectrogramViewParamsSchema,
   ViewParams,
 } from "@/types";
-import { FindPeaksTool } from '@/app/components/peaks';
-import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
-import { set } from 'zod/v4';
+import { FindPeaksTool } from "@/app/components/peaks";
+import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+import { set } from "zod/v4";
 
-async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
+async function saveAnnotations(
+  project_id: string,
+  sample_id: string,
+  annotations: Annotations
+) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
-    method: 'PUT',
+    method: "PUT",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(annotations),
   });
@@ -55,7 +59,7 @@ async function getShotSample(project_id: string, shot_id: string) {
   const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?shot_id=${shot_id}`;
   const sampleResult = await fetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
-  let sample = null
+  let sample = null;
   if (sampleArray.length > 0) {
     sample = sampleArray[0];
   }
@@ -110,14 +114,14 @@ function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
 
 export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   const router = useRouter();
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const onSearchSubmit = async (newValue: string) => {
-    if (newValue == '') {
-      setErrorMessage("")
+    if (newValue == "") {
+      setErrorMessage("");
     } else if (/^[0-9]*$/.test(newValue)) {
-      setErrorMessage("")
-      const shot_id = newValue
+      setErrorMessage("");
+      const shot_id = newValue;
       try {
         await saveAnnotations(project_id, sample_id, annotations);
         const sample = await getShotSample(project_id, shot_id);
@@ -128,19 +132,21 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
           setErrorMessage("Shot not found!");
         }
       } catch (err) {
-        console.error('Failed to fetch data:', err);
+        console.error("Failed to fetch data:", err);
       }
     } else {
       setErrorMessage("Please enter a number.");
     }
-  }
+  };
 
-  return <SearchField
-    label="Jump to Shot"
-    onSubmit={onSearchSubmit}
-    validationState={errorMessage ? 'invalid' : undefined}
-    errorMessage={errorMessage} >
-  </SearchField>
+  return (
+    <SearchField
+      label="Jump to Shot"
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    ></SearchField>
+  );
 }
 
 type AmplitudeSliderInfo = {
@@ -148,7 +154,6 @@ type AmplitudeSliderInfo = {
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
   plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
 };
 
 function AmplitudeSlider({
@@ -156,7 +161,6 @@ function AmplitudeSlider({
   viewParams,
   setViewParams,
   plotProps,
-  setPlotProps,
 }: AmplitudeSliderInfo) {
   const onAmplitudeRangeChange = async ({
     start,
@@ -176,7 +180,9 @@ function AmplitudeSlider({
   const largePrecisionFactor = Math.pow(10, numDigits);
 
   let ampValues = data.amplitude.flat();
-  ampValues = ampValues.map((x: number) => Math.log10(Math.max(x, smallPrecisionFactor)));
+  ampValues = ampValues.map((x: number) =>
+    Math.log10(Math.max(x, smallPrecisionFactor))
+  );
 
   const displayAmplitudeValues = (val: number) => {
     // Convert the log10 amplitude value back to linear scale and round to the specified number of significant digits
@@ -203,17 +209,13 @@ type ColorMapPickerInfo = {
   setPlotProps: (props: PlotProps) => void;
 };
 
-function ColorMapPicker({
-  plotProps,
-  setPlotProps,
-}: ColorMapPickerInfo) {
-
+function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
   const options = [
     { id: 1, name: "Viridis" },
     { id: 2, name: "Plasma" },
     { id: 3, name: "Inferno" },
     { id: 4, name: "Magma" },
-    { id: 5, name: "Cividis" }
+    { id: 5, name: "Cividis" },
   ];
 
   const onColorMapChange = (key: Key | null) => {
@@ -222,42 +224,44 @@ function ColorMapPicker({
       const value = options.find((item) => item.id === selectedColorMap);
       setPlotProps({ ...plotProps, colorMap: value?.name || "Cividis" });
     }
-  }
-
+  };
 
   return (
     <ComboBox
       label="Color Map"
       defaultItems={options}
       inputValue={plotProps.colorMap || "Cividis"}
-      onSelectionChange={onColorMapChange}>
-      {item => <Item key={item.id}>{item.name}</Item>}
+      onSelectionChange={onColorMapChange}
+    >
+      {(item) => <Item key={item.id}>{item.name}</Item>}
     </ComboBox>
-  )
+  );
 }
 
-type ThresholdToolInfo = {
+type SpectrogramThresholdToolInfo = {
   project_id: string;
   sample_id: string;
+  signal_name: string;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
   setAnnotations: (annotations: Annotations) => void;
 };
 
-function ThresholdTool({
+function SpectrogramThresholdTool({
   project_id,
   sample_id,
+  signal_name,
   plotProps,
   setPlotProps,
   setAnnotations,
-}: ThresholdToolInfo) {
+}: SpectrogramThresholdToolInfo) {
   const [active, setActive] = useState(false);
   const [value, setValue] = useState(95);
 
   const onThresholdChange = (value: boolean) => {
     setActive(value);
     setPlotProps({ ...plotProps, thresholdActive: value });
-  }
+  };
 
   const incrementValue = (increment: number) => {
     setValue((prevValue) => {
@@ -266,7 +270,7 @@ function ThresholdTool({
       if (newValue > 99) return 99;
       return newValue;
     });
-  }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -283,6 +287,7 @@ function ThresholdTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            signal_name: signal_name,
             percentile: value,
           }),
         }
@@ -293,7 +298,7 @@ function ThresholdTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, active, value]);
+  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
 
   return (
     <>
@@ -301,18 +306,54 @@ function ThresholdTool({
         Thresholding
       </Switch>
       {active && (
-        <Flex direction="column" gap="size-100" margin={"size-200"} alignItems={"center"}>
-          <NumberField label="Percentile" value={value} onChange={setValue} minValue={0} maxValue={99} hideStepper={true} />
+        <Flex
+          direction="column"
+          gap="size-100"
+          margin={"size-200"}
+          alignItems={"center"}
+        >
+          <NumberField
+            label="Percentile"
+            value={value}
+            onChange={setValue}
+            minValue={0}
+            maxValue={99}
+            hideStepper={true}
+          />
           <Flex direction="row" gap="size-100">
-            <ActionButton onPress={() => { incrementValue(-5) }}>-5</ActionButton>
-            <ActionButton onPress={() => { incrementValue(-1) }}>-1</ActionButton>
-            <ActionButton onPress={() => { incrementValue(1) }}>+1</ActionButton>
-            <ActionButton onPress={() => { incrementValue(5) }}>+5</ActionButton>
+            <ActionButton
+              onPress={() => {
+                incrementValue(-5);
+              }}
+            >
+              -5
+            </ActionButton>
+            <ActionButton
+              onPress={() => {
+                incrementValue(-1);
+              }}
+            >
+              -1
+            </ActionButton>
+            <ActionButton
+              onPress={() => {
+                incrementValue(1);
+              }}
+            >
+              +1
+            </ActionButton>
+            <ActionButton
+              onPress={() => {
+                incrementValue(5);
+              }}
+            >
+              +5
+            </ActionButton>
           </Flex>
         </Flex>
       )}
     </>
-  )
+  );
 }
 
 type ToolBarInfo = {
@@ -377,22 +418,19 @@ export default function ToolBar({
 
     const ampRangeTool = (
       <>
-        <ColorMapPicker
-          plotProps={plotProps}
-          setPlotProps={setPlotProps}
-        />
+        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
         <hr className="m-4 h-px opacity-30 border-gray-200" />
         <AmplitudeSlider
           data={mhdData.data}
           viewParams={viewParams}
           setViewParams={setViewParams}
           plotProps={plotProps}
-          setPlotProps={setPlotProps}
         />
         <hr className="m-4 h-px opacity-30 border-gray-200" />
-        <ThresholdTool
+        <SpectrogramThresholdTool
           project_id={project_id}
           sample_id={sample_id}
+          signal_name={"mirnov"}
           plotProps={plotProps}
           setPlotProps={setPlotProps}
           setAnnotations={setAnnotations}
@@ -404,18 +442,32 @@ export default function ToolBar({
 
   return (
     <Provider theme={defaultTheme}>
-      <div className='h-screen text-center'>
-        <div className='pl-4 pr-4 pt-4'>
+      <div className="h-screen text-center">
+        <div className="pl-4 pr-4 pt-4">
           <ButtonGroup>
-            <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations} />
-            <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations} />
+            <SaveButton
+              project_id={project_id}
+              sample_id={sample_id}
+              annotations={annotations}
+            />
+            <NextButton
+              project_id={project_id}
+              sample_id={sample_id}
+              annotations={annotations}
+            />
           </ButtonGroup>
         </div>
-        <div className='pl-4 pr-4 pb-4 pt-2'>
-          <ShotSearch project_id={project_id} sample_id={sample_id} annotations={annotations} />
+        <div className="pl-4 pr-4 pb-4 pt-2">
+          <ShotSearch
+            project_id={project_id}
+            sample_id={sample_id}
+            annotations={annotations}
+          />
         </div>
-        <hr className='m-4' />
-        {tools.map((item, i) => <div key={i}>{item}</div>)}
+        <hr className="m-4" />
+        {tools.map((item, i) => (
+          <div key={i}>{item}</div>
+        ))}
       </div>
     </Provider>
   );

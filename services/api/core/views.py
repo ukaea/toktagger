@@ -1,6 +1,7 @@
 import numpy as np
 import xarray as xr
 from scipy.signal import stft
+from services.api.core.annotators import compute_stft
 from services.api.schemas.data import (
     CompositeData,
     MultiVariateTimeSeriesData,
@@ -40,14 +41,7 @@ class SpectrogramView:
         values = np.array(data.values)
 
         # Compute the Short-Time Fourier Transform (STFT)
-        sample_rate = 1 / (time[1] - time[0])
-        freq, ts, values = stft(
-            values,
-            fs=int(sample_rate),
-            nperseg=self.params.nperseg,
-            noverlap=self.params.nperseg // 2,
-        )
-        values = np.absolute(values)
+        freq, ts, values = compute_stft(data)
         freq /= 1000
         time = ts + time[0]
 

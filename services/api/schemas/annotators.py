@@ -29,12 +29,13 @@ class TimeSeriesChangepoints(Annotator):
     penalty: int
 
 
-class ThresholdParams(Annotator):
+class SpectrogramThresholdParams(Annotator):
+    signal_name: str
     percentile: float
 
 
 AnnotatorTypes = Union[
     FindPeaksParams,
     TimeSeriesChangepoints,
-    ThresholdParams,
+    SpectrogramThresholdParams,
 ]

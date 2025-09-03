@@ -1,14 +1,29 @@
-from enum import Enum
 from abc import ABC, abstractmethod
 from scipy.signal import find_peaks, stft
 from scipy.ndimage import uniform_filter1d
 import numpy as np
 
-from services.api.schemas.data import MultiVariateTimeSeriesData
-from services.api.schemas.annotators import FindPeaksParams, ThresholdParams
+from services.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
+from services.api.schemas.annotators import FindPeaksParams, SpectrogramThresholdParams
 from services.api.schemas.annotations import TimeRegion, SpectrogramMask
 from services.api.schemas.projects import Task
 from services.api.schemas.annotators import AnnotatorIds
+
+
+def compute_stft(data: TimeSeriesData) -> np.ndarray:
+    time = np.array(data.time)
+    values = np.array(data.values)
+
+    sample_rate = 1 / (time[1] - time[0])
+
+    freq, ts, Zxx = stft(
+        values,
+        fs=int(sample_rate),
+        nperseg=256,
+        noverlap=128,
+    )
+
+    return freq, ts, np.abs(Zxx)
 
 
 class DataAnnotator(ABC):
@@ -56,24 +71,13 @@ class FindPeaksAnnotator:
         return regions
 
 
-class ThresholdAnnotator:
-    def __init__(self, params: ThresholdParams):
+class SpectrogramThresholdAnnotator:
+    def __init__(self, params: SpectrogramThresholdParams):
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> SpectrogramMask:
-        time = np.array(data.values["mirnov"].time)
-        values = np.array(data.values["mirnov"].values)
+        _, _, values = compute_stft(data.values[self.params.signal_name])
 
-        sample_rate = 1 / (time[1] - time[0])
-
-        _, _, values = stft(
-            values,
-            fs=int(sample_rate),
-            nperseg=256,
-            noverlap=128,
-        )
-
-        values = np.absolute(values)
         threshold_value = np.percentile(values, self.params.percentile)
         threshold_mask = values > threshold_value
         return [
@@ -83,7 +87,7 @@ class ThresholdAnnotator:
 
 ANNOTATORS = {
     AnnotatorIds.FIND_PEAKS: FindPeaksAnnotator,
-    AnnotatorIds.THRESHOLD: ThresholdAnnotator,
+    AnnotatorIds.THRESHOLD: SpectrogramThresholdAnnotator,
 }
 # Currently only allowing these annotators to task mapping
 # Might want user to be able to specify a choice when making the project down the line?
