@@ -13,9 +13,11 @@ class AnnotationIn(ConfiguredModel):
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
         if isinstance(values, dict):
-            if values.get('validated') in values and values["validated"]:
+            if values.get("validated") in values and values["validated"]:
                 values["uncertainty"] = 0
-            elif not values.get("validated", False) and values.get("uncertainty") is None:
+            elif (
+                not values.get("validated", False) and values.get("uncertainty") is None
+            ):
                 values["uncertainty"] = 1
         return values
 
@@ -77,6 +79,10 @@ class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
 
 class ModelAnnotation(AnnotationIn):
     uncertainty: float
+
+
+class SpectrogramMask(AnnotationIn):
+    values: list[list[float]]
 
 
 AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]

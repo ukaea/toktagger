@@ -10,6 +10,8 @@ import {
   Zone,
   TimePoint,
   TimeRegion,
+  SpectrogramMaskSchema,
+  SpectrogramMask,
 } from "@/types";
 
 export const linspace = (start: number, end: number, num: number) => {
@@ -69,6 +71,12 @@ export const createAnnotationToDisplayAnnotationFunc = (
         category: { name: timePoint.label, color: colors[timePoint.label] },
       };
       return vspan;
+    } else if (SpectrogramMaskSchema.safeParse(item).success) {
+      const schema = SpectrogramMaskSchema.parse(item);
+      const spectrogramMask: SpectrogramMask = {
+        values: schema.values,
+      };
+      return spectrogramMask;
     } else {
       throw new Error("Unsupported annotation type");
     }

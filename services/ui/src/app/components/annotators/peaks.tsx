@@ -43,7 +43,11 @@ export function PeakDetectionTool({
     name: value,
   }));
 
-  const validSignalName = signalName && signalName in data.values;
+  const validSignal = signalName !== null && signalName in data.values;
+
+  const clearPeaks = () => {
+    setAnnotations([]);
+  };
 
   useEffect(() => {
     if (data && signalName !== null && signalName in data.values) {
@@ -57,7 +61,7 @@ export function PeakDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignalName || !isEnabled) {
+      if (!validSignal || !isEnabled) {
         return;
       }
 
@@ -97,7 +101,7 @@ export function PeakDetectionTool({
     timeRange,
     isEnabled,
     signalName,
-    validSignalName,
+    validSignal,
     setAnnotations,
   ]);
 

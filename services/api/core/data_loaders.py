@@ -1,4 +1,3 @@
-from typing import cast
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
@@ -27,7 +26,9 @@ class ImageDataLoader(DataLoader):
         assert isinstance(sample.data, FileData)
         item: FileData = sample.data
         if not pathlib.Path(item.file_name).exists():
-            raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
+            raise FileNotFoundError(
+                f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
+            )
         im = Image.open(item.file_name)
         arr = np.asarray(im)
         return ImageData(data=arr.tolist())
@@ -40,7 +41,9 @@ class ParquetDataLoader(DataLoader):
         assert isinstance(sample.data, TimeSeriesFileData)
         item: TimeSeriesFileData = sample.data
         if not pathlib.Path(item.file_name).exists():
-            raise FileNotFoundError(f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}")
+            raise FileNotFoundError(
+                f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
+            )
         df = pd.read_parquet(item.file_name, columns=item.column_names)
         df = df.fillna(0)
         data = df.to_dict("list")
@@ -70,9 +73,9 @@ class UDADataLoader(DataLoader):
                 signal = self.client.get(name, sample.shot_id)
                 data = signal.data
                 time = signal.time.data
-                signal = TimeSeriesData(time=time, values=data)
-                results[name] = signal
-            except Exception as e:
+                item = TimeSeriesData(time=time, values=data)
+                results[name] = item
+            except Exception:
                 results[name] = None
 
         return MultiVariateTimeSeriesData(values=results)

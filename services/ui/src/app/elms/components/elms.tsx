@@ -8,7 +8,6 @@ import {
   TimeRegionSchema,
   Annotation,
 } from "@/types";
-import { Plotly } from "react-plotly.js";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { TimeSeries } from "@/app/components/plots/time-series";
@@ -75,7 +74,7 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     mode: "lines",
   };
 
-  const n_e_lineTrace = {
+  const n_e_lineTrace: Partial<Plotly.PlotData> = {
     name: "Density",
     x: data.values.n_e_line.time,
     y: data.values.n_e_line.values,
@@ -93,7 +92,7 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     mode: "lines",
   };
 
-  const sxrTrace = {
+  const sxrTrace: Partial<Plotly.PlotData> = {
     name: "Soft X-Ray",
     x: data.values.sxr.time,
     y: data.values.sxr.values,

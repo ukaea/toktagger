@@ -16,9 +16,15 @@ from services.api.schemas.annotators import (
     JumpDetectionParams,
     OutlierDetectionParams,
 )
-from services.api.schemas.annotations import TimeRegion
+from scipy.signal import stft
+
+from services.api.schemas.data import TimeSeriesData
+from services.api.schemas.annotations import SpectrogramMask, TimeRegion
+from services.api.schemas.annotators import (
+    SpectrogramThresholdParams,
+    AnnotatorParamTypes,
+)
 from services.api.schemas.projects import Task
-from services.api.schemas.annotators import AnnotatorParamTypes
 
 
 def binary_runs_to_tuples(arr: np.ndarray) -> list[tuple[int, int]]:
@@ -133,6 +139,22 @@ def downsample_time_series(
     interpolator = interp1d(time, signal, kind="linear")
     signal = interpolator(time_coarse)
     return time_coarse, signal
+
+
+def compute_stft(data: TimeSeriesData) -> np.ndarray:
+    time = np.array(data.time)
+    values = np.array(data.values)
+
+    sample_rate = 1 / (time[1] - time[0])
+
+    freq, ts, Zxx = stft(
+        values,
+        fs=int(sample_rate),
+        nperseg=256,
+        noverlap=128,
+    )
+
+    return freq, ts, np.abs(Zxx)
 
 
 class DataAnnotator(ABC):
@@ -410,14 +432,15 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         scaler = StandardScaler()
         signal = scaler.fit_transform(signal)
 
-
         best_score = -1e-10
         best_model = None
         num_models = 10
 
         # try a range of fits to find the best model for the data
         for seed in range(num_models):
-            m = hmm.GaussianHMM(n_components=self.params.num_components, n_iter=200, random_state=seed)
+            m = hmm.GaussianHMM(
+                n_components=self.params.num_components, n_iter=200, random_state=seed
+            )
             m.fit(signal)
             score = m.score(signal)
             if score > best_score:
@@ -525,12 +548,26 @@ class JumpDetectionAnnotator(DataAnnotator):
         return bounds
 
 
+class SpectrogramThresholdAnnotator:
+    def __init__(self, params: SpectrogramThresholdParams):
+        self.params = params
+
+    def predict(self, data: MultiVariateTimeSeriesData) -> SpectrogramMask:
+        _, _, values = compute_stft(data.values[self.params.signal_name])
+
+        threshold_value = np.percentile(values, self.params.percentile)
+        threshold_mask = values > threshold_value
+        return SpectrogramMask(label="SpectrogramMask", values=threshold_mask.tolist())
+
+
 ANNOTATORS = {
     AnnotatorTypes.PEAK_DETECTION: PeakDetectionAnnotator,
     AnnotatorTypes.OUTLIER_DETECTION: OutlierDetectionAnnotator,
     AnnotatorTypes.CHANGE_POINT_DETECTION: ChangePointDetectionAnnotator,
     AnnotatorTypes.JUMP_DETECTION: JumpDetectionAnnotator,
+    AnnotatorTypes.SPECTROGRAM_THRESHOLD: SpectrogramThresholdAnnotator,
 }
+
 # Currently only allowing these annotators to task mapping
 # Might want user to be able to specify a choice when making the project down the line?
 ANNOTATORS_PER_TASK = {
@@ -546,6 +583,6 @@ ANNOTATORS_PER_TASK = {
         AnnotatorTypes.CHANGE_POINT_DETECTION,
         AnnotatorTypes.JUMP_DETECTION,
     ],
-    Task.MHD: [],
+    Task.MHD: [AnnotatorTypes.SPECTROGRAM_THRESHOLD],
     Task.UFO: [],
 }

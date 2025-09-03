@@ -9,6 +9,7 @@ class AnnotatorTypes(str, Enum):
     CHANGE_POINT_DETECTION = "change_point_detection"
     JUMP_DETECTION = "jump_detection"
     MANUAL_ANNOTATION = "manual"
+    SPECTROGRAM_THRESHOLD = "spectrogram_threshold"
 
 
 class DataTypes(Enum):
@@ -51,9 +52,15 @@ class JumpDetectionParams(AnnotatorParams):
     num_points: int
 
 
+class SpectrogramThresholdParams(AnnotatorParams):
+    signal_name: str
+    percentile: float
+
+
 AnnotatorParamTypes = Union[
     PeakDetectionParams,
     OutlierDetectionParams,
     ChangePointDetectionParams,
     JumpDetectionParams,
+    SpectrogramThresholdParams,
 ]

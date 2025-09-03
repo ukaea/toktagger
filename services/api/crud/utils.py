@@ -3,10 +3,9 @@ from fastapi import HTTPException
 from pydantic import TypeAdapter
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import Annotation, AnnotationIn, AnnotationOut, AnnotationOutTypes, AnnotationTypes
+from services.api.schemas.annotations import AnnotationIn, AnnotationOutTypes
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
-from bson.objectid import ObjectId
 
 
 async def get_projects(
@@ -160,7 +159,9 @@ async def get_annotations(
         limit=count if count is not None else 0,
     )
 
-    annotations = [TypeAdapter(AnnotationOutTypes).validate_python(a) for a in annotations]
+    annotations = [
+        TypeAdapter(AnnotationOutTypes).validate_python(a) for a in annotations
+    ]
     return annotations
 
 
