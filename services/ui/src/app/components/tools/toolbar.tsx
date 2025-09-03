@@ -486,17 +486,28 @@ export default function ToolBar({
     }
 
     const mhdData = resultSpec.data;
-    const ampRangeTool = (
-      <>
-        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
-        <hr className="m-4 h-px opacity-30 border-gray-200" />
+    tools.push({
+      name: "Amplitude Range",
+      component: (
         <AmplitudeSlider
           data={mhdData}
           viewParams={viewParams}
           setViewParams={setViewParams}
           plotProps={plotProps}
         />
-        <hr className="m-4 h-px opacity-30 border-gray-200" />
+      ),
+    });
+
+    tools.push({
+      name: "Color Map",
+      component: (
+        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
+      ),
+    });
+
+    tools.push({
+      name: "Threshold",
+      component: (
         <SpectrogramThresholdTool
           project_id={project_id}
           sample_id={sample_id}
@@ -505,11 +516,7 @@ export default function ToolBar({
           setPlotProps={setPlotProps}
           setAnnotations={setAnnotations}
         />
-      </>
-    );
-    tools.push({
-      name: "Amplitude Range",
-      component: ampRangeTool,
+      ),
     });
   }
 
