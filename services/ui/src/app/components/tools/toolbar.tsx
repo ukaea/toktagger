@@ -1,7 +1,14 @@
 "use client";
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import {Provider, defaultTheme,  ButtonGroup, ToastQueue, Button, SearchField } from '@adobe/react-spectrum'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Provider,
+  defaultTheme,
+  ButtonGroup,
+  ToastQueue,
+  Button,
+  SearchField,
+} from "@adobe/react-spectrum";
 import {
   Annotations,
   CompositeDataSchema,
@@ -14,36 +21,40 @@ import {
   SpectrogramViewParamsSchema,
   ViewParams,
 } from "@/types";
-import { FindPeaksTool } from '@/app/components/peaks';
-import { DataRangeSlider } from '@/app/components/tools/dataRangeSlider';
+import { FindPeaksTool } from "@/app/components/peaks";
+import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 
-async function saveAnnotations(project_id: string, sample_id: string, annotations: Annotations) {
-    const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
-    const response = await fetch(ANNOTATIONS_URL, {
-        method: 'PUT',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(annotations),
-    });
+async function saveAnnotations(
+  project_id: string,
+  sample_id: string,
+  annotations: Annotations,
+) {
+  const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+  await fetch(ANNOTATIONS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(annotations),
+  });
 }
 
 async function getNextSample(project_id: string) {
-    const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
-    const sampleResult = await fetch(NEXT_URL);
-    const sample = await sampleResult.json();
-    return sample;
+  const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
+  const sampleResult = await fetch(NEXT_URL);
+  const sample = await sampleResult.json();
+  return sample;
 }
 
 async function getShotSample(project_id: string, shot_id: string) {
-    const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?shot_id=${shot_id}`;
-    const sampleResult = await fetch(NEXT_URL);
-    const sampleArray = await sampleResult.json();
-    let sample = null
-    if (sampleArray.length > 0) {
-      sample = sampleArray[0];
-    }
-    return sample;
+  const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?shot_id=${shot_id}`;
+  const sampleResult = await fetch(NEXT_URL);
+  const sampleArray = await sampleResult.json();
+  let sample = null;
+  if (sampleArray.length > 0) {
+    sample = sampleArray[0];
+  }
+  return sample;
 }
 
 type SaveInfo = {
@@ -92,16 +103,16 @@ function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   );
 }
 
-export function ShotSearch({project_id, sample_id, annotations} : SaveInfo) {
+export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   const router = useRouter();
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
   const onSearchSubmit = async (newValue: string) => {
-    if (newValue == '') {
-      setErrorMessage("")
+    if (newValue == "") {
+      setErrorMessage("");
     } else if (/^[0-9]*$/.test(newValue)) {
-      setErrorMessage("")
-      const shot_id = newValue 
+      setErrorMessage("");
+      const shot_id = newValue;
       try {
         await saveAnnotations(project_id, sample_id, annotations);
         const sample = await getShotSample(project_id, shot_id);
@@ -112,19 +123,21 @@ export function ShotSearch({project_id, sample_id, annotations} : SaveInfo) {
           setErrorMessage("Shot not found!");
         }
       } catch (err) {
-        console.error('Failed to fetch data:', err);
+        console.error("Failed to fetch data:", err);
       }
     } else {
       setErrorMessage("Please enter a number.");
     }
-    }
+  };
 
-  return  <SearchField 
-            label="Jump to Shot" 
-            onSubmit={onSearchSubmit}
-            validationState={errorMessage ? 'invalid' : undefined}
-            errorMessage={errorMessage} >
-          </SearchField>
+  return (
+    <SearchField
+      label="Jump to Shot"
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    ></SearchField>
+  );
 }
 
 type AmplitudeSliderInfo = {
@@ -166,7 +179,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end
+          val.end,
         )}`
       }
     />
@@ -222,7 +235,7 @@ export default function ToolBar({
     }
 
     const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"]
+      result.data.values["mirnov"],
     );
 
     if (!mhdData.success) {
@@ -242,18 +255,32 @@ export default function ToolBar({
 
   return (
     <Provider theme={defaultTheme}>
-      <div className='h-screen text-center'>
-        <div className='pl-4 pr-4 pt-4'>
+      <div className="h-screen text-center">
+        <div className="pl-4 pr-4 pt-4">
           <ButtonGroup>
-            <SaveButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
-            <NextButton project_id={project_id} sample_id={sample_id} annotations={annotations}/>
+            <SaveButton
+              project_id={project_id}
+              sample_id={sample_id}
+              annotations={annotations}
+            />
+            <NextButton
+              project_id={project_id}
+              sample_id={sample_id}
+              annotations={annotations}
+            />
           </ButtonGroup>
         </div>
-        <div className='pl-4 pr-4 pb-4 pt-2'>
-          <ShotSearch project_id={project_id} sample_id={sample_id} annotations={annotations}/>
+        <div className="pl-4 pr-4 pb-4 pt-2">
+          <ShotSearch
+            project_id={project_id}
+            sample_id={sample_id}
+            annotations={annotations}
+          />
         </div>
-        <hr className='m-4'/>
-        {tools.map((item, i) => <div  key={i}>{item}</div>)}
+        <hr className="m-4" />
+        {tools.map((item, i) => (
+          <div key={i}>{item}</div>
+        ))}
       </div>
     </Provider>
   );

@@ -1,4 +1,3 @@
-from enum import Enum
 from abc import ABC, abstractmethod
 from scipy.signal import find_peaks
 from scipy.ndimage import uniform_filter1d
@@ -9,6 +8,7 @@ from services.api.schemas.annotators import FindPeaksParams
 from services.api.schemas.annotations import TimeRegion
 from services.api.schemas.projects import Task
 from services.api.schemas.annotators import AnnotatorIds
+
 
 class DataAnnotator(ABC):
     @abstractmethod
@@ -54,14 +54,17 @@ class FindPeaksAnnotator:
 
         return regions
 
+
 ANNOTATORS = {
     AnnotatorIds.FIND_PEAKS: FindPeaksAnnotator,
 }
 # Currently only allowing these annotators to task mapping
 # Might want user to be able to specify a choice when making the project down the line?
 ANNOTATORS_PER_TASK = {
-    Task.ELM: [AnnotatorIds.FIND_PEAKS,],
+    Task.ELM: [
+        AnnotatorIds.FIND_PEAKS,
+    ],
     Task.DISRUPTION: [],
     Task.MHD: [],
-    Task.UFO: []
+    Task.UFO: [],
 }

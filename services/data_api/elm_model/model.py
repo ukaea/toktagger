@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import torch
-import torch.nn as nn
-
 
 class Conv1dAutoencoder(nn.Module):
     def __init__(self, input_channels=1, latent_dim=16):

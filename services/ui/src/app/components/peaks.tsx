@@ -42,7 +42,7 @@ export function FindPeaksTool({
     name: value,
   }));
 
-  const validSignal = signalName !== null && (signalName in data.values)
+  const validSignal = signalName !== null && signalName in data.values;
 
   const clearPeaks = () => {
     setAnnotations([]);
@@ -78,7 +78,7 @@ export function FindPeaksTool({
             time_min: timeRange.start,
             time_max: timeRange.end,
           }),
-        }
+        },
       );
 
       const payload = await response.json();
@@ -86,7 +86,16 @@ export function FindPeaksTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, prominence, distance, timeRange, signalName, setAnnotations, validSignal]);
+  }, [
+    project_id,
+    sample_id,
+    prominence,
+    distance,
+    timeRange,
+    signalName,
+    setAnnotations,
+    validSignal,
+  ]);
 
   return (
     <Provider theme={defaultTheme}>
