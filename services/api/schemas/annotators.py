@@ -1,11 +1,11 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 from pydantic import BaseModel
 from enum import Enum
 
 
 class AnnotatorIds(str, Enum):
     FIND_PEAKS = "find_peaks"
-    THRESHOLD = "threshold"
+    SPECTROGRAM_THRESHOLD = "spectrogram_threshold"
 
 
 class DataTypes(Enum):

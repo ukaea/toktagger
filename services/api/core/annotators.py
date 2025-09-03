@@ -87,7 +87,7 @@ class SpectrogramThresholdAnnotator:
 
 ANNOTATORS = {
     AnnotatorIds.FIND_PEAKS: FindPeaksAnnotator,
-    AnnotatorIds.THRESHOLD: SpectrogramThresholdAnnotator,
+    AnnotatorIds.SPECTROGRAM_THRESHOLD: SpectrogramThresholdAnnotator,
 }
 # Currently only allowing these annotators to task mapping
 # Might want user to be able to specify a choice when making the project down the line?
@@ -96,6 +96,6 @@ ANNOTATORS_PER_TASK = {
         AnnotatorIds.FIND_PEAKS,
     ],
     Task.DISRUPTION: [],
-    Task.MHD: [AnnotatorIds.THRESHOLD],
+    Task.MHD: [AnnotatorIds.SPECTROGRAM_THRESHOLD],
     Task.UFO: [],
 }
