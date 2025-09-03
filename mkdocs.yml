@@ -5,6 +5,7 @@ theme:
     scheme: default
 nav:
   - Home: index.md
+  - Data Loaders: data_loaders.md
   - Developer Documentation: 
     - Getting Started: dev/developer-setup.md
     - Unit Tests: dev/tests.md

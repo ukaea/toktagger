@@ -14,7 +14,13 @@ from services.api.schemas.data import (
     TimeSeriesData,
     ImageData,
 )
-from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
+from services.api.schemas.samples import (
+    FileData,
+    Sample,
+    ShotData,
+    TimeSeriesFileData,
+    ToksearchShotData,
+)
 from services.api.schemas.projects import DataLoaderType
 
 
@@ -134,20 +140,22 @@ class SALDataLoader(DataLoader):
 class TokSearchDataLoader(DataLoader):
     def __init__(self):
         super().__init__()
-        self.endpoint = "https://echo.stfc.ac.uk"
-        self.base_path = "s3://mast/level2/shots/"
-        self.fs = s3fs.S3FileSystem(
-            anon=True, endpoint_url=self.endpoint, asynchronous=True
-        )
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        item: ShotData = sample.data
+        item: ToksearchShotData = sample.data
+        endpoint = item.endpoint
+        base_path = item.base_path
+
+        if item.backend_type != "zarr":
+            raise ValueError("Only zarr backend is currently supported")
+
+        self.fs = s3fs.S3FileSystem(anon=True, endpoint_url=endpoint, asynchronous=True)
 
         from toksearch.signal.zarr import ZarrSignal
 
         results = {}
         for name in item.signal_names:
-            signal = ZarrSignal(self.base_path, name, fs=self.fs)
+            signal = ZarrSignal(base_path, name, fs=self.fs)
             ds = signal.fetch_as_xarray(sample.shot_id)
             data = ds.data
             time = ds.times.data

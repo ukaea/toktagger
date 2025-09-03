@@ -1,5 +1,6 @@
 from typing import Annotated, List, Optional
 from enum import Enum
+from typing_extensions import Literal
 from pydantic import Field, BaseModel
 from services.api.schemas import ConfiguredModel
 from services.api.schemas.annotations import AnnotationIn
@@ -48,9 +49,15 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_items=1)]
 
 
+class ToksearchShotData(ShotData):
+    backend_type: Literal["zarr"]
+    base_path: str
+    endpoint: str
+
+
 class SampleBase(ConfiguredModel):
     shot_id: int
-    data: FileData | ShotData | TimeSeriesFileData
+    data: FileData | ShotData | ToksearchShotData | TimeSeriesFileData
 
 
 class SampleIn(SampleBase):

@@ -62,6 +62,9 @@ def create_toksearch_samples(project_id: str, shot_ids: list[int]):
             "data": {
                 "signal_names": ["magnetics/ip"],
                 "protocol": "toksearch",
+                "backend_type": "zarr",
+                "base_path": "s3://mast/level2/shots/",
+                "endpoint": "https://echo.stfc.ac.uk",
             },
         }
         samples.append(sample)

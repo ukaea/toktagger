@@ -1,7 +1,7 @@
 [project]
 name = "viz-annotation"
 version = "2025.0.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
 ]
 maintainers = [
@@ -18,7 +18,7 @@ dependencies = [
   "fsspec",
   "xarray",
   "s3fs",
-  "zarr<3",
+  "zarr>=3.0.0",
   "scipy",
   "pyarrow",
   "pymongo",
@@ -35,6 +35,7 @@ dependencies = [
   "mkdocs-material",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
+  "psutil>=7.0.0",
 ]
 
 [tool.setuptools.packages.find]
