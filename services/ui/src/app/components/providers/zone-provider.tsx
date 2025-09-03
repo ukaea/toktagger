@@ -44,17 +44,6 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
 
     const {setToolingCallbacks, registerMenuItem} = useContextMenuProvider()
 
-    const cleanZoneData = () => {
-        for (const zone of zones.current) {
-            if (zone.x1 < zone.x0) {
-                const temp = zone.x0
-                zone.x0 = zone.x1
-                zone.x1 = temp
-            }
-        }
-        triggerZoneUpdate()
-    }
-
     // It is necessary for the context to trigger child refreshes
     const triggerZoneUpdate = () => {
         setTriggerUpdate((current) => (current+1)%10)
@@ -66,7 +55,6 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
     }
 
     const handleZoneDragFinish = () => {
-        cleanZoneData()
         onModifyZone(zones.current);
     }
 
@@ -107,8 +95,14 @@ export const ZoneProvider = ({categories, initialData, children, onModifyZone} :
                 triggerZoneUpdate()
             },
             end: (x, _y) => {
-                zones.current[zones.current.length-1].x1 = x;
-                handleZoneDragFinish()
+                const z = zones.current[zones.current.length-1];
+                z.x1 = x;
+                // Normalize orientation on creation finish (provider has no min-width context).
+                if (z.x1 < z.x0) {
+                  [z.x0, z.x1] = [z.x1, z.x0];
+                }
+                triggerZoneUpdate();
+                handleZoneDragFinish();
             },
         })
     }

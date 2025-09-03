@@ -49,7 +49,7 @@ async function saveAnnotations(
     body: JSON.stringify(annotations),
   });
   return response;
-}
+
 
 async function getNextSample(project_id: string) {
   const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
