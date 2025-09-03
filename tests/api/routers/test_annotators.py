@@ -32,7 +32,7 @@ async def test_annotators(api_client, setup_db):
 async def test_annotators_not_supported_for_project(api_client, setup_db):
     params = {"signal_name": "Ip", "prominence": 10, "distance": 5}
     response = await api_client.post(
-        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_3']}/annotator/find_peaks",
+        f"/projects/{setup_db['project_id_3']}/samples/{setup_db['sample_id_3']}/annotator/peak_detection",
         json=params,
     )
     # Should throw a 409 conflict error since Disruption project does not support Find Peaks annotator

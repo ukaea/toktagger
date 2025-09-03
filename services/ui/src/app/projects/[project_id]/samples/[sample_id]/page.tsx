@@ -58,7 +58,7 @@ type SampleViewInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
   plotProps: PlotProps;
 };
@@ -101,7 +101,7 @@ const SampleView = ({
       throw new Error("Invalid data for MHD view");
     }
     const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"]
+      result.data.values["mirnov"],
     );
     if (!mhdData.success) {
       throw new Error("Invalid data for MHD view");
@@ -125,25 +125,25 @@ export async function getData<T>(url: string): Promise<T> {
 
 async function getSample(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Sample> {
   return await getData<Sample>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`,
   );
 }
 
 async function getProject(project_id: string): Promise<Project> {
   return await getData<Project>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`,
   );
 }
 
 async function getAnnotations(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`,
   );
 }
 
@@ -196,7 +196,7 @@ export default function SamplePage({
             "Content-Type": "application/json",
           },
           body: JSON.stringify(params),
-        }
+        },
       );
       const data: Data = await response.json();
       setData(data);

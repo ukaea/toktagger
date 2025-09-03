@@ -21,7 +21,7 @@ type ChangePointDetectionType = {
   sample_id: string;
   data: MultiVariateTimeSeriesData;
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
 };
 
@@ -68,14 +68,14 @@ export function ChangePointDetectionTool({
             num_points: numPoints,
             num_components: numComponents,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
+            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
         );
         return otherAnnotations.concat(payload);
       });

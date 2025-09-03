@@ -16,7 +16,7 @@ type OutlierDetectionType = {
   sample_id: string;
   data: MultiVariateTimeSeriesData;
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
 };
 
@@ -60,14 +60,14 @@ export function OutlierDetectionTool({
             threshold: threshold,
             contamination: contamination,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
+            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION,
         );
         return otherAnnotations.concat(payload);
       });
