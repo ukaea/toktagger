@@ -82,7 +82,11 @@ export const SpectrogramMaskSchema = z.object({
 });
 export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
 
-export const DisplayAnnotationSchema = z.union([ZoneSchema, VSpanSchema, SpectrogramMaskSchema]);
+export const DisplayAnnotationSchema = z.union([
+  ZoneSchema,
+  VSpanSchema,
+  SpectrogramMaskSchema,
+]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export const ProjectSchema = z.object({
@@ -130,18 +134,18 @@ export type ToolingProps = {
 
 export enum ToolingTypes {
   ZONE,
-  VSPAN
+  VSPAN,
 }
 
 export type ToolingCallbacks = {
-  id: ToolingTypes
-  start: (x: number, y: number) => void
-  move: (x: number, y: number) => void
-  end: (x: number, y: number) => void
-}
+  id: ToolingTypes;
+  start: (x: number, y: number) => void;
+  move: (x: number, y: number) => void;
+  end: (x: number, y: number) => void;
+};
 
 export type PlotProps = {
   colorMap?: string;
   numSignificantDigits?: number;
   thresholdActive?: boolean;
-}
+};

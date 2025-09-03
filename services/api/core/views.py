@@ -1,6 +1,5 @@
 import numpy as np
 import xarray as xr
-from scipy.signal import stft
 from services.api.core.annotators import compute_stft
 from services.api.schemas.data import (
     CompositeData,

@@ -41,21 +41,33 @@ class Annotation(BaseModel):
     id: str = Field(..., alias="_id")
     project_id: str
     sample_id: str
-    
+
+
 class TimePointOut(TimePoint, Annotation):
     pass
+
+
 class TimeRegionOut(TimeRegion, Annotation):
     pass
+
+
 class BoundingBoxOut(BoundingBox, Annotation):
     pass
+
+
 class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
     pass
+
 
 class ModelAnnotation(AnnotationIn):
     uncertainty: float
 
+
 class SpectrogramMask(AnnotationIn):
     values: list[list[float]]
 
+
 AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
-AnnotationOutTypes = Union[TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut]
+AnnotationOutTypes = Union[
+    TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
+]

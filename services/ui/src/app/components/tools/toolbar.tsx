@@ -31,7 +31,6 @@ import {
 } from "@/types";
 import { FindPeaksTool } from "@/app/components/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
-import { set } from "zod/v4";
 
 async function saveAnnotations(
   project_id: string,
@@ -39,8 +38,8 @@ async function saveAnnotations(
   annotations: Annotations
 ) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
-  const response = await fetch(ANNOTATIONS_URL, {
-    method: "PUT",
+  await fetch(ANNOTATIONS_URL, {
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
     },

@@ -71,8 +71,8 @@ export const SpectrogramView = ({
   plotProps,
 }: SpectrogramViewInfo) => {
   useEffect(() => {
-    console.log('SpectrogramView plotProps updated:', plotProps);
-    console.log('Threshold active:', plotProps.thresholdActive);
+    console.log("SpectrogramView plotProps updated:", plotProps);
+    console.log("Threshold active:", plotProps.thresholdActive);
   }, [plotProps]);
 
   console.log(annotations);
@@ -91,7 +91,9 @@ export const SpectrogramView = ({
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
   const mask: SpectrogramMask = displayAnnotations
-    .filter((x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success)
+    .filter(
+      (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success
+    )
     .map((x: DisplayAnnotation) => SpectrogramMaskSchema.parse(x))[0];
 
   const updateZones = (newZones: Array<Zone>) => {
@@ -116,13 +118,13 @@ export const SpectrogramView = ({
           maskValue = 1; // Default to 1 if mask value is undefined
         }
         return value * maskValue;
-      }));
+      })
+    );
   } else {
     amplitude = data.amplitude;
   }
   const ampMin = Math.max(smallPrecisionFactor, Math.min(...amplitude.flat()));
   const ampMax = Math.max(...amplitude.flat());
-
 
   const logAmplitude_og = amplitude_og.map((row: Array<number>) =>
     row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
@@ -154,7 +156,11 @@ export const SpectrogramView = ({
       // Add minor ticks (2-9 × 10^power)
       for (let multiplier = 2; multiplier <= 9; multiplier++) {
         const subValue = baseValue * multiplier;
-        if (subValue >= min && subValue <= max && subValue < Math.pow(10, maxPower + 1)) {
+        if (
+          subValue >= min &&
+          subValue <= max &&
+          subValue < Math.pow(10, maxPower + 1)
+        ) {
           tickvals.push(Math.log10(subValue));
           ticktext.push(""); // Empty labels for minor ticks
         }
@@ -162,11 +168,11 @@ export const SpectrogramView = ({
     }
 
     // Add min and max if they're not already included
-    if (!tickvals.some(val => Math.abs(val - Math.log10(min)) < 1e-10)) {
+    if (!tickvals.some((val) => Math.abs(val - Math.log10(min)) < 1e-10)) {
       tickvals.unshift(Math.log10(min));
       ticktext.unshift(formatTickLabel(min));
     }
-    if (!tickvals.some(val => Math.abs(val - Math.log10(max)) < 1e-10)) {
+    if (!tickvals.some((val) => Math.abs(val - Math.log10(max)) < 1e-10)) {
       tickvals.push(Math.log10(max));
       ticktext.push(formatTickLabel(max));
     }
@@ -207,7 +213,6 @@ export const SpectrogramView = ({
       showscale: false,
     });
   }
-
 
   const interpFunc = (value: number) => {
     if (plotProps.colorMap === "Viridis") {
@@ -284,7 +289,6 @@ export const SpectrogramView = ({
     modeBarButtonsToRemove: ["pan2d"],
   };
 
-
   return (
     <div className="flex flex-col items-center space-y-3">
       <ContextMenuProvider menuId="locked-mode-menu">
@@ -313,6 +317,6 @@ export const SpectrogramView = ({
           </ZoneProvider>
         </VSpanProvider>
       </ContextMenuProvider>
-    </div >
+    </div>
   );
 };
