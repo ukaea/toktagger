@@ -16,6 +16,7 @@ import {
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
+  PlotProps,
   ViewParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
@@ -59,6 +60,7 @@ type SampleViewInfo = {
   setAnnotations: (
     updater: (annotations: Annotations) => Annotations | Annotations,
   ) => void;
+  plotProps: PlotProps;
 };
 
 const SampleView = ({
@@ -66,6 +68,7 @@ const SampleView = ({
   data,
   annotations,
   setAnnotations,
+  plotProps,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -92,6 +95,7 @@ const SampleView = ({
       />
     );
   } else if (project.task == "MHD") {
+    console.log(data);
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
@@ -107,6 +111,7 @@ const SampleView = ({
         data={mhdData.data}
         annotations={annotations}
         setAnnotations={setAnnotations}
+        plotProps={plotProps}
       />
     );
   }
@@ -160,6 +165,9 @@ export default function SamplePage({
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });
+  const [plotProps, setPlotProps] = useState<PlotProps>({
+    colorMap: "Cividis",
+  }); // Set default color map
 
   useEffect(() => {
     const refreshData = async (params: ViewParams) => {
@@ -201,6 +209,8 @@ export default function SamplePage({
     run(viewParams);
   }, [project_id, sample_id, viewParams]);
 
+  useEffect(() => {}, [plotProps]);
+
   if (!data || !project || !sample) {
     return;
   }
@@ -222,6 +232,8 @@ export default function SamplePage({
             setAnnotations={setAnnotations}
             viewParams={viewParams}
             setViewParams={setViewParams}
+            plotProps={plotProps}
+            setPlotProps={setPlotProps}
           />
           <div className="flex-1 justify-center">
             <SampleView
@@ -229,6 +241,7 @@ export default function SamplePage({
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
+              plotProps={plotProps}
             />
           </div>
         </div>

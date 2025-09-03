@@ -2,8 +2,9 @@ import services.api.core.annotators as annotators
 import numpy
 import math
 from scipy.datasets import electrocardiogram
+from services.api.schemas.annotations import SpectrogramMask
 from services.api.schemas.data import TimeSeriesData, MultiVariateTimeSeriesData
-from services.api.schemas.annotators import FindPeaksParams
+from services.api.schemas.annotators import FindPeaksParams, SpectrogramThresholdParams
 
 
 def test_find_peaks():
@@ -60,3 +61,19 @@ def test_find_peaks_params():
     peak = time_regions[1]
     assert numpy.isclose(peak.time_min, 228, rtol=1e-1)
     assert numpy.isclose(peak.time_max, 273, rtol=1e-1)
+
+
+def test_spectrogram_threshold():
+    data = electrocardiogram()[2000:4000]
+    ts_data = TimeSeriesData(time=numpy.arange(len(data)), values=data)
+    mv_data = MultiVariateTimeSeriesData(values={"Ip": ts_data})
+
+    params = SpectrogramThresholdParams(signal_name="Ip", percentile=95)
+    annotator = annotators.SpectrogramThresholdAnnotator(params)
+    result = annotator.predict(mv_data)
+
+    assert isinstance(result, SpectrogramMask)
+    mask = numpy.array(result.values)
+    assert mask.shape == (129, 17)
+    assert mask.min() == 0
+    assert mask.max() == 1
