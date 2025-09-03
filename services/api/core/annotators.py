@@ -80,9 +80,7 @@ class SpectrogramThresholdAnnotator:
 
         threshold_value = np.percentile(values, self.params.percentile)
         threshold_mask = values > threshold_value
-        return [
-            SpectrogramMask(label="SpectrogramMask", values=threshold_mask.tolist())
-        ]
+        return SpectrogramMask(label="SpectrogramMask", values=threshold_mask.tolist())
 
 
 ANNOTATORS = {
