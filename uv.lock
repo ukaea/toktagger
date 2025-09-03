@@ -680,11 +680,19 @@ wheels = [
 
 [[package]]
 name = "fsspec"
+<<<<<<< HEAD
 version = "2025.7.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8b/02/0835e6ab9cfc03916fe3f78c0956cfcdb6ff2669ffa6651065d5ebf7fc98/fsspec-2025.7.0.tar.gz", hash = "sha256:786120687ffa54b8283d942929540d8bc5ccfa820deb555a2b5d0ed2b737bf58", size = 304432, upload-time = "2025-07-15T16:05:21.19Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2f/e0/014d5d9d7a4564cf1c40b5039bc882db69fd881111e03ab3657ac0b218e2/fsspec-2025.7.0-py3-none-any.whl", hash = "sha256:8b012e39f63c7d5f10474de957f3ab793b47b45ae7d39f2fb735f8bbe25c0e21", size = 199597, upload-time = "2025-07-15T16:05:19.529Z" },
+=======
+version = "2025.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/e0/bab50af11c2d75c9c4a2a26a5254573c0bd97cea152254401510950486fa/fsspec-2025.9.0.tar.gz", hash = "sha256:19fd429483d25d28b65ec68f9f4adc16c17ea2c7c7bf54ec61360d478fb19c19", size = 304847, upload-time = "2025-09-02T19:10:49.215Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl", hash = "sha256:530dc2a2af60a414a832059574df4a6e10cce927f6f4a78209390fe38955cfb7", size = 199289, upload-time = "2025-09-02T19:10:47.708Z" },
+>>>>>>> main
 ]
 
 [[package]]
@@ -759,7 +767,11 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+<<<<<<< HEAD
     { name = "zipp", marker = "python_full_version < '3.10'" },
+=======
+    { name = "zipp" },
+>>>>>>> main
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -989,6 +1001,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "mongita"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -999,6 +1012,8 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a4/b6/9159dca5e74e497b19ab8e68c369f789dc2167d2c8cccb5fbd21377ba040/mongita-1.2.0.tar.gz", hash = "sha256:27487d1deb40d83e4ecb107c3d9d732d369a83cc5f10599ba86fc024e2ce9cda", size = 54582, upload-time = "2023-04-03T02:34:58.504Z" }
 
 [[package]]
+=======
+>>>>>>> main
 name = "multidict"
 version = "6.6.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2262,16 +2277,26 @@ wheels = [
 
 [[package]]
 name = "s3fs"
+<<<<<<< HEAD
 version = "2025.7.0"
+=======
+version = "2025.9.0"
+>>>>>>> main
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiobotocore" },
     { name = "aiohttp" },
     { name = "fsspec" },
 ]
+<<<<<<< HEAD
 sdist = { url = "https://files.pythonhosted.org/packages/bf/13/37438c4672ba1d23ec46df0e4b57e98469e5c5f4f98313cf6842b631652b/s3fs-2025.7.0.tar.gz", hash = "sha256:5e7f9ec0cad7745155e3eb86fae15b1481fa29946bf5b3a4ce3a60701ce6022d", size = 77795, upload-time = "2025-07-15T16:35:22.177Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ff/c7/30d13b7fd4f866ca3f30e9a6e7ae038f0c45226f6e26b3cc98d6d197f93b/s3fs-2025.7.0-py3-none-any.whl", hash = "sha256:b6b2d3f84b6aa1c2ba5e62e39dd9410cf54f10a2cce1ea6db1ba0d1a6bcce685", size = 30315, upload-time = "2025-07-15T16:35:20.734Z" },
+=======
+sdist = { url = "https://files.pythonhosted.org/packages/ee/f3/8e6371436666aedfd16e63ff68a51b8a8fcf5f33a0eee33c35e0b2476b27/s3fs-2025.9.0.tar.gz", hash = "sha256:6d44257ef19ea64968d0720744c4af7a063a05f5c1be0e17ce943bef7302bc30", size = 77823, upload-time = "2025-09-02T19:18:21.781Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/b3/ca7d58ca25b1bb6df57e6cbd0ca8d6437a4b9ce1cd35adc8a6b2949c113b/s3fs-2025.9.0-py3-none-any.whl", hash = "sha256:c33c93d48f66ed440dbaf6600be149cdf8beae4b6f8f0201a209c5801aeb7e30", size = 30319, upload-time = "2025-09-02T19:18:20.563Z" },
+>>>>>>> main
 ]
 
 [[package]]
@@ -2551,6 +2576,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "sortedcontainers"
 version = "2.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2560,6 +2586,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "starlette"
 version = "0.47.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2777,11 +2805,17 @@ source = { virtual = "." }
 dependencies = [
     { name = "celery", extra = ["redis"] },
     { name = "fastapi" },
+<<<<<<< HEAD
     { name = "filelock" },
     { name = "fsspec" },
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mongita" },
+=======
+    { name = "fsspec" },
+    { name = "mkdocs" },
+    { name = "mkdocs-material" },
+>>>>>>> main
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "numpy", version = "2.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -2821,11 +2855,17 @@ dev = [
 requires-dist = [
     { name = "celery", extras = ["redis"] },
     { name = "fastapi" },
+<<<<<<< HEAD
     { name = "filelock", specifier = ">=3.19.1" },
     { name = "fsspec" },
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mongita", specifier = ">=1.2.0" },
+=======
+    { name = "fsspec" },
+    { name = "mkdocs" },
+    { name = "mkdocs-material" },
+>>>>>>> main
     { name = "numpy" },
     { name = "pillow" },
     { name = "pyarrow" },

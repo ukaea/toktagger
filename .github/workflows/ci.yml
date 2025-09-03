@@ -11,6 +11,7 @@ jobs:
   lint:
     name: Ruff Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     strategy:
       matrix:
@@ -37,6 +38,8 @@ jobs:
   eslint:
     name: ESLint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     defaults:
       run:
         working-directory: ./services/ui
@@ -59,6 +62,8 @@ jobs:
   prettier:
     name: Prettier Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     defaults:
       run:
         working-directory: ./services/ui
@@ -81,6 +86,7 @@ jobs:
   test:
     name: Pytest
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     strategy:
       matrix:

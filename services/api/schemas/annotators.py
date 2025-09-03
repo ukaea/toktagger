@@ -5,6 +5,7 @@ from enum import Enum
 
 class AnnotatorIds(str, Enum):
     FIND_PEAKS = "find_peaks"
+    SPECTROGRAM_THRESHOLD = "spectrogram_threshold"
 
 
 class DataTypes(Enum):
@@ -28,4 +29,13 @@ class TimeSeriesChangepoints(Annotator):
     penalty: int
 
 
-AnnotatorTypes = Union[FindPeaksParams, TimeSeriesChangepoints]
+class SpectrogramThresholdParams(Annotator):
+    signal_name: str
+    percentile: float
+
+
+AnnotatorTypes = Union[
+    FindPeaksParams,
+    TimeSeriesChangepoints,
+    SpectrogramThresholdParams,
+]

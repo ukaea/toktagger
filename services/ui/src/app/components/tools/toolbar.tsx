@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -7,12 +7,20 @@ import {
   ToastQueue,
   Button,
   SearchField,
+  ComboBox,
+  Item,
+  Key,
+  Switch,
+  Flex,
+  NumberField,
+  ActionButton,
 } from "@adobe/react-spectrum";
 import {
   Annotations,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
+  PlotProps,
   Project,
   Sample,
   SpectrogramData,
@@ -145,12 +153,14 @@ type AmplitudeSliderInfo = {
   data: SpectrogramData;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
+  plotProps: PlotProps;
 };
 
 function AmplitudeSlider({
   data,
   viewParams,
   setViewParams,
+  plotProps,
 }: AmplitudeSliderInfo) {
   const onAmplitudeRangeChange = async ({
     start,
@@ -165,12 +175,18 @@ function AmplitudeSlider({
     setViewParams(params);
   };
 
+  const numDigits = plotProps.numSignificantDigits || 4;
+  const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
+  const largePrecisionFactor = Math.pow(10, numDigits);
+
   let ampValues = data.amplitude.flat();
-  ampValues = ampValues.map((x: number) => Math.log10(Math.max(x, 1e-6)));
+  ampValues = ampValues.map((x: number) =>
+    Math.log10(Math.max(x, smallPrecisionFactor))
+  );
 
   const displayAmplitudeValues = (val: number) => {
-    // Convert the log10 amplitude value back to linear scale and round to 4 decimal places
-    return `${Math.round(Math.pow(10, val) * 10000) / 10000}`;
+    // Convert the log10 amplitude value back to linear scale and round to the specified number of significant digits
+    return `${Math.round(Math.pow(10, val) * largePrecisionFactor) / largePrecisionFactor}`;
   };
 
   const ampRangeTool = (
@@ -188,6 +204,158 @@ function AmplitudeSlider({
   return ampRangeTool;
 }
 
+type ColorMapPickerInfo = {
+  plotProps: PlotProps;
+  setPlotProps: (props: PlotProps) => void;
+};
+
+function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
+  const options = [
+    { id: 1, name: "Viridis" },
+    { id: 2, name: "Plasma" },
+    { id: 3, name: "Inferno" },
+    { id: 4, name: "Magma" },
+    { id: 5, name: "Cividis" },
+  ];
+
+  const onColorMapChange = (key: Key | null) => {
+    if (key) {
+      const selectedColorMap = Number(key.toString());
+      const value = options.find((item) => item.id === selectedColorMap);
+      setPlotProps({ ...plotProps, colorMap: value?.name || "Cividis" });
+    }
+  };
+
+  return (
+    <ComboBox
+      label="Color Map"
+      defaultItems={options}
+      inputValue={plotProps.colorMap || "Cividis"}
+      onSelectionChange={onColorMapChange}
+    >
+      {(item) => <Item key={item.id}>{item.name}</Item>}
+    </ComboBox>
+  );
+}
+
+type SpectrogramThresholdToolInfo = {
+  project_id: string;
+  sample_id: string;
+  signal_name: string;
+  plotProps: PlotProps;
+  setPlotProps: (props: PlotProps) => void;
+  setAnnotations: (annotations: Annotations) => void;
+};
+
+function SpectrogramThresholdTool({
+  project_id,
+  sample_id,
+  signal_name,
+  plotProps,
+  setPlotProps,
+  setAnnotations,
+}: SpectrogramThresholdToolInfo) {
+  const [active, setActive] = useState(false);
+  const [value, setValue] = useState(95);
+
+  const onThresholdChange = (value: boolean) => {
+    setActive(value);
+    setPlotProps({ ...plotProps, thresholdActive: value });
+  };
+
+  const incrementValue = (increment: number) => {
+    setValue((prevValue) => {
+      const newValue = prevValue + increment;
+      if (newValue < 0) return 0;
+      if (newValue > 99) return 99;
+      return newValue;
+    });
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!active) {
+        setAnnotations([]);
+        return;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            signal_name: signal_name,
+            percentile: value,
+          }),
+        }
+      );
+
+      const payload = await response.json();
+      setAnnotations([payload]);
+    };
+
+    fetchData();
+  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
+
+  return (
+    <>
+      <Switch isSelected={active} onChange={onThresholdChange}>
+        Thresholding
+      </Switch>
+      {active && (
+        <Flex
+          direction="column"
+          gap="size-100"
+          margin={"size-200"}
+          alignItems={"center"}
+        >
+          <NumberField
+            label="Percentile"
+            value={value}
+            onChange={setValue}
+            minValue={0}
+            maxValue={99}
+            hideStepper={true}
+          />
+          <Flex direction="row" gap="size-100">
+            <ActionButton
+              onPress={() => {
+                incrementValue(-5);
+              }}
+            >
+              -5
+            </ActionButton>
+            <ActionButton
+              onPress={() => {
+                incrementValue(-1);
+              }}
+            >
+              -1
+            </ActionButton>
+            <ActionButton
+              onPress={() => {
+                incrementValue(1);
+              }}
+            >
+              +1
+            </ActionButton>
+            <ActionButton
+              onPress={() => {
+                incrementValue(5);
+              }}
+            >
+              +5
+            </ActionButton>
+          </Flex>
+        </Flex>
+      )}
+    </>
+  );
+}
+
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
@@ -196,6 +364,8 @@ type ToolBarInfo = {
   setAnnotations: (annotations: Annotations) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
+  plotProps: PlotProps;
+  setPlotProps: (props: PlotProps) => void;
 };
 export default function ToolBar({
   project,
@@ -205,6 +375,8 @@ export default function ToolBar({
   setAnnotations,
   viewParams,
   setViewParams,
+  plotProps,
+  setPlotProps,
 }: ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
@@ -245,11 +417,25 @@ export default function ToolBar({
     }
 
     const ampRangeTool = (
-      <AmplitudeSlider
-        data={mhdData.data}
-        viewParams={viewParams}
-        setViewParams={setViewParams}
-      />
+      <>
+        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
+        <hr className="m-4 h-px opacity-30 border-gray-200" />
+        <AmplitudeSlider
+          data={mhdData.data}
+          viewParams={viewParams}
+          setViewParams={setViewParams}
+          plotProps={plotProps}
+        />
+        <hr className="m-4 h-px opacity-30 border-gray-200" />
+        <SpectrogramThresholdTool
+          project_id={project_id}
+          sample_id={sample_id}
+          signal_name={"mirnov"}
+          plotProps={plotProps}
+          setPlotProps={setPlotProps}
+          setAnnotations={setAnnotations}
+        />
+      </>
     );
     tools.push(ampRangeTool);
   }
