@@ -70,7 +70,7 @@ git lfs install
 git lfs pull
 ```
 
-Create the relevant dataset fo locally
+Create some example datasets for testing.
 ```sh
 python -m scripts.setup 
 ```

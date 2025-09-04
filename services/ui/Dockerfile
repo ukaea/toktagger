@@ -7,17 +7,13 @@ WORKDIR /app
 # Copy package.json first (to optimize caching)
 COPY package.json ./
 
-# Install dependencies using Yarn
-RUN yarn install
+# Install dependencies
+RUN npm install
 
 # Copy the rest of the application files
 COPY . .
 
-# Build the Next.js application
-# RUN yarn build
-
-# Expose the port Next.js runs on
-EXPOSE 3001
+EXPOSE 5173
 
 # Start the application
-CMD ["yarn", "dev"]
+CMD ["npm", "run", "dev"]

@@ -1,5 +1,11 @@
 # .dockerignore
+.git
+.venv
+.pytest_cache
+.ruff_cache
+active_learning
+build
 data
+node_modules
 notebooks
 scripts
-active_learning
