@@ -60,6 +60,25 @@ uvicorn services.api:app --host 0.0.0.0 --port 8002 --reload
 npm --prefix services/ui run dev
 ```
 
+## Development Setup with Docker
+
+Alternatively, you can run the application in development mode using docker:
+
+```sh
+docker compose --env-file .env.dev -f docker-compose.dev.yml up    
+```
+
+This will start both the backend API and the frontend UI at the following urls:
+
+| Service URL                     | Description                |
+|---------------------------------|----------------------------|
+| `http://localhost:5173/`        | User Interface             |
+| `http://localhost:8002/`        | Backend API                |
+| `http://localhost:27017/`       | MongoDB Database           |
+| `http://localhost:8081/`        | MongoExpress Admin Panel   |
+
+The development setup runs both the frontend and backend in development mode, so any changes to the code will automatically be reflected in the running application.
+
 ## Setup local data
 Once the application is running, the following setup script can be used to automatically set up a basic model
 
