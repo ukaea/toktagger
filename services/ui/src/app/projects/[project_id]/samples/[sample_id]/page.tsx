@@ -16,6 +16,7 @@ import {
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
+  PlotProps,
   ViewParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
@@ -57,8 +58,9 @@ type SampleViewInfo = {
   data: Data;
   annotations: Annotations;
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations
+    updater: (annotations: Annotations) => Annotations | Annotations,
   ) => void;
+  plotProps: PlotProps;
 };
 
 const SampleView = ({
@@ -66,6 +68,7 @@ const SampleView = ({
   data,
   annotations,
   setAnnotations,
+  plotProps,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -92,12 +95,13 @@ const SampleView = ({
       />
     );
   } else if (project.task == "MHD") {
+    console.log(data);
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
     }
     const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"]
+      result.data.values["mirnov"],
     );
     if (!mhdData.success) {
       throw new Error("Invalid data for MHD view");
@@ -107,6 +111,7 @@ const SampleView = ({
         data={mhdData.data}
         annotations={annotations}
         setAnnotations={setAnnotations}
+        plotProps={plotProps}
       />
     );
   }
@@ -120,25 +125,25 @@ export async function getData<T>(url: string): Promise<T> {
 
 async function getSample(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Sample> {
   return await getData<Sample>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`,
   );
 }
 
 async function getProject(project_id: string): Promise<Project> {
   return await getData<Project>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`,
   );
 }
 
 async function getAnnotations(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Annotations> {
   return await getData<Annotations>(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`
+    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`,
   );
 }
 
@@ -157,10 +162,14 @@ export default function SamplePage({
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotations>([]);
-  const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
+  const [viewParams, setViewParams] = useState<ViewParams>({
+    name: "identity",
+  });
+  const [plotProps, setPlotProps] = useState<PlotProps>({
+    colorMap: "Cividis",
+  }); // Set default color map
 
   useEffect(() => {
-
     const refreshData = async (params: ViewParams) => {
       const project = await getProject(project_id);
       setProject(project);
@@ -187,7 +196,7 @@ export default function SamplePage({
             "Content-Type": "application/json",
           },
           body: JSON.stringify(params),
-        }
+        },
       );
       const data: Data = await response.json();
       setData(data);
@@ -198,8 +207,9 @@ export default function SamplePage({
     };
 
     run(viewParams);
-
   }, [project_id, sample_id, viewParams]);
+
+  useEffect(() => {}, [plotProps]);
 
   if (!data || !project || !sample) {
     return;
@@ -222,6 +232,8 @@ export default function SamplePage({
             setAnnotations={setAnnotations}
             viewParams={viewParams}
             setViewParams={setViewParams}
+            plotProps={plotProps}
+            setPlotProps={setPlotProps}
           />
           <div className="flex-1 justify-center">
             <SampleView
@@ -229,6 +241,7 @@ export default function SamplePage({
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
+              plotProps={plotProps}
             />
           </div>
         </div>

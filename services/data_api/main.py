@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from typing import List
 from pathlib import Path
-from scipy.signal import savgol_filter, stft
+from scipy.signal import stft, medfilt
 from fastapi import FastAPI
 
 from client import MongoDBClient
@@ -29,18 +29,6 @@ def get_saddle_coil_channel_fft(data, nperseg=128):
 
     return dataset
 
-def get_saddle_coil_channel_fft(data, nperseg=128):
-    ds = data
-    # Compute the Short-Time Fourier Transform (STFT)
-    sample_rate = 1 / (ds.time[1] - ds.time[0])
-    f, t, Zxx = stft(ds, fs=int(sample_rate), nperseg=nperseg, noverlap=nperseg // 5)
-
-    t = t + ds.time.values[0]
-    x = xr.DataArray(np.abs(Zxx), coords=dict(frequency=f, time=t))
-    phi = xr.DataArray(np.angle(Zxx, deg=True), coords=dict(frequency=f, time=t))
-    dataset = xr.Dataset(dict(amplitude=x, phase=phi))
-
-    return dataset
 
 class S3DataReader:
     def __init__(self):
@@ -112,9 +100,6 @@ class S3DataReader:
         return df.to_dict(orient="records")
 
 
-        
-
-
 app = FastAPI()
 db = MongoDBClient()
 data_pool = DataPool(DATA_PATH)
@@ -127,7 +112,7 @@ async def create_item(
 ):
     print(f"Updating annotations for {shot_id}")
     # Insert or update annotation in database
-    new_annotation: bool = await db.upsert(item)
+    await db.upsert(item)
     labelled_shot_ids = await db.get_validated_shot_ids()
     data_pool.set_validated(labelled_shot_ids)
 
@@ -213,16 +198,10 @@ async def get_disruption_data(shot_id: int):
         "shot_id": shot_id,
     }
 
+
 @app.get("/data/locked-mode/{shot_id}")
 async def get_locked_mode_data(shot_id: int):
     return {
         "saddle_coil_fft": data_reader.get_locked_mode_data(shot_id),
-        "shot_id": shot_id,
-    }
-
-@app.get("/data/locked-mode-raw/{shot_id}")
-async def get_locked_mode_data(shot_id: int):
-    return {
-        "saddle_coil_fft": data_reader.get_locked_mode_data(shot_id, False),
         "shot_id": shot_id,
     }

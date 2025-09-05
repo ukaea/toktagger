@@ -1,9 +1,12 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 from pydantic import BaseModel
 from enum import Enum
 
+
 class AnnotatorIds(str, Enum):
     FIND_PEAKS = "find_peaks"
+    SPECTROGRAM_THRESHOLD = "spectrogram_threshold"
+
 
 class DataTypes(Enum):
     TIME_SERIES = "time_series"
@@ -25,4 +28,14 @@ class FindPeaksParams(Annotator):
 class TimeSeriesChangepoints(Annotator):
     penalty: int
 
-AnnotatorTypes = Union[FindPeaksParams, TimeSeriesChangepoints]
+
+class SpectrogramThresholdParams(Annotator):
+    signal_name: str
+    percentile: float
+
+
+AnnotatorTypes = Union[
+    FindPeaksParams,
+    TimeSeriesChangepoints,
+    SpectrogramThresholdParams,
+]

@@ -1,5 +1,4 @@
 import pymongo
-import os
 import pydantic
 import typing
 from bson.objectid import ObjectId
@@ -9,40 +8,42 @@ MONGO_URL = "mongodb://root:example@localhost:27017"
 DATABASE_NAME = "event_db"
 COLLECTION_NAME = "shots"
 
-class MongoDBClient():
-    
+
+class MongoDBClient:
     def __init__(self, url: str, db_name: str):
         self.client = pymongo.AsyncMongoClient(url)
         self.db = self.client[db_name]
-        
+
     async def insert(
-        self, 
-        collection: typing.Literal["projects", "annotations", "models", "samples"], 
-        model: pydantic.BaseModel, 
-        ids: dict[str, ObjectId] | None = None
+        self,
+        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        model: pydantic.BaseModel,
+        ids: dict[str, ObjectId] | None = None,
     ):
         ids = ids or {}
         document = model.model_dump(mode="python")
         document.update(ids)
         result = await self.db[collection].insert_one(document)
         return str(result.inserted_id)
-        
+
     async def insert_many(
-        self, 
-        collection: typing.Literal["projects", "annotations", "models", "samples"], 
-        models: list[pydantic.BaseModel], 
-        ids: typing.Union[dict, list[dict]] | None = None
+        self,
+        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        models: list[pydantic.BaseModel],
+        ids: typing.Union[dict, list[dict]] | None = None,
     ):
         ids = ids or {}
         documents = [model.model_dump(mode="python") for model in models]
-        
+
         if type(ids) is list:
             if len(ids) != len(models):
-                raise ValueError("If providing IDs as a list, must be the same length as models")
-            documents  = [{**document, **_id} for document, _id in zip(documents, ids)]
+                raise ValueError(
+                    "If providing IDs as a list, must be the same length as models"
+                )
+            documents = [{**document, **_id} for document, _id in zip(documents, ids)]
         else:
-            documents  = [{**document, **ids} for document in documents]
-            
+            documents = [{**document, **ids} for document in documents]
+
         result = await self.db[collection].insert_many(documents)
         return [str(object_id) for object_id in result.inserted_ids]
     
@@ -63,36 +64,47 @@ class MongoDBClient():
     async def get_document_by_id(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        object_id: ObjectId
+        object_id: ObjectId,
     ):
         return await self.db[collection].find_one({"_id": object_id})
-    
+
     async def get_all_documents(
-        self, 
-        collection: typing.Literal["projects", "annotations", "models", "samples"]
+        self, collection: typing.Literal["projects", "annotations", "models", "samples"]
     ):
         all_documents = self.db[collection].find()
         return await all_documents.to_list()
-    
+
     async def get_filtered_documents(
-        self, 
-        collection: typing.Literal["projects", "annotations", "models", "samples"], 
-        filters: dict = {}, 
-        sort_by: str = "_id", 
-        sort_direction: typing.Literal["ascending", "descending"] = "descending", 
-        start=0, 
-        limit=0
+        self,
+        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        filters: dict = {},
+        sort_by: str = "_id",
+        sort_direction: typing.Literal["ascending", "descending"] = "descending",
+        start=0,
+        limit=0,
     ):
-        documents = self.db[collection].find(filters).sort(sort_by, pymongo.ASCENDING if sort_direction == "ascending" else pymongo.DESCENDING).skip(start).limit(limit)
+        documents = (
+            self.db[collection]
+            .find(filters)
+            .sort(
+                sort_by,
+                pymongo.ASCENDING
+                if sort_direction == "ascending"
+                else pymongo.DESCENDING,
+            )
+            .skip(start)
+            .limit(limit)
+        )
         return await documents.to_list()
-    
+
     async def delete_filtered_documents(
-        self, 
+        self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
         filters: dict = {},
     ):
         return await self.db[collection].delete_many(filters)
-    
+
+
 # Notes to self
 # I am planning on doing a collection per route
 # Eg Projects, Annotations, Samples, Models etc etc
@@ -100,4 +112,3 @@ class MongoDBClient():
 # So each annotation document would have a 'sample_id' and a 'project_id' for example
 # This means that you can search through them using that ID
 # Eg above, get_documents_per_project would get you all documents from a collection which are relevant for a certain project
-

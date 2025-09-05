@@ -9,21 +9,18 @@ from services.api.schemas.models import Model, ModelUpdate
 from bson.objectid import ObjectId
 
 async def get_projects(
-    db_client: MongoDBClient, 
+    db_client: MongoDBClient,
     name: Optional[str] = None,
     sort_by: Optional[str] = "_id",
     sort_direction: Optional[Literal["ascending", "descending"]] = "descending",
     start: Optional[int] = 0,
-    count: Optional[int] = None
+    count: Optional[int] = None,
 ):
     filters = {}
     if name:
         # Search with regex, return any projects which start with the searched for string, case insensitive
-        filters['name'] = {
-            "$regex": f"{name}",
-            "$options": "i"
-        }
-                
+        filters["name"] = {"$regex": f"{name}", "$options": "i"}
+
     # Return a list of all projects and info about them
     projects = await db_client.get_filtered_documents(
         collection="projects",
@@ -33,7 +30,7 @@ async def get_projects(
         start=start,
         limit=count if count is not None else 0,
     )
-    
+
     return projects
 
 
@@ -49,6 +46,7 @@ async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
 
     return Project(**projects[0])
 
+
 async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
     obj_id = convert_to_objectid(project_id, "projects")
 
@@ -63,10 +61,10 @@ async def get_samples(
     project_id: str,
     validated: Optional[bool] = None,
     shot_id: Optional[int] = None,
-    sort_by: str = "_id", 
-    sort_direction: Literal["ascending", "descending"] = "descending", 
-    start: int = 0, 
-    count: Optional[int] = None
+    sort_by: str = "_id",
+    sort_direction: Literal["ascending", "descending"] = "descending",
+    start: int = 0,
+    count: Optional[int] = None,
 ) -> list[Sample]:
     # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -180,7 +178,8 @@ async def get_sample(db_client: MongoDBClient, project_id: str, sample_id: str) 
     sample_obj_id = convert_to_objectid(sample_id, "samples")
 
     samples = await db_client.get_filtered_documents(
-        collection="samples", filters={"_id": sample_obj_id, "project_id": project_obj_id}
+        collection="samples",
+        filters={"_id": sample_obj_id, "project_id": project_obj_id},
     )
 
     if len(samples) == 0:
@@ -192,21 +191,24 @@ async def get_sample(db_client: MongoDBClient, project_id: str, sample_id: str) 
     return Sample(**samples[0])
 
 
-async def delete_samples(db_client: MongoDBClient, project_id: str, sample_id: str = None) -> None:
+async def delete_samples(
+    db_client: MongoDBClient, project_id: str, sample_id: str = None
+) -> None:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
-    
+
     if sample_id:
         sample_obj_id = convert_to_objectid(sample_id, "samples")
         filters["_id"] = sample_obj_id
-    
 
     result = await db_client.delete_filtered_documents(
         collection="samples", filters=filters
     )
-    
+
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Sample not found belonging to this Project.")
+        raise HTTPException(
+            status_code=404, detail="Sample not found belonging to this Project."
+        )
 
 
 async def get_annotations(
@@ -243,22 +245,41 @@ async def add_annotations(db_client, project_id: str, sample_id: str, annotation
         }
     return await db_client.insert_many(collection="annotations", models=annotations, ids=db_ids)
 
-async def delete_annotations(db_client: MongoDBClient, project_id: str, sample_id: str = None, annotation_id: str = None) -> None:
+async def add_annotations(
+    db_client, project_id: str, sample_id: str, annotations: list[AnnotationIn]
+) -> list[str]:
+    db_ids = {
+        "project_id": convert_to_objectid(project_id, "projects"),
+        "sample_id": convert_to_objectid(sample_id, "samples"),
+    }
+    return await db_client.insert_many(
+        collection="annotations", models=annotations, ids=db_ids
+    )
+
+
+async def delete_annotations(
+    db_client: MongoDBClient,
+    project_id: str,
+    sample_id: str = None,
+    annotation_id: str = None,
+) -> None:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
-    
+
     if sample_id:
         sample_obj_id = convert_to_objectid(sample_id, "samples")
         filters["sample_id"] = sample_obj_id
-        
+
     if annotation_id:
         annotation_obj_id = convert_to_objectid(annotation_id, "annotations")
         filters["_id"] = annotation_obj_id
-    
 
     result = await db_client.delete_filtered_documents(
         collection="annotations", filters=filters
     )
-    
+
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Annotations not found belonging to this Sample and/or Project.")
+        raise HTTPException(
+            status_code=404,
+            detail="Annotations not found belonging to this Sample and/or Project.",
+        )

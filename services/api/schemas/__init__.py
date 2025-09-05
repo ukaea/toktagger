@@ -27,7 +27,7 @@ class ConfiguredModel(BaseModel):
 def convert_to_objectid(id: str, collection: str):
     try:
         obj_id = ObjectId(id)
-    except InvalidId as e:
+    except InvalidId:
         raise HTTPException(
             status_code=400, detail=f"{collection[:-1].title()} ID is not valid."
         )

@@ -23,11 +23,11 @@ async def get_samples(
     request: Request,
     project_id: str = Path(description="The ID of the project to get samples for."),
     sort_by: str = Query(
-        "_id", 
+        "_id",
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
     ),
     sort_direction: Literal["ascending", "descending"] = Query(
-        "descending", 
+        "descending",
         description="Direction to sort responses, by default 'descending'",
     ),
     start: int = Query(
@@ -39,9 +39,8 @@ async def get_samples(
         description="The number of samples to return, leave blank to return all entries",
     ),
     shot_id: int | None = Query(
-        None,
-        description="The shot ID to search for, by default None"
-    )
+        None, description="The shot ID to search for, by default None"
+    ),
 ) -> list[Sample]:
     """
     Get the full list of samples available for this project.
@@ -205,7 +204,7 @@ async def get_next_sample(
     )
     try:
         sample = data_pool.query_strategy.get_next_sample()
-    except RuntimeError as e:
+    except RuntimeError:
         raise HTTPException(status_code=204, detail="No more samples available!")
 
     return sample
@@ -264,10 +263,11 @@ async def remove_sample(
     db_client = request.app.state.db_client
     # Check project exists
     await utils.get_project(db_client, project_id=project_id)
-    
+
     # Delete sample
     await utils.delete_samples(db_client, project_id=project_id, sample_id=sample_id)
-    
+
     # Delete annotations associated with this sample
-    await utils.delete_annotations(db_client, project_id=project_id, sample_id=sample_id)
-    
+    await utils.delete_annotations(
+        db_client, project_id=project_id, sample_id=sample_id
+    )

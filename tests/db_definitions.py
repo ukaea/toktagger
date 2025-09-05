@@ -2,47 +2,50 @@ from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
 from services.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
 import pathlib
+
 # Define some common things to add to db
 PROJECT_1 = ProjectIn(
-        name="test_project_0",
-        task="disruption",
-        query_strategy="sequential",
-        data_loader="uda"
-    )
+    name="test_project_0",
+    task="disruption",
+    query_strategy="sequential",
+    data_loader="uda",
+)
 PROJECT_2 = ProjectIn(
-        name="test_project_1",
-        task="ELM",
-        query_strategy="sequential",
-        data_loader="parquet"
-    )
+    name="test_project_1",
+    task="ELM",
+    query_strategy="sequential",
+    data_loader="parquet",
+)
 PROJECT_3 = ProjectIn(
-        name="project_2",
-        task="UFO",
-        query_strategy="uncertainty",
-        data_loader="image"
-    )
+    name="project_2", task="UFO", query_strategy="uncertainty", data_loader="image"
+)
 
 
 SAMPLE_1 = SampleIn(
-        shot_id=1,
-        data=ShotData(protocol="uda", signal_names=["Ip"]),
-        annotations=None
-    ) 
+    shot_id=1, data=ShotData(protocol="uda", signal_names=["Ip"]), annotations=None
+)
 SAMPLE_2 = SampleIn(
-        shot_id=3,
-        data=ShotData(protocol="sal", signal_names=["Ip"]),
-        annotations=None
-    ) 
+    shot_id=3, data=ShotData(protocol="sal", signal_names=["Ip"]), annotations=None
+)
 SAMPLE_3 = SampleIn(
-        shot_id=2,
-        data=TimeSeriesFileData(file_name="test.csv", type="csv", protocol="s3", signal_names=["Ip"]),
-        annotations=None
-    ) 
+    shot_id=2,
+    data=TimeSeriesFileData(
+        file_name="test.csv", type="csv", protocol="s3", column_names=["Ip"]
+    ),
+    annotations=None,
+)
 SAMPLE_4 = SampleIn(
-        shot_id=4,
-        data=TimeSeriesFileData(file_name=str(pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()), type="parquet", protocol="file", signal_names=["Ip"]),
-        annotations=None
-    )
+    shot_id=4,
+    data=TimeSeriesFileData(
+        file_name=str(
+            pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()
+        ),
+        type="parquet",
+        protocol="file",
+        column_names=["Ip"],
+    ),
+    annotations=None,
+)
 
 
 ANNOTATION_1 = TimeRegion(time_min=0.2, time_max=0.4, label="annotation", validated=True)

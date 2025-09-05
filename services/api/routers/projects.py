@@ -8,7 +8,6 @@ from services.api.crud import utils
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.query_strategy import QUERY_STRATEGIES
-from fastapi import HTTPException
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -22,11 +21,11 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 async def get_projects(
     request: Request,
     sort_by: str = Query(
-        "_id", 
+        "_id",
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
     ),
     sort_direction: Literal["ascending", "descending"] = Query(
-        "descending", 
+        "descending",
         description="Direction to sort responses, by default 'descending'",
     ),
     start: int = Query(
@@ -38,9 +37,8 @@ async def get_projects(
         description="Number of projects you want returned, leave blank to return all entries",
     ),
     name: str | None = Query(
-        None,
-        description="Name of a project to search for, by default None"
-    )
+        None, description="Name of a project to search for, by default None"
+    ),
 ) -> list[Project]:
     """
     Get a list of all available projects.
@@ -52,7 +50,7 @@ async def get_projects(
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
-        count=count
+        count=count,
     )
 
     return projects
@@ -206,9 +204,9 @@ async def delete_project(
     db_client = request.app.state.db_client
     # Delete this specific project
     await utils.delete_project(db_client=db_client, project_id=project_id)
-    
+
     # Delete samples associated with this project
     await utils.delete_samples(db_client=db_client, project_id=project_id)
-    
+
     # Delete annotations associated with this project
     await utils.delete_annotations(db_client=db_client, project_id=project_id)

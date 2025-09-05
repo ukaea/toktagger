@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from typing import Literal
 from services.api.crud import utils
+<<<<<<< HEAD
 from services.api.schemas.samples import Sample, SampleUpdate
 from services.api.schemas.annotators import Annotator
 from services.api.schemas.annotations import AnnotationIn, Annotation, AnnotationTypes, AnnotationOutTypes
 from services.api.schemas import convert_to_objectid
+=======
+from services.api.schemas.annotations import AnnotationTypes, AnnotationOutTypes
+>>>>>>> main
 
 router = APIRouter(
     prefix="/projects/{project_id}",
@@ -26,11 +30,11 @@ async def get_all_annotations(
         description="The ID of the project to retrieve annotations for"
     ),
     sort_by: str = Query(
-        "_id", 
+        "_id",
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
     ),
     sort_direction: Literal["ascending", "descending"] = Query(
-        "descending", 
+        "descending",
         description="Direction to sort responses, by default 'descending'",
     ),
     start: int = Query(
@@ -53,7 +57,7 @@ async def get_all_annotations(
     db_client = request.app.state.db_client
     # Check project exists
     await utils.get_project(db_client=db_client, project_id=project_id)
-    
+
     # Get annotations
     annotations = await utils.get_annotations(
         db_client=db_client,
@@ -62,7 +66,7 @@ async def get_all_annotations(
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
-        count=count
+        count=count,
     )
 
     return annotations
@@ -105,11 +109,11 @@ async def get_annotations(
     project_id: str = Path(description="The ID of the project to get samples from."),
     sample_id: str = Path(description="The ID of the sample to get annotations from."),
     sort_by: str = Query(
-        "_id", 
+        "_id",
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
     ),
     sort_direction: Literal["ascending", "descending"] = Query(
-        "descending", 
+        "descending",
         description="Direction to sort responses, by default 'descending'",
     ),
     start: int = Query(
@@ -131,8 +135,10 @@ async def get_annotations(
     db_client = request.app.state.db_client
     # Check project and sample exist
     await utils.get_project(db_client=db_client, project_id=project_id)
-    await utils.get_sample(db_client=db_client, project_id=project_id, sample_id=sample_id)
-    
+    await utils.get_sample(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+
     # Get annotations
     annotations = await utils.get_annotations(
         db_client=db_client,
@@ -142,7 +148,7 @@ async def get_annotations(
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
-        count=count
+        count=count,
     )
 
     return annotations
@@ -158,8 +164,12 @@ async def get_annotations(
 async def update_annotations(
     request: Request,
     annotations: list[AnnotationTypes],
-    project_id: str = Path(description="The ID of the project to update annotations for."),
-    sample_id: str = Path(description="The ID of the sample to update annotations for."),
+    project_id: str = Path(
+        description="The ID of the project to update annotations for."
+    ),
+    sample_id: str = Path(
+        description="The ID of the sample to update annotations for."
+    ),
 ):
     """
     Update the list of annotations to a given sample for a specified project. Will overwrite existing annotations.
@@ -171,22 +181,31 @@ async def update_annotations(
     # This should be added into the database, with validated=True
     # Delete predictions from model, if they exist, since they are being replaced by human validated ones
     db_client = request.app.state.db_client
-    
+
     # Check project and sample exist
     await utils.get_project(db_client=db_client, project_id=project_id)
-    await utils.get_sample(db_client=db_client, project_id=project_id, sample_id=sample_id)
-    
+    await utils.get_sample(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+
     if len(annotations) == 0:
         # Nothing to do!
         return
 
     # Delete previous annotations, if they exist
     try:
-        await utils.delete_annotations(db_client=db_client, project_id=project_id, sample_id=sample_id)
+        await utils.delete_annotations(
+            db_client=db_client, project_id=project_id, sample_id=sample_id
+        )
     except HTTPException:
         pass
-        
-    return await utils.add_annotations(db_client=db_client, project_id=project_id, sample_id=sample_id, annotations=annotations)
+
+    return await utils.add_annotations(
+        db_client=db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        annotations=annotations,
+    )
 
 
 @router.delete(
@@ -209,11 +228,15 @@ async def remove_annotations(
     """
     # Remove annotations for this project and sample
     # Probably dont need to be able to specify params here, don't envisage how/why the UI would allow you to remove specific annotations
-    
+
     db_client = request.app.state.db_client
     # Check project and sample exist
     await utils.get_project(db_client=db_client, project_id=project_id)
-    await utils.get_sample(db_client=db_client, project_id=project_id, sample_id=sample_id)
-    
+    await utils.get_sample(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+
     # Delete all annotations for this project and sample
-    await utils.delete_annotations(db_client=db_client, project_id=project_id, sample_id=sample_id)
+    await utils.delete_annotations(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
