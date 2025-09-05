@@ -1,7 +1,7 @@
 import redis
 import json
 import os
-#from services.api.schemas.models import ModelUpdate
+from services.api.schemas.models import ModelUpdate
 
 REDIS_HOST = os.environ["REDIS_HOST"]
 
@@ -10,7 +10,7 @@ redis_publisher.flushdb()
 
 def publish_progress(
     model_id: str,
-    model_update#: ModelUpdate
+    model_update: ModelUpdate
 ):
-    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="json")}
+    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="json", exclude_unset=True)}
     redis_publisher.publish("model_updates", json.dumps(message))

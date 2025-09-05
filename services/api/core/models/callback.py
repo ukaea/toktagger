@@ -14,7 +14,7 @@ class ModelProgress(Callback):
         
     def on_epoch_end(self, epoch: int, logs: dict):
         model_update = ModelUpdate(
-            progress=epoch / self.num_epochs,
+            progress=(epoch / self.num_epochs) * 100,
             accuracy = logs.get("val_accuracy") or logs.get("accuracy")
         )
         publish_progress(model_id=self.model_id, model_update=model_update)

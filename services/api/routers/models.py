@@ -70,10 +70,10 @@ async def delete_models(
     
     models_to_delete = await utils.get_models(db_client, project_id, model_type)
     if version:
-        models_to_delete = [model for model in models_to_delete if model["version"] != version]
+        models_to_delete = [model for model in models_to_delete if model["version"] == version]
     
     if not models_to_delete:
-        return HTTPException(status_code=404, detail=f"Version {version} of model type {model_type} not found!")
+        raise HTTPException(status_code=404, detail=f"Version {version} of model type {model_type} not found!" if version else f"No models of type {model_type} found for this project!")
     
     # Delete from DB
     for model in models_to_delete:
