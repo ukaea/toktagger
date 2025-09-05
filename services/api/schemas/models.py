@@ -1,4 +1,5 @@
 from typing import List, Literal, Annotated, Optional
+from pydantic import BaseModel
 from enum import Enum
 from pydantic import Field
 from services.api.schemas import ConfiguredModel

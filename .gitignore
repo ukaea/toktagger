@@ -169,3 +169,6 @@ services/ui/.next/*
 services/ui/node_modules/*
 data/elms
 data/elm-events
+node_modules
+package-lock.json
+package.json

@@ -82,8 +82,8 @@ async def delete_models(
             filters={"_id": model['_id'], "project_id": project_obj_id},
         )
         
-        # And delete file from storage
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model['_id']}.model").unlink()
+        # And delete file from storage (if it exists - may not if the job failed)
+        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model['_id']}.model").unlink(missing_ok=True)
 
 @router.get("/models/{model_type}/train")
 async def get_training_info(request: Request, project_id: str, model_type: str) -> Model:

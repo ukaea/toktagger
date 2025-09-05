@@ -15,3 +15,8 @@ scikit-learn
 celery[redis]
 pillow
 uda
+pytest
+mkdocs
+mkdocs-material
+aioredis
+tensorflow

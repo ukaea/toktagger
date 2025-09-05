@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
+from typing import Literal
 from services.api.schemas.projects import ProjectIn, Project
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.samples import Sample
@@ -7,7 +8,6 @@ from services.api.crud import utils
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.query_strategy import QUERY_STRATEGIES
-
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -20,29 +20,40 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 )
 async def get_projects(
     request: Request,
+    sort_by: str = Query(
+        "_id",
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "descending",
+        description="Direction to sort responses, by default 'descending'",
+    ),
     start: int = Query(
         0,
-        description="Index of the first project you want returned when sorted newest - oldest",
+        description="Index of the first project you want returned when sorted by above parameter",
     ),
-    end: int = Query(
+    count: int | None = Query(
         None,
-        description="Index of the last project you want returned when sorted newest - oldest, leave blank to return all entries",
+        description="Number of projects you want returned, leave blank to return all entries",
+    ),
+    name: str | None = Query(
+        None, description="Name of a project to search for, by default None"
     ),
 ) -> list[Project]:
     """
     Get a list of all available projects.
     -------------------------------------
     """
-    # Return a list of all projects and info about them
-    _projects = await request.app.state.db_client.get_filtered_documents(
-        collection="projects",
-        sort_by="timestamp",
-        sort_direction=-1,
+    projects = await utils.get_projects(
+        db_client=request.app.state.db_client,
+        name=name,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
         start=start,
-        limit=end - start + 1 if end is not None else 0,
+        count=count,
     )
 
-    return _projects
+    return projects
 
 
 @router.post(
@@ -190,12 +201,12 @@ async def delete_project(
     Permanently delete a project.
     -----------------------------
     """
+    db_client = request.app.state.db_client
     # Delete this specific project
-    obj_id = convert_to_objectid(project_id, "projects")
+    await utils.delete_project(db_client=db_client, project_id=project_id)
 
-    result = await request.app.state.db_client.delete_filtered_documents(
-        collection="projects", filters={"_id": obj_id}
-    )
+    # Delete samples associated with this project
+    await utils.delete_samples(db_client=db_client, project_id=project_id)
 
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    # Delete annotations associated with this project
+    await utils.delete_annotations(db_client=db_client, project_id=project_id)

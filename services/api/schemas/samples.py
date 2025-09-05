@@ -1,6 +1,6 @@
 from typing import Annotated, List, Optional
 from enum import Enum
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, BaseModel
 from services.api.schemas import ConfiguredModel
 from services.api.schemas.annotations import AnnotationTypes
 
@@ -11,6 +11,7 @@ class FileType(str, Enum):
     MP4 = "mp4"
     PNG = "png"
     JSON = "json"
+    JPG = "jpg"
 
 
 class FileProtocol(str, Enum):
@@ -23,7 +24,7 @@ class ShotProtocol(str, Enum):
     SAL = "sal"
 
 
-class FileData(ConfiguredModel):
+class FileData(BaseModel):
     file_name: str
     type: FileType
     protocol: FileProtocol = FileProtocol.LOCAL
@@ -35,10 +36,10 @@ class TimeSeriesFileData(FileData):
 
 class ImageFileData(FileData):
     frame: int
-    time: int
+    time: float
 
 
-class ShotData(ConfiguredModel):
+class ShotData(BaseModel):
     protocol: ShotProtocol
     signal_names: Annotated[list[str], Field(min_items=1)]
 

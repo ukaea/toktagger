@@ -1,21 +1,19 @@
 import os
 import redis
 from celery import Celery
-from sklearn.model_selection import train_test_split
 from services.api.crud.db import MongoDBClient
 from bson.objectid import ObjectId
 import asyncio
 from services.api.crud import utils
-from services.api.core.models import MODELS, DisruptionCNN
-from services.api.core.data_loaders import DATA_LOADERS
-from services.api.core.views import DATA_VIEWS
-from services.api.schemas.projects import Project, Task
+from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate
-from services.api.schemas.annotations import Annotation, AnnotationTypes, TimePoint
-from services.api.schemas.models import ModelIn, Model, ModelUpdate
+from services.api.schemas.annotations import AnnotationTypes
+from services.api.schemas.models import Model, ModelUpdate
+from services.api.core.models.registry import MODELS
 import pathlib
 import itertools
 from pydantic import TypeAdapter
+import json
 
 REDIS_HOST = os.environ["REDIS_HOST"]
 
@@ -25,9 +23,19 @@ app = Celery(
     backend=f"redis://{REDIS_HOST}:6379/0",  # Redis as result backend
 )
 
-redis_client = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
-# Flush client at start to remove any stale messages.
-redis_client.flushdb()
+redis_broker = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
+# Flush broker at start to remove any stale messages.
+redis_broker.flushdb()
+
+redis_publisher = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=1)
+redis_publisher.flushdb()
+
+def publish_progress(
+    model_id: str,
+    model_update: ModelUpdate
+):
+    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="python")}
+    redis_publisher.publish("model_updates", json.dumps(message))
 
 mongo_url = os.environ["MONGO_URL"]
 #mongo_url = "mongodb://root:example@localhost:27017"
@@ -46,6 +54,7 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         print(f"Collected {len(annotations)} annotations.")
         samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project.id, validated=True)]
         print(f"Collected {len(samples)} samples.")
+        
         # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
         annotator_model = TypeAdapter(AnnotationTypes)
         
@@ -56,15 +65,16 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
                 annotations, key=lambda annotation: annotation['sample_id']
                 )
             ]
+
+        # TODO: Where should epochs, batch size be passed in???
+        BATCH_SIZE = 32
+        NUM_EPOCHS = 10
             
         # Get model
-        ml_model = MODELS[model.type](db_client, ObjectId(model.id), project, samples, annotations_2d)
-        
-        # Set DB entry to show job has left the celery queue, and training has started
-        await utils.update_model(db_client, model.id, ModelUpdate(training_status="started"))
+        ml_model = MODELS[model.type](project=project, samples=samples, annotations=annotations_2d, callbacks=[])
         
         # Train model
-        accuracy = await ml_model.train(num_epochs=10, batch_size=32)
+        accuracy = ml_model.train(num_epochs=NUM_EPOCHS, batch_size=BATCH_SIZE)
         
         # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
         ml_model.save(model_dir.joinpath(f"{model.id}.model"))
