@@ -19,6 +19,8 @@ import {
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import type { Project, Sample } from "@/types";
+import { ModelTrainModal } from '@/app/components/tools/modelTrain';
+import { ModelPredictModal } from '@/app/components/tools/modelPredict';
 
 export const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   return (
@@ -156,6 +158,8 @@ export default function ProjectView({
   return (
     <div>
       <SampleBreadCrumbs project={project} />
+      <ModelTrainModal project={project}></ModelTrainModal>
+      <ModelPredictModal project={project}></ModelPredictModal>
       <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>

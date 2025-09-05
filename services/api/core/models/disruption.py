@@ -2,7 +2,7 @@ from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation, TimePoint
 from services.api.schemas.projects import Project
 from services.api.schemas.data import TimeSeriesData
-
+import typing
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
@@ -34,6 +34,17 @@ class DisruptionDataset(TorchDataset):
         return plasma_current, disruption_time / data.time[-1]
         
 class DisruptionCNN(TorchModel):
+    def __init__(
+        self, 
+        model_id: str,
+        project: Project, 
+        samples: list[Sample], 
+        annotations: list[list[Annotation]],
+        train_val_test_split: typing.Tuple[float, float, float],
+        num_epochs: int = 100
+    ):
+        super().__init__(model_id=model_id, project=project, dataset=DisruptionDataset, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split, num_epochs=num_epochs)
+                 
     
     def _define_model(self):
         return nn.Sequential(

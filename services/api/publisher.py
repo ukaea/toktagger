@@ -12,5 +12,5 @@ def publish_progress(
     model_id: str,
     model_update#: ModelUpdate
 ):
-    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="python")}
+    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="json")}
     redis_publisher.publish("model_updates", json.dumps(message))

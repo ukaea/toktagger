@@ -19,12 +19,7 @@
     "react": "^19.0.0",
     "react-contexify": "^6.0.0",
     "react-dom": "^19.0.0",
-<<<<<<< HEAD
-    "@adobe/react-spectrum": "^3.14.0",
-    "@spectrum-icons/workflow": "^4"
-=======
     "zod": "^3.25.67"
->>>>>>> wk9874/model_backend
   },
   "devDependencies": {
     "@adobe/react-spectrum": "^3.14.0",
@@ -34,11 +29,6 @@
     "@types/plotly.js": "^2.35.2",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19",
-<<<<<<< HEAD
-    "@adobe/react-spectrum": "^3.14.0",
-    "@spectrum-icons/workflow": "^4",
-=======
->>>>>>> wk9874/model_backend
     "eslint": "^9",
     "eslint-config-next": "15.1.7",
     "postcss": "^8",

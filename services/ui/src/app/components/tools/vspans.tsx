@@ -21,14 +21,9 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
   });
   const { disableToolingInteraction } = useContextMenuProvider();
 
-<<<<<<< HEAD
-    // Hook to pull in data from context provider
-    const {vspans, handleVSpanUpdate, handleVspanDragFinish, triggerUpdate} = useVSpanContext()
-=======
   // Hook to pull in data from context provider
   const { vspans, handleVSpanUpdate, handleVSpanDragFinish, triggerUpdate } =
     useVSpanContext();
->>>>>>> wk9874/model_backend
 
   // Main rendering effect
   useEffect(() => {
@@ -160,106 +155,5 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
     disableToolingInteraction,
   ]);
 
-<<<<<<< HEAD
-        // Get a reference to all subplots and find the name of the axis
-        const subplots = plot.querySelectorAll(".subplot")
-        const subplotNames = [...subplots].map(el => 
-        [...el.classList].find(cls => cls !== "subplot")
-        )
-
-        // For each subplot carry out the tooling generation
-        subplotNames.forEach((subplotId => {
-            if (subplotId === undefined) {
-                console.error("Could not find valid subplot ID")
-                return
-            }
-
-            const overplot = document.getElementsByClassName(`${plotId}-overplot-${subplotId}`)[0]
-
-            if (!overplot) {
-                console.error("Could not locate D3 overplot to generate zones")
-                handleVSpanUpdate()
-                return
-            }
-
-            // Find the y axis ID relating to this subplot
-            const yAxisID = subplotId.match(/y(.*)$/)?.[1];
-            if (!yAxisID && yAxisID !== "") {
-                console.error("Could not find valid subplot y-axis ID")
-                return
-            }
-            // Use the axis information to calculate the upper and lower limits of the zone
-            const axis = plot._fullLayout[`yaxis${yAxisID}`]
-            const range = axis._tmax - axis._tmin
-            const upperLimit = axis.d2p(axis._tmax + 2*range)
-            const lowerLimit =  axis.d2p(axis._tmin - 2*range)
-            const height = lowerLimit - upperLimit
-
-            const xaxis = plot._fullLayout.xaxis;
-
-            const graphGroup = d3.select(overplot)
-            graphGroup.selectAll(".vspan").remove() // All VSpans are removed each render cycle
-
-            const drag = d3.drag<SVGRectElement, VSpan>()
-                .on("start", function (event, d) {
-                    dragOffset.current = xaxis.d2p(d.x) - event.x
-                })
-                .on("drag", function (event, d) {
-                    const newX = event.x + dragOffset.current;
-                    d3.select(this).attr("x", newX);
-
-                    const x = xaxis.p2d(newX); // The context provider stores the decimal value rather than pixel
-                    d.x = x;
-                    handleVSpanUpdate() // Global refresh must be triggered to update all linked plots
-                })
-                .on("end", function(event, d) {
-                    handleVspanDragFinish();  
-                })
-
-            function handleContextMenu(event, vspan: VSpan) {
-                showVSpanMenu({
-                    event,
-                    props: {
-                        vspan
-                    }
-                })
-            }
-
-            // Create a line and a transparent drag handle for each VSpan
-            for (const vspan of vspans) {
-                const x = xaxis.d2p(vspan.x);
-                graphGroup.append("line")
-                    .attr("class", "vspan disable-on-shift")
-                    .attr("x1", x)
-                    .attr("x2", x)
-                    .attr("y1", upperLimit)
-                    .attr("y2", upperLimit + height)
-                    .attr("stroke", vspan.category.color)
-                    .attr("stroke-width", 6)
-                    .attr("style", "pointer-events: all")
-                    .style("cursor", "move")
-
-                graphGroup.append("rect")
-                    .attr("class", "vspan disable-on-shift")
-                    .attr("x", x-10)
-                    .attr("y", upperLimit)
-                    .attr("width", 20)
-                    .attr("height", height)
-                    .attr("fill", "transparent")
-                    .attr("style", "pointer-events: all")
-                    .style("cursor", "move")
-                    .datum(vspan)
-                    .call(drag)
-                    .on("contextmenu", handleContextMenu)
-            }
-        }))
-    }, [handleVSpanUpdate, plotId, plotReady, showVSpanMenu, vspans, triggerUpdate, forceUpdate])
-
-    return (
-        <div />
-    )
-}
-=======
   return <div />;
 };
->>>>>>> wk9874/model_backend

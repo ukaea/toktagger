@@ -14,7 +14,7 @@ import pathlib
 import itertools
 from pydantic import TypeAdapter
 import json
-
+from services.api.publisher import publish_progress
 REDIS_HOST = os.environ["REDIS_HOST"]
 
 app = Celery(
@@ -26,16 +26,6 @@ app = Celery(
 redis_broker = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
 # Flush broker at start to remove any stale messages.
 redis_broker.flushdb()
-
-redis_publisher = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=1)
-redis_publisher.flushdb()
-
-def publish_progress(
-    model_id: str,
-    model_update: ModelUpdate
-):
-    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="python")}
-    redis_publisher.publish("model_updates", json.dumps(message))
 
 mongo_url = os.environ["MONGO_URL"]
 #mongo_url = "mongodb://root:example@localhost:27017"
@@ -71,10 +61,10 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         NUM_EPOCHS = 10
             
         # Get model
-        ml_model = MODELS[model.type](project=project, samples=samples, annotations=annotations_2d, callbacks=[])
+        ml_model = MODELS[model.type](model_id=str(model.id), project=project, samples=samples, annotations=annotations_2d, train_val_test_split=(0.7, 0.2, 0.1), num_epochs=NUM_EPOCHS)
         
         # Train model
-        accuracy = ml_model.train(num_epochs=NUM_EPOCHS, batch_size=BATCH_SIZE)
+        accuracy = ml_model.train(batch_size=BATCH_SIZE)
         
         # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
         ml_model.save(model_dir.joinpath(f"{model.id}.model"))

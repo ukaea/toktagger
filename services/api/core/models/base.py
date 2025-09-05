@@ -34,6 +34,7 @@ class Model(ABC):
         self.project = project
         self.model = self._define_model()
         self.type = ModelType[self.__class__.__name__]
+        self.num_epochs = num_epochs
         
         # If train ratio is 1, no splitting required, just set train sets and return
         if train_fraction == 1:

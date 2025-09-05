@@ -23,6 +23,8 @@ import { ELMView } from "@/app/elms/components/elms";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
+import { ModelTrainModal } from '@/app/components/tools/modelTrain';
+import { ModelPredictModal } from '@/app/components/tools/modelPredict';
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -223,6 +225,8 @@ export default function SamplePage({
           project={project}
           sample={sample}
         ></SampleDataBreadCrumbs>
+        <ModelTrainModal project={project}></ModelTrainModal>
+        <ModelPredictModal project={project}></ModelPredictModal>
         <div className="flex">
           <ToolBar
             project={project}

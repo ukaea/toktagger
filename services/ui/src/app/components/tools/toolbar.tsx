@@ -31,6 +31,7 @@ import {
 } from "@/types";
 import { FindPeaksTool } from "@/app/components/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+import { ModelPredictTool } from '@/app/components/tools/modelPredictSample';
 
 async function saveAnnotations(
   project_id: string,
@@ -381,6 +382,11 @@ export default function ToolBar({
   const sample_id = sample._id;
   const tools: React.ReactNode[] = [];
 
+  const modelPredictTool = (
+    <ModelPredictTool project={project} sample_id={sample_id} setAnnotations={setAnnotations}></ModelPredictTool>
+  )
+  tools.push(modelPredictTool);
+  
   if (project.task == "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
