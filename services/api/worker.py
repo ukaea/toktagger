@@ -7,15 +7,16 @@ import asyncio
 from services.api.crud import utils
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate
-from services.api.schemas.annotations import AnnotationTypes
+from services.api.schemas.annotations import AnnotationOutTypes
 from services.api.schemas.models import Model, ModelUpdate
 from services.api.core.models.registry import MODELS
 import pathlib
 import itertools
 from pydantic import TypeAdapter
-import json
+import requests
 from services.api.publisher import publish_progress
 REDIS_HOST = os.environ["REDIS_HOST"]
+API_URL = os.environ["API_URL"]
 
 app = Celery(
     "tasks",
@@ -31,28 +32,21 @@ mongo_url = os.environ["MONGO_URL"]
 #mongo_url = "mongodb://root:example@localhost:27017"
 db_name = "annotate_db"
 
-async def train_model(project: Project, model: Model): # TODO: do we want to support retraining where we only get annotations not previously put into model?
+async def train_model(project: Project, model: Model, samples: list[Sample], annotations: list[AnnotationOutTypes]): # TODO: do we want to support retraining where we only get annotations not previously put into model?
     try:
         print(f"Running model training for project {project.id}")
         model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
         model_dir.mkdir(exist_ok=True) # Do i need to do this every time?
-        
-        db_client = MongoDBClient(mongo_url, db_name)
-        
+                
         # Get all validated samples and annotations for this project
-        annotations = await utils.get_annotations(db_client, project.id, validated=True)
         print(f"Collected {len(annotations)} annotations.")
-        samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project.id, validated=True)]
         print(f"Collected {len(samples)} samples.")
-        
-        # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
-        annotator_model = TypeAdapter(AnnotationTypes)
         
         # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
         annotations_2d = [
-            [annotator_model.validate_python(ann) for ann in group]
+            [ann for ann in group]
             for _, group in itertools.groupby(
-                annotations, key=lambda annotation: annotation['sample_id']
+                annotations, key=lambda annotation: annotation.sample_id
                 )
             ]
 
@@ -68,13 +62,13 @@ async def train_model(project: Project, model: Model): # TODO: do we want to sup
         
         # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
         ml_model.save(model_dir.joinpath(f"{model.id}.model"))
-        await utils.update_model(db_client, model.id, ModelUpdate(training_status="completed", accuracy=accuracy, progress=100))
+        publish_progress(model.id, ModelUpdate(training_status="completed", accuracy=accuracy, progress=100))
     
     except Exception as e:
         # If anything goes wrong, update model to failed status
         # This is important as if this does not happen, your model will be stuck in 'training' forever,
         # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
-        await utils.update_model(db_client, model.id, ModelUpdate(training_status="failed"))
+        publish_progress(model.id, ModelUpdate(training_status="failed"))
         raise e
 
 async def get_predictions(project: Project, model: Model, samples: list[Sample]):
@@ -105,7 +99,11 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
     return predictions
     
 @app.task()
-def run_training(project: dict, model: dict):
+def run_training(project: dict, model: dict, samples: list[dict], annotations: list[dict]):
+    # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
+    annotator_adapter = TypeAdapter(AnnotationOutTypes)
+    sample_models = [Sample(**sample) for sample in samples]
+    annotation_models = [annotator_adapter.validate_python(ann) for ann in annotations]
     asyncio.run(train_model(project=Project(**project), model=Model(**model)))
     
 @app.task()

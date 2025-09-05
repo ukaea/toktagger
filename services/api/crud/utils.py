@@ -238,13 +238,6 @@ async def get_annotations(
     return annotations
 
 
-async def add_annotations(db_client, project_id: str, sample_id: str, annotations: list[AnnotationIn]) -> list[str]:
-    db_ids = {
-            "project_id": convert_to_objectid(project_id, "projects"), 
-            "sample_id": convert_to_objectid(sample_id, "samples")
-        }
-    return await db_client.insert_many(collection="annotations", models=annotations, ids=db_ids)
-
 async def add_annotations(
     db_client, project_id: str, sample_id: str, annotations: list[AnnotationIn]
 ) -> list[str]:

@@ -13,6 +13,8 @@ from services.api.worker import run_training, run_inference
 import random
 import asyncio
 from bson.objectid import ObjectId
+from pydantic import TypeAdapter
+
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 
 
@@ -123,8 +125,13 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
     )
     model["project_id"] = project.id
     model["id"] = model_id
+    
+    # Get annotations and samples
+    annotations = await utils.get_annotations(db_client, project.id, validated=True)
+    samples = await utils.get_samples(db_client, project.id, validated=True)
+    
     # Start task with ID of this project? How will we know whether training is running? dont want multiple trainings at once? TODO
-    run_training.delay(project.model_dump(mode="python"), model)
+    run_training.delay(project.model_dump(mode="python"), model, samples, annotations)
     pass
 
 

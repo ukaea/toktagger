@@ -54,6 +54,7 @@ services:
       UDA_METANEW_PLUGINNAME: "MAST_DB"
       REDIS_HOST: "redis"
       MODEL_STORAGE: "/data/models"
+      API_URL: "http://api_app:8002"   # 👈 Add this line
     working_dir: /app
     command: ["celery", "-A", "services.api.worker", "worker"]
     networks:
