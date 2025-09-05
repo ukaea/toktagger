@@ -22,7 +22,7 @@ def test_image_file_loader_jpg():
         frame=1,
         time=0.1,
     )
-    sample = Sample(shot_id=10000, data=img_file, _id="test", project_id="test")
+    sample = Sample(shot_id=10000, data=img_file, _id="test", project_id="test", validated_annotations=False)
     data_loader = data_loaders.ImageDataLoader()
     image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
@@ -37,7 +37,7 @@ def test_image_file_loader_png():
         frame=1,
         time=0.1,
     )
-    sample = Sample(shot_id=10000, data=img_file, _id="test", project_id="test")
+    sample = Sample(shot_id=10000, data=img_file, _id="test", project_id="test", validated_annotations=False)
     data_loader = data_loaders.ImageDataLoader()
     image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
@@ -51,7 +51,7 @@ def test_parquet_file_loader():
         protocol="file",
         column_names=["Ip", "dalpha"],
     )
-    sample = Sample(shot_id=10000, data=parquet_file, _id="test", project_id="test")
+    sample = Sample(shot_id=10000, data=parquet_file, _id="test", project_id="test", validated_annotations=False)
     data_loader = data_loaders.ParquetDataLoader()
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)

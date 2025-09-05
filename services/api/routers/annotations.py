@@ -1,14 +1,10 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from typing import Literal
 from services.api.crud import utils
-<<<<<<< HEAD
 from services.api.schemas.samples import Sample, SampleUpdate
 from services.api.schemas.annotators import Annotator
 from services.api.schemas.annotations import AnnotationIn, Annotation, AnnotationTypes, AnnotationOutTypes
 from services.api.schemas import convert_to_objectid
-=======
-from services.api.schemas.annotations import AnnotationTypes, AnnotationOutTypes
->>>>>>> main
 
 router = APIRouter(
     prefix="/projects/{project_id}",
