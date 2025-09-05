@@ -59,6 +59,25 @@ services:
     networks:
       - app-network
 
+  listener:
+    build:
+      context: ./
+      dockerfile: ./api.dockerfile
+    container_name: progress_listener
+    restart: always
+    depends_on:
+      - redis
+      - mongo
+    volumes:
+      - ./services:/app/services
+    environment:
+      MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
+      REDIS_HOST: "redis"
+    working_dir: /app
+    command: ["python", "-m", "services.api.listener"]
+    networks:
+      - app-network
+
   api:
     build:
       context: ./

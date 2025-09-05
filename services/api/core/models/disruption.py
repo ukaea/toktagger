@@ -7,9 +7,6 @@ from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
-import typing
-from services.api.crud.db import MongoDBClient
-from bson.objectid import ObjectId
 from services.api.core.models.base import TorchDataset, TorchModel
 
 
@@ -37,17 +34,7 @@ class DisruptionDataset(TorchDataset):
         return plasma_current, disruption_time / data.time[-1]
         
 class DisruptionCNN(TorchModel):
-    def __init__(
-        self,
-        project: Project, 
-        samples: list[Sample], 
-        annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float] = (0.7, 0.2, 0.1),
-        callbacks: list = []
-    ) -> None:
-        self.type = "disruption_cnn"
-        super().__init__(project=project, dataset=DisruptionDataset, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split, callbacks=callbacks)
-        
+    
     def _define_model(self):
         return nn.Sequential(
             nn.Conv1d(1, 16, kernel_size=5, padding=2),
@@ -65,7 +52,8 @@ class DisruptionCNN(TorchModel):
             nn.Linear(32, 1) # TODO: what if not all annotations present for all samples?
         )
         
-    def train(self, num_epochs: int, batch_size: int, patience=20, threshold=1e-4, device='cpu') -> float:        
+    def train(self, batch_size: int, patience=20, threshold=1e-4, device='cpu') -> float:  
+        self.update_progress.on_train_begin()      
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
         if not self.train_samples or not self.train_annotations:
@@ -77,13 +65,13 @@ class DisruptionCNN(TorchModel):
         
         loss_history = {"train": [], "val": []}
         best_val_loss = float("inf")
-        print_per_epoch = max(1, num_epochs // 50) # print 50 times
+        print_per_epoch = max(1, self.num_epochs // 50) # print 50 times
         
         train_accuracy = None
         val_accuracy = None
         test_accuracy = None
         
-        for epoch in range(num_epochs):
+        for epoch in range(self.num_epochs):
             self.model.train()
             total_train_loss = 0
             sum_correct = 0
@@ -152,10 +140,10 @@ class DisruptionCNN(TorchModel):
                 loss_history["train"].append(train_loss_avg)
                 loss_history["val"].append(val_loss_avg)
                 
-                self.callbacks.on_epoch_end(epoch=epoch, logs={"accuracy": train_accuracy, "loss": train_loss_avg, "val_accuracy": val_accuracy, "val_loss": val_loss_avg})
+                self.update_progress.on_epoch_end(epoch=epoch, logs={"accuracy": train_accuracy, "loss": train_loss_avg, "val_accuracy": val_accuracy, "val_loss": val_loss_avg})
 
                 if epoch % print_per_epoch == 0:
-                    print(f"Epoch [{epoch + 1}/{num_epochs}]")
+                    print(f"Epoch [{epoch + 1}/{self.num_epochs}]")
                     print(f"  Train Loss: {train_loss_avg:.4f}, MAE: {train_mae:.4f}, RMSE: {train_rmse:.4f}")
                     print(f"  Val   Loss: {val_loss_avg:.4f}, MAE: {val_mae:.4f}, RMSE: {val_rmse:.4f}")
 
@@ -199,7 +187,7 @@ class DisruptionCNN(TorchModel):
         
         
         final_accuracy = test_accuracy or val_accuracy or train_accuracy
-        self.callbacks.on_train_end(logs={"accuracy": final_accuracy})      
+        self.update_progress.on_train_end(logs={"accuracy": final_accuracy})      
         
         return (sum_correct / sum_total) * 100
     

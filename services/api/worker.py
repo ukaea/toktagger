@@ -5,14 +5,15 @@ from services.api.crud.db import MongoDBClient
 from bson.objectid import ObjectId
 import asyncio
 from services.api.crud import utils
-from services.api.core.models import MODELS
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate
 from services.api.schemas.annotations import AnnotationTypes
 from services.api.schemas.models import Model, ModelUpdate
+from services.api.core.models.registry import MODELS
 import pathlib
 import itertools
 from pydantic import TypeAdapter
+import json
 
 REDIS_HOST = os.environ["REDIS_HOST"]
 
@@ -22,9 +23,19 @@ app = Celery(
     backend=f"redis://{REDIS_HOST}:6379/0",  # Redis as result backend
 )
 
-redis_client = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
-# Flush client at start to remove any stale messages.
-redis_client.flushdb()
+redis_broker = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
+# Flush broker at start to remove any stale messages.
+redis_broker.flushdb()
+
+redis_publisher = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=1)
+redis_publisher.flushdb()
+
+def publish_progress(
+    model_id: str,
+    model_update: ModelUpdate
+):
+    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="python")}
+    redis_publisher.publish("model_updates", json.dumps(message))
 
 mongo_url = os.environ["MONGO_URL"]
 #mongo_url = "mongodb://root:example@localhost:27017"

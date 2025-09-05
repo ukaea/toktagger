@@ -2,23 +2,22 @@ from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation, AnnotationIn
 from services.api.schemas.projects import Project
 from services.api.core.data_loaders import DATA_LOADERS
-from services.api.schemas.models import ModelUpdate
-
+from services.api.core.models.callback import ModelProgress
+from services.api.schemas.models import ModelType
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
 import typing
-from services.api.crud.db import MongoDBClient
-from bson.objectid import ObjectId
 import math
 
 class Model(ABC):
     def __init__(
         self,
+        model_id: str,
         project: Project, 
         samples: list[Sample], 
         annotations: list[list[Annotation]], 
         train_val_test_split: typing.Tuple[float, float, float],
-        callbacks: list
+        num_epochs: int = 100
         ) -> None:
         
         if len(samples) != len(annotations):
@@ -30,10 +29,11 @@ class Model(ABC):
         
         if train_fraction == 0:
             raise ValueError("Must be samples in the training set!")
-        
+        self.update_progress = ModelProgress(model_id=model_id, num_epochs=num_epochs)
+        self.id = model_id
         self.project = project
         self.model = self._define_model()
-        self.callbacks = callbacks
+        self.type = ModelType[self.__class__.__name__]
         
         # If train ratio is 1, no splitting required, just set train sets and return
         if train_fraction == 1:
@@ -81,7 +81,7 @@ class Model(ABC):
         pass
     
     @abstractmethod
-    def train(self, epochs: int) -> float:
+    def train(self) -> float:
         # pass in list of samples and list of annotations
         # return some measure of accuracy
         pass
@@ -118,14 +118,15 @@ class TorchDataset(ABC):
 class TorchModel(Model):
     def __init__(
         self, 
+        model_id: str,
         project: Project, 
         dataset: TorchDataset,
         samples: list[Sample], 
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float],
-        callbacks: list
+        num_epochs: int = 100
     ) -> None:
-        super().__init__(project=project, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split, callbacks=callbacks)
+        super().__init__(model_id=model_id, project=project, samples=samples, annotations=annotations, train_val_test_split=train_val_test_split, num_epochs=num_epochs)
         self.dataset = dataset
         self.train_dataset = dataset(project, self.train_samples, self.train_annotations)
         self.val_dataset = dataset(project, self.val_samples, self.val_annotations) if self.val_samples else None

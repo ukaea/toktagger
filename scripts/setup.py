@@ -32,7 +32,7 @@ def create_uda_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
 def create_local_samples(
@@ -63,7 +63,7 @@ def create_local_samples(
             sample["annotations"] = annotations[shot_id]
         samples.append(sample)
 
-    requests.put(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
 def main():
