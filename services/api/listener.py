@@ -4,8 +4,8 @@ import json
 import os
 from services.api.crud.db import MongoDBClient
 import services.api.crud.utils as utils
-from services.api.schemas.models import ModelUpdate
-from services.api.schemas.samples import SampleUpdate
+from services.common.schemas.models import ModelUpdate
+from services.common.schemas.samples import SampleUpdate
 
 REDIS_HOST = os.environ["REDIS_HOST"]
 MONGO_URL = os.environ["MONGO_URL"]

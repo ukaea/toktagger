@@ -1,9 +1,9 @@
 import random
 from abc import ABC, abstractmethod
 
-from services.api.schemas.samples import Sample
-from services.api.schemas.annotations import Annotation
-from services.api.schemas.projects import QueryStrategyType
+from services.common.schemas.samples import Sample
+from services.common.schemas.annotations import Annotation
+from services.common.schemas.projects import QueryStrategyType
 
 
 class QueryStrategy(ABC):

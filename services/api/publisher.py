@@ -1,9 +1,9 @@
 import redis
 import json
 import os
-from services.api.schemas.models import ModelUpdate
-from services.api.schemas.samples import SampleUpdate
-from services.api.schemas.annotations import AnnotationTypes
+from services.common.schemas.models import ModelUpdate
+from services.common.schemas.samples import SampleUpdate
+from services.common.schemas.annotations import AnnotationTypes
 import typing
 
 REDIS_HOST = os.environ["REDIS_HOST"]

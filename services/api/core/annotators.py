@@ -3,11 +3,11 @@ from scipy.signal import find_peaks, stft
 from scipy.ndimage import uniform_filter1d
 import numpy as np
 
-from services.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
-from services.api.schemas.annotators import FindPeaksParams, SpectrogramThresholdParams
-from services.api.schemas.annotations import TimeRegion, SpectrogramMask
-from services.api.schemas.projects import Task
-from services.api.schemas.annotators import AnnotatorIds
+from services.common.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
+from services.common.schemas.annotators import FindPeaksParams, SpectrogramThresholdParams
+from services.common.schemas.annotations import TimeRegion, SpectrogramMask
+from services.common.schemas.projects import Task
+from services.common.schemas.annotators import AnnotatorIds
 
 
 def compute_stft(data: TimeSeriesData) -> np.ndarray:

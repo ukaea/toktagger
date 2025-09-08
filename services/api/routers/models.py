@@ -4,11 +4,11 @@ import os
 from services.api.core.annotators import FindPeaksAnnotator
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
-from services.api.schemas.annotations import TimeRegion, AnnotationTypes
-from services.api.schemas.annotators import Annotator, FindPeaksParams
-from services.api.schemas.models import Model, ModelType, ModelIn
-from services.api.schemas.samples import Sample
-from services.api.schemas import convert_to_objectid
+from services.common.schemas.annotations import TimeRegion, AnnotationTypes
+from services.common.schemas.annotators import Annotator, FindPeaksParams
+from services.common.schemas.models import Model, ModelType, ModelIn
+from services.common.schemas.samples import Sample
+from services.common.schemas import convert_to_objectid
 from services.api.worker import run_training, run_inference
 import random
 import asyncio

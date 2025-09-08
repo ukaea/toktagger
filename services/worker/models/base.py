@@ -1,8 +1,8 @@
 from services.common.schemas.samples import Sample
 from services.common.schemas.annotations import Annotation, AnnotationIn
 from services.common.schemas.projects import Project
-from services.api.core.data_loaders import DATA_LOADERS
-from services.api.core.models.callback import ModelProgress
+from services.common.core.data_loaders import DATA_LOADERS
+from services.worker.models.callback import ModelProgress
 from services.common.schemas.models import ModelType
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod

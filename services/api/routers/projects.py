@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
 from typing import Literal
-from services.api.schemas.projects import ProjectIn, Project
-from services.api.schemas.annotations import Annotation
-from services.api.schemas.samples import Sample
-from services.api.schemas import convert_to_objectid
+from services.common.schemas.projects import ProjectIn, Project
+from services.common.schemas.annotations import Annotation
+from services.common.schemas.samples import Sample
+from services.common.schemas import convert_to_objectid
 from services.api.crud import utils
 from services.api.core.data_pool import DataPool
 from services.api.core.data_loaders import DATA_LOADERS

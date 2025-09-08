@@ -1,11 +1,11 @@
 from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
-from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import Annotation, AnnotationIn
-from services.api.schemas.projects import Project
-from services.api.schemas.samples import Sample, SampleUpdate
-from services.api.schemas.models import Model, ModelUpdate
+from services.common.schemas import convert_to_objectid
+from services.common.schemas.annotations import Annotation, AnnotationIn
+from services.common.schemas.projects import Project
+from services.common.schemas.samples import Sample, SampleUpdate
+from services.common.schemas.models import Model, ModelUpdate
 from bson.objectid import ObjectId
 
 async def get_projects(

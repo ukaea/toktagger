@@ -9,7 +9,7 @@ from services.common.schemas.projects import Project
 from services.common.schemas.samples import Sample, SampleUpdate
 from services.common.schemas.annotations import AnnotationOutTypes
 from services.common.schemas.models import Model, ModelUpdate
-from services.api.core.models.registry import MODELS
+from services.worker.models.registry import MODELS
 import pathlib
 import itertools
 from pydantic import TypeAdapter

@@ -1,14 +1,14 @@
 import numpy as np
 import xarray as xr
 from services.api.core.annotators import compute_stft
-from services.api.schemas.data import (
+from services.common.schemas.data import (
     CompositeData,
     MultiVariateTimeSeriesData,
     SpectrogramData,
     Data,
     TimeSeriesData,
 )
-from services.api.schemas.views import SpectrogramViewParams, ViewParams, ViewType
+from services.common.schemas.views import SpectrogramViewParams, ViewParams, ViewType
 
 
 class IdentityView:

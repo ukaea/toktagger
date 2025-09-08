@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional, Union
-from services.api.schemas import ConfiguredModel
+from services.common.schemas import ConfiguredModel
 
 
 class ViewType(str, Enum):

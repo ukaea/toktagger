@@ -3,9 +3,9 @@ from typing import Optional
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.views import DATA_VIEWS
 from services.api.crud import utils
-from services.api.schemas.samples import Sample
-from services.api.schemas.data import DataResponseType
-from services.api.schemas.views import ViewParams, ViewParamTypes
+from services.common.schemas.samples import Sample
+from services.common.schemas.data import DataResponseType
+from services.common.schemas.views import ViewParams, ViewParamTypes
 
 
 router = APIRouter(
