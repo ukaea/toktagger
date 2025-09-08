@@ -62,13 +62,20 @@ async def train_model(project: Project, model: Model, samples: list[Sample], ann
         
         # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
         ml_model.save(model_dir.joinpath(f"{model.id}.model"))
-        publish_progress(model.id, ModelUpdate(training_status="completed", accuracy=accuracy, progress=100))
+        publish_progress(
+            id=model.id, 
+            collection="models",
+            updates=ModelUpdate(training_status="completed", accuracy=accuracy, progress=100))
     
     except Exception as e:
         # If anything goes wrong, update model to failed status
         # This is important as if this does not happen, your model will be stuck in 'training' forever,
         # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
-        publish_progress(model.id, ModelUpdate(training_status="failed"))
+        publish_progress(
+            id=model.id,
+            collection="models",
+            updates=ModelUpdate(training_status="failed")
+            )
         raise e
 
 async def get_predictions(project: Project, model: Model, samples: list[Sample]):
@@ -89,12 +96,21 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
     
     for i, sample in enumerate(samples):
         # Insert prediction annotations for each sample into the database
+        publish_progress(
+            id=sample.id, 
+            collection="annotations", 
+            updates=predictions[i]
+            )
         await db_client.insert_many(
             collection="annotations",
             models = predictions[i],
             ids={"project_id": ObjectId(project.id), "sample_id": ObjectId(sample.id)}
         )
-        await utils.update_sample(db_client, sample.id, updates=SampleUpdate(validated_annotations=False))
+        publish_progress(
+            id=sample.id, 
+            collection="samples", 
+            updates=SampleUpdate(validated_annotations=False)
+            )
     print("Predictions complete!")
     return predictions
     
@@ -104,7 +120,7 @@ def run_training(project: dict, model: dict, samples: list[dict], annotations: l
     annotator_adapter = TypeAdapter(AnnotationOutTypes)
     sample_models = [Sample(**sample) for sample in samples]
     annotation_models = [annotator_adapter.validate_python(ann) for ann in annotations]
-    asyncio.run(train_model(project=Project(**project), model=Model(**model)))
+    asyncio.run(train_model(project=Project(**project), model=Model(**model)), samples=sample_models, annotations=annotation_models)
     
 @app.task()
 def run_inference(project: dict, model: dict, samples: list[dict]):

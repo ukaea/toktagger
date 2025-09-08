@@ -276,3 +276,25 @@ async def delete_annotations(
             status_code=404,
             detail="Annotations not found belonging to this Sample and/or Project.",
         )
+
+
+async def update_annotations(
+    db_client: MongoDBClient,
+    project_id: str,
+    sample_id: str,
+    annotations: list[AnnotationIn]
+)-> list[str]:
+    # Delete previous annotations, if they exist
+    try:
+        await delete_annotations(
+            db_client=db_client, project_id=project_id, sample_id=sample_id
+        )
+    except HTTPException:
+        pass
+
+    return await add_annotations(
+        db_client=db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        annotations=annotations,
+    )

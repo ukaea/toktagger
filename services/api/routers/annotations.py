@@ -189,18 +189,11 @@ async def update_annotations(
         return
 
     # Delete previous annotations, if they exist
-    try:
-        await utils.delete_annotations(
-            db_client=db_client, project_id=project_id, sample_id=sample_id
-        )
-    except HTTPException:
-        pass
-
-    return await utils.add_annotations(
-        db_client=db_client,
-        project_id=project_id,
-        sample_id=sample_id,
-        annotations=annotations,
+    return await utils.update_annotations(
+        db_client,
+        project_id,
+        sample_id,
+        annotations
     )
 
 

@@ -2,15 +2,27 @@ import redis
 import json
 import os
 from services.api.schemas.models import ModelUpdate
+from services.api.schemas.samples import SampleUpdate
+from services.api.schemas.annotations import AnnotationTypes
+import typing
 
 REDIS_HOST = os.environ["REDIS_HOST"]
 
 redis_publisher = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=1)
 redis_publisher.flushdb()
 
-def publish_progress(
+def publish_model_progress(
     model_id: str,
-    model_update: ModelUpdate
+    updates: ModelUpdate
 ):
-    message = {"model_id": model_id, "model_update": model_update.model_dump(mode="json", exclude_unset=True)}
-    redis_publisher.publish("model_updates", json.dumps(message))
+    message = {"model_id": model_id, "updates": updates.model_dump(mode="json", exclude_unset=True)}
+    redis_publisher.publish("models", json.dumps(message))
+    
+def publish_sample_progress(
+    sample_id: str,
+    updates: SampleUpdate
+):
+    message = {"sample_id": sample_id, "updates": updates.model_dump(mode="json", exclude_unset=True)}
+    redis_publisher.publish("samples", json.dumps(message))
+    
+    

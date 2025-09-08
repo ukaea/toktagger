@@ -18,5 +18,4 @@ uda
 pytest
 mkdocs
 mkdocs-material
-aioredis
 tensorflow
