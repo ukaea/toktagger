@@ -70,12 +70,7 @@ export const SpectrogramView = ({
   setAnnotations,
   plotProps,
 }: SpectrogramViewInfo) => {
-  useEffect(() => {
-    console.log("SpectrogramView plotProps updated:", plotProps);
-    console.log("Threshold active:", plotProps.thresholdActive);
-  }, [plotProps]);
-
-  console.log(annotations);
+  useEffect(() => {}, [plotProps]);
 
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
@@ -110,7 +105,6 @@ export const SpectrogramView = ({
   const amplitude_og = data.amplitude;
   let amplitude: Array<Array<number>> = [];
   if (plotProps.thresholdActive) {
-    console.log("Applying threshold mask to amplitude data");
     amplitude = data.amplitude.map((row: Array<number>, rowIndex: number) =>
       row.map((value: number, colIndex: number) => {
         let maskValue = mask?.values[rowIndex]?.[colIndex];

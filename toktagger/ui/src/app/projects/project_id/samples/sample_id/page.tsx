@@ -124,7 +124,6 @@ const SampleView = ({
       />
     );
   } else if (project.task == "MHD") {
-    console.log(data);
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
