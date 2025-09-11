@@ -1,20 +1,18 @@
 import os
 import redis
 from celery import Celery
-from services.api.crud.db import MongoDBClient
-from bson.objectid import ObjectId
 import asyncio
-from services.api.crud import utils
 from services.common.schemas.projects import Project
-from services.common.schemas.samples import Sample, SampleUpdate
-from services.common.schemas.annotations import AnnotationOutTypes
+from services.common.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
+from services.common.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
 from services.common.schemas.models import Model, ModelUpdate
-from services.api.core.models.registry import MODELS
+from services.common.models.registry import MODELS
 import pathlib
 import itertools
 from pydantic import TypeAdapter
-import requests
-from services.api.publisher import publish_progress
+from services.common.core.sender import send_batch_samples, send_batch_annotations
+from services.common.core.publisher import publish_progress
+
 REDIS_HOST = os.environ["REDIS_HOST"]
 API_URL = os.environ["API_URL"]
 
@@ -27,10 +25,6 @@ app = Celery(
 redis_broker = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
 # Flush broker at start to remove any stale messages.
 redis_broker.flushdb()
-
-mongo_url = os.environ["MONGO_URL"]
-#mongo_url = "mongodb://root:example@localhost:27017"
-db_name = "annotate_db"
 
 async def train_model(project: Project, model: Model, samples: list[Sample], annotations: list[AnnotationOutTypes]): # TODO: do we want to support retraining where we only get annotations not previously put into model?
     try:
@@ -63,8 +57,7 @@ async def train_model(project: Project, model: Model, samples: list[Sample], ann
         # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
         ml_model.save(model_dir.joinpath(f"{model.id}.model"))
         publish_progress(
-            id=model.id, 
-            collection="models",
+            model_id=model.id, 
             updates=ModelUpdate(training_status="completed", accuracy=accuracy, progress=100))
     
     except Exception as e:
@@ -72,8 +65,7 @@ async def train_model(project: Project, model: Model, samples: list[Sample], ann
         # This is important as if this does not happen, your model will be stuck in 'training' forever,
         # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
         publish_progress(
-            id=model.id,
-            collection="models",
+            model_id=model.id,
             updates=ModelUpdate(training_status="failed")
             )
         raise e
@@ -84,33 +76,19 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
     # Where inference is run on some batch of samples first
     print(f"Creating predictions for project {project.id} on {len(samples)} samples.")
     
-    # Create db connection - TODO should this be here or at a per worker / per session level?
-    db_client = MongoDBClient(mongo_url, db_name)
-    
     # Load the model from the weights stored during training
     model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{str(model.id)}.model")
     ml_model = MODELS[model.type].load(project, model_path)
     
     predictions = ml_model.predict(samples, batch_size=32)
     
+    samples_batch = [SampleUpdateBatchItem(id=sample.id, sample_update=SampleUpdate(validated_annotations=False)) for sample in samples]
+    annotations_batch = [AnnotationBatchItem(sample_id=sample.id, annotations=annotations) for sample, annotations in zip(samples, predictions)]
     
-    for i, sample in enumerate(samples):
-        # Insert prediction annotations for each sample into the database
-        publish_progress(
-            id=sample.id, 
-            collection="annotations", 
-            updates=predictions[i]
-            )
-        await db_client.insert_many(
-            collection="annotations",
-            models = predictions[i],
-            ids={"project_id": ObjectId(project.id), "sample_id": ObjectId(sample.id)}
-        )
-        publish_progress(
-            id=sample.id, 
-            collection="samples", 
-            updates=SampleUpdate(validated_annotations=False)
-            )
+    # Return predictions over rest API to server
+    send_batch_samples(project.id, samples_batch)
+    send_batch_annotations(project.id, annotations_batch)
+    
     print("Predictions complete!")
     return predictions
     
@@ -120,7 +98,7 @@ def run_training(project: dict, model: dict, samples: list[dict], annotations: l
     annotator_adapter = TypeAdapter(AnnotationOutTypes)
     sample_models = [Sample(**sample) for sample in samples]
     annotation_models = [annotator_adapter.validate_python(ann) for ann in annotations]
-    asyncio.run(train_model(project=Project(**project), model=Model(**model)), samples=sample_models, annotations=annotation_models)
+    asyncio.run(train_model(project=Project(**project), model=Model(**model), samples=sample_models, annotations=annotation_models))
     
 @app.task()
 def run_inference(project: dict, model: dict, samples: list[dict]):

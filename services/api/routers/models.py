@@ -6,10 +6,10 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
 from services.common.schemas.annotations import TimeRegion, AnnotationTypes
 from services.common.schemas.annotators import Annotator, FindPeaksParams
-from services.common.schemas.models import Model, ModelType, ModelIn
+from services.common.schemas.models import Model, ModelType, ModelIn, ModelUpdate
 from services.common.schemas.samples import Sample
 from services.common.schemas import convert_to_objectid
-from services.api.worker import run_training, run_inference
+from services.common.core.celery_app import app, run_training, run_inference
 import random
 import asyncio
 from bson.objectid import ObjectId
@@ -72,7 +72,7 @@ async def delete_models(
     
     models_to_delete = await utils.get_models(db_client, project_id, model_type)
     if version:
-        models_to_delete = [model for model in models_to_delete if model["version"] == version]
+        models_to_delete = [model for model in models_to_delete if model.version == version]
     
     if not models_to_delete:
         raise HTTPException(status_code=404, detail=f"Version {version} of model type {model_type} not found!" if version else f"No models of type {model_type} found for this project!")
@@ -108,20 +108,20 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
     # Try to get model for this project from database if it exists
     db_models = await utils.get_models(db_client, project_id, model_type)
     
-    if len([db_model for db_model in db_models if db_model.get("training_status") in ["queued", "started"]]) > 0:
+    if len([db_model for db_model in db_models if db_model.training_status in ["queued", "started"]]) > 0:
         raise HTTPException(status_code=409, detail=f"Training of {model_type} model already in progress!")
     
     if len(db_models) == 0:
         # This is the first time a model has been saved for this project, so version = 1
         version = 1
     else:
-        version = db_models[0]["version"] + 1
+        version = db_models[0].version + 1
     
     model = {"type": model_type, "version": version, "training_status": "queued", "accuracy": 0, "progress": 0}
-    model_id = await db_client.insert(
-        collection = "models",
-        model = ModelIn(**model),
-        ids = {"project_id": ObjectId(project.id)}
+    model_id = await utils.add_model(
+        db_client=db_client,
+        project_id=project.id,
+        model=ModelIn(**model)
     )
     model["project_id"] = project.id
     model["id"] = model_id
@@ -129,16 +129,53 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
     # Get annotations and samples
     annotations = await utils.get_annotations(db_client, project.id, validated=True)
     samples = await utils.get_samples(db_client, project.id, validated=True)
+
+    # Add the training task to the queue
+    task = run_training.delay(
+        project.model_dump(mode="python"), 
+        model, 
+        [sample.model_dump(mode="python") for sample in samples], 
+        [annotation.model_dump(mode="python") for annotation in annotations]
+    )
     
-    # Start task with ID of this project? How will we know whether training is running? dont want multiple trainings at once? TODO
-    run_training.delay(project.model_dump(mode="python"), model, samples, annotations)
+    # Associate the Celery task ID with the model in the database
+    await utils.update_model(
+        db_client=db_client,
+        model_id=model_id,
+        updates=ModelUpdate(task_id=task.id)
+    )
     pass
 
 
 @router.delete("/models/{model_type}/train")
-async def stop_model_training(project_id: str, model_id: str):
-    # Stop training of this model
-    pass
+async def stop_model_training(request: Request, project_id: str, model_type: ModelType):
+    db_client = request.app.state.db_client
+    # Get models which are either queued or in progress
+    models = await utils.get_models(
+        db_client=db_client,
+        project_id=project_id,
+        model_type=model_type,
+        status="queued"
+    )
+    models += await utils.get_models(
+        db_client=db_client,
+        project_id=project_id,
+        model_type=model_type,
+        status="started"
+    )
+
+    # Get the celery task IDs and stop them
+    for model in models:
+        if model.task_id:
+            app.control.revoke(model.task_id, terminate=True)
+        await utils.update_model(
+            db_client=db_client,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="aborted")
+        )
+    
+    # Return list of model IDs which were stopped
+    return [model.id for model in models]
 
 
 @router.post("/models/{model_type}/predict")
@@ -191,9 +228,7 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
     # Convert ObjectID to string
-    sample_objs = [Sample(**sample) for sample in samples]
-
-    run_inference.delay(project.model_dump(mode="python"), model.model_dump(mode="python"), [sample_obj.model_dump(mode="python") for sample_obj in sample_objs])
+    run_inference.delay(project.model_dump(mode="python"), model.model_dump(mode="python"), [sample.model_dump(mode="python") for sample in samples])
 
 @router.delete("/models/{model_type}/predict")
 async def delete_predictions(

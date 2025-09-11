@@ -2,10 +2,10 @@ from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.common.schemas import convert_to_objectid
-from services.common.schemas.annotations import Annotation, AnnotationIn
+from services.common.schemas.annotations import Annotation, AnnotationIn, AnnotationOutTypeAdapter
 from services.common.schemas.projects import Project
 from services.common.schemas.samples import Sample, SampleUpdate
-from services.common.schemas.models import Model, ModelUpdate
+from services.common.schemas.models import Model, ModelIn, ModelUpdate, ModelType
 from bson.objectid import ObjectId
 
 async def get_projects(
@@ -88,7 +88,7 @@ async def get_samples(
         start=start,
         limit=count if count is not None else 0,
     )
-    return samples
+    return [Sample(**sample) for sample in samples]
 
 async def update_sample(
     db_client: MongoDBClient, 
@@ -108,14 +108,15 @@ async def update_sample(
         raise HTTPException(status_code=500, detail="Failed to update sample")
 
 async def get_models(
-    db_client: MongoDBClient, project_id: str, model_type: Optional[str] = None, status: Optional[Literal["queued", "started", "failed", "completed"]] = None, start: int = 0, end: Optional[int] = None
+    db_client: MongoDBClient, project_id: str, model_type: Optional[ModelType] = None, status: Optional[Literal["queued", "started", "failed", "completed", "aborted"]] = None, start: int = 0, end: Optional[int] = None
 ) -> list[Model]:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
     if model_type:
+        print(model_type)
         filters["type"] = model_type
     if status:
-        filters["status"] = status
+        filters["training_status"] = status
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
@@ -128,10 +129,10 @@ async def get_models(
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
-    return models
+    return [Model(**model) for model in models]
 
 async def get_model(
-    db_client: MongoDBClient, project_id: str, model_type: str, version: int = None, status: Optional[Literal["queued", "started", "failed", "completed"]] = None
+    db_client: MongoDBClient, project_id: str, model_type: str, version: int = None, status: Optional[Literal["queued", "started", "failed", "completed", "aborted"]] = None
 ):
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id, "type": model_type}
@@ -170,6 +171,21 @@ async def update_model(
     
     if result.matched_count != 1:
         raise HTTPException(status_code=500, detail="Failed to update model")
+    
+async def add_model(
+    db_client: MongoDBClient,
+    project_id: str,
+    model: ModelIn
+):
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    
+    return await db_client.insert(
+        collection = "models",
+        model = model,
+        ids = {"project_id": project_obj_id}
+    )
+    
+    
 async def get_sample(db_client: MongoDBClient, project_id: str, sample_id: str) -> Sample:
     # Convert project ID to ObhectID
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -235,7 +251,7 @@ async def get_annotations(
         start=start,
         limit=count if count is not None else 0,
     )
-    return annotations
+    return [AnnotationOutTypeAdapter.validate_python(a) for a in annotations]
 
 
 async def add_annotations(
@@ -291,6 +307,10 @@ async def update_annotations(
         )
     except HTTPException:
         pass
+    
+    if len(annotations) == 0:
+        # Nothing to add!
+        return
 
     return await add_annotations(
         db_client=db_client,

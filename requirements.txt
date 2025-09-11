@@ -1,15 +1,9 @@
 fastapi
 uvicorn
-fsspec
 xarray
-s3fs
-zarr<3
 scipy
-pyarrow
 pymongo
 requests
-torch
-torchmetrics
 numpy
 scikit-learn
 celery[redis]
@@ -19,3 +13,5 @@ pytest
 mkdocs
 mkdocs-material
 tensorflow
+torch
+torchmetrics

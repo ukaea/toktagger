@@ -181,6 +181,7 @@ export default function SamplePage({
 
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
+      console.log(dbAnnotations)
 
       if (project.task == "MHD") {
         params = {

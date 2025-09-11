@@ -70,6 +70,7 @@ export const DisruptionView = ({
   const displayAnnotations: DisplayAnnotation[] = annotations.map(
     convertAnnotationToDisplayAnnotation,
   );
+  console.log(displayAnnotations)
 
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
@@ -79,6 +80,8 @@ export const DisruptionView = ({
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
 
+  console.log(vspans)
+
   const updateZones = (newZones: Array<Zone>) => {
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
   };
@@ -87,16 +90,20 @@ export const DisruptionView = ({
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
   };
 
-  const plotData: Partial<Plotly.PlotData>[] = [
-    {
+  const plotData: Partial<Plotly.PlotData>[] = []
+
+  if (data.values["ip"]) {
+    plotData.push({
       x: data.values["ip"].time,
       y: data.values["ip"].values,
       line: {
         color: "black",
       },
       name: "ip",
-    },
-    {
+    });
+  };
+  if (data.values["ANE_DENSITY"]) {
+    plotData.push({
       x: data.values["ANE_DENSITY"].time,
       y: data.values["ANE_DENSITY"].values,
       line: {
@@ -105,8 +112,8 @@ export const DisruptionView = ({
       name: "density",
       xaxis: "x2",
       yaxis: "y2",
-    },
-  ];
+    });
+  };
 
   const plotLayout: Partial<Plotly.Layout> = {
     uirevision: "true",

@@ -68,3 +68,7 @@ class Sample(SampleBase):
 
 class SampleUpdate(ConfiguredModel):
     validated_annotations: Optional[bool] = None
+    
+class SampleUpdateBatchItem(ConfiguredModel):
+    id: str = Field(..., alias="_id")
+    sample_update: SampleUpdate

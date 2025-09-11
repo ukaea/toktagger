@@ -1,12 +1,12 @@
 import services.api.core.data_loaders as data_loaders
 import pytest
-from services.api.schemas.samples import (
+from services.common.schemas.samples import (
     Sample,
     ImageFileData,
     TimeSeriesFileData,
     ShotData,
 )
-from services.api.schemas.data import (
+from services.common.schemas.data import (
     MultiVariateTimeSeriesData,
     ImageData,
 )

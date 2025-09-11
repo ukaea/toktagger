@@ -1,7 +1,7 @@
 from typing import Tuple, Optional, Union
 from services.common.schemas import ConfiguredModel
 from services.common.schemas.models import ModelType
-from pydantic import Field, model_validator, BaseModel
+from pydantic import Field, TypeAdapter, model_validator, BaseModel
 
 
 class AnnotationIn(ConfiguredModel):
@@ -74,3 +74,10 @@ AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
 AnnotationOutTypes = Union[
     TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
 ]
+
+class AnnotationBatchItem(ConfiguredModel):
+    sample_id: str
+    annotations: list[AnnotationTypes]
+
+AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
+AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)

@@ -1,5 +1,5 @@
 from tensorflow.keras.callbacks import Callback
-from services.api.publisher import publish_progress
+from services.common.core.publisher import publish_progress
 from services.common.schemas.models import ModelUpdate
 
 class ModelProgress(Callback):
@@ -11,8 +11,7 @@ class ModelProgress(Callback):
     def on_train_begin(self):
         model_update = ModelUpdate(training_status="started", progress=0)
         publish_progress(
-            id=self.model_id, 
-            collection="models",
+            model_id=self.model_id, 
             updates=model_update
             )
         
@@ -22,8 +21,7 @@ class ModelProgress(Callback):
             accuracy = logs.get("val_accuracy") or logs.get("accuracy")
         )
         publish_progress(
-            id=self.model_id, 
-            collection="models",
+            model_id=self.model_id, 
             updates=model_update
             )
     
@@ -34,8 +32,7 @@ class ModelProgress(Callback):
             accuracy = logs.get("val_accuracy") or logs.get("accuracy")
         )
         publish_progress(
-            id=self.model_id, 
-            collection="models",
+            model_id=self.model_id, 
             updates=model_update
             )
     

@@ -3,7 +3,7 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
 from services.api.crud import utils
-from services.common.schemas.samples import SampleIn, Sample
+from services.common.schemas.samples import SampleIn, Sample, SampleUpdate, SampleUpdateBatchItem
 from services.common.schemas.annotations import Annotation
 from services.common.schemas import convert_to_objectid
 from typing import Literal
@@ -164,6 +164,32 @@ async def add_samples(
     return ids
 
 
+@router.put(
+    "",
+    responses={
+        200: {
+            "description": "Samples have been updated successfully."
+        },
+        404: {"description": "Project or Sample(s) not found with that ID."},
+    },
+)
+async def update_samples(
+    request: Request,
+    sample_batch: list[SampleUpdateBatchItem],
+    project_id: str = Path(
+        description="The project ID to associate these samples with."
+    ),
+):
+    """
+    Update a list of samples (provided with their IDs) for this project.
+    ---------------------------------------------------------------------
+    """
+    db_client = request.app.state.db_client
+    project = await utils.get_project(db_client, project_id)
+    
+    for sample_batch_item in sample_batch:
+        await utils.update_sample(db_client=db_client, sample_id=sample_batch_item.id, updates=sample_batch_item.sample_update)
+
 @router.get(
     "/next",
     response_model=Sample,
@@ -193,8 +219,8 @@ async def get_next_sample(
     project = await utils.get_project(db_client, project_id)
     
     # Only consider samples that have not been human annotated
-    samples = [Sample(**sample) for sample in await utils.get_samples(db_client, project_id, validated=False, sort_by="shot_id")]
-    annotations = [Annotation(**annotation) for annotation in await utils.get_annotations(db_client, project_id, validated=False, sort_by="uncertainty")]
+    samples = await utils.get_samples(db_client, project_id, validated=False, sort_by="shot_id")
+    annotations = await utils.get_annotations(db_client, project_id, validated=False, sort_by="uncertainty")
     print(f"found {len(samples)} non validated samples")
     print(f"found {len(annotations)} non validated annotations")
 

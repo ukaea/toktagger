@@ -7,7 +7,7 @@ from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
-from services.worker.models.base import TorchDataset, TorchModel
+from services.common.models.base import TorchDataset, TorchModel
 
 
 class DisruptionDataset(TorchDataset):

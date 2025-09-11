@@ -57,7 +57,7 @@ class MongoDBClient:
         document = await self.db[collection].find_one({"_id": object_id})
         
         # Add updates to db entry
-        updated_document = {**document, **model.model_dump(mode="python", exclude_unset=True)}
+        updated_document = {**document, **model.model_dump(mode="python", exclude_unset=True, exclude_none=True)}
         
         return await self.db[collection].update_one({"_id": object_id}, {"$set": updated_document})
         
