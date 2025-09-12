@@ -1,4 +1,4 @@
-from services.common.models.disruption import DisruptionCNN
+from services.api.models.disruption import DisruptionCNN
 
 # Need this in here to avoid circular imports
 MODELS = {

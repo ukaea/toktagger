@@ -1,8 +1,8 @@
 from typing import Annotated, List, Optional
 from enum import Enum
 from pydantic import Field, computed_field, BaseModel
-from services.common.schemas import ConfiguredModel
-from services.common.schemas.annotations import AnnotationTypes
+from services.api.schemas import ConfiguredModel
+from services.api.schemas.annotations import AnnotationTypes
 
 
 class FileType(str, Enum):

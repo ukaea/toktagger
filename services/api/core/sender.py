@@ -1,9 +1,23 @@
 import requests
-from services.common.schemas.samples import SampleUpdateBatchItem
-from services.common.schemas.annotations import AnnotationBatchItem
+from services.api.schemas.samples import SampleUpdateBatchItem
+from services.api.schemas.models import ModelUpdate
+from services.api.schemas.annotations import AnnotationBatchItem
 import pydantic
 import os
 API_URL = os.environ.get("API_URL", "localhost:8002")
+
+def send_model_updates(
+    project_id: str,
+    model_id: str,
+    updates: ModelUpdate
+):
+    url = f"{API_URL}/projects/{project_id}/models/{model_id}"
+    response = requests.put(
+        url=url,
+        json=updates.model_dump(mode="json")
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Failed to write model updates with status {response.status_code}")
 
 def send_batch_updates(url: str, updates: list[pydantic.BaseModel]):
     payload = [model.model_dump(mode="json") for model in updates]

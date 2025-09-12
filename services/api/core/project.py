@@ -1,5 +1,5 @@
 from typing import List
-from services.common.schemas.projects import (
+from services.api.schemas.projects import (
     DataLoaderType,
     Project as ProjectMetadata,
     QueryStrategyType,
@@ -11,7 +11,7 @@ from services.api.core.query_strategy import (
 )
 from services.api.core.data_loaders import DataLoader, ParquetDataLoader, UDADataLoader
 from services.api.core.data_pool import DataPool
-from services.common.schemas.samples import Sample
+from services.api.schemas.samples import Sample
 
 
 class Project:

@@ -2,16 +2,15 @@ import os
 import redis
 from celery import Celery
 import asyncio
-from services.common.schemas.projects import Project
-from services.common.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
-from services.common.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
-from services.common.schemas.models import Model, ModelUpdate
-from services.common.models.registry import MODELS
+from services.api.schemas.projects import Project
+from services.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
+from services.api.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
+from services.api.schemas.models import Model, ModelUpdate
+from services.api.models.registry import MODELS
 import pathlib
 import itertools
 from pydantic import TypeAdapter
-from services.common.core.sender import send_batch_samples, send_batch_annotations
-from services.common.core.publisher import publish_progress
+from services.api.core.sender import send_batch_samples, send_batch_annotations, send_model_updates
 
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 API_URL = os.environ.get("API_URL", "localhost:8002")
@@ -53,7 +52,8 @@ async def train_model(project: Project, model: Model, samples: list[Sample], ann
         
         # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
         ml_model.save(model_dir.joinpath(f"{model.id}.model"))
-        publish_progress(
+        send_model_updates(
+            project_id=project.id,
             model_id=model.id, 
             updates=ModelUpdate(training_status="completed", accuracy=accuracy, progress=100))
     
@@ -61,7 +61,8 @@ async def train_model(project: Project, model: Model, samples: list[Sample], ann
         # If anything goes wrong, update model to failed status
         # This is important as if this does not happen, your model will be stuck in 'training' forever,
         # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
-        publish_progress(
+        send_model_updates(
+            project_id=project.id,
             model_id=model.id,
             updates=ModelUpdate(training_status="failed")
             )

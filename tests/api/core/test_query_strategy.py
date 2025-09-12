@@ -1,8 +1,8 @@
 import services.api.core.query_strategy as query_strategy
 import pytest
 import random
-from services.common.schemas.samples import Sample
-from services.common.schemas.annotations import TimePointOut
+from services.api.schemas.samples import Sample
+from services.api.schemas.annotations import TimePointOut
 import tests.db_definitions as db_definitions
 
 

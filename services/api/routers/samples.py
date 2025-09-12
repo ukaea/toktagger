@@ -3,9 +3,9 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
 from services.api.crud import utils
-from services.common.schemas.samples import SampleIn, Sample, SampleUpdate, SampleUpdateBatchItem
-from services.common.schemas.annotations import Annotation
-from services.common.schemas import convert_to_objectid
+from services.api.schemas.samples import SampleIn, Sample, SampleUpdate, SampleUpdateBatchItem
+from services.api.schemas.annotations import Annotation
+from services.api.schemas import convert_to_objectid
 from typing import Literal
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])

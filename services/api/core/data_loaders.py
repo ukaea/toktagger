@@ -4,14 +4,14 @@ import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
 import numpy as np
-from services.common.schemas.data import (
+from services.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
     ImageData,
 )
-from services.common.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
-from services.common.schemas.projects import DataLoaderType
+from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
+from services.api.schemas.projects import DataLoaderType
 
 import pathlib
 

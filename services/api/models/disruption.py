@@ -1,13 +1,13 @@
-from services.common.schemas.samples import Sample
-from services.common.schemas.annotations import Annotation, TimePoint
-from services.common.schemas.projects import Project
-from services.common.schemas.data import TimeSeriesData
+from services.api.schemas.samples import Sample
+from services.api.schemas.annotations import Annotation, TimePoint
+from services.api.schemas.projects import Project
+from services.api.schemas.data import TimeSeriesData
 import typing
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
-from services.common.models.base import TorchDataset, TorchModel
+from services.api.models.base import TorchDataset, TorchModel
 
 
 class DisruptionDataset(TorchDataset):

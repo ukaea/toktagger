@@ -1,6 +1,6 @@
-from services.common.schemas.projects import ProjectIn
-from services.common.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
-from services.common.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
+from services.api.schemas.projects import ProjectIn
+from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
+from services.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
 import pathlib
 
 # Define some common things to add to db

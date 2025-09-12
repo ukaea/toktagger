@@ -24,23 +24,23 @@ def mongo_container():
     with MongoDbContainer("mongo:latest") as mongo:
         yield mongo.get_connection_url()
 
-# @pytest.fixture(scope="session")
-# def redis_container():
-#     """Start a Redis container for tests and yield a client."""
-#     with RedisContainer("redis:7.2") as container:
-#         host = container.get_container_host_ip()
-#         port = int(container.get_exposed_port(6379))
+@pytest.fixture(scope="session")
+def redis_container():
+    """Start a Redis container for tests and yield a client."""
+    with RedisContainer("redis:7.2") as container:
+        host = container.get_container_host_ip()
+        port = int(container.get_exposed_port(6379))
 
-#         os.environ["REDIS_HOST"] = host
+        os.environ["REDIS_HOST"] = host
 
-#         # Connect the redis client to the test container
-#         client = redis.Redis(host=host, port=port, decode_responses=True)
+        # Connect the redis client to the test container
+        client = redis.Redis(host=host, port=port, decode_responses=True)
 
-#         # Wait until Redis is ready
-#         client.ping()
-#         client.flushdb()
+        # Wait until Redis is ready
+        client.ping()
+        client.flushdb()
 
-#         yield client  # yield the client to your tests
+        yield client  # yield the client to your tests
 
 @pytest_asyncio.fixture(scope="function")
 async def db_client(mongo_container):

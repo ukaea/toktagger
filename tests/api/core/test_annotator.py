@@ -2,9 +2,9 @@ import services.api.core.annotators as annotators
 import numpy
 import math
 from scipy.datasets import electrocardiogram
-from services.common.schemas.annotations import SpectrogramMask
-from services.common.schemas.data import TimeSeriesData, MultiVariateTimeSeriesData
-from services.common.schemas.annotators import FindPeaksParams, SpectrogramThresholdParams
+from services.api.schemas.annotations import SpectrogramMask
+from services.api.schemas.data import TimeSeriesData, MultiVariateTimeSeriesData
+from services.api.schemas.annotators import FindPeaksParams, SpectrogramThresholdParams
 
 
 def test_find_peaks():

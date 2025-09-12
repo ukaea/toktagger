@@ -2,7 +2,7 @@ from typing import List, Literal, Annotated, Optional
 from pydantic import BaseModel
 from enum import Enum
 from pydantic import Field
-from services.common.schemas import ConfiguredModel
+from services.api.schemas import ConfiguredModel
 
 class ModelType(str, Enum): # Is this needed?
     DisruptionCNN = "disruption_cnn"

@@ -7,7 +7,6 @@ from services.api.routers.models import router as models_router
 from services.api.routers.projects import router as projects_router
 from services.api.routers.samples import router as samples_router
 from services.api.crud.db import MongoDBClient
-from services.api.crud.listener import redis_listener
 from contextlib import asynccontextmanager
 import asyncio
 
@@ -19,15 +18,8 @@ async def lifespan(app: FastAPI):
     app.state.db_client = MongoDBClient(mongo_url, db_name)
     app.state.project = None
     app.state.date_pool = None
-    redis_listener_task = asyncio.create_task(redis_listener(app.state.db_client))
 
     yield
-    
-    redis_listener_task.cancel()
-    try:
-        await redis_listener_task
-    except asyncio.CancelledError:
-        pass
     
     await app.state.db_client.client.close()
 

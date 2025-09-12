@@ -4,12 +4,12 @@ import os
 from services.api.core.annotators import FindPeaksAnnotator
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.crud import utils
-from services.common.schemas.annotations import TimeRegion, AnnotationTypes
-from services.common.schemas.annotators import Annotator, FindPeaksParams
-from services.common.schemas.models import Model, ModelType, ModelIn, ModelUpdate
-from services.common.schemas.samples import Sample
-from services.common.schemas import convert_to_objectid
-from services.common.core.celery_app import app, run_training, run_inference
+from services.api.schemas.annotations import TimeRegion, AnnotationTypes
+from services.api.schemas.annotators import Annotator, FindPeaksParams
+from services.api.schemas.models import Model, ModelType, ModelIn, ModelUpdate
+from services.api.schemas.samples import Sample
+from services.api.schemas import convert_to_objectid
+from services.api.worker import app, run_training, run_inference
 import random
 import asyncio
 from bson.objectid import ObjectId
@@ -281,7 +281,23 @@ async def get_sample_predictions(
         raise HTTPException(status_code=408, detail="Prediction request timed out!") # How should we handle this? Because the task will still complete and get added to the databse, will it be added to the UI on a refesh?
     
     return annotations[0]
-    
+
+@router.put("/models/{model_id}")
+async def update_model(
+    request: Request,
+    model_updates: ModelUpdate,
+    project_id: str = Path(description="The ID of the project to make model predictions for."),
+    model_id: str = Path(description="The ID of the model to update information about."),
+    ):
+    # Update model status
+    db_client = request.app.state.db_client
+    project = await utils.get_project(db_client, project_id)
+    # Associate the Celery task ID with the model in the database
+    await utils.update_model(
+        db_client=db_client,
+        model_id=model_id,
+        updates=model_updates
+    )    
 
 @router.get("/models/{model_id}/evaluate")
 async def evaluate(project_id: str, model_id: str):

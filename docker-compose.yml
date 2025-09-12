@@ -56,7 +56,7 @@ services:
       MODEL_STORAGE: "/data/models"
       API_URL: "http://api_app:8002"
     working_dir: /app
-    command: ["celery", "-A", "services.worker.main", "worker"]
+    command: ["celery", "-A", "services.api.worker", "worker"]
     networks:
       - app-network
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
-from services.common.schemas.projects import Project, Task
-from services.common.schemas.samples import Sample
-from services.common.schemas.annotators import AnnotatorIds, AnnotatorTypes
+from services.api.schemas.projects import Project, Task
+from services.api.schemas.samples import Sample
+from services.api.schemas.annotators import AnnotatorIds, AnnotatorTypes
 from services.api.crud.utils import get_project, get_sample
 from services.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from services.api.core.data_loaders import DATA_LOADERS

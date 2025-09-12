@@ -1,8 +1,8 @@
 from pydantic import Field, computed_field
 from enum import Enum
-from services.common.schemas import ConfiguredModel
+from services.api.schemas import ConfiguredModel
 from typing import List
-from services.common.schemas.models import ModelType
+from services.api.schemas.models import ModelType
 class Task(Enum):
     ELM = "ELM"
     DISRUPTION = "disruption"
