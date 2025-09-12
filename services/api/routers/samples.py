@@ -188,7 +188,7 @@ async def update_samples(
     project = await utils.get_project(db_client, project_id)
     
     for sample_batch_item in sample_batch:
-        await utils.update_sample(db_client=db_client, sample_id=sample_batch_item.id, updates=sample_batch_item.sample_update)
+        await utils.update_sample(db_client=db_client, sample_id=sample_batch_item.id, updates=sample_batch_item.updates)
 
 @router.get(
     "/next",

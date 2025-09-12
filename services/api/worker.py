@@ -80,7 +80,7 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
     
     predictions = ml_model.predict(samples, batch_size=32)
     
-    samples_batch = [SampleUpdateBatchItem(id=sample.id, sample_update=SampleUpdate(validated_annotations=False)) for sample in samples]
+    samples_batch = [SampleUpdateBatchItem(id=sample.id, updates=SampleUpdate(validated_annotations=False)) for sample in samples]
     annotations_batch = [AnnotationBatchItem(sample_id=sample.id, annotations=annotations) for sample, annotations in zip(samples, predictions)]
     
     # Return predictions over rest API to server

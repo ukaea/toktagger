@@ -249,13 +249,13 @@ async def test_batch_update_samples(api_client, setup_db, db_client):
     update_samples_batch = [
         {
             "id": setup_db["sample_id_1"],
-            "sample_update": {
+            "updates": {
                 "validated_annotations": True
             }
         },
         {
             "id": setup_db["sample_id_2"],
-            "sample_update": {
+            "updates": {
                 "validated_annotations": True
             }
         },

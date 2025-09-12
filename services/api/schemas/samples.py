@@ -71,4 +71,4 @@ class SampleUpdate(ConfiguredModel):
     
 class SampleUpdateBatchItem(ConfiguredModel):
     id: str = Field(..., alias="_id")
-    sample_update: SampleUpdate
+    updates: SampleUpdate
