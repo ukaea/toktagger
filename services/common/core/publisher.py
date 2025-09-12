@@ -4,10 +4,9 @@ from services.common.schemas.models import ModelUpdate
 import json
 
 
-REDIS_HOST = os.environ["REDIS_HOST"]
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 
 redis_publisher = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=1)
-redis_publisher.flushdb()
 
 def publish_progress(
     model_id: str,

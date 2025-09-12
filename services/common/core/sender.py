@@ -3,7 +3,7 @@ from services.common.schemas.samples import SampleUpdateBatchItem
 from services.common.schemas.annotations import AnnotationBatchItem
 import pydantic
 import os
-API_URL = os.environ["API_URL"]
+API_URL = os.environ.get("API_URL", "localhost:8002")
 
 def send_batch_updates(url: str, updates: list[pydantic.BaseModel]):
     payload = [model.model_dump(mode="json") for model in updates]

@@ -6,7 +6,7 @@ from services.api.crud.db import MongoDBClient
 import services.api.crud.utils as utils
 from services.common.schemas.models import ModelUpdate
 
-REDIS_HOST = os.environ["REDIS_HOST"]
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 
 async def redis_listener(db_client):
     redis = await aioredis.from_url(f"redis://{REDIS_HOST}:6379/1", decode_responses=True)

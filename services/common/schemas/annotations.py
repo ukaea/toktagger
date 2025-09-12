@@ -7,6 +7,9 @@ from pydantic import Field, TypeAdapter, model_validator, BaseModel
 class AnnotationIn(ConfiguredModel):
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
+        if not isinstance(values, dict):
+            values = values.model_dump(mode="python")
+            
         if values.get("validated"):
             values["uncertainty"] = 0
         elif not values.get("validated") and values.get("uncertainty") is None:

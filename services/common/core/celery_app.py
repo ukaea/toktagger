@@ -13,9 +13,8 @@ from pydantic import TypeAdapter
 from services.common.core.sender import send_batch_samples, send_batch_annotations
 from services.common.core.publisher import publish_progress
 
-REDIS_HOST = os.environ["REDIS_HOST"]
-API_URL = os.environ["API_URL"]
-
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+API_URL = os.environ.get("API_URL", "localhost:8002")
 app = Celery(
     "tasks",
     broker=f"redis://{REDIS_HOST}:6379/0",  # Redis as a message broker
@@ -23,8 +22,6 @@ app = Celery(
 )
 
 redis_broker = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
-# Flush broker at start to remove any stale messages.
-redis_broker.flushdb()
 
 async def train_model(project: Project, model: Model, samples: list[Sample], annotations: list[AnnotationOutTypes]): # TODO: do we want to support retraining where we only get annotations not previously put into model?
     try:
