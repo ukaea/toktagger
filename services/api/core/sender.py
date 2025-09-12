@@ -4,14 +4,13 @@ from services.api.schemas.models import ModelUpdate
 from services.api.schemas.annotations import AnnotationBatchItem
 import pydantic
 import os
-API_URL = os.environ.get("API_URL", "localhost:8002")
 
 def send_model_updates(
     project_id: str,
     model_id: str,
     updates: ModelUpdate
 ):
-    url = f"{API_URL}/projects/{project_id}/models/{model_id}"
+    url = f"{os.environ['API_URL']}/projects/{project_id}/models/{model_id}"
     response = requests.put(
         url=url,
         json=updates.model_dump(mode="json")
@@ -30,9 +29,9 @@ def send_batch_updates(url: str, updates: list[pydantic.BaseModel]):
         raise RuntimeError(f"Failed to write batch updates with status {response.status_code}")
     
 def send_batch_samples(project_id: str, samples: list[SampleUpdateBatchItem]):
-    url = f"{API_URL}/projects/{project_id}/samples"
+    url = f"{os.environ['API_URL']}/projects/{project_id}/samples"
     send_batch_updates(url, samples)
     
 def send_batch_annotations(project_id: str, annotations: list[AnnotationBatchItem]):
-    url = f"{API_URL}/projects/{project_id}/annotations"
+    url = f"{os.environ['API_URL']}/projects/{project_id}/annotations"
     send_batch_updates(url, annotations)

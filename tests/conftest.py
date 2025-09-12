@@ -69,6 +69,7 @@ async def api_client(mongo_container):
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
+        os.environ["API_URL"] = "http://test:8002"
         yield client
     await lifespan_ctx.__aexit__(None, None, None)
 
