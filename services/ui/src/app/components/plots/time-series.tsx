@@ -56,7 +56,7 @@ export const TimeSeries = ({
 
   const plotId = externalId || "disruption"; // Facilitate an external or default ID
 
-  const { show: showContextMenu, toolingCallbacks } = useAnnotationProvider();
+  const { show: showContextMenu, toolingCallbacks, editMode } = useAnnotationProvider();
   const showContextMenuRef = useRef(showContextMenu);
 
   const allowRelayout = useRef(true);
@@ -255,6 +255,11 @@ export const TimeSeries = ({
 
   // Handles context menu creation
   useEffect(() => {
+    // Only add event listeners if edit mode is active
+    if (!editMode) {
+      return
+    }
+
     if (!plotReady) {
       // Plot may not have loaded yet - this will rerun after loading
       return;
@@ -419,7 +424,7 @@ export const TimeSeries = ({
       });
       document.removeEventListener("keyup", cancelToolCreation);
     };
-  }, [plotId, plotReady, toolingCallbacks]);
+  }, [editMode, plotId, plotReady, toolingCallbacks]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">
