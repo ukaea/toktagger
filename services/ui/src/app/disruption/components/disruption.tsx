@@ -138,32 +138,36 @@ export const DisruptionView = ({
   };
 
   return (
-      <ContextMenuProvider menuId="disruption-menu">
-        <VSpanProvider
-          categories={disruptionCategories}
-          initialData={vspans}
-          onModifyVSpan={updateVSpans}
-        >
-          <ZoneProvider
-            categories={zoneCategories}
-            initialData={zones}
-            onModifyZone={updateZones}
+    <div className="flex space-y-3">
+      <div className="flex-1 text-center items-center">
+        <ContextMenuProvider menuId="disruption-menu">
+          <VSpanProvider
+            categories={disruptionCategories}
+            initialData={vspans}
+            onModifyVSpan={updateVSpans}
           >
-            <div className="flex gap-4">
-              <div className="flex-1 flex-col items-center space-y-3">
-                <TimeSeries
-                  plotId="Disruption"
-                  plotConfig={{ data: plotData, layout: plotLayout }}
-                >
-                  <Zones onZoneUpdate={updateZones} />
-                  <VSpans onZoneUpdate={updateVSpans} />
-                </TimeSeries>
-                <DisruptionTable />
+            <ZoneProvider
+              categories={zoneCategories}
+              initialData={zones}
+              onModifyZone={updateZones}
+            >
+              <div className="flex gap-4">
+                <div className="flex-auto flex-col items-center space-y-3">
+                  <TimeSeries
+                    plotId="Disruption"
+                    plotConfig={{ data: plotData, layout: plotLayout }}
+                  >
+                    <Zones onZoneUpdate={updateZones} />
+                    <VSpans onZoneUpdate={updateVSpans} />
+                  </TimeSeries>
+                  <DisruptionTable />
+                </div>
+                <AnnotationToolbar />
               </div>
-              <AnnotationToolbar />
-            </div>
-          </ZoneProvider>
-        </VSpanProvider>
-      </ContextMenuProvider>
+            </ZoneProvider>
+          </VSpanProvider>
+        </ContextMenuProvider>
+      </div>
+    </div>
   );
 };

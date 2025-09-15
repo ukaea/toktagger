@@ -9,6 +9,7 @@ type MakeOptional<Type, Key extends keyof Type> = Omit<Type, Key> & Partial<Pick
 interface ContextMenuContextType {
     setToolingCallbacks: (type: ToolingTypes, category?: Category) => void;
     registerTooling: (id: string, callbacks: ToolingInfo, element: React.ReactNode) => void;
+    toggleEditMode: () => void;
     show: (params: MakeOptional<ShowContextMenuParams<unknown>, "id">) => void
     toolingCallbacks: ToolingCallbacks | null;
     toolingInfo: Map<ToolingTypes, ToolingInfo>;
@@ -44,6 +45,11 @@ export const ContextMenuProvider = ({menuId, children} : {
     const {show} = useContextMenu({ id:  menuId})
 
     const keyHeldRef = useRef(false);
+
+    const toggleEditMode = () => {
+        setDisableToolInteraction(editMode)
+        setEditMode((prev) => !prev)
+    }
 
     // Allows tools to register their own menu item in the general context menu
     // TODO: Change id to tooling type
@@ -83,7 +89,7 @@ export const ContextMenuProvider = ({menuId, children} : {
             }
         }
 
-        const toggleEditMode = (event: KeyboardEvent) => {
+        const handleEditMode = (event: KeyboardEvent) => {
             if (event.key === "e") {
                 setDisableToolInteraction(editMode)
                 setEditMode((prev) => !prev)
@@ -93,13 +99,13 @@ export const ContextMenuProvider = ({menuId, children} : {
         document.addEventListener("keydown", disableInteraction)
         document.addEventListener("keyup", enableInteraction)
 
-        document.addEventListener("keyup", toggleEditMode)
+        document.addEventListener("keyup", handleEditMode)
 
         return () => {
             document.removeEventListener("keydown", disableInteraction)
             document.removeEventListener("keyup", enableInteraction)
 
-            document.removeEventListener("keyup", toggleEditMode)
+            document.removeEventListener("keyup", handleEditMode)
         }
     }, [disableToolingInteraction, editMode])
 
@@ -122,7 +128,7 @@ export const ContextMenuProvider = ({menuId, children} : {
     }
 
     return (
-        <ContextMenuContext.Provider value={{setToolingCallbacks, registerTooling, show, toolingCallbacks: toolingCallbacksState, toolingInfo, disableToolingInteraction, editMode}}>
+        <ContextMenuContext.Provider value={{setToolingCallbacks, registerTooling, toggleEditMode, show, toolingCallbacks: toolingCallbacksState, toolingInfo, disableToolingInteraction, editMode}}>
             {children}
             <Menu id={menuId}>
                 {[...menuElements.values()]}
