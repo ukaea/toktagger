@@ -47,7 +47,7 @@ export const ZoneProvider = ({
   const zones = useRef<Zone[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
 
-  const {  setToolingCallbacks, registerTooling  } = useAnnotationProvider();
+  const { setToolingCallbacks, registerTooling } = useAnnotationProvider();
 
   // It is necessary for the context to trigger child refreshes
   const triggerZoneUpdate = () => {
@@ -92,9 +92,9 @@ export const ZoneProvider = ({
     onModifyZone(zones.current);
   };
 
-    const activateTooling = (category?: Category) => {
-        setToolingCallbacks(ToolingTypes.ZONE, category)
-    }
+  const activateTooling = (category?: Category) => {
+    setToolingCallbacks(ToolingTypes.ZONE, category);
+  };
 
   // On initialisation the tool registers a menu item with the general context menu
   useEffect(() => {
@@ -155,31 +155,32 @@ export const ZoneProvider = ({
         </Submenu>
       );
 
-        const toolingCallbacks: ToolingInfo = {
-            id: ToolingTypes.ZONE,
-            categories,
-            start: (x, _y, category) => { addZone(x, x, category) },
-            move: (x, _y) => {
-                zones.current[zones.current.length - 1].x1 = x;
-                triggerZoneUpdate()
-            },
-            end: (x, _y) => {
-                zones.current[zones.current.length - 1].x1 = x;
-                for (const zone of zones.current) {
-                    if (zone.x1 < zone.x0) {
-                        const temp = zone.x0
-                        zone.x0 = zone.x1
-                        zone.x1 = temp
-                    }
-                }
-                triggerZoneUpdate()
-                onModifyZone(zones.current);
-            },
+    const toolingCallbacks: ToolingInfo = {
+      id: ToolingTypes.ZONE,
+      categories,
+      start: (x, _y, category) => {
+        addZone(x, x, category);
+      },
+      move: (x, _y) => {
+        zones.current[zones.current.length - 1].x1 = x;
+        triggerZoneUpdate();
+      },
+      end: (x, _y) => {
+        zones.current[zones.current.length - 1].x1 = x;
+        for (const zone of zones.current) {
+          if (zone.x1 < zone.x0) {
+            const temp = zone.x0;
+            zone.x0 = zone.x1;
+            zone.x1 = temp;
+          }
         }
+        triggerZoneUpdate();
+        onModifyZone(zones.current);
+      },
+    };
 
-        registerTooling("zone", toolingCallbacks, menuElement)
-
-    }, [categories, onModifyZone, registerTooling])
+    registerTooling("zone", toolingCallbacks, menuElement);
+  }, [categories, onModifyZone, registerTooling]);
 
   // Initialisation of data - this should only run once
   // Effect: run ONCE per mount to populate from initialData

@@ -52,7 +52,7 @@ export const VSpanProvider = ({
   const spans = useRef<VSpan[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
 
-  const {  setToolingCallbacks, registerTooling  } = useAnnotationProvider();
+  const { setToolingCallbacks, registerTooling } = useAnnotationProvider();
 
   // It is necessary for the context to trigger child refreshes
   const triggerVSpanUpdate = () => {
@@ -96,9 +96,9 @@ export const VSpanProvider = ({
     triggerVSpanUpdate();
   };
 
-    const activateTooling = (category?: Category) => {
-        setToolingCallbacks(ToolingTypes.VSPAN, category)
-    }
+  const activateTooling = (category?: Category) => {
+    setToolingCallbacks(ToolingTypes.VSPAN, category);
+  };
 
   // On initialisation the tool registers a menu item with the general context menu
   useEffect(() => {
@@ -130,47 +130,48 @@ export const VSpanProvider = ({
             - When there are multiple categories keep the existing “Add VSpan” submenu containing one Item per type.
             - This prevents an unnecessary extra click in the single-category case.
         */
-        const menuElement =
-            categories.length === 1
-                ? ( // single-category Case 
-                    <Item
-                        key="add-vspan-single"
-                        id="add-vspan-single"
-                        onClick={({ props }) => {
-                            add(props.x, categories[0])
-                        }}
-                    >
-                        {`Add ${categories[0].name}`}
-                    </Item>
-                ) : ( // multiple-category branch
-                    <Submenu key="vspan-submenu" label="Add VSpan">
-                        {addVSpanItems}
-                    </Submenu>
-                )
+    const menuElement =
+      categories.length === 1 ? (
+        // single-category Case
+        <Item
+          key="add-vspan-single"
+          id="add-vspan-single"
+          onClick={({ props }) => {
+            add(props.x, categories[0]);
+          }}
+        >
+          {`Add ${categories[0].name}`}
+        </Item>
+      ) : (
+        // multiple-category branch
+        <Submenu key="vspan-submenu" label="Add VSpan">
+          {addVSpanItems}
+        </Submenu>
+      );
 
-        const toolingCallbacks: ToolingInfo = {
-            id: ToolingTypes.VSPAN,
-            categories,
-            start: (x, _y, category) => {
-                spans.current.push({
-                    x,
-                    category
-                })
-                triggerVSpanUpdate()
-            },
-            move: (x, _y) => {
-                spans.current[spans.current.length - 1].x = x;
-                triggerVSpanUpdate()
-            },
-            end: (x, _y) => {
-                spans.current[spans.current.length - 1].x = x;
-                onModifyVSpan(spans.current);
-                triggerVSpanUpdate()
-            },
-        }
+    const toolingCallbacks: ToolingInfo = {
+      id: ToolingTypes.VSPAN,
+      categories,
+      start: (x, _y, category) => {
+        spans.current.push({
+          x,
+          category,
+        });
+        triggerVSpanUpdate();
+      },
+      move: (x, _y) => {
+        spans.current[spans.current.length - 1].x = x;
+        triggerVSpanUpdate();
+      },
+      end: (x, _y) => {
+        spans.current[spans.current.length - 1].x = x;
+        onModifyVSpan(spans.current);
+        triggerVSpanUpdate();
+      },
+    };
 
-        registerTooling("vspan", toolingCallbacks, menuElement)
-    }, [categories, onModifyVSpan, registerTooling])
+    registerTooling("vspan", toolingCallbacks, menuElement);
+  }, [categories, onModifyVSpan, registerTooling]);
 
   // Initialisation of data - this should only run once
   useEffect(() => {

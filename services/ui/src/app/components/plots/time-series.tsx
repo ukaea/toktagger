@@ -56,7 +56,11 @@ export const TimeSeries = ({
 
   const plotId = externalId || "disruption"; // Facilitate an external or default ID
 
-  const { show: showContextMenu, toolingCallbacks, editMode } = useAnnotationProvider();
+  const {
+    show: showContextMenu,
+    toolingCallbacks,
+    editMode,
+  } = useAnnotationProvider();
   const showContextMenuRef = useRef(showContextMenu);
 
   const allowRelayout = useRef(true);
@@ -257,7 +261,7 @@ export const TimeSeries = ({
   useEffect(() => {
     // Only add event listeners if edit mode is active
     if (!editMode) {
-      return
+      return;
     }
 
     if (!plotReady) {

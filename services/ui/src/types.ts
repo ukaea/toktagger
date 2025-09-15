@@ -143,7 +143,7 @@ export type ToolingInfo = {
   start: (x: number, y: number, category: Category) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
-}
+};
 
 export type ToolingCallbacks = {
   id: ToolingTypes;
@@ -152,4 +152,4 @@ export type ToolingCallbacks = {
   start: (x: number, y: number) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
-}
+};
