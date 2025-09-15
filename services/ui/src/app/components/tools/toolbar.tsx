@@ -17,6 +17,7 @@ import {
   ActionButton,
 } from "@adobe/react-spectrum";
 import {
+  Annotation,
   Annotations,
   CompositeDataSchema,
   Data,
@@ -39,12 +40,18 @@ async function saveAnnotations(
   annotations: Annotations
 ) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+
+  const validatedAnnotations: Annotations = annotations.map((annotation: Annotation) => ({
+    ...annotation,
+    validated: true,
+  }));
+
   await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(annotations),
+    body: JSON.stringify(validatedAnnotations),
   });
 }
 

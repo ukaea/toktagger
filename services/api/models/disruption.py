@@ -229,7 +229,7 @@ class DisruptionCNN(TorchModel):
             [TimePoint(
                 validated=False, 
                 uncertainty=stds[i], 
-                label="disruption",
+                label="Disruption",
                 time=means[i],
                 created_by=self.type
                 )

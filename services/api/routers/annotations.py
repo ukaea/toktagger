@@ -220,13 +220,19 @@ async def update_annotations(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
 
-    # Delete previous annotations, if they exist
-    return await utils.update_annotations(
+    # Delete previous annotations, if they exist, and add new ones
+    result = await utils.update_annotations(
         db_client,
         project_id,
         sample_id,
         annotations
     )
+    
+    # Update sample to show that annotations are validated
+    if any(annotation.validated for annotation in annotations):
+        await utils.update_sample(db_client=db_client, sample_id=sample_id, updates=SampleUpdate(validated_annotations=True))
+    
+    return result
 
 
 @router.delete(

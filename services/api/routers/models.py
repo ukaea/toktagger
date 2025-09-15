@@ -14,6 +14,7 @@ import random
 import asyncio
 from bson.objectid import ObjectId
 from pydantic import TypeAdapter
+from celery.exceptions import TimeoutError
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 
@@ -271,13 +272,13 @@ async def get_sample_predictions(
     # Find the latest created model for this project
     model = await utils.get_model(db_client, project.id, model_type, status="completed")
     
-    sample = await utils.get_sample(db_client, sample_id)
+    sample = await utils.get_sample(db_client, project_id, sample_id)
     
     inference = run_inference.delay(project.model_dump(mode="python"), model.model_dump(mode="python"), [sample.model_dump(mode="python")])
     
     try:
         annotations = inference.get(timeout=10) # do we want to have a timeout here? Is 10s appropriate?
-    except TimeoutError():
+    except TimeoutError:
         raise HTTPException(status_code=408, detail="Prediction request timed out!") # How should we handle this? Because the task will still complete and get added to the databse, will it be added to the UI on a refesh?
     
     return annotations[0]
