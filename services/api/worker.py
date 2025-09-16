@@ -101,4 +101,11 @@ def run_training(project: dict, model: dict, samples: list[dict], annotations: l
 @app.task()
 def run_inference(project: dict, model: dict, samples: list[dict]):
     predictions = asyncio.run(get_predictions(project=Project(**project), model=Model(**model), samples=[Sample(**sample) for sample in samples]))
-    return [[annotation.model_dump(mode="python") for annotation in annotations] for annotations in predictions]
+    return {
+        "project_id": project["id"],
+        "model_type": model["type"],
+        "sample_ids": [sample["id"] for sample in samples],
+        "annotations": {
+            sample["id"]: [annotation.model_dump(mode="python") for annotation in annotations] for sample, annotations in zip(samples, predictions)
+            }
+        }

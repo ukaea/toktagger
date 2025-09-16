@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import {Provider, defaultTheme, ComboBox, Item, Flex, ActionButton, Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Header, Footer, Heading, Text} from '@adobe/react-spectrum';
+import {Provider, defaultTheme, ComboBox, Item, Flex, ProgressCircle, ActionButton, Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Header, Footer, Heading, Text} from '@adobe/react-spectrum';
 import WorkflowAdd from '@spectrum-icons/workflow/WorkflowAdd';
 import CheckmarkCircle from '@spectrum-icons/workflow/CheckmarkCircle';
 import Alert from '@spectrum-icons/workflow/Alert';
@@ -8,10 +8,13 @@ import Alert from '@spectrum-icons/workflow/Alert';
 export function ModelPredictTool({project, sample_id, setAnnotations}) { // all of this should be typed, waiting on Sam's PR
 
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
+    const [taskId, setTaskId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [pollCounter, setPollCounter] = useState<number>(0);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const scheduleTask = async () => {
             if (selectedModel == null) {
                 return;
             }
@@ -23,16 +26,54 @@ export function ModelPredictTool({project, sample_id, setAnnotations}) { // all 
                 });
             const payload = await response.json();
             if (response.ok) {
-                setAnnotations((previousAnnotations) => { // add type for annotations, wait for Sams PR
-                    const otherAnnotations = previousAnnotations.filter((annotation) => annotation.created_by !== selectedModel);
-                    return otherAnnotations.concat(payload);
-                });
+                setIsLoading(true);
+                setTaskId(payload.task_id);
             } else {
                 setErrorMessage(payload.detail)                
             };
-        }
-        fetchData();
+        };
+        scheduleTask();
     }, [selectedModel]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (taskId == null) {
+                return;
+            }
+            setPollCounter(0)
+            // Poll for result from GET predictions endpoint
+            const interval = setInterval(async () => {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/samples/${sample_id}/models/${selectedModel}/predict/${taskId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        },
+                    });
+                const payload = await response.json();
+                if (response.status === 204) { // Predictions queued but not done yet, so continue to poll
+                    setPollCounter(prevPollCounter => prevPollCounter + 1);
+                    if (pollCounter > 10) {
+                        setErrorMessage("Failed to retrieve predictions result.")      
+                        clearInterval(interval)
+                        setIsLoading(false);
+                    }
+
+                } else if (response.ok) {
+                    setAnnotations((previousAnnotations) => { // add type for annotations, wait for Sams PR
+                        const otherAnnotations = previousAnnotations.filter((annotation) => annotation.created_by !== selectedModel);
+                        return otherAnnotations.concat(payload);
+                    });
+                    clearInterval(interval)
+                    setIsLoading(false);
+                } else {
+                    setErrorMessage(payload.detail)      
+                    clearInterval(interval)
+                    setIsLoading(false);
+                };
+            }, 1000);
+        };
+        fetchData();
+    }, [taskId]);
 
 
     return (
@@ -49,6 +90,9 @@ export function ModelPredictTool({project, sample_id, setAnnotations}) { // all 
                     ))}
                 </ComboBox>
                 <br/>
+                {isLoading ? (
+                    <ProgressCircle aria-label="Loading…" isIndeterminate />
+                ) : null}
             </Flex>
             </div>
         </Provider>

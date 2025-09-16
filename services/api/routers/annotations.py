@@ -160,6 +160,10 @@ async def get_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
+    created_by: str = Query(
+        None,
+        description="Whether to only return annotations created by a specific model or by a human."
+    )
 ) -> list[AnnotationOutTypes]:
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
@@ -177,6 +181,7 @@ async def get_annotations(
         project_id=project_id,
         sample_id=sample_id,
         validated=validated,
+        created_by=created_by,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,

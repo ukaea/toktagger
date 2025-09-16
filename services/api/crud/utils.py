@@ -232,6 +232,7 @@ async def get_annotations(
     project_id: str,
     sample_id: Optional[str] = None,
     validated: Optional[bool] = None,
+    created_by: Optional[str] = None,
     sort_by: str = "_id",
     sort_direction: Literal["ascending", "descending"] = "descending", 
     start: int = 0,
@@ -242,6 +243,8 @@ async def get_annotations(
         db_filters["sample_id"] = convert_to_objectid(sample_id, "samples")
     if validated is not None:
         db_filters["validated"] = validated
+    if created_by is not None:
+        db_filters["created_by"] = created_by
 
     annotations = await db_client.get_filtered_documents(
         collection="annotations",
