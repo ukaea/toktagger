@@ -1,11 +1,14 @@
 import { useState } from "react";
-import {Provider, defaultTheme, ComboBox, Item, Flex, ActionButton, Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Header, Footer, Heading, Text} from '@adobe/react-spectrum';
+import {Provider, defaultTheme, ComboBox, Item, Flex, ActionButton, Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Footer, Heading, Text} from '@adobe/react-spectrum';
 import WorkflowAdd from '@spectrum-icons/workflow/WorkflowAdd';
 import CheckmarkCircle from '@spectrum-icons/workflow/CheckmarkCircle';
 import Alert from '@spectrum-icons/workflow/Alert';
+import {
+  Project,
+  Model,
+} from "@/types";
 
-
-export function ModelTrainModal({project}) { // Project should be typed somewhere
+export function ModelTrainModal({project}: Project) {
     const [message, setMessage] = useState<string | null>(null);
     const [messageColour, setMessageColour] = useState<string>("primary");
     const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);

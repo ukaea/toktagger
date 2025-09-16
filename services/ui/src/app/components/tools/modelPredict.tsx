@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
-import {Provider, defaultTheme, NumberField, TableView, Cell, Column, Row, TableBody, TableHeader, ComboBox, Item, Flex, ActionButton, Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Header, Footer, Heading, Text} from '@adobe/react-spectrum';
+import {Provider, defaultTheme, NumberField, TableView, Cell, Column, Row, TableBody, TableHeader, Flex, ActionButton, Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Footer, Heading, Text} from '@adobe/react-spectrum';
 import Workflow from '@spectrum-icons/workflow/Workflow';
 import CheckmarkCircle from '@spectrum-icons/workflow/CheckmarkCircle';
 import Alert from '@spectrum-icons/workflow/Alert';
-import { getModels } from '@/app/core';
+import {
+  Project,
+  Model,
+} from "@/types";
 
-export function ModelPredictModal({project}) { // Project should be typed somewhere
-    const [models, setModels] = useState(null); // TODO models needs typing
+export function ModelPredictModal({project}: Project) {
+    const [models, setModels] = useState<Model | null>(null);
     let [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
-    let [modalOpen, setModalOpen] = useState(false);
+    let [modalOpen, setModalOpen] = useState<bool>(false);
     let [numPredictions, setNumPredictions] = useState<string>("20");
     const [message, setMessage] = useState<string | null>(null);
     const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);

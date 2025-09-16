@@ -1,11 +1,18 @@
 import { useState, useEffect } from "react";
-import {Provider, defaultTheme, ComboBox, Item, Flex, ProgressCircle, ActionButton, Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Header, Footer, Heading, Text} from '@adobe/react-spectrum';
-import WorkflowAdd from '@spectrum-icons/workflow/WorkflowAdd';
-import CheckmarkCircle from '@spectrum-icons/workflow/CheckmarkCircle';
-import Alert from '@spectrum-icons/workflow/Alert';
+import {Provider, defaultTheme, ComboBox, Item, Flex, ProgressCircle} from '@adobe/react-spectrum';
+import {
+  Project,
+  Annotations,
+  Model,
+} from "@/types";
 
-// This should be added to the toolbar
-export function ModelPredictTool({project, sample_id, setAnnotations}) { // all of this should be typed, waiting on Sam's PR
+type ModelPredictInfo = {
+  project: Project;
+  sample_id: string;
+  setAnnotations: (annotations: Annotations) => void;
+};
+
+export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPredictInfo ) { // all of this should be typed, waiting on Sam's PR
 
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
     const [taskId, setTaskId] = useState<string | null>(null);

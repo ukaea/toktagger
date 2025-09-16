@@ -96,6 +96,7 @@ export const ProjectSchema = z.object({
   query_strategy: z.string(),
   data_loader: z.string(),
   timestamp: z.string(),
+  model_types: z.array(z.string())
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -107,6 +108,19 @@ export const SampleSchema = z.object({
   data: z.record(z.string(), DataSchema),
 });
 export type Sample = z.infer<typeof SampleSchema>;
+
+export const ModelSchema = z.object({
+  _id: z.string(),
+  timestamp: z.string(),
+  project_id: z.string(),
+  type: z.string(),
+  training_status: z.string(),
+  progress: z.number(),
+  accuracy: z.number(),
+  task_id: z.string(),
+});
+
+export type Model = z.infer<typeof ModelSchema>;
 
 export const ViewParamsSchema = z.object({
   name: z.string(),
