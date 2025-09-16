@@ -9,7 +9,7 @@ class AnnotationIn(ConfiguredModel):
     def set_uncertainty(cls, values):
         if not isinstance(values, dict):
             values = values.model_dump(mode="python")
-            
+
         if values.get("validated"):
             values["uncertainty"] = 0
         elif not values.get("validated") and values.get("uncertainty") is None:
@@ -20,7 +20,7 @@ class AnnotationIn(ConfiguredModel):
     validated: bool = False
     uncertainty: Optional[float] = None
     label: str
-    created_by: Optional[ModelType] = None # TODO: this should also contain annotators
+    created_by: Optional[ModelType] = None  # TODO: this should also contain annotators
 
 
 class TimePoint(AnnotationIn):
@@ -78,9 +78,11 @@ AnnotationOutTypes = Union[
     TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
 ]
 
+
 class AnnotationBatchItem(ConfiguredModel):
     sample_id: str
     annotations: list[AnnotationTypes]
+
 
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)

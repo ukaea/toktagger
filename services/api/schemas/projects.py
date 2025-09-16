@@ -3,18 +3,22 @@ from enum import Enum
 from services.api.schemas import ConfiguredModel
 from typing import List
 from services.api.schemas.models import ModelType
+
+
 class Task(Enum):
     ELM = "ELM"
     DISRUPTION = "disruption"
     MHD = "MHD"
     UFO = "UFO"
-    
+
+
 MODELS_PER_TASK = {
     Task.DISRUPTION: ["disruption_cnn"],
     Task.UFO: [],
     Task.MHD: [],
-    Task.ELM: []
+    Task.ELM: [],
 }
+
 
 class QueryStrategyType(str, Enum):
     RANDOM = "random"
@@ -46,6 +50,6 @@ class ProjectIn(ConfiguredModel):
     def model_types(self) -> List[ModelType]:
         return MODELS_PER_TASK[Task(self.task)]
 
+
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
-    

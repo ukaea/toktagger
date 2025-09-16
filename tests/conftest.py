@@ -12,6 +12,7 @@ import asyncio
 from httpx import AsyncClient, ASGITransport
 import os
 
+
 @pytest.fixture(scope="function")
 def uda_env_vars():
     os.environ.setdefault("UDA_HOST", "uda2.mast.l")
@@ -23,6 +24,7 @@ def uda_env_vars():
 def mongo_container():
     with MongoDbContainer("mongo:latest") as mongo:
         yield mongo.get_connection_url()
+
 
 @pytest.fixture(scope="session")
 def redis_container():
@@ -41,6 +43,7 @@ def redis_container():
         client.flushdb()
 
         yield client  # yield the client to your tests
+
 
 @pytest_asyncio.fixture(scope="function")
 async def db_client(mongo_container):

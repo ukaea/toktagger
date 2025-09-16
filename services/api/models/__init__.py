@@ -1,2 +1,1 @@
-"""Contains code for implemented ML models.
-"""
+"""Contains code for implemented ML models."""

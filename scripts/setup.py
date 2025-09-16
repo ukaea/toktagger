@@ -41,7 +41,7 @@ def create_local_samples(
     base_path: str,
     file_type: str,
     signals: Optional[list[str]] = None,
-    annotations: Optional[list[dict]] = None
+    annotations: Optional[list[dict]] = None,
 ):
     samples = []
 
@@ -57,7 +57,7 @@ def create_local_samples(
                 "type": file_type,
                 "protocol": "file",
                 "signal_names": signals,
-            }
+            },
         }
         if annotations:
             sample["annotations"] = annotations[shot_id]
@@ -75,14 +75,20 @@ def main():
     create_uda_samples(project_id, shot_ids)
 
     project_id = create_project("Local ELM Project", "ELM", "parquet", "random")
-    create_local_samples(project_id, shot_ids, base_path="/data/test/summary", file_type="parquet")
+    create_local_samples(
+        project_id, shot_ids, base_path="/data/test/summary", file_type="parquet"
+    )
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
     project_id = create_project("Local MHD Project", "MHD", "parquet", "random")
     create_local_samples(
-        project_id, shot_ids, base_path="/data/test/mhd", file_type="parquet", signals=["mirnov"]
+        project_id,
+        shot_ids,
+        base_path="/data/test/mhd",
+        file_type="parquet",
+        signals=["mirnov"],
     )
 
 

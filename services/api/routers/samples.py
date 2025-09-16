@@ -3,7 +3,7 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
 from services.api.crud import utils
-from services.api.schemas.samples import SampleIn, Sample, SampleUpdate, SampleUpdateBatchItem
+from services.api.schemas.samples import SampleIn, Sample, SampleUpdateBatchItem
 from services.api.schemas.annotations import Annotation
 from services.api.schemas import convert_to_objectid
 from typing import Literal
@@ -48,13 +48,14 @@ async def get_samples(
     """
     db_client = request.app.state.db_client
     samples = await utils.get_samples(
-        db_client=db_client, 
-        project_id=project_id, 
-        shot_id=shot_id, 
-        sort_by=sort_by, 
-        sort_direction=sort_direction, 
-        start=start, 
-        count=count)
+        db_client=db_client,
+        project_id=project_id,
+        shot_id=shot_id,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        start=start,
+        count=count,
+    )
     return samples
 
 
@@ -107,7 +108,6 @@ async def add_samples(
     annotations = []
     annotation_ids = []
     for _ann_list, _id in zip(all_annotations, all_ids):
-
         if _ann_list is not None:
             _ids = [_id for item in _ann_list]
             annotations.extend(_ann_list)
@@ -167,9 +167,7 @@ async def add_samples(
 @router.put(
     "",
     responses={
-        200: {
-            "description": "Samples have been updated successfully."
-        },
+        200: {"description": "Samples have been updated successfully."},
         404: {"description": "Project or Sample(s) not found with that ID."},
     },
 )
@@ -185,10 +183,15 @@ async def update_samples(
     ---------------------------------------------------------------------
     """
     db_client = request.app.state.db_client
-    project = await utils.get_project(db_client, project_id)
-    
+    await utils.get_project(db_client, project_id)
+
     for sample_batch_item in sample_batch:
-        await utils.update_sample(db_client=db_client, sample_id=sample_batch_item.id, updates=sample_batch_item.updates)
+        await utils.update_sample(
+            db_client=db_client,
+            sample_id=sample_batch_item.id,
+            updates=sample_batch_item.updates,
+        )
+
 
 @router.get(
     "/next",
@@ -217,10 +220,14 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    
+
     # Only consider samples that have not been human annotated
-    samples = await utils.get_samples(db_client, project_id, validated=False, sort_by="shot_id")
-    annotations = await utils.get_annotations(db_client, project_id, validated=False, sort_by="uncertainty")
+    samples = await utils.get_samples(
+        db_client, project_id, validated=False, sort_by="shot_id"
+    )
+    annotations = await utils.get_annotations(
+        db_client, project_id, validated=False, sort_by="uncertainty"
+    )
     print(f"found {len(samples)} non validated samples")
     print(f"found {len(annotations)} non validated annotations")
 

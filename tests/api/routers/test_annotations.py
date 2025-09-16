@@ -253,49 +253,47 @@ async def test_create_annotation_invalid(api_client, setup_db, db_client):
         annotation["sample_id"] for annotation in annotations
     ]
 
+
 @pytest.mark.asyncio
 async def test_batch_update_annotations(api_client, setup_db, db_client):
     annotations_batch = [
         {
             "sample_id": setup_db["sample_id_1"],
             "annotations": [
-                {
-                    "label": "TestAnnotation1",
-                    "time": 1
-                },
-                {
-                    "label": "TestAnnotation2",
-                    "time": 2
-                }
-            ]
+                {"label": "TestAnnotation1", "time": 1},
+                {"label": "TestAnnotation2", "time": 2},
+            ],
         },
         {
             "sample_id": setup_db["sample_id_2"],
             "annotations": [
-                {
-                    "label": "TestAnnotation",
-                    "time_min": 1,
-                    "time_max": 2
-                },
-            ]
+                {"label": "TestAnnotation", "time_min": 1, "time_max": 2},
+            ],
         },
     ]
-    
+
     response = await api_client.put(
         f"/projects/{setup_db['project_id_1']}/annotations", json=annotations_batch
     )
     assert response.status_code == 200
 
     # Check annotations for sample 1 have been updated
-    annotations_sample_1 = await db_client.get_filtered_documents("annotations", filters={"sample_id": ObjectId(setup_db["sample_id_1"])}, sort_by="time", sort_direction="ascending")
+    annotations_sample_1 = await db_client.get_filtered_documents(
+        "annotations",
+        filters={"sample_id": ObjectId(setup_db["sample_id_1"])},
+        sort_by="time",
+        sort_direction="ascending",
+    )
     assert len(annotations_sample_1) == 2
     assert annotations_sample_1[0]["label"] == "TestAnnotation1"
     assert annotations_sample_1[0]["time"] == 1
     assert annotations_sample_1[1]["label"] == "TestAnnotation2"
     assert annotations_sample_1[1]["time"] == 2
-    
+
     # Check annotation for sample 2 also updated
-    annotations_sample_1 = await db_client.get_filtered_documents("annotations", filters={"sample_id": ObjectId(setup_db["sample_id_2"])})
+    annotations_sample_1 = await db_client.get_filtered_documents(
+        "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_2"])}
+    )
     assert len(annotations_sample_1) == 1
     assert annotations_sample_1[0]["label"] == "TestAnnotation"
     assert annotations_sample_1[0]["time_min"] == 1

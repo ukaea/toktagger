@@ -51,14 +51,16 @@ class SampleBase(ConfiguredModel):
 
 class SampleIn(SampleBase):
     annotations: Optional[List[AnnotationTypes]] = None
-    
+
     @computed_field
     @property
     def validated_annotations(self) -> bool:
         if not self.annotations:
             return False
-        
-        return any([annotation.validated for annotation in self.annotations]) # TODO any or all?
+
+        return any(
+            [annotation.validated for annotation in self.annotations]
+        )  # TODO any or all?
 
 
 class Sample(SampleBase):
@@ -66,9 +68,11 @@ class Sample(SampleBase):
     id: str = Field(..., alias="_id")
     project_id: str
 
+
 class SampleUpdate(ConfiguredModel):
     validated_annotations: Optional[bool] = None
-    
+
+
 class SampleUpdateBatchItem(ConfiguredModel):
     id: str = Field(..., alias="_id")
     updates: SampleUpdate

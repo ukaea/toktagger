@@ -1,6 +1,6 @@
 from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
-from services.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
+from services.api.schemas.annotations import TimePoint, TimeRegion
 import pathlib
 
 # Define some common things to add to db
@@ -48,7 +48,9 @@ SAMPLE_4 = SampleIn(
 )
 
 
-ANNOTATION_1 = TimeRegion(time_min=0.2, time_max=0.4, label="annotation", validated=True)
+ANNOTATION_1 = TimeRegion(
+    time_min=0.2, time_max=0.4, label="annotation", validated=True
+)
 ANNOTATION_2 = TimeRegion(time_min=0.1, time_max=0.2, label="ramp_up", validated=True)
 ANNOTATION_3 = TimePoint(time=0.1, label="disruption", validated=False, uncertainty=0.6)
 ANNOTATION_4 = TimePoint(time=0.3, label="disruption", validated=False, uncertainty=0.4)

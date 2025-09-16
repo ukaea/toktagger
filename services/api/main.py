@@ -8,7 +8,7 @@ from services.api.routers.projects import router as projects_router
 from services.api.routers.samples import router as samples_router
 from services.api.crud.db import MongoDBClient
 from contextlib import asynccontextmanager
-import asyncio
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     app.state.date_pool = None
 
     yield
-    
+
     await app.state.db_client.client.close()
 
 

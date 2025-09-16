@@ -1,11 +1,12 @@
-from typing import List, Literal, Annotated, Optional
-from pydantic import BaseModel
+from typing import Literal, Annotated, Optional
 from enum import Enum
 from pydantic import Field
 from services.api.schemas import ConfiguredModel
 
-class ModelType(str, Enum): # Is this needed?
+
+class ModelType(str, Enum):  # Is this needed?
     DisruptionCNN = "disruption_cnn"
+
 
 class ModelIn(ConfiguredModel):
     type: ModelType
@@ -16,14 +17,16 @@ class ModelIn(ConfiguredModel):
     task_id: Optional[str] | None = None
     # and whatever else we need....
 
+
 class ModelUpdate(ConfiguredModel):
-    training_status: Optional[Literal["queued", "started", "failed", "completed", "aborted"]] = None
+    training_status: Optional[
+        Literal["queued", "started", "failed", "completed", "aborted"]
+    ] = None
     progress: Optional[Annotated[float, Field(strict=True, ge=0, le=100)]] = None
     accuracy: Optional[float] = None
     task_id: Optional[str] = None
-    
+
 
 class Model(ModelIn):
     id: str = Field(..., alias="_id")
     project_id: str
-    

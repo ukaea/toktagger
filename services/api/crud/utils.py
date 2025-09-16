@@ -2,11 +2,15 @@ from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import Annotation, AnnotationIn, AnnotationOutTypeAdapter
+from services.api.schemas.annotations import (
+    Annotation,
+    AnnotationIn,
+    AnnotationOutTypeAdapter,
+)
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate
 from services.api.schemas.models import Model, ModelIn, ModelUpdate, ModelType
-from bson.objectid import ObjectId
+
 
 async def get_projects(
     db_client: MongoDBClient,
@@ -56,6 +60,7 @@ async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
+
 async def get_samples(
     db_client: MongoDBClient,
     project_id: str,
@@ -71,9 +76,9 @@ async def get_samples(
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
-    
+
     filters = {"project_id": project_obj_id}
-    
+
     if validated is not None:
         filters["validated_annotations"] = validated
 
@@ -90,25 +95,38 @@ async def get_samples(
     )
     return [Sample(**sample) for sample in samples]
 
+
 async def update_sample(
-    db_client: MongoDBClient, 
-    sample_id: str,
-    updates: SampleUpdate
+    db_client: MongoDBClient, sample_id: str, updates: SampleUpdate
 ):
     sample_obj_id = convert_to_objectid(sample_id, "samples")
-    
+
     # Check sample already exists
-    if not await db_client.get_document_by_id(collection="samples", object_id=sample_obj_id):
-        raise HTTPException(status_code=404, detail="Tried to update a sample which does not exist!")
-    
+    if not await db_client.get_document_by_id(
+        collection="samples", object_id=sample_obj_id
+    ):
+        raise HTTPException(
+            status_code=404, detail="Tried to update a sample which does not exist!"
+        )
+
     # Update sample
-    result = await db_client.update(collection="samples", model=updates, object_id=sample_obj_id)
-    
+    result = await db_client.update(
+        collection="samples", model=updates, object_id=sample_obj_id
+    )
+
     if result.matched_count != 1:
         raise HTTPException(status_code=500, detail="Failed to update sample")
 
+
 async def get_models(
-    db_client: MongoDBClient, project_id: str, model_type: Optional[ModelType] = None, status: Optional[Literal["queued", "started", "failed", "completed", "aborted"]] = None, start: int = 0, end: Optional[int] = None
+    db_client: MongoDBClient,
+    project_id: str,
+    model_type: Optional[ModelType] = None,
+    status: Optional[
+        Literal["queued", "started", "failed", "completed", "aborted"]
+    ] = None,
+    start: int = 0,
+    end: Optional[int] = None,
 ) -> list[Model]:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
@@ -131,8 +149,15 @@ async def get_models(
     )
     return [Model(**model) for model in models]
 
+
 async def get_model(
-    db_client: MongoDBClient, project_id: str, model_type: str, version: int = None, status: Optional[Literal["queued", "started", "failed", "completed", "aborted"]] = None
+    db_client: MongoDBClient,
+    project_id: str,
+    model_type: str,
+    version: int = None,
+    status: Optional[
+        Literal["queued", "started", "failed", "completed", "aborted"]
+    ] = None,
 ):
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id, "type": model_type}
@@ -150,43 +175,45 @@ async def get_model(
         sort_direction=-1,
     )
     if not models:
-        raise HTTPException(status_code=404, detail="No models found of that version and type for this project!")
+        raise HTTPException(
+            status_code=404,
+            detail="No models found of that version and type for this project!",
+        )
 
     return Model(**models[0])
 
 
-async def update_model(
-    db_client: MongoDBClient, 
-    model_id: str,
-    updates: ModelUpdate
-):
+async def update_model(db_client: MongoDBClient, model_id: str, updates: ModelUpdate):
     model_obj_id = convert_to_objectid(model_id, "models")
-    
+
     # Check model already exists
-    if not await db_client.get_document_by_id(collection="models", object_id=model_obj_id):
-        raise HTTPException(status_code=404, detail="Tried to update a model which does not exist!")
-    
+    if not await db_client.get_document_by_id(
+        collection="models", object_id=model_obj_id
+    ):
+        raise HTTPException(
+            status_code=404, detail="Tried to update a model which does not exist!"
+        )
+
     # Update model
-    result = await db_client.update(collection="models", model=updates, object_id=model_obj_id)
-    
+    result = await db_client.update(
+        collection="models", model=updates, object_id=model_obj_id
+    )
+
     if result.matched_count != 1:
         raise HTTPException(status_code=500, detail="Failed to update model")
-    
-async def add_model(
-    db_client: MongoDBClient,
-    project_id: str,
-    model: ModelIn
-):
+
+
+async def add_model(db_client: MongoDBClient, project_id: str, model: ModelIn):
     project_obj_id = convert_to_objectid(project_id, "projects")
-    
+
     return await db_client.insert(
-        collection = "models",
-        model = model,
-        ids = {"project_id": project_obj_id}
+        collection="models", model=model, ids={"project_id": project_obj_id}
     )
-    
-    
-async def get_sample(db_client: MongoDBClient, project_id: str, sample_id: str) -> Sample:
+
+
+async def get_sample(
+    db_client: MongoDBClient, project_id: str, sample_id: str
+) -> Sample:
     # Convert project ID to ObhectID
     project_obj_id = convert_to_objectid(project_id, "projects")
 
@@ -234,7 +261,7 @@ async def get_annotations(
     validated: Optional[bool] = None,
     created_by: Optional[str] = None,
     sort_by: str = "_id",
-    sort_direction: Literal["ascending", "descending"] = "descending", 
+    sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
     count: Optional[int] = None,
 ) -> list[Annotation]:
@@ -301,8 +328,8 @@ async def update_annotations(
     db_client: MongoDBClient,
     project_id: str,
     sample_id: str,
-    annotations: list[AnnotationIn]
-)-> list[str]:
+    annotations: list[AnnotationIn],
+) -> list[str]:
     # Delete previous annotations, if they exist
     try:
         await delete_annotations(
@@ -310,7 +337,7 @@ async def update_annotations(
         )
     except HTTPException:
         pass
-    
+
     if len(annotations) == 0:
         # Nothing to add!
         return
