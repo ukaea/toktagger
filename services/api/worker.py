@@ -1,7 +1,5 @@
 import os
-import redis
-from celery import Celery
-import asyncio
+import ray
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from services.api.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
@@ -9,25 +7,15 @@ from services.api.schemas.models import Model, ModelUpdate
 from services.api.models.registry import MODELS
 import pathlib
 import itertools
-from pydantic import TypeAdapter
 from services.api.core.sender import (
     send_batch_samples,
     send_batch_annotations,
     send_model_updates,
 )
 
-REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
-API_URL = os.environ.get("API_URL", "localhost:8002")
-app = Celery(
-    "tasks",
-    broker=f"redis://{REDIS_HOST}:6379/0",  # Redis as a message broker
-    backend=f"redis://{REDIS_HOST}:6379/0",  # Redis as result backend
-)
 
-redis_broker = redis.Redis(host=f"{REDIS_HOST}", port=6379, db=0)
-
-
-async def train_model(
+@ray.remote
+def train_model(
     project: Project,
     model: Model,
     samples: list[Sample],
@@ -89,7 +77,8 @@ async def train_model(
         raise e
 
 
-async def get_predictions(project: Project, model: Model, samples: list[Sample]):
+@ray.remote
+def get_predictions(project: Project, model: Model, samples: list[Sample]):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
     # Where inference is run on some batch of samples first
@@ -119,42 +108,13 @@ async def get_predictions(project: Project, model: Model, samples: list[Sample])
     send_batch_annotations(project.id, annotations_batch)
 
     print("Predictions complete!")
-    return predictions
 
-
-@app.task()
-def run_training(
-    project: dict, model: dict, samples: list[dict], annotations: list[dict]
-):
-    # Use Pydantic v2 'TypeAdapter' to decide which type of Annotation needs to be used
-    annotator_adapter = TypeAdapter(AnnotationOutTypes)
-    sample_models = [Sample(**sample) for sample in samples]
-    annotation_models = [annotator_adapter.validate_python(ann) for ann in annotations]
-    asyncio.run(
-        train_model(
-            project=Project(**project),
-            model=Model(**model),
-            samples=sample_models,
-            annotations=annotation_models,
-        )
-    )
-
-
-@app.task()
-def run_inference(project: dict, model: dict, samples: list[dict]):
-    predictions = asyncio.run(
-        get_predictions(
-            project=Project(**project),
-            model=Model(**model),
-            samples=[Sample(**sample) for sample in samples],
-        )
-    )
     return {
-        "project_id": project["id"],
-        "model_type": model["type"],
-        "sample_ids": [sample["id"] for sample in samples],
+        "project_id": project.id,
+        "model_type": model.type,
+        "sample_ids": [sample.id for sample in samples],
         "annotations": {
-            sample["id"]: [
+            sample.id: [
                 annotation.model_dump(mode="python") for annotation in annotations
             ]
             for sample, annotations in zip(samples, predictions)

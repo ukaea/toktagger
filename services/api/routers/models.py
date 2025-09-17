@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Request, Path, Query, HTTPException, Response
+from fastapi import APIRouter, Request, Path, Query, HTTPException
+from fastapi.responses import JSONResponse
 import pathlib
 import os
 from services.api.crud import utils
 from services.api.schemas.annotations import AnnotationTypes
 from services.api.schemas.models import Model, ModelType, ModelIn, ModelUpdate
 from services.api.schemas import convert_to_objectid
-from services.api.worker import app, run_training, run_inference
+from services.api.worker import train_model, get_predictions
 import random
 from bson.objectid import ObjectId
-from celery.result import AsyncResult
+import ray
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 
@@ -113,8 +114,11 @@ async def get_training_info(
 
 
 @router.put("/models/{model_type}/train")
-async def train_model(request: Request, project_id: str, model_type: ModelType):
+async def start_model_training(
+    request: Request, project_id: str, model_type: ModelType
+):
     db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
     project = await utils.get_project(db_client, project_id)
     # Check that this model type is valid for this project
     if model_type not in project.model_types:
@@ -166,16 +170,17 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
     samples = await utils.get_samples(db_client, project.id, validated=True)
 
     # Add the training task to the queue
-    task = run_training.delay(
-        project.model_dump(mode="python"),
-        model,
-        [sample.model_dump(mode="python") for sample in samples],
-        [annotation.model_dump(mode="python") for annotation in annotations],
+    task = train_model.remote(
+        project,
+        Model(**model),
+        samples,
+        annotations,
     )
+    task_id = task_registry.store(task)
 
     # Associate the Celery task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task.id)
+        db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
     )
     pass
 
@@ -183,6 +188,8 @@ async def train_model(request: Request, project_id: str, model_type: ModelType):
 @router.delete("/models/{model_type}/train")
 async def stop_model_training(request: Request, project_id: str, model_type: ModelType):
     db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
     # Get models which are either queued or in progress
     models = await utils.get_models(
         db_client=db_client,
@@ -200,7 +207,9 @@ async def stop_model_training(request: Request, project_id: str, model_type: Mod
     # Get the celery task IDs and stop them
     for model in models:
         if model.task_id:
-            app.control.revoke(model.task_id, terminate=True)
+            task = task_registry.get(model.task_id)
+            if task is not None:
+                ray.kill(task)
         await utils.update_model(
             db_client=db_client,
             model_id=model.id,
@@ -274,12 +283,11 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
 
-    task = run_inference.delay(
-        project.model_dump(mode="python"),
-        model.model_dump(mode="python"),
-        [sample.model_dump(mode="python") for sample in samples],
+    get_predictions.remote(
+        project,
+        model,
+        samples,
     )
-    return {"task_id": task.id}
 
 
 @router.delete("/models/{model_type}/predict")
@@ -327,6 +335,8 @@ async def create_sample_predictions(
     ),
 ) -> None:
     db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
     project = await utils.get_project(db_client, project_id)
 
     if model_type not in project.model_types:
@@ -340,12 +350,14 @@ async def create_sample_predictions(
 
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    task = run_inference.delay(
-        project.model_dump(mode="python"),
-        model.model_dump(mode="python"),
-        [sample.model_dump(mode="python")],
+    task = get_predictions.remote(
+        project,
+        model,
+        [sample],
     )
-    return {"task_id": task.id}
+    task_id = task_registry.store(task)
+
+    return {"task_id": task_id}
 
 
 @router.get("/samples/{sample_id}/models/{model_type}/predict/{task_id}")
@@ -363,6 +375,8 @@ async def get_sample_predictions(
     task_id: str = Path(description="The prediction task to get results from."),
 ) -> list[AnnotationTypes]:
     db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
     project = await utils.get_project(db_client, project_id)
 
     if model_type not in project.model_types:
@@ -373,30 +387,47 @@ async def get_sample_predictions(
 
     await utils.get_sample(db_client, project_id, sample_id)
 
-    result = AsyncResult(task_id)
-
-    if result.state in ("PENDING", "STARTED", "RETRY"):
-        return Response(content="Predict task in the queue!", status_code=202)
-    elif result.state in ("FAILURE, REVOKED"):
+    # Check whether predictions are complete
+    task = task_registry.get(task_id)
+    if task is None:
         raise HTTPException(
-            content="Predict task failed - no predictions available", status_code=500
+            content="Predict task not found with that ID!", status_code=404
         )
-    else:
+
+    ready, waiting = ray.wait([task], timeout=0)
+
+    if waiting:
+        return JSONResponse(
+            content={"message": "Predict task in the queue!"}, status_code=202
+        )
+    elif ready:
+        try:
+            result = ray.get(task)
+        except Exception:
+            raise HTTPException(
+                content="Predict task failed - no predictions available",
+                status_code=500,
+            )
         # Check project ID and model type match those expected by user
-        if result.result["project_id"] != project_id:
+        if result["project_id"] != project_id:
             raise HTTPException(
                 content="Project ID for this task does not match!", status_code=422
             )
-        elif result.result["model_type"] != model_type:
+        elif result["model_type"] != model_type:
             raise HTTPException(
                 content="Model used for this task does not match!", status_code=422
             )
-        elif not (annotations := result.result["annotations"].get(sample_id)):
+        elif not (annotations := result["annotations"].get(sample_id)):
             raise HTTPException(
-                "This task does not have results for the specified sample!"
+                "This task does not have results for the specified sample!",
+                status_code=404,
             )
         else:
             return annotations
+    else:
+        return HTTPException(
+            status_code=404, content="Predict task not found with that ID!"
+        )
 
 
 @router.put("/models/{model_id}")

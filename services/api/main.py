@@ -1,4 +1,5 @@
 import os
+import ray
 from fastapi import FastAPI
 from services.api.routers.annotations import router as annotations_router
 from services.api.routers.annotators import router as annotators_router
@@ -8,6 +9,20 @@ from services.api.routers.projects import router as projects_router
 from services.api.routers.samples import router as samples_router
 from services.api.crud.db import MongoDBClient
 from contextlib import asynccontextmanager
+import uuid
+
+
+class TaskRegistry:
+    def __init__(self):
+        self.tasks = {}
+
+    def store(self, task_ref):
+        task_id = str(uuid.uuid4())
+        self.tasks[task_id] = task_ref
+        return task_id
+
+    def get(self, task_id):
+        return self.tasks.get(task_id)
 
 
 @asynccontextmanager
@@ -18,6 +33,10 @@ async def lifespan(app: FastAPI):
     app.state.db_client = MongoDBClient(mongo_url, db_name)
     app.state.project = None
     app.state.date_pool = None
+
+    ray.init()
+
+    app.state.task_registry = TaskRegistry()
 
     yield
 

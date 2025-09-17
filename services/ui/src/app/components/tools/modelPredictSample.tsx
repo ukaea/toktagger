@@ -18,7 +18,6 @@ export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPred
     const [taskId, setTaskId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [pollCounter, setPollCounter] = useState<number>(0);
 
     useEffect(() => {
         const scheduleTask = async () => {
@@ -47,7 +46,7 @@ export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPred
             if (taskId == null) {
                 return;
             }
-            setPollCounter(0)
+            let pollCounter = 0;
             // Poll for result from GET predictions endpoint
             const interval = setInterval(async () => {
                 const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/samples/${sample_id}/models/${selectedModel}/predict/${taskId}`, {
@@ -57,9 +56,10 @@ export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPred
                         },
                     });
                 const payload = await response.json();
-                if (response.status === 204) { // Predictions queued but not done yet, so continue to poll
-                    setPollCounter(prevPollCounter => prevPollCounter + 1);
-                    if (pollCounter > 10) {
+                if (response.status === 202) { // Predictions queued but not done yet, so continue to poll
+                    pollCounter += 1;
+                    console.log("Poll counter", pollCounter)
+                    if (pollCounter > 20) {
                         setErrorMessage("Failed to retrieve predictions result.")      
                         clearInterval(interval)
                         setIsLoading(false);
