@@ -13,16 +13,32 @@ import uuid
 
 
 class TaskRegistry:
-    def __init__(self):
+    def __init__(self, max_actors: int):
+        self.max_actors = max_actors
         self.tasks = {}
+        self.actors = []
 
-    def store(self, task_ref):
+    def store(self, task_ref: ray.ObjectRef):
         task_id = str(uuid.uuid4())
         self.tasks[task_id] = task_ref
         return task_id
 
-    def get(self, task_id):
+    def get(self, task_id: str):
         return self.tasks.get(task_id)
+
+    def update_actors(self, actor_name: str):
+        if actor_name in self.actors:
+            self.actors.remove(actor_name)
+
+        self.actors.append(actor_name)
+
+        if len(self.actors) > self.max_actors:
+            stale_actor = self.actors.pop(0)
+            try:
+                actor = ray.get_actor(stale_actor)
+                ray.kill(actor)
+            except ValueError:
+                return
 
 
 @asynccontextmanager
@@ -36,7 +52,7 @@ async def lifespan(app: FastAPI):
 
     ray.init()
 
-    app.state.task_registry = TaskRegistry()
+    app.state.task_registry = TaskRegistry(max_actors=5)
 
     yield
 

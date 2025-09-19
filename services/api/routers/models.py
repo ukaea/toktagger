@@ -197,6 +197,7 @@ async def start_model_training(
     )
 
     task_id = task_registry.store(train_task)
+    task_registry.update_actors(model.id)
 
     # Associate the Celery task ID with the model in the database
     await utils.update_model(
@@ -265,6 +266,8 @@ async def predict(
     ),
 ):
     db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
     project = await utils.get_project(db_client, project_id)
 
     if model_type not in project.model_types:
@@ -307,11 +310,13 @@ async def predict(
         samples = selected_samples
     else:
         samples = random.sample(selected_samples, num_predictions)
-    print(model.id)
+
     BATCH_SIZE = 32  # TODO again where to define this?
+
     get_predictions.remote(
         project=project, model=model, samples=samples, batch_size=BATCH_SIZE
     )
+    task_registry.update_actors(model.id)
 
 
 @router.delete("/models/{model_type}/predict")
@@ -379,6 +384,7 @@ async def create_sample_predictions(
         project=project, model=model, samples=[sample], batch_size=BATCH_SIZE
     )
     task_id = task_registry.store(task)
+    task_registry.update_actors(model.id)
 
     return {"task_id": task_id}
 
