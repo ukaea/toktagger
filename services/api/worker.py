@@ -62,9 +62,12 @@ def train_model(
             train_val_test_split=train_val_test_split,
             num_epochs=num_epochs,
         )
-        model_actor.train.remote(batch_size=batch_size)
-
         print(f"Running model training for project {project.id}")
+        train_task = model_actor.train.remote(batch_size=batch_size)
+
+        # Wait for train task to complete
+        ray.get(train_task)
+
         model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
         model_dir.mkdir(exist_ok=True)  # Do i need to do this every time?
         model_actor.save.remote(model_dir.joinpath(f"{model.id}.model"))

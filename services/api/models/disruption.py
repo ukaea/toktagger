@@ -227,7 +227,7 @@ class DisruptionCNN(TorchModel):
         return (sum_correct / sum_total) * 100
 
     def predict(
-        self, samples: list[Sample], batch_size: int, device="cpu"
+        self, samples: list[Sample], batch_size: int = 32, device="cpu"
     ) -> list[list[TimePoint]]:
         num_mc_samples = 20  # Should let user choose num mc samples? TODO
         dataset = self.dataset(self.project, samples, annotations=None)

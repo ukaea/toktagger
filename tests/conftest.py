@@ -3,14 +3,13 @@ import pytest_asyncio
 from services.api.main import app
 from services.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
-from testcontainers.redis import RedisContainer
-import redis
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
 
 import asyncio
 from httpx import AsyncClient, ASGITransport
 import os
+import ray
 
 
 @pytest.fixture(scope="function")
@@ -26,23 +25,12 @@ def mongo_container():
         yield mongo.get_connection_url()
 
 
-@pytest.fixture(scope="session")
-def redis_container():
-    """Start a Redis container for tests and yield a client."""
-    with RedisContainer("redis:7.2") as container:
-        host = container.get_container_host_ip()
-        port = int(container.get_exposed_port(6379))
-
-        os.environ["REDIS_HOST"] = host
-
-        # Connect the redis client to the test container
-        client = redis.Redis(host=host, port=port, decode_responses=True)
-
-        # Wait until Redis is ready
-        client.ping()
-        client.flushdb()
-
-        yield client  # yield the client to your tests
+@pytest.fixture(scope="session", autouse=True)
+def ray_session():
+    os.environ["MODEL_STORAGE"] = "Test"
+    ray.init(ignore_reinit_error=True, local_mode=True)
+    yield
+    ray.shutdown()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -72,7 +60,7 @@ async def api_client(mongo_container):
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        os.environ["API_URL"] = "http://test:8002"
+        os.environ["API_URL"] = ""
         yield client
     await lifespan_ctx.__aexit__(None, None, None)
 

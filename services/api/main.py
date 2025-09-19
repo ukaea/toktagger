@@ -50,13 +50,14 @@ async def lifespan(app: FastAPI):
     app.state.project = None
     app.state.date_pool = None
 
-    ray.init()
-
+    if not ray.is_initialized():
+        ray.init()
     app.state.task_registry = TaskRegistry(max_actors=5)
 
     yield
 
     await app.state.db_client.client.close()
+    ray.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)
