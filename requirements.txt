@@ -15,4 +15,4 @@ tensorflow
 torch
 torchmetrics
 pyarrow
-ray[default]
+ray

@@ -9,13 +9,12 @@ import {
 } from "@/types";
 
 export function ModelPredictModal({project}: Project) {
-    const [models, setModels] = useState<Model | null>(null);
+    const [models, setModels] = useState<Model[] | null>(null);
     let [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
-    let [modalOpen, setModalOpen] = useState<bool>(false);
+    let [modalOpen, setModalOpen] = useState<boolean>(false);
     let [numPredictions, setNumPredictions] = useState<string>("20");
     const [message, setMessage] = useState<string | null>(null);
     const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
-    const [refresh, setRefresh] = useState(0)
     const buttonStyle = {
         position: 'fixed',
         top: 10,
@@ -24,40 +23,39 @@ export function ModelPredictModal({project}: Project) {
     };
 
     const fetchData = async () => {
+        console.log("Inside fetch")
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models`);
         const data = await response.json();
         setModels(data);
+        console.log("Fetched and set")
         };
 
     useEffect( () => {
-        fetchData();
-        setMessage(null);
-        setMessageIcon(null);
-        setSelectedKeys(new Set([]))
+        let poll: ReturnType<typeof setInterval>;
+        console.log("Inside effect")
+        if (modalOpen) {
+            console.log("Inside modalOpen")
+            fetchData();
+            setMessage(null);
+            setMessageIcon(null);
+            setSelectedKeys(new Set([]));
+
+            poll = setInterval(() => {
+                fetchData();
+            }, 5000);
+        }
+        return () => {
+            if (poll) clearInterval(poll);
+        }
 
     }, [modalOpen]);
 
-    useEffect( () => {
-        let timer: ReturnType<typeof setInterval>;
-
-        if (modalOpen) {
-            timer = setInterval(() => {
-                setRefresh((last) => last + 1)
-            }, 5000);
-        }
-        return () => clearInterval(timer);
-    }, [modalOpen])
-
-    useEffect( () => {
-        fetchData();
-    }, [refresh]);
-
-    if (!models) {
+    if (!project) {
         return;
     }
 
     const submitPredictJob = async () => {
-        if (selectedKeys.size === 0) {
+        if (selectedKeys.size === 0 || !models) {
             return;
         }
         const selectedModel = models.find(model => model._id === selectedKeys.values().next().value)
@@ -108,33 +106,35 @@ export function ModelPredictModal({project}: Project) {
                                     step={10}
                                 />
                             </div>
-                            <TableView
-                            flex
-                            selectionMode="single"
-                            selectedKeys={selectedKeys}
-                            onSelectionChange={setSelectedKeys}
-                            >
-                                <TableHeader>
-                                <Column>Model Type</Column>
-                                <Column>Version</Column>
-                                <Column>Status</Column>
-                                <Column>Accuracy</Column>
-                                </TableHeader>
-                                <TableBody items={models}>
-                                {item => (
-                                    <Row key={item['_id']}>
-                                    <Cell>{item['type']}</Cell>
-                                    <Cell>{item['version']}</Cell>
-                                    <Cell>{
-                                    item['training_status'] === "started"
-                                    ? "Training: "+ Math.round(item["progress"]) + "%"
-                                    : item['training_status']}
-                                    </Cell>
-                                    <Cell>{Math.round(item['accuracy']) + "%" }</Cell>
-                                    </Row>
-                                )}
-                                </TableBody>
-                        </TableView>
+                            {models && (
+                                <TableView
+                                flex
+                                selectionMode="single"
+                                selectedKeys={selectedKeys}
+                                onSelectionChange={setSelectedKeys}
+                                >
+                                    <TableHeader>
+                                    <Column>Model Type</Column>
+                                    <Column>Version</Column>
+                                    <Column>Status</Column>
+                                    <Column>Accuracy</Column>
+                                    </TableHeader>
+                                    <TableBody items={models}>
+                                    {item => (
+                                        <Row key={item['_id']}>
+                                        <Cell>{item['type']}</Cell>
+                                        <Cell>{item['version']}</Cell>
+                                        <Cell>{
+                                        item['training_status'] === "started"
+                                        ? "Training: "+ Math.round(item["progress"]) + "%"
+                                        : item['training_status']}
+                                        </Cell>
+                                        <Cell>{Math.round(item['accuracy']) + "%" }</Cell>
+                                        </Row>
+                                    )}
+                                    </TableBody>
+                            </TableView>
+                            )}
                         </Content>
                         <Footer>
                             {message && (
