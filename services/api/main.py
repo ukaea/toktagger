@@ -57,7 +57,6 @@ async def lifespan(app: FastAPI):
     yield
 
     await app.state.db_client.client.close()
-    ray.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)

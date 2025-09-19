@@ -296,7 +296,8 @@ async def predict(
         )
     else:
         selected_samples = [
-            await utils.get_sample(db_client, sample_id) for sample_id in sample_ids
+            await utils.get_sample(db_client, project_id, sample_id)
+            for sample_id in sample_ids
         ]
         if None in selected_samples:
             selected_samples.remove(
