@@ -4,9 +4,8 @@ from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from services.api.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
 from services.api.schemas.models import Model, ModelUpdate
-from services.api.models.registry import MODELS
 import pathlib
-import itertools
+import typing
 from services.api.core.sender import (
     send_batch_samples,
     send_batch_annotations,
@@ -14,55 +13,66 @@ from services.api.core.sender import (
 )
 
 
+def get_actor(project, model):
+    try:
+        print(f"Finding actor for model {model.id}")
+        ml_model = ray.get_actor(model.id)
+        print("Found!")
+    except ValueError:
+        # Actor not alive, so load from weights
+        print("Actor not found, loading from disk...")
+
+        # Lazy loading so it doesnt initialize tensorflow every time TODO is this ok?
+        from services.api.models.registry import MODELS
+
+        ml_model = (
+            MODELS[model.type]
+            .options(name=model.id, lifetime="detached")
+            .remote(
+                model_id=str(model.id),
+                project=project,
+            )
+        )
+        model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+            f"{str(model.id)}.model"
+        )
+        if model_path.exists():
+            ml_model.load.remote(model_path)
+        else:
+            print("No saved weights found, initializing blank model")
+
+    return ml_model
+
+
 @ray.remote
 def train_model(
-    project: Project,
     model: Model,
+    project: Project,
     samples: list[Sample],
-    annotations: list[AnnotationOutTypes],
+    annotations: list[list[AnnotationOutTypes]],
+    train_val_test_split: typing.Tuple[float, float, float],
+    num_epochs: int = 100,
+    batch_size: int = 32,
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
+    model_actor = get_actor(project=project, model=model)
     try:
+        model_actor.setup_training.remote(
+            samples=samples,
+            annotations=annotations,
+            train_val_test_split=train_val_test_split,
+            num_epochs=num_epochs,
+        )
+        model_actor.train.remote(batch_size=batch_size)
+
         print(f"Running model training for project {project.id}")
         model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
         model_dir.mkdir(exist_ok=True)  # Do i need to do this every time?
+        model_actor.save.remote(model_dir.joinpath(f"{model.id}.model"))
 
-        # Get all validated samples and annotations for this project
-        print(f"Collected {len(annotations)} annotations.")
-        print(f"Collected {len(samples)} samples.")
-
-        # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
-        annotations_2d = [
-            [ann for ann in group]
-            for _, group in itertools.groupby(
-                annotations, key=lambda annotation: annotation.sample_id
-            )
-        ]
-
-        # TODO: Where should epochs, batch size be passed in???
-        BATCH_SIZE = 32
-        NUM_EPOCHS = 10
-
-        # Get model
-        ml_model = MODELS[model.type](
-            model_id=str(model.id),
-            project=project,
-            samples=samples,
-            annotations=annotations_2d,
-            train_val_test_split=(0.7, 0.2, 0.1),
-            num_epochs=NUM_EPOCHS,
-        )
-
-        # Train model
-        accuracy = ml_model.train(batch_size=BATCH_SIZE)
-
-        # Save model weights with file name equal to ID, so that it can be retrieved easily for predictions
-        ml_model.save(model_dir.joinpath(f"{model.id}.model"))
         send_model_updates(
             project_id=project.id,
             model_id=model.id,
-            updates=ModelUpdate(
-                training_status="completed", accuracy=accuracy, progress=100
-            ),
+            updates=ModelUpdate(training_status="completed", progress=100),
         )
 
     except Exception as e:
@@ -78,19 +88,17 @@ def train_model(
 
 
 @ray.remote
-def get_predictions(project: Project, model: Model, samples: list[Sample]):
+def get_predictions(
+    project: Project, model: Model, samples: list[Sample], batch_size: int = 32
+):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
     # Where inference is run on some batch of samples first
     print(f"Creating predictions for project {project.id} on {len(samples)} samples.")
+    model_actor = get_actor(project=project, model=model)
 
-    # Load the model from the weights stored during training
-    model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
-        f"{str(model.id)}.model"
-    )
-    ml_model = MODELS[model.type].load(project, model_path)
-
-    predictions = ml_model.predict(samples, batch_size=32)
+    predictions_task = model_actor.predict.remote(samples, batch_size=batch_size)
+    predictions = ray.get(predictions_task)
 
     samples_batch = [
         SampleUpdateBatchItem(

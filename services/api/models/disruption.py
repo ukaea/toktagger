@@ -1,13 +1,13 @@
 from services.api.schemas.samples import Sample
-from services.api.schemas.annotations import Annotation, TimePoint
+from services.api.schemas.annotations import TimePoint
 from services.api.schemas.projects import Project
 from services.api.schemas.data import TimeSeriesData
-import typing
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
 from services.api.models.base import TorchDataset, TorchModel
+import ray
 
 
 class DisruptionDataset(TorchDataset):
@@ -36,24 +36,17 @@ class DisruptionDataset(TorchDataset):
         return plasma_current, disruption_time / data.time[-1]
 
 
+@ray.remote
 class DisruptionCNN(TorchModel):
     def __init__(
         self,
         model_id: str,
         project: Project,
-        samples: list[Sample],
-        annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
     ):
         super().__init__(
             model_id=model_id,
             project=project,
             dataset=DisruptionDataset,
-            samples=samples,
-            annotations=annotations,
-            train_val_test_split=train_val_test_split,
-            num_epochs=num_epochs,
         )
 
     def _define_model(self):
@@ -72,8 +65,8 @@ class DisruptionCNN(TorchModel):
             ),  # TODO: what if not all annotations present for all samples?
         )
 
-    def train(
-        self, batch_size: int, patience=20, threshold=1e-4, device="cpu"
+    def train(  # TODO add extra params to here and base and call pre train
+        self, batch_size: int = 32, patience=20, threshold=1e-4, device="cpu"
     ) -> float:
         self.update_progress.on_train_begin()
         criterion = nn.MSELoss()
@@ -276,14 +269,5 @@ class DisruptionCNN(TorchModel):
     def save(self, file_path: str):
         torch.save(self.model.state_dict(), file_path)
 
-    @classmethod
-    def load(cls, project: Project, file_path: str):
-        instance = cls.__new__(cls)
-        instance.type = "disruption_cnn"
-        instance.project = project
-        instance.train_samples = None
-        instance.train_annotations = None
-        instance.dataset = DisruptionDataset
-        instance.model = instance._define_model()
-        instance.model.load_state_dict(torch.load(file_path))
-        return instance
+    def load(self, file_path: str):
+        self.model.load_state_dict(torch.load(file_path))

@@ -10,6 +10,7 @@ from services.api.worker import train_model, get_predictions
 import random
 from bson.objectid import ObjectId
 import ray
+import itertools
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 
@@ -152,37 +153,55 @@ async def start_model_training(
     else:
         version = db_models[0].version + 1
 
-    model = {
-        "type": model_type,
-        "version": version,
-        "training_status": "queued",
-        "accuracy": 0,
-        "progress": 0,
-    }
-    model_id = await utils.add_model(
-        db_client=db_client, project_id=project.id, model=ModelIn(**model)
+    model_in = ModelIn(
+        type=model_type,
+        version=version,
+        training_status="queued",
+        progress=0,
+        accuracy=0,
     )
-    model["project_id"] = project.id
-    model["id"] = model_id
+
+    model_id = await utils.add_model(
+        db_client=db_client, project_id=project.id, model=model_in
+    )
 
     # Get annotations and samples
     annotations = await utils.get_annotations(db_client, project.id, validated=True)
     samples = await utils.get_samples(db_client, project.id, validated=True)
 
-    # Add the training task to the queue
-    task = train_model.remote(
-        project,
-        Model(**model),
-        samples,
-        annotations,
+    # Get all validated samples and annotations for this project
+    print(f"Collected {len(annotations)} annotations.")
+    print(f"Collected {len(samples)} samples.")
+
+    # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
+    annotations_2d = [
+        [ann for ann in group]
+        for _, group in itertools.groupby(
+            annotations, key=lambda annotation: annotation.sample_id
+        )
+    ]
+
+    NUM_EPOCHS = 10  # TODO where to define this? User selected? In model?
+    BATCH_SIZE = 32
+
+    model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
+
+    train_task = train_model.remote(
+        model=model,
+        project=project,
+        samples=samples,
+        annotations=annotations_2d,
+        train_val_test_split=(0.7, 0.2, 0.1),
+        num_epochs=NUM_EPOCHS,
+        batch_size=BATCH_SIZE,
     )
-    task_id = task_registry.store(task)
+
+    task_id = task_registry.store(train_task)
 
     # Associate the Celery task ID with the model in the database
     await utils.update_model(
         db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
     )
-    pass
 
 
 @router.delete("/models/{model_type}/train")
@@ -204,12 +223,18 @@ async def stop_model_training(request: Request, project_id: str, model_type: Mod
         status="started",
     )
 
-    # Get the celery task IDs and stop them
+    # Get the task IDs and stop them
     for model in models:
         if model.task_id:
             task = task_registry.get(model.task_id)
             if task is not None:
                 ray.kill(task)
+            try:
+                actor = ray.get_actor(model.id)
+                ray.kill(actor)
+            except ValueError:
+                continue
+
         await utils.update_model(
             db_client=db_client,
             model_id=model.id,
@@ -282,11 +307,10 @@ async def predict(
         samples = selected_samples
     else:
         samples = random.sample(selected_samples, num_predictions)
-
+    print(model.id)
+    BATCH_SIZE = 32  # TODO again where to define this?
     get_predictions.remote(
-        project,
-        model,
-        samples,
+        project=project, model=model, samples=samples, batch_size=BATCH_SIZE
     )
 
 
@@ -350,10 +374,9 @@ async def create_sample_predictions(
 
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
+    BATCH_SIZE = 32  # TODO again where to define this?
     task = get_predictions.remote(
-        project,
-        model,
-        [sample],
+        project=project, model=model, samples=[sample], batch_size=BATCH_SIZE
     )
     task_id = task_registry.store(task)
 

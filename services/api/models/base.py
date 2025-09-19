@@ -15,11 +15,19 @@ class Model(ABC):
         self,
         model_id: str,
         project: Project,
+    ) -> None:
+        self.id = model_id
+        self.project = project
+        self.model = self._define_model()
+        self.type = ModelType[self.__class__.__name__]
+
+    def setup_training(
+        self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float],
         num_epochs: int = 100,
-    ) -> None:
+    ):
         if len(samples) != len(annotations):
             raise ValueError("Annotations missing for some samples!")
         if not math.isclose(sum(train_val_test_split), 1):
@@ -29,13 +37,10 @@ class Model(ABC):
 
         if train_fraction == 0:
             raise ValueError("Must be samples in the training set!")
+
         self.update_progress = ModelProgress(
-            project_id=project.id, model_id=model_id, num_epochs=num_epochs
+            project_id=self.project.id, model_id=self.id, num_epochs=num_epochs
         )
-        self.id = model_id
-        self.project = project
-        self.model = self._define_model()
-        self.type = ModelType[self.__class__.__name__]
         self.num_epochs = num_epochs
 
         # If train ratio is 1, no splitting required, just set train sets and return
@@ -104,7 +109,6 @@ class Model(ABC):
     def save(self, file_path: str):
         pass
 
-    @classmethod
     @abstractmethod
     def load(cls, project: Project, file_path: str):
         pass
@@ -136,30 +140,27 @@ class TorchModel(Model):
         model_id: str,
         project: Project,
         dataset: TorchDataset,
-        samples: list[Sample],
-        annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
     ) -> None:
         super().__init__(
             model_id=model_id,
             project=project,
-            samples=samples,
-            annotations=annotations,
-            train_val_test_split=train_val_test_split,
-            num_epochs=num_epochs,
         )
         self.dataset = dataset
-        self.train_dataset = dataset(
-            project, self.train_samples, self.train_annotations
+
+    def setup_training(
+        self, samples, annotations, train_val_test_split, num_epochs=100
+    ):
+        super().setup_training(samples, annotations, train_val_test_split, num_epochs)
+        self.train_dataset = self.dataset(
+            self.project, self.train_samples, self.train_annotations
         )
         self.val_dataset = (
-            dataset(project, self.val_samples, self.val_annotations)
+            self.dataset(self.project, self.val_samples, self.val_annotations)
             if self.val_samples
             else None
         )
         self.test_dataset = (
-            dataset(project, self.test_samples, self.test_annotations)
+            self.dataset(self.project, self.test_samples, self.test_annotations)
             if self.test_samples
             else None
         )
