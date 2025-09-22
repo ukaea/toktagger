@@ -131,7 +131,6 @@ async def get_models(
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
     if model_type:
-        print(model_type)
         filters["type"] = model_type
     if status:
         filters["training_status"] = status
@@ -209,6 +208,24 @@ async def add_model(db_client: MongoDBClient, project_id: str, model: ModelIn):
     return await db_client.insert(
         collection="models", model=model, ids={"project_id": project_obj_id}
     )
+
+
+async def delete_model(
+    db_client: MongoDBClient, project_id: str, model_id: str
+) -> None:
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    model_obj_id = convert_to_objectid(model_id, "models")
+
+    filters = {"project_id": project_obj_id, "_id": model_obj_id}
+
+    result = await db_client.delete_filtered_documents(
+        collection="models", filters=filters
+    )
+
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=404, detail="Model not found belonging to this Project."
+        )
 
 
 async def get_sample(

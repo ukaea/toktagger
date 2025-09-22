@@ -69,15 +69,16 @@ async def delete_models(
     ),
 ):
     db_client = request.app.state.db_client
-    project_obj_id = convert_to_objectid(project_id, "projects")
+    convert_to_objectid(project_id, "projects")
 
     await utils.get_project(db_client, project_id)
 
-    models_to_delete = await utils.get_models(db_client, project_id, model_type)
     if version:
         models_to_delete = [
-            model for model in models_to_delete if model.version == version
+            await utils.get_model(db_client, project_id, model_type, version)
         ]
+    else:
+        models_to_delete = await utils.get_models(db_client, project_id, model_type)
 
     if not models_to_delete:
         raise HTTPException(
@@ -89,15 +90,14 @@ async def delete_models(
 
     # Delete from DB
     for model in models_to_delete:
-        await request.app.state.db_client.delete_filtered_documents(
-            collection="models",
-            filters={"_id": model["_id"], "project_id": project_obj_id},
+        await utils.delete_model(
+            db_client=db_client, project_id=project_id, model_id=model.id
         )
 
         # And delete file from storage (if it exists - may not if the job failed)
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
-            f"{model['_id']}.model"
-        ).unlink(missing_ok=True)
+        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model.id}.model").unlink(
+            missing_ok=True
+        )
 
 
 @router.get("/models/{model_type}/train")
