@@ -117,7 +117,7 @@ export function ModelPredictModal({project}: Project) {
                                     <Column>Model Type</Column>
                                     <Column>Version</Column>
                                     <Column>Status</Column>
-                                    <Column>Accuracy</Column>
+                                    <Column>Score</Column>
                                     </TableHeader>
                                     <TableBody items={models}>
                                     {item => (
@@ -129,7 +129,7 @@ export function ModelPredictModal({project}: Project) {
                                         ? "Training: "+ Math.round(item["progress"]) + "%"
                                         : item['training_status']}
                                         </Cell>
-                                        <Cell>{Math.round(item['accuracy']) + "%" }</Cell>
+                                        <Cell>{Math.round(item['score'])}</Cell>
                                         </Row>
                                     )}
                                     </TableBody>

@@ -1,13 +1,13 @@
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation, AnnotationIn
 from services.api.schemas.projects import Project
-from services.api.core.data_loaders import DATA_LOADERS
-from services.api.models.callback import ModelProgress
 from services.api.schemas.models import ModelType
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
 import typing
 import math
+from services.api.core.sender import send_model_updates
+from services.api.schemas.models import ModelUpdate
 
 
 class Model(ABC):
@@ -18,16 +18,29 @@ class Model(ABC):
     ) -> None:
         self.id = model_id
         self.project = project
-        self.model = self._define_model()
+        self.model = self.define_model()
         self.type = ModelType[self.__class__.__name__]
 
-    def setup_training(
+    def log_progress(
+        self,
+        training_status: typing.Literal[
+            "queued", "started", "failed", "completed", "aborted"
+        ]
+        | None = None,
+        progress: float | None = None,
+        score: float | None = None,
+    ):
+        model_update = ModelUpdate(
+            training_status=training_status, progress=progress, score=score
+        )
+        send_model_updates(self.project.id, self.id, model_update)
+
+    def split_data(
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
         train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
-    ):
+    ) -> None:
         if len(samples) != len(annotations):
             raise ValueError("Annotations missing for some samples!")
         if not math.isclose(sum(train_val_test_split), 1):
@@ -37,11 +50,6 @@ class Model(ABC):
 
         if train_fraction == 0:
             raise ValueError("Must be samples in the training set!")
-
-        self.update_progress = ModelProgress(
-            project_id=self.project.id, model_id=self.id, num_epochs=num_epochs
-        )
-        self.num_epochs = num_epochs
 
         # If train ratio is 1, no splitting required, just set train sets and return
         if train_fraction == 1:
@@ -90,11 +98,17 @@ class Model(ABC):
             )
 
     @abstractmethod
-    def _define_model(self):
+    def define_model(self):
         pass
 
     @abstractmethod
-    def train(self) -> float:
+    def train(
+        self,
+        samples: list[Sample],
+        annotations: list[list[Annotation]],
+        train_val_test_split: typing.Tuple[float, float, float],
+        num_epochs: int = 100,
+    ) -> float:
         # pass in list of samples and list of annotations
         # return some measure of accuracy
         pass
@@ -112,55 +126,3 @@ class Model(ABC):
     @abstractmethod
     def load(cls, project: Project, file_path: str):
         pass
-
-
-class TorchDataset(ABC):
-    def __init__(
-        self,
-        project: Project,
-        samples: list[Sample],
-        annotations: list[list[Annotation]] | None,
-    ):
-        self.data_loader = DATA_LOADERS[project.data_loader]()
-        self.samples = samples
-        self.annotations = annotations
-
-    @abstractmethod
-    def __len__(self) -> int:
-        pass
-
-    @abstractmethod
-    def __getitem__(self, idx):  # TODO will this always return constant types?
-        pass
-
-
-class TorchModel(Model):
-    def __init__(
-        self,
-        model_id: str,
-        project: Project,
-        dataset: TorchDataset,
-    ) -> None:
-        super().__init__(
-            model_id=model_id,
-            project=project,
-        )
-        self.dataset = dataset
-
-    def setup_training(
-        self, samples, annotations, train_val_test_split, num_epochs=100
-    ):
-        super().setup_training(samples, annotations, train_val_test_split, num_epochs)
-        self.train_dataset = self.dataset(
-            self.project, self.train_samples, self.train_annotations
-        )
-        self.val_dataset = (
-            self.dataset(self.project, self.val_samples, self.val_annotations)
-            if self.val_samples
-            else None
-        )
-        self.test_dataset = (
-            self.dataset(self.project, self.test_samples, self.test_annotations)
-            if self.test_samples
-            else None
-        )

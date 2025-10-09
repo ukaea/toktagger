@@ -56,14 +56,14 @@ def train_model(
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
     model_actor = get_actor(project=project, model=model)
     try:
-        model_actor.setup_training.remote(
+        print(f"Running model training for project {project.id}")
+        model_actor.log_progress.remote(training_status="started")
+        train_task = model_actor.train.remote(
             samples=samples,
             annotations=annotations,
             train_val_test_split=train_val_test_split,
             num_epochs=num_epochs,
         )
-        print(f"Running model training for project {project.id}")
-        train_task = model_actor.train.remote(batch_size=batch_size)
 
         # Wait for train task to complete
         ray.get(train_task)
@@ -82,6 +82,7 @@ def train_model(
         # If anything goes wrong, update model to failed status
         # This is important as if this does not happen, your model will be stuck in 'training' forever,
         # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
+        print(e)
         send_model_updates(
             project_id=project.id,
             model_id=model.id,

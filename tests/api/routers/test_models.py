@@ -86,7 +86,7 @@ async def setup_model_db(db_client):
             version=1,
             training_status="completed",
             progress=100,
-            accuracy=80,
+            score=80,
         )
         model_id = await db_client.insert(
             "models", model, ids={"project_id": ObjectId(project_id)}

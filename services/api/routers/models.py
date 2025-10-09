@@ -158,7 +158,7 @@ async def start_model_training(
         version=version,
         training_status="queued",
         progress=0,
-        accuracy=0,
+        score=0,
     )
 
     model_id = await utils.add_model(
@@ -471,6 +471,7 @@ async def update_model(
         description="The ID of the model to update information about."
     ),
 ):
+    print(model_updates)
     # Update model status
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)

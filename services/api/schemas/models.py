@@ -13,7 +13,7 @@ class ModelIn(ConfiguredModel):
     version: int
     training_status: Literal["queued", "started", "failed", "completed", "aborted"]
     progress: Annotated[float, Field(strict=True, ge=0, le=100)]
-    accuracy: Annotated[float, Field(strict=True, ge=0, le=100)]
+    score: float
     task_id: Optional[str] | None = None
     # and whatever else we need....
 
@@ -23,7 +23,7 @@ class ModelUpdate(ConfiguredModel):
         Literal["queued", "started", "failed", "completed", "aborted"]
     ] = None
     progress: Optional[Annotated[float, Field(strict=True, ge=0, le=100)]] = None
-    accuracy: Optional[float] = None
+    score: Optional[float] = None
     task_id: Optional[str] = None
 
 

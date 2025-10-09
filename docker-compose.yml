@@ -48,7 +48,6 @@ services:
       UDA_HOST: "uda2.mast.l"
       UDA_META_PLUGINNAME: "MASTU_DB"
       UDA_METANEW_PLUGINNAME: "MAST_DB"
-      REDIS_HOST: "redis"
       MODEL_STORAGE: "/data/models"
       API_URL: "http://api_app:8002"
     working_dir: /app

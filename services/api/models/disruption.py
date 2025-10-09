@@ -1,20 +1,24 @@
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import TimePoint
-from services.api.schemas.projects import Project
 from services.api.schemas.data import TimeSeriesData
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
-from torch.utils.data import DataLoader
-from services.api.models.base import TorchDataset, TorchModel
+from torch.utils.data import DataLoader, Dataset
 import ray
+from services.api.schemas.annotations import Annotation
+import typing
+from services.api.core.data_loaders import DATA_LOADERS
+from services.api.models.base import Model
 
 
-class DisruptionDataset(TorchDataset):
+class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
     def __init__(self, project, samples, annotations):
+        self.data_loader = DATA_LOADERS[project.data_loader]()
+        self.samples = samples
+        self.annotations = annotations
         self.current_scaling = []
         self.time_scaling = []
-        super().__init__(project, samples, annotations)
 
     def __len__(self):
         return len(self.samples)
@@ -37,19 +41,8 @@ class DisruptionDataset(TorchDataset):
 
 
 @ray.remote
-class DisruptionCNN(TorchModel):
-    def __init__(
-        self,
-        model_id: str,
-        project: Project,
-    ):
-        super().__init__(
-            model_id=model_id,
-            project=project,
-            dataset=DisruptionDataset,
-        )
-
-    def _define_model(self):
+class DisruptionCNN(Model):
+    def define_model(self):
         return nn.Sequential(
             nn.Conv1d(1, 16, kernel_size=5, padding=2),
             nn.LeakyReLU(),
@@ -60,20 +53,42 @@ class DisruptionCNN(TorchModel):
             nn.AdaptiveAvgPool1d(1),
             nn.Flatten(),
             nn.Dropout(0.1),
-            nn.Linear(
-                32, 1
-            ),  # TODO: what if not all annotations present for all samples?
+            nn.Linear(32, 1),
         )
 
-    def train(  # TODO add extra params to here and base and call pre train
-        self, batch_size: int = 32, patience=20, threshold=1e-4, device="cpu"
+    def train(
+        self,
+        samples: list[Sample],
+        annotations: list[list[Annotation]],
+        train_val_test_split: typing.Tuple[float, float, float],
+        num_epochs: int = 100,
+        # TODO extra kwargs, eg batch size?
+        batch_size=32,
+        patience=20,
+        threshold=1e-4,
+        device="cpu",
     ) -> float:
-        self.update_progress.on_train_begin()
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        if not self.train_samples or not self.train_annotations:
-            raise ValueError("No samples or annotations found!")
+        self.log_progress(training_status="started")
 
+        self.split_data(
+            samples=samples,
+            annotations=annotations,
+            train_val_test_split=train_val_test_split,
+        )
+
+        self.train_dataset = DisruptionDataset(
+            self.project, self.train_samples, self.train_annotations
+        )
+        self.val_dataset = (
+            DisruptionDataset(self.project, self.val_samples, self.val_annotations)
+            if self.val_samples
+            else None
+        )
+        self.test_dataset = (
+            DisruptionDataset(self.project, self.test_samples, self.test_annotations)
+            if self.test_samples
+            else None
+        )
         train_loader = DataLoader(
             self.train_dataset, batch_size=batch_size, shuffle=False
         )
@@ -88,15 +103,20 @@ class DisruptionCNN(TorchModel):
             else None
         )
 
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        if not self.train_samples or not self.train_annotations:
+            raise ValueError("No samples or annotations found!")
+
         loss_history = {"train": [], "val": []}
         best_val_loss = float("inf")
-        print_per_epoch = max(1, self.num_epochs // 50)  # print 50 times
+        print_per_epoch = max(1, num_epochs // 50)  # print 50 times
 
         train_accuracy = None
         val_accuracy = None
         test_accuracy = None
 
-        for epoch in range(self.num_epochs):
+        for epoch in range(num_epochs):
             self.model.train()
             total_train_loss = 0
             sum_correct = 0
@@ -163,18 +183,12 @@ class DisruptionCNN(TorchModel):
                 loss_history["train"].append(train_loss_avg)
                 loss_history["val"].append(val_loss_avg)
 
-                self.update_progress.on_epoch_end(
-                    epoch=epoch,
-                    logs={
-                        "accuracy": train_accuracy,
-                        "loss": train_loss_avg,
-                        "val_accuracy": val_accuracy,
-                        "val_loss": val_loss_avg,
-                    },
+                self.log_progress(
+                    progress=int((epoch / num_epochs) * 100), score=val_accuracy
                 )
 
                 if epoch % print_per_epoch == 0:
-                    print(f"Epoch [{epoch + 1}/{self.num_epochs}]")
+                    print(f"Epoch [{epoch + 1}/{num_epochs}]")
                     print(
                         f"  Train Loss: {train_loss_avg:.4f}, MAE: {train_mae:.4f}, RMSE: {train_rmse:.4f}"
                     )
@@ -211,9 +225,7 @@ class DisruptionCNN(TorchModel):
                     outputs = self.model(batch_samples).squeeze(1)
 
                     error = torch.abs(outputs - batch_annotations)
-                    print(outputs)
-                    print(batch_annotations)
-                    print(error)
+
                     correct = error <= 0.05 * batch_annotations
                     sum_correct += correct.sum().item()
                     sum_total += batch_samples.size(0)
@@ -222,15 +234,20 @@ class DisruptionCNN(TorchModel):
             print("Test Accuracy:", (sum_correct / sum_total) * 100)
 
         final_accuracy = test_accuracy or val_accuracy or train_accuracy
-        self.update_progress.on_train_end(logs={"accuracy": final_accuracy})
 
-        return (sum_correct / sum_total) * 100
+        self.log_progress(
+            training_status="completed",
+            progress=int((epoch / num_epochs) * 100),
+            score=final_accuracy,
+        )
+
+        return final_accuracy
 
     def predict(
         self, samples: list[Sample], batch_size: int = 32, device="cpu"
     ) -> list[list[TimePoint]]:
         num_mc_samples = 20  # Should let user choose num mc samples? TODO
-        dataset = self.dataset(self.project, samples, annotations=None)
+        dataset = DisruptionDataset(self.project, samples, annotations=None)
 
         self.model.train()  # Using dropout so has to be in train mode
         all_predictions: list[list[torch.tensor]] = []
