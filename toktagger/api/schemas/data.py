@@ -28,7 +28,8 @@ class SpectrogramData(Data):
 
 
 class ImageData(Data):
-    data: list[list[tuple[int, int, int]]]
+    frame: int
+    values: list[list[tuple[int, int, int]]]
 
 
 class DataType(str, Enum):

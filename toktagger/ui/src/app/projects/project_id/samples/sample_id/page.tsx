@@ -6,20 +6,24 @@ import {
   Breadcrumbs,
   Item,
   ToastContainer,
+  ToastQueue,
 } from "@adobe/react-spectrum";
 import {
   Annotation,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
+  ImageDataSchema,
   Project,
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
   PlotProps,
   ViewParams,
+  DataParams
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
+import { UFOView } from "@/app/ufos/components/ufos";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -57,6 +61,10 @@ type SampleViewInfo = {
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
+  dataParams: DataParams;
+  setDataParams: (
+    updater: (dataParams: DataParams) => DataParams | DataParams,
+  ) => void;
   plotProps: PlotProps;
 };
 
@@ -65,6 +73,8 @@ const SampleView = ({
   data,
   annotations,
   setAnnotations,
+  dataParams,
+  setDataParams,
   plotProps,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
@@ -89,6 +99,20 @@ const SampleView = ({
         data={result.data}
         annotations={annotations}
         setAnnotations={setAnnotations}
+      />
+    );
+  } else if (project.task == "UFO") {
+    const result = ImageDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for UFO view");
+    }
+    return (
+      <UFOView
+        data={result.data}
+        annotations={annotations}
+        setAnnotations={setAnnotations}
+        dataParams={dataParams}
+        setDataParams={setDataParams}
       />
     );
   } else if (project.task == "MHD") {
@@ -150,15 +174,18 @@ export default function SamplePage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [dataParams, setDataParams] = useState<DataParams>({
+    name: "identity",
+  });
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });
   const [plotProps, setPlotProps] = useState<PlotProps>({
     colorMap: "Cividis",
-  }); // Set default color map
+  });
 
   useEffect(() => {
-    const refreshData = async (params: ViewParams) => {
+    const refreshData = async (dataParams: DataParams, params: ViewParams) => {
       if (!hasIds) {
         return;
       }
@@ -187,19 +214,24 @@ export default function SamplePage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(params),
+          body: JSON.stringify({ params: dataParams, view: params }),
         },
       );
       const data: Data = await response.json();
-      setData(data);
+
+      if (!response.ok) {
+        ToastQueue.negative("Error:", (data as any).detail);
+      } else {
+        setData(data);
+      }
     };
 
-    const run = async (viewParams: ViewParams) => {
-      await refreshData(viewParams);
+    const run = async (dataParams: DataParams, viewParams: ViewParams) => {
+      await refreshData(dataParams, viewParams);
     };
 
-    run(viewParams);
-  }, [project_id, sample_id, viewParams, hasIds]);
+    run(dataParams, viewParams);
+  }, [project_id, sample_id, dataParams, viewParams, hasIds]);
 
   if (!data || !project || !sample || !hasIds) {
     return;
@@ -231,6 +263,8 @@ export default function SamplePage() {
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
+              dataParams={dataParams}
+              setDataParams={setDataParams}
               plotProps={plotProps}
             />
           </div>
