@@ -23,6 +23,7 @@ async def get_data(
 ) -> DataResponseType:
     """Get data, e.g. time trace, about the given sample required for the given project"""
     db_client = request.app.state.db_client
+    print("PARAMS", params)
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, project_id, sample_id)
 

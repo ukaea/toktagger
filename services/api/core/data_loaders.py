@@ -26,23 +26,31 @@ class DataLoader(ABC):
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
+    def __init__(self, params: DataParamTypes):
+        super().__init__(params)
+        # if params.name != "image":
+        #     raise ValueError("Frame number is a required parameter to load image data.")
+
     def get_sample(self, sample: Sample) -> ImageData:
         item: FileData = sample.data
         # Find directory of images
         dir_path = pathlib.Path(item.file_name)
         if not dir_path.exists() or not dir_path.is_dir():
             raise FileNotFoundError(
-                f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()}"
+                f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
             )
         # Open image which represents frame selected
-        file_path = dir_path.joinpath(f"{self.params.frame}.{item.type}")
+        if self.params.name != "image":  # TODO do we want this?
+            file_path = next(dir_path.iterdir())
+        else:
+            file_path = dir_path.joinpath(f"{self.params.frame}.{item.type}")
         if not file_path.exists():
             raise FileNotFoundError(
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
             )
         im = Image.open(file_path)
         arr = np.asarray(im)
-        return ImageData(data=arr.tolist())
+        return ImageData(frame=file_path.name.split(".")[0], values=arr.tolist())
 
 
 class ParquetDataLoader(DataLoader):
