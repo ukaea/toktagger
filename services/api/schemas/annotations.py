@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Union
+from typing import Optional, Union
 from services.api.schemas import ConfiguredModel
 from pydantic import Field, model_validator, BaseModel
 
@@ -28,13 +28,15 @@ class TimeRegion(AnnotationIn):
 
 
 class BoundingBox(AnnotationIn):
-    height: float = None
-    width: float = None
-    centre: Tuple[float, float] = None
+    height: int
+    width: int
+    x_min: int
+    y_min: int
 
 
 class VideoBoundingBox(BoundingBox):
     frame: int
+    track_id: str
 
 
 class Annotation(BaseModel):
