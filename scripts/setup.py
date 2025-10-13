@@ -60,6 +60,28 @@ def create_local_samples(
     requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
+def create_image_samples(
+    project_id: str,
+    shot_ids: list[int],
+    dir_paths: list[str],
+):
+    samples = []
+
+    for shot_id, dir_path in zip(shot_ids, dir_paths):
+        sample = {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "file_name": dir_path,
+                "type": "png",
+                "protocol": "file",
+            },
+        }
+        samples.append(sample)
+
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+
+
 def main():
     shot_files = Path("./data/test/summary").glob("*.parquet")
     shot_files = list(shot_files)
@@ -78,6 +100,9 @@ def main():
     create_local_samples(
         project_id, shot_ids, base_path="/data/test/mhd", columns=["mirnov"]
     )
+
+    project_id = create_project("UFO Project", "UFO", "image")
+    create_image_samples(project_id, ["104522"], ["/data/jet_images"])
 
 
 if __name__ == "__main__":
