@@ -49,11 +49,13 @@ class BoundingBox(AnnotationIn):
     height: Optional[float] = None
     width: Optional[float] = None
     centre: Optional[Tuple[float, float]] = None
-
+    x_min: Optional[float] = None
+    y_min: Optional[float] = None
 
 class VideoBoundingBox(BoundingBox):
     type: Literal["video_bounding_box"] = "video_bounding_box"
     frame: int
+    track_id: Optional[str] = None
 
 
 class AnnotationOut(BaseModel):
