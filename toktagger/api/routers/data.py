@@ -6,7 +6,11 @@ from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.data import DataResponseType
 from toktagger.api.schemas.views import ViewParams, ViewParamTypes
-
+from toktagger.api.schemas.data import (
+    DataResponseType,
+    DataParams,
+    DataParamTypes,
+)
 
 router = APIRouter(
     prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"]
@@ -18,6 +22,7 @@ async def get_data(
     request: Request,
     project_id: str,
     sample_id: str,
+    params: Optional[DataParamTypes] = DataParams(),
     view: Optional[ViewParamTypes] = ViewParams(),
 ) -> DataResponseType:
     """Get data, e.g. time trace, about the given sample required for the given project"""
@@ -25,7 +30,8 @@ async def get_data(
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    data_loader = LoaderRegistry.get(project.data_loader)()
+    loader_cls = LoaderRegistry.get(project.data_loader)
+    data_loader = loader_cls(params)
     try:
         data = data_loader.get_sample(sample)
     except FileNotFoundError as e:
