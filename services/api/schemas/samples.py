@@ -35,7 +35,6 @@ class TimeSeriesFileData(FileData):
 
 class ImageFileData(FileData):
     frame: int
-    time: float
 
 
 class ShotData(BaseModel):
