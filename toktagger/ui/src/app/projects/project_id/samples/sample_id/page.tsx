@@ -24,7 +24,7 @@ import {
   DataParams
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { UFOView } from "@/app/ufos/components/ufos";
+import { UFOView } from "@/app/frames/components/ufos";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -186,11 +186,15 @@ export default function SamplePage() {
   });
 
   useEffect(() => {
-    const refreshData = async (dataParams: DataParams, params: ViewParams) => {
+    const refreshData = async (
+      currentDataParams: DataParams,
+      currentViewParams: ViewParams,
+    ) => {
       if (!hasIds) {
         return;
       }
 
+      // 1) Load project, sample, annotations
       const project = await getProject(project_id);
       setProject(project);
 
@@ -200,20 +204,18 @@ export default function SamplePage() {
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
 
-      if (project.task == "MHD") {
-        params = {
-          ...params,
+      // 2) Build the "view" object we’ll send to the backend
+      let effectiveViewParams: ViewParams = currentViewParams;
+
+      if (project.task === "MHD") {
+        effectiveViewParams = {
+          ...currentViewParams,
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
-      } else if (project.task == "UFO") {
-        viewParams = {
-          ...viewParams,
-          name: "image",
-          resize_fraction: 0.5,
-        } as ImageViewParams;
       }
 
+      // 3) Fetch data using { params, view }
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
         {
@@ -221,23 +223,23 @@ export default function SamplePage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ params: dataParams, view: params }),
+          body: JSON.stringify({
+            params: currentDataParams,
+            view: effectiveViewParams,
+          }),
         },
       );
-      const data: Data = await response.json();
+
+      const payload: Data = await response.json();
 
       if (!response.ok) {
-        ToastQueue.negative("Error:", (data as any).detail);
+        ToastQueue.negative("Error:", (payload as any).detail);
       } else {
-        setData(data);
+        setData(payload);
       }
     };
 
-    const run = async (dataParams: DataParams, viewParams: ViewParams) => {
-      await refreshData(dataParams, viewParams);
-    };
-
-    run(dataParams, viewParams);
+    refreshData(dataParams, viewParams);
   }, [project_id, sample_id, dataParams, viewParams, hasIds]);
 
   if (!data || !project || !sample || !hasIds) {
