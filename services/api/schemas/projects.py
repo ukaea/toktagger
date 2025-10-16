@@ -30,7 +30,6 @@ class DataLoaderType(str, Enum):
     PARQUET = "parquet"
     UDA = "uda"
     IMAGE = "image"
-    JSON = "json"
 
 
 class ProjectIn(ConfiguredModel):

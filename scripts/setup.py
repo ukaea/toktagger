@@ -46,10 +46,8 @@ def create_local_samples(
     samples = []
 
     base_path = Path(base_path)
-    file_name = str(base_path)
     for shot_id in shot_ids:
-        if file_type != "json":
-            file_name = str(base_path / f"{shot_id}.{file_type}")
+        file_name = str(base_path / f"{shot_id}.{file_type}")
         sample = {
             "shot_id": shot_id,
             "data": {

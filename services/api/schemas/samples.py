@@ -10,7 +10,6 @@ class FileType(str, Enum):
     PARQUET = "parquet"
     MP4 = "mp4"
     PNG = "png"
-    JSON = "json"
     JPG = "jpg"
 
 

@@ -1,5 +1,4 @@
 import pandas as pd
-import json
 import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
@@ -79,40 +78,8 @@ class UDADataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
-class JsonDataLoader(DataLoader):
-    """DataLoader for retrieving data from a JSON file."""
-
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        # Open the file which contains the data, getting the path from sample.data
-        with open(sample.data.file_name, "r") as json_file:
-            # Load in the data, and extract only the data for the shot relevant to this sample
-            shot_data = json.load(json_file)[str(sample.shot_id)]["data"]
-
-        # For each signal name specified in the sample, extract the lists of times and values,
-        # constructing an instance of TimeSeriesData for each one
-
-        # Note from the schema that sample.data.signal_names can be None, which should include all signals
-        signal_names = (
-            sample.data.signal_names
-            if sample.data.signal_names
-            else list(shot_data.keys())
-        )
-
-        results = {
-            signal_name: TimeSeriesData(
-                time=shot_data[signal_name]["times"],
-                values=shot_data[signal_name]["values"],
-            )
-            for signal_name in signal_names
-        }
-
-        # Pass this correctly formatted dictionary of data into our MultiVariateTimeSeriesData schema
-        return MultiVariateTimeSeriesData(values=results)
-
-
 DATA_LOADERS = {
     DataLoaderType.PARQUET: ParquetDataLoader,
     DataLoaderType.UDA: UDADataLoader,
     DataLoaderType.IMAGE: ImageDataLoader,
-    DataLoaderType.JSON: JsonDataLoader,
 }

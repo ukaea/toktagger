@@ -1,11 +1,11 @@
 from pathlib import Path
 import numpy
 import random
-import json
 from setup import create_project, create_local_samples
+import pandas as pd
 
 
-def create_mock_data(file_path: str, shot_ids: list):
+def create_mock_data(base_path: Path, shot_ids: list):
     data = {}
     for shot_id in shot_ids:
         t_ramp_start = random.randint(20, 40)
@@ -50,20 +50,20 @@ def create_mock_data(file_path: str, shot_ids: list):
                 "disruption": 0.02 * t_disrupt_start,
             },
         }
-
-    with open(str(Path(__file__).parents[1]) + file_path, "w") as file:
-        json.dump(data, file)
+        df = pd.DataFrame(data={"ip": current}, index=time)
+        df.to_parquet(base_path.joinpath(f"{shot_id}.parquet"))
 
     return data
 
 
 def main():
     num_samples = 200
-    file_path = "/data/test/mock_data.json"
-    non_annotated_file_path = "/data/test/non_annotated_data.json"
-    data = create_mock_data(file_path, list(range(1, num_samples + 1)))
+    base_path = Path(__file__).parents[1].joinpath("data", "test", "mock_disruptions")
+    base_path.mkdir(parents=True, exist_ok=True)
+    data = create_mock_data(base_path, list(range(1, num_samples + 1)))
+
     project_id = create_project(
-        "New Mock Disruption Project", "disruption", "json", "uncertainty"
+        "New Mock Disruption Project", "disruption", "parquet", "uncertainty"
     )
     # Make annotations to add at same time as sample
     annotations = {
@@ -79,20 +79,18 @@ def main():
     create_local_samples(
         project_id,
         list(range(1, num_samples + 1)),
-        base_path=file_path,
-        file_type="json",
+        base_path="/data/test/mock_disruptions",
+        file_type="parquet",
         annotations=annotations,
         signals=["ip"],
     )
-
-    create_mock_data(
-        non_annotated_file_path, list(range(num_samples + 1, num_samples + 100))
-    )
+    # Create 100 non-annotated samples
+    create_mock_data(base_path, list(range(num_samples + 1, num_samples + 101)))
     create_local_samples(
         project_id,
         list(range(num_samples + 1, num_samples + 100)),
-        base_path=non_annotated_file_path,
-        file_type="json",
+        base_path="/data/test/mock_disruptions",
+        file_type="parquet",
         signals=["ip"],
     )
 
