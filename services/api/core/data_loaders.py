@@ -28,8 +28,6 @@ class ImageDataLoader(DataLoader):
 
     def __init__(self, params: DataParamTypes):
         super().__init__(params)
-        # if params.name != "image":
-        #     raise ValueError("Frame number is a required parameter to load image data.")
 
     def get_sample(self, sample: Sample) -> ImageData:
         item: FileData = sample.data

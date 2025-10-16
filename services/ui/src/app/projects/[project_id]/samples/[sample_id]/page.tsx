@@ -18,6 +18,7 @@ import {
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
+  ImageViewParams,
   PlotProps,
   ViewParams,
   DataParams
@@ -213,6 +214,12 @@ export default function SamplePage({
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
+      } else if (project.task == "UFO") {
+        viewParams = {
+          ...viewParams,
+          name: "image",
+          resize_fraction: 0.5,
+        } as ImageViewParams;
       }
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/data`,
