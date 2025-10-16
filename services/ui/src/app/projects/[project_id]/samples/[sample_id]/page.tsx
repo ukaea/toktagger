@@ -198,7 +198,7 @@ export default function SamplePage({
   }); // Set default color map
 
   useEffect(() => {
-    const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
+    const refreshSample = async () => {
       const project = await getProject(project_id);
       setProject(project);
 
@@ -207,6 +207,16 @@ export default function SamplePage({
 
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
+    };
+    refreshSample();
+  }, [project_id, sample_id]);
+
+
+  useEffect(() => {
+    const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
+      if (!project || !sample) {
+        return;
+      }
 
       if (project.task == "MHD") {
         viewParams = {
@@ -244,7 +254,7 @@ export default function SamplePage({
     };
 
     run(dataParams, viewParams);
-  }, [project_id, sample_id, dataParams, viewParams]);
+  }, [project, sample, dataParams, viewParams]);
 
   useEffect(() => {}, [plotProps]);
 
