@@ -6,6 +6,7 @@ from toktagger.api.schemas import ConfiguredModel
 class ViewType(str, Enum):
     IDENTITY = "identity"
     SPECTROGRAM = "spectrogram"
+    IMAGE = "image"
 
 
 class ViewParams(ConfiguredModel):
@@ -23,4 +24,8 @@ class SpectrogramViewParams(ViewParams):
     threshold_value: Optional[float] = None
 
 
-ViewParamTypes = Union[ViewParams, SpectrogramViewParams]
+class ImageViewParams(ViewParams):
+    resize_fraction: Optional[float] = 1.0
+
+
+ViewParamTypes = Union[ViewParams, SpectrogramViewParams, ImageViewParams]
