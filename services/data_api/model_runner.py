@@ -11,7 +11,7 @@ ANNOTATORS = {
 }
 
 
-REDIS_HOST = os.environ.get("REDIS_HOST", "localhost:8002")
+REDIS_HOST = os.environ["REDIS_HOST"]
 
 app = Celery(
     "tasks",

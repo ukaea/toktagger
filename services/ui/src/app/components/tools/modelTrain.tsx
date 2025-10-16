@@ -5,7 +5,6 @@ import CheckmarkCircle from '@spectrum-icons/workflow/CheckmarkCircle';
 import Alert from '@spectrum-icons/workflow/Alert';
 import {
   Project,
-  Model,
 } from "@/types";
 
 export function ModelTrainModal({project}: Project) {
@@ -64,7 +63,7 @@ export function ModelTrainModal({project}: Project) {
                             <ComboBox 
                                 label="Select Model Type"
                                 onSelectionChange={setSelectedModel}>
-                                {project.model_types.map((model_type) => (  // doesnt know the type of this, should be defined what getProject returns, imagine this is the case in more recent branch? Needs updating with model_type regardless
+                                {project.model_types.map((model_type) => (
                                     <Item key={model_type}>{model_type}</Item>
                                 ))}
                             </ComboBox>

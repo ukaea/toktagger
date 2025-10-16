@@ -86,11 +86,11 @@ def main():
     )
 
     create_mock_data(
-        non_annotated_file_path, list(range(num_samples + 1, (2 * num_samples) + 1))
+        non_annotated_file_path, list(range(num_samples + 1, num_samples + 100))
     )
     create_local_samples(
         project_id,
-        list(range(num_samples + 1, (2 * num_samples) + 1)),
+        list(range(num_samples + 1, num_samples + 100)),
         base_path=non_annotated_file_path,
         file_type="json",
         signals=["ip"],

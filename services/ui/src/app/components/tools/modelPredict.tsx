@@ -10,9 +10,9 @@ import {
 
 export function ModelPredictModal({project}: Project) {
     const [models, setModels] = useState<Model[] | null>(null);
-    let [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
-    let [modalOpen, setModalOpen] = useState<boolean>(false);
-    let [numPredictions, setNumPredictions] = useState<string>("20");
+    const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
+    const [modalOpen, setModalOpen] = useState<boolean>(false);
+    const [numPredictions, setNumPredictions] = useState<string>("20");
     const [message, setMessage] = useState<string | null>(null);
     const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
     const buttonStyle = {
@@ -22,19 +22,15 @@ export function ModelPredictModal({project}: Project) {
         zIndex: 1000
     };
 
-    const fetchData = async () => {
-        console.log("Inside fetch")
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models`);
-        const data = await response.json();
-        setModels(data);
-        console.log("Fetched and set")
-        };
-
     useEffect( () => {
+        const fetchData = async () => {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models`);
+            const data = await response.json();
+            setModels(data);
+            };
+            
         let poll: ReturnType<typeof setInterval>;
-        console.log("Inside effect")
         if (modalOpen) {
-            console.log("Inside modalOpen")
             fetchData();
             setMessage(null);
             setMessageIcon(null);

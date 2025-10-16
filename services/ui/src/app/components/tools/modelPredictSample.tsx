@@ -3,7 +3,7 @@ import {Provider, defaultTheme, ComboBox, Item, Flex, ProgressCircle} from '@ado
 import {
   Project,
   Annotations,
-  Model,
+  Annotation,
 } from "@/types";
 
 type ModelPredictInfo = {
@@ -66,8 +66,8 @@ export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPred
                     }
 
                 } else if (response.ok) {
-                    setAnnotations((previousAnnotations) => { // add type for annotations, wait for Sams PR
-                        const otherAnnotations = previousAnnotations.filter((annotation) => annotation.created_by !== selectedModel);
+                    setAnnotations((previousAnnotations: Annotations) => {
+                        const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== selectedModel);
                         return otherAnnotations.concat(payload);
                     });
                     clearInterval(interval)
