@@ -30,7 +30,7 @@ SAMPLE_2 = SampleIn(
 SAMPLE_3 = SampleIn(
     shot_id=2,
     data=TimeSeriesFileData(
-        file_name="test.csv", type="csv", protocol="s3", column_names=["Ip"]
+        file_name="test.csv", type="csv", protocol="s3", signal_names=["Ip"]
     ),
     annotations=None,
 )
@@ -42,7 +42,7 @@ SAMPLE_4 = SampleIn(
         ),
         type="parquet",
         protocol="file",
-        column_names=["Ip"],
+        signal_names=["Ip"],
     ),
     annotations=None,
 )

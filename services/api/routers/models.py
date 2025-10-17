@@ -363,7 +363,7 @@ async def create_sample_predictions(
     model_type: ModelType = Path(
         description="The type of model to make predictions from."
     ),
-) -> None:
+) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -421,7 +421,7 @@ async def get_sample_predictions(
     task = task_registry.get(task_id)
     if task is None:
         raise HTTPException(
-            content="Predict task not found with that ID!", status_code=404
+            detail="Predict task not found with that ID!", status_code=404
         )
 
     ready, waiting = ray.wait([task], timeout=0)
@@ -435,28 +435,28 @@ async def get_sample_predictions(
             result = ray.get(task)
         except Exception:
             raise HTTPException(
-                content="Predict task failed - no predictions available",
+                detail="Predict task failed - no predictions available",
                 status_code=500,
             )
         # Check project ID and model type match those expected by user
         if result["project_id"] != project_id:
             raise HTTPException(
-                content="Project ID for this task does not match!", status_code=422
+                detail="Project ID for this task does not match!", status_code=422
             )
         elif result["model_type"] != model_type:
             raise HTTPException(
-                content="Model used for this task does not match!", status_code=422
+                detail="Model used for this task does not match!", status_code=422
             )
         elif not (annotations := result["annotations"].get(sample_id)):
             raise HTTPException(
-                "This task does not have results for the specified sample!",
                 status_code=404,
+                detail="This task does not have results for the specified sample!",
             )
         else:
             return annotations
     else:
         return HTTPException(
-            status_code=404, content="Predict task not found with that ID!"
+            status_code=404, detail="Predict task not found with that ID!"
         )
 
 
@@ -475,7 +475,6 @@ async def update_model(
     # Update model status
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
-    # Associate the Celery task ID with the model in the database
     await utils.update_model(
         db_client=db_client, model_id=model_id, updates=model_updates
     )

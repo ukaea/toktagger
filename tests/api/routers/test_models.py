@@ -72,6 +72,8 @@ async def post_to_url(api_client, url):
     for put_url, payload in RESULTS.items():
         await api_client.put(put_url, json=payload)
 
+    return response.json()
+
 
 @pytest_asyncio.fixture(scope="function")
 async def setup_model_db(db_client):
@@ -150,6 +152,10 @@ async def setup_model_db(db_client):
             "model_id_1": model_id_1,
             "model_id_2": model_id_2,
         }
+
+
+def mock_wait(*args, **kwargs):
+    return [], ["waiting"]
 
 
 @pytest.mark.asyncio
@@ -235,3 +241,93 @@ async def test_model_sample_predict(api_client, db_client, setup_model_db):
 
     # Check it corresponds to sample ID we asked for predictions on
     assert str(annotations[0]["sample_id"]) == setup_model_db["sample_ids"][-1]
+
+
+@pytest.mark.asyncio
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+async def test_model_get_sample_prediction(api_client, db_client, setup_model_db):
+    prediction_response = await post_to_url(
+        api_client=api_client,
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+    )
+    task_id = prediction_response["task_id"]
+
+    get_response = await api_client.get(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict/{task_id}"
+    )
+    assert get_response.status_code == 200
+
+    # Get annotation from the database
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    annotation = annotations[0]
+    # Check it corresponds to sample ID we asked for predictions on
+    assert str(annotation["sample_id"]) == setup_model_db["sample_ids"][-1]
+
+    # Check it is the same as the one returned to us via API
+    returned_annotation = get_response.json()[0]
+
+    for key in ("validated", "uncertainty", "label", "created_by", "time"):
+        assert annotation[key] == returned_annotation[key]
+
+
+@pytest.mark.asyncio
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+async def test_model_get_sample_prediction_invalid_task(
+    api_client, db_client, setup_model_db
+):
+    # Ask for predictions from a task which doesn't exist
+    get_response = await api_client.get(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict/invalid_id"
+    )
+
+    # Check it returns 404 with appropriate message
+    assert get_response.status_code == 404
+    assert "Predict task not found with that ID!" in get_response.json()["detail"]
+
+
+@pytest.mark.asyncio
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+async def test_model_get_sample_prediction_wrong_sample(
+    api_client, db_client, setup_model_db
+):
+    prediction_response = await post_to_url(
+        api_client=api_client,
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+    )
+    task_id = prediction_response["task_id"]
+
+    # Ask for predictions from this task for a sample which we did not predict on
+    get_response = await api_client.get(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/disruption_cnn/predict/{task_id}"
+    )
+
+    # Check it returns 404 with appropriate message
+    assert get_response.status_code == 404
+    assert (
+        "This task does not have results for the specified sample!"
+        in get_response.json()["detail"]
+    )
+
+
+@pytest.mark.asyncio
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch("ray.wait", mock_wait)
+async def test_model_get_sample_prediction_in_progress(
+    api_client, db_client, setup_model_db
+):
+    prediction_response = await post_to_url(
+        api_client=api_client,
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+    )
+    task_id = prediction_response["task_id"]
+
+    # Ask for predictions from this task for a sample while it is still in progress
+    get_response = await api_client.get(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict/{task_id}"
+    )
+
+    # Check it returns 202 with appropriate message
+    assert get_response.status_code == 202
+    assert "Predict task in the queue!" in get_response.json()["message"]
