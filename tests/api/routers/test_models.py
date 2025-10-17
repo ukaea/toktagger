@@ -46,20 +46,28 @@ class DisruptionCNN(Model):
         pass
 
 
-def return_predictions(self, samples, *args, **kwargs):
-    print("Inside mock")
-    return [
-        [
-            TimePoint(
-                validated=False,
-                uncertainty=random.random(),
-                label="Disruption",
-                time=random.randint(80, 120),
-                created_by=self.type,
-            )
-        ]
-        for i in range(len(samples))
-    ]
+async def post_to_url(api_client, url):
+    """
+    Perform a POST to a URL with the test API client.
+
+    Catch any response which is sent from the worker to the server via the API,
+    and use the test API client to send it (this is needed due to a sync / async mismatch in the tests)
+    """
+    RESULTS = {}
+
+    def send_updates(url: str, updates: list):
+        payload = [model.model_dump(mode="json") for model in updates]
+        RESULTS[url] = payload
+
+    with patch("services.api.core.sender.send_batch_updates", send_updates):
+        response = await api_client.post(url)
+        # Check you get a 200 response
+        assert response.status_code == 200
+
+    # Push results to server via API endpoints which predict task uses
+    # This is a fudge since that uses sync requests module, whereas this is an Async test client
+    for put_url, payload in RESULTS.items():
+        await api_client.put(put_url, json=payload)
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -146,23 +154,10 @@ async def setup_model_db(db_client):
 async def test_model_batch_predict_num_predictions(
     api_client, db_client, setup_model_db
 ):
-    RESULTS = {}
-
-    def send_updates(url: str, updates: list):
-        payload = [model.model_dump(mode="json") for model in updates]
-        RESULTS[url] = payload
-
-    with patch("services.api.core.sender.send_batch_updates", send_updates):
-        response = await api_client.post(
-            f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?num_predictions=5",
-        )
-        # Check you get a 200 response
-        assert response.status_code == 200
-
-    # Push results to server via API endpoints which predict task uses
-    # This is a fudge since that uses sync requests module, whereas this is an Async test client
-    for url, payload in RESULTS.items():
-        await api_client.put(url, json=payload)
+    await post_to_url(
+        api_client=api_client,
+        url=f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?num_predictions=5",
+    )
 
     # Get annotations from the database, there should be 5 non validated ones
     annotations = await db_client.get_filtered_documents(
@@ -177,27 +172,13 @@ async def test_model_batch_predict_num_predictions(
 @pytest.mark.asyncio
 @patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
-    RESULTS = {}
-
-    def send_updates(url: str, updates: list):
-        payload = [model.model_dump(mode="json") for model in updates]
-        RESULTS[url] = payload
-
-    with patch("services.api.core.sender.send_batch_updates", send_updates):
-        query_string = "&".join(
-            f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
-        )
-
-        response = await api_client.post(
-            f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?{query_string}",
-        )
-        # Check you get a 200 response
-        assert response.status_code == 200
-
-    # Push results to server via API endpoints which predict task uses
-    # This is a fudge since that uses sync requests module, whereas this is an Async test client
-    for url, payload in RESULTS.items():
-        await api_client.put(url, json=payload)
+    query_string = "&".join(
+        f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
+    )
+    await post_to_url(
+        api_client=api_client,
+        url=f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?{query_string}",
+    )
 
     # Get annotations from the database, there should be 2 non validated ones
     annotations = await db_client.get_filtered_documents(
@@ -217,23 +198,10 @@ async def test_model_batch_predict_samples(api_client, db_client, setup_model_db
 @pytest.mark.asyncio
 @patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_version(api_client, db_client, setup_model_db):
-    RESULTS = {}
-
-    def send_updates(url: str, updates: list):
-        payload = [model.model_dump(mode="json") for model in updates]
-        RESULTS[url] = payload
-
-    with patch("services.api.core.sender.send_batch_updates", send_updates):
-        response = await api_client.post(
-            f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?num_predictions=5&version=1",
-        )
-        # Check you get a 200 response
-        assert response.status_code == 200
-
-    # Push results to server via API endpoints which predict task uses
-    # This is a fudge since that uses sync requests module, whereas this is an Async test client
-    for url, payload in RESULTS.items():
-        await api_client.put(url, json=payload)
+    await post_to_url(
+        api_client=api_client,
+        url=f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?num_predictions=5&version=1",
+    )
 
     # Get annotations from the database, there should be 5 non validated ones
     annotations = await db_client.get_filtered_documents(
