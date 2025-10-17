@@ -6,6 +6,41 @@ import typing
 import os
 
 
+def send_updates(
+    object_type: str,
+    url: str,
+    updates: ModelUpdate
+    | list[typing.Union[SampleUpdateBatchItem, AnnotationBatchItem]],
+) -> None:
+    """Send a single item or batch of items from worker node to a provided URL.
+
+    Parameters
+    ----------
+    object_type: str
+        The type of object you are sending updates for (eg 'models', 'samples', 'annotations')
+    url : str
+        The URL to send the items to
+    updates : ModelUpdates | list[typing.Union[SampleUpdateBatchItem, AnnotationBatchItem]]
+        Updates to be sent to the server - parameters which are unset or None will be ignored
+
+    Raises
+    ------
+    RuntimeError
+        Raised if the server returns an error when updating the model
+    """
+    if isinstance(updates, list):
+        payload = [model.model_dump(mode="json") for model in updates]
+    else:
+        payload = updates.model_dump(mode="json")
+
+    response = requests.put(url=url, json=payload)
+    if response.status_code != 200:
+        # TODO what to do here?
+        raise RuntimeError(
+            f"Failed to write updates for {object_type} with status {response.status_code}"
+        )
+
+
 def send_model_updates(project_id: str, model_id: str, updates: ModelUpdate) -> None:
     """Send updates about model training status from worker node to server via API.
 
@@ -24,40 +59,10 @@ def send_model_updates(project_id: str, model_id: str, updates: ModelUpdate) -> 
         Raised if the server returns an error when updating the model
     """
     url = f"{os.environ['API_URL']}/projects/{project_id}/models/{model_id}"
-    response = requests.put(url=url, json=updates.model_dump(mode="json"))
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Failed to write model updates with status {response.status_code}"
-        )
+    send_updates("model", url, updates=updates)
 
 
-def send_batch_updates(
-    url: str, updates: list[typing.Union[SampleUpdateBatchItem, AnnotationBatchItem]]
-):
-    """Send a batch of items from worker node to a provided URL.
-
-    Parameters
-    ----------
-    url : str
-        The URL to send the items to
-    updates : list[typing.Union[SampleUpdateBatchItem, AnnotationBatchItem]]
-        Updates to be sent to the server - parameters which are unset or None will be ignored
-
-    Raises
-    ------
-    RuntimeError
-        Raised if the server returns an error when updating the model
-    """
-    payload = [model.model_dump(mode="json") for model in updates]
-    response = requests.put(url=url, json=payload)
-    if response.status_code != 200:
-        # TODO what to do here?
-        raise RuntimeError(
-            f"Failed to write batch updates with status {response.status_code}"
-        )
-
-
-def send_batch_samples(project_id: str, samples: list[SampleUpdateBatchItem]):
+def send_batch_samples(project_id: str, samples: list[SampleUpdateBatchItem]) -> None:
     """Send a batch of sample updates from worker node to server via API.
 
     Parameters
@@ -68,10 +73,12 @@ def send_batch_samples(project_id: str, samples: list[SampleUpdateBatchItem]):
         Updates to be sent to the server - parameters which are unset or None will be ignored
     """
     url = f"{os.environ['API_URL']}/projects/{project_id}/samples"
-    send_batch_updates(url, samples)
+    send_updates("samples", url, samples)
 
 
-def send_batch_annotations(project_id: str, annotations: list[AnnotationBatchItem]):
+def send_batch_annotations(
+    project_id: str, annotations: list[AnnotationBatchItem]
+) -> None:
     """Send a batch of new annotations from worker node to server via API.
 
     Parameters
@@ -82,4 +89,4 @@ def send_batch_annotations(project_id: str, annotations: list[AnnotationBatchIte
         Annotations to be sent to the server
     """
     url = f"{os.environ['API_URL']}/projects/{project_id}/annotations"
-    send_batch_updates(url, annotations)
+    send_updates("annotations", url, annotations)

@@ -57,7 +57,7 @@ def train_model(
     model_actor = get_actor(project=project, model=model)
     try:
         print(f"Running model training for project {project.id}")
-        model_actor.log_progress.remote(training_status="started")
+        model_actor.log_progress.remote(training_status="started", progress=0)
         train_task = model_actor.train.remote(
             samples=samples,
             annotations=annotations,
@@ -66,7 +66,7 @@ def train_model(
         )
 
         # Wait for train task to complete
-        ray.get(train_task)
+        score = ray.get(train_task)
 
         model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
         model_dir.mkdir(exist_ok=True)  # Do i need to do this every time?
@@ -75,7 +75,7 @@ def train_model(
         send_model_updates(
             project_id=project.id,
             model_id=model.id,
-            updates=ModelUpdate(training_status="completed", progress=100),
+            updates=ModelUpdate(training_status="completed", progress=100, score=score),
         )
 
     except Exception as e:

@@ -470,8 +470,7 @@ async def update_model(
     model_id: str = Path(
         description="The ID of the model to update information about."
     ),
-):
-    print(model_updates)
+) -> None:
     # Update model status
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
