@@ -11,8 +11,39 @@ from services.api.schemas.annotations import TimePoint
 from services.api.schemas.models import ModelIn
 from unittest.mock import patch
 from bson import ObjectId
-from services.api.models.disruption import DisruptionCNN
+from services.api.models.base import Model
+
 import os
+import ray
+
+
+@ray.remote
+class DisruptionCNN(Model):
+    def define_model(self):
+        return None
+
+    def train(self, samples, annotations, *args, **kwargs):
+        pass
+
+    def predict(self, samples, *args, **kwargs):
+        return [
+            [
+                TimePoint(
+                    validated=False,
+                    uncertainty=random.random(),
+                    label=self.id,
+                    time=random.randint(80, 120),
+                    created_by=self.type,
+                )
+            ]
+            for i in range(len(samples))
+        ]
+
+    def save(self, file_path):
+        pass
+
+    def load(self, project, file_path):
+        pass
 
 
 def return_predictions(self, samples, *args, **kwargs):
@@ -81,23 +112,37 @@ async def setup_model_db(db_client):
                         "sample_id": ObjectId(sample_ids[i]),
                     },
                 )
-        model = ModelIn(
+        model_1 = ModelIn(
             type="disruption_cnn",
             version=1,
             training_status="completed",
             progress=100,
             score=80,
         )
-        model_id = await db_client.insert(
-            "models", model, ids={"project_id": ObjectId(project_id)}
+        model_id_1 = await db_client.insert(
+            "models", model_1, ids={"project_id": ObjectId(project_id)}
+        )
+        model_2 = ModelIn(
+            type="disruption_cnn",
+            version=2,
+            training_status="completed",
+            progress=100,
+            score=90,
+        )
+        model_id_2 = await db_client.insert(
+            "models", model_2, ids={"project_id": ObjectId(project_id)}
         )
 
-        yield {"project_id": project_id, "sample_ids": sample_ids, "model_id": model_id}
+        yield {
+            "project_id": project_id,
+            "sample_ids": sample_ids,
+            "model_id_1": model_id_1,
+            "model_id_2": model_id_2,
+        }
 
 
 @pytest.mark.asyncio
-@patch.object(DisruptionCNN, "predict", return_predictions)
-@patch.object(DisruptionCNN, "predict", return_predictions)
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_num_predictions(
     api_client, db_client, setup_model_db
 ):
@@ -125,10 +170,12 @@ async def test_model_batch_predict_num_predictions(
     )
     assert len(annotations) == 5
 
+    # Check latest version of model has been used by default (annotation label set to model ID in Mock)
+    assert all(ann["label"] == setup_model_db["model_id_2"] for ann in annotations)
+
 
 @pytest.mark.asyncio
-@patch.object(DisruptionCNN, "predict", return_predictions)
-@patch.object(DisruptionCNN, "predict", return_predictions)
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
     RESULTS = {}
 
@@ -162,3 +209,37 @@ async def test_model_batch_predict_samples(api_client, db_client, setup_model_db
     assert sorted(
         [str(annotation["sample_id"]) for annotation in annotations]
     ) == sorted(setup_model_db["sample_ids"][:2])
+
+    # Check latest version of model has been used by default (annotation label set to model ID in Mock)
+    assert all(ann["label"] == setup_model_db["model_id_2"] for ann in annotations)
+
+
+@pytest.mark.asyncio
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+async def test_model_batch_predict_version(api_client, db_client, setup_model_db):
+    RESULTS = {}
+
+    def send_updates(url: str, updates: list):
+        payload = [model.model_dump(mode="json") for model in updates]
+        RESULTS[url] = payload
+
+    with patch("services.api.core.sender.send_batch_updates", send_updates):
+        response = await api_client.post(
+            f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?num_predictions=5&version=1",
+        )
+        # Check you get a 200 response
+        assert response.status_code == 200
+
+    # Push results to server via API endpoints which predict task uses
+    # This is a fudge since that uses sync requests module, whereas this is an Async test client
+    for url, payload in RESULTS.items():
+        await api_client.put(url, json=payload)
+
+    # Get annotations from the database, there should be 5 non validated ones
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert len(annotations) == 5
+
+    # Check version 1 of model has been used (annotation label set to model ID in Mock)
+    assert all(ann["label"] == setup_model_db["model_id_1"] for ann in annotations)
