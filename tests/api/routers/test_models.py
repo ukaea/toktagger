@@ -52,6 +52,9 @@ async def post_to_url(api_client, url):
 
     Catch any response which is sent from the worker to the server via the API,
     and use the test API client to send it (this is needed due to a sync / async mismatch in the tests)
+
+    Note that ray is in local mode, which means everything is executed in a single thread.
+    This means tasks are executed in serial, and there is no need to wait for the model to complete predictions.
     """
     RESULTS = {}
 
@@ -211,3 +214,24 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
     # Check version 1 of model has been used (annotation label set to model ID in Mock)
     assert all(ann["label"] == setup_model_db["model_id_1"] for ann in annotations)
+
+
+@pytest.mark.asyncio
+@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+async def test_model_sample_predict(api_client, db_client, setup_model_db):
+    await post_to_url(
+        api_client=api_client,
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+    )
+
+    # Get annotations from the database, there should be 1 non validated one
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert len(annotations) == 1
+
+    # Check latest version of model has been used (annotation label set to model ID in Mock)
+    assert annotations[0]["label"] == setup_model_db["model_id_2"]
+
+    # Check it corresponds to sample ID we asked for predictions on
+    assert str(annotations[0]["sample_id"]) == setup_model_db["sample_ids"][-1]
