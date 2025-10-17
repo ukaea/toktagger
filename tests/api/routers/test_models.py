@@ -6,7 +6,8 @@ import pathlib
 from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, TimeSeriesFileData
 from services.api.schemas.annotations import TimePoint
-from services.api.schemas.models import ModelIn, ModelUpdate
+from services.api.schemas.models import ModelUpdate
+from tests.db_definitions import MODEL_1, MODEL_2
 from unittest.mock import patch
 from bson import ObjectId
 from services.api.models.base import Model
@@ -128,25 +129,13 @@ async def setup_model_db(db_client):
                         "sample_id": ObjectId(sample_ids[i]),
                     },
                 )
-        model_1 = ModelIn(
-            type="disruption_cnn",
-            version=1,
-            training_status="completed",
-            progress=100,
-            score=80,
-        )
+
         model_id_1 = await db_client.insert(
-            "models", model_1, ids={"project_id": ObjectId(project_id)}
+            "models", MODEL_1, ids={"project_id": ObjectId(project_id)}
         )
-        model_2 = ModelIn(
-            type="disruption_cnn",
-            version=2,
-            training_status="completed",
-            progress=100,
-            score=90,
-        )
+
         model_id_2 = await db_client.insert(
-            "models", model_2, ids={"project_id": ObjectId(project_id)}
+            "models", MODEL_2, ids={"project_id": ObjectId(project_id)}
         )
 
         yield {

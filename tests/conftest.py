@@ -118,6 +118,30 @@ async def setup_db(db_client):
         db_definitions.ANNOTATION_5,
         ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)},
     )
+    await asyncio.sleep(0.01)
+    annotation_id_5 = await db_client.insert(
+        "annotations",
+        db_definitions.ANNOTATION_5,
+        ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)},
+    )
+    await asyncio.sleep(0.01)
+    model_id_1 = await db_client.insert(
+        "models",
+        db_definitions.MODEL_1,
+        ids={"project_id": ObjectId(project_id_1)},
+    )
+    await asyncio.sleep(0.01)
+    model_id_2 = await db_client.insert(
+        "models",
+        db_definitions.MODEL_2,
+        ids={"project_id": ObjectId(project_id_1)},
+    )
+    await asyncio.sleep(0.01)
+    model_id_3 = await db_client.insert(
+        "models",
+        db_definitions.MODEL_3,
+        ids={"project_id": ObjectId(project_id_1)},
+    )
     yield {
         "project_id_1": project_id_1,
         "project_id_2": project_id_2,
@@ -131,6 +155,9 @@ async def setup_db(db_client):
         "annotation_id_3": annotation_id_3,
         "annotation_id_4": annotation_id_4,
         "annotation_id_5": annotation_id_5,
+        "model_id_1": model_id_1,
+        "model_id_2": model_id_2,
+        "model_id_3": model_id_3,
     }
 
 

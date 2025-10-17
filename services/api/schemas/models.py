@@ -6,6 +6,7 @@ from services.api.schemas import ConfiguredModel
 
 class ModelType(str, Enum):  # Is this needed?
     DisruptionCNN = "disruption_cnn"
+    BaseModel = "base"
 
 
 class ModelIn(ConfiguredModel):

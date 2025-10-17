@@ -1,6 +1,7 @@
 import pytest
 from bson.objectid import ObjectId
 from tests.db_definitions import PROJECT_1, SAMPLE_1, ANNOTATION_1, ANNOTATION_2
+from services.api.schemas.samples import SampleUpdate
 import services.api.crud.utils as utils
 from fastapi import HTTPException
 
@@ -115,6 +116,27 @@ async def test_delete_specific_sample(db_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_update_sample(db_client, setup_db):
+    # Check Sample 1 has validated_annotations = False
+    sample_1 = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_1"])
+    )
+    assert not sample_1["validated_annotations"]
+
+    # Update sample to set validated_annotations to True
+    updates = SampleUpdate(validated_annotations=True)
+    await utils.update_sample(
+        db_client, sample_id=setup_db["sample_id_1"], updates=updates
+    )
+
+    # Check sample is updated
+    sample_1_updated = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_1"])
+    )
+    assert sample_1_updated["validated_annotations"]
+
+
+@pytest.mark.asyncio
 async def test_get_annotations_in_project(db_client, setup_db):
     annotations = await utils.get_annotations(
         db_client, project_id=setup_db["project_id_1"]
@@ -220,3 +242,36 @@ async def test_delete_specific_annotation(db_client, setup_db):
     assert setup_db["annotation_id_1"] not in [
         str(annotation["_id"] for annotation in annotations)
     ]
+
+
+@pytest.mark.asyncio
+async def test_get_models(db_client, setup_db):
+    models = await utils.get_models(db_client, project_id=setup_db["project_id_1"])
+    # Check three models returned
+    assert len(models) == 3
+    # Check returned in correct order - reverse order of created
+    assert [model.version for model in models] == [3, 2, 1]
+
+
+@pytest.mark.asyncio
+async def test_get_models_by_type(db_client, setup_db):
+    models = await utils.get_models(
+        db_client, project_id=setup_db["project_id_1"], model_type="disruption_cnn"
+    )
+    # Check two models returned
+    assert len(models) == 2
+    # Check returned in correct order - reverse order of created, not version 3
+    assert [model.version for model in models] == [2, 1]
+    assert all(model.type == "disruption_cnn" for model in models)
+
+
+@pytest.mark.asyncio
+async def test_get_models_by_status(db_client, setup_db):
+    models = await utils.get_models(
+        db_client, project_id=setup_db["project_id_1"], status="started"
+    )
+    # Check one model returned
+    assert len(models) == 1
+    # Check this is the correct model
+    assert models[0].version == 3
+    assert models[0].type == "base"
