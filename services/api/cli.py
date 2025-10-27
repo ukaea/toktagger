@@ -2,7 +2,6 @@ import time
 import webbrowser
 import argparse
 from services.api.main import Server
-import webbrowser
 
 
 def do_open_browser(host: str, port: int):

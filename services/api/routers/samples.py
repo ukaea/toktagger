@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
-from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
+from services.api.core.data_loaders import LoaderRegistry
 from services.api.crud import utils
 from services.api.schemas.samples import SampleIn, Sample
 from services.api.schemas.annotations import Annotation
@@ -190,7 +190,7 @@ async def get_next_sample(
     annotations = await utils.get_annotations(db_client, project_id, validated=False)
 
     data_pool = DataPool(
-        data_loader=DATA_LOADERS[project.data_loader](),
+        data_loader=LoaderRegistry(project.data_loader)(),
         query_strategy=QUERY_STRATEGIES[project.query_strategy](samples, annotations),
     )
     try:

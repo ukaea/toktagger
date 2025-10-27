@@ -11,7 +11,6 @@ from services.api.schemas.data import (
     ImageData,
 )
 from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
-from services.api.schemas.projects import DataLoaderType
 
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -29,6 +28,34 @@ class DataLoader(ABC):
         pass
 
 
+class LoaderRegistry:
+    _registry: dict[str, DataLoader] = {}
+
+    @classmethod
+    def register(cls, name: str):
+        def decorator(loader_class: DataLoader):
+            if not issubclass(loader_class, DataLoader):
+                raise ValueError(
+                    f"Loader '{name}' does not inherit from DataLoader base class."
+                )
+            cls._registry[name] = loader_class
+            return loader_class
+
+        return decorator
+
+    @classmethod
+    def get(cls, name: str):
+        loader_class: DataLoader | None = cls._registry.get(name)
+        if not loader_class:
+            raise ValueError(f"No DataLoader class called '{name}' found in registry!")
+        return loader_class
+
+    @classmethod
+    def names(cls):
+        return list(cls._registry.keys())
+
+
+@LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
@@ -44,6 +71,7 @@ class ImageDataLoader(DataLoader):
         return ImageData(data=arr.tolist())
 
 
+@LoaderRegistry.register("parquet")
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
@@ -65,6 +93,7 @@ class ParquetDataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+@LoaderRegistry.register("uda")
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
@@ -89,10 +118,3 @@ class UDADataLoader(DataLoader):
                 results[name] = None
 
         return MultiVariateTimeSeriesData(values=results)
-
-
-DATA_LOADERS = {
-    DataLoaderType.PARQUET: ParquetDataLoader,
-    DataLoaderType.UDA: UDADataLoader,
-    DataLoaderType.IMAGE: ImageDataLoader,
-}
