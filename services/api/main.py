@@ -66,8 +66,14 @@ class Server:
             name="assets",
         )
 
-    def run(self, host: str = "localhost", port: int = 8002, open_browser: bool = True):
+    def run(
+        self,
+        host: str = "localhost",
+        port: int = 8002,
+        open_browser: bool = True,
+        reload: bool = False,
+    ):
         self._setup_app()
         if open_browser:
             webbrowser.open(f"http://{host}:{port}")
-        uvicorn.run(self.app, host=host, port=port)
+        uvicorn.run(self.app, host=host, port=port, reload=reload)

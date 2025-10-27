@@ -11,8 +11,11 @@ def main():
     argparser.add_argument(
         "--no-browser", action="store_true", help="Don't open a browser"
     )
+    argparser.add_argument(
+        "--reload", action="store_true", help="Reload the API on changes"
+    )
     args = argparser.parse_args()
     open_browser = not args.no_browser
 
     server = Server()
-    server.run(args.host, args.port, open_browser)
+    server.run(args.host, args.port, open_browser, args.reload)
