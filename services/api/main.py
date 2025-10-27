@@ -13,7 +13,6 @@ from services.api.routers.base import router as base_router
 
 from services.api.crud.db import MongoDBClient
 from contextlib import asynccontextmanager
-import webbrowser
 import uvicorn
 
 
@@ -70,10 +69,12 @@ class Server:
         self,
         host: str = "localhost",
         port: int = 8002,
-        open_browser: bool = True,
         reload: bool = False,
     ):
         self._setup_app()
-        if open_browser:
-            webbrowser.open(f"http://{host}:{port}")
         uvicorn.run(self.app, host=host, port=port, reload=reload)
+
+
+server = Server()
+server._setup_app()
+app = server.app
