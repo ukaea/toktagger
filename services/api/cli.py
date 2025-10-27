@@ -1,9 +1,7 @@
-import threading
 import time
 import webbrowser
 import argparse
-import uvicorn
-from services.api.main import app
+from services.api.main import Server
 
 
 def do_open_browser(host: str, port: int):
@@ -31,7 +29,5 @@ def main():
     args = argparser.parse_args()
     open_browser = not args.no_browser
 
-    if open_browser:
-        threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
-
-    uvicorn.run(app, host=args.host, port=args.port)
+    server = Server()
+    server.run(args.host, args.port, open_browser)
