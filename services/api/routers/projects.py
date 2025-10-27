@@ -6,7 +6,7 @@ from services.api.schemas.samples import Sample
 from services.api.schemas import convert_to_objectid
 from services.api.crud import utils
 from services.api.core.data_pool import DataPool
-from services.api.core.data_loaders import DATA_LOADERS
+from services.api.core.data_loaders import LoaderRegistry
 from services.api.core.query_strategy import QUERY_STRATEGIES
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -71,6 +71,9 @@ async def create_project(request: Request, project: ProjectIn):
     """
     # Create instance of this project class, instantiating all required classes for that task, and return its ID
     # In the future, should be able to specify eg dataloader, data type, query strategy etc
+    if project.data_loader not in LoaderRegistry.names():
+        raise HTTPException(422, detail="Invalid data loader specified.")
+
     _id = await request.app.state.db_client.insert(collection="projects", model=project)
     return {"_id": _id}
 
@@ -177,7 +180,7 @@ async def set_project(
     ]
 
     request.app.state.data_pool = DataPool(
-        data_loader=DATA_LOADERS[project.data_loader](),
+        data_loader=LoaderRegistry(project.data_loader)(),
         query_strategy=QUERY_STRATEGIES[project.query_strategy](
             sample_models, annotation_models
         ),

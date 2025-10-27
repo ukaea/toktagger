@@ -1,6 +1,5 @@
 from typing import List
 from services.api.schemas.projects import (
-    DataLoaderType,
     Project as ProjectMetadata,
     QueryStrategyType,
 )
@@ -30,11 +29,11 @@ class Project:
         self.data_pool = DataPool(self.data_loader, self.query_strategy)
 
     def get_data_loader(
-        self, samples: List[Sample], data_loader_type: DataLoaderType
+        self, samples: List[Sample], data_loader_type: str
     ) -> DataLoader:
-        if data_loader_type == DataLoaderType.PARQUET:
+        if data_loader_type == "parquet":
             data_loader = ParquetDataLoader(samples)
-        elif data_loader_type == DataLoaderType.UDA:
+        elif data_loader_type == "uda":
             data_loader = UDADataLoader(samples)
         else:
             raise RuntimeError(f"Unknown query strategy {data_loader_type}")

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from typing import Optional
-from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.views import DATA_VIEWS
+from services.api.core.data_loaders import LoaderRegistry
 from services.api.crud import utils
 from services.api.schemas.samples import Sample
 from services.api.schemas.data import DataResponseType
@@ -25,7 +25,7 @@ async def get_data(
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    data_loader = DATA_LOADERS[project.data_loader]()
+    data_loader = LoaderRegistry.get(project.data_loader)()
     try:
         data = data_loader.get_sample(sample)
     except FileNotFoundError as e:
