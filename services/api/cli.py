@@ -1,7 +1,5 @@
-import webbrowser
 import argparse
-import uvicorn
-from services.api.main import app
+from services.api.main import Server
 
 
 def main():
@@ -15,6 +13,6 @@ def main():
     )
     args = argparser.parse_args()
     open_browser = not args.no_browser
-    if open_browser:
-        webbrowser.open(f"http://{args.host}:{args.port}")
-    uvicorn.run(app, host=args.host, port=args.port)
+
+    server = Server()
+    server.run(args.host, args.port, open_browser)
