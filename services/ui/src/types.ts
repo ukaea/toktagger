@@ -147,7 +147,7 @@ export const SamplesSummarySchema = z
     {
       message: "shot min must be less than or equal to shot max",
       path: ["shot_max"], // attach error to `max`
-    }
+    },
   );
 export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
 

@@ -64,7 +64,7 @@ export const ProjectsTable = ({
     try {
       await deleteProject(project_id);
       const project = projects.find(
-        (project) => project["_id"] === project_id
+        (project) => project["_id"] === project_id,
       ) as Project;
       onModify(project);
       ToastQueue.positive("Project deleted successfully", { timeout: 3000 });
@@ -134,7 +134,7 @@ export default function Projects() {
       sortDescriptor,
       currentPage,
       projectsPerPage,
-      projectName
+      projectName,
     );
 
     if (!projects) {
