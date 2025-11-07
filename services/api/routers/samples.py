@@ -209,6 +209,10 @@ async def get_sample_summary(
         description="The ID of the project to get a summary of samples from."
     ),
 ) -> SampleSummary:
+    """Get a summary of samples for this project.
+
+    This includes total number of samples, min and max shot IDs, and sample data type.
+    """
     db_client = request.app.state.db_client
     samples = await utils.get_samples(db_client, project_id)
 

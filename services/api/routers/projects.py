@@ -110,6 +110,9 @@ async def update_project(
     project: ProjectUpdate,
     project_id: str = Path(description="The ID of the project to activate"),
 ):
+    """Update a project's information.
+    -----------------------------
+    """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.update_project(db_client, project_id, project)
 

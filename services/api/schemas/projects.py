@@ -41,6 +41,6 @@ class Project(ProjectIn):
 
 
 class ProjectUpdate(ConfiguredModel):
-    name: Optional[str]
-    task: Optional[Task]
-    query_strategy: Optional[QueryStrategyType]
+    name: Optional[str] = None
+    task: Optional[Task] = None
+    query_strategy: Optional[QueryStrategyType] = None
