@@ -189,12 +189,18 @@ const UDADataLoaderOptionsUI = ({
             isRequired
             value={shotMin ?? undefined}
             onChange={setShotMin}
+            formatOptions={{
+              maximumFractionDigits: 0,
+            }}
           />
           <NumberField
             label="Shot Max"
             isRequired
             value={shotMax ?? undefined}
             onChange={setShotMax}
+            formatOptions={{
+              maximumFractionDigits: 0,
+            }}
           />
         </Flex>
         <SignalNamesUI
@@ -507,7 +513,12 @@ const createSamples = async (projectId: string, samples: Sample[]) => {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Error creating samples: ${error.message}`);
+    if (error.message) {
+      throw new Error(`Error creating samples: ${error.message}`);
+    } else {
+      // Input data validation error
+      throw new Error(`Error creating samples: ${error.detail.msg}`);
+    }
   }
 };
 
