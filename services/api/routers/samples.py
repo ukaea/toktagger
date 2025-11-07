@@ -3,10 +3,9 @@ from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
 from services.api.crud import utils
-from services.api.schemas.samples import FileData, SampleIn, Sample, SampleSummary
+from services.api.schemas.samples import SampleIn, Sample, SampleSummary
 from services.api.schemas.annotations import Annotation
 from services.api.schemas import convert_to_objectid
-import pathlib
 from typing import Literal
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
@@ -214,18 +213,7 @@ async def get_sample_summary(
     This includes total number of samples, min and max shot IDs, and sample data type.
     """
     db_client = request.app.state.db_client
-    samples = await utils.get_samples(db_client, project_id)
-
-    summary = SampleSummary(
-        total=len(samples),
-        shot_min=min(sample.shot_id for sample in samples) if samples else None,
-        shot_max=max(sample.shot_id for sample in samples) if samples else None,
-        data=samples[0].data if samples else None,
-    )
-
-    if isinstance(summary.data, FileData):
-        summary.data.file_name = str(pathlib.Path(summary.data.file_name).parent)
-
+    summary = await utils.get_sample_summary(db_client, project_id)
     return summary
 
 

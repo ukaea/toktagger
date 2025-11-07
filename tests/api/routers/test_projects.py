@@ -19,6 +19,20 @@ async def test_get_all_projects(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_update_project(api_client, setup_db):
+    in_update = {
+        "name": "updated_project_name",
+    }
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}", json=in_update
+    )
+
+    result = await api_client.get(f"/projects/{setup_db['project_id_1']}")
+    assert response.status_code == 200
+    assert result.json().get("name") == "updated_project_name"
+
+
+@pytest.mark.asyncio
 async def test_get_all_projects_sortby(api_client, setup_db):
     response = await api_client.get("/projects?sort_by=task")
     # Should sort alphabetically by task

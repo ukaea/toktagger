@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
@@ -8,7 +9,7 @@ from services.api.schemas.annotations import (
     AnnotationTypes,
 )
 from services.api.schemas.projects import Project, ProjectUpdate
-from services.api.schemas.samples import Sample
+from services.api.schemas.samples import FileData, Sample, SampleSummary
 
 
 async def get_projects(
@@ -224,3 +225,28 @@ async def delete_annotations(
             status_code=404,
             detail="Annotations not found belonging to this Sample and/or Project.",
         )
+
+
+async def get_files(dir_path: str, file_type: str) -> list[str]:
+    file_names = Path(dir_path).glob(f"*.{file_type}")
+    file_names = map(str, file_names)
+    file_names = list(sorted(file_names))
+    return file_names
+
+
+async def get_sample_summary(
+    db_client: MongoDBClient, project_id: str
+) -> SampleSummary:
+    samples = await get_samples(db_client, project_id)
+
+    summary = SampleSummary(
+        total=len(samples),
+        shot_min=min(sample.shot_id for sample in samples) if samples else None,
+        shot_max=max(sample.shot_id for sample in samples) if samples else None,
+        data=samples[0].data if samples else None,
+    )
+
+    if isinstance(summary.data, FileData):
+        summary.data.file_name = str(Path(summary.data.file_name).parent)
+
+    return summary
