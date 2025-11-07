@@ -16,7 +16,7 @@ type JumpDetectionType = {
   sample_id: string;
   data: MultiVariateTimeSeriesData;
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
 };
 
@@ -41,6 +41,13 @@ export function JumpDetectionTool({
   useEffect(() => {
     const fetchData = async () => {
       if (!validSignalName || !isEnabled) {
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
+          );
+          return otherAnnotations;
+        });
         return;
       }
 
@@ -58,14 +65,14 @@ export function JumpDetectionTool({
             smoothing: smoothingValue,
             num_points: numPoints,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
         );
         return otherAnnotations.concat(payload);
       });
