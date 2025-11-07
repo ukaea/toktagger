@@ -1,44 +1,30 @@
-from __future__ import annotations
-
 import asyncio
 import re
 from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, Tuple
-
-from filelock import FileLock
 from mongita import MongitaClientDisk
 
 
-class _AsyncFileMutex:
-    def __init__(self, lock_path: str, timeout: float = 60.0) -> None:
+class AsyncMutex:
+    def __init__(self) -> None:
         self._alock = asyncio.Lock()
-        self._flock = FileLock(lock_path, timeout=timeout)
         self._loop = asyncio.get_event_loop()
 
     async def __aenter__(self):
         await self._alock.acquire()
-        await asyncio.to_thread(self._flock.acquire)
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        try:
-            await asyncio.to_thread(self._flock.release)
-        finally:
-            self._alock.release()
+        self._alock.release()
 
 
 class AsyncMongitaClient:
     def __init__(
         self,
         db_path: str,
-        *,
-        lock_path: Optional[str] = None,
-        lock_timeout: float = 60.0,
     ) -> None:
         self._client = MongitaClientDisk(db_path)
         self._closed = False
-        self._mutex = _AsyncFileMutex(
-            lock_path or f"{db_path}.lock", timeout=lock_timeout
-        )
+        self._mutex = AsyncMutex()
 
     def __getitem__(self, name: str) -> "AsyncDatabase":
         return AsyncDatabase(self, name)
@@ -100,49 +86,49 @@ class AsyncCollection:
         **kwargs,
     ) -> "AsyncCursor":
         async def _snapshot() -> List[Dict[str, Any]]:
+            mongo_filter = {}
+            regex_filters = []
+
+            # Separate regex conditions from normal filters
+            if filter:
+                for field, condition in filter.items():
+                    if isinstance(condition, dict) and "$regex" in condition:
+                        pattern = condition["$regex"]
+                        flags = condition.get("$options", 0)
+                        if flags == "i":
+                            flags = re.IGNORECASE
+                        regex_filters.append((field, re.compile(pattern, flags)))
+                    else:
+                        mongo_filter[field] = condition
+
             async with self._database._client._mutex:
-                mongo_filter = {}
-                regex_filters = []
-
-                # Separate regex conditions from normal filters
-                if filter:
-                    for field, condition in filter.items():
-                        if isinstance(condition, dict) and "$regex" in condition:
-                            pattern = condition["$regex"]
-                            flags = condition.get("$options", 0)
-                            if flags == "i":
-                                flags = re.IGNORECASE
-                            regex_filters.append((field, re.compile(pattern, flags)))
-                        else:
-                            mongo_filter[field] = condition
-
                 cursor = await asyncio.to_thread(
                     self._sync_col.find, mongo_filter or {}, *args, **kwargs
                 )
                 results = await asyncio.to_thread(lambda: list(cursor))
 
-                # Apply regex filters
-                if regex_filters:
-                    filtered = []
-                    for doc in results:
-                        match = True
-                        for field, regex in regex_filters:
-                            value = str(doc.get(field, ""))
-                            if not regex.search(value):
-                                match = False
-                                break
-                        if match:
-                            filtered.append(doc)
-                    results = filtered
+            # Apply regex filters
+            if regex_filters:
+                filtered = []
+                for doc in results:
+                    match = True
+                    for field, regex in regex_filters:
+                        value = str(doc.get(field, ""))
+                        if not regex.search(value):
+                            match = False
+                            break
+                    if match:
+                        filtered.append(doc)
+                results = filtered
 
-                if sort:
-                    for key, direction in reversed(sort):
-                        results.sort(key=lambda x: x.get(key), reverse=(direction < 0))
-                if skip:
-                    results = results[skip:]
-                if limit is not None and limit > 0:
-                    results = results[:limit]
-                return results
+            if sort:
+                for key, direction in reversed(sort):
+                    results.sort(key=lambda x: x.get(key), reverse=(direction < 0))
+            if skip:
+                results = results[skip:]
+            if limit is not None and limit > 0:
+                results = results[:limit]
+            return results
 
         return AsyncCursor(_snapshot())
 
