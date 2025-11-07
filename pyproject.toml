@@ -36,8 +36,8 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["services"]
-include = ["api*"]
+where = ["."]
+include = ["services.api*"]
 
 [tool.setuptools.package-data]
 "vizannotation" = ["services/api/static/**/*"]
