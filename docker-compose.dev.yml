@@ -41,7 +41,7 @@ services:
     depends_on:
       - mongo
     volumes:
-      - ./data/:/data
+      - ./data/:/app/data
       - ./services:/app/services
     environment:
       MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
