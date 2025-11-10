@@ -1,10 +1,14 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
 
 
-class AnnotatorIds(str, Enum):
-    FIND_PEAKS = "find_peaks"
+class AnnotatorTypes(str, Enum):
+    PEAK_DETECTION = "peak_detection"
+    OUTLIER_DETECTION = "outlier_detection"
+    CHANGE_POINT_DETECTION = "change_point_detection"
+    JUMP_DETECTION = "jump_detection"
+    MANUAL_ANNOTATION = "manual"
     SPECTROGRAM_THRESHOLD = "spectrogram_threshold"
 
 
@@ -13,11 +17,11 @@ class DataTypes(Enum):
     IMAGE = "image"
 
 
-class Annotator(BaseModel):
+class AnnotatorParams(BaseModel):
     pass
 
 
-class FindPeaksParams(Annotator):
+class PeakDetectionParams(AnnotatorParams):
     signal_name: str
     prominence: float
     distance: int
@@ -25,17 +29,38 @@ class FindPeaksParams(Annotator):
     time_max: Optional[float] = None
 
 
-class TimeSeriesChangepoints(Annotator):
-    penalty: int
+class OutlierDetectionParams(AnnotatorParams):
+    signal_name: str
+    method: Literal["mad", "isoforest"]
+    threshold: Optional[float] = None
+    contamination: Optional[float] = None
 
 
-class SpectrogramThresholdParams(Annotator):
+class ChangePointDetectionParams(AnnotatorParams):
+    signal_name: str
+    method: Literal["pelt", "hmm"]
+    num_points: int
+    penalty: Optional[float] = None
+    num_components: Optional[int] = None  # Only used if method is 'hmm'
+
+
+class JumpDetectionParams(AnnotatorParams):
+    signal_name: str
+    threshold: float
+    min_distance: int
+    smoothing: float
+    num_points: int
+
+
+class SpectrogramThresholdParams(AnnotatorParams):
     signal_name: str
     percentile: float
 
 
-AnnotatorTypes = Union[
-    FindPeaksParams,
-    TimeSeriesChangepoints,
+AnnotatorParamTypes = Union[
+    PeakDetectionParams,
+    OutlierDetectionParams,
+    ChangePointDetectionParams,
+    JumpDetectionParams,
     SpectrogramThresholdParams,
 ]

@@ -8,7 +8,7 @@ import {
   ToastContainer,
 } from "@adobe/react-spectrum";
 import {
-  Annotations,
+  Annotation,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
@@ -56,9 +56,9 @@ export const SampleDataBreadCrumbs = ({
 type SampleViewInfo = {
   project: Project;
   data: Data;
-  annotations: Annotations;
+  annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
   plotProps: PlotProps;
 };
@@ -141,8 +141,8 @@ async function getProject(project_id: string): Promise<Project> {
 async function getAnnotations(
   project_id: string,
   sample_id: string,
-): Promise<Annotations> {
-  return await getData<Annotations>(
+): Promise<Annotation[]> {
+  return await getData<Annotation[]>(
     `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`,
   );
 }
@@ -161,7 +161,7 @@ export default function SamplePage({
   const [project, setProject] = useState<Project | null>(null);
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
-  const [annotations, setAnnotations] = useState<Annotations>([]);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });

@@ -1,12 +1,16 @@
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
+  created_by: z.string().default("manual"),
   timestamp: z.string().optional(),
   validated: z.boolean().optional(),
   uncertainty: z.number().optional(),
   label: z.string(),
+  type: z.string(),
 });
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
+export const ClassLabelSchema = BaseAnnotationSchema;
+export type ClassLabel = z.infer<typeof ClassLabelSchema>;
 
 export const TimeRegionSchema = BaseAnnotationSchema.extend({
   time_min: z.number(),
@@ -19,11 +23,14 @@ export const TimePointSchema = BaseAnnotationSchema.extend({
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
 
-export const AnnotationSchema = z.union([TimePointSchema, TimeRegionSchema]);
+export const AnnotationSchema = z.union([
+  TimePointSchema,
+  TimeRegionSchema,
+  ClassLabelSchema,
+]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
 export const AnnotationsSchema = z.array(AnnotationSchema);
-export type Annotations = z.infer<typeof AnnotationsSchema>;
 
 export const TimeSeriesDataSchema = z.object({
   time: z.array(z.number()),
@@ -65,6 +72,7 @@ export const CategorySchema = z.object({
 export type Category = z.infer<typeof CategorySchema>;
 
 export const ZoneSchema = z.object({
+  created_by: z.string().default("manual"),
   category: CategorySchema,
   x0: z.number(),
   x1: z.number(),
@@ -72,6 +80,7 @@ export const ZoneSchema = z.object({
 export type Zone = z.infer<typeof ZoneSchema>;
 
 export const VSpanSchema = z.object({
+  created_by: z.string().default("manual"),
   category: CategorySchema,
   x: z.number(),
 });

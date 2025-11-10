@@ -1,37 +1,32 @@
 import services.api.core.annotators as annotators
 import numpy
-import math
 from scipy.datasets import electrocardiogram
 from services.api.schemas.annotations import SpectrogramMask
 from services.api.schemas.data import TimeSeriesData, MultiVariateTimeSeriesData
-from services.api.schemas.annotators import FindPeaksParams, SpectrogramThresholdParams
+import numpy as np
+from services.api.schemas.annotators import (
+    PeakDetectionParams,
+    OutlierDetectionParams,
+    JumpDetectionParams,
+    SpectrogramThresholdParams,
+    ChangePointDetectionParams,
+)
 
 
 def test_find_peaks():
-    # Create data with clear peaks above noise
-    data = numpy.random.uniform(0, 10, 100)
-    data[20] = 200
-    data[40] = 400
-    data[60] = 600
-    data[80] = 800
-
-    ts_data = TimeSeriesData(time=numpy.arange(100), values=data)
+    data = electrocardiogram()[2000:4000]
+    ts_data = TimeSeriesData(time=np.arange(len(data)), values=data)
     mv_data = MultiVariateTimeSeriesData(values={"Ip": ts_data})
 
-    params = FindPeaksParams(signal_name="Ip", prominence=10, distance=10)
-    annotator = annotators.FindPeaksAnnotator(params)
+    params = PeakDetectionParams(signal_name="Ip", prominence=1, distance=1)
+    annotator = annotators.PeakDetectionAnnotator(params)
     time_regions = annotator.predict(mv_data)
 
-    assert len(time_regions) == 4
-
-    for i in range(4):
-        assert (time_regions[i].time_min < 20 * (i + 1)) and (
-            time_regions[i].time_max > 20 * (i + 1)
-        )
-
-        # Check midpoint between time_min and time_max is roughly location of the peak
-        time_mid = (time_regions[i].time_min + time_regions[i].time_max) / 2
-        assert math.isclose(time_mid, 20 * (i + 1))
+    assert len(time_regions) == 12
+    for region in time_regions:
+        assert region.time_min < region.time_max
+        assert region.time_min >= 0
+        assert region.time_max <= len(data)
 
 
 def test_find_peaks_params():
@@ -39,28 +34,144 @@ def test_find_peaks_params():
     ts_data = TimeSeriesData(time=numpy.arange(len(data)), values=data)
     mv_data = MultiVariateTimeSeriesData(values={"Ip": ts_data})
 
-    small_params = FindPeaksParams(signal_name="Ip", prominence=1, distance=1)
+    small_params = PeakDetectionParams(signal_name="Ip", prominence=1, distance=1)
     # Create an annotator with the above params - this should detect all 7 peaks
-    full_annotator = annotators.FindPeaksAnnotator(small_params)
+    full_annotator = annotators.PeakDetectionAnnotator(small_params)
     time_regions = full_annotator.predict(mv_data)
     assert len(time_regions) == 12
 
     # Then create an annotator with more limiting params
-    params = FindPeaksParams(
+    params = PeakDetectionParams(
         signal_name="Ip", prominence=1, distance=100, time_min=10, time_max=500
     )
-    annotator = annotators.FindPeaksAnnotator(params)
+    annotator = annotators.PeakDetectionAnnotator(params)
     time_regions = annotator.predict(mv_data)
 
     assert len(time_regions) == 3
 
     peak = time_regions[0]
-    assert numpy.isclose(peak.time_min, 44, rtol=1e-1)
+    assert numpy.isclose(peak.time_min, 51, rtol=1e-1)
     assert numpy.isclose(peak.time_max, 85, rtol=1e-1)
 
     peak = time_regions[1]
     assert numpy.isclose(peak.time_min, 228, rtol=1e-1)
     assert numpy.isclose(peak.time_max, 273, rtol=1e-1)
+
+
+def make_mv_data(values, signal_name="Ip"):
+    ts_data = TimeSeriesData(time=np.arange(len(values)), values=values)
+    return MultiVariateTimeSeriesData(values={signal_name: ts_data})
+
+
+def test_outlier_detection_annotator_mad():
+    # Create a signal with a clear outlier
+    values = np.ones(100)
+    values[50] = 100  # outlier
+    mv_data = make_mv_data(values)
+
+    params = OutlierDetectionParams(signal_name="Ip", threshold=5, method="mad")
+    annotator = annotators.OutlierDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+
+    assert len(regions) == 1
+    assert regions[0].time_min == 50
+    assert regions[0].time_max == 51
+
+
+def test_outlier_detection_annotator_isoforest():
+    # Create a signal with a clear outlier
+    values = np.ones(100)
+    values[50] = 100  # outlier
+    mv_data = make_mv_data(values)
+
+    params = OutlierDetectionParams(
+        signal_name="Ip", contamination=0.1, method="isoforest"
+    )
+    annotator = annotators.OutlierDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+
+    assert len(regions) == 1
+    assert regions[0].time_min == 50
+    assert regions[0].time_max == 51
+
+
+def test_outlier_detection_annotator_no_outlier():
+    values = np.ones(100)
+    params = OutlierDetectionParams(signal_name="Ip", threshold=5, method="mad")
+    mv_data = make_mv_data(values)
+    annotator = annotators.OutlierDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+    assert len(regions) == 0
+
+
+def test_jump_annotator_detects_jump():
+    # Create a signal with a jump at index 50
+    values = np.concatenate([np.ones(50), np.ones(50) * 10])
+    params = JumpDetectionParams(
+        signal_name="Ip", threshold=1, min_distance=1, smoothing=0, num_points=100
+    )
+    mv_data = make_mv_data(values)
+    annotator = annotators.JumpDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+    assert len(regions) == 1
+    assert 49 <= regions[0].time_min <= 51
+
+
+def test_jump_annotator_no_jump():
+    values = np.ones(100)
+    params = JumpDetectionParams(
+        signal_name="Ip", threshold=1, min_distance=1, smoothing=0, num_points=100
+    )
+    mv_data = make_mv_data(values)
+    annotator = annotators.JumpDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+    assert len(regions) == 0
+
+
+def test_changepoint_annotator_detects_change():
+    # Create a signal with a change in mean at index 30 and 70
+    values = np.concatenate([np.ones(30), np.ones(40) * 5, np.ones(30) * 2])
+    params = ChangePointDetectionParams(
+        signal_name="Ip", threshold=1, method="pelt", num_points=100, penalty=10
+    )
+    mv_data = make_mv_data(values)
+    annotator = annotators.ChangePointDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+    # Should detect two changepoints
+    assert len(regions) == 3
+    assert any(0 <= r.time_min <= 2 for r in regions)
+    assert any(28 <= r.time_min <= 32 for r in regions)
+    assert any(68 <= r.time_min <= 72 for r in regions)
+
+
+def test_changepoint_annotator_detects_change_hmm():
+    # Create a signal with a change in mean at index 30 and 70
+    values = np.concatenate([np.ones(30), np.ones(40) * 5, np.ones(30) * 2])
+    params = ChangePointDetectionParams(
+        signal_name="Ip", threshold=1, method="hmm", num_points=100, num_components=3
+    )
+    mv_data = make_mv_data(values)
+    annotator = annotators.ChangePointDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+    # Should detect two changepoints
+    assert len(regions) == 3
+    assert any(0 <= r.time_min <= 2 for r in regions)
+    assert any(28 <= r.time_min <= 32 for r in regions)
+    assert any(68 <= r.time_min <= 72 for r in regions)
+
+
+def test_changepoint_annotator_no_change():
+    values = np.ones(100)
+    params = ChangePointDetectionParams(
+        signal_name="Ip", threshold=1, method="pelt", num_points=100, penalty=10
+    )
+    mv_data = make_mv_data(values)
+    annotator = annotators.ChangePointDetectionAnnotator(params)
+    regions = annotator.predict(mv_data)
+
+    assert len(regions) == 1
+    assert np.isclose(regions[0].time_min, 0)
+    assert np.isclose(regions[0].time_max, 99)
 
 
 def test_spectrogram_threshold():

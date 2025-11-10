@@ -5,12 +5,12 @@ import {
   TimeRegionSchema,
   TimePointSchema,
   MultiVariateTimeSeriesData,
-  Annotations,
   VSpan,
   Zone,
   ZoneSchema,
   VSpanSchema,
   DisplayAnnotation,
+  Annotation,
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
@@ -53,9 +53,9 @@ const colorMapping = { ...disruptionCategoryColors, ...zoneCategoryColors };
 
 type DisruptionViewInfo = {
   data: MultiVariateTimeSeriesData;
-  annotations: Annotations;
+  annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
 };
 
@@ -67,9 +67,9 @@ export const DisruptionView = ({
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
-  const displayAnnotations: DisplayAnnotation[] = annotations.map(
-    convertAnnotationToDisplayAnnotation,
-  );
+  const displayAnnotations: DisplayAnnotation[] = annotations
+    .filter((x: Annotation) => x.type !== "class_label")
+    .map(convertAnnotationToDisplayAnnotation);
 
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
