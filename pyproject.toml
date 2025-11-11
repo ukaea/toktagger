@@ -39,6 +39,7 @@ dependencies = [
   "psutil>=7.0.0",
   "ray>=2.49.1",
   "pyspark>=4.0.0",
+  "hmmlearn>=0.3.3",
 ]
 
 [tool.setuptools.packages.find]
