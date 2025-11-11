@@ -1,5 +1,5 @@
 [project]
-name = "viz-annotation"
+name = "toktagger"
 version = "2025.0.0"
 requires-python = ">=3.9"
 authors = [
@@ -40,7 +40,7 @@ where = ["."]
 include = ["services.api*"]
 
 [tool.setuptools.package-data]
-"vizannotation" = ["services/api/static/**/*"]
+"services.api" = ["static/**/*"]
 
 [tool.ruff]
 exclude = [".venv", "notebooks"]
@@ -57,4 +57,4 @@ dev = [
 ]
 
 [project.scripts]
-viz-annot = "services.api.cli:main"
+toktagger = "services.api.cli:main"
