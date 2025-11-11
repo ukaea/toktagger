@@ -40,7 +40,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {}
+  {},
 );
 
 const disruptionCategoryColors = disruptionCategories.reduce<
@@ -56,7 +56,7 @@ type DisruptionViewInfo = {
   data: MultiVariateTimeSeriesData;
   annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
 };
 
@@ -94,7 +94,7 @@ export const DisruptionView = ({
       name: signalName,
       xaxis: `x${index + 1}`,
       yaxis: `y${index + 1}`,
-    })
+    }),
   );
 
   let axes = Object.entries(data.values).map((_, index) => {
