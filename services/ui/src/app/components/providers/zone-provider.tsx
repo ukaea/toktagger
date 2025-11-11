@@ -84,6 +84,7 @@ export const ZoneProvider = ({
 
   const addZone = (x0: number, x1: number, category: Category) => {
     zones.current.push({
+      created_by: "manual",
       category,
       x0,
       x1,
@@ -119,6 +120,7 @@ export const ZoneProvider = ({
   useEffect(() => {
     const addZone = (x0: number, x1: number, category: Category) => {
       zones.current.push({
+        created_by: "manual",
         category,
         x0,
         x1,

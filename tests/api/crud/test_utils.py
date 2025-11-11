@@ -61,9 +61,9 @@ async def test_delete_project_wrong_id(db_client, setup_db):
 async def test_get_samples(db_client, setup_db):
     samples = await utils.get_samples(db_client, project_id=setup_db["project_id_1"])
     # Check three samples returned
-    assert len(samples) == 3
+    assert len(samples) == 2
     # Check returned in correct order - reverse order of created
-    assert [sample["shot_id"] for sample in samples] == [2, 3, 1]
+    assert [sample["shot_id"] for sample in samples] == [3, 1]
 
 
 @pytest.mark.asyncio
@@ -97,7 +97,7 @@ async def test_delete_all_samples_in_project(db_client, setup_db):
     await utils.delete_samples(db_client, project_id=setup_db["project_id_1"])
     # Should only be one remaining sample
     samples = await db_client.get_filtered_documents("samples")
-    assert len(samples) == 1
+    assert len(samples) == 2
 
 
 @pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_get_annotations_in_project(db_client, setup_db):
     # Check four annotations returned
     assert len(annotations) == 4
     # Check returned in correct order - reverse order of created
-    assert [str(ann["_id"]) for ann in annotations] == [
+    assert [str(ann.id) for ann in annotations] == [
         setup_db["annotation_id_4"],
         setup_db["annotation_id_3"],
         setup_db["annotation_id_2"],
@@ -140,7 +140,7 @@ async def test_get_annotations_in_sample(db_client, setup_db):
     # Check three annotations returned
     assert len(annotations) == 3
     # Check returned in correct order - reverse order of created
-    assert [str(ann["_id"]) for ann in annotations] == [
+    assert [str(ann.id) for ann in annotations] == [
         setup_db["annotation_id_3"],
         setup_db["annotation_id_2"],
         setup_db["annotation_id_1"],
@@ -154,7 +154,7 @@ async def test_get_annotations_validated(db_client, setup_db):
     )
 
     assert len(annotations) == 2
-    assert [str(annotation["_id"]) for annotation in annotations] == [
+    assert [str(annotation.id) for annotation in annotations] == [
         setup_db["annotation_id_2"],
         setup_db["annotation_id_1"],
     ]

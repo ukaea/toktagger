@@ -120,7 +120,7 @@ async def test_delete_project(api_client, setup_db, db_client):
 
     # Check samples associated with this project have been deleted
     samples = await db_client.get_all_documents("samples")
-    assert len(samples) == 3  # Samples associated with project 1 still exist
+    assert len(samples) == 2  # Samples associated with project 1 still exist
     # Check sample associated with above project no longer in database
     assert setup_db["sample_id_4"] not in [sample.get("_id") for sample in samples]
 

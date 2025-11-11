@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    mongo_url = os.environ.get("MONGO_URL", "./viz_app_db")
+    mongo_url = os.environ.get("MONGO_URL", "./toktagger_db")
     db_name = "annotate_db"
 
     app.state.db_client = MongoDBClient(mongo_url, db_name)

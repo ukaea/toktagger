@@ -1,8 +1,9 @@
 from typing import Optional, Literal
 from fastapi import HTTPException
+from pydantic import TypeAdapter
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import Annotation, AnnotationIn
+from services.api.schemas.annotations import AnnotationIn, AnnotationOutTypes
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample
 
@@ -140,10 +141,12 @@ async def get_annotations(
     sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
     count: Optional[int] = None,
-) -> list[Annotation]:
+) -> list[AnnotationOutTypes]:
     db_filters = {"project_id": convert_to_objectid(project_id, "projects")}
+
     if sample_id:
         db_filters["sample_id"] = convert_to_objectid(sample_id, "samples")
+
     if validated is not None:
         db_filters["validated"] = validated
 
@@ -155,6 +158,10 @@ async def get_annotations(
         start=start,
         limit=count if count is not None else 0,
     )
+
+    annotations = [
+        TypeAdapter(AnnotationOutTypes).validate_python(a) for a in annotations
+    ]
     return annotations
 
 

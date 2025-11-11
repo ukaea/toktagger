@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import ShotInput from "../components/shotInput";
+import ShotInput from "../components/annotators/shotInput";
 
 export const metadata: Metadata = {
   title: "MAST Data Tagging",

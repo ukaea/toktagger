@@ -6,7 +6,7 @@ import {
   DisplayAnnotation,
   ZoneSchema,
   TimeRegionSchema,
-  Annotations,
+  Annotation,
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
@@ -20,8 +20,10 @@ import {
 } from "@/app/utils";
 
 const zoneCategories: Category[] = [
-  { name: "ELM", color: "rgb(233, 170, 98)" },
-  { name: "H-Mode", color: "rgb(100, 170, 98)" },
+  { name: "Peak", color: "rgb(233, 170, 98)" },
+  { name: "Outlier", color: "rgb(233, 170, 250)" },
+  { name: "Jump", color: "rgb(1, 250, 1)" },
+  { name: "Change Point", color: "rgb(133, 170, 250)" },
 ];
 
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
@@ -34,18 +36,20 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
 
 type ELMViewInfo = {
   data: MultiVariateTimeSeriesData;
-  annotations: Annotations;
+  annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
 };
 
 export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
-  const displayAnnotations: DisplayAnnotation[] = annotations.map(
-    convertAnnotationToDisplayAnnotation,
-  );
+
+  const displayAnnotations: DisplayAnnotation[] = annotations
+    .filter((x: Annotation) => x.type !== "class_label")
+    .map(convertAnnotationToDisplayAnnotation);
+
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
@@ -70,6 +74,15 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     mode: "lines",
   };
 
+  const n_e_lineTrace: Partial<Plotly.PlotData> = {
+    name: "Density",
+    x: data.values.n_e_line.time,
+    y: data.values.n_e_line.values,
+    xaxis: "x4",
+    yaxis: "y4",
+    mode: "lines",
+  };
+
   const powerNBITrace: Partial<Plotly.PlotData> = {
     name: "NBI Power",
     x: data.values.power_nbi.time,
@@ -79,12 +92,12 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     mode: "lines",
   };
 
-  const densityGradientTrace: Partial<Plotly.PlotData> = {
-    name: "Density Gradient",
-    x: data.values.density_gradient.time,
-    y: data.values.density_gradient.values,
-    xaxis: "x4",
-    yaxis: "y4",
+  const sxrTrace: Partial<Plotly.PlotData> = {
+    name: "Soft X-Ray",
+    x: data.values.sxr.time,
+    y: data.values.sxr.values,
+    xaxis: "x6",
+    yaxis: "y6",
     mode: "lines",
   };
 
@@ -100,14 +113,15 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
   const plotData: Partial<Plotly.PlotData>[] = [
     dataTrace,
     ipTrace,
-    densityGradientTrace,
+    n_e_lineTrace,
     powerNBITrace,
     t_e_coreTrace,
+    sxrTrace,
   ];
 
   const plotLayout: Partial<Plotly.Layout> = {
     uirevision: "true",
-    grid: { rows: 5, columns: 1, pattern: "independent" },
+    grid: { rows: 6, columns: 1, pattern: "independent" },
     dragmode: false, // Disable default drag behavior
     width: 1100,
     height: 800,
@@ -186,7 +200,7 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     },
     yaxis4: {
       title: {
-        text: "Density Gradient []",
+        text: "Density",
         font: {
           family: "Courier New, monospace",
           size: 12,
@@ -205,9 +219,20 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
         },
       },
     },
-    yaxis5: {
+    xaxis6: {
+      matches: "x",
       title: {
-        text: "T_e Core [eV]",
+        text: "Time [s]",
+        font: {
+          family: "Courier New, monospace",
+          size: 12,
+          color: "#7f7f7f",
+        },
+      },
+    },
+    yaxis6: {
+      title: {
+        text: "SXR [arb]",
         font: {
           family: "Courier New, monospace",
           size: 12,

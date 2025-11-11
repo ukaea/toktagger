@@ -218,6 +218,8 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .attr("opacity", 0.5)
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
+          .attr("stroke", "gray")
+          .attr("stroke-width", 1)
           .datum(zone)
           .call(drag)
           .on("contextmenu", handleContextMenu);

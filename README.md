@@ -1,20 +1,23 @@
+# TokTagger
+
+An interactive annotation platform for Tokamak diagnostic data.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml/badge.svg)](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml)
 
-# Quick Start
+## Quick Start
 
 You run the application locally through a simple pip install:
 
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/ukaea/viz-annotation.git
-viz-annot
+toktagger
 ```
 
 This will start a local instance of the application running at `http://localhost:8002`.
 
 
-# Project Overview
+## Project Overview
 
 Below is a high level overview of the project structure:
 ```
@@ -29,9 +32,9 @@ Below is a high level overview of the project structure:
 └── docker-compose.yml  # Master docker compose for running the application
 ```
 
-# Development Setup
+## Development Setup
 
-## Installation
+### Installation
 
 1. Install and setup `git lfs`: https://git-lfs.com/
 2. Create a new python environment and install the dependancies
@@ -60,7 +63,7 @@ uvicorn services.api:app --host 0.0.0.0 --port 8002 --reload
 npm --prefix services/ui run dev
 ```
 
-## Development Setup with Docker
+### Development Setup with Docker
 
 Alternatively, you can run the application in development mode using docker:
 
@@ -79,7 +82,7 @@ This will start both the backend API and the frontend UI at the following urls:
 
 The development setup runs both the frontend and backend in development mode, so any changes to the code will automatically be reflected in the running application.
 
-## Setup local data
+### Setup local test data
 Once the application is running, the following setup script can be used to automatically set up a basic model
 
 Configure git LFS and pull the model
@@ -94,7 +97,7 @@ Create some example datasets for testing.
 python -m scripts.setup 
 ```
 
-## Building the Single Page Application (SPA)
+### Building the Single Page Application (SPA)
 
 The version of the application which get served to users is built using the following command:
 
