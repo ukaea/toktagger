@@ -40,7 +40,7 @@ where = ["."]
 include = ["services.api*"]
 
 [tool.setuptools.package-data]
-"services.api" = ["static/**/*"]
+"toktagger" = ["services/api/static/**/*"]
 
 [tool.ruff]
 exclude = [".venv", "notebooks"]
