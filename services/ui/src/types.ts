@@ -132,23 +132,12 @@ export const SampleSchema = z.object({
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
-export const SamplesSummarySchema = z
-  .object({
-    total: z.number(),
-    shot_min: z.number().optional(),
-    shot_max: z.number().optional(),
-    data: SampleDataSchema,
-  })
-  .refine(
-    (data) =>
-      data.shot_max == null ||
-      data.shot_min == null ||
-      data.shot_min <= data.shot_max,
-    {
-      message: "shot min must be less than or equal to shot max",
-      path: ["shot_max"], // attach error to `max`
-    },
-  );
+export const SamplesSummarySchema = z.object({
+  total: z.number(),
+  shot_min: z.number().optional(),
+  shot_max: z.number().optional(),
+  data: SampleDataSchema,
+});
 export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
 
 export const ViewParamsSchema = z.object({
