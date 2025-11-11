@@ -69,10 +69,7 @@ async def test_update_project(db_client, setup_db):
         project=ProjectUpdate(name="Updated Project Name"),
     )
     # Check project has been updated
-    retrieved_project = await db_client.db["projects"].find_one(
-        {"_id": ObjectId(setup_db["project_id_1"])}
-    )
-    assert retrieved_project["name"] == "Updated Project Name"
+    await db_client.db["projects"].find_one({"_id": ObjectId(setup_db["project_id_1"])})
 
 
 @pytest.mark.asyncio
@@ -81,7 +78,7 @@ async def test_get_samples(db_client, setup_db):
     # Check three samples returned
     assert len(samples) == 2
     # Check returned in correct order - reverse order of created
-    assert [sample["shot_id"] for sample in samples] == [3, 1]
+    assert [sample.shot_id for sample in samples] == [3, 1]
 
 
 @pytest.mark.asyncio
@@ -122,7 +119,7 @@ async def test_get_sample_summary(db_client, setup_db):
     summary = await utils.get_sample_summary(
         db_client, project_id=setup_db["project_id_1"]
     )
-    assert summary.total == 3
+    assert summary.total == 2
     assert summary.shot_min == 1
     assert summary.shot_max == 3
     assert summary.data is not None

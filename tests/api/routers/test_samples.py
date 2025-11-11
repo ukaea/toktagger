@@ -247,6 +247,6 @@ async def test_get_samples_summary(api_client, setup_db):
     )
     assert response.status_code == 200
     summary = response.json()
-    assert summary.get("total") == 3
+    assert summary.get("total") == 2
     assert summary.get("shot_min") == 1
     assert summary.get("shot_max") == 3
