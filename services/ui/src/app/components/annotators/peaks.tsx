@@ -19,7 +19,7 @@ type PeakDetectionType = {
   sample_id: string;
   data: MultiVariateTimeSeriesData;
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
 };
 export function PeakDetectionTool({
@@ -63,7 +63,7 @@ export function PeakDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION
+              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
           );
           return otherAnnotations;
         });
@@ -85,14 +85,14 @@ export function PeakDetectionTool({
             time_min: timeRange.start,
             time_max: timeRange.end,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION
+            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
         );
         return otherAnnotations.concat(payload);
       });

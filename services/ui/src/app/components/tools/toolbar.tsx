@@ -46,7 +46,7 @@ import { BACKEND_API_URL } from "@/app/core";
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotation[]
+  annotations: Annotation[],
 ) {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
@@ -109,7 +109,7 @@ function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
       const response = await saveAnnotations(
         project_id,
         sample_id,
-        annotations
+        annotations,
       );
 
       if (!response.ok) {
@@ -203,7 +203,7 @@ function AmplitudeSlider({
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor))
+    Math.log10(Math.max(x, smallPrecisionFactor)),
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -218,7 +218,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end
+          val.end,
         )}`
       }
     />
@@ -312,7 +312,7 @@ function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        }
+        },
       );
 
       const payload = await response.json();
@@ -384,7 +384,7 @@ type ToolBarInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
@@ -483,7 +483,7 @@ export default function ToolBar({
     }
 
     const resultSpec = SpectrogramDataSchema.safeParse(
-      resultComposite.data.values["mirnov"]
+      resultComposite.data.values["mirnov"],
     );
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");
