@@ -23,6 +23,7 @@ class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
     def get_sample(self, sample: Sample) -> ImageData:
+        assert isinstance(sample.data, FileData)
         item: FileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(
@@ -37,6 +38,7 @@ class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, TimeSeriesFileData)
         item: TimeSeriesFileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(
@@ -62,6 +64,7 @@ class UDADataLoader(DataLoader):
         self.client = pyuda.Client()
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, ShotData)
         item: ShotData = sample.data
 
         results = {}

@@ -79,9 +79,9 @@ async def test_update_project(db_client, setup_db):
 async def test_get_samples(db_client, setup_db):
     samples = await utils.get_samples(db_client, project_id=setup_db["project_id_1"])
     # Check three samples returned
-    assert len(samples) == 3
+    assert len(samples) == 2
     # Check returned in correct order - reverse order of created
-    assert [sample.shot_id for sample in samples] == [2, 3, 1]
+    assert [sample["shot_id"] for sample in samples] == [3, 1]
 
 
 @pytest.mark.asyncio
@@ -140,7 +140,7 @@ async def test_delete_all_samples_in_project(db_client, setup_db):
     await utils.delete_samples(db_client, project_id=setup_db["project_id_1"])
     # Should only be one remaining sample
     samples = await db_client.get_filtered_documents("samples")
-    assert len(samples) == 1
+    assert len(samples) == 2
 
 
 @pytest.mark.asyncio

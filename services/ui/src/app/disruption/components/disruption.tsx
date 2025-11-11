@@ -2,21 +2,19 @@
 
 import {
   Category,
+  TimeRegionSchema,
+  TimePointSchema,
   MultiVariateTimeSeriesData,
-  Annotations,
+  Annotation,
   VSpan,
   Zone,
   ZoneSchema,
   VSpanSchema,
   DisplayAnnotation,
-  TimeRegionSchema,
-  TimePointSchema,
   TimeSeriesData,
 } from "@/types";
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { DisruptionTable } from "./disruption-table";
-import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { TimeSeries } from "@/app/components/plots/time-series";
 import { Zones } from "@/app/components/tools/zones";
 import { VSpans } from "@/app/components/tools/vspans";
@@ -24,6 +22,8 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
+import { ZoneProvider } from "@/app/components/providers/zone-provider";
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 
 const disruptionCategories: Category[] = [
   { name: "Disruption", color: "rgb(255, 0, 0)" },
@@ -40,7 +40,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {},
+  {}
 );
 
 const disruptionCategoryColors = disruptionCategories.reduce<
@@ -54,9 +54,9 @@ const colorMapping = { ...disruptionCategoryColors, ...zoneCategoryColors };
 
 type DisruptionViewInfo = {
   data: MultiVariateTimeSeriesData;
-  annotations: Annotations;
+  annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
 };
 
@@ -68,9 +68,9 @@ export const DisruptionView = ({
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
-  const displayAnnotations: DisplayAnnotation[] = annotations.map(
-    convertAnnotationToDisplayAnnotation,
-  );
+  const displayAnnotations: DisplayAnnotation[] = annotations
+    .filter((x: Annotation) => x.type !== "class_label")
+    .map(convertAnnotationToDisplayAnnotation);
 
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
@@ -80,6 +80,13 @@ export const DisruptionView = ({
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
 
+  const updateZones = (newZones: Array<Zone>) => {
+    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
+  };
+
+  const updateVSpans = (newVSpans: Array<VSpan>) => {
+    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
+  };
   const plotData: Partial<Plotly.PlotData>[] = Object.entries(data.values).map(
     ([signalName, item], index) => ({
       x: (item as TimeSeriesData).time,
@@ -87,7 +94,7 @@ export const DisruptionView = ({
       name: signalName,
       xaxis: `x${index + 1}`,
       yaxis: `y${index + 1}`,
-    }),
+    })
   );
 
   let axes = Object.entries(data.values).map((_, index) => {
@@ -106,14 +113,6 @@ export const DisruptionView = ({
     showlegend: true,
     dragmode: "pan",
     ...axes,
-  };
-
-  const updateZones = (newZones: Array<Zone>) => {
-    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-  };
-
-  const updateVSpans = (newVSpans: Array<VSpan>) => {
-    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
   };
 
   return (

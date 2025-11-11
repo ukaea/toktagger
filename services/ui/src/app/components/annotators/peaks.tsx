@@ -1,38 +1,39 @@
 "use client";
-import { Annotations, MultiVariateTimeSeriesData } from "@/types";
+import { useEffect, useState } from "react";
+import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import {
   Provider,
   defaultTheme,
   Slider,
-  Button,
   Flex,
-  Header,
   ComboBox,
   Item,
   RangeSlider,
+  Switch,
 } from "@adobe/react-spectrum";
-import { RangeValue } from "@react-types/shared";
-import { useEffect, useState } from "react";
+import { AnnotatorTypes } from "./types";
 
-type FindPeaksToolInfo = {
+type PeakDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (annotations: Annotations) => void;
+  setAnnotations: (
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+  ) => void;
 };
-
-export function FindPeaksTool({
+export function PeakDetectionTool({
   project_id,
   sample_id,
   data,
   setAnnotations,
-}: FindPeaksToolInfo) {
-  const [prominence, setProminance] = useState<number>(0.1);
+}: PeakDetectionType) {
+  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const [prominence, setProminance] = useState<number>(5);
   const [distance, setDistance] = useState<number>(1);
 
-  const [timeMinDefault, setTimeMinDefault] = useState<number | null>(null);
-  const [timeMaxDefault, setTimeMaxDefault] = useState<number | null>(null);
-  const [timeRange, setTimeRange] = useState<RangeValue<number>>({
+  const [timeMinDefault, setTimeMinDefault] = useState<number>(0);
+  const [timeMaxDefault, setTimeMaxDefault] = useState<number>(0);
+  const [timeRange, setTimeRange] = useState<{ start: number; end: number }>({
     start: 0,
     end: 100,
   });
@@ -44,28 +45,33 @@ export function FindPeaksTool({
 
   const validSignal = signalName !== null && signalName in data.values;
 
-  const clearPeaks = () => {
-    setAnnotations([]);
-  };
-
   useEffect(() => {
-    if (data && validSignal) {
+    if (data && signalName !== null && signalName in data.values) {
       const time = data.values[signalName].time;
       const tmin = Math.min(...time);
       const tmax = Math.max(...time);
       setTimeMinDefault(tmin);
       setTimeMaxDefault(tmax);
     }
-  }, [data, signalName, validSignal]);
+  }, [data, signalName]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignal) {
+      if (!validSignal || !isEnabled) {
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
+          );
+          return otherAnnotations;
+        });
+
         return;
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/find_peaks`,
+        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/peak_detection`,
         {
           method: "POST",
           headers: {
@@ -81,8 +87,14 @@ export function FindPeaksTool({
         },
       );
 
-      const payload = await response.json();
-      setAnnotations(payload);
+      const payload: Annotation[] = await response.json();
+      setAnnotations((previousAnnotations: Annotation[]) => {
+        const otherAnnotations = previousAnnotations.filter(
+          (annotation: Annotation) =>
+            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
+        );
+        return otherAnnotations.concat(payload);
+      });
     };
 
     fetchData();
@@ -92,20 +104,24 @@ export function FindPeaksTool({
     prominence,
     distance,
     timeRange,
+    isEnabled,
     signalName,
-    setAnnotations,
     validSignal,
+    setAnnotations,
   ]);
 
   return (
     <Provider theme={defaultTheme}>
-      <Header>Find Peaks</Header>
       <div className="m-4">
         <Flex direction="column">
+          <Switch isSelected={isEnabled} onChange={setIsEnabled}>
+            Enable Tool
+          </Switch>
           <ComboBox
+            label="Signal Name"
+            defaultInputValue={signalName ?? undefined}
             defaultItems={signalOptions}
             onInputChange={setSignalName}
-            label="Signal Name"
           >
             {(x) => <Item>{x.name}</Item>}
           </ComboBox>
@@ -113,7 +129,7 @@ export function FindPeaksTool({
           <Slider
             label="Prominence"
             minValue={0.01}
-            maxValue={1}
+            maxValue={10}
             defaultValue={prominence}
             step={0.001}
             onChangeEnd={setProminance}
@@ -127,20 +143,13 @@ export function FindPeaksTool({
           />
           <RangeSlider
             label="Time Range"
-            defaultValue={{
-              start: timeMinDefault || 0,
-              end: timeMaxDefault || 0,
-            }}
+            defaultValue={{ start: timeMinDefault, end: timeMaxDefault }}
             value={timeRange}
             onChangeEnd={setTimeRange}
             step={0.001}
-            minValue={timeMinDefault || 0}
-            maxValue={timeMaxDefault || 0}
+            minValue={timeMinDefault}
+            maxValue={timeMaxDefault}
           />
-          <br />
-          <Button variant="primary" onPress={clearPeaks}>
-            Clear Peaks
-          </Button>
         </Flex>
       </div>
     </Provider>
