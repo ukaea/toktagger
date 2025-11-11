@@ -33,6 +33,8 @@ dependencies = [
   "mkdocs-material",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
+  "ruptures>=1.1.10",
+  "hmmlearn>=0.3.3",
 ]
 
 [tool.setuptools.packages.find]
