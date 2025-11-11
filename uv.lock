@@ -2360,6 +2360,15 @@ wheels = [
 ]
 
 [[package]]
+name = "ruptures"
+version = "1.1.10.dev10+ge88da13b5"
+source = { git = "https://github.com/deepcharles/ruptures.git?rev=e88da13b5f625f37321abd07c5d14b91701c6655#e88da13b5f625f37321abd07c5d14b91701c6655" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+
+[[package]]
 name = "s3fs"
 version = "2025.10.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2590,6 +2599,7 @@ dependencies = [
     { name = "pytest" },
     { name = "ray" },
     { name = "requests" },
+    { name = "ruptures" },
     { name = "s3fs" },
     { name = "sal" },
     { name = "scikit-learn" },
@@ -2630,6 +2640,7 @@ requires-dist = [
     { name = "pytest" },
     { name = "ray", specifier = ">=2.49.1" },
     { name = "requests" },
+    { name = "ruptures", git = "https://github.com/deepcharles/ruptures.git?rev=e88da13b5f625f37321abd07c5d14b91701c6655" },
     { name = "s3fs" },
     { name = "sal" },
     { name = "scikit-learn" },
