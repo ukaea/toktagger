@@ -2,8 +2,6 @@
 
 An interactive annotation platform for Tokamak diagnostic data.
 
- - [License](https://github.com/ukaea/viz-annotation/blob/main/LICENSE.md)
-
 ## Quick Start
 
 You can run the application locally through a simple pip install:
@@ -14,3 +12,9 @@ toktagger
 ```
 
 This will start a local instance of the application running at `http://localhost:8002`.
+
+## Project Links
+
+ - [Git Repo](https://github.com/ukaea/viz-annotation)
+ - [License](https://github.com/ukaea/viz-annotation/blob/main/LICENSE.md)
+
