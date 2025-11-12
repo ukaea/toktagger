@@ -116,6 +116,8 @@ export const TimeSeries = ({
           x1 = (plot as any)._fullData[0]._extremes.x.max[0].val as number;
         }
 
+        let yAxesRanges = {};
+
         // Ensure each data set is handled (ensures all subplots are zoomed correctly)
         data.forEach((dataSet) => {
           let yAxisID = "";
@@ -144,22 +146,15 @@ export const TimeSeries = ({
             const yMin = Math.min(...yValues);
             const yMax = Math.max(...yValues);
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`]
-              .range;
-
-            // Only allow relayout if new yRange is smaller than previous one or if this isn't a manual zoom
-            // This allows users to zoom in on bits of the graph accurately without it auto-scaling
-            if (
-              yMax - yMin < previousRange[1] - previousRange[0] ||
-              !manualZoom
-            ) {
-              relayout(plot, {
-                [`yaxis${yAxisID}.range`]: [yMin, yMax],
-              });
-            }
+            yAxesRanges = {
+              ...yAxesRanges,
+              [`yaxis${yAxisID}.range`]: [yMin, yMax],
+            };
           }
         });
+
+        // Do one final relayout to set all y axes
+        relayout(plot, yAxesRanges);
 
         // Debounce the relayout calls
         setTimeout(() => {
