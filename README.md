@@ -9,14 +9,17 @@ An interactive annotation platform for Tokamak diagnostic data.
 [![Testing: pytest](https://img.shields.io/badge/testing-pytest-red)](https://github.com/pylint-dev/pylint-pytest)
 
 
-
-
 ## Quick Start
 
 You run the application locally through a simple pip install:
 
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/ukaea/viz-annotation.git
+```
+
+Then run:
+
+```sh
 toktagger
 ```
 
