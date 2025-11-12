@@ -34,6 +34,7 @@ import {
   SpectrogramViewParamsSchema,
   ViewParams,
 } from "@/types";
+import { BACKEND_API_URL, getAnnotationsForSample } from "@/app/core";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 import { ShotLabels } from "../annotators/labels";
@@ -41,20 +42,27 @@ import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
-import { BACKEND_API_URL } from "@/app/core";
+import { ExportTool } from "./export";
+import { ImportTool } from "./import";
 
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotation[],
+  annotations: Annotation[]
 ) {
+  // user has validated the annotations, so set created_by to "manual"
+  const updatedAnnotations = annotations.map((annotation: Annotation) => {
+    annotation.created_by = "manual";
+    return annotation;
+  });
+
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(annotations),
+    body: JSON.stringify(updatedAnnotations),
   });
   return response;
 }
@@ -109,7 +117,7 @@ function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
       const response = await saveAnnotations(
         project_id,
         sample_id,
-        annotations,
+        annotations
       );
 
       if (!response.ok) {
@@ -203,7 +211,7 @@ function AmplitudeSlider({
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor)),
+    Math.log10(Math.max(x, smallPrecisionFactor))
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -218,7 +226,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end,
+          val.end
         )}`
       }
     />
@@ -312,7 +320,7 @@ function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        },
+        }
       );
 
       const payload = await response.json();
@@ -384,7 +392,7 @@ type ToolBarInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
@@ -483,7 +491,7 @@ export default function ToolBar({
     }
 
     const resultSpec = SpectrogramDataSchema.safeParse(
-      resultComposite.data.values["mirnov"],
+      resultComposite.data.values["mirnov"]
     );
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");
@@ -524,6 +532,11 @@ export default function ToolBar({
       ),
     });
   }
+
+  const refreshAnnotations = async () => {
+    const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
+    setAnnotations(dbAnnotations);
+  };
 
   const clearAnnotations = () => {
     setAnnotations([]);
@@ -568,6 +581,31 @@ export default function ToolBar({
               sample_id={sample_id}
               annotations={annotations}
             />
+            <Accordion allowsMultipleExpanded={true} width="100%">
+              <Disclosure>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
+                </DisclosureTitle>
+                <DisclosurePanel>
+                  <ExportTool
+                    project={project}
+                    sample={sample}
+                    current_annotations={annotations}
+                  />
+                </DisclosurePanel>
+              </Disclosure>
+              <Disclosure>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
+                </DisclosureTitle>
+                <DisclosurePanel>
+                  <ImportTool
+                    project_id={project_id}
+                    refreshAnnotations={refreshAnnotations}
+                  />
+                </DisclosurePanel>
+              </Disclosure>
+            </Accordion>
           </Flex>
           <Flex justifyContent="center" alignItems="center">
             <Header height="size-300" marginBottom="size-100">

@@ -67,6 +67,28 @@ async def get_all_annotations(
     return annotations
 
 
+@router.put(
+    "/annotations",
+    responses={
+        200: {"description": "Annotations for this project updated successfully."},
+        404: {"description": "Project not found with that ID."},
+    },
+)
+async def import_annotations(
+    request: Request,
+    annotations: list[AnnotationTypes],
+    project_id: str = Path(
+        description="The ID of the project to update annotations for"
+    ),
+) -> None:
+    """
+    Update or add annotations for this project.
+    -------------------------------------------
+    """
+    db_client = request.app.state.db_client
+    await utils.import_annotations(db_client, project_id, annotations)
+
+
 @router.delete(
     "/annotations",
     responses={
@@ -95,7 +117,7 @@ async def delete_all_annotations(
     "/samples/{sample_id}/annotations",
     response_model=list[AnnotationOutTypes],
     responses={
-        200: {"description": "Annotations for this sample retrieved successfully."},
+        200: {"description": "Annotations for this sample deleted successfully."},
         404: {"description": "Project or Sample not found with that ID."},
     },
 )
@@ -152,7 +174,7 @@ async def get_annotations(
 @router.put(
     "/samples/{sample_id}/annotations",
     responses={
-        200: {"description": "Annotations for this sample retrieved successfully."},
+        200: {"description": "Annotations for this sample updated successfully."},
         404: {"description": "Project or Sample not found with that ID."},
     },
 )
@@ -183,10 +205,6 @@ async def update_annotations(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
 
-    if len(annotations) == 0:
-        # Nothing to do!
-        return
-
     # Delete previous annotations, if they exist
     try:
         await utils.delete_annotations(
@@ -194,6 +212,10 @@ async def update_annotations(
         )
     except HTTPException:
         pass
+
+    if len(annotations) == 0:
+        # Nothing to do!
+        return
 
     return await utils.add_annotations(
         db_client=db_client,

@@ -9,6 +9,8 @@ class AnnotationIn(ConfiguredModel):
     created_by: AnnotatorTypes
     validated: bool = False
     uncertainty: Optional[float] = None
+    sample_id: Optional[str] = None
+    project_id: Optional[str] = None
 
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
@@ -24,9 +26,6 @@ class AnnotationIn(ConfiguredModel):
 
 class Annotation(AnnotationIn):
     id: str = Field(..., alias="_id")
-    created_by: AnnotatorTypes
-    project_id: Optional[str] = None
-    sample_id: Optional[str] = None
 
 
 class ClassLabel(AnnotationIn):
