@@ -77,7 +77,7 @@ npm --prefix services/ui run dev
 Alternatively, you can run the application in development mode using docker:
 
 ```sh
-docker compose --env-file .env.dev -f docker-compose.dev.yml up    
+docker compose --env-file .env.dev -f docker-compose.dev.yml up --build
 ```
 
 This will start both the backend API and the frontend UI at the following urls:
