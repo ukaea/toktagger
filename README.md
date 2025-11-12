@@ -2,8 +2,14 @@
 
 An interactive annotation platform for Tokamak diagnostic data.
 
+[![Workflow: CI](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml/badge.svg)](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml)
+[![Workflow: Dependabot](https://img.shields.io/badge/Dependabot-enabled-34d058?logo=github)](https://github.com/ukaea/viz-annotation/actions/workflows/dependabot/dependabot-updates)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml/badge.svg)](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml)
+[![Linting: ruff](https://img.shields.io/badge/linting-ruff-purple)](https://github.com/astral-sh/ruff)
+[![Testing: pytest](https://img.shields.io/badge/testing-pytest-red)](https://github.com/pylint-dev/pylint-pytest)
+
+
+
 
 ## Quick Start
 
