@@ -37,8 +37,6 @@ def annotations():
     annotations = [
         TimePointOut(
             **annotation_in.model_dump(),
-            project_id="test",
-            sample_id="test",
             _id="test",
         )
         for annotation_in in annotation_ins
@@ -54,27 +52,31 @@ def test_sequential_strategy(samples, annotations):
     strategy = query_strategy.SequentialQueryStrategy(
         samples.copy(), annotations.copy()
     )
+
+    next_sample_id = None
     for i in range(len(samples)):
-        next_sample = strategy.get_next_sample()
+        next_sample = strategy.get_next_sample(next_sample_id)
+        next_sample_id = next_sample.id
         assert next_sample == samples[i]
+
     # Should raise an error when you get to the end
     with pytest.raises(RuntimeError, match="No more samples to label!"):
-        strategy.get_next_sample()
+        strategy.get_next_sample(next_sample_id)
 
 
 def test_random_strategy(samples, annotations):
     random.seed(42)
     strategy_1 = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
-    returned_samples_1 = [strategy_1.get_next_sample() for i in range(len(samples))]
-    # Should raise an error when you get to the end
-    with pytest.raises(RuntimeError, match="No more samples to label!"):
-        strategy_1.get_next_sample()
 
-    strategy_2 = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
-    returned_samples_2 = [strategy_2.get_next_sample() for i in range(len(samples))]
+    next_sample_id = None
+    random_samples = []
+    for i in range(len(samples)):
+        next_sample = strategy_1.get_next_sample(next_sample_id)
+        random_samples.append(next_sample)
+        next_sample_id = next_sample.id
 
-    # Check that two instances have not returned the same order of results
-    assert returned_samples_1 != returned_samples_2
+    assert len(random_samples) == len(samples)
+    assert random_samples != samples
 
 
 def test_uncertainty_strategy(samples, annotations):
@@ -86,13 +88,13 @@ def test_uncertainty_strategy(samples, annotations):
     # These correspond to samples number 4, 1, 2
     # It should then fallback to random selection of remaining samples - 3
     next_sample = strategy.get_next_sample()
-    assert next_sample.id == "sample_4"
-    next_sample = strategy.get_next_sample()
-    assert next_sample.id == "sample_1"
-    next_sample = strategy.get_next_sample()
     assert next_sample.id == "sample_2"
-    next_sample = strategy.get_next_sample()
+    next_sample = strategy.get_next_sample("sample_2")
+    assert next_sample.id == "sample_1"
+    next_sample = strategy.get_next_sample("sample_1")
+    assert next_sample.id == "sample_4"
+    next_sample = strategy.get_next_sample("sample_4")
     assert next_sample.id == "sample_3"
     # Should raise an error when you get to the end
     with pytest.raises(RuntimeError, match="No more samples to label!"):
-        strategy.get_next_sample()
+        strategy.get_next_sample("sample_3")

@@ -3,9 +3,6 @@ import { useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
-  ButtonGroup,
-  ToastQueue,
-  Button,
   Flex,
   View,
   Header,
@@ -44,6 +41,7 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
 import { ExportTool } from "./export";
 import { ImportTool } from "./import";
+import { NavigationBar } from "./nav";
 
 async function saveAnnotations(
   project_id: string,
@@ -66,12 +64,6 @@ async function saveAnnotations(
   });
   return response;
 }
-async function getNextSample(project_id: string) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
-  const sampleResult = await fetch(NEXT_URL);
-  const sample = await sampleResult.json();
-  return sample;
-}
 
 async function getShotSample(project_id: string, shot_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
@@ -89,58 +81,6 @@ type SaveInfo = {
   sample_id: string;
   annotations: Annotation[];
 };
-
-function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const navigate = useNavigate();
-
-  const handleClick = async () => {
-    try {
-      await saveAnnotations(project_id, sample_id, annotations);
-      const sample = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-      navigate(NEXT_SAMPLE_URL);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-    }
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Next
-    </Button>
-  );
-}
-
-function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const handleClick = async () => {
-    try {
-      const response = await saveAnnotations(
-        project_id,
-        sample_id,
-        annotations
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to save annotations: ${response.statusText}`);
-      }
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
-        timeout: 5000,
-      });
-    } catch (err) {
-      if (err instanceof Error) {
-        ToastQueue.negative(`${err.message}`, {
-          timeout: 5000,
-        });
-      }
-    }
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Save
-    </Button>
-  );
-}
 
 export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   const navigate = useNavigate();
@@ -538,10 +478,6 @@ export default function ToolBar({
     setAnnotations(dbAnnotations);
   };
 
-  const clearAnnotations = () => {
-    setAnnotations([]);
-  };
-
   return (
     <Provider theme={defaultTheme} height="100vh">
       <View overflow="auto" height="100vh">
@@ -561,21 +497,12 @@ export default function ToolBar({
             <Header height="size-300" marginBottom="size-100">
               <span style={{ fontSize: "1.2rem" }}>Controls</span>
             </Header>
-            <ButtonGroup>
-              <SaveButton
-                project_id={project_id}
-                sample_id={sample_id}
-                annotations={annotations}
-              />
-              <NextButton
-                project_id={project_id}
-                sample_id={sample_id}
-                annotations={annotations}
-              />
-              <Button variant="primary" onPress={clearAnnotations}>
-                Clear
-              </Button>
-            </ButtonGroup>
+            <NavigationBar
+              project_id={project_id}
+              sample_id={sample_id}
+              annotations={annotations}
+              setAnnotations={setAnnotations}
+            />
             <ShotSearch
               project_id={project_id}
               sample_id={sample_id}

@@ -81,7 +81,7 @@ async def get_samples(
         limit=count if count is not None else 0,
     )
 
-    samples = [Sample(**sample) for sample in samples]
+    samples = [TypeAdapter(Sample).validate_python(s) for s in samples]
     return samples
 
 
