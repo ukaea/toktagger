@@ -44,7 +44,7 @@ export const TimeSeries = ({
     config = {
       displaylogo: false,
       displayModeBar: true,
-      scrollZoom: false,
+      scrollZoom: true,
     },
   },
   children,
@@ -72,7 +72,7 @@ export const TimeSeries = ({
       // Get all subplot elements and extract the subplot name (xy for example) from the class list
       const subplots = plot.querySelectorAll(".subplot");
       const subplotNames = [...subplots].map((el) =>
-        [...el.classList].find((cls) => cls !== "subplot"),
+        [...el.classList].find((cls) => cls !== "subplot")
       );
 
       // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
@@ -90,7 +90,7 @@ export const TimeSeries = ({
           // ensure only one custom overlay group is present
           const svg = document.createElementNS(
             "http://www.w3.org/2000/svg",
-            "g",
+            "g"
           );
           svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`);
           svg.setAttribute("fill", "none");
@@ -172,10 +172,15 @@ export const TimeSeries = ({
         triggerToolUpdate();
 
         // This makes use of the first graph displayed but this should be fine
-        const x0 = eventData["xaxis.range[0]"];
-        const x1 = eventData["xaxis.range[1]"];
-
-        rescale(x0, x1, true);
+        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+          // for zoom and pan events
+          rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
+        } else if ("xaxis.range" in eventData) {
+          // for range slider events
+          rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
+        } else {
+          rescale(); // for initial load & autoscale
+        }
       };
       plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
       plot.on("plotly_doubleclick", rescale);
