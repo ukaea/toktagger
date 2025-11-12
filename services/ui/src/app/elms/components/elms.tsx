@@ -19,6 +19,7 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
+import { useRef } from "react";
 
 const zoneCategories: Category[] = [
   { name: "Peak", color: "rgb(233, 170, 98)" },
@@ -135,6 +136,9 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     ...yAxesLayout,
   };
 
+  const dataRef = useRef(plotData);
+  const layoutRef = useRef(plotLayout);
+
   return (
     <div className="flex space-y-3">
       <div className="flex-1 text-center items-center">
@@ -146,7 +150,7 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
           >
             <TimeSeries
               plotId="ELMs"
-              plotConfig={{ data: plotData, layout: plotLayout }}
+              plotConfig={{ data: dataRef.current, layout: layoutRef.current }}
             >
               <Zones onZoneUpdate={updateZones} />
             </TimeSeries>

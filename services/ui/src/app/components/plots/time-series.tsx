@@ -6,6 +6,7 @@ import Plotly, {
   Layout,
   PlotData,
   relayout,
+  react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
@@ -53,8 +54,7 @@ export const TimeSeries = ({
   const [plotReady, setPlotReady] = useState(false);
   const isDraggingRef = useRef(false);
   const controlHeldRef = useRef(false);
-
-  const plotId = externalId || "disruption"; // Facilitate an external or default ID
+  const plotId = externalId || "time-series"; // Facilitate an external or default ID
 
   const { show: showContextMenu, toolingCallbacks } = useContextMenuProvider();
   const showContextMenuRef = useRef(showContextMenu);
@@ -184,15 +184,15 @@ export const TimeSeries = ({
     const root = document.getElementById(plotId);
 
     if (!root) {
-      console.error("Cannot locate disruption element");
       return;
     }
 
     const initGraph = async () => {
-      const { react } = await import("plotly.js"); // Annoyingly there seems to be an issue with plotly so dynamic import is needed
       react(root, data, layout, config).then(renderZones);
     };
+
     initGraph();
+
     return () => {
       // cleanup on unmount / Fast-Refresh
 
