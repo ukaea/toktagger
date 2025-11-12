@@ -26,6 +26,7 @@ export default defineConfig({
   },
   define: {
     global: "globalThis", // polyfill Node's global
+    "process.env": {},
   },
   optimizeDeps: {
     include: ["plotly.js-dist-min"],

@@ -205,10 +205,9 @@ export const TimeSeries = ({
 
   useEffect(() => {
     const reload = async () => {
-      const { react } = await import("plotly.js"); // Annoyingly there seems to be an issue with plotly so dynamic import is needed
       const root = document.getElementById(plotId);
       if (root) {
-        react(root, data, layout, config);
+        Plotly.react(root, data, layout, config);
       }
     };
     reload();

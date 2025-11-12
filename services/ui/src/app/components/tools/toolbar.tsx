@@ -302,7 +302,7 @@ function SpectrogramThresholdTool({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
         {
           method: "POST",
           headers: {

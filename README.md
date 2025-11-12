@@ -64,7 +64,7 @@ npm --prefix services/ui run install
 3. Run the backend API service in development mode. The backend API will be accessible at `http://localhost:8002`.
 
 ```sh
-uvicorn services.api:app --host 0.0.0.0 --port 8002 --reload
+uvicorn services.api.main:app --host 0.0.0.0 --port 8002 --reload
 ```
 
 4. Run the frontend UI service in development mode. The UI will be accessible at `http://localhost:5173`
