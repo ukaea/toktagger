@@ -68,12 +68,6 @@ class Server:
         self,
         host: str = "localhost",
         port: int = 8002,
-        reload: bool = False,
     ):
         self._setup_app()
-        uvicorn.run(self.app, host=host, port=port, reload=reload)
-
-
-server = Server()
-server._setup_app()
-app = server.app
+        uvicorn.run(self.app, host=host, port=port)

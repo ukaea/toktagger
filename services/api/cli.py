@@ -1,6 +1,12 @@
 import argparse
 from services.api.main import Server
 import webbrowser
+import uvicorn
+
+# Need to point to app as a module level string if we want reload option
+server = Server()
+server._setup_app()
+app = server.app
 
 
 def main():
@@ -19,5 +25,6 @@ def main():
     open_browser = not args.no_browser
     if open_browser:
         webbrowser.open(f"http://{args.host}:{args.port}")
-    server = Server()
-    server.run(args.host, args.port, open_browser, args.reload)
+    uvicorn.run(
+        "services.api.cli:app", host=args.host, port=args.port, reload=args.reload
+    )
