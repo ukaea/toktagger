@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Request
-from services.api.core.annotators import PeakDetectionAnnotator
-from services.api.core.data_loaders import LoaderRegistry
-from services.api.crud import utils
-from services.api.schemas.annotations import TimeRegion
-from services.api.schemas.annotators import AnnotatorParams, PeakDetectionParams
-from services.api.schemas.models import Model
+from toktagger.api.core.annotators import PeakDetectionAnnotator
+from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.crud import utils
+from toktagger.api.schemas.annotations import TimeRegion
+from toktagger.api.schemas.annotators import AnnotatorParams, PeakDetectionParams
+from toktagger.api.schemas.models import Model
 
 router = APIRouter(prefix="/projects/{project_id}/models", tags=["Models"])
 

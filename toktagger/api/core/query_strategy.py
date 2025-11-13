@@ -1,9 +1,9 @@
 import random
 from abc import ABC, abstractmethod
 
-from services.api.schemas.samples import Sample
-from services.api.schemas.annotations import Annotation
-from services.api.schemas.projects import QueryStrategyType
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.annotations import Annotation
+from toktagger.api.schemas.projects import QueryStrategyType
 
 
 class QueryStrategy(ABC):

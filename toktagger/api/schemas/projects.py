@@ -1,7 +1,7 @@
 from pydantic import Field, field_validator
 from enum import Enum
-from services.api.schemas import ConfiguredModel
-from services.api.core.data_loaders import LoaderRegistry
+from toktagger.api.schemas import ConfiguredModel
+from toktagger.api.core.data_loaders import LoaderRegistry
 
 
 class Task(Enum):

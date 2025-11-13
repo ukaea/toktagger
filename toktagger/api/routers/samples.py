@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
-from services.api.core.data_pool import DataPool
-from services.api.core.query_strategy import QUERY_STRATEGIES
-from services.api.core.data_loaders import LoaderRegistry
-from services.api.crud import utils
-from services.api.schemas.samples import SampleIn, Sample
-from services.api.schemas.annotations import Annotation
-from services.api.schemas import convert_to_objectid
+from toktagger.api.core.data_pool import DataPool
+from toktagger.api.core.query_strategy import QUERY_STRATEGIES
+from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.crud import utils
+from toktagger.api.schemas.samples import SampleIn, Sample
+from toktagger.api.schemas.annotations import Annotation
+from toktagger.api.schemas import convert_to_objectid
 from typing import Literal
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])

@@ -42,7 +42,7 @@ services:
       - mongo
     volumes:
       - ./data/:/app/data
-      - ./services:/app/services
+      - ./toktagger:/app/toktagger
     environment:
       MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
       UDA_HOST: "uda2.mast.l"

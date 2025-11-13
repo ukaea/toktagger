@@ -8,8 +8,8 @@ from scipy.interpolate import interp1d
 
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from services.api.schemas.data import MultiVariateTimeSeriesData
-from services.api.schemas.annotators import (
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData
+from toktagger.api.schemas.annotators import (
     AnnotatorTypes,
     ChangePointDetectionParams,
     PeakDetectionParams,
@@ -18,13 +18,13 @@ from services.api.schemas.annotators import (
 )
 from scipy.signal import stft
 
-from services.api.schemas.data import TimeSeriesData
-from services.api.schemas.annotations import SpectrogramMask, TimeRegion
-from services.api.schemas.annotators import (
+from toktagger.api.schemas.data import TimeSeriesData
+from toktagger.api.schemas.annotations import SpectrogramMask, TimeRegion
+from toktagger.api.schemas.annotators import (
     SpectrogramThresholdParams,
     AnnotatorParamTypes,
 )
-from services.api.schemas.projects import Task
+from toktagger.api.schemas.projects import Task
 
 
 def binary_runs_to_tuples(arr: np.ndarray) -> list[tuple[int, int]]:

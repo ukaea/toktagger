@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException
 from typing import Optional
-from services.api.core.views import DATA_VIEWS
-from services.api.core.data_loaders import LoaderRegistry
-from services.api.crud import utils
-from services.api.schemas.samples import Sample
-from services.api.schemas.data import DataResponseType
-from services.api.schemas.views import ViewParams, ViewParamTypes
+from toktagger.api.core.views import DATA_VIEWS
+from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.crud import utils
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.data import DataResponseType
+from toktagger.api.schemas.views import ViewParams, ViewParamTypes
 
 
 router = APIRouter(

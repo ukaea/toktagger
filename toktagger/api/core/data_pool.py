@@ -1,5 +1,5 @@
-from services.api.core.data_loaders import DataLoader
-from services.api.core.query_strategy import QueryStrategy
+from toktagger.api.core.data_loaders import DataLoader
+from toktagger.api.core.query_strategy import QueryStrategy
 
 
 class DataPool:

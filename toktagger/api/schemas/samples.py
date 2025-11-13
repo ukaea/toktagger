@@ -1,8 +1,8 @@
 from typing import Annotated, List, Optional
 from enum import Enum
 from pydantic import Field, BaseModel
-from services.api.schemas import ConfiguredModel
-from services.api.schemas.annotations import AnnotationIn
+from toktagger.api.schemas import ConfiguredModel
+from toktagger.api.schemas.annotations import AnnotationIn
 
 
 class FileType(str, Enum):

@@ -1,16 +1,16 @@
 from typing import List
-from services.api.schemas.projects import (
+from toktagger.api.schemas.projects import (
     Project as ProjectMetadata,
     QueryStrategyType,
 )
-from services.api.core.query_strategy import (
+from toktagger.api.core.query_strategy import (
     QueryStrategy,
     RandomQueryStrategy,
     SequentialQueryStrategy,
 )
-from services.api.core.data_loaders import DataLoader, ParquetDataLoader, UDADataLoader
-from services.api.core.data_pool import DataPool
-from services.api.schemas.samples import Sample
+from toktagger.api.core.data_loaders import DataLoader, ParquetDataLoader, UDADataLoader
+from toktagger.api.core.data_pool import DataPool
+from toktagger.api.schemas.samples import Sample
 
 
 class Project:

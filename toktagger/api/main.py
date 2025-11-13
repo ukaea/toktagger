@@ -3,14 +3,14 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from services.api.routers.annotations import router as annotations_router
-from services.api.routers.annotators import router as annotators_router
-from services.api.routers.data import router as data_router
-from services.api.routers.models import router as models_router
-from services.api.routers.projects import router as projects_router
-from services.api.routers.samples import router as samples_router
-from services.api.routers.base import router as base_router
-from services.api.crud.db import MongoDBClient
+from toktagger.api.routers.annotations import router as annotations_router
+from toktagger.api.routers.annotators import router as annotators_router
+from toktagger.api.routers.data import router as data_router
+from toktagger.api.routers.models import router as models_router
+from toktagger.api.routers.projects import router as projects_router
+from toktagger.api.routers.samples import router as samples_router
+from toktagger.api.routers.base import router as base_router
+from toktagger.api.crud.db import MongoDBClient
 from contextlib import asynccontextmanager
 import uvicorn
 

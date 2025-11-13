@@ -42,7 +42,7 @@ services:
       - mongo
     volumes:
       - ./data/:/app/data
-      - ./services:/app/services
+      - ./toktagger:/app/toktagger
     environment:
       MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
       UDA_HOST: "uda2.mast.l"
@@ -55,7 +55,7 @@ services:
 
   ui:
     container_name: ui_app
-    build: ./services/ui/
+    build: ./toktagger/ui/
     ports:
       - "5173:5173"
     environment:
@@ -63,7 +63,7 @@ services:
       NODE_ENV: development
       VITE_DATA_API_URL: "http://localhost:8002"
     volumes:
-      - ./services/ui:/app
+      - ./toktagger/ui:/app
       - /app/node_modules
     restart: always
     networks:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from typing import Literal
-from services.api.crud import utils
-from services.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
+from toktagger.api.crud import utils
+from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
 
 router = APIRouter(
     prefix="/projects/{project_id}",

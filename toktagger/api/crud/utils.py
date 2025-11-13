@@ -1,11 +1,11 @@
 from typing import Optional, Literal
 from fastapi import HTTPException
 from pydantic import TypeAdapter
-from services.api.crud.db import MongoDBClient
-from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import AnnotationIn, AnnotationOutTypes
-from services.api.schemas.projects import Project
-from services.api.schemas.samples import Sample
+from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.schemas import convert_to_objectid
+from toktagger.api.schemas.annotations import AnnotationIn, AnnotationOutTypes
+from toktagger.api.schemas.projects import Project
+from toktagger.api.schemas.samples import Sample
 
 
 async def get_projects(
