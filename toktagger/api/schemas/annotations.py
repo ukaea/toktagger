@@ -1,6 +1,6 @@
 from typing import Literal, Tuple, Optional, Union
-from services.api.schemas import ConfiguredModel
-from services.api.schemas.annotators import AnnotatorTypes
+from toktagger.api.schemas import ConfiguredModel
+from toktagger.api.schemas.annotators import AnnotatorTypes
 from pydantic import Field, model_validator, BaseModel
 
 

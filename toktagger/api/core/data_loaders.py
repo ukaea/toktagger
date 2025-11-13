@@ -4,14 +4,14 @@ import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
 import numpy as np
-from services.api.schemas.data import (
+from toktagger.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
     ImageData,
 )
-from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
-from services.api.schemas.projects import DataLoaderType
+from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
+from toktagger.api.schemas.projects import DataLoaderType
 
 
 # Set up UDA environment variables with defaults if not already set. This is required for

@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
 from typing import Literal
-from services.api.schemas.projects import ProjectIn, Project
-from services.api.schemas.annotations import Annotation
-from services.api.schemas.samples import Sample
-from services.api.schemas import convert_to_objectid
-from services.api.crud import utils
-from services.api.core.data_pool import DataPool
-from services.api.core.data_loaders import DATA_LOADERS
-from services.api.core.query_strategy import QUERY_STRATEGIES
+from toktagger.api.schemas.projects import ProjectIn, Project
+from toktagger.api.schemas.annotations import Annotation
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas import convert_to_objectid
+from toktagger.api.crud import utils
+from toktagger.api.core.data_pool import DataPool
+from toktagger.api.core.data_loaders import DATA_LOADERS
+from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 

@@ -5,7 +5,7 @@ import typing
 from bson.objectid import ObjectId
 
 from platformdirs import user_cache_dir
-from services.api.crud.mongita_client import AsyncMongitaClient
+from toktagger.api.crud.mongita_client import AsyncMongitaClient
 
 DATABASE_NAME = "event_db"
 COLLECTION_NAME = "shots"

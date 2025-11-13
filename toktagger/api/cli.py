@@ -3,7 +3,7 @@ import time
 import webbrowser
 import argparse
 import uvicorn
-from services.api.main import app
+from toktagger.api.main import app
 
 
 def do_open_browser(host: str, port: int):

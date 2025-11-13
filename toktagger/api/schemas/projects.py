@@ -1,6 +1,6 @@
 from pydantic import Field
 from enum import Enum
-from services.api.schemas import ConfiguredModel
+from toktagger.api.schemas import ConfiguredModel
 
 
 class Task(Enum):
