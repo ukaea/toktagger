@@ -1,6 +1,6 @@
 version: '3.8'
 
-toktagger:
+services:
   mongo:
     image: mongo:4.4.6
     container_name: mongo
