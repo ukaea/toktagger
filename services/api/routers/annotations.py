@@ -143,7 +143,6 @@ async def get_annotations(
         start=start,
         count=count,
     )
-    print(annotations)
 
     return annotations
 

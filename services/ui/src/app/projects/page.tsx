@@ -1,6 +1,7 @@
 "use client";
-import { getProjects } from "@/app/core";
+import { getProjects } from "../core";
 import { useEffect, useState } from "react";
+import { useNavigate, useHref } from "react-router-dom";
 import {
   Provider,
   defaultTheme,
@@ -26,14 +27,11 @@ type ProjectsTableProps = {
   onSortChange: (sort: SortDescriptor) => void;
 };
 
-export const ProjectsBreadCrumbs = () => {
+const ProjectsBreadCrumbs = () => {
   return (
     <Provider theme={defaultTheme}>
       <Breadcrumbs>
-        <Item
-          key="projects"
-          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}
-        >
+        <Item key="projects" href={`/projects/`}>
           Projects
         </Item>
       </Breadcrumbs>
@@ -41,18 +39,19 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = ({
+const ProjectsTable = ({
   projects,
   sortDescriptor,
   onSortChange,
 }: ProjectsTableProps) => {
+  const navigate = useNavigate();
   const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id,
   }));
 
   return (
-    <Provider theme={defaultTheme}>
+    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
       <Flex height="size-5000" width="100%" direction="column">
         <TableView
           flex
@@ -78,9 +77,7 @@ export const ProjectsTable = ({
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row
-                href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${item["id"]}`}
-              >
+              <Row href={`/ui/projects/${item.id}`}>
                 <Cell>{item["name"]}</Cell>
                 <Cell>{item["task"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>

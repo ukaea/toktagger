@@ -167,7 +167,8 @@ export const LinkedPlot = () => {
       event: MouseEvent,
       plot: Plotly.PlotlyHTMLElement,
     ) {
-      const xaxis = plot._fullLayout.xaxis;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const xaxis = (plot as any)._fullLayout.xaxis;
       if (!event.target) {
         return;
       }
@@ -184,12 +185,13 @@ export const LinkedPlot = () => {
       });
     }
 
-    const contextHandler = (event: MouseEvent) => {
+    const contextHandler = (event: Event) => {
       //  wrap handler so we can remove it
       event.preventDefault(); // Prevent default context menu
-      const isRightClickEvent = event.button === 2 && !event.ctrlKey;
+      const mouseEvent = event as MouseEvent;
+      const isRightClickEvent = mouseEvent.button === 2 && !mouseEvent.ctrlKey;
       if (isRightClickEvent) {
-        handleContextMenu(event, plot);
+        handleContextMenu(mouseEvent, plot);
       }
     };
 

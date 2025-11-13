@@ -24,6 +24,7 @@ class AnnotationIn(ConfiguredModel):
 
 class Annotation(AnnotationIn):
     id: str = Field(..., alias="_id")
+    created_by: AnnotatorTypes
     project_id: Optional[str] = None
     sample_id: Optional[str] = None
 
@@ -57,6 +58,7 @@ class VideoBoundingBox(BoundingBox):
 
 class AnnotationOut(BaseModel):
     id: str = Field(..., alias="_id")
+    created_by: AnnotatorTypes
     project_id: str
     sample_id: str
 

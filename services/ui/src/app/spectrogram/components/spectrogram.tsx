@@ -196,6 +196,7 @@ export const SpectrogramView = ({
       customdata: data.amplitude,
       hovertemplate:
         "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
+      // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
       coloraxis: "coloraxis",
       opacity: plotProps.thresholdActive ? 0.4 : 1,
     },
@@ -251,6 +252,7 @@ export const SpectrogramView = ({
       zerolinewidth: 1,
       showgrid: false,
     },
+    // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
     coloraxis: {
       cmin: logAmpMin,
       cmax: logAmpMax,

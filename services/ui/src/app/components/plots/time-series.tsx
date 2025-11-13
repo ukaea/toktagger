@@ -1,13 +1,13 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import {
+import Plotly, {
   Config,
   Layout,
   PlotData,
   relayout,
   PlotRelayoutEvent,
-} from "plotly.js";
+} from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
 
 type InjectedProps = {
@@ -205,10 +205,9 @@ export const TimeSeries = ({
 
   useEffect(() => {
     const reload = async () => {
-      const { react } = await import("plotly.js"); // Annoyingly there seems to be an issue with plotly so dynamic import is needed
       const root = document.getElementById(plotId);
       if (root) {
-        react(root, data, layout, config);
+        Plotly.react(root, data, layout, config);
       }
     };
     reload();

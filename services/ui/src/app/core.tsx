@@ -2,6 +2,11 @@
 import type { SortDescriptor } from "@react-types/shared";
 import type { Project, Sample } from "@/types";
 
+export let BACKEND_API_URL = "http://localhost:8002";
+if (import.meta.env.VITE_DATA_API_URL) {
+  BACKEND_API_URL = import.meta.env.VITE_DATA_API_URL;
+}
+
 export const getURL = async (url: string) => {
   const response = await fetch(url);
   const payload = await response.json();
@@ -25,9 +30,8 @@ export const getSamples = async (
     params.append("shot_id", shotId);
   }
 
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?${params.toString()}`,
-  );
+  const url = `${BACKEND_API_URL}/projects/${project_id}/samples?${params.toString()}`;
+  const response = await fetch(url);
   const data = await response.json();
   const samples = data as Sample[];
   return samples;
@@ -38,7 +42,7 @@ export const getSample = async (
   sample_id: string,
 ): Promise<Sample> => {
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
   );
   const data = await response.json();
   const sample = data as Sample;
@@ -61,7 +65,7 @@ export const getProjects = async (
   }
 
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/?${params.toString()}`,
+    `${BACKEND_API_URL}/projects?${params.toString()}`,
   );
   const data = await response.json();
   const projects = data as Project[];
@@ -71,9 +75,7 @@ export const getProjects = async (
 export const getProject = async (
   project_id: string,
 ): Promise<Project | null> => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`,
-  );
+  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}`);
   const data = await response.json();
   const project = data as Project;
   return project;

@@ -10,6 +10,7 @@ import {
 } from "@adobe/react-spectrum";
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
+import { BACKEND_API_URL } from "@/app/core";
 
 type OutlierDetectionType = {
   project_id: string;
@@ -55,7 +56,7 @@ export function OutlierDetectionTool({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/outlier_detection`,
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/outlier_detection`,
         {
           method: "POST",
           headers: {
