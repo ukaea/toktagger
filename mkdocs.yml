@@ -4,9 +4,14 @@ theme:
   palette:
     scheme: default
 markdown_extensions: 
+- admonition
+- pymdownx.details
 - pymdownx.highlight
 - pymdownx.inlinehilite
 - pymdownx.superfences
+- md_in_html
+- pymdownx.arithmatex:
+    generic: true
 nav:
   - Home: index.md
   - Annotators: annotators.md
@@ -23,11 +28,6 @@ nav:
       - UI Details: dev/User-Interface-Details.md
       - Providers: dev/Providers.md
       - Context Menu: dev/Context-Menu-Provider.md
-
-markdown_extensions:
-  - md_in_html
-  - pymdownx.arithmatex:
-      generic: true
 
 extra_javascript:
   - javascripts/mathjax.js
