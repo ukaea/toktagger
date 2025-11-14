@@ -1,5 +1,7 @@
 from typing import Union
 from pydantic import BaseModel
+from enum import Enum
+from services.api.schemas import ConfiguredModel
 
 
 class Data(BaseModel):
@@ -26,7 +28,22 @@ class SpectrogramData(Data):
 
 
 class ImageData(Data):
-    data: list[list[tuple[int, int, int]]]
+    frame: int
+    values: list[list[tuple[int, int, int]]]
+
+
+class DataType(str, Enum):
+    IDENTITY = "identity"
+    SPECTROGRAM = "spectrogram"
+    IMAGE = "image"
+
+
+class DataParams(ConfiguredModel):
+    name: DataType = DataType.IDENTITY
+
+
+class ImageParams(DataParams):
+    frame: int
 
 
 DataResponseType = Union[
@@ -36,3 +53,5 @@ DataResponseType = Union[
     CompositeData,
     SpectrogramData,
 ]
+
+DataParamTypes = Union[DataParams, ImageParams]

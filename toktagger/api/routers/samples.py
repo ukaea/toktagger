@@ -189,12 +189,10 @@ async def get_next_sample(
     samples = await utils.get_samples(db_client, project_id)
     annotations = await utils.get_annotations(db_client, project_id, validated=False)
 
-    data_pool = DataPool(
-        data_loader=LoaderRegistry(project.data_loader)(),
-        query_strategy=QUERY_STRATEGIES[project.query_strategy](samples, annotations),
-    )
+    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
+
     try:
-        sample = data_pool.query_strategy.get_next_sample()
+        sample = query_strategy.get_next_sample()
     except RuntimeError:
         raise HTTPException(status_code=204, detail="No more samples available!")
 

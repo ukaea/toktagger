@@ -7,6 +7,13 @@ from toktagger.api.schemas.data import (
     SpectrogramData,
     Data,
     TimeSeriesData,
+    ImageData,
+)
+from services.api.schemas.views import (
+    SpectrogramViewParams,
+    ViewParams,
+    ImageViewParams,
+    ViewType,
 )
 from toktagger.api.schemas.views import SpectrogramViewParams, ViewParams, ViewType
 
@@ -86,4 +93,24 @@ class SpectrogramView:
         )
 
 
-DATA_VIEWS = {ViewType.IDENTITY: IdentityView, ViewType.SPECTROGRAM: SpectrogramView}
+class ImageView:
+    def __init__(self, params: ImageViewParams):
+        self.params = params
+
+    def __call__(self, data: ImageData):
+        data_arr = numpy.array(data.values, dtype=numpy.uint8)
+        # Need to reverse shape here, since a numpy array's shape is in (row, col) format
+        # While Image.resize expects it to be in (width, height)
+        new_shape = [
+            int(dim * self.params.resize_fraction)
+            for dim in reversed(data_arr.shape[:2])
+        ]
+        resized = np.asarray(Image.fromarray(data_arr).resize(new_shape))
+        return ImageData(frame=data.frame, values=resized.tolist())
+
+
+DATA_VIEWS = {
+    ViewType.IDENTITY: IdentityView,
+    ViewType.SPECTROGRAM: SpectrogramView,
+    ViewType.IMAGE: ImageView,
+}

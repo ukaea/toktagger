@@ -46,14 +46,16 @@ class TimeRegion(AnnotationIn):
 
 class BoundingBox(AnnotationIn):
     type: Literal["bounding_box"] = "bounding_box"
-    height: Optional[float] = None
-    width: Optional[float] = None
-    centre: Optional[Tuple[float, float]] = None
+    height: int
+    width: int
+    x_min: int
+    y_min: int
 
 
 class VideoBoundingBox(BoundingBox):
     type: Literal["video_bounding_box"] = "video_bounding_box"
     frame: int
+    track_id: str
 
 
 class AnnotationOut(BaseModel):
