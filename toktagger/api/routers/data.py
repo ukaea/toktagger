@@ -27,11 +27,7 @@ async def get_data(
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-<<<<<<< HEAD:toktagger/api/routers/data.py
     data_loader = LoaderRegistry.get(project.data_loader)()
-=======
-    data_loader = DATA_LOADERS[project.data_loader](params)
->>>>>>> wk9874/image_loader:services/api/routers/data.py
     try:
         data = data_loader.get_sample(sample)
     except FileNotFoundError as e:

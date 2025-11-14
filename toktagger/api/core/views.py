@@ -9,7 +9,7 @@ from toktagger.api.schemas.data import (
     TimeSeriesData,
     ImageData,
 )
-from services.api.schemas.views import (
+from toktagger.api.schemas.views import (
     SpectrogramViewParams,
     ViewParams,
     ImageViewParams,
