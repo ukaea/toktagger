@@ -98,7 +98,7 @@ const ProjectsTable = ({
                     <Button
                       variant="negative"
                       onPress={() => {
-                        if (project["_id"]) handleDelete(project["_id"]);
+                        if (project["_id"]) deleteProject(project["_id"]);
                       }}
                     >
                       <Delete />
@@ -129,7 +129,7 @@ export default function Projects() {
       sortDescriptor,
       currentPage,
       projectsPerPage,
-      projectName,
+      projectName
     );
 
     if (!projects) {
