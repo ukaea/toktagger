@@ -129,7 +129,7 @@ export default function Projects() {
       sortDescriptor,
       currentPage,
       projectsPerPage,
-      projectName
+      projectName,
     );
 
     if (!projects) {
