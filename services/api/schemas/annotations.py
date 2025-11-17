@@ -1,7 +1,7 @@
 from typing import Literal, Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
 from services.api.schemas.annotators import AnnotatorTypes
-from pydantic import Field, model_validator, BaseModel
+from pydantic import Field, TypeAdapter, model_validator, BaseModel
 
 
 class AnnotationIn(ConfiguredModel):
@@ -91,3 +91,5 @@ AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
 AnnotationOutTypes = Union[
     TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
 ]
+AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
+AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)

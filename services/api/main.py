@@ -10,6 +10,7 @@ from services.api.routers.data import router as data_router
 from services.api.routers.models import router as models_router
 from services.api.routers.projects import router as projects_router
 from services.api.routers.samples import router as samples_router
+from services.api.routers.files import router as files_router
 from services.api.crud.db import MongoDBClient
 from contextlib import asynccontextmanager
 
@@ -49,6 +50,7 @@ app.include_router(data_router)
 app.include_router(models_router)
 app.include_router(projects_router)
 app.include_router(samples_router)
+app.include_router(files_router)
 app.include_router(annotators_router)
 
 
