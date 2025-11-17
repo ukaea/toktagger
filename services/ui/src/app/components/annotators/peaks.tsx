@@ -12,6 +12,7 @@ import {
   Switch,
 } from "@adobe/react-spectrum";
 import { AnnotatorTypes } from "./types";
+import { BACKEND_API_URL } from "@/app/core";
 
 type PeakDetectionType = {
   project_id: string;
@@ -71,7 +72,7 @@ export function PeakDetectionTool({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/peak_detection`,
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/peak_detection`,
         {
           method: "POST",
           headers: {

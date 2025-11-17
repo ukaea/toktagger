@@ -1,4 +1,4 @@
-site_name: Viz Annotation
+site_name: TokTagger
 theme:
   name: material
   palette:

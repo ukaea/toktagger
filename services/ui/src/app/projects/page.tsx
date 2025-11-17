@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { deleteProject, getProjects } from "@/app/core";
 import Delete from "@spectrum-icons/workflow/Delete";
 import { ProjectConfigEditor } from "./components/project_config";
+import { useNavigate, useHref } from "react-router-dom";
 import {
   Provider,
   defaultTheme,
@@ -31,14 +32,11 @@ type ProjectsTableProps = {
   onModify?: (project: Project) => void;
 };
 
-export const ProjectsBreadCrumbs = () => {
+const ProjectsBreadCrumbs = () => {
   return (
     <Provider theme={defaultTheme}>
       <Breadcrumbs>
-        <Item
-          key="projects"
-          href={`${process.env.NEXT_PUBLIC_API_URL}/projects/`}
-        >
+        <Item key="projects" href={`/projects/`}>
           Projects
         </Item>
       </Breadcrumbs>
@@ -46,76 +44,73 @@ export const ProjectsBreadCrumbs = () => {
   );
 };
 
-export const ProjectsTable = ({
+const ProjectsTable = ({
   projects,
   sortDescriptor,
   onSortChange,
   onModify = () => {},
 }: ProjectsTableProps) => {
-  if (projects.length === 0) {
-    return (
-      <Flex alignItems="center" justifyContent="center" height="100%">
-        <span style={{ color: "#6E6E6E" }}>No projects available.</span>
-      </Flex>
-    );
-  }
-
-  const handleDelete = async (project_id: string) => {
-    try {
-      await deleteProject(project_id);
-      const project = projects.find(
-        (project) => project["_id"] === project_id,
-      ) as Project;
-      onModify(project);
-      ToastQueue.positive("Project deleted successfully", { timeout: 3000 });
-    } catch {
-      ToastQueue.negative("Error deleting project", { timeout: 3000 });
-    }
-  };
+  const navigate = useNavigate();
+  const rows = projects.map(({ _id, ...rest }) => ({
+    ...rest,
+    id: _id,
+  }));
 
   return (
-    <>
-      <TableView
-        aria-label="Projects"
-        sortDescriptor={sortDescriptor}
-        onSortChange={onSortChange}
-        selectionMode="none"
-      >
-        <TableHeader>
-          <Column>Name</Column>
-          <Column>Task</Column>
-          <Column>Date Created</Column>
-          <Column>Loader</Column>
-          <Column>Edit</Column>
-        </TableHeader>
-        <TableBody>
-          {projects.map((project) => (
-            <Row
-              key={project["_id"]}
-              href={`${process.env.NEXT_PUBLIC_API_URL}/projects/${project["_id"]}`}
-            >
-              <Cell>{project["name"]}</Cell>
-              <Cell>{project["task"]}</Cell>
-              <Cell>{project["timestamp"]}</Cell>
-              <Cell>{project["data_loader"]}</Cell>
-              <Cell>
-                <Flex direction="row" gap="size-100">
-                  <ProjectConfigEditor project={project} onModify={onModify} />
-                  <Button
-                    variant="negative"
-                    onPress={() => {
-                      if (project["_id"]) handleDelete(project["_id"]);
-                    }}
-                  >
-                    <Delete />
-                  </Button>
-                </Flex>
-              </Cell>
-            </Row>
-          ))}
-        </TableBody>
-      </TableView>
-    </>
+    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
+      <Flex height="size-5000" width="100%" direction="column">
+        <TableView
+          flex
+          aria-label="Projects"
+          selectionMode="none"
+          selectionStyle="highlight"
+          sortDescriptor={sortDescriptor}
+          onSortChange={onSortChange}
+        >
+          <TableHeader>
+            <Column key="name" allowsSorting>
+              Name
+            </Column>
+            <Column key="task" allowsSorting>
+              Task
+            </Column>
+            <Column key="_id" allowsSorting>
+              Date Created
+            </Column>
+            <Column key="data_loader" allowsSorting>
+              Loader
+            </Column>
+            <Column key="edit">Edit</Column>
+          </TableHeader>
+          <TableBody items={rows}>
+            {(item) => (
+              <Row href={`/ui/projects/${item.id}`}>
+                <Cell>{item["name"]}</Cell>
+                <Cell>{item["task"]}</Cell>
+                <Cell>{item["timestamp"]}</Cell>
+                <Cell>{item["data_loader"]}</Cell>
+                <Cell>
+                  <Flex direction="row" gap="size-100">
+                    <ProjectConfigEditor
+                      project={project}
+                      onModify={onModify}
+                    />
+                    <Button
+                      variant="negative"
+                      onPress={() => {
+                        if (project["_id"]) handleDelete(project["_id"]);
+                      }}
+                    >
+                      <Delete />
+                    </Button>
+                  </Flex>
+                </Cell>
+              </Row>
+            )}
+          </TableBody>
+        </TableView>
+      </Flex>
+    </Provider>
   );
 };
 
@@ -134,7 +129,7 @@ export default function Projects() {
       sortDescriptor,
       currentPage,
       projectsPerPage,
-      projectName,
+      projectName
     );
 
     if (!projects) {

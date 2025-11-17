@@ -1,17 +1,27 @@
+from pathlib import Path
 import pymongo
 import pydantic
 import typing
 from bson.objectid import ObjectId
 
-# MONGO_URL = os.environ["MONGO_URL"]
-MONGO_URL = "mongodb://root:example@localhost:27017"
+from platformdirs import user_cache_dir
+from services.api.crud.mongita_client import AsyncMongitaClient
+
 DATABASE_NAME = "event_db"
 COLLECTION_NAME = "shots"
 
 
 class MongoDBClient:
     def __init__(self, url: str, db_name: str):
-        self.client = pymongo.AsyncMongoClient(url)
+        if url.startswith("mongodb://"):
+            # Use mongodb (expects running instance of mongodb at this address)
+            self.client = pymongo.AsyncMongoClient(url)
+        else:
+            cache_dir = user_cache_dir("viz-annotation", "ukaea")
+            cache_dir = Path(cache_dir)
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            file_name = cache_dir / db_name
+            self.client = AsyncMongitaClient(file_name)
         self.db = self.client[db_name]
 
     async def insert(
@@ -88,17 +98,14 @@ class MongoDBClient:
         start=0,
         limit=0,
     ):
-        documents = (
-            self.db[collection]
-            .find(filters)
-            .sort(
-                sort_by,
-                pymongo.ASCENDING
-                if sort_direction == "ascending"
-                else pymongo.DESCENDING,
-            )
-            .skip(start)
-            .limit(limit)
+        direction = (
+            pymongo.ASCENDING if sort_direction == "ascending" else pymongo.DESCENDING
+        )
+        documents = self.db[collection].find(
+            filters,
+            sort=[(sort_by, direction)],
+            skip=start,
+            limit=limit,
         )
         return await documents.to_list()
 

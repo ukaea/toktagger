@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
@@ -11,6 +12,15 @@ from services.api.schemas.data import (
 )
 from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 from services.api.schemas.projects import DataLoaderType
+
+
+# Set up UDA environment variables with defaults if not already set. This is required for
+# the pyuda client to work correctly outside of Freia.
+os.environ["UDA_HOST"] = os.environ.get("UDA_HOST", "uda2.mast.l")
+os.environ["UDA_META_PLUGINNAME"] = os.environ.get("UDA_META_PLUGINNAME", "MASTU_DB")
+os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
+    "UDA_METANEW_PLUGINNAME", "MAST_DB"
+)
 
 
 class DataLoader(ABC):

@@ -1,7 +1,6 @@
 [project]
-name = "viz-annotation"
+name = "toktagger"
 version = "2025.0.0"
-dynamic = ["dependencies"]
 requires-python = ">=3.9"
 authors = [
 ]
@@ -13,14 +12,37 @@ classifiers = [
   "Programming Language :: Python"
 ]
 
-[tool.setuptools]
-packages = ["services"]
-py-modules = ["__init__"] #
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "fsspec",
+  "xarray",
+  "s3fs",
+  "zarr",
+  "scipy",
+  "pyarrow<21",
+  "pymongo",
+  "requests",
+  "numpy<2",
+  "scikit-learn",
+  "celery[redis]",
+  "pillow",
+  "uda",
+  "pytest",
+  "mkdocs",
+  "mkdocs-material",
+  "mongita>=1.2.0",
+  "filelock>=3.19.1",
+  "ruptures>=1.1.10",
+  "hmmlearn>=0.3.3",
+]
 
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["services.api*"]
 
-[project.urls]
+[tool.setuptools.package-data]
+"services.api" = ["static/**/*"]
 
 [tool.ruff]
 exclude = [".venv", "notebooks"]
@@ -35,3 +57,6 @@ dev = [
     "ruff>=0.12.9",
     "pre-commit>=4.3.0",
 ]
+
+[project.scripts]
+toktagger = "services.api.cli:main"
