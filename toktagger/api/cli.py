@@ -2,11 +2,18 @@ import webbrowser
 import argparse
 from toktagger.api.main import Server
 import uvicorn
+import time
+import threading
 
 # Need to point to app as a module level string if we want reload option
 server = Server()
 server._setup_app()
 app = server.app
+
+
+def do_open_browser(host: str, port: int):
+    time.sleep(1)  # allow server to start
+    webbrowser.open(f"http://{host}:{port}/ui/projects")
 
 
 def main():
@@ -32,7 +39,8 @@ def main():
     args = argparser.parse_args()
     open_browser = not args.no_browser
     if open_browser:
-        webbrowser.open(f"http://{args.host}:{args.port}")
+        threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
+
     uvicorn.run(
         "toktagger.api.cli:app", host=args.host, port=args.port, reload=args.reload
     )
