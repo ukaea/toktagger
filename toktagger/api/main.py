@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 
 class Server:
     def __init__(self):
-        self.frontend_path = pathlib.Path(__file__).parent / "static"
+        self.frontend_path = pathlib.Path(__file__).parent.joinpath("static")
 
     def _setup_app(self):
         self.app = FastAPI(lifespan=lifespan)
@@ -48,6 +48,14 @@ class Server:
             allow_headers=["*"],
         )
 
+        # Static front end files
+        self.app.state.index_file = self.frontend_path.joinpath("index.html")
+        self.app.mount(
+            "/assets",
+            StaticFiles(directory=self.frontend_path.joinpath("assets")),
+            name="assets",
+        )
+
         self.app.include_router(annotations_router)
         self.app.include_router(data_router)
         self.app.include_router(models_router)
@@ -55,14 +63,6 @@ class Server:
         self.app.include_router(samples_router)
         self.app.include_router(annotators_router)
         self.app.include_router(base_router)
-
-        # Static front end files
-        self.app.state.index_file = self.frontend_path / "index.html"
-        self.app.mount(
-            "/assets",
-            StaticFiles(directory=self.frontend_path / "assets"),
-            name="assets",
-        )
 
     def run(
         self,
