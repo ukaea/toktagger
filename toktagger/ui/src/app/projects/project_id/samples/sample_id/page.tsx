@@ -103,6 +103,7 @@ const SampleView = ({
       />
     );
   } else if (project.task == "UFO") {
+    console.log({data})
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for UFO view");

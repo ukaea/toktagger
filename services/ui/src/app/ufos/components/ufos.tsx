@@ -4,18 +4,8 @@ import {
   Annotations,
   DataParams
 } from "@/types";
-import { Plotly } from "react-plotly.js";
-import {Image, SearchField} from '@adobe/react-spectrum'
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
-import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { TimeSeries } from "@/app/components/plots/time-series";
-import { Zones } from "@/app/components/tools/zones";
+import {SearchField} from '@adobe/react-spectrum'
 import "react-contexify/ReactContexify.css";
-
-import {
-  createAnnotationToDisplayAnnotationFunc,
-  updateAnnotations,
-} from "@/app/utils";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -52,41 +42,14 @@ export function FrameSearch({ setDataParams }) {
   );
 }
 
-
-// This is all chatGPT, dunno if theres an easier way
-export default function CanvasImage({ imageData }: { imageData: number[][][] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const height = imageData.length;
-    const width = imageData[0].length;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    const imgData = ctx.createImageData(width, height);
-    let i = 0;
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const [r, g, b] = imageData[y][x];
-        imgData.data[i++] = r;
-        imgData.data[i++] = g;
-        imgData.data[i++] = b;
-        imgData.data[i++] = 255; // alpha
-      }
-    }
-
-    ctx.putImageData(imgData, 0, 0);
-  }, [imageData]);
-
-  return <canvas ref={canvasRef} />;
+export default function ImageDisplay({ imageData }: { imageData: string }) {
+  return (
+    <img
+      src={`data:image/png;base64,${imageData}`}
+      alt="generated"
+      style={{ imageRendering: "pixelated" }}
+    />
+  );
 }
 
 
@@ -111,8 +74,8 @@ export const UFOView = ({ data, annotations, setAnnotations, dataParams, setData
         <FrameSearch
           setDataParams={setDataParams}
         />
-        <CanvasImage imageData={data.values}>
-        </CanvasImage>
+        <ImageDisplay imageData={data.values}>
+        </ImageDisplay>
       </div>
     </div>
   );

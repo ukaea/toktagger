@@ -29,7 +29,7 @@ class SpectrogramData(Data):
 
 class ImageData(Data):
     frame: int
-    values: list[list[tuple[int, int, int]]]
+    values: str  # base64 string of bytes
 
 
 class DataType(str, Enum):

@@ -1,9 +1,11 @@
 import os
+import io
+import base64
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
-import numpy as np
+
 from toktagger.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
@@ -12,7 +14,6 @@ from toktagger.api.schemas.data import (
     DataParamTypes,
 )
 from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
-
 
 # Set up UDA environment variables with defaults if not already set. This is required for
 # the pyuda client to work correctly outside of Freia.
@@ -85,8 +86,13 @@ class ImageDataLoader(DataLoader):
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
             )
         im = Image.open(file_path)
-        arr = np.asarray(im)
-        return ImageData(frame=file_path.name.split(".")[0], values=arr.tolist())
+        buffer = io.BytesIO()
+        im.save(buffer, format="PNG")
+        buffer.seek(0)
+        return ImageData(
+            frame=file_path.name.split(".")[0],
+            values=base64.b64encode(buffer.getvalue()).decode(),
+        )
 
 
 @LoaderRegistry.register("parquet")
