@@ -186,11 +186,6 @@ export default function SamplePage() {
   }); // Set default color map
 
   useEffect(() => {
-    const refreshData = async (params: ViewParams) => {
-      if (!hasIds) {
-        return;
-      }
-
     const refreshSample = async () => {
       const project = await getProject(project_id);
       setProject(project);
@@ -207,7 +202,7 @@ export default function SamplePage() {
 
   useEffect(() => {
     const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
-      if (!project || !sample) {
+      if (!hasIds) {
         return;
       }
 
@@ -247,9 +242,8 @@ export default function SamplePage() {
     };
 
     run(dataParams, viewParams);
-  }, [project_id, sample_id, dataParams, viewParams]);
+  }, [project_id, sample_id, dataParams, viewParams, hasIds, project]);
 
-  useEffect(() => {}, [plotProps]);
 
   if (!data || !project || !sample || !hasIds) {
     return;
