@@ -103,6 +103,7 @@ const SampleView = ({
       />
     );
   } else if (project.task == "UFO") {
+    console.log({data})
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for UFO view");
@@ -212,12 +213,6 @@ export default function SamplePage() {
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
-      } else if (project.task == "UFO") {
-        viewParams = {
-          ...viewParams,
-          name: "image",
-          resize_fraction: 0.5,
-        } as ImageViewParams;
       }
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
