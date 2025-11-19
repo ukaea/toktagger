@@ -175,7 +175,7 @@ export function importJSONFile(
       const annotations = parsed as Annotation[];
       await saveAnnotations(project_id, annotations);
       callback?.();
-    } catch (err) {
+    } catch {
       throw new Error(`Failed to parse JSON from file: ${file.name}`);
     }
   };

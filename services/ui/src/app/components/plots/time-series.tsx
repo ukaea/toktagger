@@ -1,8 +1,6 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { drag } from "d3";
-import { relative } from "path";
 import Plotly, {
   Config,
   Layout,
@@ -11,7 +9,7 @@ import Plotly, {
   react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
-import React, { use, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 type InjectedProps = {
   plotId: string;
