@@ -14,7 +14,7 @@ export const getURL = async (url: string) => {
 };
 
 export async function getSamplesSummary(
-  project_id: string
+  project_id: string,
 ): Promise<SamplesSummary> {
   const url = `${BACKEND_API_URL}/projects/${project_id}/samples/summary`;
   const response = await fetch(url);
@@ -28,7 +28,7 @@ export const getSamples = async (
   project_id: string,
   page: number,
   samplesPerPage: number,
-  shotId: string
+  shotId: string,
 ): Promise<Sample[]> => {
   const params = new URLSearchParams();
   params.append("sort_by", sortDescriptor.column.toString());
@@ -49,10 +49,10 @@ export const getSamples = async (
 
 export const getSample = async (
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Sample> => {
   const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
   );
   const data = await response.json();
   const sample = data as Sample;
@@ -63,7 +63,7 @@ export const getProjects = async (
   sortDescriptor: SortDescriptor,
   page: number,
   projectsPerPage: number,
-  name: string
+  name: string,
 ): Promise<Project[]> => {
   const params = new URLSearchParams();
   params.append("sort_by", sortDescriptor.column.toString());
@@ -75,7 +75,7 @@ export const getProjects = async (
   }
 
   const response = await fetch(
-    `${BACKEND_API_URL}/projects?${params.toString()}`
+    `${BACKEND_API_URL}/projects?${params.toString()}`,
   );
   const data = await response.json();
   const projects = data as Project[];
@@ -83,7 +83,7 @@ export const getProjects = async (
 };
 
 export const getProject = async (
-  project_id: string
+  project_id: string,
 ): Promise<Project | null> => {
   const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}`);
   const data = await response.json();
@@ -105,7 +105,7 @@ export const deleteProject = async (project_id: string) => {
 
 export async function getAnnotationsForSample(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Annotation[]> {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL);
@@ -117,7 +117,7 @@ export async function getAnnotationsForSample(
 }
 
 export async function getAnnotations(
-  project_id: string
+  project_id: string,
 ): Promise<Annotation[]> {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL);
@@ -131,7 +131,7 @@ export async function getAnnotations(
 export async function saveSampleAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotation[]
+  annotations: Annotation[],
 ) {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
@@ -148,7 +148,7 @@ export async function saveSampleAnnotations(
 
 export async function saveAnnotations(
   project_id: string,
-  annotations: Annotation[]
+  annotations: Annotation[],
 ) {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
@@ -166,7 +166,7 @@ export async function saveAnnotations(
 export function importJSONFile(
   project_id: string,
   file: File,
-  callback?: () => void
+  callback?: () => void,
 ): void {
   const reader = new FileReader();
   reader.onload = async (e) => {
