@@ -28,7 +28,7 @@ export const useContextMenuProvider = () => {
   const context = useContext(ContextMenuContext);
   if (!context) {
     throw new Error(
-      "useRegisterContextMenuItem must be used within a ContextMenuProvider",
+      "useRegisterContextMenuItem must be used within a ContextMenuProvider"
     );
   }
   return context;
@@ -67,13 +67,13 @@ export const ContextMenuProvider = ({
         return newMap;
       });
     },
-    [],
+    []
   );
 
   // Set up listeners to toggle tooling interaction
   useEffect(() => {
     const disableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Shift" || event.key === "Control") {
+      if (event.key === "Alt") {
         if (!keyHeldRef.current) {
           keyHeldRef.current = true;
           setDisableToolInteraction(true);
@@ -82,7 +82,7 @@ export const ContextMenuProvider = ({
     };
 
     const enableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Shift" || event.key === "Control") {
+      if (event.key === "Alt") {
         keyHeldRef.current = false;
         setDisableToolInteraction(false);
       }

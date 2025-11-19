@@ -1,6 +1,8 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { drag } from "d3";
+import { relative } from "path";
 import Plotly, {
   Config,
   Layout,
@@ -9,7 +11,7 @@ import Plotly, {
   react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
-import React, { useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
 
 type InjectedProps = {
   plotId: string;
@@ -54,24 +56,27 @@ export const TimeSeries = ({
           "resetScale2d",
         ],
       ],
+      dragmode: false,
       displaylogo: false,
       displayModeBar: true,
-      scrollZoom: true,
+      scrollZoom: false,
     },
   },
   children,
 }: DisruptionPlotProps) => {
-  const editMode = useRef(true);
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
     null
   );
   const [updateTools, setUpdateTools] = useState(0);
   const [plotReady, setPlotReady] = useState(false);
   const isDraggingRef = useRef(false);
-  const controlHeldRef = useRef(false);
   const plotId = externalId || "time-series"; // Facilitate an external or default ID
 
-  const { show: showContextMenu, toolingCallbacks } = useContextMenuProvider();
+  const {
+    show: showContextMenu,
+    toolingCallbacks,
+    disableToolingInteraction,
+  } = useContextMenuProvider();
   const showContextMenuRef = useRef(showContextMenu);
 
   const allowRelayout = useRef(true);
@@ -80,6 +85,11 @@ export const TimeSeries = ({
     setUpdateTools((current) => (current + 1) % 100);
   };
 
+  if (!disableToolingInteraction) {
+    config = { ...config, scrollZoom: false, dragmode: "pan" };
+  } else {
+    config = { ...config, scrollZoom: true, dragmode: "pan" };
+  }
   // Main plotly rendering
   useEffect(() => {
     const overplots: string[] = [];
@@ -135,7 +145,7 @@ export const TimeSeries = ({
           x1 = (plot as any)._fullData[0]._extremes.x.max[0].val as number;
         }
 
-        let yAxesRanges = {};
+        let configUpdate = {};
 
         // Ensure each data set is handled (ensures all subplots are zoomed correctly)
         data.forEach((dataSet) => {
@@ -166,33 +176,19 @@ export const TimeSeries = ({
             const yMax = Math.max(...yValues);
             const offset = 0.1 * (yMax - yMin); // 10 % offset
 
-            yAxesRanges = {
-              ...yAxesRanges,
+            configUpdate = {
+              ...configUpdate,
               [`yaxis${yAxisID}.range`]: [yMin - offset, yMax + offset],
             };
           }
         });
 
-        // Do one final relayout to set all y axes
-        relayout(plot, yAxesRanges);
+        relayout(plot, configUpdate);
 
         // Debounce the relayout calls
         setTimeout(() => {
           allowRelayout.current = true;
         }, 100);
-      };
-
-      const updateEditMode = (mode: boolean) => {
-        const elements = plot.querySelectorAll(".disable-on-shift");
-        if (!mode) {
-          elements.forEach((element) => {
-            element.setAttribute("style", "pointer-events: none");
-          });
-        } else {
-          elements.forEach((element) => {
-            element.setAttribute("style", "pointer-events: all");
-          });
-        }
       };
 
       const relayoutHandler = (eventData: PlotRelayoutEvent) => {
@@ -209,8 +205,6 @@ export const TimeSeries = ({
         } else {
           rescale(); // for initial load & autoscale
         }
-
-        updateEditMode(editMode.current);
       };
       plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
       plot.on("plotly_doubleclick", rescale);
@@ -270,33 +264,8 @@ export const TimeSeries = ({
     const plot = document.getElementById(plotId);
 
     if (!plot) {
-      console.error("Could not locate plot to set drag mode");
       return;
     }
-
-    const disableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Control") {
-        if (!controlHeldRef.current) {
-          controlHeldRef.current = true;
-          relayout(plot, { dragmode: false });
-        }
-      }
-    };
-
-    const enableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Control") {
-        controlHeldRef.current = false;
-        relayout(plot, { dragmode: "pan" });
-      }
-    };
-
-    document.addEventListener("keydown", disableInteraction);
-    document.addEventListener("keyup", enableInteraction);
-
-    return () => {
-      document.removeEventListener("keydown", disableInteraction);
-      document.removeEventListener("keyup", enableInteraction);
-    };
   }, [plotId, plotReady]);
 
   // Handles context menu creation
@@ -422,11 +391,7 @@ export const TimeSeries = ({
 
     // This is a backup listener in case the user lifts the control key first - this isn't ideal as a final update won't be sent
     const cancelToolCreation = (event: KeyboardEvent) => {
-      if (
-        event.key === "Control" &&
-        toolingCallbacks &&
-        isDraggingRef.current
-      ) {
+      if (event.key === "Alt" && toolingCallbacks && isDraggingRef.current) {
         isDraggingRef.current = false;
       }
     };
