@@ -47,17 +47,7 @@ export const SpectrogramDataSchema = z.object({
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 export const ImageDataSchema = z.object({
   frame: z.number(),
-  values: z.array(
-    z.array(
-      z.tuple(
-        [
-          z.number(),
-          z.number(),
-          z.number()
-        ]
-      )
-    )
-  ),
+  values: z.string()  // base64 PNG
 });
 export type ImageData = z.infer<typeof ImageDataSchema>;
 
