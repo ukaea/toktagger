@@ -19,8 +19,7 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
-import { use, useEffect, useMemo, useRef, useState } from "react";
-import { pl } from "zod/v4/locales";
+import { useEffect, useMemo, useState } from "react";
 
 const zoneCategories: Category[] = [
   { name: "Peak", color: "rgb(233, 170, 98)" },
@@ -37,7 +36,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
   {}
 );
 
-type ELMViewInfo = {
+type TimeSeriesViewInfo = {
   data: MultiVariateTimeSeriesData;
   annotations: Annotation[];
   setAnnotations: (
@@ -45,7 +44,11 @@ type ELMViewInfo = {
   ) => void;
 };
 
-export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
+export const TimeSeriesView = ({
+  data,
+  annotations,
+  setAnnotations,
+}: TimeSeriesViewInfo) => {
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
 

@@ -22,7 +22,7 @@ import {
   MultiVariateTimeSeriesData,
   SpectrogramData,
 } from "@/types";
-import { ELMView } from "@/app/elms/components/elms";
+import { TimeSeriesView } from "@/app/time_series/components/time_series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -117,7 +117,7 @@ const SampleView = ({
     );
   } else if (project.task == "ELM") {
     return (
-      <ELMView
+      <TimeSeriesView
         data={result as MultiVariateTimeSeriesData}
         annotations={annotations}
         setAnnotations={setAnnotations}
