@@ -22,10 +22,16 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 const zoneCategories: Category[] = [
-  { name: "Peak", color: "rgb(233, 170, 98)" },
-  { name: "Outlier", color: "rgb(233, 170, 250)" },
-  { name: "Jump", color: "rgb(1, 250, 1)" },
-  { name: "Change Point", color: "rgb(133, 170, 250)" },
+  { name: "ELM", color: "#FF5733" },
+  { name: "L-mode", color: "#33FF57" },
+  { name: "H-mode", color: "#3357FF" },
+  { name: "Thermal Quench", color: "#FF33A8" },
+  { name: "Current Quench", color: "#A833FF" },
+  { name: "Sawtooth", color: "#33FFF6" },
+  { name: "IRE", color: "#FFC733" },
+  { name: "Locked Mode", color: "#8DFF33" },
+  { name: "VDE", color: "#FF3380" },
+  { name: "Unknown", color: "#B0B0B0" },
 ];
 
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(

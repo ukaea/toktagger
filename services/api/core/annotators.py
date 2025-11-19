@@ -234,7 +234,7 @@ class PeakDetectionAnnotator(DataAnnotator):
             peak_time = time[idx]
             if peak_time >= tmin and peak_time <= tmax:
                 region = TimeRegion(
-                    label="Peak",
+                    label="Unknown",
                     time_min=max(float(peak_time - width), np.min(time)),
                     time_max=min(float(peak_time + width), np.max(time)),
                     created_by=AnnotatorTypes.PEAK_DETECTION,
@@ -308,7 +308,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=time[imin],
                 time_max=time[imax],
-                label="Outlier",
+                label="Unknown",
                 created_by=AnnotatorTypes.OUTLIER_DETECTION,
             )
             for imin, imax in bounds
@@ -333,7 +333,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=time[imin],
                 time_max=time[imax],
-                label="Outlier",
+                label="Unknown",
                 created_by=AnnotatorTypes.OUTLIER_DETECTION,
             )
             for imin, imax in bounds
@@ -418,7 +418,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=time[imin],
                 time_max=time[imax],
-                label="Change Point",
+                label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
             )
             for imin, imax in zip(result, result[1:])
@@ -456,7 +456,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=tmin,
                 time_max=tmax,
-                label="Change Point",
+                label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
             )
             for (tmin, tmax) in bounds
@@ -540,7 +540,7 @@ class JumpDetectionAnnotator(DataAnnotator):
                 TimeRegion(
                     time_min=tmin,
                     time_max=tmax,
-                    label="Jump",
+                    label="Unknown",
                     created_by=AnnotatorTypes.JUMP_DETECTION,
                 )
             )
