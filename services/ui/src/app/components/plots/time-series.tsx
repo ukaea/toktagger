@@ -93,6 +93,7 @@ export const TimeSeries = ({
   // Main plotly rendering
   useEffect(() => {
     const overplots: string[] = [];
+
     const renderZones = (plot: Plotly.PlotlyHTMLElement) => {
       // Get all subplot elements and extract the subplot name (xy for example) from the class list
       const subplots = plot.querySelectorAll(".subplot");
@@ -107,7 +108,7 @@ export const TimeSeries = ({
           ?.querySelector(".overplot")
           ?.querySelector(`.${coordinateSystem}`) as HTMLElement;
         if (!subplot) {
-          console.error("Cannot locate disruption plotly subplot");
+          console.error("Cannot locate plotly subplot");
           return;
         }
 
@@ -125,87 +126,108 @@ export const TimeSeries = ({
       });
 
       setPlotReady(true);
+    };
 
-      // Sets the y axis range required for the current x range for each subplot
-      const rescale = (x0?: number, x1?: number, manualZoom = false) => {
-        if (!allowRelayout.current) return; // Prevents relayout triggering itself
+    // Sets the y axis range required for the current x range for each subplot
+    const rescale = (x0?: number, x1?: number) => {
+      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+      if (!plot) {
+        return;
+      }
 
-        if (data.length === 0) {
-          return;
-        }
-        allowRelayout.current = false;
+      if (!allowRelayout.current) return; // Prevents relayout triggering itself
 
-        // If no x range is passed, then the min/max is used
-        if (!x0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          x0 = (plot as any)._fullData[0]._extremes.x.min[0].val as number;
-        }
-        if (!x1) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          x1 = (plot as any)._fullData[0]._extremes.x.max[0].val as number;
-        }
+      if (data.length === 0) {
+        return;
+      }
+      allowRelayout.current = false;
 
-        let configUpdate = {};
+      // If no x range is passed, then the min/max is used
+      if (!x0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        x0 = (plot as any)._fullData[0]._extremes.x.min[0].val as number;
+      }
+      if (!x1) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        x1 = (plot as any)._fullData[0]._extremes.x.max[0].val as number;
+      }
 
-        // Ensure each data set is handled (ensures all subplots are zoomed correctly)
-        data.forEach((dataSet) => {
-          let yAxisID = "";
+      let configUpdate = {};
 
-          if (dataSet.yaxis) {
-            // Find the y axis ID relating to this subplot
-            const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
-            if (locatedID) {
-              yAxisID = locatedID;
-            }
+      // Ensure each data set is handled (ensures all subplots are zoomed correctly)
+      data.forEach((dataSet) => {
+        let yAxisID = "";
+
+        if (dataSet.yaxis) {
+          // Find the y axis ID relating to this subplot
+          const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
+          if (locatedID) {
+            yAxisID = locatedID;
           }
-
-          const xArray = (dataSet as PlotData).x as number[];
-          const yArray = (dataSet as PlotData).y as number[];
-
-          // Find min and max y data values
-          const yValues: number[] = [];
-          for (let i = 0; i < xArray.length; i++) {
-            const xVal = xArray[i];
-            if (xVal >= x0 && xVal <= x1) {
-              yValues.push(yArray[i]);
-            }
-          }
-
-          if (yValues.length > 0) {
-            const yMin = Math.min(...yValues);
-            const yMax = Math.max(...yValues);
-            const offset = 0.1 * (yMax - yMin); // 10 % offset
-
-            configUpdate = {
-              ...configUpdate,
-              [`yaxis${yAxisID}.range`]: [yMin - offset, yMax + offset],
-            };
-          }
-        });
-
-        relayout(plot, configUpdate);
-
-        // Debounce the relayout calls
-        setTimeout(() => {
-          allowRelayout.current = true;
-        }, 100);
-      };
-
-      const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-        // triggers re-render of overlay tools when axes change
-        triggerToolUpdate();
-
-        // This makes use of the first graph displayed but this should be fine
-        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
-          // for zoom and pan events
-          rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
-        } else if ("xaxis.range" in eventData) {
-          // for range slider events
-          rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
-        } else {
-          rescale(); // for initial load & autoscale
         }
-      };
+
+        const xArray = (dataSet as PlotData).x as number[];
+        const yArray = (dataSet as PlotData).y as number[];
+
+        // Find min and max y data values
+        const yValues: number[] = [];
+        for (let i = 0; i < xArray.length; i++) {
+          const xVal = xArray[i];
+          if (xVal >= x0 && xVal <= x1) {
+            yValues.push(yArray[i]);
+          }
+        }
+
+        if (yValues.length > 0) {
+          const yMin = Math.min(...yValues);
+          const yMax = Math.max(...yValues);
+          const offset = 0.1 * (yMax - yMin); // 10 % offset
+
+          configUpdate = {
+            ...configUpdate,
+            [`yaxis${yAxisID}.range`]: [yMin - offset, yMax + offset],
+          };
+        }
+      });
+
+      relayout(plot, configUpdate);
+
+      // Debounce the relayout calls
+      setTimeout(() => {
+        allowRelayout.current = true;
+      }, 100);
+    };
+
+    const relayoutHandler = (eventData: PlotRelayoutEvent) => {
+      // triggers re-render of overlay tools when axes change
+      triggerToolUpdate();
+
+      // This makes use of the first graph displayed but this should be fine
+      if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+        // for zoom and pan events
+        rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
+      } else if ("xaxis.range" in eventData) {
+        // for range slider events
+        rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
+      } else {
+        rescale(); // for initial load & autoscale
+      }
+    };
+
+    const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+
+    if (!plot) {
+      return;
+    }
+
+    const initGraph = async () => {
+      react(plot, data, layout, config).then(renderZones);
+
+      plot.removeAllListeners("plotly_relayout"); // remove any existing listeners
+      plot.removeAllListeners("plotly_doubleclick");
+      plot.removeAllListeners("plotly_selected");
+      plot.removeAllListeners("plotly_deselect");
+
       plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
       plot.on("plotly_doubleclick", rescale);
 
@@ -222,51 +244,16 @@ export const TimeSeries = ({
       });
     };
 
-    const root = document.getElementById(plotId);
-
-    if (!root) {
-      return;
-    }
-
-    const initGraph = async () => {
-      react(root, data, layout, config).then(renderZones);
-    };
-
     initGraph();
 
     return () => {
-      // cleanup on unmount / Fast-Refresh
-
+      // // cleanup on unmount / Fast-Refresh
       overplots.forEach((overplot) => {
-        root?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
+        plot?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
       });
       setPlotReady(false); // reset ready state
     };
   }, [plotId, config, data, layout, plotReady, allowRelayout]);
-
-  useEffect(() => {
-    const reload = async () => {
-      const root = document.getElementById(plotId);
-      if (root) {
-        Plotly.react(root, data, layout, config);
-      }
-    };
-    reload();
-  }, [plotId, data, layout, config]);
-
-  // Change drag mode based on tooling interactability
-  useEffect(() => {
-    if (!plotReady) {
-      // Plot may not have loaded yet - this will rerun after loading
-      return;
-    }
-
-    const plot = document.getElementById(plotId);
-
-    if (!plot) {
-      return;
-    }
-  }, [plotId, plotReady]);
 
   // Handles context menu creation
   useEffect(() => {
