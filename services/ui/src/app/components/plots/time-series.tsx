@@ -104,6 +104,10 @@ export const TimeSeries = ({
       // Sets the y axis range required for the current x range for each subplot
       const rescale = (x0?: number, x1?: number, manualZoom = false) => {
         if (!allowRelayout.current) return; // Prevents relayout triggering itself
+
+        if (data.length === 0) {
+          return;
+        }
         allowRelayout.current = false;
 
         // If no x range is passed, then the min/max is used

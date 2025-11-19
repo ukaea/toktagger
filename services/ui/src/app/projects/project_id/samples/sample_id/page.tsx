@@ -213,7 +213,6 @@ export default function SamplePage() {
       );
       const data: Data = await response.json();
       setData(data);
-      console.log("Data re-rendered for Top view");
     };
 
     const run = async (viewParams: ViewParams) => {
