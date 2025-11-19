@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
-from toktagger.api.core.data_pool import DataPool
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
-from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import SampleIn, Sample
 from toktagger.api.schemas.annotations import Annotation

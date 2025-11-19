@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+from PIL import Image
 from toktagger.api.core.annotators import compute_stft
 from toktagger.api.schemas.data import (
     CompositeData,
@@ -15,7 +16,6 @@ from toktagger.api.schemas.views import (
     ImageViewParams,
     ViewType,
 )
-from toktagger.api.schemas.views import SpectrogramViewParams, ViewParams, ViewType
 
 
 class IdentityView:
@@ -98,7 +98,7 @@ class ImageView:
         self.params = params
 
     def __call__(self, data: ImageData):
-        data_arr = numpy.array(data.values, dtype=numpy.uint8)
+        data_arr = np.array(data.values, dtype=np.uint8)
         # Need to reverse shape here, since a numpy array's shape is in (row, col) format
         # While Image.resize expects it to be in (width, height)
         new_shape = [
