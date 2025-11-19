@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
-from requests_cache import Optional
 from services.api.crud import utils
 from services.api.schemas.samples import SampleIn, Sample, SampleSummary
 from services.api.core.query_strategy import QUERY_STRATEGIES
 from services.api.schemas.annotations import Annotation
 from services.api.schemas import convert_to_objectid
-from typing import Literal
+from typing import Literal, Optional
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
