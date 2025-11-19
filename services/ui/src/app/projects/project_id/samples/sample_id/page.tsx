@@ -58,7 +58,7 @@ type SampleViewInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
   plotProps: PlotProps;
   forceResetZoom?: boolean;
@@ -94,7 +94,7 @@ const SampleView = ({
         throw new Error("Invalid data for MHD view");
       }
       const mhdData = SpectrogramDataSchema.safeParse(
-        result.data.values["mirnov"]
+        result.data.values["mirnov"],
       );
       if (!mhdData.success) {
         throw new Error("Invalid data for MHD view");
@@ -143,10 +143,10 @@ async function getData<T>(url: string): Promise<T> {
 
 async function getSample(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Sample> {
   return await getData<Sample>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
   );
 }
 
@@ -156,10 +156,10 @@ async function getProject(project_id: string): Promise<Project> {
 
 async function getAnnotations(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`,
   );
 }
 
@@ -209,7 +209,7 @@ export default function SamplePage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(params),
-        }
+        },
       );
       const data: Data = await response.json();
       setData(data);

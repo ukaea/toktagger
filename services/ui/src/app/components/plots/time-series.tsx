@@ -65,7 +65,7 @@ export const TimeSeries = ({
   children,
 }: DisruptionPlotProps) => {
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
-    null
+    null,
   );
   const [updateTools, setUpdateTools] = useState(0);
   const [plotReady, setPlotReady] = useState(false);
@@ -98,7 +98,7 @@ export const TimeSeries = ({
       // Get all subplot elements and extract the subplot name (xy for example) from the class list
       const subplots = plot.querySelectorAll(".subplot");
       const subplotNames = [...subplots].map((el) =>
-        [...el.classList].find((cls) => cls !== "subplot")
+        [...el.classList].find((cls) => cls !== "subplot"),
       );
 
       // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
@@ -116,7 +116,7 @@ export const TimeSeries = ({
           // ensure only one custom overlay group is present
           const svg = document.createElementNS(
             "http://www.w3.org/2000/svg",
-            "g"
+            "g",
           );
           svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`);
           svg.setAttribute("fill", "none");

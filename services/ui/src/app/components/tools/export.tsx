@@ -42,7 +42,7 @@ export function ExportTool({
     } else {
       saveJSONToFile(
         current_annotations,
-        `${project.name}_${sample.shot_id}_annotations.json`
+        `${project.name}_${sample.shot_id}_annotations.json`,
       );
     }
   };

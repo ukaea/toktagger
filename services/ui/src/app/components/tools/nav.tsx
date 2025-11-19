@@ -27,7 +27,7 @@ async function getNextSample(project_id: string, current_sample_id: string) {
 
 async function getPreviousSample(
   project_id: string,
-  current_sample_id: string
+  current_sample_id: string,
 ) {
   const PREVIOUS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/previous?current_sample_id=${current_sample_id}`;
   const sampleResult = await fetch(PREVIOUS_URL);
