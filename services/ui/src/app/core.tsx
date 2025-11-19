@@ -193,7 +193,6 @@ export function saveJSONToFile(data: object, filename: string) {
 
 export const exportAnnotations = async (project: Project) => {
   getAnnotations(project._id).then((annotations: Annotation[]) => {
-    console.log(annotations);
     saveJSONToFile(annotations, `${project.name}_annotations.json`);
   });
 };

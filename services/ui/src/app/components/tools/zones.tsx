@@ -12,7 +12,12 @@ import { useContextMenuProvider } from "../providers/annotation-provider";
  * @param plotId Used to identify the plot that the tooling should be rendered on
  * @param plotReady Signal from main plot that tooling can be drawn
  */
-export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
+export const Zones = ({
+  plotId,
+  plotReady,
+  forceUpdate,
+  selectedXRange,
+}: ToolingProps) => {
   const dragOffset = useRef(0);
 
   // Hook to trigger the context provider to render context menu
@@ -206,6 +211,19 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
         const x0IsLeft = px0 <= px1;
 
+        let opacity = 0.5;
+        // change opacity if the zone is selected
+        if (
+          selectedXRange &&
+          zone.x0 > selectedXRange[0] &&
+          zone.x1 < selectedXRange[1]
+        ) {
+          zone.selected = true;
+          opacity = 0.8;
+        } else {
+          zone.selected = false;
+        }
+
         // Span (center drag target)
         graphGroup
           .append("rect")
@@ -215,7 +233,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .attr("width", spanWidth)
           .attr("height", height)
           .attr("fill", zone.category.color)
-          .attr("opacity", 0.5)
+          .attr("opacity", opacity)
           .attr("style", `pointer-events: ${pointerEvent}`)
           .attr("stroke", "black")
           .attr("stroke-width", 1)
@@ -269,6 +287,7 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
     forceUpdate,
     handleZoneDragFinish,
     disableToolingInteraction,
+    selectedXRange,
   ]);
 
   return <div />;

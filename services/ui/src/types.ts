@@ -72,6 +72,7 @@ export const CategorySchema = z.object({
 export type Category = z.infer<typeof CategorySchema>;
 
 export const ZoneSchema = z.object({
+  selected: z.boolean().default(false),
   created_by: z.string().default("manual"),
   category: CategorySchema,
   x0: z.number(),
@@ -171,6 +172,7 @@ export type ToolingProps = {
   plotReady?: boolean;
   forceUpdate?: number;
   onZoneUpdate?: CallableFunction;
+  selectedXRange?: [number, number];
 };
 
 export enum ToolingTypes {

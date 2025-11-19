@@ -63,20 +63,23 @@ export const ZoneProvider = ({
     onModifyZone?.(zones.current);
   };
 
-  const handleDelete = (input: unknown) => {
+  const handleZoneDelete = (input: Zone) => {
+    // Remove the current zone and all selected zones
     zones.current = zones.current.filter((zone) => zone !== input);
+    zones.current = zones.current.filter((zone) => !zone.selected);
     triggerZoneUpdate();
     onModifyZone?.(zones.current);
   };
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     zones.current = zones.current.map((zone) => {
-      if (zone === props.zone) {
+      if (zone === props.zone || zone.selected) {
         zone.category = targetCategory;
       }
+      zone.selected = false;
       return zone;
     });
     triggerZoneUpdate();
@@ -84,6 +87,7 @@ export const ZoneProvider = ({
 
   const addZone = (x0: number, x1: number, category: Category) => {
     zones.current.push({
+      selected: false,
       created_by: "manual",
       category,
       x0,
@@ -120,6 +124,7 @@ export const ZoneProvider = ({
   useEffect(() => {
     const addZone = (x0: number, x1: number, category: Category) => {
       zones.current.push({
+        selected: false,
         created_by: "manual",
         category,
         x0,
@@ -209,6 +214,19 @@ export const ZoneProvider = ({
     );
   });
 
+  // Handle keyboard events
+
+  // Delete selected zones on Delete/Backspace keypress
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Delete" || e.key == "Backspace") {
+      e.preventDefault(); // Prevent default delete behavior
+      const selectedZones = zones.current.filter((zone) => zone.selected);
+      for (const zone of selectedZones) {
+        handleZoneDelete(zone);
+      }
+    }
+  });
+
   // The context provider is responsible for rendering the context menu relating to zones
   return (
     <ZoneContext.Provider
@@ -226,7 +244,7 @@ export const ZoneProvider = ({
         <Item
           id="delete"
           onClick={({ props }: ItemParams) => {
-            handleDelete(props.zone);
+            handleZoneDelete(props.zone);
           }}
         >
           Delete

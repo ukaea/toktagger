@@ -15,6 +15,7 @@ type InjectedProps = {
   plotId: string;
   plotReady: boolean;
   forceUpdate: number;
+  selectedXRange: [number, number] | null;
 };
 
 interface PlotConfiguration {
@@ -43,6 +44,16 @@ export const TimeSeries = ({
     data,
     layout,
     config = {
+      modeBarButtons: [
+        [
+          "toImage",
+          "zoom2d",
+          "select2d",
+          "pan2d",
+          "autoScale2d",
+          "resetScale2d",
+        ],
+      ],
       displaylogo: false,
       displayModeBar: true,
       scrollZoom: true,
@@ -50,6 +61,10 @@ export const TimeSeries = ({
   },
   children,
 }: DisruptionPlotProps) => {
+  const editMode = useRef(true);
+  const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
+    null
+  );
   const [updateTools, setUpdateTools] = useState(0);
   const [plotReady, setPlotReady] = useState(false);
   const isDraggingRef = useRef(false);
@@ -166,6 +181,19 @@ export const TimeSeries = ({
         }, 100);
       };
 
+      const updateEditMode = (mode: boolean) => {
+        const elements = plot.querySelectorAll(".disable-on-shift");
+        if (!mode) {
+          elements.forEach((element) => {
+            element.setAttribute("style", "pointer-events: none");
+          });
+        } else {
+          elements.forEach((element) => {
+            element.setAttribute("style", "pointer-events: all");
+          });
+        }
+      };
+
       const relayoutHandler = (eventData: PlotRelayoutEvent) => {
         // triggers re-render of overlay tools when axes change
         triggerToolUpdate();
@@ -180,9 +208,23 @@ export const TimeSeries = ({
         } else {
           rescale(); // for initial load & autoscale
         }
+
+        updateEditMode(editMode.current);
       };
       plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
       plot.on("plotly_doubleclick", rescale);
+
+      // attach listener for selection events
+      plot.on("plotly_selected", function (eventData) {
+        if (eventData && eventData.range) {
+          setSelectedXRange(eventData.range.x);
+          relayout(plot, { selections: [] }); // clear selection
+        }
+      });
+      plot.on("plotly_deselect", function () {
+        setSelectedXRange(null);
+        relayout(plot, { selections: [] }); // clear selection
+      });
     };
 
     const root = document.getElementById(plotId);
@@ -435,6 +477,7 @@ export const TimeSeries = ({
                 plotId,
                 plotReady,
                 forceUpdate: updateTools,
+                selectedXRange: selectedXRange,
               })
             : child;
         })}
