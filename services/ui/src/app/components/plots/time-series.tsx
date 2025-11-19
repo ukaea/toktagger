@@ -164,10 +164,11 @@ export const TimeSeries = ({
           if (yValues.length > 0) {
             const yMin = Math.min(...yValues);
             const yMax = Math.max(...yValues);
+            const offset = 0.1 * (yMax - yMin); // 10 % offset
 
             yAxesRanges = {
               ...yAxesRanges,
-              [`yaxis${yAxisID}.range`]: [yMin, yMax],
+              [`yaxis${yAxisID}.range`]: [yMin - offset, yMax + offset],
             };
           }
         });
