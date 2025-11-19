@@ -19,7 +19,8 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
-import { useRef } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
+import { pl } from "zod/v4/locales";
 
 const zoneCategories: Category[] = [
   { name: "Peak", color: "rgb(233, 170, 98)" },
@@ -60,84 +61,90 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
   };
 
-  let plotData: Plotly.Data[] = Object.entries(data.values).map(
-    ([key, value]: [string, TimeSeriesData]) => {
-      return {
-        name: key,
-        x: value.time,
-        y: value.values,
-        mode: "lines",
-      };
-    }
-  );
+  const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
 
-  const numRows = plotData.length;
-  const domainHeight = 1 / numRows;
+  useEffect(() => {
+    const numRows = Object.keys(data.values).length;
 
-  const yAxesNames = Array.from(
-    { length: numRows },
-    (_, i) => `y${i === 0 ? "" : i + 1}`
-  ).reverse();
+    let plotData: Plotly.Data[] = Object.entries(data.values).map(
+      ([key, value]: [string, TimeSeriesData]) => {
+        return {
+          name: key,
+          x: value.time,
+          y: value.values,
+          mode: "lines",
+        };
+      }
+    );
 
-  // Dynamically generate y-axis titles based on plotData names
-  plotData = plotData.map((trace, index) => ({
-    ...trace,
-    yaxis: yAxesNames[index],
-  }));
+    const yAxesNames = Array.from(
+      { length: numRows },
+      (_, i) => `y${i === 0 ? "" : i + 1}`
+    ).reverse();
 
-  // Dynamically generate y-axis domains based on numRows
-  const yAxisDomains = Array.from({ length: numRows }, (_, i) => {
-    const start = i * domainHeight;
-    const end = (i + 1) * domainHeight;
-    return [start, end];
-  });
+    // Dynamically generate y-axis titles based on plotData names
+    plotData = plotData.map((trace, index) => ({
+      ...trace,
+      yaxis: yAxesNames[index],
+    }));
+    setPlotData(plotData);
+  }, [data]);
 
-  // Build yaxis layout object dynamically
-  const yAxesLayout = yAxisDomains.reduce(
-    (acc, domain, idx) => {
-      const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
-      acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true };
-      return acc;
-    },
-    {} as Record<string, unknown>
-  );
+  const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
+    const maxTime = plotData.reduce(
+      (max, trace) => Math.max(max, Math.max(...(trace.x as number[]))),
+      -Infinity
+    );
 
-  const maxTime = plotData.reduce(
-    (max, trace) => Math.max(max, Math.max(...trace.x)),
-    -Infinity
-  );
-  const minTime = plotData.reduce(
-    (min, trace) => Math.min(min, Math.min(...trace.x)),
-    Infinity
-  );
+    const minTime = plotData.reduce(
+      (min, trace) => Math.min(min, Math.min(...(trace.x as number[]))),
+      Infinity
+    );
 
-  const plotLayout: Partial<Plotly.Layout> = {
-    uirevision: "true",
-    grid: { rows: 1, columns: 1, pattern: "independent" },
-    dragmode: "pan",
-    width: window.innerWidth * 0.84,
-    height: window.innerHeight * 0.9,
-    xaxis: {
-      minallowed: minTime,
-      maxallowed: maxTime,
-      range: [minTime, maxTime],
-      fixedrange: false,
-      autorange: false,
-      rangeslider: { visible: true, thickness: 0.1 },
-      title: {
-        text: "Time [s]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
+    const numRows = plotData.length;
+    const domainHeight = 1 / numRows;
+    // Dynamically generate y-axis domains based on numRows
+    const yAxisDomains = Array.from({ length: numRows }, (_, i) => {
+      const start = i * domainHeight;
+      const end = (i + 1) * domainHeight;
+      return [start, end];
+    });
+
+    // Build yaxis layout object dynamically
+    const yAxesLayout = yAxisDomains.reduce(
+      (acc, domain, idx) => {
+        const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
+        acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true };
+        return acc;
+      },
+      {} as Record<string, unknown>
+    );
+
+    return {
+      uirevision: "true",
+      grid: { rows: 1, columns: 1, pattern: "independent" },
+      dragmode: "pan",
+      width: window.innerWidth * 0.84,
+      height: window.innerHeight * 0.9,
+      xaxis: {
+        minallowed: minTime,
+        maxallowed: maxTime,
+        range: [minTime, maxTime],
+        fixedrange: false,
+        autorange: false,
+        rangeslider: { visible: true, thickness: 0.1 },
+        title: {
+          text: "Time [s]",
+          font: {
+            family: "Courier New, monospace",
+            size: 12,
+            color: "#7f7f7f",
+          },
         },
       },
-    },
-    ...yAxesLayout,
-  };
-
-  const dataRef = useRef(plotData);
-  const layoutRef = useRef(plotLayout);
+      ...yAxesLayout,
+    };
+  }, [plotData]);
 
   return (
     <div className="flex space-y-3">
@@ -150,7 +157,7 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
           >
             <TimeSeries
               plotId="ELMs"
-              plotConfig={{ data: dataRef.current, layout: layoutRef.current }}
+              plotConfig={{ data: plotData, layout: plotLayout }}
             >
               <Zones onZoneUpdate={updateZones} />
             </TimeSeries>

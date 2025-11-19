@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, use } from "react";
 import {
   Provider,
   defaultTheme,
@@ -18,6 +18,9 @@ import {
   SpectrogramViewParams,
   PlotProps,
   ViewParams,
+  CompositeData,
+  MultiVariateTimeSeriesData,
+  SpectrogramData,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
@@ -55,9 +58,10 @@ type SampleViewInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
   plotProps: PlotProps;
+  forceResetZoom?: boolean;
 };
 
 const SampleView = ({
@@ -67,45 +71,62 @@ const SampleView = ({
   setAnnotations,
   plotProps,
 }: SampleViewInfo) => {
-  if (project.task == "disruption") {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for disruption view");
+  const [result, setResult] = useState<
+    MultiVariateTimeSeriesData | CompositeData | SpectrogramData | null
+  >(null);
+
+  useEffect(() => {
+    if (project.task == "disruption") {
+      const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+      if (!result.success) {
+        throw new Error("Invalid data for disruption view");
+      }
+      setResult(result.data);
+    } else if (project.task == "ELM") {
+      const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+      if (!result.success) {
+        throw new Error("Invalid data for ELM view");
+      }
+      setResult(result.data);
+    } else if (project.task == "MHD") {
+      const result = CompositeDataSchema.safeParse(data);
+      if (!result.success) {
+        throw new Error("Invalid data for MHD view");
+      }
+      const mhdData = SpectrogramDataSchema.safeParse(
+        result.data.values["mirnov"]
+      );
+      if (!mhdData.success) {
+        throw new Error("Invalid data for MHD view");
+      }
+      setResult(result.data);
     }
+  }, [data, project.task]);
+
+  if (result == null) {
+    return null;
+  }
+
+  if (project.task == "disruption") {
     return (
       <DisruptionView
-        data={result.data}
+        data={result as MultiVariateTimeSeriesData}
         annotations={annotations}
         setAnnotations={setAnnotations}
       />
     );
   } else if (project.task == "ELM") {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for ELM view");
-    }
     return (
       <ELMView
-        data={result.data}
+        data={result as MultiVariateTimeSeriesData}
         annotations={annotations}
         setAnnotations={setAnnotations}
       />
     );
   } else if (project.task == "MHD") {
-    console.log(data);
-    const result = CompositeDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for MHD view");
-    }
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"],
-    );
-    if (!mhdData.success) {
-      throw new Error("Invalid data for MHD view");
-    }
     return (
       <SpectrogramView
-        data={mhdData.data}
+        data={result as SpectrogramData}
         annotations={annotations}
         setAnnotations={setAnnotations}
         plotProps={plotProps}
@@ -122,10 +143,10 @@ async function getData<T>(url: string): Promise<T> {
 
 async function getSample(
   project_id: string,
-  sample_id: string,
+  sample_id: string
 ): Promise<Sample> {
   return await getData<Sample>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`
   );
 }
 
@@ -135,10 +156,10 @@ async function getProject(project_id: string): Promise<Project> {
 
 async function getAnnotations(
   project_id: string,
-  sample_id: string,
+  sample_id: string
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`
   );
 }
 
@@ -188,10 +209,11 @@ export default function SamplePage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(params),
-        },
+        }
       );
       const data: Data = await response.json();
       setData(data);
+      console.log("Data re-rendered for Top view");
     };
 
     const run = async (viewParams: ViewParams) => {
