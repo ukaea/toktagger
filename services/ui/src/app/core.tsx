@@ -16,7 +16,7 @@ export const getURL = async (url: string) => {
 export async function getSamplesSummary(
   project_id: string,
 ): Promise<SamplesSummary> {
-  const url = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/summary`;
+  const url = `${BACKEND_API_URL}/projects/${project_id}/samples/summary`;
   const response = await fetch(url);
   const data = await response.json();
   const summary = data as SamplesSummary;
@@ -92,15 +92,12 @@ export const getProject = async (
 };
 
 export const deleteProject = async (project_id: string) => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}`,
-    {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
+  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+  });
   if (!response.ok && response.status !== 404) {
     throw new Error(`Failed to delete project: ${response.statusText}`);
   }

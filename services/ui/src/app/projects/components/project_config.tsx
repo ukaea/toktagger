@@ -32,7 +32,7 @@ import {
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
-import { getSamplesSummary } from "@/app/core";
+import { BACKEND_API_URL, getSamplesSummary } from "@/app/core";
 
 const Tasks = [
   { key: "ELM", value: "ELM" },
@@ -284,7 +284,7 @@ const FileDataLoaderOptionsUI = ({
       if (filePath) {
         try {
           const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/backend-api/files?dir_path=${filePath}&file_type=${fileType}`,
+            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
           );
           if (response.ok) {
             const fileList = await response.json();
@@ -424,16 +424,13 @@ const editProject = async (
   projectId: string,
   project: ProjectUpdate,
 ): Promise<string> => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(project),
+  const response = await fetch(`${BACKEND_API_URL}/projects/${projectId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(project),
+  });
 
   if (!response.ok) {
     const error = await response.json();
@@ -444,20 +441,18 @@ const editProject = async (
 };
 
 const createProject = async (project: Project): Promise<string> => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(project),
+  console.log("Creating project:", project);
+  const response = await fetch(`${BACKEND_API_URL}/projects`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(project),
+  });
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Error creating project: ${error.message}`);
+    throw new Error(`Error creating project: ${error.detail}`);
   }
 
   const projectId = (await response.json())["_id"];
@@ -536,7 +531,7 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
 
 const createSamples = async (projectId: string, samples: Sample[]) => {
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${projectId}/samples`,
+    `${BACKEND_API_URL}/projects/${projectId}/samples`,
     {
       method: "POST",
       headers: {
@@ -696,11 +691,12 @@ export const ProjectConfigEditor = ({
     }
   }, [project, samplesSummary]);
 
-  const onCreatePress = async (close: () => void) => {
+  const onFormSubmit = async (close: () => void) => {
     if (editMode && project?._id) {
       try {
-        await doEditProject(project);
-        close();
+        await doEditProject(project).then(() => {
+          close();
+        });
       } catch (error) {
         ToastQueue.negative(`${error}`, { timeout: 3000 });
       }
@@ -769,7 +765,7 @@ export const ProjectConfigEditor = ({
             <Button variant="primary" onPress={close}>
               Close
             </Button>
-            <Button variant="primary" onPress={() => onCreatePress(close)}>
+            <Button variant="primary" onPress={async () => onFormSubmit(close)}>
               {text}
             </Button>
           </ButtonGroup>

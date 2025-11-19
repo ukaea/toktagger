@@ -18,7 +18,6 @@ import {
   Button,
   Picker,
   Flex,
-  ToastQueue,
   SearchField,
   ToastContainer,
 } from "@adobe/react-spectrum";
@@ -29,7 +28,7 @@ type ProjectsTableProps = {
   projects: Project[];
   sortDescriptor: SortDescriptor;
   onSortChange: (sort: SortDescriptor) => void;
-  onModify?: (project: Project) => void;
+  onModify?: () => void;
 };
 
 const ProjectsBreadCrumbs = () => {
@@ -48,12 +47,13 @@ const ProjectsTable = ({
   projects,
   sortDescriptor,
   onSortChange,
-  onModify = () => {},
+  onModify,
 }: ProjectsTableProps) => {
   const navigate = useNavigate();
   const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id,
+    _id: _id,
   }));
 
   return (
@@ -74,7 +74,7 @@ const ProjectsTable = ({
             <Column key="task" allowsSorting>
               Task
             </Column>
-            <Column key="_id" allowsSorting>
+            <Column key="date_created" allowsSorting>
               Date Created
             </Column>
             <Column key="data_loader" allowsSorting>
@@ -84,21 +84,24 @@ const ProjectsTable = ({
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row href={`/ui/projects/${item.id}`}>
+              <Row href={`/ui/projects/${item._id}`}>
                 <Cell>{item["name"]}</Cell>
                 <Cell>{item["task"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
                 <Cell>{item["data_loader"]}</Cell>
                 <Cell>
                   <Flex direction="row" gap="size-100">
-                    <ProjectConfigEditor
-                      project={project}
-                      onModify={onModify}
-                    />
+                    <ProjectConfigEditor project={item} onModify={onModify} />
                     <Button
                       variant="negative"
-                      onPress={() => {
-                        if (project["_id"]) deleteProject(project["_id"]);
+                      onPress={async () => {
+                        if (item._id == null) {
+                          return;
+                        }
+
+                        deleteProject(item._id).then(() => {
+                          onModify?.();
+                        });
                       }}
                     >
                       <Delete />
@@ -125,6 +128,7 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
 
   const refreshProjects = useCallback(async () => {
+    console.log("Refreshing projects...");
     const projects = await getProjects(
       sortDescriptor,
       currentPage,
@@ -132,13 +136,8 @@ export default function Projects() {
       projectName,
     );
 
-    if (!projects) {
-      ToastQueue.negative("Error fetching projects", { timeout: 3000 });
-      return;
-    }
-
     setProjects(projects);
-  }, [sortDescriptor, currentPage, projectsPerPage, projectName]);
+  }, [sortDescriptor, currentPage, projectsPerPage, projectName, setProjects]);
 
   useEffect(() => {
     refreshProjects();
