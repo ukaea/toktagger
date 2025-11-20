@@ -2,6 +2,8 @@ import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
+import io
+import base64
 from services.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
@@ -11,8 +13,6 @@ from services.api.schemas.data import (
 )
 from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 from services.api.schemas.projects import DataLoaderType
-import io
-import base64
 
 
 class DataLoader(ABC):
@@ -51,6 +51,7 @@ class ImageDataLoader(DataLoader):
         buffer = io.BytesIO()
         im.save(buffer, format="PNG")
         buffer.seek(0)
+
         return ImageData(
             frame=file_path.name.split(".")[0],
             values=base64.b64encode(buffer.getvalue()).decode(),
