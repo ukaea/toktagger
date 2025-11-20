@@ -1,6 +1,8 @@
 "use client";
-import { getProjects } from "../core";
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { deleteProject, getProjects } from "@/app/core";
+import Delete from "@spectrum-icons/workflow/Delete";
+import { ProjectConfigEditor } from "./components/project_config";
 import { useNavigate, useHref } from "react-router-dom";
 import {
   Provider,
@@ -17,6 +19,7 @@ import {
   Picker,
   Flex,
   SearchField,
+  ToastContainer,
 } from "@adobe/react-spectrum";
 import type { SortDescriptor } from "@react-types/shared";
 import type { Project } from "@/types";
@@ -25,6 +28,7 @@ type ProjectsTableProps = {
   projects: Project[];
   sortDescriptor: SortDescriptor;
   onSortChange: (sort: SortDescriptor) => void;
+  onModify?: () => void;
 };
 
 const ProjectsBreadCrumbs = () => {
@@ -43,11 +47,13 @@ const ProjectsTable = ({
   projects,
   sortDescriptor,
   onSortChange,
+  onModify,
 }: ProjectsTableProps) => {
   const navigate = useNavigate();
   const rows = projects.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id,
+    _id: _id,
   }));
 
   return (
@@ -68,20 +74,40 @@ const ProjectsTable = ({
             <Column key="task" allowsSorting>
               Task
             </Column>
-            <Column key="_id" allowsSorting>
+            <Column key="date_created" allowsSorting>
               Date Created
             </Column>
             <Column key="data_loader" allowsSorting>
               Loader
             </Column>
+            <Column key="edit">Edit</Column>
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row href={`/ui/projects/${item.id}`}>
+              <Row href={`/ui/projects/${item._id}`}>
                 <Cell>{item["name"]}</Cell>
                 <Cell>{item["task"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
                 <Cell>{item["data_loader"]}</Cell>
+                <Cell>
+                  <Flex direction="row" gap="size-100">
+                    <ProjectConfigEditor project={item} onModify={onModify} />
+                    <Button
+                      variant="negative"
+                      onPress={async () => {
+                        if (item._id == null) {
+                          return;
+                        }
+
+                        deleteProject(item._id).then(() => {
+                          onModify?.();
+                        });
+                      }}
+                    >
+                      <Delete />
+                    </Button>
+                  </Flex>
+                </Cell>
               </Row>
             )}
           </TableBody>
@@ -101,18 +127,31 @@ export default function Projects() {
   });
   const [projects, setProjects] = useState<Project[]>([]);
 
+  const refreshProjects = useCallback(async () => {
+    console.log("Refreshing projects...");
+    const projects = await getProjects(
+      sortDescriptor,
+      currentPage,
+      projectsPerPage,
+      projectName,
+    );
+
+    setProjects(projects);
+  }, [sortDescriptor, currentPage, projectsPerPage, projectName, setProjects]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      const projects = await getProjects(
-        sortDescriptor,
-        currentPage,
-        projectsPerPage,
-        projectName,
-      );
-      setProjects(projects);
-    };
-    fetchData();
-  }, [currentPage, projectsPerPage, projectName, sortDescriptor]);
+    refreshProjects();
+  }, [
+    sortDescriptor,
+    currentPage,
+    projectsPerPage,
+    projectName,
+    refreshProjects,
+  ]);
+
+  if (!projects) {
+    return;
+  }
 
   const onSortChange = (newSortDescriptor: SortDescriptor) => {
     setSortDescriptor(newSortDescriptor);
@@ -125,7 +164,15 @@ export default function Projects() {
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Projects</h1>
           <Provider theme={defaultTheme}>
-            <div className="pl-4">
+            <ToastContainer placement="top" />
+            <Flex
+              direction="row"
+              margin="size-100"
+              gap="size-100"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <ProjectConfigEditor onModify={refreshProjects} />
               <SearchField
                 label="Search By Name"
                 onSubmit={(name) => {
@@ -135,11 +182,12 @@ export default function Projects() {
                   }
                 }}
               />
-            </div>
+            </Flex>
             <ProjectsTable
               projects={projects}
               sortDescriptor={sortDescriptor}
               onSortChange={onSortChange}
+              onModify={refreshProjects}
             ></ProjectsTable>
             <div className="flex items-center justify-between pl-4 pr-4">
               <Button

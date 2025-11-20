@@ -1,11 +1,12 @@
+from pathlib import Path
 from typing import Optional, Literal
 from fastapi import HTTPException
 from pydantic import TypeAdapter
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
-from toktagger.api.schemas.annotations import AnnotationIn, AnnotationOutTypes
-from toktagger.api.schemas.projects import Project
-from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
+from toktagger.api.schemas.projects import Project, ProjectUpdate
+from toktagger.api.schemas.samples import FileData, Sample, SampleSummary
 
 
 async def get_projects(
@@ -47,17 +48,6 @@ async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     return Project(**projects[0])
 
 
-async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
-    obj_id = convert_to_objectid(project_id, "projects")
-
-    result = await db_client.delete_filtered_documents(
-        collection="projects", filters={"_id": obj_id}
-    )
-
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
-
-
 async def get_samples(
     db_client: MongoDBClient,
     project_id: str,
@@ -75,7 +65,7 @@ async def get_samples(
 
     filters = {"project_id": project_obj_id}
 
-    if shot_id:
+    if shot_id is not None:
         filters["shot_id"] = shot_id
 
     samples = await db_client.get_filtered_documents(
@@ -86,7 +76,41 @@ async def get_samples(
         start=start,
         limit=count if count is not None else 0,
     )
+
+    samples = [Sample(**sample) for sample in samples]
     return samples
+
+
+async def update_project(
+    db_client: MongoDBClient, project_id: str, project: ProjectUpdate
+) -> None:
+    project_id = convert_to_objectid(project_id, "projects")
+
+    result = await db_client.update("projects", project, project_id)
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+
+async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
+    project_id = convert_to_objectid(project_id, "projects")
+
+    # Clean up all associated samples
+    await db_client.delete_filtered_documents(
+        collection="samples", filters={"project_id": project_id}
+    )
+
+    # Clean up all associated annotations
+    await db_client.delete_filtered_documents(
+        collection="annotations", filters={"project_id": project_id}
+    )
+
+    # Delete this specific project
+    result = await db_client.delete_filtered_documents(
+        collection="projects", filters={"_id": project_id}
+    )
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
 
 async def get_sample(
@@ -166,7 +190,7 @@ async def get_annotations(
 
 
 async def add_annotations(
-    db_client, project_id: str, sample_id: str, annotations: list[AnnotationIn]
+    db_client, project_id: str, sample_id: str, annotations: list[AnnotationTypes]
 ) -> list[str]:
     db_ids = {
         "project_id": convert_to_objectid(project_id, "projects"),
@@ -203,3 +227,28 @@ async def delete_annotations(
             status_code=404,
             detail="Annotations not found belonging to this Sample and/or Project.",
         )
+
+
+async def get_files(dir_path: str, file_type: str) -> list[str]:
+    file_names = Path(dir_path).glob(f"*.{file_type}")
+    file_names = map(str, file_names)
+    file_names = list(sorted(file_names))
+    return file_names
+
+
+async def get_sample_summary(
+    db_client: MongoDBClient, project_id: str
+) -> SampleSummary:
+    samples = await get_samples(db_client, project_id)
+
+    summary = SampleSummary(
+        total=len(samples),
+        shot_min=min(sample.shot_id for sample in samples) if samples else None,
+        shot_max=max(sample.shot_id for sample in samples) if samples else None,
+        data=samples[0].data if samples else None,
+    )
+
+    if isinstance(summary.data, FileData):
+        summary.data.file_name = str(Path(summary.data.file_name).parent)
+
+    return summary

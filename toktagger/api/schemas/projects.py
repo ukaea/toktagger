@@ -1,4 +1,5 @@
 from pydantic import Field, field_validator
+from typing import Optional
 from enum import Enum
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.core.data_loaders import LoaderRegistry
@@ -41,3 +42,9 @@ class ProjectIn(ConfiguredModel):
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
+
+
+class ProjectUpdate(ConfiguredModel):
+    name: Optional[str] = None
+    task: Optional[Task] = None
+    query_strategy: Optional[QueryStrategyType] = None

@@ -5,17 +5,16 @@ import {
   TimeRegionSchema,
   TimePointSchema,
   MultiVariateTimeSeriesData,
+  Annotation,
   VSpan,
   Zone,
   ZoneSchema,
   VSpanSchema,
   DisplayAnnotation,
-  Annotation,
+  TimeSeriesData,
 } from "@/types";
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { DisruptionTable } from "./disruption-table";
-import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { TimeSeries } from "@/app/components/plots/time-series";
 import { Zones } from "@/app/components/tools/zones";
 import { VSpans } from "@/app/components/tools/vspans";
@@ -23,6 +22,8 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
+import { ZoneProvider } from "@/app/components/providers/zone-provider";
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 
 const disruptionCategories: Category[] = [
   { name: "Disruption", color: "rgb(255, 0, 0)" },
@@ -86,54 +87,32 @@ export const DisruptionView = ({
   const updateVSpans = (newVSpans: Array<VSpan>) => {
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
   };
+  const plotData: Partial<Plotly.PlotData>[] = Object.entries(data.values).map(
+    ([signalName, item], index) => ({
+      x: (item as TimeSeriesData).time,
+      y: (item as TimeSeriesData).values,
+      name: signalName,
+      xaxis: `x${index + 1}`,
+      yaxis: `y${index + 1}`,
+    }),
+  );
 
-  const plotData: Partial<Plotly.PlotData>[] = [
-    {
-      x: data.values["ip"].time,
-      y: data.values["ip"].values,
-      line: {
-        color: "black",
-      },
-      name: "ip",
-    },
-    {
-      x: data.values["ANE_DENSITY"].time,
-      y: data.values["ANE_DENSITY"].values,
-      line: {
-        color: "black",
-      },
-      name: "density",
-      xaxis: "x2",
-      yaxis: "y2",
-    },
-  ];
+  let axes = Object.entries(data.values).map((_, index) => {
+    const axName = `xaxis${index + 1}`;
+    return { [axName]: { matches: "x" } };
+  });
+  axes = Object.assign({}, ...axes);
 
   const plotLayout: Partial<Plotly.Layout> = {
+    grid: {
+      rows: Object.entries(data.values).length,
+      columns: 1,
+      pattern: "independent",
+    },
     uirevision: "true",
-    grid: { rows: 2, columns: 1, pattern: "independent" },
-    xaxis: {
-      title: {
-        text: "Time [s]",
-      },
-    },
-    yaxis: {
-      title: {
-        text: "Plasma current, ip [A]",
-      },
-    },
-    xaxis2: {
-      matches: "x",
-      title: {
-        text: "Time [s]",
-      },
-    },
-    yaxis2: {
-      title: {
-        text: "Plasma current, ip [A]",
-      },
-    },
     showlegend: true,
     dragmode: "pan",
+    ...axes,
   };
 
   return (

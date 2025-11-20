@@ -57,6 +57,25 @@ class MongoDBClient:
         result = await self.db[collection].insert_many(documents)
         return [str(object_id) for object_id in result.inserted_ids]
 
+    async def update(
+        self,
+        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        model: pydantic.BaseModel,
+        object_id: ObjectId,
+    ):
+        # Retrieve existing entry:
+        document = await self.db[collection].find_one({"_id": object_id})
+
+        # Add updates to db entry
+        updated_document = {
+            **document,
+            **model.model_dump(mode="python", exclude_unset=True),
+        }
+
+        return await self.db[collection].update_one(
+            {"_id": object_id}, {"$set": updated_document}
+        )
+
     async def get_document_by_id(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],

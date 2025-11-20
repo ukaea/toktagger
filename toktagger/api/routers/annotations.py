@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
 from typing import Literal
 from toktagger.api.crud import utils
-from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
+from toktagger.api.schemas.annotations import (
+    AnnotationTypes,
+    AnnotationOutTypes,
+)
 
 router = APIRouter(
     prefix="/projects/{project_id}",
@@ -61,7 +64,6 @@ async def get_all_annotations(
         start=start,
         count=count,
     )
-
     return annotations
 
 
