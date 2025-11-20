@@ -1,7 +1,7 @@
-from services.api.schemas.annotators import AnnotatorTypes
-from services.api.schemas.projects import ProjectIn
-from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
-from services.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
+from toktagger.api.schemas.annotators import AnnotatorTypes
+from toktagger.api.schemas.projects import ProjectIn
+from toktagger.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
+from toktagger.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
 import pathlib
 
 # Define some common things to add to db

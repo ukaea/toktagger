@@ -1,8 +1,8 @@
 import pytest
 from bson.objectid import ObjectId
-from services.api.schemas.projects import ProjectUpdate
+from toktagger.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, SAMPLE_1, ANNOTATION_1, ANNOTATION_2
-import services.api.crud.utils as utils
+import toktagger.api.crud.utils as utils
 from fastapi import HTTPException
 import tempfile
 import os

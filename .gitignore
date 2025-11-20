@@ -165,8 +165,8 @@ cython_debug/
 tmp
 # ignore yarn lock file
 *yarn.lock
-services/ui/.next/*
-services/ui/node_modules/*
+toktagger/ui/.next/*
+toktagger/ui/node_modules/*
 data/elms
 data/elm-events
 node_modules
