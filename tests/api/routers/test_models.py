@@ -104,7 +104,10 @@ async def setup_model_db(db_client):
             # Generate sample data
             disruption_time = random.randint(80, 120)
             annotation = TimePoint(
-                validated=True, label="Disruption", time=disruption_time
+                validated=True,
+                label="Disruption",
+                time=disruption_time,
+                created_by="manual",
             )
 
             sample = SampleIn(

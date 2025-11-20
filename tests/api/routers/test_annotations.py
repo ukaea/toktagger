@@ -283,14 +283,19 @@ async def test_batch_update_annotations(api_client, setup_db, db_client):
         {
             "sample_id": setup_db["sample_id_1"],
             "annotations": [
-                {"label": "TestAnnotation1", "time": 1},
-                {"label": "TestAnnotation2", "time": 2},
+                {"label": "TestAnnotation1", "time": 1, "created_by": "disruption_cnn"},
+                {"label": "TestAnnotation2", "time": 2, "created_by": "disruption_cnn"},
             ],
         },
         {
             "sample_id": setup_db["sample_id_2"],
             "annotations": [
-                {"label": "TestAnnotation", "time_min": 1, "time_max": 2},
+                {
+                    "label": "TestAnnotation",
+                    "time_min": 1,
+                    "time_max": 2,
+                    "created_by": "disruption_cnn",
+                },
             ],
         },
     ]

@@ -119,12 +119,6 @@ async def setup_db(db_client):
         ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)},
     )
     await asyncio.sleep(0.01)
-    annotation_id_5 = await db_client.insert(
-        "annotations",
-        db_definitions.ANNOTATION_5,
-        ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)},
-    )
-    await asyncio.sleep(0.01)
     model_id_1 = await db_client.insert(
         "models",
         db_definitions.MODEL_1,

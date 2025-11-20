@@ -265,6 +265,7 @@ async def test_batch_update_samples(api_client, setup_db, db_client):
     assert sample_2["validated_annotations"] is True
 
 
+@pytest.mark.asyncio
 async def test_get_samples_summary(api_client, setup_db):
     response = await api_client.get(
         f"/projects/{setup_db['project_id_1']}/samples/summary"
