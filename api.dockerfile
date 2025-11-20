@@ -4,10 +4,10 @@ FROM python:3.11
 WORKDIR /app
 
 # Copy the application code
-COPY ../../services ./services
+COPY ../../toktagger ./toktagger
 COPY pyproject.toml README.md ./
 RUN pip install .
 
 
 # Run FastAPI with Uvicorn
-CMD ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "toktagger.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

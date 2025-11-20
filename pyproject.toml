@@ -18,12 +18,12 @@ dependencies = [
   "fsspec",
   "xarray",
   "s3fs",
-  "zarr>=3.0.0",
+  "zarr",
   "scipy",
-  "pyarrow",
+  "pyarrow<21",
   "pymongo",
   "requests",
-  "numpy>=2.2.0,<=2.2.6",
+  "numpy<2",
   "scikit-learn",
   "celery[redis]",
   "pillow",
@@ -44,10 +44,10 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["services.api*"]
+include = ["toktagger.api*"]
 
 [tool.setuptools.package-data]
-"services.api" = ["static/**/*"]
+"toktagger.api" = ["static/**/*"]
 
 [tool.ruff]
 exclude = [".venv", "notebooks"]
@@ -64,4 +64,4 @@ dev = [
 ]
 
 [project.scripts]
-toktagger = "services.api.cli:main"
+toktagger = "toktagger.api.cli:main"

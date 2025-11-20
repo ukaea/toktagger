@@ -8,6 +8,11 @@ You can run the application locally through a simple pip install:
 
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/ukaea/viz-annotation.git
+```
+
+Then run:
+
+```sh
 toktagger
 ```
 
@@ -17,4 +22,6 @@ This will start a local instance of the application running at `http://localhost
 
  - [Git Repo](https://github.com/ukaea/viz-annotation)
  - [License](https://github.com/ukaea/viz-annotation/blob/main/LICENSE.md)
+ - [Bug/Issue Tracker](https://github.com/ukaea/viz-annotation/issues)
+ - [Contributing](https://github.com/ukaea/viz-annotation/blob/main/CONTRIBUTING.md)
 
