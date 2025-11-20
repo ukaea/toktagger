@@ -182,12 +182,6 @@ export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
 });
 export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
 
-export const ImageViewParamsSchema = ViewParamsSchema.extend({
-  resize_fraction: z.number().optional(),
-});
-
-export type ImageViewParams = z.infer<typeof ImageViewParamsSchema>;
-
 export type ToolingProps = {
   plotId?: string;
   plotReady?: boolean;

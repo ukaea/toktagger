@@ -89,6 +89,7 @@ class ImageDataLoader(DataLoader):
         buffer = io.BytesIO()
         im.save(buffer, format="PNG")
         buffer.seek(0)
+
         return ImageData(
             frame=file_path.name.split(".")[0],
             values=base64.b64encode(buffer.getvalue()).decode(),

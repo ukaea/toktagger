@@ -29,7 +29,7 @@ class SpectrogramData(Data):
 
 class ImageData(Data):
     frame: int
-    values: str  # base64 string of bytes
+    values: str  # Base64 encoded string
 
 
 class DataType(str, Enum):
