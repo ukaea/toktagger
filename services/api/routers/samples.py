@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
+from loguru import logger
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
@@ -233,8 +234,8 @@ async def get_next_sample(
     annotations = await utils.get_annotations(
         db_client, project_id, validated=False, sort_by="uncertainty"
     )
-    print(f"found {len(samples)} non validated samples")
-    print(f"found {len(annotations)} non validated annotations")
+    logger.debug(f"found {len(samples)} non validated samples")
+    logger.debug(f"found {len(annotations)} non validated annotations")
 
     data_pool = DataPool(
         data_loader=DATA_LOADERS[project.data_loader](),

@@ -1,5 +1,6 @@
 import random
 from abc import ABC, abstractmethod
+from loguru import logger
 
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation
@@ -51,8 +52,8 @@ class UncertaintyQueryStrategy(QueryStrategy):
             raise RuntimeError("No more samples to label!")
 
         if len(self.annotations) == 0:
-            print(
-                "Warning: No unvalidated annotations available - falling back to random sample selection."
+            logger.warning(
+                "No unvalidated annotations available - falling back to random sample selection."
             )
             index = random.randint(0, len(self.samples) - 1)
             return self.samples.pop(index)
@@ -67,7 +68,9 @@ class UncertaintyQueryStrategy(QueryStrategy):
                 None,
             )
             if index is None:
-                print("Error: Most uncertain annotation does not link to a sample")
+                logger.warning(
+                    "Most uncertain annotation does not link to a sample - falling back to random sample selection."
+                )
                 index = random.randint(0, len(self.samples) - 1)
             return self.samples.pop(index)
 

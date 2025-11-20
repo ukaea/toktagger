@@ -1,11 +1,12 @@
 import os
 import ray
+import pathlib
+import typing
+from loguru import logger
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from services.api.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
 from services.api.schemas.models import Model, ModelUpdate
-import pathlib
-import typing
 from services.api.core.sender import (
     send_batch_samples,
     send_batch_annotations,
@@ -15,12 +16,12 @@ from services.api.core.sender import (
 
 def get_actor(project, model):
     try:
-        print(f"Finding actor for model {model.id}")
+        logger.debug(f"Finding actor for model {model.id}")
         ml_model = ray.get_actor(model.id)
-        print("Found!")
+        logger.debug("Found existing actor!")
     except ValueError:
         # Actor not alive, so load from weights
-        print("Actor not found, loading from disk...")
+        logger.debug("Actor not found, loading from disk...")
 
         # Lazy loading so it doesnt initialize tensorflow every time TODO is this ok?
         from services.api.models.registry import MODELS
@@ -39,7 +40,7 @@ def get_actor(project, model):
         if model_path.exists():
             ml_model.load.remote(model_path)
         else:
-            print("No saved weights found, initializing blank model")
+            logger.debug("No saved weights found, initializing blank model")
 
     return ml_model
 
@@ -56,7 +57,7 @@ def train_model(
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
     model_actor = get_actor(project=project, model=model)
     try:
-        print(f"Running model training for project {project.id}")
+        logger.info(f"Running model training for project {project.id}")
         model_actor.log_progress.remote(training_status="started", progress=0)
         train_task = model_actor.train.remote(
             samples=samples,
@@ -82,7 +83,7 @@ def train_model(
         # If anything goes wrong, update model to failed status
         # This is important as if this does not happen, your model will be stuck in 'training' forever,
         # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
-        print(e)
+        logger.error(e)
         send_model_updates(
             project_id=project.id,
             model_id=model.id,
@@ -98,7 +99,9 @@ def get_predictions(
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
     # Where inference is run on some batch of samples first
-    print(f"Creating predictions for project {project.id} on {len(samples)} samples.")
+    logger.info(
+        f"Creating predictions for project {project.id} on {len(samples)} samples."
+    )
     model_actor = get_actor(project=project, model=model)
 
     predictions_task = model_actor.predict.remote(samples, batch_size=batch_size)
@@ -119,7 +122,7 @@ def get_predictions(
     send_batch_samples(project.id, samples_batch)
     send_batch_annotations(project.id, annotations_batch)
 
-    print("Predictions complete!")
+    logger.info(f"Predictions for project {project.id} complete!")
 
     return {
         "project_id": project.id,

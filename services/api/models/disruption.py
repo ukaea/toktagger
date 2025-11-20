@@ -10,6 +10,7 @@ from services.api.schemas.annotations import Annotation
 import typing
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.models.base import Model
+from loguru import logger
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
@@ -188,11 +189,11 @@ class DisruptionCNN(Model):
                 )
 
                 if epoch % print_per_epoch == 0:
-                    print(f"Epoch [{epoch + 1}/{num_epochs}]")
-                    print(
+                    logger.debug(f"Epoch [{epoch + 1}/{num_epochs}]")
+                    logger.debug(
                         f"  Train Loss: {train_loss_avg:.4f}, MAE: {train_mae:.4f}, RMSE: {train_rmse:.4f}"
                     )
-                    print(
+                    logger.debug(
                         f"  Val   Loss: {val_loss_avg:.4f}, MAE: {val_mae:.4f}, RMSE: {val_rmse:.4f}"
                     )
 
@@ -204,7 +205,7 @@ class DisruptionCNN(Model):
             else:
                 epochs_since_improvement += 1
                 if epochs_since_improvement >= patience:
-                    print(
+                    logger.debug(
                         f"No validation improvement for {patience} epochs. Stopping early."
                     )
                     self.model = self.best_model
@@ -231,7 +232,7 @@ class DisruptionCNN(Model):
                     sum_total += batch_samples.size(0)
                     test_accuracy = (sum_correct / sum_total) * 100
 
-            print("Test Accuracy:", (sum_correct / sum_total) * 100)
+            logger.debug("Test Accuracy:", (sum_correct / sum_total) * 100)
 
         final_accuracy = test_accuracy or val_accuracy or train_accuracy
 

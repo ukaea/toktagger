@@ -6,6 +6,7 @@ import random
 from bson.objectid import ObjectId
 import ray
 import itertools
+from loguru import logger
 from services.api.crud import utils
 from services.api.schemas.annotations import AnnotationTypes
 from services.api.schemas.models import Model, ModelType, ModelIn, ModelUpdate
@@ -170,8 +171,8 @@ async def start_model_training(
     samples = await utils.get_samples(db_client, project.id, validated=True)
 
     # Get all validated samples and annotations for this project
-    print(f"Collected {len(annotations)} annotations.")
-    print(f"Collected {len(samples)} samples.")
+    logger.debug(f"Collected {len(annotations)} annotations.")
+    logger.debug(f"Collected {len(samples)} samples.")
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
     annotations_2d = [
