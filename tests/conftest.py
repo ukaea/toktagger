@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
-from services.api.main import app
-from services.api.crud.db import MongoDBClient
+from toktagger.api.main import app
+from toktagger.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId

@@ -1,8 +1,8 @@
-import services.api.core.query_strategy as query_strategy
+import toktagger.api.core.query_strategy as query_strategy
 import pytest
 import random
-from services.api.schemas.samples import Sample
-from services.api.schemas.annotations import TimePointOut
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.annotations import TimePointOut
 import tests.db_definitions as db_definitions
 
 

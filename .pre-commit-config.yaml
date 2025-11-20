@@ -3,9 +3,9 @@ repos:
     rev: v0.12.9
     hooks:
       - id: ruff
-        args: [services, tests, --fix, --exit-non-zero-on-fix, "--ignore=C901"]
+        args: [toktagger, tests, --fix, --exit-non-zero-on-fix, "--ignore=C901"]
       - id: ruff-format
-        args: [services, tests]
+        args: [toktagger, tests]
   - repo: https://github.com/conorfalvey/check_pdb_hook
     rev: 0.0.9
     hooks:

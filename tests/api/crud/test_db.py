@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 from bson.objectid import ObjectId
-from services.api.crud.db import MongoDBClient
-from services.api.schemas.projects import ProjectUpdate
+from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, PROJECT_2, SAMPLE_1, SAMPLE_2
 import pytest_asyncio
 
