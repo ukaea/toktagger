@@ -10,6 +10,8 @@ from toktagger.api.routers.data import router as data_router
 from toktagger.api.routers.models import router as models_router
 from toktagger.api.routers.projects import router as projects_router
 from toktagger.api.routers.samples import router as samples_router
+from toktagger.api.routers.files import router as files_router
+
 from toktagger.api.crud.db import MongoDBClient
 from contextlib import asynccontextmanager
 
@@ -49,6 +51,7 @@ app.include_router(data_router)
 app.include_router(models_router)
 app.include_router(projects_router)
 app.include_router(samples_router)
+app.include_router(files_router)
 app.include_router(annotators_router)
 
 

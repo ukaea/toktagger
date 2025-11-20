@@ -99,23 +99,55 @@ export const DisplayAnnotationSchema = z.union([
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export const ProjectSchema = z.object({
-  _id: z.string(),
+  _id: z.string().optional(),
   name: z.string(),
   task: z.string(),
   query_strategy: z.string(),
   data_loader: z.string(),
-  timestamp: z.string(),
+  timestamp: z.string().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
+export const ProjectUpdateSchema = z.object({
+  name: z.string().optional(),
+  task: z.string().optional(),
+  query_strategy: z.string().optional(),
+});
+export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
+
+export const FileDataSchema = z.object({
+  file_name: z.string(),
+  type: z.string(),
+  protocol: z.string(),
+  column_names: z.array(z.string()),
+});
+export type FileData = z.infer<typeof FileDataSchema>;
+
+export const ShotDataSchema = z.object({
+  protocol: z.string(),
+  signal_names: z.array(z.string()),
+});
+export type ShotData = z.infer<typeof ShotDataSchema>;
+
+export const SampleDataSchema = z.union([FileDataSchema, ShotDataSchema]);
+export type SampleData = z.infer<typeof SampleDataSchema>;
+
 export const SampleSchema = z.object({
-  _id: z.string(),
+  _id: z.string().optional(),
   timestamp: z.string(),
-  project_id: z.string(),
+  project_id: z.string().optional(),
   shot_id: z.number(),
-  data: z.record(z.string(), DataSchema),
+  data: SampleDataSchema,
 });
 export type Sample = z.infer<typeof SampleSchema>;
+
+export const SamplesSummarySchema = z.object({
+  total: z.number(),
+  shot_min: z.number().optional(),
+  shot_max: z.number().optional(),
+  data: SampleDataSchema,
+});
+export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
 
 export const ViewParamsSchema = z.object({
   name: z.string(),

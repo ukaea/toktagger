@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import Field
 from enum import Enum
 from toktagger.api.schemas import ConfiguredModel
@@ -37,3 +38,9 @@ class ProjectIn(ConfiguredModel):
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
+
+
+class ProjectUpdate(ConfiguredModel):
+    name: Optional[str] = None
+    task: Optional[Task] = None
+    query_strategy: Optional[QueryStrategyType] = None

@@ -238,3 +238,15 @@ async def test_create_sample_invalid(api_client, setup_db, db_client):
     # Check it has not been added to database
     samples = await db_client.get_all_documents("samples")
     assert len(samples) == 4
+
+
+@pytest.mark.asyncio
+async def test_get_samples_summary(api_client, setup_db):
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/summary"
+    )
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary.get("total") == 2
+    assert summary.get("shot_min") == 1
+    assert summary.get("shot_max") == 3

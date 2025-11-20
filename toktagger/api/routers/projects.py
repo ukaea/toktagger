@@ -1,13 +1,8 @@
-from fastapi import APIRouter, Request, HTTPException, Query, Path
 from typing import Literal
-from toktagger.api.schemas.projects import ProjectIn, Project
-from toktagger.api.schemas.annotations import Annotation
-from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas import convert_to_objectid
+from fastapi import APIRouter, Request, HTTPException, Query, Path
+from toktagger.api.schemas.projects import ProjectIn, Project, ProjectUpdate
 from toktagger.api.crud import utils
-from toktagger.api.core.data_pool import DataPool
-from toktagger.api.core.data_loaders import DATA_LOADERS
-from toktagger.api.core.query_strategy import QUERY_STRATEGIES
+from toktagger.api.crud.db import MongoDBClient
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -110,80 +105,16 @@ async def get_project(
         404: {"description": "Project not found with that ID."},
     },
 )
-async def set_project(
+async def update_project(
     request: Request,
+    project: ProjectUpdate,
     project_id: str = Path(description="The ID of the project to activate"),
 ):
+    """Update a project's information.
+    -----------------------------
     """
-    Set a project as the active project using its ID.
-    --------------------------------------------------
-    """
-    # This is not a complete solution, but I'm going to go for this to get a MVP going
-    # This endpoint is used to select which project we want to use for all subsequent API calls
-    # Defines the data pool, data loader, annotator, etc etc
-    # Set these in the app state so that they can be used by other endpoints
-    # Obviously this makes it not scalable and will only work for one user/project at a time, and should be eventually replaced by Redis caching or something?
-    # TODO ^^
-
-    # Get project with that ID:
-    obj_id = convert_to_objectid(project_id, "projects")
-
-    projects = await request.app.state.db_client.get_filtered_documents(
-        collection="projects", filters={"_id": obj_id}
-    )
-
-    if len(projects) == 0:
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
-
-    project = Project.model_validate(projects[0])
-
-    # Set some global variables in the app state
-    request.app.state.project = project
-
-    # Get all samples which can be considered - sort by shot ID
-    samples = await request.app.state.db_client.get_filtered_documents(
-        collection="samples",
-        filters={"project_id": obj_id},
-        sort_by="shot_id",
-        sort_direction=1,
-    )
-
-    # Then get all non-validated annotations for these samples, sorted by uncertainty:
-    non_validated_annotations = (
-        await request.app.state.db_client.get_filtered_documents(
-            collection="annotations",
-            filters={"project_id": obj_id, "validated": False},
-            sort_by="uncertainty",
-            sort_direction=1,
-        )
-    )
-    validated_annotations = await request.app.state.db_client.get_filtered_documents(
-        collection="annotations",
-        filters={"project_id": obj_id, "validated": True},
-    )
-    validated_sample_ids = [
-        validated_annotation["sample_id"]
-        for validated_annotation in validated_annotations
-    ]
-
-    sample_models = [
-        Sample.model_validate(sample)
-        for sample in samples
-        if sample["_id"] not in validated_sample_ids
-    ]
-    annotation_models = [
-        Annotation.model_validate(annotation)
-        for annotation in non_validated_annotations
-    ]
-
-    request.app.state.data_pool = DataPool(
-        data_loader=DATA_LOADERS[project.data_loader](),
-        query_strategy=QUERY_STRATEGIES[project.query_strategy](
-            sample_models, annotation_models
-        ),
-    )
-
-    # TODO: Add annotator etc based on task?
+    db_client: MongoDBClient = request.app.state.db_client
+    await utils.update_project(db_client, project_id, project)
 
 
 @router.delete(
@@ -204,9 +135,3 @@ async def delete_project(
     db_client = request.app.state.db_client
     # Delete this specific project
     await utils.delete_project(db_client=db_client, project_id=project_id)
-
-    # Delete samples associated with this project
-    await utils.delete_samples(db_client=db_client, project_id=project_id)
-
-    # Delete annotations associated with this project
-    await utils.delete_annotations(db_client=db_client, project_id=project_id)

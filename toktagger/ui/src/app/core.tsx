@@ -1,6 +1,6 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import type { Project, Sample } from "@/types";
+import type { Project, Sample, SamplesSummary } from "@/types";
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -12,6 +12,16 @@ export const getURL = async (url: string) => {
   const payload = await response.json();
   return payload;
 };
+
+export async function getSamplesSummary(
+  project_id: string,
+): Promise<SamplesSummary> {
+  const url = `${BACKEND_API_URL}/projects/${project_id}/samples/summary`;
+  const response = await fetch(url);
+  const data = await response.json();
+  const summary = data as SamplesSummary;
+  return summary;
+}
 
 export const getSamples = async (
   sortDescriptor: SortDescriptor,
@@ -79,4 +89,16 @@ export const getProject = async (
   const data = await response.json();
   const project = data as Project;
   return project;
+};
+
+export const deleteProject = async (project_id: string) => {
+  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Failed to delete project: ${response.statusText}`);
+  }
 };
