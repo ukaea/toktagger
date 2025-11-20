@@ -75,6 +75,7 @@ async def make_request(api_client, request_method, endpoint, request_body):
         ("/projects/id/samples/id/data", "sample", "post", {}),
         ("/projects/id", "project", "get", {}),
         ("/projects/id/samples", "project", "get", {}),
+        ("/projects/id/samples/summary", "project", "get", {}),
         (
             "/projects/id/samples",
             "project",
@@ -102,6 +103,7 @@ async def make_request(api_client, request_method, endpoint, request_body):
         "get_data-wrong_sample_id",
         "get_project-wrong_project_id",
         "get_samples-wrong_project_id",
+        "get_samples_summary-wrong_project_id",
         "put_samples-wrong_project_id",
         "get_next_sample-wrong_project_id",
         "get_sample-wrong_project_id",

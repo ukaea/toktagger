@@ -1,6 +1,7 @@
-from typing import Tuple, Optional, Union
+from typing import Literal, Tuple, Optional, Union
 from services.api.schemas import ConfiguredModel
 from services.api.schemas.models import ModelType
+from services.api.schemas.annotators import AnnotatorTypes
 from pydantic import Field, TypeAdapter, model_validator, BaseModel
 
 
@@ -20,30 +21,45 @@ class AnnotationIn(ConfiguredModel):
     validated: bool = False
     uncertainty: Optional[float] = None
     label: str
-    created_by: Optional[ModelType] = None  # TODO: this should also contain annotators
+    created_by: Union[AnnotatorTypes, ModelType]
+
+
+class Annotation(AnnotationIn):
+    id: str = Field(..., alias="_id")
+    project_id: Optional[str] = None
+    sample_id: Optional[str] = None
+
+
+class ClassLabel(AnnotationIn):
+    type: Literal["class_label"] = "class_label"
 
 
 class TimePoint(AnnotationIn):
+    type: Literal["time_point"] = "time_point"
     time: float
 
 
 class TimeRegion(AnnotationIn):
+    type: Literal["time_region"] = "time_region"
     time_min: float
     time_max: float
 
 
 class BoundingBox(AnnotationIn):
-    height: float
-    width: float
-    centre: Tuple[float, float]
+    type: Literal["bounding_box"] = "bounding_box"
+    height: Optional[float] = None
+    width: Optional[float] = None
+    centre: Optional[Tuple[float, float]] = None
 
 
 class VideoBoundingBox(BoundingBox):
+    type: Literal["video_bounding_box"] = "video_bounding_box"
     frame: int
 
 
-class Annotation(BaseModel):
+class AnnotationOut(BaseModel):
     id: str = Field(..., alias="_id")
+    created_by: AnnotatorTypes
     project_id: str
     sample_id: str
 

@@ -2,15 +2,15 @@ from fastapi import APIRouter, Request, Path, Query, HTTPException
 from fastapi.responses import JSONResponse
 import pathlib
 import os
+import random
+from bson.objectid import ObjectId
+import ray
+import itertools
 from services.api.crud import utils
 from services.api.schemas.annotations import AnnotationTypes
 from services.api.schemas.models import Model, ModelType, ModelIn, ModelUpdate
 from services.api.schemas import convert_to_objectid
 from services.api.worker import train_model, get_predictions
-import random
-from bson.objectid import ObjectId
-import ray
-import itertools
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 

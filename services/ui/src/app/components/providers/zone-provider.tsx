@@ -42,7 +42,7 @@ export const ZoneProvider = ({
   categories: Category[];
   initialData?: Zone[];
   children: React.ReactNode;
-  onModifyZone: (newZones: Zone[]) => void;
+  onModifyZone?: (newZones: Zone[]) => void;
 }) => {
   const zones = useRef<Zone[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
@@ -60,13 +60,13 @@ export const ZoneProvider = ({
   };
 
   const handleZoneDragFinish = () => {
-    onModifyZone(zones.current);
+    onModifyZone?.(zones.current);
   };
 
   const handleDelete = (input: unknown) => {
     zones.current = zones.current.filter((zone) => zone !== input);
     triggerZoneUpdate();
-    onModifyZone(zones.current);
+    onModifyZone?.(zones.current);
   };
 
   const handleTypeSetting = (
@@ -84,12 +84,13 @@ export const ZoneProvider = ({
 
   const addZone = (x0: number, x1: number, category: Category) => {
     zones.current.push({
+      created_by: "manual",
       category,
       x0,
       x1,
     });
     triggerZoneUpdate();
-    onModifyZone(zones.current);
+    onModifyZone?.(zones.current);
   };
 
   const activateTooling = () => {
@@ -119,12 +120,13 @@ export const ZoneProvider = ({
   useEffect(() => {
     const addZone = (x0: number, x1: number, category: Category) => {
       zones.current.push({
+        created_by: "manual",
         category,
         x0,
         x1,
       });
       triggerZoneUpdate();
-      onModifyZone(zones.current);
+      onModifyZone?.(zones.current);
     };
     /**
      * Converts generic props into a new zone.

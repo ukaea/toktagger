@@ -73,13 +73,15 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
         return;
       }
       // Use the axis information to calculate the upper and lower limits of the zone
-      const axis = plot._fullLayout[`yaxis${yAxisID}`];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const axis = (plot as any)._fullLayout[`yaxis${yAxisID}`];
       const range = axis._tmax - axis._tmin;
       const upperLimit = axis.d2p(axis._tmax + 2 * range);
       const lowerLimit = axis.d2p(axis._tmin - 2 * range);
       const height = lowerLimit - upperLimit;
 
-      const xaxis = plot._fullLayout.xaxis;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const xaxis = (plot as any)._fullLayout.xaxis;
 
       // Minimum width in data units: 0.1% of current x-range
       const [xMin, xMax] = xaxis.range as [number, number];
@@ -216,6 +218,8 @@ export const Zones = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .attr("opacity", 0.5)
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
+          .attr("stroke", "gray")
+          .attr("stroke-width", 1)
           .datum(zone)
           .call(drag)
           .on("contextmenu", handleContextMenu);

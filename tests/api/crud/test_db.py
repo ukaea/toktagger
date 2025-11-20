@@ -1,6 +1,8 @@
 import pytest
 import asyncio
 from bson.objectid import ObjectId
+from services.api.crud.db import MongoDBClient
+from services.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, PROJECT_2, SAMPLE_1, SAMPLE_2
 import pytest_asyncio
 
@@ -82,6 +84,19 @@ async def test_insert_many_same_ids(db_client):
 
     assert retrieved_sample_2["shot_id"] == SAMPLE_2.shot_id
     assert retrieved_sample_2["project_id"] == ObjectId(project_id)
+
+
+@pytest.mark.asyncio
+async def test_update(db_client: MongoDBClient):
+    project_id = await db_client.insert(collection="projects", model=PROJECT_1)
+    update = ProjectUpdate(name="New Project Name")
+    await db_client.update("projects", update, ObjectId(project_id))
+
+    # Check project has been updated
+    retrieved_project = await db_client.db["projects"].find_one(
+        {"_id": ObjectId(project_id)}
+    )
+    assert retrieved_project["name"] == "New Project Name"
 
 
 @pytest.mark.asyncio

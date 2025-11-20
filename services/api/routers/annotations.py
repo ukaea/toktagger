@@ -66,7 +66,6 @@ async def get_all_annotations(
         start=start,
         count=count,
     )
-
     return annotations
 
 

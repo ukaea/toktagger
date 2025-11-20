@@ -1,4 +1,5 @@
 from pydantic import Field, computed_field
+from typing import Optional
 from enum import Enum
 from services.api.schemas import ConfiguredModel
 from typing import List
@@ -52,3 +53,9 @@ class ProjectIn(ConfiguredModel):
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
+
+
+class ProjectUpdate(ConfiguredModel):
+    name: Optional[str] = None
+    task: Optional[Task] = None
+    query_strategy: Optional[QueryStrategyType] = None

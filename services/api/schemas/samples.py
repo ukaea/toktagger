@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Optional, Union
 from enum import Enum
 from pydantic import Field, computed_field, BaseModel
 from services.api.schemas import ConfiguredModel
@@ -43,9 +43,12 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_items=1)]
 
 
+DataTypes = Union[TimeSeriesFileData, FileData, ShotData, ImageFileData]
+
+
 class SampleBase(ConfiguredModel):
     shot_id: int
-    data: FileData | ShotData | TimeSeriesFileData | ImageFileData
+    data: DataTypes
 
 
 class SampleIn(SampleBase):
@@ -75,3 +78,10 @@ class SampleUpdate(ConfiguredModel):
 class SampleUpdateBatchItem(ConfiguredModel):
     id: str = Field(..., alias="_id")
     updates: SampleUpdate
+
+
+class SampleSummary(BaseModel):
+    total: int
+    shot_min: Optional[int] = None
+    shot_max: Optional[int] = None
+    data: Optional[DataTypes] = None

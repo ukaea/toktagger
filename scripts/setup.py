@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import Optional
 import requests
@@ -65,6 +66,18 @@ def create_local_samples(
 
 
 def main():
+    parser = ArgumentParser()
+    parser.add_argument(
+        "-b",
+        "--base-path",
+        default="./data/test",
+        type=str,
+        help="Base path for remote data files",
+    )
+    args = parser.parse_args()
+
+    base_path = Path(args.base_path)
+
     shot_files = Path("./data/test/summary").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
@@ -72,10 +85,8 @@ def main():
     project_id = create_project("UDA Disruption Project", "disruption", "uda", "random")
     create_uda_samples(project_id, shot_ids)
 
-    project_id = create_project("Local ELM Project", "ELM", "parquet", "random")
-    create_local_samples(
-        project_id, shot_ids, base_path="/data/test/summary", file_type="parquet"
-    )
+    project_id = create_project("Local ELM Project", "ELM", "parquet")
+    create_local_samples(project_id, shot_ids, base_path=base_path / "summary")
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
@@ -84,7 +95,7 @@ def main():
     create_local_samples(
         project_id,
         shot_ids,
-        base_path="/data/test/mhd",
+        base_path=base_path / "mhd",
         file_type="parquet",
         signals=["mirnov"],
     )

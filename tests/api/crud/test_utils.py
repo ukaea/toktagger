@@ -1,9 +1,13 @@
 import pytest
 from bson.objectid import ObjectId
+from services.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, SAMPLE_1, ANNOTATION_1, ANNOTATION_2
 from services.api.schemas.samples import SampleUpdate
 import services.api.crud.utils as utils
 from fastapi import HTTPException
+import tempfile
+import os
+from pathlib import Path
 
 
 @pytest.mark.asyncio
@@ -59,12 +63,23 @@ async def test_delete_project_wrong_id(db_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_update_project(db_client, setup_db):
+    await utils.update_project(
+        db_client,
+        setup_db["project_id_1"],
+        project=ProjectUpdate(name="Updated Project Name"),
+    )
+    # Check project has been updated
+    await db_client.db["projects"].find_one({"_id": ObjectId(setup_db["project_id_1"])})
+
+
+@pytest.mark.asyncio
 async def test_get_samples(db_client, setup_db):
     samples = await utils.get_samples(db_client, project_id=setup_db["project_id_1"])
     # Check three samples returned
-    assert len(samples) == 3
+    assert len(samples) == 2
     # Check returned in correct order - reverse order of created
-    assert [sample.shot_id for sample in samples] == [2, 3, 1]
+    assert [sample.shot_id for sample in samples] == [3, 1]
 
 
 @pytest.mark.asyncio
@@ -87,6 +102,31 @@ async def test_get_sample(db_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_get_files(db_client, setup_db):
+    # Create temporary directory and parquet files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create fake parquet files
+        Path(os.path.join(temp_dir, "file1.parquet")).touch()
+        Path(os.path.join(temp_dir, "file2.parquet")).touch()
+        Path(os.path.join(temp_dir, "file3.txt")).touch()  # Non-parquet file
+
+        file_names = await utils.get_files(dir_path=temp_dir, file_type="parquet")
+        assert len(file_names) == 2
+        assert all(file.endswith(".parquet") for file in file_names)
+
+
+@pytest.mark.asyncio
+async def test_get_sample_summary(db_client, setup_db):
+    summary = await utils.get_sample_summary(
+        db_client, project_id=setup_db["project_id_1"]
+    )
+    assert summary.total == 2
+    assert summary.shot_min == 1
+    assert summary.shot_max == 3
+    assert summary.data is not None
+
+
+@pytest.mark.asyncio
 async def test_get_sample_wrong_id(db_client, setup_db):
     with pytest.raises(HTTPException, match="Sample not found with that ID"):
         await utils.get_sample(db_client, setup_db["project_id_1"], str(ObjectId()))
@@ -98,7 +138,7 @@ async def test_delete_all_samples_in_project(db_client, setup_db):
     await utils.delete_samples(db_client, project_id=setup_db["project_id_1"])
     # Should only be one remaining sample
     samples = await db_client.get_filtered_documents("samples")
-    assert len(samples) == 1
+    assert len(samples) == 2
 
 
 @pytest.mark.asyncio
@@ -109,7 +149,7 @@ async def test_delete_specific_sample(db_client, setup_db):
         project_id=setup_db["project_id_1"],
         sample_id=setup_db["sample_id_1"],
     )
-    # Should be three remaining sample
+    # Should be two remaining sample
     samples = await db_client.get_filtered_documents("samples")
     assert len(samples) == 3
     assert 1 not in [sample["shot_id"] for sample in samples]

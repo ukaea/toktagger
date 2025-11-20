@@ -1,3 +1,4 @@
+from services.api.schemas.annotators import AnnotatorTypes
 from services.api.schemas.projects import ProjectIn
 from services.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
 from services.api.schemas.annotations import TimePoint, TimeRegion
@@ -48,14 +49,41 @@ SAMPLE_4 = SampleIn(
     annotations=None,
 )
 
-
 ANNOTATION_1 = TimeRegion(
-    time_min=0.2, time_max=0.4, label="annotation", validated=True
+    time_min=0.2,
+    time_max=0.4,
+    label="annotation",
+    validated=True,
+    created_by=AnnotatorTypes.MANUAL_ANNOTATION,
 )
-ANNOTATION_2 = TimeRegion(time_min=0.1, time_max=0.2, label="ramp_up", validated=True)
-ANNOTATION_3 = TimePoint(time=0.1, label="disruption", validated=False, uncertainty=0.6)
-ANNOTATION_4 = TimePoint(time=0.3, label="disruption", validated=False, uncertainty=0.4)
-ANNOTATION_5 = TimePoint(time=0.4, label="disruption", validated=False, uncertainty=0.8)
+ANNOTATION_2 = TimeRegion(
+    time_min=0.1,
+    time_max=0.2,
+    label="ramp_up",
+    validated=True,
+    created_by=AnnotatorTypes.MANUAL_ANNOTATION,
+)
+ANNOTATION_3 = TimePoint(
+    time=0.1,
+    label="disruption",
+    validated=False,
+    uncertainty=0.6,
+    created_by=AnnotatorTypes.PEAK_DETECTION,
+)
+ANNOTATION_4 = TimePoint(
+    time=0.3,
+    label="disruption",
+    validated=False,
+    uncertainty=0.4,
+    created_by=AnnotatorTypes.PEAK_DETECTION,
+)
+ANNOTATION_5 = TimePoint(
+    time=0.4,
+    label="disruption",
+    validated=False,
+    uncertainty=0.8,
+    created_by=AnnotatorTypes.PEAK_DETECTION,
+)
 
 MODEL_1 = ModelIn(
     type="disruption_cnn",

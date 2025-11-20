@@ -1,14 +1,16 @@
+from pathlib import Path
 from typing import Optional, Literal
 from fastapi import HTTPException
 from services.api.crud.db import MongoDBClient
 from services.api.schemas import convert_to_objectid
 from services.api.schemas.annotations import (
-    Annotation,
     AnnotationIn,
     AnnotationOutTypeAdapter,
+    AnnotationOutTypes,
+    AnnotationTypes,
 )
-from services.api.schemas.projects import Project
-from services.api.schemas.samples import Sample, SampleUpdate
+from services.api.schemas.projects import Project, ProjectUpdate
+from services.api.schemas.samples import Sample, SampleUpdate, FileData, SampleSummary
 from services.api.schemas.models import Model, ModelIn, ModelUpdate, ModelType
 
 
@@ -49,16 +51,6 @@ async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
     return Project(**projects[0])
-
-
-async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
-    obj_id = convert_to_objectid(project_id, "projects")
-
-    result = await db_client.delete_filtered_documents(
-        collection="projects", filters={"_id": obj_id}
-    )
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
 
 async def get_samples(
@@ -228,6 +220,38 @@ async def delete_model(
         )
 
 
+async def update_project(
+    db_client: MongoDBClient, project_id: str, project: ProjectUpdate
+) -> None:
+    project_id = convert_to_objectid(project_id, "projects")
+
+    result = await db_client.update("projects", project, project_id)
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+
+async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
+    project_id = convert_to_objectid(project_id, "projects")
+
+    # Clean up all associated samples
+    await db_client.delete_filtered_documents(
+        collection="samples", filters={"project_id": project_id}
+    )
+
+    # Clean up all associated annotations
+    await db_client.delete_filtered_documents(
+        collection="annotations", filters={"project_id": project_id}
+    )
+
+    # Delete this specific project
+    result = await db_client.delete_filtered_documents(
+        collection="projects", filters={"_id": project_id}
+    )
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+
 async def get_sample(
     db_client: MongoDBClient, project_id: str, sample_id: str
 ) -> Sample:
@@ -281,10 +305,12 @@ async def get_annotations(
     sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
     count: Optional[int] = None,
-) -> list[Annotation]:
+) -> list[AnnotationOutTypes]:
     db_filters = {"project_id": convert_to_objectid(project_id, "projects")}
+
     if sample_id:
         db_filters["sample_id"] = convert_to_objectid(sample_id, "samples")
+
     if validated is not None:
         db_filters["validated"] = validated
     if created_by is not None:
@@ -302,7 +328,7 @@ async def get_annotations(
 
 
 async def add_annotations(
-    db_client, project_id: str, sample_id: str, annotations: list[AnnotationIn]
+    db_client, project_id: str, sample_id: str, annotations: list[AnnotationTypes]
 ) -> list[str]:
     db_ids = {
         "project_id": convert_to_objectid(project_id, "projects"),
@@ -365,3 +391,28 @@ async def update_annotations(
         sample_id=sample_id,
         annotations=annotations,
     )
+
+
+async def get_files(dir_path: str, file_type: str) -> list[str]:
+    file_names = Path(dir_path).glob(f"*.{file_type}")
+    file_names = map(str, file_names)
+    file_names = list(sorted(file_names))
+    return file_names
+
+
+async def get_sample_summary(
+    db_client: MongoDBClient, project_id: str
+) -> SampleSummary:
+    samples = await get_samples(db_client, project_id)
+
+    summary = SampleSummary(
+        total=len(samples),
+        shot_min=min(sample.shot_id for sample in samples) if samples else None,
+        shot_max=max(sample.shot_id for sample in samples) if samples else None,
+        data=samples[0].data if samples else None,
+    )
+
+    if isinstance(summary.data, FileData):
+        summary.data.file_name = str(Path(summary.data.file_name).parent)
+
+    return summary

@@ -1,24 +1,28 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Provider,
   defaultTheme,
   ButtonGroup,
   ToastQueue,
   Button,
+  Flex,
+  View,
+  Header,
+  Accordion,
+  Disclosure,
+  DisclosureTitle,
+  DisclosurePanel,
   SearchField,
   ComboBox,
   Item,
   Key,
   Switch,
-  Flex,
   NumberField,
   ActionButton,
 } from "@adobe/react-spectrum";
 import {
   Annotation,
-  Annotations,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
@@ -30,40 +34,46 @@ import {
   SpectrogramViewParamsSchema,
   ViewParams,
 } from "@/types";
-import { FindPeaksTool } from "@/app/components/peaks";
+import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 import { ModelPredictTool } from '@/app/components/tools/modelPredictSample';
+import { ShotLabels } from "../annotators/labels";
+import { OutlierDetectionTool } from "../annotators/outliers";
+import { ChangePointDetectionTool } from "../annotators/changepoints";
+import { JumpDetectionTool } from "../annotators/jump";
+import { useNavigate } from "react-router-dom";
+import { BACKEND_API_URL } from "@/app/core";
 
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotations
+  annotations: Annotation[],
 ) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
 
-  const validatedAnnotations: Annotations = annotations.map((annotation: Annotation) => ({
+  const validatedAnnotations: Annotation[] = annotations.map((annotation: Annotation) => ({
     ...annotation,
     validated: true,
   }));
 
-  await fetch(ANNOTATIONS_URL, {
+  const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(validatedAnnotations),
   });
+  return response;
 }
-
 async function getNextSample(project_id: string) {
-  const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/next`;
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
   const sampleResult = await fetch(NEXT_URL);
   const sample = await sampleResult.json();
   return sample;
 }
 
 async function getShotSample(project_id: string, shot_id: string) {
-  const NEXT_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/?shot_id=${shot_id}`;
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
   const sampleResult = await fetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
   let sample = null;
@@ -76,18 +86,18 @@ async function getShotSample(project_id: string, shot_id: string) {
 type SaveInfo = {
   project_id: string;
   sample_id: string;
-  annotations: Annotations;
+  annotations: Annotation[];
 };
 
 function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handleClick = async () => {
     try {
       await saveAnnotations(project_id, sample_id, annotations);
       const sample = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
-      router.push(NEXT_SAMPLE_URL);
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     }
@@ -103,12 +113,24 @@ function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
 function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   const handleClick = async () => {
     try {
-      await saveAnnotations(project_id, sample_id, annotations);
+      const response = await saveAnnotations(
+        project_id,
+        sample_id,
+        annotations,
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to save annotations: ${response.statusText}`);
+      }
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
         timeout: 5000,
       });
     } catch (err) {
-      console.error("Failed to fetch data:", err);
+      if (err instanceof Error) {
+        ToastQueue.negative(`${err.message}`, {
+          timeout: 5000,
+        });
+      }
     }
   };
 
@@ -120,7 +142,7 @@ function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
 }
 
 export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   const onSearchSubmit = async (newValue: string) => {
@@ -130,11 +152,11 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
       setErrorMessage("");
       const shot_id = newValue;
       try {
-        await saveAnnotations(project_id, sample_id, annotations);
         const sample = await getShotSample(project_id, shot_id);
         if (sample !== null) {
-          const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
-          router.push(NEXT_SAMPLE_URL);
+          await saveAnnotations(project_id, sample_id, annotations);
+          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+          navigate(NEXT_SAMPLE_URL);
         } else {
           setErrorMessage("Shot not found!");
         }
@@ -188,7 +210,7 @@ function AmplitudeSlider({
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor))
+    Math.log10(Math.max(x, smallPrecisionFactor)),
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -203,7 +225,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end
+          val.end,
         )}`
       }
     />
@@ -251,7 +273,7 @@ type SpectrogramThresholdToolInfo = {
   signal_name: string;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
-  setAnnotations: (annotations: Annotations) => void;
+  setAnnotations: (annotations: Annotation[]) => void;
 };
 
 function SpectrogramThresholdTool({
@@ -287,7 +309,7 @@ function SpectrogramThresholdTool({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
         {
           method: "POST",
           headers: {
@@ -297,7 +319,7 @@ function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        }
+        },
       );
 
       const payload = await response.json();
@@ -367,8 +389,10 @@ type ToolBarInfo = {
   project: Project;
   sample: Sample;
   data: Data;
-  annotations: Annotations;
-  setAnnotations: (annotations: Annotations) => void;
+  annotations: Annotation[];
+  setAnnotations: (
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+  ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
   plotProps: PlotProps;
@@ -387,7 +411,7 @@ export default function ToolBar({
 }: ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
-  const tools: React.ReactNode[] = [];
+  const tools: { name: string; component: React.ReactNode }[] = [];
 
   const modelPredictTool = (
     <ModelPredictTool project={project} sample_id={sample_id} setAnnotations={setAnnotations}></ModelPredictTool>
@@ -402,43 +426,105 @@ export default function ToolBar({
       return;
     }
 
-    const findPeaksTool = (
-      <FindPeaksTool
-        project_id={project_id}
-        sample_id={sample_id}
-        data={result.data}
-        setAnnotations={setAnnotations}
-      ></FindPeaksTool>
-    );
-    tools.push(findPeaksTool);
+    const tsData = result.data;
+
+    const labels = ["No ELMs", "Type I", "Type II", "Type III"];
+    tools.push({
+      name: "Shot Labels",
+      component: (
+        <ShotLabels
+          labels={labels}
+          annotations={annotations}
+          setAnnotations={setAnnotations}
+        ></ShotLabels>
+      ),
+    });
+
+    tools.push({
+      name: "Peak Detection",
+      component: (
+        <PeakDetectionTool
+          project_id={project_id}
+          sample_id={sample_id}
+          data={tsData}
+          setAnnotations={setAnnotations}
+        ></PeakDetectionTool>
+      ),
+    });
+
+    tools.push({
+      name: "Outlier Detection",
+      component: (
+        <OutlierDetectionTool
+          project_id={project_id}
+          sample_id={sample_id}
+          data={tsData}
+          setAnnotations={setAnnotations}
+        ></OutlierDetectionTool>
+      ),
+    });
+
+    tools.push({
+      name: "Change Point Detection",
+      component: (
+        <ChangePointDetectionTool
+          project_id={project_id}
+          sample_id={sample_id}
+          data={tsData}
+          setAnnotations={setAnnotations}
+        ></ChangePointDetectionTool>
+      ),
+    });
+
+    tools.push({
+      name: "Jump Detection",
+      component: (
+        <JumpDetectionTool
+          project_id={project_id}
+          sample_id={sample_id}
+          data={tsData}
+          setAnnotations={setAnnotations}
+        ></JumpDetectionTool>
+      ),
+    });
   } else if (project.task == "MHD") {
-    const result = CompositeDataSchema.safeParse(data);
-
-    if (!result.success || !("mirnov" in result.data.values)) {
+    const resultComposite = CompositeDataSchema.safeParse(data);
+    if (!resultComposite.success) {
       console.warn("MHD data is not available");
       return;
     }
 
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"]
+    const resultSpec = SpectrogramDataSchema.safeParse(
+      resultComposite.data.values["mirnov"],
     );
-
-    if (!mhdData.success) {
-      console.warn("MHD data is not available");
+    if (!resultSpec.success) {
+      console.warn("MHD spectrogram data is not available");
       return;
     }
 
-    const ampRangeTool = (
-      <>
-        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
-        <hr className="m-4 h-px opacity-30 border-gray-200" />
+    const mhdData = resultSpec.data;
+    tools.push({
+      name: "Amplitude Range",
+      component: (
         <AmplitudeSlider
-          data={mhdData.data}
+          data={mhdData}
           viewParams={viewParams}
           setViewParams={setViewParams}
           plotProps={plotProps}
         />
-        <hr className="m-4 h-px opacity-30 border-gray-200" />
+      ),
+    });
+
+    tools.push({
+      name: "Color Map",
+      component: (
+        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
+      ),
+    });
+
+    tools.push({
+      name: "Threshold",
+      component: (
         <SpectrogramThresholdTool
           project_id={project_id}
           sample_id={sample_id}
@@ -447,40 +533,71 @@ export default function ToolBar({
           setPlotProps={setPlotProps}
           setAnnotations={setAnnotations}
         />
-      </>
-    );
-    tools.push(ampRangeTool);
+      ),
+    });
   }
 
+  const clearAnnotations = () => {
+    setAnnotations([]);
+  };
+
   return (
-    <Provider theme={defaultTheme}>
-      <div className="h-screen text-center">
-        <div className="pl-4 pr-4 pt-4">
-          <ButtonGroup>
-            <SaveButton
+    <Provider theme={defaultTheme} height="100vh">
+      <View overflow="auto" height="100vh">
+        <Flex
+          direction="column"
+          alignItems="center"
+          justifyContent="center"
+          gap="size-100"
+          width="100%"
+        >
+          <Flex
+            direction="column"
+            alignItems="center"
+            justifyContent="center"
+            gap="size-100"
+          >
+            <Header height="size-300" marginBottom="size-100">
+              <span style={{ fontSize: "1.2rem" }}>Controls</span>
+            </Header>
+            <ButtonGroup>
+              <SaveButton
+                project_id={project_id}
+                sample_id={sample_id}
+                annotations={annotations}
+              />
+              <NextButton
+                project_id={project_id}
+                sample_id={sample_id}
+                annotations={annotations}
+              />
+              <Button variant="primary" onPress={clearAnnotations}>
+                Clear
+              </Button>
+            </ButtonGroup>
+            <ShotSearch
               project_id={project_id}
               sample_id={sample_id}
               annotations={annotations}
             />
-            <NextButton
-              project_id={project_id}
-              sample_id={sample_id}
-              annotations={annotations}
-            />
-          </ButtonGroup>
-        </div>
-        <div className="pl-4 pr-4 pb-4 pt-2">
-          <ShotSearch
-            project_id={project_id}
-            sample_id={sample_id}
-            annotations={annotations}
-          />
-        </div>
-        <hr className="m-4" />
-        {tools.map((item, i) => (
-          <div key={i}>{item}</div>
-        ))}
-      </div>
+          </Flex>
+          <Flex justifyContent="center" alignItems="center">
+            <Header height="size-300" marginBottom="size-100">
+              <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+            </Header>
+          </Flex>
+          <Accordion allowsMultipleExpanded={true} width="100%">
+            {tools.map((item, i) => (
+              <Disclosure key={i}>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                </DisclosureTitle>
+                <DisclosurePanel>{item.component}</DisclosurePanel>
+              </Disclosure>
+            ))}
+          </Accordion>
+        </Flex>
+      </View>
     </Provider>
   );
 }

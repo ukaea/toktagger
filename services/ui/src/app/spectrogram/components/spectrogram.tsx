@@ -4,7 +4,6 @@ import { SpectrogramViewTable } from "./spectrogram-table";
 import {
   SpectrogramData,
   Category,
-  Annotations,
   Zone,
   TimeRegionSchema,
   TimePointSchema,
@@ -12,6 +11,7 @@ import {
   ZoneSchema,
   VSpanSchema,
   VSpan,
+  Annotation,
   SpectrogramMaskSchema,
   SpectrogramMask,
   PlotProps,
@@ -57,9 +57,9 @@ const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
 
 type SpectrogramViewInfo = {
   data: SpectrogramData;
-  annotations: Annotations;
+  annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
   plotProps: PlotProps;
 };
@@ -80,9 +80,9 @@ export const SpectrogramView = ({
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
-  const displayAnnotations: DisplayAnnotation[] = annotations.map(
-    convertAnnotationToDisplayAnnotation,
-  );
+  const displayAnnotations: DisplayAnnotation[] = annotations
+    .filter((x: Annotation) => x.type !== "class_label")
+    .map(convertAnnotationToDisplayAnnotation);
 
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
@@ -196,6 +196,7 @@ export const SpectrogramView = ({
       customdata: data.amplitude,
       hovertemplate:
         "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
+      // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
       coloraxis: "coloraxis",
       opacity: plotProps.thresholdActive ? 0.4 : 1,
     },
@@ -251,6 +252,7 @@ export const SpectrogramView = ({
       zerolinewidth: 1,
       showgrid: false,
     },
+    // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
     coloraxis: {
       cmin: logAmpMin,
       cmax: logAmpMax,

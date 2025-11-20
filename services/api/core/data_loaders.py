@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
@@ -13,6 +14,15 @@ from services.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesF
 from services.api.schemas.projects import DataLoaderType
 
 
+# Set up UDA environment variables with defaults if not already set. This is required for
+# the pyuda client to work correctly outside of Freia.
+os.environ["UDA_HOST"] = os.environ.get("UDA_HOST", "uda2.mast.l")
+os.environ["UDA_META_PLUGINNAME"] = os.environ.get("UDA_META_PLUGINNAME", "MASTU_DB")
+os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
+    "UDA_METANEW_PLUGINNAME", "MAST_DB"
+)
+
+
 class DataLoader(ABC):
     @abstractmethod
     def get_sample(self, sample: Sample) -> Data:
@@ -23,6 +33,7 @@ class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
     def get_sample(self, sample: Sample) -> ImageData:
+        assert isinstance(sample.data, FileData)
         item: FileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(
@@ -37,6 +48,7 @@ class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, TimeSeriesFileData)
         item: TimeSeriesFileData = sample.data
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(
@@ -62,6 +74,7 @@ class UDADataLoader(DataLoader):
         self.client = pyuda.Client()
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, ShotData)
         item: ShotData = sample.data
 
         results = {}
