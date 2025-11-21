@@ -10,7 +10,8 @@ from services.api.schemas.annotations import Annotation
 import typing
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.models.base import Model
-from loguru import logger
+import logging
+logger = logging.getLogger("ray")
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset

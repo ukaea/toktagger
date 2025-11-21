@@ -1,11 +1,12 @@
 import random
 from abc import ABC, abstractmethod
-from loguru import logger
 
 from services.api.schemas.samples import Sample
 from services.api.schemas.annotations import Annotation
 from services.api.schemas.projects import QueryStrategyType
 
+import logging
+logger = logging.getLogger(__name__)
 
 class QueryStrategy(ABC):
     def __init__(self, samples: list[Sample], annotations: list[Annotation]):

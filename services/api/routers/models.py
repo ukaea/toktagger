@@ -6,12 +6,14 @@ import random
 from bson.objectid import ObjectId
 import ray
 import itertools
-from loguru import logger
 from services.api.crud import utils
 from services.api.schemas.annotations import AnnotationTypes
 from services.api.schemas.models import Model, ModelType, ModelIn, ModelUpdate
 from services.api.schemas import convert_to_objectid
 from services.api.worker import train_model, get_predictions
+
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 

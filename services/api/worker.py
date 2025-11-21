@@ -2,7 +2,6 @@ import os
 import ray
 import pathlib
 import typing
-from loguru import logger
 from services.api.schemas.projects import Project
 from services.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from services.api.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
@@ -12,6 +11,8 @@ from services.api.core.sender import (
     send_batch_annotations,
     send_model_updates,
 )
+import logging
+logger = logging.getLogger("ray")
 
 
 def get_actor(project, model):

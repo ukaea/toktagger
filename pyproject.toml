@@ -37,7 +37,6 @@ dependencies = [
   "hmmlearn>=0.3.3",
   "torch>=2.8.0",
   "ray>=2.51.1",
-  "loguru>=0.7.3",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
-from loguru import logger
 from services.api.core.data_loaders import DATA_LOADERS
 from services.api.core.data_pool import DataPool
 from services.api.core.query_strategy import QUERY_STRATEGIES
@@ -13,6 +12,8 @@ from services.api.schemas.samples import (
 from services.api.schemas.annotations import Annotation
 from services.api.schemas import convert_to_objectid
 from typing import Literal
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
