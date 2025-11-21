@@ -31,6 +31,10 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
     "UDA_METANEW_PLUGINNAME", "MAST_DB"
 )
 
+# Setup SAL environment variables with defaults if not already set. This is required for
+# the SAL client to work correctly.
+os.environ["SAL_HOST"] = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
+
 
 # Toksearch specific patch
 # Create a Fake MDS plus module to avoid the need to install MDSPlus on the system.
