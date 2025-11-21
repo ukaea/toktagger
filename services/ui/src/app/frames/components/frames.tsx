@@ -9,7 +9,8 @@ import React, {
 } from "react";
 import {
   Annotorious,
-  ImageAnnotator
+  ImageAnnotator,
+  type ImageAnnotation
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
 
@@ -153,17 +154,61 @@ export function FrameView({
   }, [adapter, frameKey]);
 
   // Helper: persist current frame immediately
-  const saveCurrentFrame = useCallback(async () => {
-    const bridge = bridgeRef.current;
-    if (!bridge) return;
-    try {
-      const list = await bridge.persistWorkingNow(frameKey);
-      await adapter.write(list);
-      bridge.markSaved();
-    } catch (err) {
-      console.error("Auto-save failed:", err);
-    }
-  }, [adapter, frameKey]);
+  const saveCurrentFrame = useCallback(
+    async (): Promise<ImageAnnotation[]> => {
+      const bridge = bridgeRef.current;
+      if (!bridge) return [];
+
+      try {
+        const list = await bridge.persistWorkingNow(frameKey);
+        await adapter.write(list);
+        bridge.markSaved();
+        return list;
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+        return [];
+      }
+    },
+    [adapter, frameKey]
+  );
+
+  // Forward propagation: seed next frame with current annotations if it's empty
+  const propagateForwardIfEmpty = useCallback(
+    async (currentList: ImageAnnotation[], nextFrameNumber: number) => {
+      // Nothing to propagate
+      if (!currentList || currentList.length === 0) return;
+
+      // Build the next frame's source key
+      const nextKey = buildSourceKey({
+        projectId,
+        sampleId,
+        frame: nextFrameNumber
+      });
+
+      const nextAdapter = W3CImageFormat(nextKey);
+
+      // Check if next frame already has stored annotations
+      const existing = await nextAdapter.read();
+      if (Array.isArray(existing) && existing.length > 0) {
+        // Next frame already has something – don't override it
+        return;
+      }
+
+      // Seed next frame by cloning current annotations and retargeting source
+      const seeded = currentList.map((annotation) => ({
+        ...(typeof annotation === "object" && annotation
+          ? JSON.parse(JSON.stringify(annotation))
+          : annotation),
+        target: {
+          ...(annotation.target || {}),
+          source: nextKey
+        }
+      })) as ImageAnnotation[];
+
+      await nextAdapter.write(seeded);
+    },
+    [projectId, sampleId]
+  );
 
   // --- Background auto-save loop (small, cheap) ---
   useEffect(() => {
@@ -223,11 +268,21 @@ export function FrameView({
     onPrev();
   }, [onPrev, saveCurrentFrame]);
 
-  const handleNext = useCallback(async () => {
-    if (!onNext) return;
-    await saveCurrentFrame();
-    onNext();
-  }, [onNext, saveCurrentFrame]);
+  const handleNext = useCallback(
+    async () => {
+      if (!onNext) return;
+
+      // 1) Save current frame and get the final list
+      const currentList = await saveCurrentFrame();
+
+      // 2) Seed the NEXT frame if it's empty (localStorage-based)
+      await propagateForwardIfEmpty(currentList, frameNumber + 1);
+
+      // 3) Trigger upstream navigation (which will load the next frame data)
+      onNext();
+    },
+    [onNext, saveCurrentFrame, propagateForwardIfEmpty, frameNumber]
+  );
 
   const handleJump = useCallback(
     async (n: number) => {
