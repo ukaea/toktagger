@@ -171,6 +171,124 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   );
 }
 
+/**
+ * Phase 4: UFO toolbar buttons
+ */
+
+function UfoSaveButton({
+  project_id,
+  sample_id,
+}: {
+  project_id: string;
+  sample_id: string;
+}) {
+  const handleClick = async () => {
+    try {
+      await saveUfoAnnotations(project_id, sample_id);
+      ToastQueue.positive(`Saved UFO frame annotations!`, {
+        timeout: 5000,
+      });
+    } catch (err) {
+      console.error("UFO save failed:", err);
+      ToastQueue.negative("Failed to save UFO annotations", { timeout: 5000 });
+    }
+  };
+
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Save
+    </Button>
+  );
+}
+
+function UfoNextButton({
+  project_id,
+  sample_id,
+}: {
+  project_id: string;
+  sample_id: string;
+}) {
+  const router = useRouter();
+
+  const handleClick = async () => {
+    try {
+      // 1) If dirty, fire a background save (do not block navigation)
+      if (typeof window !== "undefined") {
+        const hasUnsaved =
+          (window as any).ufoHasUnsavedChanges?.() ?? false;
+
+        if (hasUnsaved) {
+          // fire-and-forget, no await on purpose
+          void saveUfoAnnotations(project_id, sample_id);
+        }
+      }
+
+      // 2) Navigate to next sample
+      const sample = await getNextSample(project_id);
+      const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
+      router.push(NEXT_SAMPLE_URL);
+    } catch (err) {
+      console.error("Failed to go to next UFO sample:", err);
+    }
+  };
+
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Next
+    </Button>
+  );
+}
+
+function UfoShotSearch({
+  project_id,
+  sample_id,
+}: {
+  project_id: string;
+  sample_id: string;
+}) {
+  const router = useRouter();
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  const onSearchSubmit = async (newValue: string) => {
+    if (newValue === "") {
+      setErrorMessage("");
+      return;
+    }
+
+    if (!/^[0-9]*$/.test(newValue)) {
+      setErrorMessage("Please enter a number.");
+      return;
+    }
+
+    const shot_id = newValue;
+
+    try {
+      // Foreground save: await before navigating
+      await saveUfoAnnotations(project_id, sample_id);
+
+      const sample = await getShotSample(project_id, shot_id);
+      if (sample !== null) {
+        const NEXT_SAMPLE_URL = `${process.env.NEXT_PUBLIC_API_URL}/projects/${project_id}/samples/${sample._id}`;
+        router.push(NEXT_SAMPLE_URL);
+      } else {
+        setErrorMessage("Shot not found!");
+      }
+    } catch (err) {
+      console.error("Failed to jump to UFO shot:", err);
+      setErrorMessage("Failed to save or jump to shot.");
+    }
+  };
+
+  return (
+    <SearchField
+      label="Jump to Shot"
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    />
+  );
+}
+
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
   viewParams: ViewParams;
@@ -391,6 +509,7 @@ type ToolBarInfo = {
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
 };
+
 export default function ToolBar({
   project,
   sample,
