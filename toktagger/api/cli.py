@@ -1,9 +1,14 @@
-import threading
-import time
 import webbrowser
 import argparse
+from toktagger.api.main import Server
 import uvicorn
-from toktagger.api.main import app
+import time
+import threading
+
+# Need to point to app as a module level string if we want reload option
+server = Server()
+server._setup_app()
+app = server.app
 
 
 def do_open_browser(host: str, port: int):
@@ -28,10 +33,14 @@ def main():
     argparser.add_argument(
         "--no-browser", action="store_true", help="Don't open a browser"
     )
+    argparser.add_argument(
+        "--reload", action="store_true", help="Reload the API on changes"
+    )
     args = argparser.parse_args()
     open_browser = not args.no_browser
-
     if open_browser:
         threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(
+        "toktagger.api.cli:app", host=args.host, port=args.port, reload=args.reload
+    )

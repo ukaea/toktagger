@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 from toktagger.api.core.annotators import PeakDetectionAnnotator
-from toktagger.api.core.data_loaders import DATA_LOADERS
+from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.annotators import AnnotatorParams, PeakDetectionParams
@@ -83,7 +83,7 @@ async def predict_sample(
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    data_loader = DATA_LOADERS[project.data_loader]()
+    data_loader = LoaderRegistry(project.data_loader)()
     data_item = data_loader.get_sample(sample)
 
     tagger = PeakDetectionAnnotator(params)

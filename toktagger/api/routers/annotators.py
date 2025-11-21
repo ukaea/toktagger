@@ -7,7 +7,7 @@ from toktagger.api.schemas.annotators import (
 )
 from toktagger.api.crud.utils import get_project, get_sample
 from toktagger.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
-from toktagger.api.core.data_loaders import DATA_LOADERS
+from toktagger.api.core.data_loaders import LoaderRegistry
 
 router = APIRouter(
     prefix="/projects/{project_id}",
@@ -48,7 +48,7 @@ async def create_annotations(
 
     sample: Sample = await get_sample(db_client, project_id, sample_id)
 
-    data_loader = DATA_LOADERS[project.data_loader]()
+    data_loader = LoaderRegistry.get(project.data_loader)()
     data_item = data_loader.get_sample(sample)
 
     annotator = annotator_cls(params)
