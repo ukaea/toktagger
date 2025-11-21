@@ -2,17 +2,17 @@
 Viz Annotation comes with some common data loader backends by default, such as local files, UDA, TokSearch etc. However if the Tokamak which you wish to label data for has its own data retrieval system which is not currentyly supported by us, you can easily add your own data loaders!
 
 ## The DataLoader Class
-To create your own data loader, it must inherit from the `DataLoader` base class. This class requires one method to be defined, `get_sample`, which accepts a `Sample` object as an input, and returns a `Data` object as an output. The structure of these objects may change depending on the type of labelling task you are doing - see full definitions in `viz-annotation.api.schemas.samples` and `viz-annotation.api.schemas.data`.
+To create your own data loader, it must inherit from the `DataLoader` base class. This class requires one method to be defined, `get_sample`, which accepts a `Sample` object as an input, and returns a `Data` object as an output. The structure of these objects may change depending on the type of labelling task you are doing - see full definitions in `toktagger.api.schemas.samples` and `toktagger.api.schemas.data`.
 
-You can import the DataLoader class from the `viz-annotation` package with:
+You can import the DataLoader class from the `toktagger` package with:
 ```python
-from viz-annotation import DataLoader
+from toktagger import DataLoader
 ```
 
 ## The LoaderRegistry
-The loader registry keeps track of which types of data loaders are available to the server when trying to access data. You must decorate your data loader class with the `LoaderRegistry.register` method, providing a shorthand name which you wish to refer to your data loader by when creating projects. You can import this from the `viz-annotation` package with:
+The loader registry keeps track of which types of data loaders are available to the server when trying to access data. You must decorate your data loader class with the `LoaderRegistry.register` method, providing a shorthand name which you wish to refer to your data loader by when creating projects. You can import this from the `toktagger` package with:
 ```python
-from viz-annotation import LoaderRegistry
+from toktagger import LoaderRegistry
 ```
 
 ## Running the server
@@ -20,8 +20,8 @@ If you have added your own data loaders, you must make sure they have been loade
 
 ```python
 from viz_annotation import DataLoader, LoaderRegistry, Server
-from viz-annotation.api.schemas.samples import Sample
-from viz-annotation.api.schemas.data import TimeSeriesData
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.data import TimeSeriesData
 
 # Say we have a python module which can load data from our Tokamak's data backend:
 import my_tokamak_data_backend

@@ -17,7 +17,7 @@ class MongoDBClient:
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
-            cache_dir = user_cache_dir("viz-annotation", "ukaea")
+            cache_dir = user_cache_dir("toktagger", "ukaea")
             cache_dir = Path(cache_dir)
             cache_dir.mkdir(parents=True, exist_ok=True)
             file_name = cache_dir / db_name
