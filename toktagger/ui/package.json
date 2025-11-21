@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@adobe/react-spectrum": "^3.14.0",
+    "@annotorious/openseadragon": "^3.7.17",
+    "@annotorious/react": "^3.7.17",
     "@react-types/shared": "^3.31.0",
     "@vitejs/plugin-react": "^5.0.2",
     "buffer": "^6.0.3",
@@ -24,7 +26,8 @@
     "rollup": "^4.50.0",
     "stream-browserify": "^3.0.0",
     "vite": "^7.1.4",
-    "zod": "^3.25.67"
+    "zod": "^3.25.67",
+    "openseadragon": "^5.0.1"
   },
   "devDependencies": {
     "@adobe/react-spectrum": "^3.14.0",
