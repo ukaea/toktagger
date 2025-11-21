@@ -63,7 +63,8 @@ export function FrameSearch({
 }
 
 /**
- * Phase 3: Frame annotator + per-frame localStorage + dumb navigation.
+ * Phase 3 + 4: Frame annotator + per-frame localStorage + dumb navigation +
+ * window helpers for toolbar integration.
  *
  * - base64 PNG → <img src="data:image/png;base64,...">
  * - Rectangle-only drawing
@@ -71,6 +72,10 @@ export function FrameSearch({
  * - Prev/Next/Jump:
  *   - On navigate: save current frame via bridge.persistWorkingNow → adapter.write.
  *   - Then call onPrev/onNext/onJump (which just tweak dataParams upstream).
+ * - Expose:
+ *   - window.ufoHasUnsavedChanges()
+ *   - window.ufoMarkSaved()
+ *   - window.ufoCollectForSave()
  */
 export function FrameView({
   data,
@@ -195,6 +200,22 @@ export function FrameView({
     };
   }, []);
 
+  // --- Expose minimal save collector on window for toolbar integration ---
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    (window as any).ufoCollectForSave = async () => {
+      // One-frame only for now (no sweep across localStorage)
+      const list =
+        (await bridgeRef.current?.persistWorkingNow?.(frameKey)) ?? [];
+      return list;
+    };
+
+    return () => {
+      delete (window as any).ufoCollectForSave;
+    };
+  }, [frameKey]);
+
   // --- Navigation handlers: save → then call upstream handler ---
   const handlePrev = useCallback(async () => {
     if (!onPrev) return;
@@ -293,10 +314,10 @@ type UFOViewInfo = {
 };
 
 /**
- * Phase 3 UFOView:
+ * Phase 3/4 UFOView:
  *
  * - Wraps FrameView.
- * - Still ignores global annotations + toolbar.
+ * - Still ignores global annotations + toolbar for now.
  * - Adds navigation via onPrev/onNext/onJump.
  */
 export const UFOView = ({
