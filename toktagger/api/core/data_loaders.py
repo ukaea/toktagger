@@ -136,6 +136,7 @@ class SALDataLoader(DataLoader):
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         item: ShotData = sample.data
+        assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
 
         results = {}
         for name in item.signal_names:
@@ -155,6 +156,10 @@ class TokSearchDataLoader(DataLoader):
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         item: ToksearchShotData = sample.data
+        assert isinstance(sample.data, ToksearchShotData), (
+            "Sample data must be of type ToksearchShotData"
+        )
+
         endpoint = item.endpoint
         base_path = item.base_path
 

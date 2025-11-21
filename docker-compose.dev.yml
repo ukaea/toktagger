@@ -48,6 +48,7 @@ services:
       UDA_HOST: "uda2.mast.l"
       UDA_META_PLUGINNAME: "MASTU_DB"
       UDA_METANEW_PLUGINNAME: "MAST_DB"
+      SAL_HOST: "https://sal.jetdata.eu"
     working_dir: /app
     command: ["uvicorn", "toktagger.api.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
     networks:

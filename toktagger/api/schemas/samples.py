@@ -1,6 +1,5 @@
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, List, Optional, Union, Literal
 from enum import Enum
-from typing_extensions import Literal
 from pydantic import Field, BaseModel
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotations import AnnotationIn

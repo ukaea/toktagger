@@ -16,7 +16,6 @@ def create_project(name: str, task: str, data_loader: str) -> str:
         "http://localhost:8002/projects",
         json=project,
     )
-    print(name, response.json())
     project_id = response.json()["_id"]
     return project_id
 
