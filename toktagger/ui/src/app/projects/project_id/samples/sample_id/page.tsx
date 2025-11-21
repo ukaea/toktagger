@@ -1,5 +1,10 @@
 "use client";
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 import { useState, useEffect } from "react";
+=======
+
+import { use, useState, useEffect } from "react";
+>>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
 import {
   Provider,
   defaultTheme,
@@ -21,7 +26,7 @@ import {
   ImageViewParams,
   PlotProps,
   ViewParams,
-  DataParams
+  DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
 import { UFOView } from "@/app/frames/components/ufos";
@@ -35,7 +40,12 @@ type SampleDataBreadCrumbsInfo = {
   project: Project;
   sample: Sample;
 };
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 const SampleDataBreadCrumbs = ({
+=======
+
+export const SampleDataBreadCrumbs = ({
+>>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
   project,
   sample,
 }: SampleDataBreadCrumbsInfo) => {
@@ -68,6 +78,9 @@ type SampleViewInfo = {
     updater: (dataParams: DataParams) => DataParams | DataParams,
   ) => void;
   plotProps: PlotProps;
+  onPrev?: () => void;
+  onNext?: () => void;
+  onJump?: (n: number) => void;
 };
 
 const SampleView = ({
@@ -79,6 +92,9 @@ const SampleView = ({
   dataParams,
   setDataParams,
   plotProps,
+  onPrev,
+  onNext,
+  onJump,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -119,6 +135,9 @@ const SampleView = ({
         setDataParams={setDataParams}
         projectId={project._id}
         sampleId={sample._id}
+        onPrev={onPrev}
+        onNext={onNext}
+        onJump={onJump}
       />
     );
   } else if (project.task == "MHD") {
@@ -172,9 +191,23 @@ async function getAnnotations(
   );
 }
 
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 export default function SamplePage() {
   const { project_id, sample_id } = useParams();
   const hasIds = project_id !== undefined && sample_id !== undefined;
+=======
+type SampleViewProps = {
+  project_id: string;
+  sample_id: string;
+};
+
+export default function SamplePage({
+  params,
+}: {
+  params: Promise<SampleViewProps>;
+}) {
+  const { project_id, sample_id } = use(params);
+>>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
 
   const [project, setProject] = useState<Project | null>(null);
   const [sample, setSample] = useState<Sample | null>(null);
@@ -218,21 +251,34 @@ export default function SamplePage() {
           ...currentViewParams,
 =======
   useEffect(() => {
-    const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
+    const refreshData = async (
+      currentDataParams: DataParams,
+      currentViewParams: ViewParams,
+    ) => {
       if (!project || !sample) {
         return;
       }
 
+      let effectiveViewParams: ViewParams = currentViewParams;
+
       if (project.task == "MHD") {
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
         viewParams = {
           ...viewParams,
 >>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
+=======
+        effectiveViewParams = {
+          ...currentViewParams,
+>>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
       }
 
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
       // 3) Fetch data using { params, view }
+=======
+>>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
         {
@@ -241,10 +287,14 @@ export default function SamplePage() {
             "Content-Type": "application/json",
           },
 <<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
+=======
+>>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
           body: JSON.stringify({
             params: currentDataParams,
             view: effectiveViewParams,
           }),
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 =======
           body: JSON.stringify({ params: dataParams, view: viewParams }),
 >>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
@@ -268,6 +318,24 @@ export default function SamplePage() {
 
     refreshData(dataParams, viewParams);
   }, [project_id, sample_id, dataParams, viewParams, hasIds]);
+=======
+        },
+      );
+      const payload: Data = await response.json();
+      if (!response.ok) {
+        ToastQueue.negative("Error:", (payload as any).detail);
+      } else {
+        setData(payload);
+      }
+    };
+
+    const run = async (
+      currentDataParams: DataParams,
+      currentViewParams: ViewParams,
+    ) => {
+      await refreshData(currentDataParams, currentViewParams);
+    };
+>>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
 
 <<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
   if (!data || !project || !sample || !hasIds) {
@@ -278,6 +346,42 @@ export default function SamplePage() {
 
   useEffect(() => {}, [plotProps]);
 
+  // Phase 3: dumb frame navigation for UFO task via dataParams
+  const currentFrame =
+    data && typeof (data as any).frame === "number"
+      ? ((data as any).frame as number)
+      : undefined;
+
+  const goToFrame = (n: number) => {
+    if (!Number.isFinite(n)) {
+      return;
+    }
+    const target = Math.max(0, Math.floor(n));
+    setDataParams((previous: DataParams | any) => ({
+      ...(previous || {}),
+      name: "image",
+      frame: target,
+    }));
+  };
+
+  const onPrev = () => {
+    if (typeof currentFrame !== "number") {
+      return;
+    }
+    goToFrame(currentFrame - 1);
+  };
+
+  const onNext = () => {
+    if (typeof currentFrame !== "number") {
+      return;
+    }
+    goToFrame(currentFrame + 1);
+  };
+
+  const onJump = (n: number) => {
+    goToFrame(n);
+  };
+
   if (!data || !project || !sample) {
     return null;
 >>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
@@ -287,10 +391,7 @@ export default function SamplePage() {
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
-        <SampleDataBreadCrumbs
-          project={project}
-          sample={sample}
-        ></SampleDataBreadCrumbs>
+        <SampleDataBreadCrumbs project={project} sample={sample} />
         <div className="flex">
           <ToolBar
             project={project}
@@ -313,6 +414,9 @@ export default function SamplePage() {
               dataParams={dataParams}
               setDataParams={setDataParams}
               plotProps={plotProps}
+              onPrev={onPrev}
+              onNext={onNext}
+              onJump={onJump}
             />
           </div>
         </div>
