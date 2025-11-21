@@ -1,7 +1,8 @@
+from pydantic import Field, field_validator
 from typing import Optional
-from pydantic import Field
 from enum import Enum
 from toktagger.api.schemas import ConfiguredModel
+from toktagger.api.core.data_loaders import LoaderRegistry
 
 
 class Task(Enum):
@@ -17,14 +18,6 @@ class QueryStrategyType(str, Enum):
     UNCERTAINTY = "uncertainty"
 
 
-class DataLoaderType(str, Enum):
-    TABULAR = "tabular"
-    IMAGE = "image"
-    SAL = "sal"
-    UDA = "uda"
-    TOKSEARCH = "toksearch"
-
-
 class ProjectIn(ConfiguredModel):
     name: str = Field(..., description="The name of the project.")
     task: Task = Field(..., description="The type of labelling task.")
@@ -32,10 +25,19 @@ class ProjectIn(ConfiguredModel):
         ...,
         description="The strategy to use when selecting the next sample to annotate.",
     )
-    data_loader: DataLoaderType = Field(
+    data_loader: str = Field(
         ...,
         description="The type of data which will need to be loaded for this project.",
     )
+
+    @field_validator("data_loader")
+    def check_data_loader(cls, value):
+        if value not in (names := LoaderRegistry.names()):
+            raise ValueError(
+                f"Invalid data loader '{value}' - valid options are '{names}'."
+            )
+
+        return value
 
 
 class Project(ProjectIn):

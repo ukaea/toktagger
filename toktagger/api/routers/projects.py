@@ -2,6 +2,7 @@ from typing import Literal
 from fastapi import APIRouter, Request, HTTPException, Query, Path
 from toktagger.api.schemas.projects import ProjectIn, Project, ProjectUpdate
 from toktagger.api.crud import utils
+from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import MongoDBClient
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -66,6 +67,9 @@ async def create_project(request: Request, project: ProjectIn):
     """
     # Create instance of this project class, instantiating all required classes for that task, and return its ID
     # In the future, should be able to specify eg dataloader, data type, query strategy etc
+    if project.data_loader not in LoaderRegistry.names():
+        raise HTTPException(422, detail="Invalid data loader specified.")
+
     _id = await request.app.state.db_client.insert(collection="projects", model=project)
     return {"_id": _id}
 

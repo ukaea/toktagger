@@ -43,14 +43,17 @@ services:
     volumes:
       - ./data/:/app/data
       - ./toktagger:/app/toktagger
+      - ${CUSTOM_SCRIPT:-./toktagger/api/run.py}:/app/run.py
     environment:
       MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
       UDA_HOST: "uda2.mast.l"
       UDA_META_PLUGINNAME: "MASTU_DB"
       UDA_METANEW_PLUGINNAME: "MAST_DB"
       SAL_HOST: "https://sal.jetdata.eu"
+      CUSTOM_SCRIPT: ${CUSTOM_SCRIPT}
+      RELOAD: "true"
     working_dir: /app
-    command: ["uvicorn", "toktagger.api.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
+    command: ["python", "run.py"]
     networks:
       - app-network
 

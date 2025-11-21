@@ -21,7 +21,6 @@ from toktagger.api.schemas.samples import (
     TimeSeriesFileData,
     ToksearchShotData,
 )
-from toktagger.api.schemas.projects import DataLoaderType
 
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -46,6 +45,34 @@ class DataLoader(ABC):
         pass
 
 
+class LoaderRegistry:
+    _registry: dict[str, DataLoader] = {}
+
+    @classmethod
+    def register(cls, name: str):
+        def decorator(loader_class: DataLoader):
+            if not issubclass(loader_class, DataLoader):
+                raise ValueError(
+                    f"Loader '{name}' does not inherit from DataLoader base class."
+                )
+            cls._registry[name] = loader_class
+            return loader_class
+
+        return decorator
+
+    @classmethod
+    def get(cls, name: str):
+        loader_class: DataLoader | None = cls._registry.get(name)
+        if not loader_class:
+            raise ValueError(f"No DataLoader class called '{name}' found in registry!")
+        return loader_class
+
+    @classmethod
+    def names(cls):
+        return list(cls._registry.keys())
+
+
+@LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
@@ -61,6 +88,7 @@ class ImageDataLoader(DataLoader):
         return ImageData(data=arr.tolist())
 
 
+@LoaderRegistry.register("tabular")
 class TabularDataLoader(DataLoader):
     """DataLoader for retrieving data from a tabular file format (e.g., CSV, Parquet)"""
 
@@ -99,6 +127,7 @@ class TabularDataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+@LoaderRegistry.register("uda")
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
@@ -125,6 +154,7 @@ class UDADataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+@LoaderRegistry.register("sal")
 class SALDataLoader(DataLoader):
     """DataLoader for retrieving data using the SAL access layer"""
 
@@ -150,6 +180,7 @@ class SALDataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+@LoaderRegistry.register("toksearch")
 class TokSearchDataLoader(DataLoader):
     def __init__(self):
         super().__init__()
@@ -180,12 +211,3 @@ class TokSearchDataLoader(DataLoader):
             results[name] = item
 
         return MultiVariateTimeSeriesData(values=results)
-
-
-DATA_LOADERS = {
-    DataLoaderType.TABULAR: TabularDataLoader,
-    DataLoaderType.IMAGE: ImageDataLoader,
-    DataLoaderType.UDA: UDADataLoader,
-    DataLoaderType.SAL: SALDataLoader,
-    DataLoaderType.TOKSEARCH: TokSearchDataLoader,
-}
