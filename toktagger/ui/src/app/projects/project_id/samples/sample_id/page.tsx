@@ -57,6 +57,7 @@ const SampleDataBreadCrumbs = ({
 
 type SampleViewInfo = {
   project: Project;
+  sample: Sample;
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
@@ -71,6 +72,7 @@ type SampleViewInfo = {
 
 const SampleView = ({
   project,
+  sample,
   data,
   annotations,
   setAnnotations,
@@ -103,7 +105,7 @@ const SampleView = ({
       />
     );
   } else if (project.task == "UFO") {
-    console.log({data})
+    console.log({ data });
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for UFO view");
@@ -115,6 +117,8 @@ const SampleView = ({
         setAnnotations={setAnnotations}
         dataParams={dataParams}
         setDataParams={setDataParams}
+        projectId={project._id}
+        sampleId={sample._id}
       />
     );
   } else if (project.task == "MHD") {
@@ -205,12 +209,24 @@ export default function SamplePage() {
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
 
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
       // 2) Build the "view" object we’ll send to the backend
       let effectiveViewParams: ViewParams = currentViewParams;
 
       if (project.task === "MHD") {
         effectiveViewParams = {
           ...currentViewParams,
+=======
+  useEffect(() => {
+    const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
+      if (!project || !sample) {
+        return;
+      }
+
+      if (project.task == "MHD") {
+        viewParams = {
+          ...viewParams,
+>>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
@@ -224,27 +240,47 @@ export default function SamplePage() {
           headers: {
             "Content-Type": "application/json",
           },
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
           body: JSON.stringify({
             params: currentDataParams,
             view: effectiveViewParams,
           }),
+=======
+          body: JSON.stringify({ params: dataParams, view: viewParams }),
+>>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
         },
       );
 
       const payload: Data = await response.json();
 
       if (!response.ok) {
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
         ToastQueue.negative("Error:", (payload as any).detail);
       } else {
         setData(payload);
+=======
+        ToastQueue.negative("Error:", (data as any).detail);
+      } else {
+        setData(data);
+>>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
       }
     };
 
     refreshData(dataParams, viewParams);
   }, [project_id, sample_id, dataParams, viewParams, hasIds]);
 
+<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
   if (!data || !project || !sample || !hasIds) {
     return;
+=======
+    run(dataParams, viewParams);
+  }, [project, sample, dataParams, viewParams, project_id, sample_id]);
+
+  useEffect(() => {}, [plotProps]);
+
+  if (!data || !project || !sample) {
+    return null;
+>>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
   }
 
   return (
@@ -270,6 +306,7 @@ export default function SamplePage() {
           <div className="flex-1 justify-center">
             <SampleView
               project={project}
+              sample={sample}
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
