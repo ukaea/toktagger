@@ -25,30 +25,27 @@ import { AnnoBridge, type BridgeHandle } from "./bridge";
 import type { ClassRegistry } from "./lib";
 import { W3CImageFormat, buildSourceKey } from "./adapters";
 
-/** (Kept for later phases) Jump to frame via Spectrum SearchField.
- *  For Phase 2 we still treat UI as single-frame, but this is ready for later.
+/**
+ * Simple Jump control: user types a frame number, we call onJump(n).
  */
 export function FrameSearch({
-  setDataParams
+  onJump
 }: {
-  setDataParams: (updater: (prev: DataParams) => DataParams) => void;
+  onJump: (n: number) => void;
 }) {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const onSearchSubmit = async (newValue: string) => {
+  const onSearchSubmit = (newValue: string) => {
     if (newValue === "") {
       setErrorMessage("");
-    } else if (/^[0-9]*$/.test(newValue)) {
+      return;
+    }
+
+    if (/^[0-9]*$/.test(newValue)) {
       setErrorMessage("");
-      const frame_num = newValue;
-      try {
-        setDataParams((prev) => ({
-          ...prev,
-          name: "image",
-          frame: Number(frame_num)
-        }));
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
+      const n = Number(newValue);
+      if (Number.isFinite(n)) {
+        onJump(n);
       }
     } else {
       setErrorMessage("Please enter a number.");
@@ -66,26 +63,33 @@ export function FrameSearch({
 }
 
 /**
- * Phase 2: Minimal frame annotator + per-frame localStorage.
+ * Phase 3: Frame annotator + per-frame localStorage + dumb navigation.
  *
- * - Takes base64 PNG string from ImageData.values
- * - Renders <img> inside Annotorious ImageAnnotator
- * - Tool: rectangle
- * - LocalStorage per frame via W3CImageFormat + buildSourceKey
- * - Still NO navigation, NO profiles, NO toolbar wiring.
+ * - base64 PNG → <img src="data:image/png;base64,...">
+ * - Rectangle-only drawing
+ * - Per-frame storage via W3CImageFormat + buildSourceKey
+ * - Prev/Next/Jump:
+ *   - On navigate: save current frame via bridge.persistWorkingNow → adapter.write.
+ *   - Then call onPrev/onNext/onJump (which just tweak dataParams upstream).
  */
 export function FrameView({
   data,
   projectId,
-  sampleId
+  sampleId,
+  onPrev,
+  onNext,
+  onJump
 }: {
   data: ImageData;
   projectId: string;
   sampleId: string;
+  onPrev?: () => void;
+  onNext?: () => void;
+  onJump?: (n: number) => void;
 }) {
   const bridgeRef = useRef<BridgeHandle | null>(null);
 
-  // For Phase 2, we still don't use profiles or classes.
+  // Still ignoring profiles/classes for now.
   const getSelectedProfile = useCallback(() => null, []);
   const getSelectedClassName = useCallback(() => null, []);
   const includeTrackIds = false;
@@ -111,7 +115,7 @@ export function FrameView({
     [frameKey]
   );
 
-  // --- Phase 2: hydrate from localStorage when the annotator is ready ---
+  // --- Hydrate from localStorage when the annotator is ready ---
   useEffect(() => {
     let cancelled = false;
 
@@ -123,7 +127,6 @@ export function FrameView({
         if (cancelled) return;
         const ready = bridgeRef.current?.isAnnotatorReady?.() ?? false;
         if (!ready) {
-          // try again shortly until Annotorious is ready
           setTimeout(attemptHydrate, 32);
           return;
         }
@@ -144,7 +147,20 @@ export function FrameView({
     };
   }, [adapter, frameKey]);
 
-  // --- Phase 2: background auto-save via dirty helpers ---
+  // Helper: persist current frame immediately
+  const saveCurrentFrame = useCallback(async () => {
+    const bridge = bridgeRef.current;
+    if (!bridge) return;
+    try {
+      const list = await bridge.persistWorkingNow(frameKey);
+      await adapter.write(list);
+      bridge.markSaved();
+    } catch (err) {
+      console.error("Auto-save failed:", err);
+    }
+  }, [adapter, frameKey]);
+
+  // --- Background auto-save loop (small, cheap) ---
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -153,25 +169,16 @@ export function FrameView({
       if (!bridge) return;
 
       if (bridge.hasUnsaved()) {
-        void (async () => {
-          try {
-            const list = await bridge.persistWorkingNow(frameKey);
-            await adapter.write(list);
-            bridge.markSaved();
-          } catch (err) {
-            // For now we just log; failures shouldn't break the UI
-            console.error("Auto-save failed:", err);
-          }
-        })();
+        void saveCurrentFrame();
       }
-    }, 1000); // small, cheap check once a second
+    }, 1000);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [adapter, frameKey]);
+  }, [saveCurrentFrame]);
 
-  // --- Phase 2: expose dirty helpers on window for future toolbar wiring ---
+  // --- Expose dirty helpers on window for future toolbar wiring ---
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -188,11 +195,62 @@ export function FrameView({
     };
   }, []);
 
+  // --- Navigation handlers: save → then call upstream handler ---
+  const handlePrev = useCallback(async () => {
+    if (!onPrev) return;
+    await saveCurrentFrame();
+    onPrev();
+  }, [onPrev, saveCurrentFrame]);
+
+  const handleNext = useCallback(async () => {
+    if (!onNext) return;
+    await saveCurrentFrame();
+    onNext();
+  }, [onNext, saveCurrentFrame]);
+
+  const handleJump = useCallback(
+    async (n: number) => {
+      if (!onJump) return;
+      await saveCurrentFrame();
+      onJump(n);
+    },
+    [onJump, saveCurrentFrame]
+  );
+
   return (
     <div className="flex flex-col items-center gap-4">
-      <p className="text-sm text-gray-700">
-        Frame: {frameLabel}
-      </p>
+      {/* Simple nav bar */}
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePrev}
+            disabled={!onPrev}
+            className="px-3 py-1 rounded border border-gray-400 text-sm disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span className="text-sm text-gray-700">
+            Frame: {frameLabel}
+          </span>
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={!onNext}
+            className="px-3 py-1 rounded border border-gray-400 text-sm disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+
+        {onJump && (
+          <div className="mt-1">
+            <FrameSearch onJump={handleJump} />
+          </div>
+        )}
+      </div>
+
+      {/* Annotorious + image */}
       <Annotorious>
         {/* Rectangle drawing enabled at all times for now */}
         <ImageAnnotator tool="rectangle" drawingEnabled={true}>
@@ -204,7 +262,7 @@ export function FrameView({
           />
         </ImageAnnotator>
 
-        {/* Imperative bridge – now used for localStorage + dirty tracking */}
+        {/* Imperative bridge – used for localStorage + dirty tracking */}
         <AnnoBridge
           ref={bridgeRef as any}
           getSelectedProfile={getSelectedProfile}
@@ -229,23 +287,29 @@ type UFOViewInfo = {
   ) => void;
   projectId: string;
   sampleId: string;
+  onPrev?: () => void;
+  onNext?: () => void;
+  onJump?: (n: number) => void;
 };
 
 /**
- * Phase 2 UFOView:
+ * Phase 3 UFOView:
  *
- * - Just wraps FrameView.
- * - Ignores global annotations + toolbar for now.
- * - Single-frame focus.
+ * - Wraps FrameView.
+ * - Still ignores global annotations + toolbar.
+ * - Adds navigation via onPrev/onNext/onJump.
  */
 export const UFOView = ({
   data,
-  annotations, // unused for Phase 2
-  setAnnotations, // unused for Phase 2
-  dataParams, // unused for Phase 2
-  setDataParams, // unused for Phase 2
+  annotations,        // unused for now
+  setAnnotations,      // unused for now
+  dataParams,          // unused for now
+  setDataParams,       // unused for now
   projectId,
-  sampleId
+  sampleId,
+  onPrev,
+  onNext,
+  onJump
 }: UFOViewInfo) => {
   return (
     <div className="flex space-y-3">
@@ -254,6 +318,9 @@ export const UFOView = ({
           data={data}
           projectId={projectId}
           sampleId={sampleId}
+          onPrev={onPrev}
+          onNext={onNext}
+          onJump={onJump}
         />
       </div>
     </div>
