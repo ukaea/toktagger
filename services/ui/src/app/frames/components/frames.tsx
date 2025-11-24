@@ -67,6 +67,10 @@ export function FrameSearch({
  * Phase 3 + 4: Frame annotator + per-frame localStorage + dumb navigation +
  * window helpers for toolbar integration.
  *
+ * Phase 5 bits:
+ * - forward propagation on Next
+ * - selected profile / class are read from global UFO toolbar via window.*
+ *
  * - base64 PNG → <img src="data:image/png;base64,...">
  * - Rectangle-only drawing
  * - Per-frame storage via W3CImageFormat + buildSourceKey
@@ -95,9 +99,21 @@ export function FrameView({
 }) {
   const bridgeRef = useRef<BridgeHandle | null>(null);
 
-  // Still ignoring profiles/classes for now.
-  const getSelectedProfile = useCallback(() => null, []);
-  const getSelectedClassName = useCallback(() => null, []);
+  // Profiles / classes are owned by the left toolbar (global UFO toolbar).
+  // We just read the current selection from window so AnnoBridge can use it.
+  const getSelectedProfile = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    // Toolbar writes this when project.task === "UFO"
+    return (window as any).ufoSelectedProfileId ?? null;
+  }, []);
+
+  const getSelectedClassName = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    // Toolbar writes this when project.task === "UFO"
+    return (window as any).ufoSelectedClassName ?? null;
+  }, []);
+
+  // Track IDs are still disabled in this branch
   const includeTrackIds = false;
   const classRegistry: ClassRegistry = useMemo(() => ({}), []);
 

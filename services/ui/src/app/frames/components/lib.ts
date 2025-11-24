@@ -3,19 +3,228 @@
 import type { ImageAnnotation } from "@annotorious/react";
 
 /**
- * Minimal types for Phase 1/3/4 (no profiles/instances yet).
+ * Profiles, Classes, Cross-frame counts
  */
-export type ClassRegistry = Record<string, number>;
+
+// lib.ts – Profiles, Classes, Cross-frame counts
+
+export const PROFILES_KEY = "ufo::profiles";
+export const CLASS_REG_KEY = "ufo::class-registry";
+export const LAST_CLASS_KEY = "ufo::last-class-name";
+
+const isBrowser = typeof window !== "undefined";
+
+function getStorage(): Storage | null {
+  if (!isBrowser) return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Types ----------
+
+export type ProfileId = string;
 
 export type Profile = {
-  key: string;
-  class_id: number;
-  class_name: string;
-  track_id: string;
+  id: ProfileId;
+  name: string;
 };
 
+export type ProfileMap = Record<ProfileId, Profile>;
+
+export type ClassDef = {
+  id: string;
+  name: string;
+  profileId?: ProfileId | null;
+  color?: string;
+};
+
+export type ClassRegistry = Record<string, ClassDef>;
+
+export type ClassCounts = Record<string, number>;
+
+// ---------- JSON helpers ----------
+
+function safeParseJSON<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Profiles ----------
+
+export function loadProfiles(): ProfileMap {
+  const storage = getStorage();
+  if (!storage) return {};
+  return safeParseJSON<ProfileMap>(storage.getItem(PROFILES_KEY)) ?? {};
+}
+
+export function saveProfiles(profiles: ProfileMap): void {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+}
+
+// Ensure at least one default profile exists
+export function ensureDefaultProfile(
+  profiles: ProfileMap
+): { profiles: ProfileMap; defaultId: ProfileId } {
+  const ids = Object.keys(profiles);
+  if (ids.length > 0) {
+    return { profiles, defaultId: ids[0] };
+  }
+
+  const defaultId: ProfileId = "default";
+  const next: ProfileMap = {
+    [defaultId]: {
+      id: defaultId,
+      name: "Default"
+    }
+  };
+
+  return { profiles: next, defaultId };
+}
+
+// ---------- Class Registry ----------
+
+export function loadClassRegistry(): ClassRegistry {
+  const storage = getStorage();
+  if (!storage) return {};
+  return safeParseJSON<ClassRegistry>(storage.getItem(CLASS_REG_KEY)) ?? {};
+}
+
+export function saveClassRegistry(registry: ClassRegistry): void {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(CLASS_REG_KEY, JSON.stringify(registry));
+}
+
+// ---------- Last class ----------
+
+export function loadLastClassName(): string | null {
+  const storage = getStorage();
+  if (!storage) return null;
+  return storage.getItem(LAST_CLASS_KEY);
+}
+
+export function saveLastClassName(name: string | null): void {
+  const storage = getStorage();
+  if (!storage) return;
+  if (!name) {
+    storage.removeItem(LAST_CLASS_KEY);
+  } else {
+    storage.setItem(LAST_CLASS_KEY, name);
+  }
+}
+
+// ---------- Annotation helpers ----------
+
+// Try to pull a class label from a W3C-style annotation.
+export function extractClassLabelFromAnnotation(
+  annotation: any
+): string | null {
+  if (!annotation) return null;
+
+  const body = (annotation as any).body;
+  if (!body) return null;
+
+  const bodies = Array.isArray(body) ? body : [body];
+
+  for (const b of bodies) {
+    if (!b) continue;
+    if (typeof b === "string" && b.trim()) {
+      return b.trim();
+    }
+    if (typeof b === "object") {
+      const value = (b as any).value ?? (b as any).label;
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+
+  // Fallbacks: some structures store a label in properties
+  const props = (annotation as any).properties;
+  if (props) {
+    const fromClass =
+      typeof props.class === "string" ? props.class : undefined;
+    const fromLabel =
+      typeof props.label === "string" ? props.label : undefined;
+    const candidate = fromClass ?? fromLabel;
+    if (candidate && candidate.trim()) return candidate.trim();
+  }
+
+  return null;
+}
+
+// ---------- Cross-frame counts (chunked scanning) ----------
+
+export function scanCrossFrameCountsChunked(options: {
+  onUpdate: (counts: ClassCounts) => void;
+  chunkSize?: number;
+}): () => void {
+  const storage = getStorage();
+  if (!storage) return () => {};
+
+  const keys = Object.keys(storage);
+  const counts: ClassCounts = {};
+  const chunkSize = options.chunkSize ?? 16;
+
+  let index = 0;
+  let cancelled = false;
+
+  const step = () => {
+    if (cancelled) return;
+
+    const end = Math.min(index + chunkSize, keys.length);
+
+    for (; index < end; index++) {
+      const key = keys[index];
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+
+      if (!Array.isArray(parsed)) continue;
+
+      for (const ann of parsed as any[]) {
+        const label = extractClassLabelFromAnnotation(ann);
+        if (!label) continue;
+        counts[label] = (counts[label] ?? 0) + 1;
+      }
+    }
+
+    // Emit a copy – keeps React state updates cheap-ish
+    options.onUpdate({ ...counts });
+
+    if (index < keys.length) {
+      // Yield back to the scheduler – avoids long blocking loops
+      window.setTimeout(step, 0);
+    }
+  };
+
+  // Kick off async scan
+  window.setTimeout(step, 0);
+
+  return () => {
+    cancelled = true;
+  };
+}
+
 /**
- * Minimal stub: we do not care about classes yet, so just return null.
+ * Minimal stub: we do not care about classes yet for COCO export,
+ * so just return null. This is separate from extractClassLabelFromAnnotation,
+ * which is used for cross-frame counts.
  */
 export function extractClassLabel(
   _a: any
@@ -55,7 +264,7 @@ export function writeClassOnly(a: any, _cls: { id: number; name: string }): any 
 export function normalizeWithMode(
   rawList: ImageAnnotation[],
   _knownById: Record<string, ImageAnnotation>,
-  _getSelectedProfile: () => Profile | null,
+  _getSelectedProfile: () => string | null,
   _getSelectedClassName: () => string | null,
   _includeTrackIds: boolean,
   _classRegistry: ClassRegistry
@@ -134,7 +343,7 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
         x_min: Math.round(x),
         y_min: Math.round(y),
         width: Math.round(w),
-        height: Math.round(h),
+        height: Math.round(h)
       };
     }
   }
@@ -151,7 +360,7 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
         x_min: Math.round(geometry.x),
         y_min: Math.round(geometry.y),
         width: Math.round(geometry.w),
-        height: Math.round(geometry.h),
+        height: Math.round(geometry.h)
       };
     }
     const bounds = geometry.bounds;
@@ -165,7 +374,7 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
         x_min: Math.round(bounds.minX),
         y_min: Math.round(bounds.minY),
         width: Math.round(bounds.maxX - bounds.minX),
-        height: Math.round(bounds.maxY - bounds.minY),
+        height: Math.round(bounds.maxY - bounds.minY)
       };
     }
   }
@@ -192,7 +401,7 @@ export function polyToCoco(a: any): CocoPolygon | null {
           Math.round(bounds.minX),
           Math.round(bounds.minY),
           Math.round(bounds.maxX - bounds.minX),
-          Math.round(bounds.maxY - bounds.minY),
+          Math.round(bounds.maxY - bounds.minY)
         ]
       : ([
           Math.round(Math.min(...points.map((p) => p[0]))),
@@ -204,16 +413,14 @@ export function polyToCoco(a: any): CocoPolygon | null {
           Math.round(
             Math.max(...points.map((p) => p[1])) -
               Math.min(...points.map((p) => p[1]))
-          ),
+          )
         ] as [number, number, number, number]);
     return { segmentation: [flat], bbox };
   }
 
   // SVG <polygon> selector string
   if (typeof selector.value === "string" && /<polygon/i.test(selector.value)) {
-    const match = selector.value.match(
-      /points\s*=\s*["']([^"']+)["']/i
-    );
+    const match = selector.value.match(/points\s*=\s*["']([^"']+)["']/i);
     if (match) {
       const coords = match[1]
         .trim()
@@ -233,7 +440,7 @@ export function polyToCoco(a: any): CocoPolygon | null {
           Math.round(Math.min(...xs)),
           Math.round(Math.min(...ys)),
           Math.round(Math.max(...xs) - Math.min(...xs)),
-          Math.round(Math.max(...ys) - Math.min(...ys)),
+          Math.round(Math.max(...ys) - Math.min(...ys))
         ];
         return { segmentation: [flat], bbox };
       }
@@ -267,7 +474,7 @@ export function augmentLabelForExport(a: any, includeTracks: boolean) {
   return {
     ...label,
     track_numeric: track_numeric ?? undefined,
-    instance: track_numeric ?? undefined,
+    instance: track_numeric ?? undefined
   };
 }
 
@@ -350,7 +557,7 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
         x_min: x,
         y_min: y,
         frame: frameIndex,
-        track_id: b.track_id || undefined,
+        track_id: b.track_id || undefined
       });
     }
   }

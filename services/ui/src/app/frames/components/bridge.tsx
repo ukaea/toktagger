@@ -17,9 +17,11 @@ import {
   extractClassLabel,
   canonicalizeTrackId,
   writeClassAndTrack,
-  type Profile,
-  type ClassRegistry
+  loadClassRegistry,
+  saveClassRegistry,
+  extractClassLabelFromAnnotation
 } from "./lib";
+import type { ClassRegistry } from "./lib";
 
 export type BridgeHandle = {
   /** Read overlay -> stamp to currentKey -> return list (no storage write). */
@@ -27,7 +29,10 @@ export type BridgeHandle = {
   /** Silently clear overlay (no events). */
   clearOverlaySilently: () => Promise<void>;
   /** Silently hydrate overlay with the given list (retarget/stamp to currentKey). */
-  hydrateOverlay: (list: ImageAnnotation[], currentKey: string) => Promise<boolean>;
+  hydrateOverlay: (
+    list: ImageAnnotation[],
+    currentKey: string
+  ) => Promise<boolean>;
   /** Is annotator ready yet? */
   isAnnotatorReady: () => boolean;
   /** Have there been user edits in this session that haven't been background-saved yet? */
@@ -49,7 +54,7 @@ export const AnnoBridge = Object.assign(
   forwardRef<
     BridgeHandle,
     {
-      getSelectedProfile: () => Profile | null;
+      getSelectedProfile: () => string | null;
       getSelectedClassName: () => string | null;
       includeTrackIds: boolean;
       classRegistry: ClassRegistry;
@@ -154,10 +159,54 @@ export const AnnoBridge = Object.assign(
       [getSelectedProfile, getSelectedClassName, includeTrackIds, classRegistry]
     );
 
+    // Auto-quick-add: ensure class exists in registry whenever a new annotation is created
+    const handleCreate = useCallback(
+      async (w3c: ImageAnnotation) => {
+        // Whatever you already do here:
+        // - ensureInstancesOnCreate(w3c, ...)
+        // - mark dirty
+        // - etc.
+
+        dirtyRef.current = true;
+
+        // --- Auto-quick-add: ensure class exists in registry ---
+        try {
+          // Prefer the currently selected class from the toolbar
+          const selectedClass =
+            getSelectedClassName?.() ?? extractClassLabelFromAnnotation(w3c);
+
+          if (!selectedClass) {
+            return;
+          }
+
+          // Load current registry from localStorage
+          let registry: ClassRegistry = loadClassRegistry();
+
+          if (!registry[selectedClass]) {
+            const profileId = getSelectedProfile?.() ?? null;
+
+            registry = {
+              ...registry,
+              [selectedClass]: {
+                id: selectedClass,
+                name: selectedClass,
+                profileId
+              }
+            };
+
+            saveClassRegistry(registry);
+          }
+        } catch (err) {
+          console.warn("Auto quick-add class failed:", err);
+        }
+      },
+      [getSelectedClassName, getSelectedProfile]
+    );
+
     useImperativeHandle(
       ref,
       () =>
-        ([
+        ([ 
           "isAnnotatorReady",
           "persistWorkingNow",
           "clearOverlaySilently",
@@ -319,11 +368,16 @@ export const AnnoBridge = Object.assign(
         void flushOverlay();
       };
 
-      anno.on?.("createAnnotation", onAnyChange);
+      const onCreate = async (w3c: ImageAnnotation) => {
+        await handleCreate(w3c);
+        await onAnyChange();
+      };
+
+      anno.on?.("createAnnotation", onCreate);
       anno.on?.("updateAnnotation", onAnyChange);
       anno.on?.("deleteAnnotation", onAnyChange);
       return () => {
-        anno.off?.("createAnnotation", onAnyChange);
+        anno.off?.("createAnnotation", onCreate);
         anno.off?.("updateAnnotation", onAnyChange);
         anno.off?.("deleteAnnotation", onAnyChange);
       };
@@ -334,7 +388,8 @@ export const AnnoBridge = Object.assign(
       getSelectedProfile,
       getSelectedClassName,
       onAutoQuickAdd,
-      flushOverlay
+      flushOverlay,
+      handleCreate
     ]);
 
     return null;

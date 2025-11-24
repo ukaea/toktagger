@@ -1,5 +1,10 @@
 "use client";
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
 import { useEffect, useState } from "react";
+=======
+import { useEffect, useState, useMemo, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+>>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 import {
   Provider,
   defaultTheme,
@@ -19,7 +24,7 @@ import {
   Key,
   Switch,
   NumberField,
-  ActionButton,
+  ActionButton
 } from "@adobe/react-spectrum";
 import {
   Annotation,
@@ -32,16 +37,37 @@ import {
   SpectrogramData,
   SpectrogramDataSchema,
   SpectrogramViewParamsSchema,
-  ViewParams,
+  ViewParams
 } from "@/types";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
+=======
+import type {
+  ProfileMap,
+  ClassRegistry,
+  ClassCounts,
+  ProfileId
+} from "@/app/frames/components/lib";
+import {
+  w3cToCocoFrames,
+  cocoFramesToVideoBBoxes,
+  loadProfiles,
+  saveProfiles,
+  ensureDefaultProfile,
+  loadClassRegistry,
+  saveClassRegistry,
+  loadLastClassName,
+  saveLastClassName,
+  scanCrossFrameCountsChunked
+} from "@/app/frames/components/lib";
+>>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 
 async function saveAnnotations(
   project_id: string,
@@ -52,12 +78,50 @@ async function saveAnnotations(
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     },
-    body: JSON.stringify(annotations),
+    body: JSON.stringify(annotations)
   });
   return response;
 }
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
+=======
+
+/**
+ * Phase 4: UFO-specific save helper. Uses the frame annotator via window.*
+ */
+async function saveUfoAnnotations(project_id: string, sample_id: string) {
+  if (typeof window === "undefined") return;
+
+  const collect = (window as any).ufoCollectForSave;
+  if (!collect) {
+    console.warn("ufoCollectForSave is not available yet");
+    return;
+  }
+
+  // 1. Get W3C annotations for the current frame
+  const w3cList = (await collect()) ?? [];
+
+  // 2. Convert W3C → COCO → VideoBoundingBox[]
+  const cocoFrames = w3cToCocoFrames(w3cList);
+  const videoBoxes = cocoFramesToVideoBBoxes(cocoFrames);
+
+  const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
+
+  // 3. PUT to backend
+  await fetch(ANNOTATIONS_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(videoBoxes)
+  });
+
+  // 4. Mark as saved in the bridge
+  (window as any).ufoMarkSaved?.();
+}
+
+>>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 async function getNextSample(project_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
   const sampleResult = await fetch(NEXT_URL);
@@ -116,7 +180,7 @@ function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
-        timeout: 5000,
+        timeout: 5000
       });
     } catch (err) {
       if (err instanceof Error) {
@@ -177,7 +241,7 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
 
 function UfoSaveButton({
   project_id,
-  sample_id,
+  sample_id
 }: {
   project_id: string;
   sample_id: string;
@@ -186,7 +250,7 @@ function UfoSaveButton({
     try {
       await saveUfoAnnotations(project_id, sample_id);
       ToastQueue.positive(`Saved UFO frame annotations!`, {
-        timeout: 5000,
+        timeout: 5000
       });
     } catch (err) {
       console.error("UFO save failed:", err);
@@ -203,7 +267,7 @@ function UfoSaveButton({
 
 function UfoNextButton({
   project_id,
-  sample_id,
+  sample_id
 }: {
   project_id: string;
   sample_id: string;
@@ -241,7 +305,7 @@ function UfoNextButton({
 
 function UfoShotSearch({
   project_id,
-  sample_id,
+  sample_id
 }: {
   project_id: string;
   sample_id: string;
@@ -300,11 +364,11 @@ function AmplitudeSlider({
   data,
   viewParams,
   setViewParams,
-  plotProps,
+  plotProps
 }: AmplitudeSliderInfo) {
   const onAmplitudeRangeChange = async ({
     start,
-    end,
+    end
   }: {
     start: number;
     end: number;
@@ -326,7 +390,10 @@ function AmplitudeSlider({
 
   const displayAmplitudeValues = (val: number) => {
     // Convert the log10 amplitude value back to linear scale and round to the specified number of significant digits
-    return `${Math.round(Math.pow(10, val) * largePrecisionFactor) / largePrecisionFactor}`;
+    return `${
+      Math.round(Math.pow(10, val) * largePrecisionFactor) /
+      largePrecisionFactor
+    }`;
   };
 
   const ampRangeTool = (
@@ -355,7 +422,7 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
     { id: 2, name: "Plasma" },
     { id: 3, name: "Inferno" },
     { id: 4, name: "Magma" },
-    { id: 5, name: "Cividis" },
+    { id: 5, name: "Cividis" }
   ];
 
   const onColorMapChange = (key: Key | null) => {
@@ -393,7 +460,7 @@ function SpectrogramThresholdTool({
   signal_name,
   plotProps,
   setPlotProps,
-  setAnnotations,
+  setAnnotations
 }: SpectrogramThresholdToolInfo) {
   const [active, setActive] = useState(false);
   const [value, setValue] = useState(95);
@@ -424,13 +491,19 @@ function SpectrogramThresholdTool({
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
             signal_name: signal_name,
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
             percentile: value,
           }),
         },
+=======
+            percentile: value
+          })
+        }
+>>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
       );
 
       const payload = await response.json();
@@ -496,6 +569,258 @@ function SpectrogramThresholdTool({
   );
 }
 
+/**
+ * ClassPanel + InstancePanel for Profiles / Classes / Counts
+ */
+
+type ClassPanelProps = {
+  profiles: ProfileMap;
+  setProfiles: (next: ProfileMap) => void;
+  selectedProfileId: string | null;
+  setSelectedProfileId: (id: string | null) => void;
+
+  classRegistry: ClassRegistry;
+  setClassRegistry: (next: ClassRegistry) => void;
+
+  selectedClassName: string | null;
+  setSelectedClassName: (name: string | null) => void;
+
+  classCounts: ClassCounts;
+};
+
+export const ClassPanel: React.FC<ClassPanelProps> = ({
+  profiles,
+  setProfiles,
+  selectedProfileId,
+  setSelectedProfileId,
+  classRegistry,
+  setClassRegistry,
+  selectedClassName,
+  setSelectedClassName,
+  classCounts
+}) => {
+  const [newClassName, setNewClassName] = useState("");
+  const [newProfileName, setNewProfileName] = useState("");
+
+  const orderedProfiles = useMemo(
+    () => Object.values(profiles),
+    [profiles]
+  );
+
+  const classesForProfile = useMemo(() => {
+    const entries = Object.values(classRegistry);
+    if (!selectedProfileId) return entries;
+    return entries.filter((c) => c.profileId === selectedProfileId);
+  }, [classRegistry, selectedProfileId]);
+
+  const handleSelectProfile = (id: string) => {
+    setSelectedProfileId(id);
+  };
+
+  const handleCreateProfile = (e: FormEvent) => {
+    e.preventDefault();
+    const name = newProfileName.trim();
+    if (!name) return;
+
+    let id: ProfileId = name;
+    if (profiles[id]) {
+      // ensure unique id
+      let idx = 2;
+      while (profiles[`${name}-${idx}`]) idx++;
+      id = `${name}-${idx}`;
+    }
+
+    const nextProfiles: ProfileMap = {
+      ...profiles,
+      [id]: { id, name }
+    };
+    setProfiles(nextProfiles);
+    setSelectedProfileId(id);
+    setNewProfileName("");
+  };
+
+  const handleCreateClass = (e: FormEvent) => {
+    e.preventDefault();
+    const raw = newClassName.trim();
+    if (!raw) return;
+
+    const name = raw;
+    if (classRegistry[name]) {
+      // Just select it if it already exists
+      setSelectedClassName(name);
+      setNewClassName("");
+      return;
+    }
+
+    const nextRegistry: ClassRegistry = {
+      ...classRegistry,
+      [name]: {
+        id: name,
+        name,
+        profileId: selectedProfileId ?? undefined
+      }
+    };
+
+    setClassRegistry(nextRegistry);
+    setSelectedClassName(name);
+    setNewClassName("");
+  };
+
+  return (
+    <div className="flex flex-col gap-2 border border-gray-300 rounded-lg p-2 bg-white">
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Profiles */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-600">
+            Profile
+          </span>
+          <select
+            className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+            value={selectedProfileId ?? ""}
+            onChange={(e) =>
+              handleSelectProfile(e.target.value || "")
+            }
+          >
+            {orderedProfiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <form
+            onSubmit={handleCreateProfile}
+            className="flex items-center gap-1"
+          >
+            <input
+              className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+              placeholder="New profile"
+              value={newProfileName}
+              onChange={(e) => setNewProfileName(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="px-2 py-0.5 rounded text-xs border border-gray-400"
+            >
+              +
+            </button>
+          </form>
+        </div>
+
+        {/* Add class */}
+        <form
+          onSubmit={handleCreateClass}
+          className="flex items-center gap-1"
+        >
+          <span className="text-xs font-semibold text-gray-600">
+            Class
+          </span>
+          <input
+            className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+            placeholder="New class"
+            value={newClassName}
+            onChange={(e) => setNewClassName(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="px-2 py-0.5 rounded text-xs border border-gray-400"
+          >
+            +
+          </button>
+        </form>
+      </div>
+
+      {/* Class list with counts */}
+      <div className="flex flex-wrap gap-1">
+        {classesForProfile.map((cls) => {
+          const isActive = cls.name === selectedClassName;
+          const count = classCounts[cls.name] ?? 0;
+          return (
+            <button
+              key={cls.id}
+              type="button"
+              onClick={() => setSelectedClassName(cls.name)}
+              className={`px-2 py-0.5 rounded-full text-xs border ${
+                isActive
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-gray-50 text-gray-800 border-gray-300"
+              }`}
+            >
+              {cls.name}
+              {count > 0 && (
+                <span className="ml-1 text-[10px] opacity-80">
+                  ({count})
+                </span>
+              )}
+            </button>
+          );
+        })}
+        {classesForProfile.length === 0 && (
+          <span className="text-xs text-gray-500 italic">
+            No classes yet – add one above.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+type InstancePanelProps = {
+  selectedClassName: string | null;
+  classCounts: ClassCounts;
+};
+
+export const InstancePanel: React.FC<InstancePanelProps> = ({
+  selectedClassName,
+  classCounts
+}) => {
+  const totalForSelected =
+    selectedClassName && classCounts[selectedClassName]
+      ? classCounts[selectedClassName]
+      : 0;
+
+  const totalAll = Object.values(classCounts).reduce(
+    (acc, n) => acc + n,
+    0
+  );
+
+  if (!selectedClassName && totalAll === 0) {
+    return (
+      <div className="border border-dashed border-gray-300 rounded-lg p-2 text-xs text-gray-500">
+        No instances counted yet. As you annotate and save frames, the
+        cross-frame counter will populate.
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-gray-300 rounded-lg p-2 bg-gray-50 text-xs text-gray-700 flex justify-between">
+      <div>
+        {selectedClassName ? (
+          <>
+            <div className="font-semibold">
+              {selectedClassName}:{" "}
+              <span className="font-normal">
+                {totalForSelected} instance
+                {totalForSelected === 1 ? "" : "s"}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="font-semibold">
+            No class selected – pick one above to see its count.
+          </div>
+        )}
+      </div>
+      <div className="text-right">
+        <div>
+          Total instances (all classes):{" "}
+          <span className="font-semibold">{totalAll}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
@@ -519,18 +844,79 @@ export default function ToolBar({
   viewParams,
   setViewParams,
   plotProps,
-  setPlotProps,
+  setPlotProps
 }: ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
+
+  // UFO profiles / classes / counts state (lives on the left toolbar)
+  const [profiles, setProfiles] = useState<ProfileMap>({});
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
+    null
+  );
+  const [classRegistry, setClassRegistry] = useState<ClassRegistry>({});
+  const [selectedClassName, setSelectedClassName] = useState<string | null>(
+    null
+  );
+  const [classCounts, setClassCounts] = useState<ClassCounts>({});
+
+  // Load profiles, classes, last class, and start cross-frame scan for UFO
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+
+    const loadedProfiles = loadProfiles();
+    const { profiles: withDefault, defaultId } =
+      ensureDefaultProfile(loadedProfiles);
+    setProfiles(withDefault);
+    setSelectedProfileId(defaultId);
+    (window as any).ufoSelectedProfileId = defaultId;
+
+    const registry = loadClassRegistry();
+    setClassRegistry(registry);
+
+    const last = loadLastClassName();
+    if (last) {
+      setSelectedClassName(last);
+      (window as any).ufoSelectedClassName = last;
+    }
+
+    const cancel = scanCrossFrameCountsChunked({
+      onUpdate: (counts) => {
+        setClassCounts(counts);
+      },
+      chunkSize: 24
+    });
+
+    return () => {
+      cancel();
+    };
+  }, [isUfo]);
+
+  // Mirror selection to window so FrameView / AnnoBridge can read it
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+    (window as any).ufoSelectedProfileId = selectedProfileId;
+  }, [isUfo, selectedProfileId]);
+
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+    (window as any).ufoSelectedClassName = selectedClassName;
+  }, [isUfo, selectedClassName]);
 
   if (project.task == "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
     if (!result.success) {
       console.warn("ELM data is not available");
-      return;
+      return (
+        <Provider theme={defaultTheme}>
+          <div className="h-screen text-center" />
+        </Provider>
+      );
     }
 
     const tsData = result.data;
@@ -598,15 +984,30 @@ export default function ToolBar({
     const resultComposite = CompositeDataSchema.safeParse(data);
     if (!resultComposite.success) {
       console.warn("MHD data is not available");
-      return;
+      return (
+        <Provider theme={defaultTheme}>
+          <div className="h-screen text-center" />
+        </Provider>
+      );
     }
 
     const resultSpec = SpectrogramDataSchema.safeParse(
       resultComposite.data.values["mirnov"],
     );
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");
       return;
+=======
+
+    if (!mhdData.success) {
+      console.warn("MHD data is not available");
+      return (
+        <Provider theme={defaultTheme}>
+          <div className="h-screen text-center" />
+        </Provider>
+      );
+>>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
     }
 
     const mhdData = resultSpec.data;
@@ -687,6 +1088,7 @@ export default function ToolBar({
               sample_id={sample_id}
               annotations={annotations}
             />
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
           </Flex>
           <Flex justifyContent="center" alignItems="center">
             <Header height="size-300" marginBottom="size-100">
@@ -705,6 +1107,49 @@ export default function ToolBar({
           </Accordion>
         </Flex>
       </View>
+=======
+          )}
+        </div>
+
+        {/* UFO profiles / classes / instance counts on the left toolbar */}
+        {isUfo && (
+          <div className="pl-4 pr-4 pb-4">
+            <ClassPanel
+              profiles={profiles}
+              setProfiles={(next) => {
+                setProfiles(next);
+                saveProfiles(next);
+              }}
+              selectedProfileId={selectedProfileId}
+              setSelectedProfileId={setSelectedProfileId}
+              classRegistry={classRegistry}
+              setClassRegistry={(next) => {
+                setClassRegistry(next);
+                saveClassRegistry(next);
+              }}
+              selectedClassName={selectedClassName}
+              setSelectedClassName={(name) => {
+                setSelectedClassName(name);
+                saveLastClassName(name ?? "");
+              }}
+              classCounts={classCounts}
+            />
+            <div className="mt-2">
+              <InstancePanel
+                selectedClassName={selectedClassName}
+                classCounts={classCounts}
+              />
+            </div>
+          </div>
+        )}
+
+        <hr className="m-4" />
+
+        {tools.map((item, i) => (
+          <div key={i}>{item}</div>
+        ))}
+      </div>
+>>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
     </Provider>
   );
 }
