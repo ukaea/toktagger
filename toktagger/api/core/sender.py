@@ -1,7 +1,7 @@
 import requests
-from services.api.schemas.samples import SampleUpdateBatchItem
-from services.api.schemas.models import ModelUpdate
-from services.api.schemas.annotations import AnnotationBatchItem
+from toktagger.api.schemas.samples import SampleUpdateBatchItem
+from toktagger.api.schemas.models import ModelUpdate
+from toktagger.api.schemas.annotations import AnnotationBatchItem
 import typing
 import os
 

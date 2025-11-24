@@ -1,7 +1,7 @@
 from typing import Literal, Annotated, Optional
 from enum import Enum
 from pydantic import Field
-from services.api.schemas import ConfiguredModel
+from toktagger.api.schemas import ConfiguredModel
 
 
 class ModelType(str, Enum):  # Is this needed?

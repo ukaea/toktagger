@@ -3,14 +3,14 @@ import pytest_asyncio
 import tempfile
 import random
 import pathlib
-from services.api.schemas.projects import ProjectIn
-from services.api.schemas.samples import SampleIn, TimeSeriesFileData
-from services.api.schemas.annotations import TimePoint
-from services.api.schemas.models import ModelUpdate
+from toktagger.api.schemas.projects import ProjectIn
+from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
+from toktagger.api.schemas.annotations import TimePoint
+from toktagger.api.schemas.models import ModelUpdate
 from tests.db_definitions import MODEL_1, MODEL_2
 from unittest.mock import patch
 from bson import ObjectId
-from services.api.models.base import Model
+from toktagger.api.models.base import Model
 import os
 import ray
 
@@ -70,7 +70,7 @@ async def send_to_url(api_client, url, method):
         payloads.append(payload)
         RESULTS[url] = payloads
 
-    with patch("services.api.core.sender.send_updates", mock_send_updates):
+    with patch("toktagger.api.core.sender.send_updates", mock_send_updates):
         if method == "POST":
             response = await api_client.post(url)
         else:
@@ -154,7 +154,7 @@ def mock_wait(*args, **kwargs):
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_num_predictions(
     api_client, db_client, setup_model_db
 ):
@@ -175,7 +175,7 @@ async def test_model_batch_predict_num_predictions(
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
     query_string = "&".join(
         f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
@@ -202,7 +202,7 @@ async def test_model_batch_predict_samples(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_version(api_client, db_client, setup_model_db):
     await send_to_url(
         api_client=api_client,
@@ -221,7 +221,7 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_sample_predict(api_client, db_client, setup_model_db):
     await send_to_url(
         api_client=api_client,
@@ -243,7 +243,7 @@ async def test_model_sample_predict(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_get_sample_prediction(api_client, db_client, setup_model_db):
     prediction_response, _ = await send_to_url(
         api_client=api_client,
@@ -273,7 +273,7 @@ async def test_model_get_sample_prediction(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_get_sample_prediction_invalid_task(
     api_client, db_client, setup_model_db
 ):
@@ -288,7 +288,7 @@ async def test_model_get_sample_prediction_invalid_task(
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_get_sample_prediction_wrong_sample(
     api_client, db_client, setup_model_db
 ):
@@ -313,7 +313,7 @@ async def test_model_get_sample_prediction_wrong_sample(
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 @patch("ray.wait", mock_wait)
 async def test_model_get_sample_prediction_in_progress(
     api_client, db_client, setup_model_db
@@ -354,7 +354,7 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
-@patch.dict("services.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
+@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_start_training(api_client, db_client, setup_model_db):
     response, model_updates = await send_to_url(
         api_client=api_client,

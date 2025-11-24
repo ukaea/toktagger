@@ -1,26 +1,13 @@
 from pathlib import Path
 from typing import Optional, Literal
 from fastapi import HTTPException
-<<<<<<< HEAD:services/api/crud/utils.py
-from services.api.crud.db import MongoDBClient
-from services.api.schemas import convert_to_objectid
-from services.api.schemas.annotations import (
-    AnnotationIn,
-    AnnotationOutTypeAdapter,
-    AnnotationOutTypes,
-    AnnotationTypes,
-)
-from services.api.schemas.projects import Project, ProjectUpdate
-from services.api.schemas.samples import Sample, SampleUpdate, FileData, SampleSummary
-from services.api.schemas.models import Model, ModelIn, ModelUpdate, ModelType
-=======
-from pydantic import TypeAdapter
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
-from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
+from toktagger.api.schemas.annotations import AnnotationIn, AnnotationOutTypes, AnnotationTypes, AnnotationOutTypeAdapter
 from toktagger.api.schemas.projects import Project, ProjectUpdate
-from toktagger.api.schemas.samples import FileData, Sample, SampleSummary
->>>>>>> main:toktagger/api/crud/utils.py
+from toktagger.api.schemas.samples import FileData, Sample, SampleUpdate, SampleSummary
+from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, ModelType
+
 
 
 async def get_projects(
