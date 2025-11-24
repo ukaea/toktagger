@@ -72,7 +72,7 @@ def main():
                 "validated": True,
                 "label": "Disruption",
                 "time": item["annotations"]["disruption"],
-                "created_by": "manual"
+                "created_by": "manual",
             }
         ]
         for shot_id, item in data.items()
