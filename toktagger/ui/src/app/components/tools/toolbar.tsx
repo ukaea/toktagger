@@ -71,7 +71,9 @@ import {
   saveLastClassName,
   scanCrossFrameCountsChunked,
   LABEL_MAP,
-  FIXED_CLASS_REG
+  FIXED_CLASS_REG,
+  canonicalizeTrackId,
+  uniqueReadableId
 } from "@/app/frames/components/lib";
 >>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 
@@ -768,6 +770,7 @@ type InstancePanelProps = {
   classCounts: ClassCounts;
 };
 
+// Old cross-frame counts panel (still available but not used in the UFO block)
 export const InstancePanel: React.FC<InstancePanelProps> = ({
   selectedClassName,
   classCounts
@@ -820,6 +823,87 @@ export const InstancePanel: React.FC<InstancePanelProps> = ({
   );
 };
 
+// Instance profiles (tracking) — simple in-memory list for Phase 8.3
+type InstanceProfile = {
+  id: string;        // e.g. "Person:ufo-silent-comet-3"
+  class_name: string;
+  class_id: number;
+  track_id: string;  // canonicalized slug
+};
+
+type InstancesPanelProps = {
+  instances: InstanceProfile[];
+  selectedInstanceId: string | null;
+  onSelectInstance: (id: string) => void;
+  onAddInstance: () => void;
+  selectedClassName: string | null;
+};
+
+export const InstancesPanel: React.FC<InstancesPanelProps> = ({
+  instances,
+  selectedInstanceId,
+  onSelectInstance,
+  onAddInstance,
+  selectedClassName
+}) => {
+  const hasClass = !!selectedClassName;
+
+  return (
+    <div className="border border-gray-300 rounded-lg p-2 bg-white mt-2">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-semibold text-gray-600">
+          Instances
+        </span>
+        <button
+          type="button"
+          disabled={!hasClass}
+          onClick={onAddInstance}
+          className={`px-2 py-0.5 rounded text-xs border ${
+            hasClass
+              ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+              : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+          }`}
+        >
+          + Add
+        </button>
+      </div>
+
+      {instances.length === 0 ? (
+        <div className="text-xs text-gray-500 italic">
+          {hasClass
+            ? "Click + Add to create the first instance."
+            : "Pick a class above, then click + Add."}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+          {instances.map((inst) => {
+            const isActive = inst.id === selectedInstanceId;
+            return (
+              <button
+                key={inst.id}
+                type="button"
+                onClick={() => onSelectInstance(inst.id)}
+                className={`w-full text-left px-2 py-1 rounded text-xs border ${
+                  isActive
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100"
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold">{inst.class_name}</span>
+                  <span className="ml-2 text-[10px] opacity-80">
+                    {inst.track_id}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
@@ -860,6 +944,14 @@ export default function ToolBar({
   );
   const [classCounts, setClassCounts] = useState<ClassCounts>({});
 
+  // NEW: instance profiles for tracking mode (Phase 8.3)
+  const [instanceProfiles, setInstanceProfiles] = useState<InstanceProfile[]>(
+    []
+  );
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
+    null
+  );
+
   // Load profiles, classes, last class, and start cross-frame scan for UFO
   useEffect(() => {
     if (!isUfo) return;
@@ -897,14 +989,24 @@ export default function ToolBar({
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
-    (window as any).ufoSelectedProfileId = selectedProfileId;
-  }, [isUfo, selectedProfileId]);
+
+    // Prefer instance selection; fall back to old profile id if needed
+    (window as any).ufoSelectedProfileId =
+      selectedInstanceId ?? selectedProfileId;
+  }, [isUfo, selectedInstanceId, selectedProfileId]);
 
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
     (window as any).ufoSelectedClassName = selectedClassName;
   }, [isUfo, selectedClassName]);
+
+  // Expose instance profiles array so FrameView / AnnoBridge can use it later
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+    (window as any).ufoInstanceProfiles = instanceProfiles;
+  }, [isUfo, instanceProfiles]);
 
   if (project.task == "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -1110,7 +1212,7 @@ export default function ToolBar({
           )}
         </div>
 
-        {/* UFO profiles / classes / instance counts on the left toolbar */}
+        {/* UFO profiles / classes / instance controls on the left toolbar */}
         {isUfo && (
           <div className="pl-4 pr-4 pb-4">
             {/* Shape + clear controls (old frameControls-style block) */}
@@ -1166,7 +1268,7 @@ export default function ToolBar({
               <hr className="m-4 h-px opacity-30 border-gray-200" />
             </div>
 
-            {/* Class / instance panels */}
+            {/* Class picker (fixed LABEL_MAP) */}
             <ClassPanel
               profiles={profiles}
               setProfiles={(next) => {
@@ -1187,12 +1289,76 @@ export default function ToolBar({
               }}
               classCounts={classCounts}
             />
-            <div className="mt-2">
-              <InstancePanel
-                selectedClassName={selectedClassName}
-                classCounts={classCounts}
-              />
-            </div>
+
+            {/* NEW: instance profiles (class + track_id) */}
+            <InstancesPanel
+              instances={instanceProfiles}
+              selectedInstanceId={selectedInstanceId}
+              selectedClassName={selectedClassName}
+              onAddInstance={() => {
+                if (!selectedClassName) return;
+
+                const keyLower = selectedClassName.toLowerCase();
+
+                // Resolve numeric class_id like normalizeWithMode does
+                const fromRegistryLower = classRegistry[keyLower];
+                const fromRegistryExact = classRegistry[selectedClassName];
+
+                const regIdStr =
+                  fromRegistryLower?.id ?? fromRegistryExact?.id;
+                const regId =
+                  regIdStr !== undefined ? Number(regIdStr) : undefined;
+
+                const fixedId =
+                  FIXED_CLASS_REG[selectedClassName] ??
+                  FIXED_CLASS_REG[keyLower];
+
+                const class_id =
+                  (typeof regId === "number" && !Number.isNaN(regId)
+                    ? regId
+                    : undefined) ??
+                  (typeof fixedId === "number"
+                    ? fixedId
+                    : undefined) ??
+                  1;
+
+                const existingTrackIds = instanceProfiles.map(
+                  (p) => p.track_id
+                );
+                const readable = uniqueReadableId(existingTrackIds);
+                const track_id = canonicalizeTrackId(readable);
+                const id = `${selectedClassName}:${track_id}`;
+
+                const nextInstances: InstanceProfile[] = [
+                  ...instanceProfiles,
+                  { id, class_name: selectedClassName, class_id, track_id }
+                ];
+
+                setInstanceProfiles(nextInstances);
+                setSelectedInstanceId(id);
+
+                if (typeof window !== "undefined") {
+                  const w = window as any;
+                  w.ufoInstanceProfiles = nextInstances;
+                  w.ufoSelectedProfileId = id;
+                  w.ufoSelectedClassName = selectedClassName;
+                  w.ufoSelectedTrackId = track_id;
+                }
+              }}
+              onSelectInstance={(id) => {
+                setSelectedInstanceId(id);
+                const inst = instanceProfiles.find((p) => p.id === id);
+                if (inst) {
+                  setSelectedClassName(inst.class_name);
+                  if (typeof window !== "undefined") {
+                    const w = window as any;
+                    w.ufoSelectedProfileId = id;
+                    w.ufoSelectedClassName = inst.class_name;
+                    w.ufoSelectedTrackId = inst.track_id;
+                  }
+                }
+              }}
+            />
           </div>
         )}
 

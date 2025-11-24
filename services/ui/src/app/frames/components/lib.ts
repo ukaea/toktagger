@@ -522,32 +522,115 @@ export function writeClassOnly(a: any, cls: { id: number; name: string }): any {
 /**
  * Mode-aware normalization.
  *
- * For now we only support **detection mode** (includeTrackIds = false):
+ * TRACKING MODE (includeTrackIds = true)
+ *
+ * - For existing rectangles (id in knownById):
+ *   If they lost class/track info due to editing, restore from the previous label.
+ *
+ * - For new rectangles (id not in knownById):
+ *   If there is a selected profile, stamp its { class_id, class_name, track_id }
+ *   using writeClassAndTrack.
+ *
+ * DETECTION MODE (includeTrackIds = false)
  *
  * - If an annotation ID already exists in knownById, we copy its previous
  *   class label forward (class_id + class_name) via writeClassOnly.
  * - Else, if getSelectedClassName() returns a class name, we look up its
  *   numeric ID from the classRegistry (if present) or FIXED_CLASS_REG,
  *   and stamp that onto the annotation via writeClassOnly.
- *
- * This gives:
- * - New rectangles inherit whatever class you have selected in the toolbar.
- * - Edits keep their existing class label, even if you change the toolbar.
  */
 export function normalizeWithMode(
   rawList: ImageAnnotation[],
   knownById: Record<string, ImageAnnotation>,
-  _getSelectedProfile: () => string | null,
+  getSelectedProfile: () => any | null,
   getSelectedClassName: () => string | null,
   includeTrackIds: boolean,
   classRegistry: ClassRegistry
 ): ImageAnnotation[] {
-  // Tracking mode not wired up in this branch yet – just passthrough.
-  // FrameView always calls this with includeTrackIds = false for now.
+  /**
+   * TRACKING MODE (includeTrackIds = true)
+   *
+   * - For existing rectangles (id in knownById):
+   *   If they lost class/track info due to editing, restore from the previous label.
+   *
+   * - For new rectangles (id not in knownById):
+   *   If there is a selected profile, stamp its { class_id, class_name, track_id }
+   *   using writeClassAndTrack.
+   */
   if (includeTrackIds) {
-    return rawList;
+    const out: ImageAnnotation[] = [];
+
+    for (const a of rawList) {
+      const id = (a as any).id as string | undefined;
+      const seen = id ? knownById[id] : undefined;
+      let next = a;
+
+      if (seen) {
+        // Existing annotation: restore label/track if the current one is missing
+        const prev = (extractClassLabel(seen) || {}) as any;
+        const hasNow = (extractClassLabel(next) || {}) as any;
+
+        const missing =
+          !hasNow.class_name ||
+          typeof hasNow.class_id !== "number" ||
+          !(
+            typeof hasNow.track_id === "string" &&
+            hasNow.track_id.length > 0
+          );
+
+        if (
+          missing &&
+          prev.class_name &&
+          typeof prev.class_id === "number" &&
+          typeof prev.track_id === "string" &&
+          prev.track_id.length > 0
+        ) {
+          next = writeClassAndTrack(
+            next,
+            { id: prev.class_id, name: prev.class_name },
+            prev.track_id
+          );
+        }
+
+        out.push(next);
+        continue;
+      }
+
+      // New annotation: inherit from currently selected instance profile, if any
+      const selected = getSelectedProfile?.() as
+        | { class_id?: number; class_name?: string; track_id?: string }
+        | null
+        | undefined;
+
+      if (
+        selected &&
+        typeof selected.class_id === "number" &&
+        selected.class_name &&
+        typeof selected.track_id === "string" &&
+        selected.track_id.length > 0
+      ) {
+        next = writeClassAndTrack(
+          next,
+          { id: selected.class_id, name: selected.class_name },
+          selected.track_id
+        );
+      }
+
+      out.push(next);
+    }
+
+    return out;
   }
 
+  /**
+   * DETECTION MODE (includeTrackIds = false)
+   *
+   * - If an annotation ID already exists in knownById, we copy its previous
+   *   class label forward (class_id + class_name) via writeClassOnly.
+   * - Else, if getSelectedClassName() returns a class name, we look up its
+   *   numeric ID from the classRegistry (if present) or FIXED_CLASS_REG,
+   *   and stamp that onto the annotation via writeClassOnly.
+   */
   const out: ImageAnnotation[] = [];
 
   for (const a of rawList) {
