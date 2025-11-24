@@ -1,8 +1,7 @@
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, Optional, Union
 from enum import Enum
 from pydantic import Field, BaseModel
 from toktagger.api.schemas import ConfiguredModel
-from toktagger.api.schemas.annotations import AnnotationIn
 
 
 class FileType(str, Enum):
@@ -52,7 +51,7 @@ class SampleBase(ConfiguredModel):
 
 
 class SampleIn(SampleBase):
-    annotations: Optional[List[AnnotationIn]] = None
+    pass
 
 
 class Sample(SampleBase):

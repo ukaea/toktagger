@@ -67,7 +67,7 @@ async def create_project(request: Request, project: ProjectIn):
     """
     # Create instance of this project class, instantiating all required classes for that task, and return its ID
     # In the future, should be able to specify eg dataloader, data type, query strategy etc
-    if project.data_loader not in LoaderRegistry.names():
+    if project.data_loader.name not in LoaderRegistry.names():
         raise HTTPException(422, detail="Invalid data loader specified.")
 
     _id = await request.app.state.db_client.insert(collection="projects", model=project)

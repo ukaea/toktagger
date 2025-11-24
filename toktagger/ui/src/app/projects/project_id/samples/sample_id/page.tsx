@@ -1,11 +1,17 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Provider,
   defaultTheme,
   Breadcrumbs,
+  Text,
   Item,
   ToastContainer,
+  Tabs,
+  TabList,
+  TabPanels,
+  Header,
+  Flex,
 } from "@adobe/react-spectrum";
 import {
   Annotation,
@@ -21,10 +27,10 @@ import {
   CompositeData,
   MultiVariateTimeSeriesData,
   SpectrogramData,
+  FileDataLoaderSchema,
 } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time_series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
-import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
@@ -53,88 +59,6 @@ const SampleDataBreadCrumbs = ({
   );
 };
 
-type SampleViewInfo = {
-  project: Project;
-  data: Data;
-  annotations: Annotation[];
-  setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
-  ) => void;
-  plotProps: PlotProps;
-  forceResetZoom?: boolean;
-};
-
-const SampleView = ({
-  project,
-  data,
-  annotations,
-  setAnnotations,
-  plotProps,
-}: SampleViewInfo) => {
-  const [result, setResult] = useState<
-    MultiVariateTimeSeriesData | CompositeData | SpectrogramData | null
-  >(null);
-
-  useEffect(() => {
-    if (project.task == "disruption") {
-      const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-      if (!result.success) {
-        throw new Error("Invalid data for disruption view");
-      }
-      setResult(result.data);
-    } else if (project.task == "ELM") {
-      const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-      if (!result.success) {
-        throw new Error("Invalid data for ELM view");
-      }
-      setResult(result.data);
-    } else if (project.task == "MHD") {
-      const result = CompositeDataSchema.safeParse(data);
-      if (!result.success) {
-        throw new Error("Invalid data for MHD view");
-      }
-      const mhdData = SpectrogramDataSchema.safeParse(
-        result.data.values["mirnov"],
-      );
-      if (!mhdData.success) {
-        throw new Error("Invalid data for MHD view");
-      }
-      setResult(result.data);
-    }
-  }, [data, project.task]);
-
-  if (result == null) {
-    return null;
-  }
-
-  if (project.task == "disruption") {
-    return (
-      <DisruptionView
-        data={result as MultiVariateTimeSeriesData}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-      />
-    );
-  } else if (project.task == "ELM") {
-    return (
-      <TimeSeriesView
-        data={result as MultiVariateTimeSeriesData}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-      />
-    );
-  } else if (project.task == "MHD") {
-    return (
-      <SpectrogramView
-        data={result as SpectrogramData}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-        plotProps={plotProps}
-      />
-    );
-  }
-};
-
 async function getData<T>(url: string): Promise<T> {
   const response = await fetch(url);
   const payload = await response.json();
@@ -143,10 +67,10 @@ async function getData<T>(url: string): Promise<T> {
 
 async function getSample(
   project_id: string,
-  sample_id: string,
+  sample_id: string
 ): Promise<Sample> {
   return await getData<Sample>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`
   );
 }
 
@@ -156,10 +80,10 @@ async function getProject(project_id: string): Promise<Project> {
 
 async function getAnnotations(
   project_id: string,
-  sample_id: string,
+  sample_id: string
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`
   );
 }
 
@@ -174,26 +98,37 @@ export default function SamplePage() {
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });
+
+  const [dataLoadingFailed, setDataLoadingFailed] = useState<boolean>(false);
+  const [dataIsLoading, setDataIsLoading] = useState<boolean>(true);
+
   const [plotProps, setPlotProps] = useState<PlotProps>({
     colorMap: "Cividis",
   }); // Set default color map
 
-  useEffect(() => {
-    const refreshData = async (params: ViewParams) => {
+  const [selected, setSelected] = useState<number>(0);
+  const [result, setResult] = useState<
+    MultiVariateTimeSeriesData | CompositeData | SpectrogramData | null
+  >(null);
+
+  const refreshData = useCallback(
+    async (params: ViewParams) => {
+      setDataIsLoading(true);
+      setData(null);
+
       if (!hasIds) {
         return;
       }
 
       const project = await getProject(project_id);
       setProject(project);
-
       const sample = await getSample(project_id, sample_id);
       setSample(sample);
-
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
 
-      if (project.task == "MHD") {
+      const task = project.tasks[selected];
+      if (task.type == "spectrogram") {
         params = {
           ...params,
           name: "spectrogram",
@@ -201,6 +136,8 @@ export default function SamplePage() {
         } as SpectrogramViewParams;
       }
 
+      setDataLoadingFailed(false);
+      const body = JSON.stringify({ task_index: selected, view: params });
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
         {
@@ -208,23 +145,53 @@ export default function SamplePage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(params),
-        },
+          body: body,
+        }
       );
+
+      if (!response.ok) {
+        setDataLoadingFailed(true);
+        return;
+      }
+
       const data: Data = await response.json();
       setData(data);
-    };
+      setDataIsLoading(false);
 
-    const run = async (viewParams: ViewParams) => {
-      await refreshData(viewParams);
-    };
+      if (task.type === "time_series") {
+        console.log(data);
+        const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+        if (!result.success) {
+          throw new Error("Invalid data for Time Series view");
+        }
+        setResult(result.data);
+      } else if (task.type === "spectrogram") {
+        const result = CompositeDataSchema.safeParse(data);
+        if (!result.success) {
+          throw new Error("Invalid data for Spectrogram view");
+        }
+        const spectrogramData = SpectrogramDataSchema.safeParse(
+          result.data.values["mirnov"]
+        );
+        if (!spectrogramData.success) {
+          throw new Error("Invalid data for Spectrogram view");
+        }
+        setResult(spectrogramData.data);
+      }
+    },
+    [project_id, sample_id, selected, hasIds]
+  );
 
-    run(viewParams);
-  }, [project_id, sample_id, viewParams, hasIds]);
+  useEffect(() => {
+    const viewParams = { name: "identity" } as ViewParams;
+    refreshData(viewParams);
+  }, [project_id, sample_id, viewParams, hasIds, selected, refreshData]);
 
-  if (!data || !project || !sample || !hasIds) {
+  if (!hasIds || !project || !sample) {
     return;
   }
+
+  const tasks = project.tasks.map((task, index) => ({ ...task, id: index }));
 
   return (
     <div>
@@ -235,25 +202,100 @@ export default function SamplePage() {
           sample={sample}
         ></SampleDataBreadCrumbs>
         <div className="flex">
-          <ToolBar
-            project={project}
-            sample={sample}
-            data={data}
-            annotations={annotations}
-            setAnnotations={setAnnotations}
-            viewParams={viewParams}
-            setViewParams={setViewParams}
-            plotProps={plotProps}
-            setPlotProps={setPlotProps}
-          />
-          <div className="flex-1 justify-center">
-            <SampleView
+          <Flex
+            direction="column"
+            alignItems="center"
+            justifyContent="center"
+            gap="size-100"
+          >
+            <ToolBar
               project={project}
+              sample={sample}
               data={data}
               annotations={annotations}
+              selectedTask={selected}
               setAnnotations={setAnnotations}
+              viewParams={viewParams}
+              setViewParams={setViewParams}
               plotProps={plotProps}
+              setPlotProps={setPlotProps}
             />
+          </Flex>
+          <div className="flex-1 justify-center items-center p-4">
+            <Tabs
+              items={tasks}
+              selectedKey={selected}
+              onSelectionChange={(value) => {
+                setSelected(Number(value));
+              }}
+            >
+              <TabList>{(item) => <Item>{item.name}</Item>}</TabList>
+
+              <TabPanels>
+                {(item) => (
+                  <Item>
+                    {!data &&
+                      dataLoadingFailed &&
+                      project.data_loader.name == "uda" && (
+                        <Text>
+                          Failed to load data for shot {sample.shot_id}. Please
+                          check UDA or VPN connection.
+                        </Text>
+                      )}
+
+                    {!data &&
+                      dataLoadingFailed &&
+                      project.data_loader.name == "parquet" && (
+                        <Text>
+                          Failed to load local data{" "}
+                          {
+                            FileDataLoaderSchema.parse(project.data_loader)
+                              .file_path
+                          }
+                          . Check file path.
+                        </Text>
+                      )}
+                    {dataIsLoading && project.data_loader.name == "uda" && (
+                      <Text>
+                        Loading data for shot {sample.shot_id} from UDA.
+                      </Text>
+                    )}
+                    {dataIsLoading && project.data_loader.name == "parquet" && (
+                      <Text>
+                        Loading local data{" "}
+                        {
+                          FileDataLoaderSchema.parse(project.data_loader)
+                            .file_path
+                        }
+                        . Check file path.
+                      </Text>
+                    )}
+                    {data &&
+                      item.type === "time_series" &&
+                      MultiVariateTimeSeriesDataSchema.safeParse(result)
+                        .success && (
+                        <TimeSeriesView
+                          name={item.name}
+                          data={result as MultiVariateTimeSeriesData}
+                          annotations={annotations}
+                          setAnnotations={setAnnotations}
+                        />
+                      )}
+                    {data &&
+                      item.type === "spectrogram" &&
+                      SpectrogramDataSchema.safeParse(result).success && (
+                        <SpectrogramView
+                          name={item.name}
+                          data={result as SpectrogramData}
+                          annotations={annotations}
+                          setAnnotations={setAnnotations}
+                          plotProps={plotProps}
+                        />
+                      )}
+                  </Item>
+                )}
+              </TabPanels>
+            </Tabs>
           </div>
         </div>
       </Provider>

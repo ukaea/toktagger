@@ -46,7 +46,7 @@ import { NavigationBar } from "./nav";
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotation[],
+  annotations: Annotation[]
 ) {
   // user has validated the annotations, so set created_by to "manual"
   const updatedAnnotations = annotations.map((annotation: Annotation) => {
@@ -151,7 +151,7 @@ function AmplitudeSlider({
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor)),
+    Math.log10(Math.max(x, smallPrecisionFactor))
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -166,7 +166,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end,
+          val.end
         )}`
       }
     />
@@ -260,7 +260,7 @@ function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        },
+        }
       );
 
       const payload = await response.json();
@@ -329,10 +329,11 @@ function SpectrogramThresholdTool({
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
-  data: Data;
+  data: Data | null;
   annotations: Annotation[];
+  selectedTask: number;
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
@@ -345,6 +346,7 @@ export default function ToolBar({
   data,
   annotations,
   setAnnotations,
+  selectedTask,
   viewParams,
   setViewParams,
   plotProps,
@@ -354,17 +356,14 @@ export default function ToolBar({
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  if (project.task == "ELM") {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+  if (!project_id || !sample_id) {
+    return null;
+  }
 
-    if (!result.success) {
-      console.warn("ELM data is not available");
-      return;
-    }
+  const task = project.tasks[selectedTask];
+  const labels = task.class_labels || [];
 
-    const tsData = result.data;
-
-    const labels = ["No ELMs", "Type I", "Type II", "Type III"];
+  if (labels.length > 0) {
     tools.push({
       name: "Shot Labels",
       component: (
@@ -375,6 +374,17 @@ export default function ToolBar({
         ></ShotLabels>
       ),
     });
+  }
+
+  if (data && task.type == "time_series") {
+    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+
+    if (!result.success) {
+      console.warn("Time series data is not available");
+      return;
+    }
+
+    const tsData = result.data;
 
     tools.push({
       name: "Peak Detection",
@@ -423,7 +433,7 @@ export default function ToolBar({
         ></JumpDetectionTool>
       ),
     });
-  } else if (project.task == "MHD") {
+  } else if (data && task.type == "spectrogram") {
     const resultComposite = CompositeDataSchema.safeParse(data);
     if (!resultComposite.success) {
       console.warn("MHD data is not available");
@@ -431,7 +441,7 @@ export default function ToolBar({
     }
 
     const resultSpec = SpectrogramDataSchema.safeParse(
-      resultComposite.data.values["mirnov"],
+      resultComposite.data.values["mirnov"]
     );
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");
@@ -479,78 +489,76 @@ export default function ToolBar({
   };
 
   return (
-    <Provider theme={defaultTheme} height="100vh">
-      <View overflow="auto" height="100vh">
+    <View overflow="auto" height="100vh">
+      <Flex
+        direction="column"
+        alignItems="center"
+        justifyContent="center"
+        gap="size-100"
+        width="100%"
+      >
         <Flex
           direction="column"
           alignItems="center"
           justifyContent="center"
           gap="size-100"
-          width="100%"
         >
-          <Flex
-            direction="column"
-            alignItems="center"
-            justifyContent="center"
-            gap="size-100"
-          >
-            <Header height="size-300" marginBottom="size-100">
-              <span style={{ fontSize: "1.2rem" }}>Controls</span>
-            </Header>
-            <NavigationBar
-              project_id={project_id}
-              sample_id={sample_id}
-              annotations={annotations}
-              setAnnotations={setAnnotations}
-            />
-            <ShotSearch
-              project_id={project_id}
-              sample_id={sample_id}
-              annotations={annotations}
-            />
-            <Accordion allowsMultipleExpanded={true} width="100%">
-              <Disclosure>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
-                </DisclosureTitle>
-                <DisclosurePanel>
-                  <ExportTool
-                    project={project}
-                    sample={sample}
-                    current_annotations={annotations}
-                  />
-                </DisclosurePanel>
-              </Disclosure>
-              <Disclosure>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
-                </DisclosureTitle>
-                <DisclosurePanel>
-                  <ImportTool
-                    project_id={project_id}
-                    refreshAnnotations={refreshAnnotations}
-                  />
-                </DisclosurePanel>
-              </Disclosure>
-            </Accordion>
-          </Flex>
-          <Flex justifyContent="center" alignItems="center">
-            <Header height="size-300" marginBottom="size-100">
-              <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
-            </Header>
-          </Flex>
+          <Header height="size-300" marginBottom="size-100">
+            <span style={{ fontSize: "1.2rem" }}>Controls</span>
+          </Header>
+          <NavigationBar
+            project_id={project_id}
+            sample_id={sample_id}
+            annotations={annotations}
+            setAnnotations={setAnnotations}
+          />
+          <ShotSearch
+            project_id={project_id}
+            sample_id={sample_id}
+            annotations={annotations}
+          />
           <Accordion allowsMultipleExpanded={true} width="100%">
-            {tools.map((item, i) => (
-              <Disclosure key={i}>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                </DisclosureTitle>
-                <DisclosurePanel>{item.component}</DisclosurePanel>
-              </Disclosure>
-            ))}
+            <Disclosure>
+              <DisclosureTitle>
+                <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
+              </DisclosureTitle>
+              <DisclosurePanel>
+                <ExportTool
+                  project={project}
+                  sample={sample}
+                  current_annotations={annotations}
+                />
+              </DisclosurePanel>
+            </Disclosure>
+            <Disclosure>
+              <DisclosureTitle>
+                <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
+              </DisclosureTitle>
+              <DisclosurePanel>
+                <ImportTool
+                  project_id={project_id}
+                  refreshAnnotations={refreshAnnotations}
+                />
+              </DisclosurePanel>
+            </Disclosure>
           </Accordion>
         </Flex>
-      </View>
-    </Provider>
+        <Flex justifyContent="center" alignItems="center">
+          <Header height="size-300" marginBottom="size-100">
+            <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+          </Header>
+        </Flex>
+        <Accordion allowsMultipleExpanded={true} width="100%">
+          {tools.map((item, i) => (
+            <Disclosure key={i}>
+              <DisclosureTitle>
+                <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+              </DisclosureTitle>
+              <DisclosurePanel>{item.component}</DisclosurePanel>
+            </Disclosure>
+          ))}
+        </Accordion>
+      </Flex>
+    </View>
   );
 }

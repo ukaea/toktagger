@@ -9,7 +9,7 @@ from toktagger.api.schemas.projects import QueryStrategyType
 
 
 class QueryStrategy(ABC):
-    def __init__(self, samples: list[Sample], annotations: list[Annotation]):
+    def __init__(self, samples: list[Sample], annotations: list[Annotation] = []):
         self.samples = samples
         self.annotations = annotations
 

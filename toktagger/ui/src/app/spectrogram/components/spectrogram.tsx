@@ -43,7 +43,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {},
+  {}
 );
 
 const lockedModeCategoryColors = lockedModeCategories.reduce<
@@ -56,15 +56,17 @@ const lockedModeCategoryColors = lockedModeCategories.reduce<
 const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
 
 type SpectrogramViewInfo = {
+  name: string;
   data: SpectrogramData;
   annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
   plotProps: PlotProps;
 };
 
 export const SpectrogramView = ({
+  name,
   data,
   annotations,
   setAnnotations,
@@ -74,8 +76,6 @@ export const SpectrogramView = ({
     console.log("SpectrogramView plotProps updated:", plotProps);
     console.log("Threshold active:", plotProps.thresholdActive);
   }, [plotProps]);
-
-  console.log(annotations);
 
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
@@ -92,7 +92,7 @@ export const SpectrogramView = ({
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
   const mask: SpectrogramMask = displayAnnotations
     .filter(
-      (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success,
+      (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success
     )
     .map((x: DisplayAnnotation) => SpectrogramMaskSchema.parse(x))[0];
 
@@ -118,7 +118,7 @@ export const SpectrogramView = ({
           maskValue = 1; // Default to 1 if mask value is undefined
         }
         return value * maskValue;
-      }),
+      })
     );
   } else {
     amplitude = data.amplitude;
@@ -127,13 +127,13 @@ export const SpectrogramView = ({
   const ampMax = Math.max(...amplitude.flat());
 
   const logAmplitude_og = amplitude_og.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor))),
+    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
   );
   const logAmpMin = Math.min(...logAmplitude_og.flat());
   const logAmpMax = Math.max(...logAmplitude_og.flat());
 
   const logAmplitude = amplitude.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor))),
+    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
   );
 
   const generateLogTicks = (min: number, max: number) => {
@@ -295,7 +295,7 @@ export const SpectrogramView = ({
     // Handle dark mode styling
     // We should probably move all the styling to this central component
     const isDarkMode = window.matchMedia(
-      "(prefers-color-scheme: dark)",
+      "(prefers-color-scheme: dark)"
     ).matches;
     if (isDarkMode) {
       layout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };
@@ -338,7 +338,7 @@ export const SpectrogramView = ({
             onModifyZone={updateZones}
           >
             <TimeSeries
-              plotId="LockedMode"
+              plotId={name}
               plotConfig={{
                 data: plotData,
                 config: plotConfig,

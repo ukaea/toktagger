@@ -99,19 +99,38 @@ export const DisplayAnnotationSchema = z.union([
 ]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
+export const DataLoaderSchema = z.object({
+  name: z.string(),
+});
+
+export const FileDataLoaderSchema = DataLoaderSchema.extend({
+  file_path: z.string(),
+});
+
+export const ShotDataLoaderSchema = DataLoaderSchema.extend({
+  shot_min: z.number().optional(),
+  shot_max: z.number().optional(),
+});
+
+export const TaskSchema = z.object({
+  name: z.string(),
+  type: z.string(),
+  signal_names: z.array(z.string()),
+  class_labels: z.array(z.string()),
+});
+
 export const ProjectSchema = z.object({
   _id: z.string().optional(),
   name: z.string(),
-  task: z.string(),
   query_strategy: z.string(),
-  data_loader: z.string(),
+  data_loader: z.union([FileDataLoaderSchema, ShotDataLoaderSchema]),
+  tasks: z.array(TaskSchema),
   timestamp: z.string().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
 export const ProjectUpdateSchema = z.object({
   name: z.string().optional(),
-  task: z.string().optional(),
   query_strategy: z.string().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;

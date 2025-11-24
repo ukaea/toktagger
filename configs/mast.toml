@@ -1,0 +1,24 @@
+[project]
+name = "MAST UDA"
+query_strategy = "sequential"
+
+[project.data_loader]
+name = "uda"
+tmin = -0.1
+tmax = 1.0
+shot_min = 30009
+shot_max = 30421
+
+[[project.tasks]]
+name = "Time Series"
+type = "time_series"
+signal_names = [
+    "ip",
+    "ane_density",
+    "ANB_TOT_SUM_POWER",
+    "AYC_TE_CORE",
+    "AYC_NE_CORE",
+    "AIM_DA/HM10/T",
+    "ANU_NEUTRONS",
+    "/xsx/HCAM/U/1"
+]

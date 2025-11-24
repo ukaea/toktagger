@@ -10,7 +10,7 @@ from toktagger.api.schemas.data import (
     TimeSeriesData,
     ImageData,
 )
-from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
+from toktagger.api.schemas.samples import FileData, Sample, TimeSeriesFileData
 
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -75,17 +75,32 @@ class ImageDataLoader(DataLoader):
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+    def get_sample(
+        self,
+        sample: Sample,
+        signal_names: list[str],
+        tmin: float,
+        tmax: float,
+        max_sample_rate: float,
+    ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, TimeSeriesFileData)
+
+        tmin = tmin if tmin is not None else -np.inf
+        tmax = tmax if tmax is not None else np.inf
+
         item: TimeSeriesFileData = sample.data
+
         if not pathlib.Path(item.file_name).exists():
             raise FileNotFoundError(
                 f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
             )
-        df = pd.read_parquet(item.file_name, columns=item.column_names)
+
+        df = pd.read_parquet(item.file_name, columns=signal_names)
         df = df.fillna(0)
+        df = df.loc[(df.index >= tmin) & (df.index <= tmax)]
         data = df.to_dict("list")
         time = df.index.values
+
         results = {}
         for key, value in data.items():
             results[key] = TimeSeriesData(time=time, values=value)
@@ -102,19 +117,48 @@ class UDADataLoader(DataLoader):
 
         self.client = pyuda.Client()
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, ShotData)
-        item: ShotData = sample.data
+    def get_sample(
+        self,
+        sample: Sample,
+        signal_names: list[str],
+        tmin: float,
+        tmax: float,
+        max_sample_rate: float,
+    ) -> MultiVariateTimeSeriesData:
+        import pyuda
+
+        tmin = tmin if tmin is not None else -np.inf
+        tmax = tmax if tmax is not None else np.inf
 
         results = {}
-        for name in item.signal_names:
+        count_server_exceptions = 0
+        for name in signal_names:
             try:
                 signal = self.client.get(name, sample.shot_id)
                 data = signal.data
                 time = signal.time.data
+
+                # crop to time configured time range
+                time_mask = (time >= tmin) & (time <= tmax)
+                data = data[time_mask]
+                time = time[time_mask]
+
+                if np.diff(time).mean() < max_sample_rate:
+                    # downsample data to max sample rate
+                    new_time = np.arange(time[0], time[-1], max_sample_rate)
+                    data = np.interp(new_time, time, data)
+                    time = new_time
+
                 item = TimeSeriesData(time=time, values=data)
                 results[name] = item
-            except Exception:
-                results[name] = None
+            except pyuda.ServerException:
+                results[name] = TimeSeriesData(time=[], values=[])
+                count_server_exceptions += 1
+
+        if count_server_exceptions == len(signal_names):
+            raise RuntimeError(
+                f"UDADataLoader: Could not retrieve any signals for shot {sample.shot_id}. "
+                "Please check your UDA connection."
+            )
 
         return MultiVariateTimeSeriesData(values=results)

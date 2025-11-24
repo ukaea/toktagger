@@ -71,9 +71,6 @@ const ProjectsTable = ({
             <Column key="name" allowsSorting>
               Name
             </Column>
-            <Column key="task" allowsSorting>
-              Task
-            </Column>
             <Column key="date_created" allowsSorting>
               Date Created
             </Column>
@@ -86,9 +83,8 @@ const ProjectsTable = ({
             {(item) => (
               <Row href={`/ui/projects/${item._id}`}>
                 <Cell>{item["name"]}</Cell>
-                <Cell>{item["task"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
-                <Cell>{item["data_loader"]}</Cell>
+                <Cell>{item["data_loader"]["name"]}</Cell>
                 <Cell>
                   <Flex direction="row" gap="size-100">
                     <ProjectConfigEditor project={item} onModify={onModify} />
@@ -128,12 +124,11 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
 
   const refreshProjects = useCallback(async () => {
-    console.log("Refreshing projects...");
     const projects = await getProjects(
       sortDescriptor,
       currentPage,
       projectsPerPage,
-      projectName,
+      projectName
     );
 
     setProjects(projects);

@@ -1,0 +1,43 @@
+[project]
+name = "Local Data"
+query_strategy = "sequential"
+
+[project.data_loader]
+name = "parquet"
+file_path = "./data/test/mhd"
+
+[[project.tasks]]
+name = "Summary Time Series"
+type = "time_series"
+signal_names = [
+    "ip",
+    "power_nbi"
+]
+
+[[project.tasks]]
+name = "ELM Analysis"
+type = "time_series"
+class_labels = [
+    "No ELMS",
+    "Type I",
+    "Type II",
+    "Type III",
+]
+signal_names = [
+    "ip",
+    "dalpha",
+    "power_nbi",
+    "t_e_core",
+    "sxr",
+]
+
+[[project.tasks]]
+name = "SpecView"
+type = "spectrogram"
+signal_names = [
+    "mirnov",
+]
+class_labels = [
+    "Has MHD Modes",
+    "No Modes"
+]
