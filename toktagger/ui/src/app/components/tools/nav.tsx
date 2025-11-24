@@ -27,7 +27,7 @@ async function getNextSample(project_id: string, current_sample_id: string) {
 
 async function getPreviousSample(
   project_id: string,
-  current_sample_id: string,
+  current_sample_id: string
 ) {
   const PREVIOUS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/previous?current_sample_id=${current_sample_id}`;
   const sampleResult = await fetch(PREVIOUS_URL);
@@ -41,14 +41,20 @@ async function getPreviousSample(
 type ButtonInfo = {
   project_id: string;
   sample_id: string;
+  task_name: string;
   annotations: Annotation[];
 };
 
-function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function NextButton({
+  project_id,
+  sample_id,
+  task_name,
+  annotations,
+}: ButtonInfo) {
   const navigate = useNavigate();
 
   const moveNextShot = useCallback(async () => {
-    await saveSampleAnnotations(project_id, sample_id, annotations);
+    await saveSampleAnnotations(project_id, sample_id, task_name, annotations);
     const sample = await getNextSample(project_id, sample_id);
     if (!sample) {
       ToastQueue.negative("No more samples available!", { timeout: 3000 });
@@ -56,7 +62,7 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
     }
     const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
     navigate(NEXT_SAMPLE_URL);
-  }, [project_id, sample_id, annotations, navigate]);
+  }, [project_id, sample_id, task_name, annotations, navigate]);
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -80,11 +86,16 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
   );
 }
 
-function PreviousButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function PreviousButton({
+  project_id,
+  sample_id,
+  task_name,
+  annotations,
+}: ButtonInfo) {
   const navigate = useNavigate();
 
   const movePreviousShot = useCallback(async () => {
-    await saveSampleAnnotations(project_id, sample_id, annotations);
+    await saveSampleAnnotations(project_id, sample_id, task_name, annotations);
     const sample = await getPreviousSample(project_id, sample_id);
     if (!sample) {
       ToastQueue.negative("No earlier samples available!", { timeout: 3000 });
@@ -92,7 +103,7 @@ function PreviousButton({ project_id, sample_id, annotations }: ButtonInfo) {
     }
     const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
     navigate(NEXT_SAMPLE_URL);
-  }, [project_id, sample_id, annotations, navigate]);
+  }, [project_id, sample_id, task_name, annotations, navigate]);
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -116,10 +127,20 @@ function PreviousButton({ project_id, sample_id, annotations }: ButtonInfo) {
   );
 }
 
-function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function SaveButton({
+  project_id,
+  sample_id,
+  task_name,
+  annotations,
+}: ButtonInfo) {
   const handleClick = async () => {
     try {
-      await saveSampleAnnotations(project_id, sample_id, annotations);
+      await saveSampleAnnotations(
+        project_id,
+        sample_id,
+        task_name,
+        annotations
+      );
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
         timeout: 5000,
       });
@@ -162,12 +183,14 @@ function ClearButton({
 type NavigationBarInfo = {
   project_id: string;
   sample_id: string;
+  task_name: string;
   annotations: Annotation[];
   setAnnotations: (annotations: Annotation[]) => void;
 };
 export function NavigationBar({
   project_id,
   sample_id,
+  task_name,
   annotations,
   setAnnotations,
 }: NavigationBarInfo) {
@@ -176,16 +199,19 @@ export function NavigationBar({
       <SaveButton
         project_id={project_id}
         sample_id={sample_id}
+        task_name={task_name}
         annotations={annotations}
       />
       <PreviousButton
         project_id={project_id}
         sample_id={sample_id}
+        task_name={task_name}
         annotations={annotations}
       />
       <NextButton
         project_id={project_id}
         sample_id={sample_id}
+        task_name={task_name}
         annotations={annotations}
       />
       <ClearButton setAnnotations={setAnnotations} />

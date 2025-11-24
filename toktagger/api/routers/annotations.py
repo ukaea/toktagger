@@ -125,6 +125,10 @@ async def get_annotations(
     request: Request,
     project_id: str = Path(description="The ID of the project to get samples from."),
     sample_id: str = Path(description="The ID of the sample to get annotations from."),
+    task_name: str = Query(
+        None,
+        description="The name of the task to filter annotations by, leave blank to return annotations for all tasks",
+    ),
     sort_by: str = Query(
         "_id",
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
@@ -161,6 +165,7 @@ async def get_annotations(
         db_client=db_client,
         project_id=project_id,
         sample_id=sample_id,
+        task_name=task_name,
         validated=validated,
         sort_by=sort_by,
         sort_direction=sort_direction,
@@ -187,6 +192,10 @@ async def update_annotations(
     sample_id: str = Path(
         description="The ID of the sample to update annotations for."
     ),
+    task_name: str = Query(
+        None,
+        description="The name of the task to filter annotations by, leave blank to update annotations for all tasks",
+    ),
 ):
     """
     Update the list of annotations to a given sample for a specified project. Will overwrite existing annotations.
@@ -208,7 +217,10 @@ async def update_annotations(
     # Delete previous annotations, if they exist
     try:
         await utils.delete_annotations(
-            db_client=db_client, project_id=project_id, sample_id=sample_id
+            db_client=db_client,
+            project_id=project_id,
+            sample_id=sample_id,
+            task_name=task_name,
         )
     except HTTPException:
         pass

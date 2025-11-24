@@ -7,6 +7,7 @@ from pydantic import Field, TypeAdapter, model_validator, BaseModel
 class AnnotationIn(ConfiguredModel):
     label: str
     created_by: AnnotatorTypes
+    task_name: str
     validated: bool = False
     uncertainty: Optional[float] = None
     sample_id: Optional[str] = None

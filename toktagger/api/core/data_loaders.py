@@ -136,6 +136,7 @@ class UDADataLoader(DataLoader):
             try:
                 signal = self.client.get(name, sample.shot_id)
                 data = signal.data
+                data = np.nan_to_num(data)
                 time = signal.time.data
 
                 # crop to time configured time range

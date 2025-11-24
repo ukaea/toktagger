@@ -211,6 +211,7 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
 type SpectrogramThresholdToolInfo = {
   project_id: string;
   sample_id: string;
+  task_name: string;
   signal_name: string;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
@@ -220,6 +221,7 @@ type SpectrogramThresholdToolInfo = {
 function SpectrogramThresholdTool({
   project_id,
   sample_id,
+  task_name,
   signal_name,
   plotProps,
   setPlotProps,
@@ -258,6 +260,7 @@ function SpectrogramThresholdTool({
           },
           body: JSON.stringify({
             signal_name: signal_name,
+            task_name: task_name,
             percentile: value,
           }),
         }
@@ -268,7 +271,15 @@ function SpectrogramThresholdTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
+  }, [
+    project_id,
+    sample_id,
+    active,
+    value,
+    signal_name,
+    setAnnotations,
+    task_name,
+  ]);
 
   return (
     <>
@@ -361,6 +372,7 @@ export default function ToolBar({
   }
 
   const task = project.tasks[selectedTask];
+  const task_name = task.name;
   const labels = task.class_labels || [];
 
   if (labels.length > 0) {
@@ -369,6 +381,7 @@ export default function ToolBar({
       component: (
         <ShotLabels
           labels={labels}
+          task_name={task_name}
           annotations={annotations}
           setAnnotations={setAnnotations}
         ></ShotLabels>
@@ -392,6 +405,7 @@ export default function ToolBar({
         <PeakDetectionTool
           project_id={project_id}
           sample_id={sample_id}
+          task_name={task_name}
           data={tsData}
           setAnnotations={setAnnotations}
         ></PeakDetectionTool>
@@ -404,6 +418,7 @@ export default function ToolBar({
         <OutlierDetectionTool
           project_id={project_id}
           sample_id={sample_id}
+          task_name={task_name}
           data={tsData}
           setAnnotations={setAnnotations}
         ></OutlierDetectionTool>
@@ -416,6 +431,7 @@ export default function ToolBar({
         <ChangePointDetectionTool
           project_id={project_id}
           sample_id={sample_id}
+          task_name={task_name}
           data={tsData}
           setAnnotations={setAnnotations}
         ></ChangePointDetectionTool>
@@ -428,6 +444,7 @@ export default function ToolBar({
         <JumpDetectionTool
           project_id={project_id}
           sample_id={sample_id}
+          task_name={task_name}
           data={tsData}
           setAnnotations={setAnnotations}
         ></JumpDetectionTool>
@@ -474,6 +491,7 @@ export default function ToolBar({
         <SpectrogramThresholdTool
           project_id={project_id}
           sample_id={sample_id}
+          task_name={task_name}
           signal_name={"mirnov"}
           plotProps={plotProps}
           setPlotProps={setPlotProps}
@@ -509,6 +527,7 @@ export default function ToolBar({
           <NavigationBar
             project_id={project_id}
             sample_id={sample_id}
+            task_name={task_name}
             annotations={annotations}
             setAnnotations={setAnnotations}
           />

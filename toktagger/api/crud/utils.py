@@ -161,6 +161,7 @@ async def get_annotations(
     db_client: MongoDBClient,
     project_id: str,
     sample_id: Optional[str] = None,
+    task_name: Optional[str] = None,
     validated: Optional[bool] = None,
     sort_by: str = "_id",
     sort_direction: Literal["ascending", "descending"] = "descending",
@@ -171,6 +172,9 @@ async def get_annotations(
 
     if sample_id:
         db_filters["sample_id"] = convert_to_objectid(sample_id, "samples")
+
+    if task_name is not None:
+        db_filters["task_name"] = task_name
 
     if validated is not None:
         db_filters["validated"] = validated
@@ -191,7 +195,10 @@ async def get_annotations(
 
 
 async def add_annotations(
-    db_client, project_id: str, sample_id: str, annotations: list[AnnotationTypes]
+    db_client,
+    project_id: str,
+    sample_id: str,
+    annotations: list[AnnotationTypes],
 ) -> list[str]:
     db_ids = {
         "project_id": convert_to_objectid(project_id, "projects"),
@@ -206,6 +213,7 @@ async def delete_annotations(
     db_client: MongoDBClient,
     project_id: str,
     sample_id: str = None,
+    task_name: str = None,
     annotation_id: str = None,
 ) -> None:
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -214,6 +222,9 @@ async def delete_annotations(
     if sample_id:
         sample_obj_id = convert_to_objectid(sample_id, "samples")
         filters["sample_id"] = sample_obj_id
+
+    if task_name is not None:
+        filters["task_name"] = task_name
 
     if annotation_id:
         annotation_obj_id = convert_to_objectid(annotation_id, "annotations")

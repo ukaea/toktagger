@@ -10,7 +10,6 @@ import {
   Tabs,
   TabList,
   TabPanels,
-  Header,
   Flex,
 } from "@adobe/react-spectrum";
 import {
@@ -80,10 +79,11 @@ async function getProject(project_id: string): Promise<Project> {
 
 async function getAnnotations(
   project_id: string,
-  sample_id: string
+  sample_id: string,
+  task_name: string
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations?task_name=${task_name}`
   );
 }
 
@@ -124,7 +124,14 @@ export default function SamplePage() {
       setProject(project);
       const sample = await getSample(project_id, sample_id);
       setSample(sample);
-      const dbAnnotations = await getAnnotations(project_id, sample_id);
+
+      const task_name = project.tasks[selected].name;
+
+      const dbAnnotations = await getAnnotations(
+        project_id,
+        sample_id,
+        task_name
+      );
       setAnnotations(dbAnnotations);
 
       const task = project.tasks[selected];

@@ -35,11 +35,13 @@ export const ZONE_MENU_ID = "zone-provider";
  */
 export const ZoneProvider = ({
   categories,
+  task_name,
   initialData,
   children,
   onModifyZone,
 }: {
   categories: Category[];
+  task_name: string;
   initialData?: Zone[];
   children: React.ReactNode;
   onModifyZone?: (newZones: Zone[]) => void;
@@ -73,7 +75,7 @@ export const ZoneProvider = ({
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     zones.current = zones.current.map((zone) => {
       if (zone === props.zone || zone.selected) {
@@ -89,6 +91,7 @@ export const ZoneProvider = ({
     zones.current.push({
       selected: false,
       created_by: "manual",
+      task_name: "",
       category,
       x0,
       x1,
@@ -127,6 +130,7 @@ export const ZoneProvider = ({
         selected: false,
         created_by: "manual",
         category,
+        task_name,
         x0,
         x1,
       });
@@ -182,7 +186,7 @@ export const ZoneProvider = ({
       );
 
     registerMenuItem("zone", menuElement);
-  }, [categories, onModifyZone, registerMenuItem]);
+  }, [categories, onModifyZone, registerMenuItem, task_name]);
 
   // Initialisation of data - this should only run once
   // Effect: run ONCE per mount to populate from initialData

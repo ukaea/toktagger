@@ -163,6 +163,7 @@ export const TimeSeriesView = ({
         <ContextMenuProvider menuId="elm-menu">
           <ZoneProvider
             categories={zoneCategories}
+            task_name={name}
             initialData={zones}
             onModifyZone={updateZones}
           >

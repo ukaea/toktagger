@@ -8,8 +8,8 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
-import { AnnotatorTypes } from "./types";
+import { Annotation } from "@/types";
+import { AnnotatorTypes, AnnotatorToolProps } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 
 enum ChangePointMethod {
@@ -17,21 +17,13 @@ enum ChangePointMethod {
   HMM = "hmm",
 }
 
-type ChangePointDetectionType = {
-  project_id: string;
-  sample_id: string;
-  data: MultiVariateTimeSeriesData;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
-};
-
 export function ChangePointDetectionTool({
   project_id,
   sample_id,
+  task_name,
   data,
   setAnnotations,
-}: ChangePointDetectionType) {
+}: AnnotatorToolProps) {
   const methodOptions = [
     { id: 0, name: ChangePointMethod.PELT },
     { id: 1, name: ChangePointMethod.HMM },
@@ -55,7 +47,7 @@ export function ChangePointDetectionTool({
         setAnnotations((previousAnnotations) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
+              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
           );
           return otherAnnotations;
         });
@@ -71,19 +63,20 @@ export function ChangePointDetectionTool({
           },
           body: JSON.stringify({
             signal_name: signalName,
+            task_name: task_name,
             method: method,
             penalty: penalty,
             num_points: numPoints,
             num_components: numComponents,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
+            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
         );
         return otherAnnotations.concat(payload);
       });

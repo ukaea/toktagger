@@ -238,6 +238,7 @@ class PeakDetectionAnnotator(DataAnnotator):
                     time_min=max(float(peak_time - width), np.min(time)),
                     time_max=min(float(peak_time + width), np.max(time)),
                     created_by=AnnotatorTypes.PEAK_DETECTION,
+                    task_name=self.params.task_name,
                 )
                 regions.append(region)
 
@@ -310,6 +311,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
                 time_max=time[imax],
                 label="Unknown",
                 created_by=AnnotatorTypes.OUTLIER_DETECTION,
+                task_name=self.params.task_name,
             )
             for imin, imax in bounds
         ]
@@ -335,6 +337,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
                 time_max=time[imax],
                 label="Unknown",
                 created_by=AnnotatorTypes.OUTLIER_DETECTION,
+                task_name=self.params.task_name,
             )
             for imin, imax in bounds
         ]
@@ -420,6 +423,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 time_max=time[imax],
                 label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
+                task_name=self.params.task_name,
             )
             for imin, imax in zip(result, result[1:])
         ]
@@ -458,6 +462,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 time_max=tmax,
                 label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
+                task_name=self.params.task_name,
             )
             for (tmin, tmax) in bounds
         ]
@@ -542,6 +547,7 @@ class JumpDetectionAnnotator(DataAnnotator):
                     time_max=tmax,
                     label="Unknown",
                     created_by=AnnotatorTypes.JUMP_DETECTION,
+                    task_name=self.params.task_name,
                 )
             )
 
@@ -561,6 +567,7 @@ class SpectrogramThresholdAnnotator:
             label="SpectrogramMask",
             values=threshold_mask.tolist(),
             created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD,
+            task_name=self.params.task_name,
         )
 
 

@@ -7,6 +7,7 @@ export const BaseAnnotationSchema = z.object({
   uncertainty: z.number().optional(),
   label: z.string(),
   type: z.string(),
+  task_name: z.string(),
 });
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 export const ClassLabelSchema = BaseAnnotationSchema;
@@ -71,23 +72,26 @@ export const CategorySchema = z.object({
 });
 export type Category = z.infer<typeof CategorySchema>;
 
-export const ZoneSchema = z.object({
-  selected: z.boolean().default(false),
+export const BaseDisplayAnnotationSchema = z.object({
   created_by: z.string().default("manual"),
+  selected: z.boolean().default(false),
+  task_name: z.string(),
+});
+
+export const ZoneSchema = BaseDisplayAnnotationSchema.extend({
   category: CategorySchema,
   x0: z.number(),
   x1: z.number(),
 });
 export type Zone = z.infer<typeof ZoneSchema>;
 
-export const VSpanSchema = z.object({
-  created_by: z.string().default("manual"),
+export const VSpanSchema = BaseDisplayAnnotationSchema.extend({
   category: CategorySchema,
   x: z.number(),
 });
 export type VSpan = z.infer<typeof VSpanSchema>;
 
-export const SpectrogramMaskSchema = z.object({
+export const SpectrogramMaskSchema = BaseDisplayAnnotationSchema.extend({
   values: z.array(z.array(z.number())),
 });
 export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;

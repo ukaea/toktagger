@@ -5,14 +5,16 @@ import { Selection } from "@react-types/shared";
 
 export type ShotLabelsType = {
   labels: string[];
+  task_name: string;
   annotations: Annotation[];
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
 };
 
 export function ShotLabels({
   labels = [],
+  task_name,
   annotations,
   setAnnotations,
 }: ShotLabelsType) {
@@ -21,7 +23,7 @@ export function ShotLabels({
 
   useEffect(() => {
     const defaultAnnotations = annotations.filter(
-      (annotation: Annotation) => annotation.type === "class_label",
+      (annotation: Annotation) => annotation.type === "class_label"
     );
     const defaultSelectedKeys = defaultAnnotations
       .map((annotation: Annotation) => {
@@ -45,7 +47,7 @@ export function ShotLabels({
       setAnnotations((prevAnnotations: Annotation[]) => {
         let newAnnotations = prevAnnotations || [];
         newAnnotations = newAnnotations.filter(
-          (annotation) => annotation.type !== "class_label",
+          (annotation) => annotation.type !== "class_label"
         );
         newKeys.forEach((key: string) => {
           const item = items.find((item) => item.id.toString() === key) || null;
@@ -57,6 +59,7 @@ export function ShotLabels({
 
           newAnnotations.push({
             type: "class_label",
+            task_name: task_name,
             label: item.name,
             created_by: "manual",
           });
@@ -64,7 +67,7 @@ export function ShotLabels({
         return newAnnotations;
       });
     },
-    [items, setAnnotations],
+    [items, setAnnotations]
   );
 
   useEffect(() => {

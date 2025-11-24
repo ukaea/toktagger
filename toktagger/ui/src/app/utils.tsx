@@ -24,12 +24,13 @@ export const linspace = (start: number, end: number, num: number) => {
 };
 
 export const convertDisplayAnnotationToAnnotation = (
-  annotation: DisplayAnnotation,
+  annotation: DisplayAnnotation
 ): Annotation => {
   if (ZoneSchema.safeParse(annotation).success) {
     const zone = ZoneSchema.parse(annotation);
     const timeRegion: TimeRegion = {
       created_by: zone.created_by,
+      task_name: zone.task_name,
       type: "time_region",
       time_min: zone.x0,
       time_max: zone.x1,
@@ -40,6 +41,7 @@ export const convertDisplayAnnotationToAnnotation = (
     const vspan = VSpanSchema.parse(annotation);
     const timePoint: TimePoint = {
       created_by: vspan.created_by,
+      task_name: vspan.task_name,
       type: "time_point",
       time: vspan.x,
       label: vspan.category.name,
@@ -51,13 +53,15 @@ export const convertDisplayAnnotationToAnnotation = (
 };
 
 export const createAnnotationToDisplayAnnotationFunc = (
-  colors: Record<string, string>,
+  colors: Record<string, string>
 ) => {
   const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
         created_by: timeRegion.created_by,
+        selected: false,
+        task_name: timeRegion.task_name,
         x0: timeRegion.time_min,
         x1: timeRegion.time_max,
         category: { name: timeRegion.label, color: colors[timeRegion.label] },
@@ -66,7 +70,9 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else if (TimePointSchema.safeParse(item).success) {
       const timePoint = TimePointSchema.parse(item);
       const vspan: VSpan = {
+        selected: false,
         created_by: timePoint.created_by,
+        task_name: timePoint.task_name,
         x: timePoint.time,
         category: { name: timePoint.label, color: colors[timePoint.label] },
       };
@@ -74,6 +80,9 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else if (SpectrogramMaskSchema.safeParse(item).success) {
       const schema = SpectrogramMaskSchema.parse(item);
       const spectrogramMask: SpectrogramMask = {
+        selected: false,
+        created_by: item.created_by,
+        task_name: schema.task_name,
         values: schema.values,
       };
       return spectrogramMask;
@@ -86,17 +95,17 @@ export const createAnnotationToDisplayAnnotationFunc = (
 
 export function updateAnnotations<T>(
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void,
   newDisplayAnnotations: DisplayAnnotation[],
-  schema: ZodSchema<T>,
+  schema: ZodSchema<T>
 ): void {
   setAnnotations((prevAnnotations: Annotation[]) => {
     const otherAnnotations: Annotation[] = prevAnnotations.filter(
-      (item: Annotation) => !schema.safeParse(item).success,
+      (item: Annotation) => !schema.safeParse(item).success
     );
     let newAnnotations: Annotation[] = newDisplayAnnotations.map(
-      convertDisplayAnnotationToAnnotation,
+      convertDisplayAnnotationToAnnotation
     );
     newAnnotations = newAnnotations.concat(otherAnnotations);
     return newAnnotations;
