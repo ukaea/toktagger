@@ -23,8 +23,8 @@ import { SearchField } from "@adobe/react-spectrum";
 import "react-contexify/ReactContexify.css";
 
 import { AnnoBridge, type BridgeHandle } from "./bridge";
-import type { ClassRegistry } from "./lib";
 import { W3CImageFormat, buildSourceKey } from "./adapters";
+import { loadClassRegistry, type ClassRegistry } from "./lib";
 
 /**
  * Simple Jump control: user types a frame number, we call onJump(n).
@@ -115,9 +115,14 @@ export function FrameView({
     return (window as any).ufoSelectedClassName ?? null;
   }, []);
 
-  // Track IDs are still disabled in this branch
-  const includeTrackIds = false;
-  const classRegistry: ClassRegistry = useMemo(() => ({}), []);
+  // Tracking mode: enable track IDs for UFO
+  const includeTrackIds = true;
+
+  // Use the persisted class registry (shared with the toolbar via localStorage)
+  const classRegistry: ClassRegistry = useMemo(
+    () => loadClassRegistry(),
+    []
+  );
 
   const frameNumber: number =
     typeof data.frame === "number" ? data.frame : 0;
