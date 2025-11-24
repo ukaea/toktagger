@@ -25,7 +25,6 @@ class MockDisruptionCNN(Model):
         return 60
 
     def predict(self, samples, *args, **kwargs):
-        print("HHHHHIIIIIIII")
         return [
             [
                 TimePoint(
@@ -43,7 +42,6 @@ class MockDisruptionCNN(Model):
         pathlib.Path(file_path).touch()
 
     def load(self, project, file_path):
-        print("HIHIH")
         pass
 
 
