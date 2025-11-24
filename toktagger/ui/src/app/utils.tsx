@@ -70,7 +70,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
         x: timePoint.time,
         category: { name: timePoint.label, color: colors[timePoint.label] },
       };
-      console.log(colors)
+      console.log(colors);
       return vspan;
     } else if (SpectrogramMaskSchema.safeParse(item).success) {
       const schema = SpectrogramMaskSchema.parse(item);

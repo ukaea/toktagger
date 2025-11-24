@@ -36,7 +36,7 @@ import {
 } from "@/types";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
-import { ModelPredictTool } from '@/app/components/tools/modelPredictSample';
+import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
@@ -51,10 +51,12 @@ async function saveAnnotations(
 ) {
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
 
-  const validatedAnnotations: Annotation[] = annotations.map((annotation: Annotation) => ({
-    ...annotation,
-    validated: true,
-  }));
+  const validatedAnnotations: Annotation[] = annotations.map(
+    (annotation: Annotation) => ({
+      ...annotation,
+      validated: true,
+    }),
+  );
 
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
@@ -414,10 +416,14 @@ export default function ToolBar({
   const tools: { name: string; component: React.ReactNode }[] = [];
 
   const modelPredictTool = (
-    <ModelPredictTool project={project} sample_id={sample_id} setAnnotations={setAnnotations}></ModelPredictTool>
-  )
+    <ModelPredictTool
+      project={project}
+      sample_id={sample_id}
+      setAnnotations={setAnnotations}
+    ></ModelPredictTool>
+  );
   tools.push(modelPredictTool);
-  
+
   if (project.task == "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 

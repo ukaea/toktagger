@@ -105,7 +105,7 @@ export const ProjectSchema = z.object({
   query_strategy: z.string(),
   data_loader: z.string(),
   timestamp: z.string(),
-  model_types: z.array(z.string())
+  model_types: z.array(z.string()),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

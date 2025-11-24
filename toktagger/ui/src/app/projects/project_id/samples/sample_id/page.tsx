@@ -23,8 +23,8 @@ import { ELMView } from "@/app/elms/components/elms";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
-import { ModelTrainModal } from '@/app/components/tools/modelTrain';
-import { ModelPredictModal } from '@/app/components/tools/modelPredict';
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -173,7 +173,7 @@ export default function SamplePage() {
 
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
-      console.log(dbAnnotations)
+      console.log(dbAnnotations);
 
       if (project.task == "MHD") {
         params = {

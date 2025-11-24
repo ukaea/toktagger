@@ -104,44 +104,53 @@ export const deleteProject = async (project_id: string) => {
 };
 
 export const startTraining = async (
-  project_id: string, 
-  selected_model: string
+  project_id: string,
+  selected_model: string,
 ): Promise<Response> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train`, {
-      method: 'PUT',
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train`,
+    {
+      method: "PUT",
       headers: {
-      'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
-  });
+    },
+  );
   return response;
 };
 
 export const stopTraining = async (
   project_id: string,
   selected_model: string,
-  version: number
+  version: number,
 ): Promise<Response> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?version=${version}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?version=${version}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
-  return response
+  );
+  return response;
 };
 
 export const startPredictions = async (
   project_id: string,
   selected_model: string,
   version: number,
-  num_predictions: number
+  num_predictions: number,
 ): Promise<Response> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}`, {
-  method: 'POST',
-  headers: {
-  'Content-Type': 'application/json',
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
   return response;
 };
 
@@ -150,12 +159,15 @@ export const startSamplePredictions = async (
   sample_id: string,
   selected_model: string,
 ): Promise<Response> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`, {
-  method: 'POST',
-  headers: {
-  'Content-Type': 'application/json',
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
   return response;
 };
 
@@ -165,19 +177,22 @@ export const getSamplePredictions = async (
   selected_model: string,
   task_id: string,
 ): Promise<Response> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict/${task_id}`, {
-  method: 'GET',
-  headers: {
-  'Content-Type': 'application/json',
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict/${task_id}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
   return response;
 };
 
-export const getModels = async (
-  project_id: string
-): Promise<Model[]> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}/models`);
+export const getModels = async (project_id: string): Promise<Model[]> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models`,
+  );
   const data = await response.json();
   const models = data as Model[];
   return models;

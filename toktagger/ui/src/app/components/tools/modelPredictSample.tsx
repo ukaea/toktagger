@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import {Provider, defaultTheme, ComboBox, Item, Flex, ProgressCircle} from '@adobe/react-spectrum';
 import {
-  Project,
-  Annotations,
-  Annotation,
-} from "@/types";
-import {
-    startSamplePredictions,
-    getSamplePredictions,
-} from "@/app/core"
+  Provider,
+  defaultTheme,
+  ComboBox,
+  Item,
+  Flex,
+  ProgressCircle,
+} from "@adobe/react-spectrum";
+import { Project, Annotations, Annotation } from "@/types";
+import { startSamplePredictions, getSamplePredictions } from "@/app/core";
 
 type ModelPredictInfo = {
   project: Project;
@@ -16,88 +16,109 @@ type ModelPredictInfo = {
   setAnnotations: (annotations: Annotations) => void;
 };
 
-export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPredictInfo ) { // all of this should be typed, waiting on Sam's PR
+export function ModelPredictTool({
+  project,
+  sample_id,
+  setAnnotations,
+}: ModelPredictInfo) {
+  // all of this should be typed, waiting on Sam's PR
 
-    const [selectedModel, setSelectedModel] = useState<string | null>(null);
-    const [taskId, setTaskId] = useState<string | null>(null);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    useEffect(() => {
-        const scheduleTask = async () => {
-            if (selectedModel == null) {
-                return;
-            }
-            const response = await startSamplePredictions(project._id, sample_id, selectedModel)
-            const payload = await response.json();
+  useEffect(() => {
+    const scheduleTask = async () => {
+      if (selectedModel == null) {
+        return;
+      }
+      const response = await startSamplePredictions(
+        project._id,
+        sample_id,
+        selectedModel,
+      );
+      const payload = await response.json();
 
-            if (response.ok) {
-                setIsLoading(true);
-                setTaskId(payload.task_id);
-            } else {
-                setErrorMessage(payload.detail)                
-            };
-        };
-        scheduleTask();
-    }, [selectedModel]);
+      if (response.ok) {
+        setIsLoading(true);
+        setTaskId(payload.task_id);
+      } else {
+        setErrorMessage(payload.detail);
+      }
+    };
+    scheduleTask();
+  }, [selectedModel]);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (taskId == null) {
-                return;
-            }
-            let pollCounter = 0;
-            // Poll for result from GET predictions endpoint
-            const interval = setInterval(async () => {
-                const response = await getSamplePredictions(project._id, sample_id, selectedModel, taskId)
-                const payload = await response.json();
-                
-                if (response.status === 202) { // Predictions queued but not done yet, so continue to poll
-                    pollCounter += 1;
-                    console.log("Poll counter", pollCounter)
-                    if (pollCounter > 20) {
-                        setErrorMessage("Failed to retrieve predictions result.")      
-                        clearInterval(interval)
-                        setIsLoading(false);
-                    }
+  useEffect(() => {
+    const fetchData = async () => {
+      if (taskId == null) {
+        return;
+      }
+      let pollCounter = 0;
+      // Poll for result from GET predictions endpoint
+      const interval = setInterval(async () => {
+        const response = await getSamplePredictions(
+          project._id,
+          sample_id,
+          selectedModel,
+          taskId,
+        );
+        const payload = await response.json();
 
-                } else if (response.ok) {
-                    setAnnotations((previousAnnotations: Annotations) => {
-                        const otherAnnotations = previousAnnotations.filter((annotation: Annotation) => annotation.created_by !== selectedModel);
-                        return otherAnnotations.concat(payload);
-                    });
-                    clearInterval(interval)
-                    setIsLoading(false);
-                } else {
-                    setErrorMessage(payload.detail)      
-                    clearInterval(interval)
-                    setIsLoading(false);
-                };
-            }, 1000);
-        };
-        fetchData();
-    }, [taskId]);
+        if (response.status === 202) {
+          // Predictions queued but not done yet, so continue to poll
+          pollCounter += 1;
+          console.log("Poll counter", pollCounter);
+          if (pollCounter > 20) {
+            setErrorMessage("Failed to retrieve predictions result.");
+            clearInterval(interval);
+            setIsLoading(false);
+          }
+        } else if (response.ok) {
+          setAnnotations((previousAnnotations: Annotations) => {
+            const otherAnnotations = previousAnnotations.filter(
+              (annotation: Annotation) =>
+                annotation.created_by !== selectedModel,
+            );
+            return otherAnnotations.concat(payload);
+          });
+          clearInterval(interval);
+          setIsLoading(false);
+        } else {
+          setErrorMessage(payload.detail);
+          clearInterval(interval);
+          setIsLoading(false);
+        }
+      }, 1000);
+    };
+    fetchData();
+  }, [taskId]);
 
-
-    return (
-        <Provider theme={defaultTheme}>
-            <div className='m-4'>
-            <Flex direction="column">
-                <ComboBox 
-                    label="Select Model Type"
-                    validationState={errorMessage ? 'invalid' : ''}
-                    errorMessage={errorMessage}
-                    onSelectionChange={setSelectedModel}>
-                    {project.model_types.map((model_type) => (  // doesnt know the type of this, should be defined what getProject returns, imagine this is the case in more recent branch? Needs updating with model_type regardless
-                        <Item key={model_type}>{model_type}</Item>
-                    ))}
-                </ComboBox>
-                <br/>
-                {isLoading ? (
-                    <ProgressCircle aria-label="Loading…" isIndeterminate />
-                ) : null}
-            </Flex>
-            </div>
-        </Provider>
-    );
+  return (
+    <Provider theme={defaultTheme}>
+      <div className="m-4">
+        <Flex direction="column">
+          <ComboBox
+            label="Select Model Type"
+            validationState={errorMessage ? "invalid" : ""}
+            errorMessage={errorMessage}
+            onSelectionChange={setSelectedModel}
+          >
+            {project.model_types.map(
+              (
+                model_type, // doesnt know the type of this, should be defined what getProject returns, imagine this is the case in more recent branch? Needs updating with model_type regardless
+              ) => (
+                <Item key={model_type}>{model_type}</Item>
+              ),
+            )}
+          </ComboBox>
+          <br />
+          {isLoading ? (
+            <ProgressCircle aria-label="Loading…" isIndeterminate />
+          ) : null}
+        </Flex>
+      </div>
+    </Provider>
+  );
 }

@@ -19,8 +19,8 @@ import {
 import { SortDescriptor } from "@react-types/shared";
 import { getSamples, getProject } from "@/app/core";
 import type { Project, Sample } from "@/types";
-import { ModelTrainModal } from '@/app/components/tools/modelTrain';
-import { ModelPredictModal } from '@/app/components/tools/modelPredict';
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
