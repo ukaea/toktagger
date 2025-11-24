@@ -1141,7 +1141,7 @@ export default function ToolBar({
                     isQuiet
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                     onPress={() => {
-                      // Phase 6.1: UI only – wiring to FrameView/AnnoBridge comes later
+                      // Still UI-only for now: Clear ALL wiring comes later
                     }}
                   >
                     Clear ALL
@@ -1151,7 +1151,9 @@ export default function ToolBar({
                     isQuiet
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                     onPress={() => {
-                      // Phase 6.1: UI only – wiring to FrameView/AnnoBridge comes later
+                      if (typeof window !== "undefined") {
+                        (window as any).ufoClearCurrent?.();
+                      }
                     }}
                   >
                     Clear Current

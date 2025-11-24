@@ -81,6 +81,7 @@ export function FrameSearch({
  *   - window.ufoHasUnsavedChanges()
  *   - window.ufoMarkSaved()
  *   - window.ufoCollectForSave()
+ *   - window.ufoClearCurrent()
  */
 export function FrameView({
   data,
@@ -276,6 +277,24 @@ export function FrameView({
       delete (window as any).ufoCollectForSave;
     };
   }, [frameKey]);
+
+  // --- Expose Clear Current on window for toolbar integration ---
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    (window as any).ufoClearCurrent = async () => {
+      const bridge = bridgeRef.current;
+      if (!bridge) return;
+
+      // Clear overlay and wipe this frame's stored annotations
+      await bridge.clearOverlaySilently();
+      await adapter.write([]);
+    };
+
+    return () => {
+      delete (window as any).ufoClearCurrent;
+    };
+  }, [adapter]);
 
   // --- Navigation handlers: save → then call upstream handler ---
   const handlePrev = useCallback(async () => {
