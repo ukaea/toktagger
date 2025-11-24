@@ -14,7 +14,6 @@ from services.api.worker import train_model, get_predictions
 
 import logging
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 
 
@@ -173,8 +172,13 @@ async def start_model_training(
     samples = await utils.get_samples(db_client, project.id, validated=True)
 
     # Get all validated samples and annotations for this project
-    logger.debug(f"Collected {len(annotations)} annotations.")
-    logger.debug(f"Collected {len(samples)} samples.")
+    logger.info(f"Collected {len(annotations)} annotations.")
+    logger.info(f"Collected {len(samples)} samples.")
+    
+    if len(samples) == 0:
+        raise HTTPException(status_code=404, detail="No validated samples found to train a model on!")
+    if len(annotations) == 0:
+        raise HTTPException(status_code=404, detail="No validated annotations found to train a model on!")
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
     annotations_2d = [

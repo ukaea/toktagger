@@ -13,7 +13,7 @@ from services.api.core.sender import (
 )
 import logging
 logger = logging.getLogger("ray")
-
+logger.setLevel("DEBUG")
 
 def get_actor(project, model):
     try:
@@ -56,6 +56,7 @@ def train_model(
     num_epochs: int = 100,
     batch_size: int = 32,
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
+    print("in train model")
     model_actor = get_actor(project=project, model=model)
     try:
         logger.info(f"Running model training for project {project.id}")
