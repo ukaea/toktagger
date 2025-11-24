@@ -1,12 +1,13 @@
-import services.api.core.data_loaders as data_loaders
+import toktagger.api.core.data_loaders as data_loaders
 import pytest
-from services.api.schemas.samples import (
+from toktagger.api.schemas.samples import (
     Sample,
     ImageFileData,
     TimeSeriesFileData,
     ShotData,
 )
-from services.api.schemas.data import (
+from toktagger.api.schemas.data import (
+    TimeSeriesData,
     MultiVariateTimeSeriesData,
     ImageData,
 )
@@ -140,3 +141,58 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
 
     # Check both columns requested are present, but filled with Nones
     assert data.values["doesnt_exist"] is None
+
+
+@pytest.mark.asyncio
+async def test_custom_data_loader(api_client):
+    # Check that you cannot create a project with 'test' data loader
+    in_project = {
+        "name": "test_project",
+        "task": "UFO",
+        "query_strategy": "random",
+        "data_loader": "test",  # <--- invalid
+    }
+    response = await api_client.post("/projects", json=in_project)
+    assert response.status_code == 422
+    assert "Invalid data loader 'test'" in response.json()["detail"][0]["msg"]
+
+    # Create a custom data loader
+    @data_loaders.LoaderRegistry.register("test")
+    class CustomLoader(data_loaders.DataLoader):
+        def get_sample(self, sample):
+            # Return some data, use something from sample to check it is passed in correctly
+            return MultiVariateTimeSeriesData(
+                values={
+                    "test_vals": TimeSeriesData(
+                        time=[0, 1], values=[sample.shot_id, sample.shot_id + 1]
+                    )
+                }
+            )
+
+    # Try again to create project with test dataloader, should be valid now
+    response = await api_client.post("/projects", json=in_project)
+    assert response.status_code == 200
+    _project_id = response.json()["_id"]
+
+    # Now create a sample, contents dont matter
+    shot_id = 10
+    in_sample = [
+        {
+            "shot_id": shot_id,
+            "data": {
+                "protocol": "uda",
+                "signal_names": ["Ip", "dalpha"],
+            },
+        },
+    ]
+    response = await api_client.post(f"/projects/{_project_id}/samples", json=in_sample)
+    assert response.status_code == 200
+    _sample_id = response.json()[0]
+
+    # And get data from that sample, should use new data loader
+    response = await api_client.post(
+        f"/projects/{_project_id}/samples/{_sample_id}/data"
+    )
+    assert response.status_code == 200
+    assert response.json()["values"]["test_vals"]["time"] == [0, 1]
+    assert response.json()["values"]["test_vals"]["values"] == [shot_id, shot_id + 1]
