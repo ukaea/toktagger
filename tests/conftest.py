@@ -28,7 +28,9 @@ def mongo_container():
 @pytest.fixture(scope="session", autouse=True)
 def ray_session():
     os.environ["MODEL_STORAGE"] = "Test"
-    ray.init(ignore_reinit_error=True, local_mode=True)
+    ray.init(
+        ignore_reinit_error=True, local_mode=True, runtime_env={"working_dir": None}
+    )
     yield
     ray.shutdown()
 
