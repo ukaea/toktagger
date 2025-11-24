@@ -1114,6 +1114,56 @@ export default function ToolBar({
         {/* UFO profiles / classes / instance counts on the left toolbar */}
         {isUfo && (
           <div className="pl-4 pr-4 pb-4">
+            {/* Shape + clear controls (old frameControls-style block) */}
+            <div className="max-w-[16rem] mx-auto mb-4">
+              {/* Annotation shape tools (smaller sizing) */}
+              <div className="mb-2">
+                <Flex gap="size-100" alignItems="center" wrap>
+                  <Button
+                    isQuiet
+                    isDisabled
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                  >
+                    Rectangle
+                  </Button>
+                  {/* Future: Polygon / Lasso etc. */}
+                </Flex>
+              </div>
+
+              {/* Divider between shape tools and destructive actions */}
+              <hr className="m-4 h-px opacity-30 border-gray-200" />
+
+              {/* Destructive actions: Clear ALL / Clear Current */}
+              <div className="mb-1">
+                <Flex gap="size-100" alignItems="center" wrap>
+                  <Button
+                    variant="negative"
+                    isQuiet
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                    onPress={() => {
+                      // Phase 6.1: UI only – wiring to FrameView/AnnoBridge comes later
+                    }}
+                  >
+                    Clear ALL
+                  </Button>
+
+                  <Button
+                    isQuiet
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                    onPress={() => {
+                      // Phase 6.1: UI only – wiring to FrameView/AnnoBridge comes later
+                    }}
+                  >
+                    Clear Current
+                  </Button>
+                </Flex>
+              </div>
+
+              {/* Divider before class / instance controls */}
+              <hr className="m-4 h-px opacity-30 border-gray-200" />
+            </div>
+
+            {/* Class / instance panels (unchanged) */}
             <ClassPanel
               profiles={profiles}
               setProfiles={(next) => {
