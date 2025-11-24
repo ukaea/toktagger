@@ -23,6 +23,24 @@ function getStorage(): Storage | null {
   }
 }
 
+// ---------- Fixed label map (Phase 7.1) ----------
+
+export const LABEL_MAP = {
+  version: "v1.0",
+  categories: [
+    { id: 1, name: "UFO" },
+    { id: 2, name: "Minor UFO" },
+    { id: 3, name: "Major UFO" },
+    { id: 4, name: "Disruption" },
+    { id: 5, name: "Marfe" },
+    { id: 6, name: "Other Anomaly" }
+  ]
+} as const;
+
+export const FIXED_CLASS_REG: Record<string, number> = Object.fromEntries(
+  LABEL_MAP.categories.map((c) => [c.name.toLowerCase(), c.id])
+);
+
 // ---------- Types ----------
 
 export type ProfileId = string;
