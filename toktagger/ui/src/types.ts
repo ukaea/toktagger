@@ -53,6 +53,13 @@ export const SpectrogramDataSchema = z.object({
 });
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 
+export const PolygonAnnotationSchema = BaseAnnotationSchema.extend({
+  segmentation: z.array(z.array(z.number())),
+  area: z.number(),
+  bbox: z.array(z.number()), // [x, y, width, height]
+});
+export type PolygonAnnotation = z.infer<typeof PolygonAnnotationSchema>;
+
 export const DataSchema = z.union([
   TimeSeriesDataSchema,
   MultiVariateTimeSeriesDataSchema,
@@ -92,10 +99,17 @@ export const SpectrogramMaskSchema = z.object({
 });
 export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
 
+export const PolygonSchema = z.object({
+  x: z.array(z.number()),
+  y: z.array(z.number()),
+});
+export type Polygon = z.infer<typeof PolygonSchema>;
+
 export const DisplayAnnotationSchema = z.union([
   ZoneSchema,
   VSpanSchema,
   SpectrogramMaskSchema,
+  PolygonAnnotationSchema,
 ]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 

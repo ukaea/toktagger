@@ -15,6 +15,8 @@ import {
   SpectrogramMaskSchema,
   SpectrogramMask,
   PlotProps,
+  Polygon,
+  PolygonSchema,
 } from "@/types";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
@@ -85,11 +87,33 @@ export const SpectrogramView = ({
   const vspans: VSpan[] = displayAnnotations
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
-  const mask: SpectrogramMask = displayAnnotations
-    .filter(
-      (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success
-    )
-    .map((x: DisplayAnnotation) => SpectrogramMaskSchema.parse(x))[0];
+
+  // const mask: SpectrogramMask = displayAnnotations
+  //   .filter(
+  //     (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success
+  //   )
+  //   .map((x: DisplayAnnotation) => SpectrogramMaskSchema.parse(x))[0];
+
+  const polygons: Polygon[] = displayAnnotations
+    .filter((x: DisplayAnnotation) => PolygonSchema.safeParse(x).success)
+    .map((x: DisplayAnnotation) => PolygonSchema.parse(x));
+
+  const paths = polygons.map((polygon) => {
+    let path = `M ${polygon.x[0]},${polygon.y[0]}`;
+    for (let i = 1; i < polygon.x.length; i++) {
+      path += ` L ${polygon.x[i]},${polygon.y[i]}`;
+    }
+    return path;
+  });
+
+  const shapes = paths.map((path) => ({
+    type: "path",
+    path: path,
+    xref: "x",
+    yref: "y2",
+    line: { color: "rgba(255, 0, 0, 0.9)", width: 2 },
+    fillcolor: "rgba(255, 0, 0, 0.1)",
+  }));
 
   const updateZones = (newZones: Array<Zone>) => {
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
@@ -105,15 +129,15 @@ export const SpectrogramView = ({
   const amplitude_og = data.amplitude;
   let amplitude: Array<Array<number>> = [];
   if (plotProps.thresholdActive) {
-    amplitude = data.amplitude.map((row: Array<number>, rowIndex: number) =>
-      row.map((value: number, colIndex: number) => {
-        let maskValue = mask?.values[rowIndex]?.[colIndex];
-        if (maskValue === undefined || maskValue === null) {
-          maskValue = 1; // Default to 1 if mask value is undefined
-        }
-        return value * maskValue;
-      })
-    );
+    // amplitude = data.amplitude.map((row: Array<number>, rowIndex: number) =>
+    //   row.map((value: number, colIndex: number) => {
+    //     let maskValue = mask?.values[rowIndex]?.[colIndex];
+    //     if (maskValue === undefined || maskValue === null) {
+    //       maskValue = 1; // Default to 1 if mask value is undefined
+    //     }
+    //     return value * maskValue;
+    //   })
+    // );
   } else {
     amplitude = data.amplitude;
   }
@@ -125,10 +149,6 @@ export const SpectrogramView = ({
   );
   const logAmpMin = Math.min(...logAmplitude_og.flat());
   const logAmpMax = Math.max(...logAmplitude_og.flat());
-
-  const logAmplitude = amplitude.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
-  );
 
   const generateLogTicks = (min: number, max: number) => {
     const minPower = Math.floor(Math.log10(min));
@@ -180,34 +200,43 @@ export const SpectrogramView = ({
 
   const { tickvals, ticktext } = generateLogTicks(ampMin, ampMax);
 
-  const plotData: Partial<Plotly.PlotData>[] = [
-    {
-      name: "Saddle Coil FFT",
-      type: "heatmap",
-      x: data.time,
-      y: data.frequency,
-      z: logAmplitude_og,
-      customdata: data.amplitude,
-      hovertemplate:
-        "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
-      // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
-      coloraxis: "coloraxis",
-      opacity: plotProps.thresholdActive ? 0.4 : 1,
-    },
-  ];
+  const fftData: Partial<Plotly.PlotData> = {
+    type: "heatmap",
+    x: data.time,
+    y: data.frequency,
+    z: logAmplitude_og,
+    customdata: data.amplitude,
+    hovertemplate:
+      "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
+    // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
+    coloraxis: "coloraxis",
+    opacity: plotProps.thresholdActive ? 0.4 : 1,
+    yaxis: "y2",
+  };
 
-  if (plotProps.thresholdActive) {
-    plotData.push({
-      name: "Threshold Mask",
-      type: "heatmap",
-      x: data.time,
-      y: data.frequency,
-      z: logAmplitude,
-      hoverinfo: "skip",
-      coloraxis: "coloraxis",
-      showscale: false,
-    });
+  function sumOverFirstAxis(arr: number[][]): number[] {
+    if (arr.length === 0) return [];
+
+    const numCols = arr[0].length;
+    const sums = new Array(numCols).fill(0);
+
+    for (let row of arr) {
+      for (let j = 0; j < numCols; j++) {
+        sums[j] += row[j];
+      }
+    }
+
+    return sums;
   }
+  const timeIntegratedData = sumOverFirstAxis(amplitude_og);
+
+  const timeIntegratedPlot: Partial<Plotly.PlotData> = {
+    mode: "lines",
+    x: data.time,
+    y: timeIntegratedData,
+  };
+
+  const plotData: Partial<Plotly.PlotData>[] = [timeIntegratedPlot, fftData];
 
   const interpFunc = (value: number) => {
     if (plotProps.colorMap === "Viridis") {
@@ -229,23 +258,41 @@ export const SpectrogramView = ({
   };
 
   let plotLayout: Partial<Plotly.Layout> = {
+    shapes: shapes,
     height: 600,
     xaxis: {
       title: {
-        text: "Time [s]",
+        text: "",
       },
+      domain: [0, 1],
       linewidth: 1,
       zerolinewidth: 1,
       showgrid: false,
     },
+
+    yaxis2: {
+      title: {
+        text: "Frequency [kHz]",
+      },
+      linewidth: 1,
+      zerolinewidth: 1,
+      showgrid: false,
+      domain: [0.2, 1],
+      fixedrange: true,
+      anchor: "x",
+    },
+
     yaxis: {
       title: {
-        text: "Frequency [Hz]",
+        text: "Integrated<br>Amplitude",
       },
+      domain: [0, 0.2],
       linewidth: 1,
       zerolinewidth: 1,
       showgrid: false,
+      anchor: "x",
     },
+
     // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
     coloraxis: {
       cmin: logAmpMin,
@@ -304,6 +351,12 @@ export const SpectrogramView = ({
       layout.yaxis!.tickcolor = "rgb(255, 255, 255)";
       layout.yaxis!.tickfont = { color: "rgb(255, 255, 255)" };
 
+      layout.yaxis2!.title!.font = { color: "rgb(255, 255, 255)" };
+      layout.yaxis2!.linecolor = "rgb(255, 255, 255)";
+      layout.yaxis2!.zerolinecolor = "rgb(255, 255, 255)";
+      layout.yaxis2!.tickcolor = "rgb(255, 255, 255)";
+      layout.yaxis2!.tickfont = { color: "rgb(255, 255, 255)" };
+
       if (layout.coloraxis && layout.coloraxis.colorbar) {
         layout.coloraxis!.colorbar!.tickcolor = "rgb(255, 255, 255)";
         layout.coloraxis!.colorbar!.tickfont = { color: "rgb(255, 255, 255)" };
@@ -332,7 +385,7 @@ export const SpectrogramView = ({
             onModifyZone={updateZones}
           >
             <TimeSeries
-              plotId="LockedMode"
+              plotId="Specgrogram"
               plotConfig={{
                 data: plotData,
                 config: plotConfig,
@@ -342,7 +395,6 @@ export const SpectrogramView = ({
               <Zones onZoneUpdate={updateZones} />
               <VSpans onZoneUpdate={updateVSpans} />
             </TimeSeries>
-            <SpectrogramViewTable />
           </ZoneProvider>
         </VSpanProvider>
       </ContextMenuProvider>

@@ -12,6 +12,8 @@ import {
   TimeRegion,
   SpectrogramMaskSchema,
   SpectrogramMask,
+  PolygonAnnotationSchema,
+  Polygon,
 } from "@/types";
 
 export const linspace = (start: number, end: number, num: number) => {
@@ -54,6 +56,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
   colors: Record<string, string>
 ) => {
   const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
+    console.log(item);
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
@@ -72,11 +75,18 @@ export const createAnnotationToDisplayAnnotationFunc = (
       };
       return vspan;
     } else if (SpectrogramMaskSchema.safeParse(item).success) {
-      const schema = SpectrogramMaskSchema.parse(item);
+      const mask = SpectrogramMaskSchema.parse(item);
       const spectrogramMask: SpectrogramMask = {
-        values: schema.values,
+        values: mask.values,
       };
       return spectrogramMask;
+    } else if (PolygonAnnotationSchema.safeParse(item).success) {
+      const polygonData = PolygonAnnotationSchema.parse(item);
+      const polygon: Polygon = {
+        x: polygonData.segmentation[0].filter((_, index) => index % 2 === 0),
+        y: polygonData.segmentation[0].filter((_, index) => index % 2 === 1),
+      };
+      return polygon;
     } else {
       throw new Error("Unsupported annotation type");
     }

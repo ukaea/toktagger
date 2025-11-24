@@ -1,11 +1,12 @@
 import numpy as np
 import ruptures as rpt
 import hmmlearn.hmm as hmm
+from typing import List, Dict, Union
 from abc import ABC, abstractmethod
-from scipy.signal import find_peaks, peak_widths
-from scipy.ndimage import uniform_filter1d, gaussian_filter
+from scipy.signal import find_peaks, peak_widths, stft
+from scipy.ndimage import uniform_filter1d, gaussian_filter, uniform_filter
 from scipy.interpolate import interp1d
-
+from skimage import measure, morphology, filters
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
@@ -16,10 +17,13 @@ from toktagger.api.schemas.annotators import (
     JumpDetectionParams,
     OutlierDetectionParams,
 )
-from scipy.signal import stft
+from shapely.geometry import Polygon, MultiPolygon
 
 from toktagger.api.schemas.data import TimeSeriesData
 from toktagger.api.schemas.annotations import SpectrogramMask, TimeRegion
+from toktagger.api.schemas.annotations import (
+    PolygonAnnotation,
+)
 from toktagger.api.schemas.annotators import (
     SpectrogramThresholdParams,
     AnnotatorParamTypes,
@@ -141,6 +145,84 @@ def downsample_time_series(
     return time_coarse, signal
 
 
+def _coords_to_flat_list(coords) -> List[float]:
+    """
+    Convert an iterable of (x,y) coordinates to COCO flattened list [x1,y1,x2,y2,...].
+    Drops the closing coordinate if it's equal to the first (Shapely exterior rings often close).
+    """
+    coords = list(coords)
+    if len(coords) == 0:
+        return []
+    # If last is same as first, drop it
+    if len(coords) > 1 and coords[0] == coords[-1]:
+        coords = coords[:-1]
+    flat = []
+    for x, y in coords:
+        # keep floats (COCO accepts floats)
+        flat.append(float(x))
+        flat.append(float(y))
+    return flat
+
+
+def shapely_to_coco_style_annotation(
+    geom: Union[Polygon, MultiPolygon],
+) -> Dict:
+    """
+    Convert a Shapely Polygon or MultiPolygon to a COCO annotation dict (polygon segmentation).
+    Returns a dict with keys: segmentation, area, bbox, iscrowd, image_id, category_id, id.
+    """
+    segs = []
+    if geom.is_empty:
+        raise ValueError("Geometry is empty")
+
+    def handle_polygon(poly: Polygon):
+        # exterior
+        exterior_coords = _coords_to_flat_list(poly.exterior.coords)
+        if exterior_coords:
+            segs.append(exterior_coords)
+        # interiors (holes) - add as separate polygons (common practice)
+        for interior in poly.interiors:
+            interior_coords = _coords_to_flat_list(interior.coords)
+            if interior_coords:
+                segs.append(interior_coords)
+
+    if isinstance(geom, Polygon):
+        handle_polygon(geom)
+    elif isinstance(geom, MultiPolygon):
+        for p in geom.geoms:
+            handle_polygon(p)
+    else:
+        raise TypeError("geom must be shapely.geometry.Polygon or MultiPolygon")
+
+    minx, miny, maxx, maxy = geom.bounds
+    width = float(maxx - minx)
+    height = float(maxy - miny)
+    bbox = [float(minx), float(miny), width, height]
+    area = float(geom.area)
+
+    annotation = {
+        "segmentation": segs,
+        "area": area,
+        "bbox": bbox,
+    }
+    return annotation
+
+
+def smooth_binary_mask(mask: np.ndarray, radius: int = 3) -> np.ndarray:
+    """
+    Smooth a binary mask (0/1) using morphological open+close.
+    """
+    # Ensure boolean mask
+    mask = mask.astype(bool)
+
+    selem = morphology.disk(radius)
+
+    opened = morphology.opening(mask, selem)  # remove small noise
+    closed = morphology.closing(opened, selem)  # fill small holes
+
+    return closed.astype(np.uint8)
+
+
 def compute_stft(data: TimeSeriesData) -> np.ndarray:
     time = np.array(data.time)
     values = np.array(data.values)
@@ -153,6 +235,8 @@ def compute_stft(data: TimeSeriesData) -> np.ndarray:
         nperseg=256,
         noverlap=128,
     )
+    freq /= 1000
+    ts += time[0]
 
     return freq, ts, np.abs(Zxx)
 
@@ -553,15 +637,49 @@ class SpectrogramThresholdAnnotator:
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> SpectrogramMask:
-        _, _, values = compute_stft(data.values[self.params.signal_name])
+        mirnov = data.values[self.params.signal_name]
+        frequency, time, amp = compute_stft(mirnov)
+        amp = np.nan_to_num(amp, 1e-6).clip(1e-6)
+        # amp = np.log10(amp)
 
-        threshold_value = np.percentile(values, self.params.percentile)
-        threshold_mask = values > threshold_value
-        return SpectrogramMask(
-            label="SpectrogramMask",
-            values=threshold_mask.tolist(),
-            created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD,
-        )
+        if self.params.line_filter_width > 0:
+            amp = amp - uniform_filter(amp, size=(self.params.line_filter_width, 1))
+        amp = gaussian_filter(amp, sigma=self.params.sigma)
+        amp = filters.meijering(amp, sigmas=(self.params.ridge_filter_size,))
+
+        mask = np.where(amp > np.percentile(amp, self.params.percentile), 1, 0)
+        mask[frequency < self.params.freq_min] = 0
+        mask[frequency > self.params.freq_max] = 0
+
+        labeled_regions = measure.label(mask, connectivity=2)
+
+        if self.params.min_size > 0:
+            labeled_regions = morphology.remove_small_objects(
+                labeled_regions, min_size=self.params.min_size
+            )
+
+        # Convert each labeled region to polygons
+        polygons = []
+        for region_label in range(1, labeled_regions.max() + 1):
+            # Create a binary mask for the current label
+            region_mask = labeled_regions == region_label
+
+            # Find contours at the 0.5 level
+            contours = measure.find_contours(region_mask, 0.5)
+
+            for contour in contours:
+                # Contour coordinates are (row, col), convert to (x, y)
+                contour_coords = [
+                    (int(np.round(c[1])), int(np.round(c[0]))) for c in contour
+                ]
+                contour_coords = [(time[x], frequency[y]) for x, y in contour_coords]
+                poly = Polygon(contour_coords)
+                # if poly.is_valid and poly.area > 0:
+                polygons.append(poly)
+
+        polygons = [shapely_to_coco_style_annotation(polygon) for polygon in polygons]
+        annotations = [PolygonAnnotation(**poly, label="modes") for poly in polygons]
+        return annotations
 
 
 ANNOTATORS = {

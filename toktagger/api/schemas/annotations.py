@@ -24,10 +24,6 @@ class AnnotationIn(ConfiguredModel):
         return values
 
 
-class Annotation(AnnotationIn):
-    id: str = Field(..., alias="_id")
-
-
 class ClassLabel(AnnotationIn):
     type: Literal["class_label"] = "class_label"
 
@@ -55,7 +51,17 @@ class VideoBoundingBox(BoundingBox):
     frame: int
 
 
-class AnnotationOut(BaseModel):
+class SpectrogramMask(AnnotationIn):
+    values: list[list[float]]
+
+
+class PolygonAnnotation(AnnotationIn):
+    segmentation: list[list[float]]
+    area: float
+    bbox: list[float]  # [x, y, width, height]
+
+
+class Annotation(BaseModel):
     id: str = Field(..., alias="_id")
     created_by: AnnotatorTypes
     project_id: str
@@ -78,17 +84,33 @@ class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
     pass
 
 
+class SpectrogramMaskOut(SpectrogramMask, Annotation):
+    pass
+
+
+class PolygonAnnotationOut(PolygonAnnotation, Annotation):
+    pass
+
+
 class ModelAnnotation(AnnotationIn):
     uncertainty: float
 
 
-class SpectrogramMask(AnnotationIn):
-    values: list[list[float]]
-
-
-AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
+AnnotationTypes = Union[
+    TimePoint,
+    TimeRegion,
+    BoundingBox,
+    VideoBoundingBox,
+    SpectrogramMask,
+    PolygonAnnotation,
+]
 AnnotationOutTypes = Union[
-    TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
+    TimePointOut,
+    TimeRegionOut,
+    BoundingBoxOut,
+    VideoBoundingBoxOut,
+    SpectrogramMaskOut,
+    PolygonAnnotationOut,
 ]
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)

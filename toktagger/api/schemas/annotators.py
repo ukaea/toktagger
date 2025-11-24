@@ -55,6 +55,12 @@ class JumpDetectionParams(AnnotatorParams):
 class SpectrogramThresholdParams(AnnotatorParams):
     signal_name: str
     percentile: float
+    freq_max: float = 50
+    freq_min: float = 3
+    sigma: float = 0.1
+    min_size: int = 150
+    line_filter_width: int = 3
+    ridge_filter_size: float = 0.01
 
 
 AnnotatorParamTypes = Union[

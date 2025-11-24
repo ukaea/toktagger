@@ -35,6 +35,7 @@ dependencies = [
   "filelock>=3.19.1",
   "ruptures>=1.1.10",
   "hmmlearn>=0.3.3",
+  "shapely>=2.0.7",
 ]
 
 [tool.setuptools.packages.find]

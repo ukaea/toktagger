@@ -40,9 +40,7 @@ class SpectrogramView:
         values = np.array(data.values)
 
         # Compute the Short-Time Fourier Transform (STFT)
-        freq, ts, values = compute_stft(data)
-        freq /= 1000
-        time = ts + time[0]
+        freq, time, values = compute_stft(data)
 
         # Clip to time/frequency range
         time_min = (

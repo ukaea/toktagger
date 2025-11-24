@@ -17,7 +17,7 @@ import {
   Switch,
   NumberField,
   ActionButton,
-  Button,
+  Slider,
 } from "@adobe/react-spectrum";
 import {
   Annotation,
@@ -82,59 +82,6 @@ type SaveInfo = {
   sample_id: string;
   annotations: Annotation[];
 };
-
-function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const navigate = useNavigate();
-
-  const handleClick = async () => {
-    try {
-      await saveAnnotations(project_id, sample_id, annotations);
-      const sample = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-      navigate(NEXT_SAMPLE_URL);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-    }
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Next
-    </Button>
-  );
-}
-
-function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const handleClick = async () => {
-    try {
-      const response = await saveAnnotations(
-        project_id,
-        sample_id,
-        annotations
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to save annotations: ${response.statusText}`);
-      }
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
-        timeout: 5000,
-      });
-    } catch (err) {
-      if (err instanceof Error) {
-        ToastQueue.negative(`${err.message}`, {
-          timeout: 5000,
-        });
-      }
-    }
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Save
-    </Button>
-  );
-}
-
 export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -261,6 +208,91 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
   );
 }
 
+type RangeStepperInfo = {
+  label: string;
+  value: number;
+  minValue?: number;
+  maxValue?: number;
+  stepSize?: { small: number; large: number };
+  setValue?: (value: number) => void;
+};
+
+function RangeStepper({
+  label,
+  value,
+  minValue,
+  maxValue,
+  stepSize = { small: 1, large: 5 },
+  setValue,
+}: RangeStepperInfo) {
+  const [internalValue, setInternalValue] = useState(value);
+
+  useEffect(() => {
+    setInternalValue(internalValue);
+    setValue?.(internalValue);
+  }, [internalValue, setValue]);
+
+  const incrementValue = (increment: number) => {
+    setInternalValue((prevValue: number) => {
+      const newValue = prevValue + increment;
+      if (newValue < (minValue || 0)) return minValue || 0;
+      if (newValue > (maxValue || 99)) return maxValue || 99;
+      return newValue;
+    });
+  };
+
+  return (
+    <Flex
+      direction="column"
+      gap="size-100"
+      margin={"size-200"}
+      alignItems={"center"}
+    >
+      <Flex direction="row" width={"100%"}>
+        <NumberField
+          label={label}
+          value={internalValue}
+          onChange={setInternalValue}
+          minValue={minValue || 0}
+          maxValue={maxValue || 99}
+          hideStepper={true}
+          width={"100%"}
+        />
+      </Flex>
+      <Flex direction="row" gap="size-100">
+        <ActionButton
+          onPress={() => {
+            incrementValue(stepSize.large * -1);
+          }}
+        >
+          -5
+        </ActionButton>
+        <ActionButton
+          onPress={() => {
+            incrementValue(stepSize.small * -1);
+          }}
+        >
+          -1
+        </ActionButton>
+        <ActionButton
+          onPress={() => {
+            incrementValue(stepSize.small);
+          }}
+        >
+          +1
+        </ActionButton>
+        <ActionButton
+          onPress={() => {
+            incrementValue(stepSize.large);
+          }}
+        >
+          +5
+        </ActionButton>
+      </Flex>
+    </Flex>
+  );
+}
+
 type SpectrogramThresholdToolInfo = {
   project_id: string;
   sample_id: string;
@@ -279,20 +311,16 @@ function SpectrogramThresholdTool({
   setAnnotations,
 }: SpectrogramThresholdToolInfo) {
   const [active, setActive] = useState(false);
-  const [value, setValue] = useState(95);
+  const [thresholdPercentile, setThresholdPercentile] = useState(95);
+  const [smoothingSigma, setSmoothingSigma] = useState(0.1);
+  const [minAnnotationSize, setMinAnnotationSize] = useState(0);
+  const [lineFilterWidth, setLineFilterWidth] = useState(0);
+  const [minFrequency, setMinFrequency] = useState(5);
+  const [filterSize, setFilterSize] = useState(0.1);
 
   const onThresholdChange = (value: boolean) => {
     setActive(value);
     setPlotProps({ ...plotProps, thresholdActive: value });
-  };
-
-  const incrementValue = (increment: number) => {
-    setValue((prevValue) => {
-      const newValue = prevValue + increment;
-      if (newValue < 0) return 0;
-      if (newValue > 99) return 99;
-      return newValue;
-    });
   };
 
   useEffect(() => {
@@ -311,69 +339,88 @@ function SpectrogramThresholdTool({
           },
           body: JSON.stringify({
             signal_name: signal_name,
-            percentile: value,
+            percentile: thresholdPercentile,
+            freq_min: minFrequency,
+            sigma: smoothingSigma,
+            min_size: minAnnotationSize,
+            line_filter_width: lineFilterWidth,
+            ridge_filter_size: filterSize,
           }),
         }
       );
 
       const payload = await response.json();
-      setAnnotations([payload]);
+      setAnnotations(payload);
     };
 
     fetchData();
-  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
+  }, [
+    project_id,
+    sample_id,
+    active,
+    signal_name,
+    thresholdPercentile,
+    minFrequency,
+    smoothingSigma,
+    minAnnotationSize,
+    lineFilterWidth,
+    filterSize,
+    setAnnotations,
+  ]);
 
   return (
     <>
       <Switch isSelected={active} onChange={onThresholdChange}>
-        Thresholding
+        Segmentation View
       </Switch>
       {active && (
-        <Flex
-          direction="column"
-          gap="size-100"
-          margin={"size-200"}
-          alignItems={"center"}
-        >
-          <NumberField
-            label="Percentile"
-            value={value}
-            onChange={setValue}
-            minValue={0}
-            maxValue={99}
-            hideStepper={true}
+        <>
+          <RangeStepper
+            label={"Threshold"}
+            value={thresholdPercentile}
+            setValue={setThresholdPercentile}
           />
-          <Flex direction="row" gap="size-100">
-            <ActionButton
-              onPress={() => {
-                incrementValue(-5);
-              }}
-            >
-              -5
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(-1);
-              }}
-            >
-              -1
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(1);
-              }}
-            >
-              +1
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(5);
-              }}
-            >
-              +5
-            </ActionButton>
-          </Flex>
-        </Flex>
+          <RangeStepper
+            label={"Min Frequency (kHz)"}
+            value={minFrequency || 5}
+            minValue={0}
+            stepSize={{ small: 1, large: 5 }}
+            setValue={setMinFrequency}
+          />
+          <Slider
+            label="Min Annotation Size"
+            minValue={0}
+            maxValue={500}
+            step={1}
+            defaultValue={minAnnotationSize}
+            onChangeEnd={setMinAnnotationSize}
+          />
+          <Slider
+            label="Vertical Filter Width"
+            minValue={0}
+            maxValue={50}
+            step={1}
+            defaultValue={lineFilterWidth}
+            onChangeEnd={setLineFilterWidth}
+          />
+          <Slider
+            label="Smoothing"
+            minValue={0.0}
+            maxValue={10.0}
+            step={0.001}
+            formatOptions={{ style: "decimal", maximumFractionDigits: 3 }}
+            defaultValue={smoothingSigma}
+            onChangeEnd={setSmoothingSigma}
+          />
+          <Slider
+            label="Ridge Filter Size"
+            minValue={0.001}
+            maxValue={1}
+            step={0.001}
+            defaultValue={filterSize}
+            onChangeEnd={setFilterSize}
+          />
+        </>
       )}
     </>
   );
