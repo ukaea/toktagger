@@ -79,7 +79,7 @@ def main():
     create_local_samples(
         project_id,
         list(range(1, num_samples + 1)),
-        base_path="/data/test/mock_disruptions",
+        base_path="data/test/mock_disruptions",
         file_type="parquet",
         annotations=annotations,
         signals=["ip"],
@@ -89,7 +89,7 @@ def main():
     create_local_samples(
         project_id,
         list(range(num_samples + 1, num_samples + 100)),
-        base_path="/data/test/mock_disruptions",
+        base_path="data/test/mock_disruptions",
         file_type="parquet",
         signals=["ip"],
     )

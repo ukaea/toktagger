@@ -7,6 +7,10 @@ import {
   Project,
   Model,
 } from "@/types";
+import {
+    startPredictions,
+    getModels,
+} from "@/app/core"
 
 export function ModelPredictModal({project}: Project) {
     const [models, setModels] = useState<Model[] | null>(null);
@@ -23,21 +27,20 @@ export function ModelPredictModal({project}: Project) {
     };
 
     useEffect( () => {
-        const fetchData = async () => {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models`);
-            const data = await response.json();
-            setModels(data);
+        const fetchModels = async () => {
+            const models = await getModels(project._id);
+            setModels(models);
             };
             
         let poll: ReturnType<typeof setInterval>;
         if (modalOpen) {
-            fetchData();
+            fetchModels();
             setMessage(null);
             setMessageIcon(null);
             setSelectedKeys(new Set([]));
 
             poll = setInterval(() => {
-                fetchData();
+                fetchModels();
             }, 5000);
         }
         return () => {
@@ -56,12 +59,7 @@ export function ModelPredictModal({project}: Project) {
         }
         const selectedModel = models.find(model => model._id === selectedKeys.values().next().value)
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models/${selectedModel.type}/predict?version=${selectedModel.version}&num_predictions=${Number(numPredictions)}`, {
-            method: 'POST',
-            headers: {
-            'Content-Type': 'application/json',
-            },
-        });
+        const response = await startPredictions(project._id, selectedModel.type, selectedModel.version, Number(numPredictions))
 
         if (response.ok) {
             setMessage("Model predictions added to job queue!");

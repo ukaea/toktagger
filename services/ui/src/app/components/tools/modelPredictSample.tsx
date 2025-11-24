@@ -5,6 +5,10 @@ import {
   Annotations,
   Annotation,
 } from "@/types";
+import {
+    startSamplePredictions,
+    getSamplePredictions,
+} from "@/app/core"
 
 type ModelPredictInfo = {
   project: Project;
@@ -24,13 +28,9 @@ export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPred
             if (selectedModel == null) {
                 return;
             }
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/samples/${sample_id}/models/${selectedModel}/predict`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    },
-                });
+            const response = await startSamplePredictions(project._id, sample_id, selectedModel)
             const payload = await response.json();
+
             if (response.ok) {
                 setIsLoading(true);
                 setTaskId(payload.task_id);
@@ -49,13 +49,9 @@ export function ModelPredictTool({project, sample_id, setAnnotations}: ModelPred
             let pollCounter = 0;
             // Poll for result from GET predictions endpoint
             const interval = setInterval(async () => {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/samples/${sample_id}/models/${selectedModel}/predict/${taskId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        },
-                    });
+                const response = await getSamplePredictions(project._id, sample_id, selectedModel, taskId)
                 const payload = await response.json();
+                
                 if (response.status === 202) { // Predictions queued but not done yet, so continue to poll
                     pollCounter += 1;
                     console.log("Poll counter", pollCounter)

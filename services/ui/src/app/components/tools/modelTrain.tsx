@@ -6,6 +6,9 @@ import Alert from '@spectrum-icons/workflow/Alert';
 import {
   Project,
 } from "@/types";
+import {
+    startTraining
+} from "@/app/core"
 
 export function ModelTrainModal({project}: Project) {
     const [message, setMessage] = useState<string | null>(null);
@@ -20,15 +23,11 @@ export function ModelTrainModal({project}: Project) {
     };
 
     const submitTrainJob = async () => {
+
         if (selectedModel == null) {
             return;
         }
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project._id}/models/${selectedModel}/train`, {
-            method: 'PUT',
-            headers: {
-            'Content-Type': 'application/json',
-            },
-        });
+        const response = await startTraining(project._id, selectedModel)
 
         if (response.ok) {
             setMessage("Model training added to job queue!");
