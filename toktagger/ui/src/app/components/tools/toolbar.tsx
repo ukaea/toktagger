@@ -17,6 +17,7 @@ import {
   Switch,
   NumberField,
   ActionButton,
+  Button,
 } from "@adobe/react-spectrum";
 import {
   Annotation,
@@ -46,7 +47,7 @@ import { NavigationBar } from "./nav";
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotation[],
+  annotations: Annotation[]
 ) {
   // user has validated the annotations, so set created_by to "manual"
   const updatedAnnotations = annotations.map((annotation: Annotation) => {
@@ -81,6 +82,58 @@ type SaveInfo = {
   sample_id: string;
   annotations: Annotation[];
 };
+
+function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
+  const navigate = useNavigate();
+
+  const handleClick = async () => {
+    try {
+      await saveAnnotations(project_id, sample_id, annotations);
+      const sample = await getNextSample(project_id);
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    }
+  };
+
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Next
+    </Button>
+  );
+}
+
+function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
+  const handleClick = async () => {
+    try {
+      const response = await saveAnnotations(
+        project_id,
+        sample_id,
+        annotations
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to save annotations: ${response.statusText}`);
+      }
+      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
+        timeout: 5000,
+      });
+    } catch (err) {
+      if (err instanceof Error) {
+        ToastQueue.negative(`${err.message}`, {
+          timeout: 5000,
+        });
+      }
+    }
+  };
+
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Save
+    </Button>
+  );
+}
 
 export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   const navigate = useNavigate();
@@ -151,7 +204,7 @@ function AmplitudeSlider({
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor)),
+    Math.log10(Math.max(x, smallPrecisionFactor))
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -166,7 +219,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end,
+          val.end
         )}`
       }
     />
@@ -260,7 +313,7 @@ function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        },
+        }
       );
 
       const payload = await response.json();
@@ -332,7 +385,7 @@ type ToolBarInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
@@ -431,7 +484,7 @@ export default function ToolBar({
     }
 
     const resultSpec = SpectrogramDataSchema.safeParse(
-      resultComposite.data.values["mirnov"],
+      resultComposite.data.values["mirnov"]
     );
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");

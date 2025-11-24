@@ -19,7 +19,7 @@ type PeakDetectionType = {
   sample_id: string;
   data: MultiVariateTimeSeriesData;
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
 };
 export function PeakDetectionTool({
@@ -63,7 +63,7 @@ export function PeakDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
+              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION
           );
           return otherAnnotations;
         });
@@ -72,7 +72,11 @@ export function PeakDetectionTool({
       }
 
       const response = await fetch(
+<<<<<<< HEAD:toktagger/ui/src/app/components/annotators/peaks.tsx
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/peak_detection`,
+=======
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/find_peaks`,
+>>>>>>> 59d1d78 (Make ui package static comiple with vite):services/ui/src/app/components/annotators/peaks.tsx
         {
           method: "POST",
           headers: {
@@ -85,14 +89,14 @@ export function PeakDetectionTool({
             time_min: timeRange.start,
             time_max: timeRange.end,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
+            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION
         );
         return otherAnnotations.concat(payload);
       });
