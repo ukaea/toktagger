@@ -1,10 +1,8 @@
-from pathlib import Path
 import pymongo
 import pydantic
 import typing
 from bson.objectid import ObjectId
 
-from platformdirs import user_cache_dir
 from toktagger.api.crud.mongita_client import AsyncMongitaClient
 
 DATABASE_NAME = "event_db"
@@ -13,15 +11,12 @@ COLLECTION_NAME = "shots"
 
 class MongoDBClient:
     def __init__(self, url: str, db_name: str):
-        if url.startswith("mongodb://"):
+        if db_name.startswith("mongodb://"):
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
-            cache_dir = user_cache_dir("viz-annotation", "ukaea")
-            cache_dir = Path(cache_dir)
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            file_name = cache_dir / db_name
-            self.client = AsyncMongitaClient(file_name)
+            # Use local mongita db.
+            self.client = AsyncMongitaClient(db_name)
         self.db = self.client[db_name]
 
     async def insert(
