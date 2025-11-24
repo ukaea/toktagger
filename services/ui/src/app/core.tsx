@@ -116,6 +116,20 @@ export const startTraining = async (
   return response;
 };
 
+export const stopTraining = async (
+  project_id: string,
+  selected_model: string,
+  version: number
+): Promise<Response> => {
+  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?version=${version}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return response
+};
+
 export const startPredictions = async (
   project_id: string,
   selected_model: string,

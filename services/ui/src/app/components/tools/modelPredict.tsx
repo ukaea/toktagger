@@ -10,6 +10,7 @@ import {
 import {
     startPredictions,
     getModels,
+    stopTraining,
 } from "@/app/core"
 
 export function ModelPredictModal({project}: Project) {
@@ -73,6 +74,26 @@ export function ModelPredictModal({project}: Project) {
         }
     }
 
+    const stopTrainingJob = async () => {
+        if (selectedKeys.size === 0 || !models) {
+            return;
+        }
+        const selectedModel = models.find(model => model._id === selectedKeys.values().next().value)
+
+        const response = await stopTraining(project._id, selectedModel.type, selectedModel.version)
+
+        if (response.ok) {
+            setMessage("Model training has been stopped!");
+            setMessageIcon(<CheckmarkCircle aria-label="Success" color="positive" size="S"/>)
+            setSelectedKeys(new Set());
+
+        } else {
+            const errorMessage = await response.json()
+            setMessage(errorMessage.detail);
+            setMessageIcon(<Alert aria-label="Failed" color="negative" size="S"/>)
+        }
+    }
+
     return (
         <Provider theme={defaultTheme}>
             <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
@@ -91,7 +112,7 @@ export function ModelPredictModal({project}: Project) {
                         </Heading>
                         <Divider />
                             <Content>
-                            <div className="pb-4">
+                              <Flex justifyContent="space-between" alignItems="center" className="pb-4" marginBottom="size-200">
                                 <NumberField
                                     label="Number of Predictions"
                                     onChange={setNumPredictions}
@@ -99,7 +120,18 @@ export function ModelPredictModal({project}: Project) {
                                     minValue={10}
                                     step={10}
                                 />
-                            </div>
+                                <Button 
+                                    variant="negative" 
+                                    isDisabled={
+                                        selectedKeys.size === 0 
+                                        || !models 
+                                        || !["training", "queued"].includes(
+                                            models.find(
+                                                model => model._id === selectedKeys.values().next().value
+                                                ).training_status
+                                                ) 
+                                        } onPress={stopTrainingJob}>Cancel Training</Button>
+                            </Flex>
                             {models && (
                                 <TableView
                                 flex
@@ -139,7 +171,16 @@ export function ModelPredictModal({project}: Project) {
                         </Footer>
                         <ButtonGroup>
                             <Button variant="secondary" onPress={close}>Close</Button>
-                            <Button variant="accent" onPress={submitPredictJob}>Predict</Button>
+                            <Button 
+                            variant="accent" 
+                            isDisabled={
+                                selectedKeys.size === 0
+                                || !models
+                                || models.find(
+                                        model => model._id === selectedKeys.values().next().value
+                                    ).training_status != "completed"
+                                } 
+                            onPress={submitPredictJob}>Predict</Button>
                         </ButtonGroup>
                     </Dialog>
                 )}

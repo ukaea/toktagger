@@ -209,23 +209,45 @@ async def start_model_training(
 
 
 @router.delete("/models/{model_type}/train")
-async def stop_model_training(request: Request, project_id: str, model_type: ModelType):
+async def stop_model_training(
+    request: Request, 
+    project_id: str, 
+    model_type: ModelType,
+    version: int | None = Query(
+        None, description="Version of model to use, leave blank for latest version"
+        )
+    ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
-
-    # Get models which are either queued or in progress
-    models = await utils.get_models(
-        db_client=db_client,
-        project_id=project_id,
-        model_type=model_type,
-        status="queued",
-    )
-    models += await utils.get_models(
-        db_client=db_client,
-        project_id=project_id,
-        model_type=model_type,
-        status="started",
-    )
+    
+    # If version provided, get only that model
+    if version:
+        model = await utils.get_model(
+            db_client, 
+            project_id, 
+            model_type, 
+            version=version
+            )
+        if model.training_status not in ("started", "queued"):
+            raise HTTPException(
+                status_code=404,
+                detail="Model training is not in progress for this model!",
+            )
+        models = [model]
+    else:
+        # Get models which are either queued or in progress
+        models = await utils.get_models(
+            db_client=db_client,
+            project_id=project_id,
+            model_type=model_type,
+            status="queued",
+        )
+        models += await utils.get_models(
+            db_client=db_client,
+            project_id=project_id,
+            model_type=model_type,
+            status="started",
+        )
 
     # Get the task IDs and stop them
     for model in models:
@@ -237,8 +259,7 @@ async def stop_model_training(request: Request, project_id: str, model_type: Mod
                 actor = ray.get_actor(model.id)
                 ray.kill(actor)
             except ValueError:
-                continue
-
+                pass
         await utils.update_model(
             db_client=db_client,
             model_id=model.id,

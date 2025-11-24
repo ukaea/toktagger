@@ -149,7 +149,7 @@ async def get_model(
     status: Optional[
         Literal["queued", "started", "failed", "completed", "aborted"]
     ] = None,
-):
+) -> Model:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id, "type": model_type}
     if version:
