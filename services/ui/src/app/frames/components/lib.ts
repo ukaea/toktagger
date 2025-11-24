@@ -418,20 +418,94 @@ export function writeClassOnly(a: any, cls: { id: number; name: string }): any {
 }
 
 /**
- * Phase 1 normalization: just return the list as-is.
- * No mode-awareness, no class/track propagation.
+ * Mode-aware normalization.
  *
- * This keeps AnnoBridge happy without pulling in the full label logic yet.
+ * For now we only support **detection mode** (includeTrackIds = false):
+ *
+ * - If an annotation ID already exists in knownById, we copy its previous
+ *   class label forward (class_id + class_name) via writeClassOnly.
+ * - Else, if getSelectedClassName() returns a class name, we look up its
+ *   numeric ID from the classRegistry (if present) or FIXED_CLASS_REG,
+ *   and stamp that onto the annotation via writeClassOnly.
+ *
+ * This gives:
+ * - New rectangles inherit whatever class you have selected in the toolbar.
+ * - Edits keep their existing class label, even if you change the toolbar.
  */
 export function normalizeWithMode(
   rawList: ImageAnnotation[],
-  _knownById: Record<string, ImageAnnotation>,
+  knownById: Record<string, ImageAnnotation>,
   _getSelectedProfile: () => string | null,
-  _getSelectedClassName: () => string | null,
-  _includeTrackIds: boolean,
-  _classRegistry: ClassRegistry
+  getSelectedClassName: () => string | null,
+  includeTrackIds: boolean,
+  classRegistry: ClassRegistry
 ): ImageAnnotation[] {
-  return rawList;
+  // Tracking mode not wired up in this branch yet – just passthrough.
+  // FrameView always calls this with includeTrackIds = false for now.
+  if (includeTrackIds) {
+    return rawList;
+  }
+
+  const out: ImageAnnotation[] = [];
+
+  for (const a of rawList) {
+    const id = (a as any).id as string | undefined;
+    const seen = id ? knownById[id] : undefined;
+    let next = a;
+
+    // --- 1) Existing annotation: keep its previous class label stable ---
+    if (seen) {
+      const prev = extractClassLabel(seen);
+      if (prev?.class_name && typeof prev.class_id === "number") {
+        next = writeClassOnly(next, {
+          id: prev.class_id,
+          name: prev.class_name
+        });
+      }
+      out.push(next);
+      continue;
+    }
+
+    // --- 2) New annotation: inherit current toolbar class, if any ---
+    const selected = getSelectedClassName();
+    if (selected) {
+      const keyLower = selected.toLowerCase();
+
+      // Our new ClassRegistry stores defs like { id: string, name: string, ... }
+      const fromRegistryLower = classRegistry[keyLower];
+      const fromRegistryExact = classRegistry[selected];
+
+      const regIdStr =
+        fromRegistryLower?.id ??
+        fromRegistryExact?.id ??
+        undefined;
+
+      const regId =
+        regIdStr !== undefined ? Number(regIdStr) : undefined;
+
+      // Fallback to fixed map if registry doesn't have it
+      const fixedId =
+        FIXED_CLASS_REG[selected] ?? FIXED_CLASS_REG[keyLower];
+
+      const finalId =
+        (typeof regId === "number" && !Number.isNaN(regId)
+          ? regId
+          : undefined) ??
+        (typeof fixedId === "number" ? fixedId : undefined) ??
+        1;
+
+      // Stamp the selected class onto the new rectangle
+      next = writeClassOnly(next, {
+        id: finalId,
+        // Keep the human-facing label as selected (e.g. "UFO", "Minor UFO", "Marfe")
+        name: selected
+      });
+    }
+
+    out.push(next);
+  }
+
+  return out;
 }
 
 /** ---------- COCO types + converters (ported from old branch) ---------- */
@@ -704,9 +778,6 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
 
       const labelValue =
         b.class_name ??
-
-
-
         (typeof b.class_id === "number" ? String(b.class_id) : "unknown");
 
       out.push({
