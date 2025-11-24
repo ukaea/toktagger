@@ -82,6 +82,7 @@ export function FrameSearch({
  *   - window.ufoMarkSaved()
  *   - window.ufoCollectForSave()
  *   - window.ufoClearCurrent()
+ *   - window.ufoClearAllFrames()
  */
 export function FrameView({
   data,
@@ -207,7 +208,7 @@ export function FrameView({
       // Check if next frame already has stored annotations
       const existing = await nextAdapter.read();
       if (Array.isArray(existing) && existing.length > 0) {
-        // Next frame already has something – don't override it
+        // Next frame already has something – do not override it
         return;
       }
 
@@ -296,6 +297,36 @@ export function FrameView({
     };
   }, [adapter]);
 
+  // --- Expose Clear ALL (multi-frame wipe) on window for toolbar integration ---
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    (window as any).ufoClearAllFrames = async () => {
+      const storage = window.localStorage;
+      const prefix =
+        "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
+
+      const keysToDelete: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key && key.startsWith(prefix)) {
+          keysToDelete.push(key);
+        }
+      }
+
+      for (const key of keysToDelete) {
+        storage.removeItem(key);
+      }
+
+      // Also clear current overlay so the user sees the wipe immediately
+      await bridgeRef.current?.clearOverlaySilently?.();
+    };
+
+    return () => {
+      delete (window as any).ufoClearAllFrames;
+    };
+  }, [projectId, sampleId]);
+
   // --- Navigation handlers: save → then call upstream handler ---
   const handlePrev = useCallback(async () => {
     if (!onPrev) return;
@@ -310,7 +341,7 @@ export function FrameView({
       // 1) Save current frame and get the final list
       const currentList = await saveCurrentFrame();
 
-      // 2) Seed the NEXT frame if it's empty (localStorage-based)
+      // 2) Seed the NEXT frame if it is empty (localStorage-based)
       await propagateForwardIfEmpty(currentList, frameNumber + 1);
 
       // 3) Trigger upstream navigation (which will load the next frame data)

@@ -1141,7 +1141,9 @@ export default function ToolBar({
                     isQuiet
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                     onPress={() => {
-                      // Still UI-only for now: Clear ALL wiring comes later
+                      if (typeof window !== "undefined") {
+                        (window as any).ufoClearAllFrames?.();
+                      }
                     }}
                   >
                     Clear ALL
