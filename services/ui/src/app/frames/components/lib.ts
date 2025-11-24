@@ -279,11 +279,113 @@ export function extractClassLabel(
   return null;
 }
 
+/** -------------------- Track id helpers (Phase 8.1) -------------------- */
+
+const ADJECTIVES = [
+  "bright",
+  "calm",
+  "curious",
+  "distant",
+  "eager",
+  "faint",
+  "fast",
+  "gentle",
+  "ghostly",
+  "glowing",
+  "hidden",
+  "icy",
+  "lively",
+  "lucky",
+  "mellow",
+  "mystic",
+  "nimble",
+  "quiet",
+  "rapid",
+  "shiny",
+  "silent",
+  "sly",
+  "stealthy",
+  "swift",
+  "tiny",
+  "wild",
+  "young",
+  "zealous",
+  "ancient",
+  "brave"
+];
+
+const NOUNS = [
+  "comet",
+  "signal",
+  "flare",
+  "shadow",
+  "spark",
+  "meteor",
+  "photon",
+  "plume",
+  "echo",
+  "nebula",
+  "pattern",
+  "speck",
+  "glint",
+  "trace",
+  "whisper",
+  "streak",
+  "drift",
+  "halo",
+  "vortex",
+  "wave",
+  "pulse",
+  "arc",
+  "beam",
+  "glow",
+  "ripple",
+  "stream",
+  "trail",
+  "blip",
+  "sparkle",
+  "cluster"
+];
+
+function randomReadableId(): string {
+  const adjective =
+    ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const digit = Math.floor(Math.random() * 9) + 1;
+  return `${adjective} ${noun}-${digit}`;
+}
+
 /**
- * Stubbed track ID normalizer – we will replace with the full version later.
+ * Track ID normalizer – slug-style:
+ * - trim
+ * - collapse whitespace to "-"
+ * - replace non [a-zA-Z0-9._-] with "-"
+ * - lowercase
  */
 export function canonicalizeTrackId(input: string): string {
-  return input.trim();
+  return input
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .toLowerCase();
+}
+
+/**
+ * Generate a readable, unique track_id like "silent comet-3" that does not
+ * collide (after canonicalization) with any of the existing track IDs.
+ *
+ * Pure string helper: callers pass an array of existing track_id strings.
+ */
+export function uniqueReadableId(existingTrackIds: string[]): string {
+  const used = new Set(existingTrackIds.map((id) => canonicalizeTrackId(id)));
+  let candidate = randomReadableId();
+  let guard = 0;
+
+  while (used.has(canonicalizeTrackId(candidate)) && guard++ < 50) {
+    candidate = randomReadableId();
+  }
+
+  return candidate;
 }
 
 /**
