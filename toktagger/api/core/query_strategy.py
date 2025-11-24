@@ -6,7 +6,9 @@ from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas.projects import QueryStrategyType
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 class QueryStrategy(ABC):
     def __init__(self, samples: list[Sample], annotations: list[Annotation]):

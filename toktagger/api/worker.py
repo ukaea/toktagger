@@ -12,23 +12,25 @@ from toktagger.api.core.sender import (
     send_model_updates,
 )
 import logging
+
 logger = logging.getLogger("ray")
 logger.setLevel("DEBUG")
 
+
 def get_actor(project, model):
     try:
-        logger.debug(f"Finding actor for model {model.id}")
+        logger.info(f"Finding actor for model {model.id}")
         ml_model = ray.get_actor(model.id)
-        logger.debug("Found existing actor!")
+        logger.info("Found existing actor!")
     except ValueError:
         # Actor not alive, so load from weights
-        logger.debug("Actor not found, loading from disk...")
+        logger.info("Actor not found, loading from disk...")
 
         # Lazy loading so it doesnt initialize tensorflow every time TODO is this ok?
-        from toktagger.api.models.registry import MODELS
+        from toktagger.api.models.base import ModelRegistry
 
         ml_model = (
-            MODELS[model.type]
+            ModelRegistry.get(model.type)
             .options(name=model.id, lifetime="detached")
             .remote(
                 model_id=str(model.id),

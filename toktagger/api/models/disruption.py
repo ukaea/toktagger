@@ -5,18 +5,18 @@ from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader, Dataset
-import ray
 from toktagger.api.schemas.annotations import Annotation
 import typing
-from toktagger.api.core.data_loaders import DATA_LOADERS
-from toktagger.api.models.base import Model
+from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.models.base import Model, ModelRegistry
 import logging
+
 logger = logging.getLogger("ray")
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
     def __init__(self, project, samples, annotations):
-        self.data_loader = DATA_LOADERS[project.data_loader]()
+        self.data_loader = LoaderRegistry.get(project.data_loader)()
         self.samples = samples
         self.annotations = annotations
         self.current_scaling = []
@@ -42,7 +42,7 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         return plasma_current, disruption_time / data.time[-1]
 
 
-@ray.remote
+@ModelRegistry.register("disruption_cnn", ["disruption"])
 class DisruptionCNN(Model):
     def define_model(self):
         return nn.Sequential(
@@ -233,7 +233,7 @@ class DisruptionCNN(Model):
                     sum_total += batch_samples.size(0)
                     test_accuracy = (sum_correct / sum_total) * 100
 
-            logger.debug("Test Accuracy:", (sum_correct / sum_total) * 100)
+            logger.debug(f"Test Accuracy: {(sum_correct / sum_total) * 100}")
 
         final_accuracy = test_accuracy or val_accuracy or train_accuracy
 

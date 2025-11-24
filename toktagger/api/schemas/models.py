@@ -1,22 +1,26 @@
 from typing import Literal, Annotated, Optional
-from enum import Enum
-from pydantic import Field
+from pydantic import Field, field_validator
 from toktagger.api.schemas import ConfiguredModel
 
 
-class ModelType(str, Enum):  # Is this needed?
-    DisruptionCNN = "disruption_cnn"
-    BaseModel = "base"
-
-
 class ModelIn(ConfiguredModel):
-    type: ModelType
+    type: str
     version: int
     training_status: Literal["queued", "started", "failed", "completed", "aborted"]
     progress: Annotated[float, Field(strict=True, ge=0, le=100)]
     score: float
     task_id: Optional[str] | None = None
-    # and whatever else we need....
+
+    @field_validator("type")
+    def check_model_type(cls, value):
+        from toktagger.api.models.base import ModelRegistry
+
+        if value not in (names := ModelRegistry.names()):
+            raise ValueError(
+                f"Invalid model type '{value}' - valid options are '{names}'."
+            )
+
+        return value
 
 
 class ModelUpdate(ConfiguredModel):

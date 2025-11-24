@@ -18,6 +18,7 @@ import uvicorn
 import ray
 import uuid
 
+
 class TaskRegistry:
     """Registry to keep track of Ray actors, and the task they are associated with."""
 
@@ -33,7 +34,7 @@ class TaskRegistry:
         self.tasks = {}
         self.actors = []
 
-    def store(self, task_ref: ray.ObjectRef) -> str:
+    def register(self, task_ref: ray.ObjectRef) -> str:
         """Store a Ray task reference in the registry and associate with a UUID.
 
         Parameters
@@ -94,7 +95,7 @@ async def lifespan(app: FastAPI):
 
     app.state.db_client = MongoDBClient(mongo_url, db_name)
     app.state.project = None
-    
+
     if not ray.is_initialized():
         ray.init()
     app.state.task_registry = TaskRegistry(max_actors=5)

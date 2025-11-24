@@ -10,43 +10,7 @@ from toktagger.api.schemas.models import ModelUpdate
 from tests.db_definitions import MODEL_1, MODEL_2
 from unittest.mock import patch
 from bson import ObjectId
-from toktagger.api.models.base import Model
 import os
-import ray
-
-
-@ray.remote
-class DisruptionCNN(Model):
-    def define_model(self):
-        return None
-
-    def train(self, samples, annotations, *args, **kwargs):
-        self.log_progress(
-            training_status="started",
-            progress=50,
-            score=20,
-        )
-        return 60
-
-    def predict(self, samples, *args, **kwargs):
-        return [
-            [
-                TimePoint(
-                    validated=False,
-                    uncertainty=random.random(),
-                    label=self.id,
-                    time=random.randint(80, 120),
-                    created_by=self.type,
-                )
-            ]
-            for i in range(len(samples))
-        ]
-
-    def save(self, file_path: str):
-        pathlib.Path(file_path).touch()
-
-    def load(self, project, file_path):
-        pass
 
 
 async def send_to_url(api_client, url, method):
@@ -154,13 +118,12 @@ def mock_wait(*args, **kwargs):
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_num_predictions(
     api_client, db_client, setup_model_db
 ):
     await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?num_predictions=5",
+        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5",
         method="POST",
     )
 
@@ -175,14 +138,13 @@ async def test_model_batch_predict_num_predictions(
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
     query_string = "&".join(
         f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
     )
     await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?{query_string}",
+        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?{query_string}",
         method="POST",
     )
 
@@ -202,11 +164,10 @@ async def test_model_batch_predict_samples(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_batch_predict_version(api_client, db_client, setup_model_db):
     await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict?num_predictions=5&version=1",
+        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1",
         method="POST",
     )
 
@@ -221,11 +182,10 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_sample_predict(api_client, db_client, setup_model_db):
     await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
         method="POST",
     )
 
@@ -243,17 +203,16 @@ async def test_model_sample_predict(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_get_sample_prediction(api_client, db_client, setup_model_db):
     prediction_response, _ = await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
         method="POST",
     )
     task_id = prediction_response["task_id"]
 
     get_response = await api_client.get(
-        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict/{task_id}"
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict/{task_id}"
     )
     assert get_response.status_code == 200
 
@@ -273,13 +232,12 @@ async def test_model_get_sample_prediction(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_get_sample_prediction_invalid_task(
     api_client, db_client, setup_model_db
 ):
     # Ask for predictions from a task which doesn't exist
     get_response = await api_client.get(
-        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict/invalid_id"
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict/invalid_id"
     )
 
     # Check it returns 404 with appropriate message
@@ -288,20 +246,19 @@ async def test_model_get_sample_prediction_invalid_task(
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_get_sample_prediction_wrong_sample(
     api_client, db_client, setup_model_db
 ):
     prediction_response, _ = await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
         method="POST",
     )
     task_id = prediction_response["task_id"]
 
     # Ask for predictions from this task for a sample which we did not predict on
     get_response = await api_client.get(
-        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/disruption_cnn/predict/{task_id}"
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_disruption_cnn/predict/{task_id}"
     )
 
     # Check it returns 404 with appropriate message
@@ -313,21 +270,20 @@ async def test_model_get_sample_prediction_wrong_sample(
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 @patch("ray.wait", mock_wait)
 async def test_model_get_sample_prediction_in_progress(
     api_client, db_client, setup_model_db
 ):
     prediction_response, _ = await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict",
+        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
         method="POST",
     )
     task_id = prediction_response["task_id"]
 
     # Ask for predictions from this task for a sample while it is still in progress
     get_response = await api_client.get(
-        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/disruption_cnn/predict/{task_id}"
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict/{task_id}"
     )
 
     # Check it returns 202 with appropriate message
@@ -354,11 +310,10 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
-@patch.dict("toktagger.api.models.registry.MODELS", {"disruption_cnn": DisruptionCNN})
 async def test_model_start_training(api_client, db_client, setup_model_db):
     response, model_updates = await send_to_url(
         api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/train",
+        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train",
         method="PUT",
     )
 

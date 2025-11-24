@@ -1,8 +1,7 @@
 from typing import Literal, Tuple, Optional, Union
 from toktagger.api.schemas import ConfiguredModel
-from toktagger.api.schemas.models import ModelType
 from toktagger.api.schemas.annotators import AnnotatorTypes
-from pydantic import Field, TypeAdapter, model_validator, BaseModel
+from pydantic import Field, TypeAdapter, model_validator, BaseModel, field_validator
 
 
 class AnnotationIn(ConfiguredModel):
@@ -21,7 +20,19 @@ class AnnotationIn(ConfiguredModel):
     validated: bool = False
     uncertainty: Optional[float] = None
     label: str
-    created_by: Union[AnnotatorTypes, ModelType]
+    created_by: str
+
+    @field_validator("created_by")
+    def check_created_by(cls, value):
+        from toktagger.api.models.base import ModelRegistry
+
+        if value not in (models := ModelRegistry.names()) and value not in (
+            annotators := [ann.value for ann in AnnotatorTypes]
+        ):
+            raise ValueError(
+                f"Invalid created_by '{value}' - valid options are ML Models '{models}', or Annotators '{annotators}'."
+            )
+        return value
 
 
 class Annotation(AnnotationIn):
@@ -82,7 +93,7 @@ class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
 
 class ModelAnnotation(AnnotationIn):
     uncertainty: float
-    created_by: ModelType
+    created_by: str
 
 
 class SpectrogramMask(AnnotationIn):

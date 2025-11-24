@@ -8,11 +8,12 @@ import ray
 import itertools
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationTypes
-from toktagger.api.schemas.models import Model, ModelType, ModelIn, ModelUpdate
+from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.schemas import convert_to_objectid
 from toktagger.api.worker import train_model, get_predictions
 
 import logging
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
 
@@ -47,7 +48,7 @@ async def get_models(
 async def get_model(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
-    model_type: ModelType = Path(
+    model_type: str = Path(
         description="The type of model to return information about."
     ),
     version: int = Query(
@@ -64,7 +65,7 @@ async def get_model(
 async def delete_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
-    model_type: ModelType = Path(description="The type of model to delete."),
+    model_type: str = Path(description="The type of model to delete."),
     version: int = Query(
         None,
         description="The version of the model to delete, leave blank to delete all models",
@@ -117,9 +118,7 @@ async def get_training_info(
 
 
 @router.put("/models/{model_type}/train")
-async def start_model_training(
-    request: Request, project_id: str, model_type: ModelType
-):
+async def start_model_training(request: Request, project_id: str, model_type: str):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
     project = await utils.get_project(db_client, project_id)
@@ -174,11 +173,16 @@ async def start_model_training(
     # Get all validated samples and annotations for this project
     logger.info(f"Collected {len(annotations)} annotations.")
     logger.info(f"Collected {len(samples)} samples.")
-    
+
     if len(samples) == 0:
-        raise HTTPException(status_code=404, detail="No validated samples found to train a model on!")
+        raise HTTPException(
+            status_code=404, detail="No validated samples found to train a model on!"
+        )
     if len(annotations) == 0:
-        raise HTTPException(status_code=404, detail="No validated annotations found to train a model on!")
+        raise HTTPException(
+            status_code=404,
+            detail="No validated annotations found to train a model on!",
+        )
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
     annotations_2d = [
@@ -203,7 +207,7 @@ async def start_model_training(
         batch_size=BATCH_SIZE,
     )
 
-    task_id = task_registry.store(train_task)
+    task_id = task_registry.register(train_task)
     task_registry.update_actors(model.id)
 
     # Associate the Celery task ID with the model in the database
@@ -214,24 +218,21 @@ async def start_model_training(
 
 @router.delete("/models/{model_type}/train")
 async def stop_model_training(
-    request: Request, 
-    project_id: str, 
-    model_type: ModelType,
+    request: Request,
+    project_id: str,
+    model_type: str,
     version: int | None = Query(
         None, description="Version of model to use, leave blank for latest version"
-        )
-    ):
+    ),
+):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
-    
+
     # If version provided, get only that model
     if version:
         model = await utils.get_model(
-            db_client, 
-            project_id, 
-            model_type, 
-            version=version
-            )
+            db_client, project_id, model_type, version=version
+        )
         if model.training_status not in ("started", "queued"):
             raise HTTPException(
                 status_code=404,
@@ -278,9 +279,7 @@ async def stop_model_training(
 async def predict(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
-    model_type: ModelType = Path(
-        description="The type of model to use for predictions."
-    ),
+    model_type: str = Path(description="The type of model to use for predictions."),
     version: int = Query(
         None, description="Version of model to use, leave blank for latest version"
     ),
@@ -352,9 +351,7 @@ async def predict(
 async def delete_predictions(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
-    model_type: ModelType = Path(
-        description="The type of model to delete predictions from."
-    ),
+    model_type: str = Path(description="The type of model to delete predictions from."),
 ):
     db_client = request.app.state.db_client
     # Delete predictions using the given model for this project
@@ -388,9 +385,7 @@ async def create_sample_predictions(
     sample_id: str = Path(
         description="The ID of the sample to make model predictions for."
     ),
-    model_type: ModelType = Path(
-        description="The type of model to make predictions from."
-    ),
+    model_type: str = Path(description="The type of model to make predictions from."),
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -412,7 +407,7 @@ async def create_sample_predictions(
     task = get_predictions.remote(
         project=project, model=model, samples=[sample], batch_size=BATCH_SIZE
     )
-    task_id = task_registry.store(task)
+    task_id = task_registry.register(task)
     task_registry.update_actors(model.id)
 
     return {"task_id": task_id}
@@ -427,9 +422,7 @@ async def get_sample_predictions(
     sample_id: str = Path(
         description="The ID of the sample to get model predictions for."
     ),
-    model_type: ModelType = Path(
-        description="The type of model to get predictions from."
-    ),
+    model_type: str = Path(description="The type of model to get predictions from."),
     task_id: str = Path(description="The prediction task to get results from."),
 ) -> list[AnnotationTypes]:
     db_client = request.app.state.db_client

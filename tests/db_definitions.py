@@ -1,10 +1,51 @@
 from toktagger.api.schemas.annotators import AnnotatorTypes
 from toktagger.api.schemas.projects import ProjectIn
 from toktagger.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
-from toktagger.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
+from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 from toktagger.api.schemas.models import ModelIn
-
+from toktagger.api.models.base import Model, ModelRegistry
 import pathlib
+import ray
+import random
+
+
+# Create a mock model for use in our model definitions
+@ray.remote
+@ModelRegistry.register("mock_disruption_cnn", ["disruption"])
+class MockDisruptionCNN(Model):
+    def define_model(self):
+        return None
+
+    def train(self, samples, annotations, *args, **kwargs):
+        self.log_progress(
+            training_status="started",
+            progress=50,
+            score=20,
+        )
+        return 60
+
+    def predict(self, samples, *args, **kwargs):
+        print("HHHHHIIIIIIII")
+        return [
+            [
+                TimePoint(
+                    validated=False,
+                    uncertainty=random.random(),
+                    label=self.id,
+                    time=random.randint(80, 120),
+                    created_by=self.type,
+                )
+            ]
+            for i in range(len(samples))
+        ]
+
+    def save(self, file_path: str):
+        pathlib.Path(file_path).touch()
+
+    def load(self, project, file_path):
+        print("HIHIH")
+        pass
+
 
 # Define some common things to add to db
 PROJECT_1 = ProjectIn(
@@ -87,7 +128,7 @@ ANNOTATION_5 = TimePoint(
 )
 
 MODEL_1 = ModelIn(
-    type="disruption_cnn",
+    type="mock_disruption_cnn",
     version=1,
     training_status="completed",
     progress=100,
@@ -95,14 +136,14 @@ MODEL_1 = ModelIn(
 )
 
 MODEL_2 = ModelIn(
-    type="disruption_cnn",
+    type="mock_disruption_cnn",
     version=2,
     training_status="completed",
     progress=100,
     score=90,
 )
 MODEL_3 = ModelIn(
-    type="base",
+    type="disruption_cnn",
     version=3,
     training_status="started",
     progress=50,

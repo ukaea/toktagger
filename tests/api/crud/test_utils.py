@@ -296,13 +296,13 @@ async def test_get_models(db_client, setup_db):
 @pytest.mark.asyncio
 async def test_get_models_by_type(db_client, setup_db):
     models = await utils.get_models(
-        db_client, project_id=setup_db["project_id_1"], model_type="disruption_cnn"
+        db_client, project_id=setup_db["project_id_1"], model_type="mock_disruption_cnn"
     )
     # Check two models returned
     assert len(models) == 2
     # Check returned in correct order - reverse order of created, not version 3
     assert [model.version for model in models] == [2, 1]
-    assert all(model.type == "disruption_cnn" for model in models)
+    assert all(model.type == "mock_disruption_cnn" for model in models)
 
 
 @pytest.mark.asyncio
@@ -314,4 +314,4 @@ async def test_get_models_by_status(db_client, setup_db):
     assert len(models) == 1
     # Check this is the correct model
     assert models[0].version == 3
-    assert models[0].type == "base"
+    assert models[0].type == "disruption_cnn"

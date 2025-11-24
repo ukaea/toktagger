@@ -3,22 +3,13 @@ from typing import Optional, List
 from enum import Enum
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.schemas.models import ModelType
 
 
-class Task(Enum):
+class Task(str, Enum):
     ELM = "ELM"
     DISRUPTION = "disruption"
     MHD = "MHD"
     UFO = "UFO"
-
-
-MODELS_PER_TASK = {
-    Task.DISRUPTION: ["disruption_cnn"],
-    Task.UFO: [],
-    Task.MHD: [],
-    Task.ELM: [],
-}
 
 
 class QueryStrategyType(str, Enum):
@@ -41,8 +32,11 @@ class ProjectIn(ConfiguredModel):
 
     @computed_field
     @property
-    def model_types(self) -> List[ModelType]:
-        return MODELS_PER_TASK[Task(self.task)]
+    def model_types(self) -> List[str]:
+        from toktagger.api.models.base import ModelRegistry
+
+        return ModelRegistry.names(Task(self.task))
+
     @field_validator("data_loader")
     def check_data_loader(cls, value):
         if value not in (names := LoaderRegistry.names()):

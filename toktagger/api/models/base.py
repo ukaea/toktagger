@@ -1,13 +1,17 @@
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation, AnnotationIn
-from toktagger.api.schemas.projects import Project
-from toktagger.api.schemas.models import ModelType
+from toktagger.api.schemas.projects import Project, Task
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
 import typing
 import math
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
+import ray
+
+import logging
+
+logger = logging.getLogger("ray")
 
 
 class Model(ABC):
@@ -19,7 +23,7 @@ class Model(ABC):
         self.id = model_id
         self.project = project
         self.model = self.define_model()
-        self.type = ModelType[self.__class__.__name__]
+        self.type = ModelRegistry.get_name(self.__class__)
 
     def log_progress(
         self,
@@ -126,3 +130,50 @@ class Model(ABC):
     @abstractmethod
     def load(cls, project: Project, file_path: str):
         pass
+
+
+class ModelRegistry:
+    _registry: dict[str, Model] = {}
+    _tasks: dict[str, list[Task]] = {}
+
+    @classmethod
+    def register(cls, name: str, tasks: list[Task | str]):
+        def decorator(model_class: Model):
+            if not issubclass(model_class, Model):
+                raise ValueError(
+                    f"Loader '{name}' does not inherit from Model base class."
+                )
+            cls._registry[name] = model_class
+            cls._tasks[name] = [Task(_task) for _task in tasks]
+
+            return model_class
+
+        return decorator
+
+    @classmethod
+    def get(cls, name: str):
+        model_class: Model | None = cls._registry.get(name)
+        if not model_class:
+            raise ValueError(f"No Model class called '{name}' found in registry!")
+        return ray.remote(model_class)
+
+    @classmethod
+    def get_name(cls, model_class: Model):
+        return next(
+            name
+            for name, model in cls._registry.items()
+            if model_class.__class__.__name__ == model.__class__.__name__
+        )
+
+    @classmethod
+    def names(cls, task: Task | None = None):
+        if not task:
+            return list(cls._registry.keys())
+        return [name for name, tasks in cls._tasks.items() if task in tasks]
+
+    @classmethod
+    def tasks(cls, name: str):
+        tasks: list[Task] | None = cls._tasks.get(name)
+        if not tasks:
+            raise ValueError(f"No tasks associated with model '{name}'!")
+        return tasks

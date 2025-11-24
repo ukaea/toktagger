@@ -4,8 +4,8 @@ from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import (
-    SampleIn, 
-    Sample, 
+    SampleIn,
+    Sample,
     SampleSummary,
     SampleUpdateBatchItem,
 )
@@ -13,6 +13,7 @@ from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas import convert_to_objectid
 from typing import Literal
 import logging
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
