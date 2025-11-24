@@ -240,13 +240,42 @@ export function scanCrossFrameCountsChunked(options: {
 }
 
 /**
- * Minimal stub: we do not care about classes yet for COCO export,
- * so just return null. This is separate from extractClassLabelFromAnnotation,
- * which is used for cross-frame counts.
+ * Class + track extractor for COCO export.
+ *
+ * Looks in annotation.body / annotation.bodies for:
+ *   { purpose: "tagging" | "classifying",
+ *     value: { type: "class", id, name, track_id?, instance? } }
+ * and falls back to a plain string value as { class_name }.
  */
 export function extractClassLabel(
-  _a: any
+  a: any
 ): { class_id?: number; class_name?: string; track_id?: string } | null {
+  const collect = (src: any) => (Array.isArray(src) ? src : src ? [src] : []);
+  const candidates = [...collect(a?.bodies), ...collect(a?.body)];
+
+  for (const b of candidates) {
+    if (b?.purpose && (b.purpose === "tagging" || b.purpose === "classifying")) {
+      if (b?.value && typeof b.value === "object" && b.value.type === "class") {
+        const trk =
+          typeof b.value.track_id === "string" && b.value.track_id.length > 0
+            ? b.value.track_id
+            : typeof b.value.instance === "number"
+            ? String(b.value.instance)
+            : undefined;
+
+        return {
+          class_id: b.value.id,
+          class_name: b.value.name,
+          track_id: trk
+        };
+      }
+
+      if (typeof b?.value === "string") {
+        return { class_name: b.value };
+      }
+    }
+  }
+
   return null;
 }
 
@@ -258,19 +287,134 @@ export function canonicalizeTrackId(input: string): string {
 }
 
 /**
- * Stubbed label writers – for early phases, we do not attach any class metadata.
- * These simply return the annotation unchanged.
+ * Write / update a W3C class body including track_id on both body & bodies.
  */
 export function writeClassAndTrack(
   a: any,
-  _cls: { id: number; name: string },
-  _track_id: string
+  cls: { id: number; name: string },
+  track_id: string
 ): any {
-  return a;
+  const classBody = () => ({
+    purpose: "tagging",
+    value: { type: "class", id: cls.id, name: cls.name, track_id }
+  });
+
+  const arr = (x: any) => (Array.isArray(x) ? x : x ? [x] : []);
+
+  const patch = (list: any[]) => {
+    let found = false;
+
+    const mapped = list.map((b) => {
+      if (b?.purpose && (b.purpose === "tagging" || b.purpose === "classifying")) {
+        if (b?.value && typeof b.value === "object" && b.value.type === "class") {
+          found = true;
+          return {
+            ...b,
+            value: {
+              ...b.value,
+              id: cls.id,
+              name: cls.name,
+              track_id
+            }
+          };
+        }
+
+        if (typeof b?.value === "string") {
+          found = true;
+          return {
+            ...b,
+            value: {
+              type: "class",
+              id: cls.id,
+              name: cls.name,
+              track_id
+            }
+          };
+        }
+      }
+      return b;
+    });
+
+    return { mapped, found };
+  };
+
+  const bodiesIn = arr(a?.bodies);
+  const bodyIn = arr(a?.body);
+
+  const pb = patch(bodiesIn);
+  const p = patch(bodyIn);
+
+  const bodiesOut = [...pb.mapped];
+  const bodyOut = [...p.mapped];
+
+  // If no existing class body was found, append one to both body & bodies
+  if (!pb.found && !p.found) {
+    const cb = classBody();
+    bodiesOut.push(cb);
+    bodyOut.push(cb);
+  }
+
+  return {
+    ...a,
+    bodies: bodiesOut,
+    body: bodyOut
+  };
 }
 
-export function writeClassOnly(a: any, _cls: { id: number; name: string }): any {
-  return a;
+/**
+ * Write / update a W3C class body without track_id (detection mode).
+ */
+export function writeClassOnly(a: any, cls: { id: number; name: string }): any {
+  const classBody = () => ({
+    purpose: "tagging",
+    value: { type: "class", id: cls.id, name: cls.name }
+  });
+
+  const arr = (x: any) => (Array.isArray(x) ? x : x ? [x] : []);
+
+  let found = false;
+
+  const patch = (list: any[]) =>
+    list.map((b) => {
+      if (b?.purpose && (b.purpose === "tagging" || b.purpose === "classifying")) {
+        if (b?.value && typeof b.value === "object" && b.value.type === "class") {
+          found = true;
+          const { id, name } = b.value;
+          return {
+            ...b,
+            value: {
+              type: "class",
+              id: cls.id ?? id,
+              name: cls.name ?? name
+            }
+          };
+        }
+
+        if (typeof b?.value === "string") {
+          found = true;
+          return {
+            ...b,
+            value: { type: "class", id: cls.id, name: cls.name }
+          };
+        }
+      }
+      return b;
+    });
+
+  const bodiesOut = patch(arr(a?.bodies));
+  const bodyOut = patch(arr(a?.body));
+
+  if (!found) {
+    const cb = classBody();
+    bodiesOut.push(cb);
+    bodyOut.push(cb);
+  }
+
+  return {
+    ...a,
+    bodies: bodiesOut,
+    body: bodyOut
+  };
 }
 
 /**
@@ -477,10 +621,6 @@ export function numericFromTrackId(track_id?: string): number | null {
 
 /**
  * Add track/class info to the exported label.
- *
- * NOTE: extractClassLabel is still a stub, so for now this will
- * usually return just `{ class_id, class_name }` as `undefined`,
- * and downstream we fall back to "unknown".
  */
 export function augmentLabelForExport(a: any, includeTracks: boolean) {
   const label = extractClassLabel(a) || {};
@@ -564,6 +704,9 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
 
       const labelValue =
         b.class_name ??
+
+
+
         (typeof b.class_id === "number" ? String(b.class_id) : "unknown");
 
       out.push({
