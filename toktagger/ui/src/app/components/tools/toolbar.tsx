@@ -1,7 +1,11 @@
 "use client";
 <<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
 import { useEffect, useState } from "react";
 =======
+=======
+
+>>>>>>> e2ccd11c (Replace the new ClassPanel New class text input with a dropdown in toolbar.tsx):services/ui/src/app/components/tools/toolbar.tsx
 import { useEffect, useState, useMemo, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 >>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
@@ -65,7 +69,9 @@ import {
   saveClassRegistry,
   loadLastClassName,
   saveLastClassName,
-  scanCrossFrameCountsChunked
+  scanCrossFrameCountsChunked,
+  LABEL_MAP,
+  FIXED_CLASS_REG
 } from "@/app/frames/components/lib";
 >>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 
@@ -599,7 +605,6 @@ export const ClassPanel: React.FC<ClassPanelProps> = ({
   setSelectedClassName,
   classCounts
 }) => {
-  const [newClassName, setNewClassName] = useState("");
   const [newProfileName, setNewProfileName] = useState("");
 
   const orderedProfiles = useMemo(
@@ -614,7 +619,7 @@ export const ClassPanel: React.FC<ClassPanelProps> = ({
   }, [classRegistry, selectedProfileId]);
 
   const handleSelectProfile = (id: string) => {
-    setSelectedProfileId(id);
+    setSelectedProfileId(id || null);
   };
 
   const handleCreateProfile = (e: FormEvent) => {
@@ -639,31 +644,30 @@ export const ClassPanel: React.FC<ClassPanelProps> = ({
     setNewProfileName("");
   };
 
-  const handleCreateClass = (e: FormEvent) => {
-    e.preventDefault();
-    const raw = newClassName.trim();
-    if (!raw) return;
-
-    const name = raw;
-    if (classRegistry[name]) {
-      // Just select it if it already exists
-      setSelectedClassName(name);
-      setNewClassName("");
+  const handleSelectClass = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const clsName = e.target.value;
+    if (!clsName) {
+      setSelectedClassName(null);
       return;
     }
 
-    const nextRegistry: ClassRegistry = {
-      ...classRegistry,
-      [name]: {
-        id: name,
-        name,
-        profileId: selectedProfileId ?? undefined
-      }
-    };
+    setSelectedClassName(clsName);
 
-    setClassRegistry(nextRegistry);
-    setSelectedClassName(name);
-    setNewClassName("");
+    const key = clsName.toLowerCase();
+    const numericId = FIXED_CLASS_REG[key] ?? 1;
+
+    // Only add to registry if it's not already there
+    if (!classRegistry[key]) {
+      const nextRegistry: ClassRegistry = {
+        ...classRegistry,
+        [key]: {
+          id: String(numericId),
+          name: clsName,
+          profileId: selectedProfileId ?? undefined
+        }
+      };
+      setClassRegistry(nextRegistry);
+    }
   };
 
   return (
@@ -677,9 +681,7 @@ export const ClassPanel: React.FC<ClassPanelProps> = ({
           <select
             className="border border-gray-300 rounded px-1 py-0.5 text-xs"
             value={selectedProfileId ?? ""}
-            onChange={(e) =>
-              handleSelectProfile(e.target.value || "")
-            }
+            onChange={(e) => handleSelectProfile(e.target.value || "")}
           >
             {orderedProfiles.map((p) => (
               <option key={p.id} value={p.id}>
@@ -706,27 +708,24 @@ export const ClassPanel: React.FC<ClassPanelProps> = ({
           </form>
         </div>
 
-        {/* Add class */}
-        <form
-          onSubmit={handleCreateClass}
-          className="flex items-center gap-1"
-        >
+        {/* Class dropdown (fixed LABEL_MAP) */}
+        <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-gray-600">
             Class
           </span>
-          <input
+          <select
             className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-            placeholder="New class"
-            value={newClassName}
-            onChange={(e) => setNewClassName(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="px-2 py-0.5 rounded text-xs border border-gray-400"
+            value={selectedClassName ?? ""}
+            onChange={handleSelectClass}
           >
-            +
-          </button>
-        </form>
+            <option value="">Select class</option>
+            {LABEL_MAP.categories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Class list with counts */}
@@ -756,7 +755,7 @@ export const ClassPanel: React.FC<ClassPanelProps> = ({
         })}
         {classesForProfile.length === 0 && (
           <span className="text-xs text-gray-500 italic">
-            No classes yet – add one above.
+            No classes yet – pick one from the dropdown above.
           </span>
         )}
       </div>
@@ -1167,7 +1166,7 @@ export default function ToolBar({
               <hr className="m-4 h-px opacity-30 border-gray-200" />
             </div>
 
-            {/* Class / instance panels (unchanged) */}
+            {/* Class / instance panels */}
             <ClassPanel
               profiles={profiles}
               setProfiles={(next) => {
