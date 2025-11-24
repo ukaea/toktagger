@@ -44,7 +44,7 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
     // Get a reference to all subplots and find the name of the axis
     const subplots = plot.querySelectorAll(".subplot");
     const subplotNames = [...subplots].map((el) =>
-      [...el.classList].find((cls) => cls !== "subplot")
+      [...el.classList].find((cls) => cls !== "subplot"),
     );
 
     // For each subplot carry out the tooling generation
@@ -55,7 +55,7 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       }
 
       const overplot = document.getElementsByClassName(
-        `${plotId}-overplot-${subplotId}`
+        `${plotId}-overplot-${subplotId}`,
       )[0];
 
       if (!overplot) {

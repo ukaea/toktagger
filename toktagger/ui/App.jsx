@@ -11,7 +11,10 @@ function App() {
         <Route path="/" element={<Projects />} />
         <Route path="/ui/projects" element={<Projects />} />
         <Route path="/ui/projects/:project_id" element={<ProjectView />} />
-        <Route path="/ui/projects/:project_id/samples/:sample_id" element={<SampleView />} />
+        <Route
+          path="/ui/projects/:project_id/samples/:sample_id"
+          element={<SampleView />}
+        />
       </Routes>
     </Router>
   );
