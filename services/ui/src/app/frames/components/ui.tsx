@@ -421,7 +421,7 @@ export function ClassInfoPopup(props: {
   };
 
   return (
-    <div className="rounded-lg shadow-md bg白/95 backdrop-blur px-3 py-2 text-sm leading-tight border border-gray-200">
+    <div className="rounded-lg shadow-md bg-white/95 backdrop-blur px-3 py-2 text-sm leading-tight border border-gray-200">
       <div className="flex items-center justify-between gap-3">
         <div>
           {includeTrackIds ? (
