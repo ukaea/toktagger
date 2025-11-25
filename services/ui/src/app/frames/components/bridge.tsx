@@ -23,21 +23,30 @@ import {
 } from "./lib";
 import type { ClassRegistry } from "./lib";
 
+/**
+ * Imperative bridge between Annotorious and the rest of the UFO frame view.
+ *
+ * Responsibilities:
+ * - Keep annotations rectangle-only and normalized (class/track stamping).
+ * - Track dirty state for background auto-save.
+ * - Expose a small API for reading, hydrating, and clearing the overlay.
+ * - Optionally auto-create instance profiles when duplicate (class, track) is drawn.
+ */
 export type BridgeHandle = {
-  /** Read overlay -> stamp to currentKey -> return list (no storage write). */
+  /** Read current overlay, stamp to currentKey, normalize, and return the list (no storage writes). */
   persistWorkingNow: (currentKey: string) => Promise<ImageAnnotation[]>;
-  /** Silently clear overlay (no events). */
+  /** Silently clear overlay (no events fired to callers). */
   clearOverlaySilently: () => Promise<void>;
-  /** Silently hydrate overlay with the given list (retarget/stamp to currentKey). */
+  /** Silently hydrate overlay with a given list, retargeting all annotations to currentKey. */
   hydrateOverlay: (
     list: ImageAnnotation[],
     currentKey: string
   ) => Promise<boolean>;
-  /** Is annotator ready yet? */
+  /** Has the annotator been mounted and is ready to accept calls? */
   isAnnotatorReady: () => boolean;
   /** Have there been user edits in this session that haven't been background-saved yet? */
   hasUnsaved: () => boolean;
-  /** Mark current overlay as saved (called after a successful PUT). */
+  /** Mark current overlay as saved (called after a successful PUT to the backend). */
   markSaved: () => void;
 };
 
@@ -74,34 +83,34 @@ export const AnnoBridge = Object.assign(
 
     const anno = useAnnotator();
 
-    // Prevent event-driven writes during programmatic overlay changes
+    // Prevent event-driven writes while we are applying programmatic overlay changes.
     const suppressPersistRef = useRef(false);
-    // Last normalized list by id -> power normalization for edits
+    // Last normalized list, indexed by id, used to keep class/track info stable across edits.
     const lastByIdRef = useRef<Record<string, ImageAnnotation>>({});
-    // Store latest currentKey for stamping
+    // Store latest currentKey (frame key) so reads/writes can stamp annotations correctly.
     const currentKeyRef = useRef<string>("");
 
-    // Track if the user has made edits this session that haven't been PUT yet
+    // Tracks whether the user has made edits that haven't been persisted yet.
     const dirtyRef = useRef(false);
 
-    // Buffered overlay apply
+    // Buffered overlay apply (one setAnnotations per animation frame).
     const pendingRef = useRef<ImageAnnotation[] | null>(null);
     const flushingRef = useRef(false);
-    const lastAppliedRef = useRef<string>(""); // JSON signature of last applied
+    const lastAppliedRef = useRef<string>(""); // JSON signature of last applied overlay
 
     const sig = (anns: ImageAnnotation[]) =>
       JSON.stringify(
         anns.map((a) => ({ id: (a as any).id, t: a.type, tSrc: a.target?.source }))
       );
 
-    // Double-RAF to ensure Annotorious has settled before re-enabling events
+    // Double-RAF to ensure Annotorious has settled before re-enabling event handling
     const doubleRAF = useCallback(async () => {
       await new Promise<void>((r) =>
         requestAnimationFrame(() => requestAnimationFrame(() => r()))
       );
     }, []);
 
-    // Run a function with suppression enabled
+    // Run a function while temporarily suppressing change-driven normalization/persist logic
     const runSilently = useCallback(
       async (fn: () => void | Promise<void>) => {
         suppressPersistRef.current = true;
@@ -115,7 +124,7 @@ export const AnnoBridge = Object.assign(
       [doubleRAF]
     );
 
-    // Once-per-frame overlay flush with signature guard
+    // Once-per-frame overlay flush with signature guard to avoid redundant setAnnotations calls
     const flushOverlay = useCallback(async () => {
       if (flushingRef.current) return;
       flushingRef.current = true;
@@ -138,7 +147,7 @@ export const AnnoBridge = Object.assign(
       flushingRef.current = false;
     }, [anno, runSilently]);
 
-    // Shared writer: normalize + remember + return (RECTANGLE ONLY)
+    // Shared writer: normalize, keep lastByIdRef in sync, and return the normalized list (rectangles only)
     const normalizeWrite = useCallback(
       (raw: ImageAnnotation[]) => {
         // Rectangle-only: drop anything not a rectangle
@@ -159,19 +168,14 @@ export const AnnoBridge = Object.assign(
       [getSelectedProfile, getSelectedClassName, includeTrackIds, classRegistry]
     );
 
-    // Auto-quick-add: ensure class exists in registry whenever a new annotation is created
+    // Auto-quick-add: ensure a class entry exists in the registry whenever a new annotation is created
     const handleCreate = useCallback(
       async (w3c: ImageAnnotation) => {
-        // Whatever you already do here:
-        // - ensureInstancesOnCreate(w3c, ...)
-        // - mark dirty
-        // - etc.
-
+        // Mark overlay as dirty so background auto-save can pick up the latest state
         dirtyRef.current = true;
 
-        // --- Auto-quick-add: ensure class exists in registry ---
         try {
-          // Prefer the currently selected class from the toolbar
+          // Prefer the currently selected class from the toolbar, fallback to annotation body
           const selectedClass =
             getSelectedClassName?.() ?? extractClassLabelFromAnnotation(w3c);
 
@@ -283,7 +287,7 @@ export const AnnoBridge = Object.assign(
       [anno, doubleRAF, runSilently, normalizeWrite]
     );
 
-    // Subscribe to create/update/delete -> normalize + auto-quick-add logic (RECTANGLE ONLY)
+    // Subscribe to create/update/delete events -> normalize + optional auto-quick-add (rectangles only)
     useEffect(() => {
       if (!anno) return;
 
@@ -296,7 +300,7 @@ export const AnnoBridge = Object.assign(
         const key = currentKeyRef.current;
         const got: any = (anno as any).getAnnotations?.() ?? [];
         const rawFull: any[] = Array.isArray(got) ? got : got?.list || [];
-        // Drop non-rectangles at the source
+        // Drop non-rectangles at the source and retarget to the current frame key
         const raw = rawFull
           .filter(isRectangleAnno)
           .map((a: any) => ({
@@ -314,7 +318,7 @@ export const AnnoBridge = Object.assign(
           classRegistry
         );
 
-        // Auto quick-add logic; will be no-op in Phase 1 because we don't pass onAutoQuickAdd
+        // Auto quick-add logic; no-op when onAutoQuickAdd is not provided
         if (includeTrackIds && normalized.length > 0 && onAutoQuickAdd) {
           const firstByInstance = new Map<string, string>();
           let duplicateAnno: ImageAnnotation | null = null;
@@ -352,7 +356,7 @@ export const AnnoBridge = Object.assign(
           }
         }
 
-        // keep lastById in sync (even if overlay doesn't need re-apply)
+        // Keep lastById in sync (even if overlay does not need re-apply)
         const byId: Record<string, ImageAnnotation> = {};
         for (const a of normalized) byId[a.id as string] = a;
         lastByIdRef.current = byId;
@@ -363,7 +367,7 @@ export const AnnoBridge = Object.assign(
           return;
         }
 
-        // Buffer; one apply per animation frame
+        // Buffer and apply once per animation frame
         pendingRef.current = normalized;
         void flushOverlay();
       };
