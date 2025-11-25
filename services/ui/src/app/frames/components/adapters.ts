@@ -5,11 +5,13 @@ import type { ImageAnnotation } from "@annotorious/react";
 const KEY_PREFIX = "anno::w3c::";
 
 /**
- * Stable, per-source W3C image annotation store.
- * Persists to localStorage today. Swap for a backend later without changing call sites.
+ * LocalStorage-backed store for W3C-style image annotations for a single image/frame.
  *
- * Storage key shape:
- *   localStorage["anno::w3c::" + sourceKey]
+ * - Keyed by a stable `sourceKey` (see `buildSourceKey`).
+ * - Returns an empty array on any failure or malformed data.
+ *
+ * Storage layout:
+ *   localStorage["anno::w3c::" + sourceKey] = JSON.stringify(ImageAnnotation[])
  */
 export function W3CImageFormat(sourceKey: string) {
   const key = `${KEY_PREFIX}${sourceKey}`;
@@ -32,7 +34,7 @@ export function W3CImageFormat(sourceKey: string) {
       if (typeof window === "undefined") return;
       window.localStorage.setItem(key, JSON.stringify(list ?? []));
     } catch {
-      // ignore quota or serialization errors for now
+      // Ignore quota or serialization errors; caller treats this as best-effort persistence.
     }
   };
 
@@ -40,7 +42,12 @@ export function W3CImageFormat(sourceKey: string) {
 }
 
 /**
- * Helper to build the stable identity for an image frame.
+ * Build a stable "source" identifier for a project/sample/frame combination.
+ *
+ * This value is used as:
+ * - the W3C `target.source` for annotations, and
+ * - the suffix for the LocalStorage key used by `W3CImageFormat`.
+ *
  * Example: app://p/abc/s/def/f/300
  */
 export function buildSourceKey({
