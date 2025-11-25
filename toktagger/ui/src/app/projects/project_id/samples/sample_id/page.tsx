@@ -346,13 +346,13 @@ export default function SamplePage({
 
   useEffect(() => {}, [plotProps]);
 
-  // Phase 3/5: frame navigation for UFO task via dataParams
+  // Frame navigation for UFO image tasks, driven by `dataParams.frame`.
   const currentFrame =
     data && typeof (data as any).frame === "number"
       ? ((data as any).frame as number)
       : undefined;
 
-  // Optional frame bounds from backend, if provided (old semantics)
+  // Optional frame bounds from the backend (min/max and/or sparse `available` frames).
   const frameBounds:
     | {
         min?: number;
@@ -364,6 +364,8 @@ export default function SamplePage({
     (data && (data as any).frame_bounds) ||
     undefined;
 
+  // Clamp a requested frame into the valid range, respecting explicit min/max
+  // and, if provided, snapping to the closest available frame index.
   const clampToBounds = (n: number): number => {
     if (!Number.isFinite(n)) return 0;
     let frame = Math.floor(n);
@@ -388,6 +390,7 @@ export default function SamplePage({
     return frame < 0 ? 0 : frame;
   };
 
+  // Compute the next frame index, respecting any sparse `available` list and max bound.
   const nextAvailable = (
     frame: number | undefined
   ): number | undefined => {
@@ -411,6 +414,7 @@ export default function SamplePage({
     return frame + 1;
   };
 
+  // Compute the previous frame index, respecting any sparse `available` list and min bound.
   const prevAvailable = (
     frame: number | undefined
   ): number | undefined => {
@@ -435,6 +439,7 @@ export default function SamplePage({
     return frame - 1;
   };
 
+  // Update `dataParams` so the backend returns the requested image frame.
   const goToFrame = (n: number) => {
     if (!Number.isFinite(n)) return;
     const target = clampToBounds(n);
@@ -446,18 +451,21 @@ export default function SamplePage({
     }));
   };
 
+  // Navigate to the previous valid frame (if any).
   const onPrev = () => {
     if (typeof currentFrame !== "number") return;
     const target = prevAvailable(currentFrame);
     if (typeof target === "number") goToFrame(target);
   };
 
+  // Navigate to the next valid frame (if any).
   const onNext = () => {
     if (typeof currentFrame !== "number") return;
     const target = nextAvailable(currentFrame);
     if (typeof target === "number") goToFrame(target);
   };
 
+  // Jump handler used by the UFO frame search box.
   const onJump = (n: number) => {
     goToFrame(n);
   };
