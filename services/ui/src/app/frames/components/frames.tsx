@@ -10,6 +10,7 @@ import React, {
 import {
   Annotorious,
   ImageAnnotator,
+  ImageAnnotationPopup,
   type ImageAnnotation
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
@@ -31,9 +32,14 @@ import {
   FIXED_CLASS_REG,
   canonicalizeTrackId,
   uniqueReadableId,
-  saveLastClassName
+  saveLastClassName,
+  extractClassLabel
 } from "./lib";
-import { Toast } from "./ui";
+import {
+  Toast,
+  ClassInfoPopup,
+  ConfirmModal
+} from "./ui";
 
 /**
  * Simple Jump control: user types a frame number, we call onJump(n).
@@ -84,6 +90,10 @@ export function FrameSearch({
  * - onAutoQuickAdd wiring to auto-create new instances when a duplicate
  *   (class_name, track_id) is drawn.
  *
+ * Phase 3 bits:
+ * - ImageAnnotationPopup + ClassInfoPopup
+ * - onDeleted → save, re-count annotations, empty-instance cleanup flow.
+ *
  * - base64 PNG → <img src="data:image/png;base64,...">
  * - Rectangle-only drawing
  * - Per-frame storage via W3CImageFormat + buildSourceKey
@@ -118,7 +128,7 @@ export function FrameView({
   // so drawingEnabled can react.
   const [, setSelectionTick] = useState(0);
 
-  // Local toast for quick-add notifications
+  // Local toast for notifications (quick-add, delete, etc.)
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string>("");
 
@@ -197,6 +207,17 @@ export function FrameView({
     [frameKey]
   );
 
+  // List of annotations for this frame used by ClassInfoPopup
+  const [popupList, setPopupList] = useState<ImageAnnotation[]>([]);
+
+  // Empty-instance cleanup state (Phase 3)
+  const [emptyInstanceModalOpen, setEmptyInstanceModalOpen] =
+    useState(false);
+  const [emptyInstanceProfile, setEmptyInstanceProfile] = useState<{
+    class_name?: string;
+    track_id?: string;
+  } | null>(null);
+
   // --- Hydrate from localStorage when the annotator is ready ---
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +225,9 @@ export function FrameView({
     const load = async () => {
       const stored = await adapter.read();
       if (cancelled || !stored || stored.length === 0) return;
+
+      // Keep a local copy for popups
+      setPopupList(stored as ImageAnnotation[]);
 
       const attemptHydrate = async () => {
         if (cancelled) return;
@@ -215,7 +239,10 @@ export function FrameView({
         try {
           await bridgeRef.current?.hydrateOverlay?.(stored, frameKey);
         } catch (err) {
-          console.error("Failed to hydrate overlay from localStorage", err);
+          console.error(
+            "Failed to hydrate overlay from localStorage",
+            err
+          );
         }
       };
 
@@ -238,6 +265,8 @@ export function FrameView({
       try {
         const list = await bridge.persistWorkingNow(frameKey);
         await adapter.write(list);
+        // Keep popupList in sync with the latest persisted state
+        setPopupList(list as ImageAnnotation[]);
         bridge.markSaved();
         return list;
       } catch (err) {
@@ -375,6 +404,7 @@ export function FrameView({
       // Clear overlay and wipe this frame's stored annotations
       await bridge.clearOverlaySilently();
       await adapter.write([]);
+      setPopupList([]);
     };
 
     return () => {
@@ -405,6 +435,7 @@ export function FrameView({
 
       // Also clear current overlay so the user sees the wipe immediately
       await bridgeRef.current?.clearOverlaySilently?.();
+      setPopupList([]);
     };
 
     return () => {
@@ -442,6 +473,60 @@ export function FrameView({
       onJump(n);
     },
     [onJump, saveCurrentFrame]
+  );
+
+  // Count annotations for a given (class_name, track_id) across ALL frames in this sample
+  const countAnnotationsForInstance = useCallback(
+    async (info: { class_name?: string; track_id?: string }) => {
+      if (typeof window === "undefined") return 0;
+
+      const className = (info.class_name || "").toLowerCase();
+      const trackKey = canonicalizeTrackId(info.track_id || "");
+
+      if (!className || !trackKey) return 0;
+
+      const storage = window.localStorage;
+      const prefix =
+        "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
+
+      let total = 0;
+
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key || !key.startsWith(prefix)) continue;
+        const raw = storage.getItem(key);
+        if (!raw) continue;
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+
+        if (!Array.isArray(parsed)) continue;
+
+        for (const ann of parsed as any[]) {
+          const label = extractClassLabel(
+            ann as ImageAnnotation
+          );
+          if (!label) continue;
+
+          const annClass =
+            (label.class_name || "").toLowerCase();
+          const annTrack = canonicalizeTrackId(
+            label.track_id || ""
+          );
+
+          if (annClass === className && annTrack === trackKey) {
+            total += 1;
+          }
+        }
+      }
+
+      return total;
+    },
+    [projectId, sampleId]
   );
 
   // Phase 2 – Quick-add-by-drawing (auto instance creation)
@@ -559,6 +644,150 @@ export function FrameView({
     [classRegistry, showToast]
   );
 
+  // Phase 3 — onDeleted handler: persist, re-count, empty-instance cleanup
+  const handleAnnotationDeleted = useCallback(
+    async (label: { class_name?: string; track_id?: string }) => {
+      // Persist current frame after deletion
+      await saveCurrentFrame();
+
+      // Always show a simple deletion toast
+      showToast("Annotation deleted.");
+
+      const class_name = label.class_name;
+      const track_id_raw = label.track_id;
+
+      if (!class_name || !track_id_raw) {
+        return;
+      }
+
+      const canonicalProfile = {
+        class_name,
+        track_id: canonicalizeTrackId(track_id_raw)
+      };
+
+      const total = await countAnnotationsForInstance(
+        canonicalProfile
+      );
+
+      if (total === 0) {
+        setEmptyInstanceProfile(canonicalProfile);
+        setEmptyInstanceModalOpen(true);
+      }
+    },
+    [saveCurrentFrame, countAnnotationsForInstance, showToast]
+  );
+
+  // Phase 3 — ConfirmModal handlers for deleting empty instance profile
+  const confirmDeleteEmptyInstance = useCallback(() => {
+    if (
+      typeof window === "undefined" ||
+      !emptyInstanceProfile
+    ) {
+      setEmptyInstanceModalOpen(false);
+      setEmptyInstanceProfile(null);
+      return;
+    }
+
+    const w = window as any;
+
+    const classNameKey =
+      (emptyInstanceProfile.class_name || "").toLowerCase();
+    const trackKey = canonicalizeTrackId(
+      emptyInstanceProfile.track_id || ""
+    );
+
+    const existingProfiles = Array.isArray(w.ufoInstanceProfiles)
+      ? (w.ufoInstanceProfiles as any[])
+      : [];
+
+    const remaining = existingProfiles.filter((p: any) => {
+      const pClass = (p.class_name || "").toLowerCase();
+      const pTrack = canonicalizeTrackId(p.track_id || "");
+      return !(pClass === classNameKey && pTrack === trackKey);
+    });
+
+    let selectedProfileId: string | null =
+      w.ufoSelectedProfileId ?? null;
+
+    // If we just removed the selected profile, choose a fallback
+    if (selectedProfileId) {
+      const removedWasSelected = existingProfiles.some(
+        (p: any) => {
+          const pClass = (p.class_name || "").toLowerCase();
+          const pTrack = canonicalizeTrackId(
+            p.track_id || ""
+          );
+          return (
+            p.id === selectedProfileId &&
+            pClass === classNameKey &&
+            pTrack === trackKey
+          );
+        }
+      );
+
+      if (removedWasSelected) {
+        if (remaining.length > 0) {
+          const last = remaining[remaining.length - 1];
+          selectedProfileId = last.id;
+          w.ufoSelectedProfileId = last.id;
+          w.ufoSelectedClassName = last.class_name;
+          w.ufoSelectedTrackId = last.track_id;
+        } else {
+          selectedProfileId = null;
+          w.ufoSelectedProfileId = null;
+          w.ufoSelectedClassName = null;
+          w.ufoSelectedTrackId = null;
+        }
+      }
+    }
+
+    // Mirror back to window and notify FrameView / toolbar
+    w.ufoInstanceProfiles = remaining;
+    w.ufoNotifySelectionChanged?.();
+
+    const profilePayload = remaining.map((p: any) => ({
+      class_name: p.class_name,
+      class_id: p.class_id,
+      track_id: p.track_id
+    }));
+
+    let selectedKey: string | null = null;
+    if (selectedProfileId && remaining.length > 0) {
+      const matched = remaining.find(
+        (p: any) => p.id === selectedProfileId
+      );
+      if (matched) {
+        selectedKey = `${String(
+          matched.class_name
+        ).toLowerCase()}:${canonicalizeTrackId(
+          matched.track_id || ""
+        )}`;
+      }
+    }
+
+    const detail = {
+      includeTrackIds: true,
+      profiles: profilePayload,
+      selectedKey,
+      selectedClassName:
+        w.ufoSelectedClassName ?? null,
+      lastClassName: w.ufoSelectedClassName ?? null,
+      classRegistry
+    };
+
+    window.dispatchEvent(
+      new CustomEvent("ufo:state", { detail })
+    );
+
+    setEmptyInstanceModalOpen(false);
+    setEmptyInstanceProfile(null);
+  }, [emptyInstanceProfile, classRegistry]);
+
+  const cancelDeleteEmptyInstance = useCallback(() => {
+    setEmptyInstanceModalOpen(false);
+    setEmptyInstanceProfile(null);
+  }, []);
+
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Simple nav bar */}
@@ -606,6 +835,18 @@ export function FrameView({
           />
         </ImageAnnotator>
 
+        {/* Annotation popup – label + track + Delete */}
+        <ImageAnnotationPopup
+          popup={(props) => (
+            <ClassInfoPopup
+              {...props}
+              list={popupList}
+              includeTrackIds={true}
+              onDeleted={handleAnnotationDeleted}
+            />
+          )}
+        />
+
         {/* Imperative bridge – used for localStorage + dirty tracking */}
         <AnnoBridge
           ref={bridgeRef as any}
@@ -616,6 +857,17 @@ export function FrameView({
           onAutoQuickAdd={onAutoQuickAdd}
         />
       </Annotorious>
+
+      {/* Phase 3 – Delete empty instance? */}
+      <ConfirmModal
+        open={emptyInstanceModalOpen}
+        title="Delete empty instance?"
+        message="This instance no longer has any annotations. Do you also want to remove the instance profile from the list?"
+        confirmLabel="Delete instance"
+        cancelLabel="Keep instance"
+        onConfirm={confirmDeleteEmptyInstance}
+        onCancel={cancelDeleteEmptyInstance}
+      />
 
       <Toast open={toastOpen} message={toastMessage} />
     </div>
