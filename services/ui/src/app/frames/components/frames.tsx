@@ -24,7 +24,16 @@ import "react-contexify/ReactContexify.css";
 
 import { AnnoBridge, type BridgeHandle } from "./bridge";
 import { W3CImageFormat, buildSourceKey } from "./adapters";
-import { loadClassRegistry, type ClassRegistry } from "./lib";
+import {
+  loadClassRegistry,
+  type ClassRegistry,
+  LABEL_MAP,
+  FIXED_CLASS_REG,
+  canonicalizeTrackId,
+  uniqueReadableId,
+  saveLastClassName
+} from "./lib";
+import { Toast } from "./ui";
 
 /**
  * Simple Jump control: user types a frame number, we call onJump(n).
@@ -69,7 +78,11 @@ export function FrameSearch({
  *
  * Phase 5 bits:
  * - forward propagation on Next
- * - selected profile / class are read from global UFO toolbar via window.*
+ * - selected profile / class are read from global UFO toolbar via window.*.
+ *
+ * Phase 2 bits:
+ * - onAutoQuickAdd wiring to auto-create new instances when a duplicate
+ *   (class_name, track_id) is drawn.
  *
  * - base64 PNG → <img src="data:image/png;base64,...">
  * - Rectangle-only drawing
@@ -104,6 +117,19 @@ export function FrameView({
   // Bump this whenever the toolbar changes the selected instance,
   // so drawingEnabled can react.
   const [, setSelectionTick] = useState(0);
+
+  // Local toast for quick-add notifications
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string>("");
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setToastOpen(true);
+    // Simple auto-dismiss
+    window.setTimeout(() => {
+      setToastOpen(false);
+    }, 2000);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -148,6 +174,8 @@ export function FrameView({
     () => loadClassRegistry(),
     []
   );
+
+  const drawingEnabled = !!getSelectedProfile();
 
   const frameNumber: number =
     typeof data.frame === "number" ? data.frame : 0;
@@ -416,6 +444,121 @@ export function FrameView({
     [onJump, saveCurrentFrame]
   );
 
+  // Phase 2 – Quick-add-by-drawing (auto instance creation)
+  const onAutoQuickAdd = useCallback(
+    async ({ class_name }: { class_name: string }) => {
+      if (typeof window === "undefined") return null;
+
+      // Hint is lowercased in AnnoBridge; normalize
+      const cnameKey = (class_name || "").toLowerCase();
+      if (!cnameKey) return null;
+
+      const w = window as any;
+
+      // Current instance profiles live on the UFO toolbar and are mirrored here
+      const existingProfiles = Array.isArray(w.ufoInstanceProfiles)
+        ? (w.ufoInstanceProfiles as any[])
+        : [];
+
+      // Resolve a "pretty" class name from LABEL_MAP (e.g. "Minor UFO")
+      const labelDef =
+        LABEL_MAP.categories.find(
+          (c) => c.name.toLowerCase() === cnameKey
+        ) || null;
+
+      const prettyClassName = labelDef?.name ?? class_name;
+
+      // Track IDs already used for this class
+      const existingTrackIds = existingProfiles
+        .filter(
+          (p) =>
+            typeof p?.class_name === "string" &&
+            p.class_name.toLowerCase() === cnameKey &&
+            typeof p?.track_id === "string"
+        )
+        .map((p) => p.track_id as string);
+
+      // Generate a new readable, unique track_id
+      const readable = uniqueReadableId(existingTrackIds);
+      const track_id = canonicalizeTrackId(readable);
+
+      // Resolve class_id from registry or fixed map
+      const reg = classRegistry;
+      const regEntry =
+        reg[cnameKey] || reg[prettyClassName] || undefined;
+
+      const regId =
+        regEntry && typeof regEntry.id === "string"
+          ? Number(regEntry.id)
+          : undefined;
+
+      const fixedId =
+        FIXED_CLASS_REG[cnameKey] ??
+        FIXED_CLASS_REG[prettyClassName.toLowerCase()];
+
+      const class_id =
+        (typeof regId === "number" && !Number.isNaN(regId)
+          ? regId
+          : undefined) ??
+        (typeof fixedId === "number" ? fixedId : undefined) ??
+        1;
+
+      const id = `${prettyClassName}:${track_id}`;
+
+      const nextProfiles = [
+        ...existingProfiles,
+        {
+          id,
+          class_name: prettyClassName,
+          class_id,
+          track_id
+        }
+      ];
+
+      // Mirror into window.* so AnnoBridge + toolbar see the new instance
+      w.ufoInstanceProfiles = nextProfiles;
+      w.ufoSelectedProfileId = id;
+      w.ufoSelectedClassName = prettyClassName;
+      w.ufoSelectedTrackId = track_id;
+      w.ufoNotifySelectionChanged?.();
+
+      // Post a ufo:state snapshot so the left toolbar updates its React state
+      const profilePayload = nextProfiles.map((p: any) => ({
+        class_name: p.class_name,
+        class_id: p.class_id,
+        track_id: p.track_id
+      }));
+
+      const selectedKey = `${prettyClassName.toLowerCase()}:${track_id}`;
+
+      const detail = {
+        includeTrackIds: true,
+        profiles: profilePayload,
+        selectedKey,
+        selectedClassName: prettyClassName,
+        lastClassName: prettyClassName,
+        classRegistry
+        // profileCounts is optional here; toolbar will keep its own scanner
+      };
+
+      window.dispatchEvent(
+        new CustomEvent("ufo:state", { detail })
+      );
+
+      // Persist last class, as in the old branch
+      saveLastClassName(prettyClassName);
+
+      // Toast to confirm auto-created instance
+      showToast(
+        `New ${prettyClassName} instance: #${track_id}`
+      );
+
+      // Return descriptor so AnnoBridge can rewrite the duplicate annotation
+      return { class_id, class_name: prettyClassName, track_id };
+    },
+    [classRegistry, showToast]
+  );
+
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Simple nav bar */}
@@ -453,7 +596,7 @@ export function FrameView({
       <Annotorious>
         <ImageAnnotator
           tool="rectangle"
-          drawingEnabled={!!getSelectedProfile()}
+          drawingEnabled={drawingEnabled}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -470,8 +613,11 @@ export function FrameView({
           getSelectedClassName={getSelectedClassName}
           includeTrackIds={includeTrackIds}
           classRegistry={classRegistry}
+          onAutoQuickAdd={onAutoQuickAdd}
         />
       </Annotorious>
+
+      <Toast open={toastOpen} message={toastMessage} />
     </div>
   );
 }
