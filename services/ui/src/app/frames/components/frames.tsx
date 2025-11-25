@@ -70,7 +70,7 @@ export function FrameSearch({
 
   return (
     <SearchField
-      label="Jump to Frame"
+      aria-label="Jump to Frame"
       onSubmit={onSearchSubmit}
       validationState={errorMessage ? "invalid" : undefined}
       errorMessage={errorMessage}
@@ -301,7 +301,7 @@ export function FrameView({
     [adapter, frameKey]
   );
 
-  // Forward propagation: seed next frame with current annotations if it's empty
+  // Forward propagation: seed next frame with current annotations if it is empty
   const propagateForwardIfEmpty = useCallback(
     async (currentList: ImageAnnotation[], nextFrameNumber: number) => {
       // Nothing to propagate
@@ -666,7 +666,7 @@ export function FrameView({
         ? (w.ufoInstanceProfiles as any[])
         : [];
 
-      // Resolve a "pretty" class name from LABEL_MAP (e.g. "Minor UFO")
+      // Resolve a "pretty" class name from LABEL_MAP (for example "Minor UFO")
       const labelDef =
         LABEL_MAP.categories.find(
           (c) => c.name.toLowerCase() === cnameKey
@@ -1052,7 +1052,7 @@ export function FrameView({
   }, [projectId, sampleId]);
 
   /**
-   * Phase 4 – Confirm delete ALL instances & annotations in this sample.
+   * Phase 4 – Confirm delete ALL instances and annotations in this sample.
    */
   const confirmDeleteAllInstances = useCallback(async () => {
     if (typeof window === "undefined") {
@@ -1081,7 +1081,7 @@ export function FrameView({
     await bridgeRef.current?.clearOverlaySilently?.();
     setPopupList([]);
 
-    // Clear instance profiles + selection from window & notify toolbar
+    // Clear instance profiles and selection from window and notify toolbar
     const w = window as any;
     w.ufoInstanceProfiles = [];
     w.ufoSelectedProfileId = null;
@@ -1175,6 +1175,10 @@ export function FrameView({
           <div className="flex flex-col items-center gap-2">
             {onJump && (
               <div className="w-60 text-center">
+                {/* Centered label above the field */}
+                <div className="text-[13px] text-gray-200 mb-1">
+                  Jump to Frame
+                </div>
                 <FrameSearch onJump={handleJump} />
               </div>
             )}
@@ -1275,7 +1279,7 @@ export function FrameView({
         onCancel={cancelBulkDelete}
       />
 
-      {/* Phase 4 – Delete ALL instances & annotations? */}
+      {/* Phase 4 – Delete ALL instances and annotations? */}
       <ConfirmModal
         open={deleteAllModalOpen}
         title="Delete ALL instances & annotations?"
@@ -1341,7 +1345,7 @@ type UFOViewInfo = {
  * Phase 3/4 UFOView:
  *
  * - Wraps FrameView.
- * - Still ignores global annotations + toolbar for now.
+ * - Still ignores global annotations and toolbar for now.
  * - Adds navigation via onPrev/onNext/onJump.
  */
 export const UFOView = ({
