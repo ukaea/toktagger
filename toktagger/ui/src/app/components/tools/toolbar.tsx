@@ -789,12 +789,12 @@ export default function ToolBar({
   }, [isUfo]);
 
   /**
-   * Per-instance usage scanner.
-   *
-   * This periodically scans localStorage for this sample's frame annotations
-   * and maintains `instanceCounts`, which is shown in the InstancePanel
-   * (e.g. "Instance X used on N frames").
-   */
+  * Per-instance usage scanner.
+  *
+  * We already have `scanInstanceCountsChunked` to compute counts from
+  * localStorage. Here we just re-run that scanner periodically so the
+  * badge stays in sync while the user is annotating.
+  */
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
@@ -802,15 +802,30 @@ export default function ToolBar({
     const keyPrefix =
       "anno::w3c::" + `app://p/${project_id}/s/${sample_id}/`;
 
-    const stop = scanInstanceCountsChunked({
-      keyPrefix,
-      onUpdate: (counts) => {
-        setInstanceCounts(counts);
-      }
-    });
+    let stopScan: (() => void) | null = null;
+
+    const startScan = () => {
+      // cancel any in-flight scan before starting a new one
+      if (stopScan) stopScan();
+      stopScan = scanInstanceCountsChunked({
+        keyPrefix,
+        onUpdate: (counts) => {
+          setInstanceCounts(counts);
+        }
+      });
+    };
+
+    // initial scan as soon as the toolbar mounts for this sample
+    startScan();
+
+    // re-scan at a gentle interval while this sample is active
+    const intervalId = window.setInterval(() => {
+      startScan();
+    }, 1000); // ~1s; adjust if you want slower/faster updates
 
     return () => {
-      stop();
+      if (stopScan) stopScan();
+      window.clearInterval(intervalId);
     };
   }, [isUfo, project_id, sample_id]);
 
