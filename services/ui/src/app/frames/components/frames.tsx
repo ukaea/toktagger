@@ -20,7 +20,7 @@ import {
   Annotations,
   DataParams
 } from "@/types";
-import { SearchField } from "@adobe/react-spectrum";
+import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 import "react-contexify/ReactContexify.css";
 
 import { AnnoBridge, type BridgeHandle } from "./bridge";
@@ -1166,74 +1166,89 @@ export function FrameView({
   }, [openDeleteAllInstances]);
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      {/* Simple nav bar */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handlePrev}
-            disabled={!onPrev}
-            className="px-3 py-1 rounded border border-gray-400 text-sm disabled:opacity-50"
-          >
-            Prev
-          </button>
-          <span className="text-sm text-gray-700">
-            Frame: {frameLabel}
-          </span>
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={!onNext}
-            className="px-3 py-1 rounded border border-gray-400 text-sm disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
+    <div className="flex flex-col items-center gap-4 w-full">
+      {/* Outer row: center our whole column (controls + image) in the remaining space */}
+      <div className="w-full flex justify-center">
+        {/* Inner column shrinks to content width (image) up to max-w-5xl */}
+        <div className="inline-flex flex-col items-center gap-4 max-w-5xl">
+          {/* Top bar: Jump-to-Frame centered ABOVE the navigation */}
+          <div className="flex flex-col items-center gap-2">
+            {onJump && (
+              <div className="w-60 text-center">
+                <FrameSearch onJump={handleJump} />
+              </div>
+            )}
 
-        {onJump && (
-          <div className="mt-1">
-            <FrameSearch onJump={handleJump} />
+            {/* Centered navigation below the search field */}
+            <div className="flex justify-center">
+              <ButtonGroup>
+                <Button
+                  variant="primary"
+                  onPress={handlePrev}
+                  isDisabled={!onPrev}
+                >
+                  Prev
+                </Button>
+                <Button variant="primary" isDisabled>
+                  Frame {frameLabel}
+                </Button>
+                <Button
+                  variant="primary"
+                  onPress={handleNext}
+                  isDisabled={!onNext}
+                >
+                  Next
+                </Button>
+              </ButtonGroup>
+            </div>
           </div>
-        )}
+
+          {/* Main area: image centered; viewport-bounded; no cropping */}
+          <div className="overflow-visible">
+            <Annotorious>
+              <ImageAnnotator
+                tool="rectangle"
+                drawingEnabled={drawingEnabled}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`data:image/png;base64,${data.values}`}
+                  alt={`Frame ${frameLabel}`}
+                  /* Fit within the available area while preserving aspect ratio */
+                  className="block mx-auto max-w-full h-auto object-contain max-h-[calc(100dvh-220px)] sm:max-h-[calc(100dvh-210px)]"
+                  style={{
+                    imageRendering: "pixelated",
+                    maxHeight: "calc(100dvh - 240px)"
+                  }}
+                  draggable={false}
+                />
+              </ImageAnnotator>
+
+              {/* Annotation popup – label + track + Delete */}
+              <ImageAnnotationPopup
+                popup={(props) => (
+                  <ClassInfoPopup
+                    {...props}
+                    list={popupList}
+                    includeTrackIds={true}
+                    onDeleted={handleAnnotationDeleted}
+                  />
+                )}
+              />
+
+              {/* Imperative bridge – used for localStorage + dirty tracking */}
+              <AnnoBridge
+                ref={bridgeRef as any}
+                getSelectedProfile={getSelectedProfile}
+                getSelectedClassName={getSelectedClassName}
+                includeTrackIds={includeTrackIds}
+                classRegistry={classRegistry}
+                onAutoQuickAdd={onAutoQuickAdd}
+              />
+            </Annotorious>
+          </div>
+        </div>
       </div>
-
-      {/* Annotorious + image */}
-      <Annotorious>
-        <ImageAnnotator
-          tool="rectangle"
-          drawingEnabled={drawingEnabled}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`data:image/png;base64,${data.values}`}
-            alt={`Frame ${frameLabel}`}
-            style={{ imageRendering: "pixelated" }}
-          />
-        </ImageAnnotator>
-
-        {/* Annotation popup – label + track + Delete */}
-        <ImageAnnotationPopup
-          popup={(props) => (
-            <ClassInfoPopup
-              {...props}
-              list={popupList}
-              includeTrackIds={true}
-              onDeleted={handleAnnotationDeleted}
-            />
-          )}
-        />
-
-        {/* Imperative bridge – used for localStorage + dirty tracking */}
-        <AnnoBridge
-          ref={bridgeRef as any}
-          getSelectedProfile={getSelectedProfile}
-          getSelectedClassName={getSelectedClassName}
-          includeTrackIds={includeTrackIds}
-          classRegistry={classRegistry}
-          onAutoQuickAdd={onAutoQuickAdd}
-        />
-      </Annotorious>
 
       {/* Phase 4 – Delete instance annotations? */}
       <ConfirmModal
@@ -1342,17 +1357,15 @@ export const UFOView = ({
   onJump
 }: UFOViewInfo) => {
   return (
-    <div className="flex space-y-3">
-      <div className="flex-1 text-center items-center">
-        <FrameView
-          data={data}
-          projectId={projectId}
-          sampleId={sampleId}
-          onPrev={onPrev}
-          onNext={onNext}
-          onJump={onJump}
-        />
-      </div>
+    <div className="w-full">
+      <FrameView
+        data={data}
+        projectId={projectId}
+        sampleId={sampleId}
+        onPrev={onPrev}
+        onNext={onNext}
+        onJump={onJump}
+      />
     </div>
   );
 };

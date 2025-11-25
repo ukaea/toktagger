@@ -123,8 +123,12 @@ async function saveUfoAnnotations(
   const w3cList = (await collect()) ?? [];
 
   // 2. Convert W3C → COCO → VideoBoundingBox[]
-  const cocoFrames = w3cToCocoFrames(w3cList);
-  const videoBoxes = cocoFramesToVideoBBoxes(cocoFrames);
+  //    includeTracks=true to preserve per-instance tracking info
+  const cocoFrames = w3cToCocoFrames(
+    w3cList as any,
+    true /* includeTracks */
+  );
+  const videoBoxes = cocoFramesToVideoBBoxes(cocoFrames as any);
   const count = videoBoxes.length;
 
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;

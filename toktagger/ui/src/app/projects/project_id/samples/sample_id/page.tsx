@@ -346,17 +346,99 @@ export default function SamplePage({
 
   useEffect(() => {}, [plotProps]);
 
-  // Phase 3: dumb frame navigation for UFO task via dataParams
+  // Phase 3/5: frame navigation for UFO task via dataParams
   const currentFrame =
     data && typeof (data as any).frame === "number"
       ? ((data as any).frame as number)
       : undefined;
 
-  const goToFrame = (n: number) => {
-    if (!Number.isFinite(n)) {
-      return;
+  // Optional frame bounds from backend, if provided (old semantics)
+  const frameBounds:
+    | {
+        min?: number;
+        max?: number;
+        available?: number[];
+      }
+    | undefined =
+    (data && (data as any).frameBounds) ||
+    (data && (data as any).frame_bounds) ||
+    undefined;
+
+  const clampToBounds = (n: number): number => {
+    if (!Number.isFinite(n)) return 0;
+    let frame = Math.floor(n);
+
+    if (frameBounds) {
+      const { min, max, available } = frameBounds;
+
+      if (typeof min === "number") frame = Math.max(min, frame);
+      if (typeof max === "number") frame = Math.min(max, frame);
+
+      if (Array.isArray(available) && available.length > 0) {
+        const sorted = [...available].sort((a, b) => a - b);
+
+        if (sorted.includes(frame)) return frame;
+
+        const candidate = sorted.find((v) => v >= frame);
+        return candidate ?? sorted[sorted.length - 1];
+      }
     }
-    const target = Math.max(0, Math.floor(n));
+
+    // Fallback: never go below 0
+    return frame < 0 ? 0 : frame;
+  };
+
+  const nextAvailable = (
+    frame: number | undefined
+  ): number | undefined => {
+    if (typeof frame !== "number" || !Number.isFinite(frame))
+      return undefined;
+
+    if (frameBounds) {
+      const { max, available } = frameBounds;
+
+      if (Array.isArray(available) && available.length > 0) {
+        const sorted = [...available].sort((a, b) => a - b);
+        const next = sorted.find((v) => v > frame);
+        return next ?? frame;
+      }
+
+      if (typeof max === "number" && frame >= max) {
+        return frame;
+      }
+    }
+
+    return frame + 1;
+  };
+
+  const prevAvailable = (
+    frame: number | undefined
+  ): number | undefined => {
+    if (typeof frame !== "number" || !Number.isFinite(frame))
+      return undefined;
+
+    if (frameBounds) {
+      const { min, available } = frameBounds;
+
+      if (Array.isArray(available) && available.length > 0) {
+        const sorted = [...available].sort((a, b) => a - b);
+        const reversed = [...sorted].reverse();
+        const prev = reversed.find((v) => v < frame);
+        return prev ?? frame;
+      }
+
+      if (typeof min === "number" && frame <= min) {
+        return frame;
+      }
+    }
+
+    return frame - 1;
+  };
+
+  const goToFrame = (n: number) => {
+    if (!Number.isFinite(n)) return;
+    const target = clampToBounds(n);
+
     setDataParams((previous: DataParams | any) => ({
       ...(previous || {}),
       name: "image",
@@ -365,17 +447,15 @@ export default function SamplePage({
   };
 
   const onPrev = () => {
-    if (typeof currentFrame !== "number") {
-      return;
-    }
-    goToFrame(currentFrame - 1);
+    if (typeof currentFrame !== "number") return;
+    const target = prevAvailable(currentFrame);
+    if (typeof target === "number") goToFrame(target);
   };
 
   const onNext = () => {
-    if (typeof currentFrame !== "number") {
-      return;
-    }
-    goToFrame(currentFrame + 1);
+    if (typeof currentFrame !== "number") return;
+    const target = nextAvailable(currentFrame);
+    if (typeof target === "number") goToFrame(target);
   };
 
   const onJump = (n: number) => {
@@ -404,7 +484,7 @@ export default function SamplePage({
             plotProps={plotProps}
             setPlotProps={setPlotProps}
           />
-          <div className="flex-1 justify-center">
+          <div className="flex-1 flex flex-col items-center">
             <SampleView
               project={project}
               sample={sample}
