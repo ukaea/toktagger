@@ -19,8 +19,6 @@ import {
 
 /** ------------------------------------------------------------------
  *  Toolbar — frame navigation UI (Spectrum)
- *  (Optional; not currently used in the new branch, but kept here
- *  to match the old ui.tsx and for future reuse.)
  *  ------------------------------------------------------------------ */
 export function Toolbar({
   index,
