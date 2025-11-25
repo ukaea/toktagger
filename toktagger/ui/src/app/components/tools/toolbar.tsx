@@ -1,6 +1,9 @@
 "use client";
 <<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
 <<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
+=======
+>>>>>>> a17e3359 (stripped any unused helpers and added comments for better documentation of new changes to toolbar.tsx):services/ui/src/app/components/tools/toolbar.tsx
 import { useEffect, useState } from "react";
 =======
 =======
@@ -71,15 +74,17 @@ import {
   saveClassRegistry,
   loadLastClassName,
   saveLastClassName,
-  LABEL_MAP,
   FIXED_CLASS_REG,
   canonicalizeTrackId,
   uniqueReadableId,
   scanInstanceCountsChunked
 } from "@/app/frames/components/lib";
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
 >>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 
 /** NEW: shared UFO UI from frames/components/ui.tsx */
+=======
+>>>>>>> a17e3359 (stripped any unused helpers and added comments for better documentation of new changes to toolbar.tsx):services/ui/src/app/components/tools/toolbar.tsx
 import {
   ClassPanel as UFOClassPanel,
   InstancePanel as UFOInstancePanel
@@ -104,8 +109,15 @@ async function saveAnnotations(
 =======
 
 /**
- * Phase 4 + 10: UFO-specific save helper.
- * Uses the frame annotator via window.* and now sweeps ALL frames in this sample.
+ * UFO FRAME PIPELINE: Save helper for the frame annotator.
+ *
+ * This function:
+ *  1. Asks the frame annotator (FrameView) for ALL W3C annotations in this sample
+ *     via the window-exposed `ufoCollectForSave`.
+ *  2. Converts the multi-frame W3C annotations to COCO frames,
+ *     and then to the backend's VideoBoundingBox[] format.
+ *  3. PUTs the result to the existing annotations endpoint.
+ *  4. Tells the bridge the data is saved via `ufoMarkSaved`.
  */
 async function saveUfoAnnotations(
   project_id: string,
@@ -263,7 +275,11 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
 }
 
 /**
- * Phase 4: UFO toolbar buttons
+ * UFO FRAME TOOLBAR BUTTONS
+ *
+ * These are the UFO-specific equivalents of Save/Next/ShotSearch above.
+ * They talk to the frame annotator via the `saveUfoAnnotations` helper
+ * and the window-exposed helpers from FrameView.
  */
 
 function UfoSaveButton({
@@ -303,13 +319,16 @@ function UfoNextButton({
 
   const handleClick = async () => {
     try {
-      // 1) If dirty, fire a background save (do not block navigation)
+      // When moving to the next sample we:
+      //  1) Fire a best-effort background save if the frame annotator reports
+      //     unsaved changes (non-blocking).
+      //  2) Navigate to the next sample as usual.
       if (typeof window !== "undefined") {
         const hasUnsaved =
           (window as any).ufoHasUnsavedChanges?.() ?? false;
 
         if (hasUnsaved) {
-          // fire-and-forget, no await on purpose
+          // Fire-and-forget; we intentionally do not await here
           void saveUfoAnnotations(project_id, sample_id);
         }
       }
@@ -354,7 +373,8 @@ function UfoShotSearch({
     const shot_id = newValue;
 
     try {
-      // Foreground save: await before navigating
+      // UFO mode differs from the legacy ShotSearch:
+      // here we ALWAYS await a full multi-frame save before navigating.
       await saveUfoAnnotations(project_id, sample_id);
 
       const sample = await getShotSample(project_id, shot_id);
@@ -597,8 +617,11 @@ function SpectrogramThresholdTool({
 }
 
 /**
- * Instance profiles (tracking) — previous in-memory list.
- * Kept as-is; now mapped into the shared InstancePanel UI.
+ * UFO INSTANCE PROFILES (TRACKING)
+ *
+ * This is the toolbar-side representation of instances for the frame annotator.
+ * Each instance combines a class label + a track_id, and is mirrored to/from
+ * the FrameView via window globals and `ufo:*` events.
  */
 type InstanceProfile = {
   id: string; // e.g. "Minor UFO:#young-vortex-2"
@@ -607,14 +630,12 @@ type InstanceProfile = {
   track_id: string; // canonicalized slug
 };
 
+/**
+ * Stable key used both by the toolbar and FrameView.
+ * Shape: "<class_name lowercase>:<canonical track_id>"
+ */
 const instanceKey = (inst: InstanceProfile) =>
   `${inst.class_name.toLowerCase()}:${inst.track_id}`;
-
-/** Shared dispatch helper for UFO events (for future phases) */
-const dispatchUfoEvent = (name: string, detail?: any) => {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(name, { detail }));
-};
 
 type ToolBarInfo = {
   project: Project;
@@ -645,6 +666,13 @@ export default function ToolBar({
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
+  /**
+   * UFO-ONLY STATE
+   *
+   * These state atoms drive the left-hand UFO toolbar and are only used
+   * when `project.task === "UFO"`.
+   */
+
   // UFO class registry and selection state (lives on the left toolbar)
   const [classRegistry, setClassRegistry] = useState<ClassRegistry>({});
   const [selectedClassName, setSelectedClassName] = useState<string | null>(
@@ -664,7 +692,13 @@ export default function ToolBar({
     Record<string, number>
   >({});
 
-  // Optional future: accept state snapshots from Frames via "ufo:state"
+  /**
+   * UFO STATE MIRROR FROM FRAMEVIEW
+   *
+   * FrameView dispatches "ufo:state" events whenever its internal state changes.
+   * This effect listens for those events and mirrors the payload into React
+   * state so the toolbar UI stays in sync.
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -712,7 +746,7 @@ export default function ToolBar({
       }
 
       if (d.classRegistry) {
-        // Old-frame style: Record<string, number> -> current ClassRegistry
+        // Map from Record<string, number> into current ClassRegistry
         const reg: ClassRegistry = {};
         Object.entries(
           d.classRegistry as Record<string, number>
@@ -736,7 +770,11 @@ export default function ToolBar({
     return () => window.removeEventListener("ufo:state", onState);
   }, []);
 
-  // Load classes + last class for UFO (current-branch logic)
+  /**
+   * Initial load of the UFO class registry and last-used class.
+   * This reads from localStorage via the shared frame `lib` helpers so that
+   * the toolbar has the same view of classes as the frame annotator.
+   */
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
@@ -750,7 +788,13 @@ export default function ToolBar({
     }
   }, [isUfo]);
 
-  // Start per-instance usage scanner when we're in UFO mode
+  /**
+   * Per-instance usage scanner.
+   *
+   * This periodically scans localStorage for this sample's frame annotations
+   * and maintains `instanceCounts`, which is shown in the InstancePanel
+   * (e.g. "Instance X used on N frames").
+   */
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
@@ -770,7 +814,15 @@ export default function ToolBar({
     };
   }, [isUfo, project_id, sample_id]);
 
-  // Helper: create or reselect an instance for a given class
+  /**
+   * Helper: create or reselect an instance for a given class.
+   *
+   * This is the main entry-point from the class panel:
+   *  - Ensures the class exists in the registry.
+   *  - Optionally reselects the last instance for that class.
+   *  - Otherwise, creates a new instance with a unique human-readable track id.
+   *  - Mirrors the resulting list + selection back to FrameView via window.*.
+   */
   const createInstanceForClass = (
     clsName: string,
     opts: { reselectOnlyIfExisting?: boolean } = {}
@@ -840,6 +892,7 @@ export default function ToolBar({
     setInstanceProfiles(nextInstances);
     setSelectedInstanceId(id);
 
+    // Mirror into window for FrameView / AnnoBridge
     if (typeof window !== "undefined") {
       const w = window as any;
       w.ufoInstanceProfiles = nextInstances;
@@ -850,7 +903,12 @@ export default function ToolBar({
     }
   };
 
-  // Mirror selection to window so FrameView / AnnoBridge can read it
+  /**
+   * The next three effects keep the window.* globals in sync with React state,
+   * so that the frame annotator (FrameView + AnnoBridge) can query them.
+   */
+
+  // Mirror selection id to window so FrameView / AnnoBridge can read it
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
@@ -858,13 +916,14 @@ export default function ToolBar({
     (window as any).ufoSelectedProfileId = selectedInstanceId ?? null;
   }, [isUfo, selectedInstanceId]);
 
+  // Mirror selected class name
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
     (window as any).ufoSelectedClassName = selectedClassName;
   }, [isUfo, selectedClassName]);
 
-  // Expose instance profiles array so FrameView / AnnoBridge can use it later
+  // Expose instance profiles array
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
@@ -1014,6 +1073,7 @@ export default function ToolBar({
   };
 
   return (
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
     <Provider theme={defaultTheme} height="100vh">
       <View overflow="auto" height="100vh">
         <Flex
@@ -1047,6 +1107,40 @@ export default function ToolBar({
                 Clear
               </Button>
             </ButtonGroup>
+=======
+    <Provider theme={defaultTheme}>
+      <div className="h-screen text-center">
+        <div className="pl-4 pr-4 pt-4">
+          <ButtonGroup>
+            {isUfo ? (
+              <>
+                {/* UFO frame annotator uses its own save/next buttons
+                    that talk to the multi-frame pipeline. */}
+                <UfoSaveButton project_id={project_id} sample_id={sample_id} />
+                <UfoNextButton project_id={project_id} sample_id={sample_id} />
+              </>
+            ) : (
+              <>
+                <SaveButton
+                  project_id={project_id}
+                  sample_id={sample_id}
+                  annotations={annotations}
+                />
+                <NextButton
+                  project_id={project_id}
+                  sample_id={sample_id}
+                  annotations={annotations}
+                />
+              </>
+            )}
+          </ButtonGroup>
+        </div>
+        <div className="pl-4 pr-4 pb-4 pt-2">
+          {isUfo ? (
+            // UFO version of "Jump to shot", which performs a full multi-frame save
+            <UfoShotSearch project_id={project_id} sample_id={sample_id} />
+          ) : (
+>>>>>>> a17e3359 (stripped any unused helpers and added comments for better documentation of new changes to toolbar.tsx):services/ui/src/app/components/tools/toolbar.tsx
             <ShotSearch
               project_id={project_id}
               sample_id={sample_id}
@@ -1075,12 +1169,15 @@ export default function ToolBar({
           )}
         </div>
 
-        {/* UFO class + instance controls on the left toolbar */}
+        {/* UFO class + instance controls for the frame annotator.
+            This whole block is hidden for non-UFO tasks. */}
         {isUfo && (
           <div className="pl-4 pr-4 pb-4">
             {/* Shape + clear controls (frameControls-style block) */}
             <div className="max-w-[16rem] mx-auto mb-4">
-              {/* Annotation shape tools (smaller sizing) */}
+              {/* Annotation shape tools (smaller sizing).
+                  Currently only rectangles are exposed from the toolbar.
+                  The frame annotator itself is still hard-coded to rectangles. */}
               <div className="mb-2">
                 <Flex gap="size-100" alignItems="center" wrap>
                   <Button
@@ -1097,7 +1194,8 @@ export default function ToolBar({
               {/* Divider between shape tools and destructive actions */}
               <hr className="m-4 h-px opacity-30 border-gray-200" />
 
-              {/* Destructive actions: Clear ALL / Clear Current */}
+              {/* Destructive actions: Clear ALL / Clear Current.
+                  These delegate to FrameView via window.* helpers. */}
               <div className="mb-1">
                 <Flex gap="size-100" alignItems="center" wrap>
                   <Button
@@ -1105,12 +1203,10 @@ export default function ToolBar({
                     isQuiet
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                     onPress={() => {
-                      // Current-branch behavior:
+                      // Wipe all frames in this sample
                       if (typeof window !== "undefined") {
                         (window as any).ufoClearAllFrames?.();
                       }
-                      // Old-branch event pattern (for future phases):
-                      dispatchUfoEvent("ufo:openClearAll");
                     }}
                   >
                     Clear ALL
@@ -1120,12 +1216,10 @@ export default function ToolBar({
                     isQuiet
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                     onPress={() => {
-                      // Current-branch behavior:
+                      // Clear only the current frame
                       if (typeof window !== "undefined") {
                         (window as any).ufoClearCurrent?.();
                       }
-                      // Old-branch event pattern:
-                      dispatchUfoEvent("ufo:clearCurrent");
                     }}
                   >
                     Clear Current
@@ -1137,27 +1231,22 @@ export default function ToolBar({
               <hr className="m-4 h-px opacity-30 border-gray-200" />
             </div>
 
-            {/* Class picker (shared ClassPanel) */}
+            {/* Class picker (shared ClassPanel).
+                Drives which class we are currently annotating in the frame view. */}
             <UFOClassPanel
               selectedClassName={selectedClassName}
               setSelectedClassName={(name) => {
                 if (!name) return;
-                // Current logic: keep existing behavior
                 setSelectedClassName(name);
                 saveLastClassName(name ?? "");
                 createInstanceForClass(name);
-
-                // Old event pattern for future integration:
-                dispatchUfoEvent("ufo:autoCreateProfile", {
-                  className: name
-                });
-                dispatchUfoEvent("ufo:setSelectedClassName", {
-                  name: null
-                });
               }}
             />
 
-            {/* Instance profiles (class + track_id) */}
+            {/* Instance profiles (class + track_id) listed in the sidebar.
+                This uses the shared InstancePanel but is powered by the
+                toolbar's InstanceProfile state and the frame annotator's
+                `instanceCounts` scanner. */}
             <UFOInstancePanel
               profiles={instanceProfiles.map((inst) => ({
                 key: instanceKey(inst),
@@ -1174,10 +1263,7 @@ export default function ToolBar({
                 })()
               }
               onSelect={(key) => {
-                // Old event pattern:
-                dispatchUfoEvent("ufo:selectProfile", { key });
-
-                // Current behavior: map key -> instance & mirror to window
+                // Map key -> instance & mirror to window.
                 const inst = instanceProfiles.find(
                   (p) => instanceKey(p) === key
                 );
@@ -1199,7 +1285,9 @@ export default function ToolBar({
                 className: string,
                 trackId: string
               ) => {
-                // If we ever show creator, hook into current logic:
+                // If we ever show a profile creator UI, this wiring ensures
+                // profiles created from the panel still use the same logic
+                // (canonical track ids, registry lookup, window mirroring).
                 const cls = className;
                 const existingTrackIds = instanceProfiles.map(
                   (p) => p.track_id
@@ -1277,7 +1365,8 @@ export default function ToolBar({
                 }
               }}
               onRequestDeleteAllInstances={() => {
-                // Trigger global "Delete ALL instances & annotations?" flow.
+                // Trigger global "Delete ALL instances & annotations?" flow
+                // in FrameView. The modal and deletion logic live there.
                 if (typeof window !== "undefined") {
                   window.dispatchEvent(
                     new CustomEvent("ufo:deleteAllInstances")
