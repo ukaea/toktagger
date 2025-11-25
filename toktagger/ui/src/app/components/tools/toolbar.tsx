@@ -98,23 +98,28 @@ async function saveAnnotations(
 =======
 
 /**
- * Phase 4: UFO-specific save helper. Uses the frame annotator via window.*
+ * Phase 4 + 10: UFO-specific save helper.
+ * Uses the frame annotator via window.* and now sweeps ALL frames in this sample.
  */
-async function saveUfoAnnotations(project_id: string, sample_id: string) {
-  if (typeof window === "undefined") return;
+async function saveUfoAnnotations(
+  project_id: string,
+  sample_id: string
+): Promise<number> {
+  if (typeof window === "undefined") return 0;
 
   const collect = (window as any).ufoCollectForSave;
   if (!collect) {
     console.warn("ufoCollectForSave is not available yet");
-    return;
+    return 0;
   }
 
-  // 1. Get W3C annotations for the current frame
+  // 1. Get W3C annotations for ALL frames in this sample
   const w3cList = (await collect()) ?? [];
 
   // 2. Convert W3C → COCO → VideoBoundingBox[]
   const cocoFrames = w3cToCocoFrames(w3cList);
   const videoBoxes = cocoFramesToVideoBBoxes(cocoFrames);
+  const count = videoBoxes.length;
 
   const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
 
@@ -129,6 +134,8 @@ async function saveUfoAnnotations(project_id: string, sample_id: string) {
 
   // 4. Mark as saved in the bridge
   (window as any).ufoMarkSaved?.();
+
+  return count;
 }
 
 >>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
@@ -258,8 +265,8 @@ function UfoSaveButton({
 }) {
   const handleClick = async () => {
     try {
-      await saveUfoAnnotations(project_id, sample_id);
-      ToastQueue.positive(`Saved UFO frame annotations!`, {
+      const count = await saveUfoAnnotations(project_id, sample_id);
+      ToastQueue.positive(`Saved ${count} UFO annotations!`, {
         timeout: 5000
       });
     } catch (err) {

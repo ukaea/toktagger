@@ -293,21 +293,48 @@ export function FrameView({
     };
   }, []);
 
-  // --- Expose minimal save collector on window for toolbar integration ---
+  // --- Expose save collector on window: flush current frame, then sweep ALL frames in this sample ---
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     (window as any).ufoCollectForSave = async () => {
-      // One-frame only for now (no sweep across localStorage)
-      const list =
-        (await bridgeRef.current?.persistWorkingNow?.(frameKey)) ?? [];
-      return list;
+      // 1) Flush current frame to localStorage
+      await saveCurrentFrame();
+
+      // 2) Sweep all frames for this sample from localStorage
+      const storage = window.localStorage;
+      const prefix =
+        "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
+
+      const all: ImageAnnotation[] = [];
+
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key || !key.startsWith(prefix)) continue;
+        const raw = storage.getItem(key);
+        if (!raw) continue;
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+
+        if (Array.isArray(parsed)) {
+          for (const ann of parsed as any[]) {
+            all.push(ann as ImageAnnotation);
+          }
+        }
+      }
+
+      return all;
     };
 
     return () => {
       delete (window as any).ufoCollectForSave;
     };
-  }, [frameKey]);
+  }, [projectId, sampleId, saveCurrentFrame]);
 
   // --- Expose Clear Current on window for toolbar integration ---
   useEffect(() => {
