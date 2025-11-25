@@ -94,6 +94,10 @@ export function FrameSearch({
  * - ImageAnnotationPopup + ClassInfoPopup
  * - onDeleted → save, re-count annotations, empty-instance cleanup flow.
  *
+ * Phase 4 bits:
+ * - Per-instance bulk delete (right-click) across all frames.
+ * - Delete ALL instances & annotations in this sample.
+ *
  * - base64 PNG → <img src="data:image/png;base64,...">
  * - Rectangle-only drawing
  * - Per-frame storage via W3CImageFormat + buildSourceKey
@@ -216,6 +220,26 @@ export function FrameView({
   const [emptyInstanceProfile, setEmptyInstanceProfile] = useState<{
     class_name?: string;
     track_id?: string;
+  } | null>(null);
+
+  // Phase 4 – per-instance bulk delete modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteModalProfile, setDeleteModalProfile] = useState<{
+    class_name?: string;
+    track_id?: string;
+  } | null>(null);
+  const [deletePreviewCounts, setDeletePreviewCounts] = useState<{
+    total: number;
+    frames: number;
+  } | null>(null);
+
+  // Phase 4 – global delete-all modal
+  const [deleteAllModalOpen, setDeleteAllModalOpen] =
+    useState(false);
+  const [deleteAllPreview, setDeleteAllPreview] = useState<{
+    totalAnnotations: number;
+    totalInstances: number;
+    totalFrames: number;
   } | null>(null);
 
   // --- Hydrate from localStorage when the annotator is ready ---
@@ -475,21 +499,29 @@ export function FrameView({
     [onJump, saveCurrentFrame]
   );
 
-  // Count annotations for a given (class_name, track_id) across ALL frames in this sample
-  const countAnnotationsForInstance = useCallback(
+  /**
+   * Phase 4 – Count annotations for a given (class_name, track_id)
+   * across ALL frames in this sample, with frame counts for preview.
+   */
+  const countAnnotationsForProfile = useCallback(
     async (info: { class_name?: string; track_id?: string }) => {
-      if (typeof window === "undefined") return 0;
+      if (typeof window === "undefined") {
+        return { total: 0, frames: 0 };
+      }
 
       const className = (info.class_name || "").toLowerCase();
       const trackKey = canonicalizeTrackId(info.track_id || "");
 
-      if (!className || !trackKey) return 0;
+      if (!className || !trackKey) {
+        return { total: 0, frames: 0 };
+      }
 
       const storage = window.localStorage;
       const prefix =
         "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
 
       let total = 0;
+      let frames = 0;
 
       for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i);
@@ -506,6 +538,8 @@ export function FrameView({
 
         if (!Array.isArray(parsed)) continue;
 
+        let frameHas = false;
+
         for (const ann of parsed as any[]) {
           const label = extractClassLabel(
             ann as ImageAnnotation
@@ -520,11 +554,98 @@ export function FrameView({
 
           if (annClass === className && annTrack === trackKey) {
             total += 1;
+            frameHas = true;
+          }
+        }
+
+        if (frameHas) frames += 1;
+      }
+
+      return { total, frames };
+    },
+    [projectId, sampleId]
+  );
+
+  // Phase 3 helper kept: return just the total
+  const countAnnotationsForInstance = useCallback(
+    async (info: { class_name?: string; track_id?: string }) => {
+      const { total } = await countAnnotationsForProfile(info);
+      return total;
+    },
+    [countAnnotationsForProfile]
+  );
+
+  /**
+   * Phase 4 – Delete annotations for a profile across ALL frames.
+   */
+  const deleteAnnotationsForProfile = useCallback(
+    async (info: { class_name?: string; track_id?: string }) => {
+      if (typeof window === "undefined") {
+        return { totalDeleted: 0, framesTouched: 0 };
+      }
+
+      const className = (info.class_name || "").toLowerCase();
+      const trackKey = canonicalizeTrackId(info.track_id || "");
+
+      if (!className || !trackKey) {
+        return { totalDeleted: 0, framesTouched: 0 };
+      }
+
+      const storage = window.localStorage;
+      const prefix =
+        "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
+
+      let totalDeleted = 0;
+      let framesTouched = 0;
+
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key || !key.startsWith(prefix)) continue;
+        const raw = storage.getItem(key);
+        if (!raw) continue;
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+
+        if (!Array.isArray(parsed)) continue;
+
+        const original = parsed as any[];
+
+        const filtered = original.filter((ann: any) => {
+          const label = extractClassLabel(
+            ann as ImageAnnotation
+          );
+          if (!label) return true;
+
+          const annClass =
+            (label.class_name || "").toLowerCase();
+          const annTrack = canonicalizeTrackId(
+            label.track_id || ""
+          );
+
+          const match =
+            annClass === className && annTrack === trackKey;
+          if (match) totalDeleted += 1;
+
+          // Keep only non-matching annotations
+          return !match;
+        });
+
+        if (filtered.length !== original.length) {
+          framesTouched += 1;
+          if (filtered.length > 0) {
+            storage.setItem(key, JSON.stringify(filtered));
+          } else {
+            storage.removeItem(key);
           }
         }
       }
 
-      return total;
+      return { totalDeleted, framesTouched };
     },
     [projectId, sampleId]
   );
@@ -788,6 +909,262 @@ export function FrameView({
     setEmptyInstanceProfile(null);
   }, []);
 
+  /**
+   * Phase 4 – onRequestBulkDelete handler:
+   * called when toolbar dispatches "ufo:requestBulkDelete".
+   */
+  const onRequestBulkDelete = useCallback(
+    async (profile: {
+      class_name?: string;
+      track_id?: string;
+    }) => {
+      if (!profile.class_name || !profile.track_id) return;
+
+      const { total, frames } =
+        await countAnnotationsForProfile(profile);
+
+      setDeleteModalProfile({
+        class_name: profile.class_name,
+        track_id: profile.track_id
+      });
+      setDeletePreviewCounts({ total, frames });
+      setDeleteModalOpen(true);
+    },
+    [countAnnotationsForProfile]
+  );
+
+  /**
+   * Phase 4 – Confirm delete instance annotations across ALL frames.
+   */
+  const confirmBulkDelete = useCallback(async () => {
+    if (!deleteModalProfile) {
+      setDeleteModalOpen(false);
+      setDeletePreviewCounts(null);
+      return;
+    }
+
+    const { totalDeleted } = await deleteAnnotationsForProfile(
+      deleteModalProfile
+    );
+
+    // Refresh current frame overlay and popup list
+    try {
+      const updated = await adapter.read();
+      await bridgeRef.current?.clearOverlaySilently?.();
+      if (updated && updated.length > 0) {
+        await bridgeRef.current?.hydrateOverlay?.(
+          updated,
+          frameKey
+        );
+      }
+      setPopupList((updated || []) as ImageAnnotation[]);
+    } catch (err) {
+      console.error(
+        "Failed to refresh overlay after bulk delete",
+        err
+      );
+    }
+
+    showToast(
+      totalDeleted > 0
+        ? `Deleted ${totalDeleted} annotations for this instance.`
+        : "No annotations to delete for this instance."
+    );
+
+    // After deletion, check if instance is now empty across all frames
+    const remaining = await countAnnotationsForInstance(
+      deleteModalProfile
+    );
+    if (remaining === 0) {
+      setEmptyInstanceProfile({
+        class_name: deleteModalProfile.class_name,
+        track_id: canonicalizeTrackId(
+          deleteModalProfile.track_id || ""
+        )
+      });
+      setEmptyInstanceModalOpen(true);
+    }
+
+    setDeleteModalOpen(false);
+    setDeletePreviewCounts(null);
+    setDeleteModalProfile(null);
+  }, [
+    deleteModalProfile,
+    deleteAnnotationsForProfile,
+    adapter,
+    frameKey,
+    showToast,
+    countAnnotationsForInstance
+  ]);
+
+  const cancelBulkDelete = useCallback(() => {
+    setDeleteModalOpen(false);
+    setDeletePreviewCounts(null);
+    setDeleteModalProfile(null);
+  }, []);
+
+  /**
+   * Phase 4 – openDeleteAllInstances: compute preview for delete-all.
+   */
+  const openDeleteAllInstances = useCallback(async () => {
+    if (typeof window === "undefined") return;
+
+    const w = window as any;
+    const instanceProfiles = Array.isArray(w.ufoInstanceProfiles)
+      ? (w.ufoInstanceProfiles as any[])
+      : [];
+
+    const storage = window.localStorage;
+    const prefix =
+      "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
+
+    let totalAnnotations = 0;
+    let totalFrames = 0;
+
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+
+      if (!Array.isArray(parsed)) continue;
+
+      const anns = parsed as any[];
+      if (anns.length > 0) {
+        totalFrames += 1;
+        totalAnnotations += anns.length;
+      }
+    }
+
+    setDeleteAllPreview({
+      totalAnnotations,
+      totalInstances: instanceProfiles.length,
+      totalFrames
+    });
+    setDeleteAllModalOpen(true);
+  }, [projectId, sampleId]);
+
+  /**
+   * Phase 4 – Confirm delete ALL instances & annotations in this sample.
+   */
+  const confirmDeleteAllInstances = useCallback(async () => {
+    if (typeof window === "undefined") {
+      setDeleteAllModalOpen(false);
+      setDeleteAllPreview(null);
+      return;
+    }
+
+    const storage = window.localStorage;
+    const prefix =
+      "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
+
+    const keysToDelete: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && key.startsWith(prefix)) {
+        keysToDelete.push(key);
+      }
+    }
+
+    for (const key of keysToDelete) {
+      storage.removeItem(key);
+    }
+
+    // Clear current frame overlay
+    await bridgeRef.current?.clearOverlaySilently?.();
+    setPopupList([]);
+
+    // Clear instance profiles + selection from window & notify toolbar
+    const w = window as any;
+    w.ufoInstanceProfiles = [];
+    w.ufoSelectedProfileId = null;
+    w.ufoSelectedClassName = null;
+    w.ufoSelectedTrackId = null;
+    w.ufoNotifySelectionChanged?.();
+
+    const detail = {
+      includeTrackIds: true,
+      profiles: [],
+      selectedKey: null,
+      selectedClassName: null,
+      lastClassName: null,
+      classRegistry
+    };
+    window.dispatchEvent(
+      new CustomEvent("ufo:state", { detail })
+    );
+
+    // Best-effort: clear "last class" info
+    saveLastClassName("");
+
+    setDeleteAllModalOpen(false);
+    setDeleteAllPreview(null);
+
+    showToast(
+      "All instances and annotations cleared for this sample."
+    );
+  }, [projectId, sampleId, classRegistry, showToast]);
+
+  const cancelDeleteAllInstances = useCallback(() => {
+    setDeleteAllModalOpen(false);
+    setDeleteAllPreview(null);
+  }, []);
+
+  /**
+   * Phase 4 – Event wiring:
+   * - Listen for "ufo:requestBulkDelete" from toolbar right-click.
+   * - Listen for "ufo:deleteAllInstances" from toolbar button.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const bulkHandler = (e: Event) => {
+      const detail = (e as CustomEvent<any>).detail;
+      const profile = detail?.profile;
+      if (!profile) return;
+      void onRequestBulkDelete(profile);
+    };
+
+    window.addEventListener(
+      "ufo:requestBulkDelete",
+      bulkHandler as any
+    );
+
+    return () => {
+      window.removeEventListener(
+        "ufo:requestBulkDelete",
+        bulkHandler as any
+      );
+    };
+  }, [onRequestBulkDelete]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handler = () => {
+      void openDeleteAllInstances();
+    };
+
+    window.addEventListener(
+      "ufo:deleteAllInstances",
+      handler as any
+    );
+
+    return () => {
+      window.removeEventListener(
+        "ufo:deleteAllInstances",
+        handler as any
+      );
+    };
+  }, [openDeleteAllInstances]);
+
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Simple nav bar */}
@@ -857,6 +1234,60 @@ export function FrameView({
           onAutoQuickAdd={onAutoQuickAdd}
         />
       </Annotorious>
+
+      {/* Phase 4 – Delete instance annotations? */}
+      <ConfirmModal
+        open={deleteModalOpen}
+        title="Delete instance annotations?"
+        message="This will delete all annotations for this instance across all frames in this sample."
+        details={
+          deletePreviewCounts ? (
+            <div className="space-y-1">
+              <div>
+                <strong>Total annotations:</strong>{" "}
+                {deletePreviewCounts.total}
+              </div>
+              <div>
+                <strong>Frames affected:</strong>{" "}
+                {deletePreviewCounts.frames}
+              </div>
+            </div>
+          ) : null
+        }
+        confirmLabel="Delete annotations"
+        cancelLabel="Cancel"
+        onConfirm={confirmBulkDelete}
+        onCancel={cancelBulkDelete}
+      />
+
+      {/* Phase 4 – Delete ALL instances & annotations? */}
+      <ConfirmModal
+        open={deleteAllModalOpen}
+        title="Delete ALL instances & annotations?"
+        message="This will delete every instance profile and annotation in this sample across all frames."
+        details={
+          deleteAllPreview ? (
+            <div className="space-y-1">
+              <div>
+                <strong>Total instances:</strong>{" "}
+                {deleteAllPreview.totalInstances}
+              </div>
+              <div>
+                <strong>Total annotations:</strong>{" "}
+                {deleteAllPreview.totalAnnotations}
+              </div>
+              <div>
+                <strong>Frames with annotations:</strong>{" "}
+                {deleteAllPreview.totalFrames}
+              </div>
+            </div>
+          ) : null
+        }
+        confirmLabel="Delete all"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteAllInstances}
+        onCancel={cancelDeleteAllInstances}
+      />
 
       {/* Phase 3 – Delete empty instance? */}
       <ConfirmModal
