@@ -50,6 +50,7 @@ import {
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 <<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
@@ -60,6 +61,9 @@ import { BACKEND_API_URL } from "@/app/core";
 import type {
   ClassRegistry
 } from "@/app/frames/components/lib";
+=======
+import type { ClassRegistry } from "@/app/frames/components/lib";
+>>>>>>> c33a0f4d (Wire counts into the UFO toolbar):services/ui/src/app/components/tools/toolbar.tsx
 import {
   w3cToCocoFrames,
   cocoFramesToVideoBBoxes,
@@ -70,7 +74,8 @@ import {
   LABEL_MAP,
   FIXED_CLASS_REG,
   canonicalizeTrackId,
-  uniqueReadableId
+  uniqueReadableId,
+  scanInstanceCountsChunked
 } from "@/app/frames/components/lib";
 >>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 
@@ -611,22 +616,27 @@ export const ClassPanel: React.FC<SimpleClassPanelProps> = ({
 
 // Instance profiles (tracking) — simple in-memory list
 type InstanceProfile = {
-  id: string;        // e.g. "Minor UFO:#young-vortex-2"
+  id: string; // e.g. "Minor UFO:#young-vortex-2"
   class_name: string;
   class_id: number;
-  track_id: string;  // canonicalized slug
+  track_id: string; // canonicalized slug
 };
+
+const instanceKey = (inst: InstanceProfile) =>
+  `${inst.class_name.toLowerCase()}:${inst.track_id}`;
 
 type InstancesPanelProps = {
   instances: InstanceProfile[];
   selectedInstanceId: string | null;
   onSelectInstance: (id: string) => void;
+  instanceCounts: Record<string, number>;
 };
 
 export const InstancesPanel: React.FC<InstancesPanelProps> = ({
   instances,
   selectedInstanceId,
-  onSelectInstance
+  onSelectInstance,
+  instanceCounts
 }) => {
   return (
     <div className="border border-gray-300 rounded-lg p-2 bg-white mt-2 max-w-[16rem] mx-auto">
@@ -644,6 +654,9 @@ export const InstancesPanel: React.FC<InstancesPanelProps> = ({
         <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
           {instances.map((inst) => {
             const isActive = inst.id === selectedInstanceId;
+            const key = instanceKey(inst);
+            const count = instanceCounts[key] ?? 0;
+
             return (
               <button
                 key={inst.id}
@@ -658,7 +671,7 @@ export const InstancesPanel: React.FC<InstancesPanelProps> = ({
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">{inst.class_name}</span>
                   <span className="ml-2 text-[10px] opacity-80">
-                    {inst.track_id}
+                    {inst.track_id} {count > 0 && `· ${count}`}
                   </span>
                 </div>
               </button>
@@ -713,6 +726,11 @@ export default function ToolBar({
     null
   );
 
+  // Per-instance usage counts across all frames in this sample
+  const [instanceCounts, setInstanceCounts] = useState<
+    Record<string, number>
+  >({});
+
   // Load classes + last class for UFO
   useEffect(() => {
     if (!isUfo) return;
@@ -726,6 +744,26 @@ export default function ToolBar({
       setSelectedClassName(last);
     }
   }, [isUfo]);
+
+  // Start per-instance usage scanner when we're in UFO mode
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+
+    const keyPrefix =
+      "anno::w3c::" + `app://p/${project_id}/s/${sample_id}/`;
+
+    const stop = scanInstanceCountsChunked({
+      keyPrefix,
+      onUpdate: (counts) => {
+        setInstanceCounts(counts);
+      }
+    });
+
+    return () => {
+      stop();
+    };
+  }, [isUfo, project_id, sample_id]);
 
   // Helper: create or reselect an instance for a given class
   const createInstanceForClass = (
@@ -1121,6 +1159,7 @@ export default function ToolBar({
                   }
                 }
               }}
+              instanceCounts={instanceCounts}
             />
           </div>
         )}
