@@ -802,6 +802,13 @@ export function frameFromSourceKey(src?: string): number | null {
 
 export type SelSize = { w: number; h: number };
 
+/** Simple helper: get width/height in pixels from a rectangle annotation. */
+export function rectToDims(a: any): SelSize | null {
+  const box = rectToCoco(a);
+  if (!box) return null;
+  return { w: box.width, h: box.height };
+}
+
 /**
  * rectangle → CocoBBox (supports:
  *  - W3C selector string "xywh=pixel:x,y,w,h" or "xywh=percent:x,y,w,h"
