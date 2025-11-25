@@ -5,8 +5,12 @@ import { useEffect, useState } from "react";
 =======
 =======
 
+<<<<<<< HEAD:toktagger/ui/src/app/components/tools/toolbar.tsx
 >>>>>>> e2ccd11c (Replace the new ClassPanel New class text input with a dropdown in toolbar.tsx):services/ui/src/app/components/tools/toolbar.tsx
 import { useEffect, useState, useMemo, FormEvent } from "react";
+=======
+import { useEffect, useState } from "react";
+>>>>>>> b225fa68 (updated instances / toolbar UI):services/ui/src/app/components/tools/toolbar.tsx
 import { useRouter } from "next/navigation";
 >>>>>>> d70c17e4 (first draft of reimplementing toolbar instance profiles):services/ui/src/app/components/tools/toolbar.tsx
 import {
@@ -54,22 +58,15 @@ import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 =======
 import type {
-  ProfileMap,
-  ClassRegistry,
-  ClassCounts,
-  ProfileId
+  ClassRegistry
 } from "@/app/frames/components/lib";
 import {
   w3cToCocoFrames,
   cocoFramesToVideoBBoxes,
-  loadProfiles,
-  saveProfiles,
-  ensureDefaultProfile,
   loadClassRegistry,
   saveClassRegistry,
   loadLastClassName,
   saveLastClassName,
-  scanCrossFrameCountsChunked,
   LABEL_MAP,
   FIXED_CLASS_REG,
   canonicalizeTrackId,
@@ -578,254 +575,43 @@ function SpectrogramThresholdTool({
 }
 
 /**
- * ClassPanel + InstancePanel for Profiles / Classes / Counts
+ * ClassPanel + InstancesPanel for UFO classes and instances (tracking)
  */
 
-type ClassPanelProps = {
-  profiles: ProfileMap;
-  setProfiles: (next: ProfileMap) => void;
-  selectedProfileId: string | null;
-  setSelectedProfileId: (id: string | null) => void;
-
-  classRegistry: ClassRegistry;
-  setClassRegistry: (next: ClassRegistry) => void;
-
+type SimpleClassPanelProps = {
   selectedClassName: string | null;
-  setSelectedClassName: (name: string | null) => void;
-
-  classCounts: ClassCounts;
+  onSelectClass: (name: string | null) => void;
 };
 
-export const ClassPanel: React.FC<ClassPanelProps> = ({
-  profiles,
-  setProfiles,
-  selectedProfileId,
-  setSelectedProfileId,
-  classRegistry,
-  setClassRegistry,
+export const ClassPanel: React.FC<SimpleClassPanelProps> = ({
   selectedClassName,
-  setSelectedClassName,
-  classCounts
+  onSelectClass
 }) => {
-  const [newProfileName, setNewProfileName] = useState("");
-
-  const orderedProfiles = useMemo(
-    () => Object.values(profiles),
-    [profiles]
-  );
-
-  const classesForProfile = useMemo(() => {
-    const entries = Object.values(classRegistry);
-    if (!selectedProfileId) return entries;
-    return entries.filter((c) => c.profileId === selectedProfileId);
-  }, [classRegistry, selectedProfileId]);
-
-  const handleSelectProfile = (id: string) => {
-    setSelectedProfileId(id || null);
-  };
-
-  const handleCreateProfile = (e: FormEvent) => {
-    e.preventDefault();
-    const name = newProfileName.trim();
-    if (!name) return;
-
-    let id: ProfileId = name;
-    if (profiles[id]) {
-      // ensure unique id
-      let idx = 2;
-      while (profiles[`${name}-${idx}`]) idx++;
-      id = `${name}-${idx}`;
-    }
-
-    const nextProfiles: ProfileMap = {
-      ...profiles,
-      [id]: { id, name }
-    };
-    setProfiles(nextProfiles);
-    setSelectedProfileId(id);
-    setNewProfileName("");
-  };
-
-  const handleSelectClass = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const clsName = e.target.value;
-    if (!clsName) {
-      setSelectedClassName(null);
-      return;
-    }
-
-    setSelectedClassName(clsName);
-
-    const key = clsName.toLowerCase();
-    const numericId = FIXED_CLASS_REG[key] ?? 1;
-
-    // Only add to registry if it's not already there
-    if (!classRegistry[key]) {
-      const nextRegistry: ClassRegistry = {
-        ...classRegistry,
-        [key]: {
-          id: String(numericId),
-          name: clsName,
-          profileId: selectedProfileId ?? undefined
-        }
-      };
-      setClassRegistry(nextRegistry);
-    }
-  };
-
   return (
-    <div className="flex flex-col gap-2 border border-gray-300 rounded-lg p-2 bg-white">
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Profiles */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-gray-600">
-            Profile
-          </span>
-          <select
-            className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-            value={selectedProfileId ?? ""}
-            onChange={(e) => handleSelectProfile(e.target.value || "")}
-          >
-            {orderedProfiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <form
-            onSubmit={handleCreateProfile}
-            className="flex items-center gap-1"
-          >
-            <input
-              className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-              placeholder="New profile"
-              value={newProfileName}
-              onChange={(e) => setNewProfileName(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="px-2 py-0.5 rounded text-xs border border-gray-400"
-            >
-              +
-            </button>
-          </form>
-        </div>
-
-        {/* Class dropdown (fixed LABEL_MAP) */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-gray-600">
-            Class
-          </span>
-          <select
-            className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-            value={selectedClassName ?? ""}
-            onChange={handleSelectClass}
-          >
-            <option value="">Select class</option>
-            {LABEL_MAP.categories.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Class list with counts */}
-      <div className="flex flex-wrap gap-1">
-        {classesForProfile.map((cls) => {
-          const isActive = cls.name === selectedClassName;
-          const count = classCounts[cls.name] ?? 0;
-          return (
-            <button
-              key={cls.id}
-              type="button"
-              onClick={() => setSelectedClassName(cls.name)}
-              className={`px-2 py-0.5 rounded-full text-xs border ${
-                isActive
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-gray-50 text-gray-800 border-gray-300"
-              }`}
-            >
-              {cls.name}
-              {count > 0 && (
-                <span className="ml-1 text-[10px] opacity-80">
-                  ({count})
-                </span>
-              )}
-            </button>
-          );
-        })}
-        {classesForProfile.length === 0 && (
-          <span className="text-xs text-gray-500 italic">
-            No classes yet – pick one from the dropdown above.
-          </span>
-        )}
+    <div className="max-w-[16rem] mx-auto mb-3 rounded-xl border border-gray-700 bg-black shadow-sm p-3">
+      <div className="text-sm font-medium mb-2 text-white">Class</div>
+      <select
+        className="w-full border rounded px-2 py-1.5 text-sm bg-gray-900 text-white border-gray-700"
+        value={selectedClassName ?? ""}
+        onChange={(e) => onSelectClass(e.target.value || null)}
+      >
+        <option value="">— Select class —</option>
+        {LABEL_MAP.categories.map((c) => (
+          <option key={c.id} value={c.name}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      <div className="text-xs mt-2 text-white/80">
+        Drawing is enabled after you pick a class (instance).
       </div>
     </div>
   );
 };
 
-type InstancePanelProps = {
-  selectedClassName: string | null;
-  classCounts: ClassCounts;
-};
-
-// Old cross-frame counts panel (still available but not used in the UFO block)
-export const InstancePanel: React.FC<InstancePanelProps> = ({
-  selectedClassName,
-  classCounts
-}) => {
-  const totalForSelected =
-    selectedClassName && classCounts[selectedClassName]
-      ? classCounts[selectedClassName]
-      : 0;
-
-  const totalAll = Object.values(classCounts).reduce(
-    (acc, n) => acc + n,
-    0
-  );
-
-  if (!selectedClassName && totalAll === 0) {
-    return (
-      <div className="border border-dashed border-gray-300 rounded-lg p-2 text-xs text-gray-500">
-        No instances counted yet. As you annotate and save frames, the
-        cross-frame counter will populate.
-      </div>
-    );
-  }
-
-  return (
-    <div className="border border-gray-300 rounded-lg p-2 bg-gray-50 text-xs text-gray-700 flex justify-between">
-      <div>
-        {selectedClassName ? (
-          <>
-            <div className="font-semibold">
-              {selectedClassName}:{" "}
-              <span className="font-normal">
-                {totalForSelected} instance
-                {totalForSelected === 1 ? "" : "s"}
-              </span>
-            </div>
-          </>
-        ) : (
-          <div className="font-semibold">
-            No class selected – pick one above to see its count.
-          </div>
-        )}
-      </div>
-      <div className="text-right">
-        <div>
-          Total instances (all classes):{" "}
-          <span className="font-semibold">{totalAll}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Instance profiles (tracking) — simple in-memory list for Phase 8.3
+// Instance profiles (tracking) — simple in-memory list
 type InstanceProfile = {
-  id: string;        // e.g. "Person:ufo-silent-comet-3"
+  id: string;        // e.g. "Minor UFO:#young-vortex-2"
   class_name: string;
   class_id: number;
   track_id: string;  // canonicalized slug
@@ -835,44 +621,24 @@ type InstancesPanelProps = {
   instances: InstanceProfile[];
   selectedInstanceId: string | null;
   onSelectInstance: (id: string) => void;
-  onAddInstance: () => void;
-  selectedClassName: string | null;
 };
 
 export const InstancesPanel: React.FC<InstancesPanelProps> = ({
   instances,
   selectedInstanceId,
-  onSelectInstance,
-  onAddInstance,
-  selectedClassName
+  onSelectInstance
 }) => {
-  const hasClass = !!selectedClassName;
-
   return (
-    <div className="border border-gray-300 rounded-lg p-2 bg-white mt-2">
+    <div className="border border-gray-300 rounded-lg p-2 bg-white mt-2 max-w-[16rem] mx-auto">
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-semibold text-gray-600">
           Instances
         </span>
-        <button
-          type="button"
-          disabled={!hasClass}
-          onClick={onAddInstance}
-          className={`px-2 py-0.5 rounded text-xs border ${
-            hasClass
-              ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-              : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-          }`}
-        >
-          + Add
-        </button>
       </div>
 
       {instances.length === 0 ? (
         <div className="text-xs text-gray-500 italic">
-          {hasClass
-            ? "Click + Add to create the first instance."
-            : "Pick a class above, then click + Add."}
+          Pick a class above to create the first instance.
         </div>
       ) : (
         <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
@@ -933,18 +699,13 @@ export default function ToolBar({
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  // UFO profiles / classes / counts state (lives on the left toolbar)
-  const [profiles, setProfiles] = useState<ProfileMap>({});
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
-    null
-  );
+  // UFO class registry and selection state (lives on the left toolbar)
   const [classRegistry, setClassRegistry] = useState<ClassRegistry>({});
   const [selectedClassName, setSelectedClassName] = useState<string | null>(
     null
   );
-  const [classCounts, setClassCounts] = useState<ClassCounts>({});
 
-  // NEW: instance profiles for tracking mode (Phase 8.3)
+  // Instance profiles for tracking mode (class + track_id)
   const [instanceProfiles, setInstanceProfiles] = useState<InstanceProfile[]>(
     []
   );
@@ -952,17 +713,10 @@ export default function ToolBar({
     null
   );
 
-  // Load profiles, classes, last class, and start cross-frame scan for UFO
+  // Load classes + last class for UFO
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
-
-    const loadedProfiles = loadProfiles();
-    const { profiles: withDefault, defaultId } =
-      ensureDefaultProfile(loadedProfiles);
-    setProfiles(withDefault);
-    setSelectedProfileId(defaultId);
-    (window as any).ufoSelectedProfileId = defaultId;
 
     const registry = loadClassRegistry();
     setClassRegistry(registry);
@@ -970,30 +724,96 @@ export default function ToolBar({
     const last = loadLastClassName();
     if (last) {
       setSelectedClassName(last);
-      (window as any).ufoSelectedClassName = last;
+    }
+  }, [isUfo]);
+
+  // Helper: create or reselect an instance for a given class
+  const createInstanceForClass = (
+    clsName: string,
+    opts: { reselectOnlyIfExisting?: boolean } = {}
+  ) => {
+    if (!clsName) return;
+
+    const keyLower = clsName.toLowerCase();
+
+    const fromRegistryLower = classRegistry[keyLower];
+    const fromRegistryExact = classRegistry[clsName];
+
+    const regIdStr =
+      fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
+    const regId =
+      regIdStr !== undefined ? Number(regIdStr) : undefined;
+
+    const fixedId =
+      FIXED_CLASS_REG[clsName] ?? FIXED_CLASS_REG[keyLower];
+
+    const class_id =
+      (typeof regId === "number" && !Number.isNaN(regId)
+        ? regId
+        : undefined) ??
+      (typeof fixedId === "number" ? fixedId : undefined) ??
+      1;
+
+    // Ensure class is in registry
+    if (!fromRegistryLower && !fromRegistryExact) {
+      const nextRegistry: ClassRegistry = {
+        ...classRegistry,
+        [keyLower]: { id: String(class_id), name: clsName }
+      };
+      setClassRegistry(nextRegistry);
+      saveClassRegistry(nextRegistry);
     }
 
-    const cancel = scanCrossFrameCountsChunked({
-      onUpdate: (counts) => {
-        setClassCounts(counts);
-      },
-      chunkSize: 24
-    });
+    // If requested, and an instance already exists for this class, just select the last one
+    if (opts.reselectOnlyIfExisting) {
+      const existing = instanceProfiles.filter(
+        (p) => p.class_name === clsName
+      );
+      if (existing.length > 0) {
+        const last = existing[existing.length - 1];
+        setSelectedInstanceId(last.id);
+        if (typeof window !== "undefined") {
+          const w = window as any;
+          w.ufoSelectedProfileId = last.id;
+          w.ufoSelectedClassName = last.class_name;
+          w.ufoSelectedTrackId = last.track_id;
+          w.ufoNotifySelectionChanged?.();
+        }
+        return;
+      }
+    }
 
-    return () => {
-      cancel();
-    };
-  }, [isUfo]);
+    // Generate a new readable track id
+    const existingTrackIds = instanceProfiles.map((p) => p.track_id);
+    const readable = uniqueReadableId(existingTrackIds);
+    const track_id = canonicalizeTrackId(readable);
+    const id = `${clsName}:${track_id}`;
+
+    const nextInstances: InstanceProfile[] = [
+      ...instanceProfiles,
+      { id, class_name: clsName, class_id, track_id }
+    ];
+
+    setInstanceProfiles(nextInstances);
+    setSelectedInstanceId(id);
+
+    if (typeof window !== "undefined") {
+      const w = window as any;
+      w.ufoInstanceProfiles = nextInstances;
+      w.ufoSelectedProfileId = id;
+      w.ufoSelectedClassName = clsName;
+      w.ufoSelectedTrackId = track_id;
+      w.ufoNotifySelectionChanged?.();
+    }
+  };
 
   // Mirror selection to window so FrameView / AnnoBridge can read it
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
 
-    // Prefer instance selection; fall back to old profile id if needed
-    (window as any).ufoSelectedProfileId =
-      selectedInstanceId ?? selectedProfileId;
-  }, [isUfo, selectedInstanceId, selectedProfileId]);
+    (window as any).ufoSelectedProfileId = selectedInstanceId ?? null;
+  }, [isUfo, selectedInstanceId]);
 
   useEffect(() => {
     if (!isUfo) return;
@@ -1212,7 +1032,7 @@ export default function ToolBar({
           )}
         </div>
 
-        {/* UFO profiles / classes / instance controls on the left toolbar */}
+        {/* UFO class + instance controls on the left toolbar */}
         {isUfo && (
           <div className="pl-4 pr-4 pb-4">
             {/* Shape + clear controls (old frameControls-style block) */}
@@ -1270,91 +1090,34 @@ export default function ToolBar({
 
             {/* Class picker (fixed LABEL_MAP) */}
             <ClassPanel
-              profiles={profiles}
-              setProfiles={(next) => {
-                setProfiles(next);
-                saveProfiles(next);
-              }}
-              selectedProfileId={selectedProfileId}
-              setSelectedProfileId={setSelectedProfileId}
-              classRegistry={classRegistry}
-              setClassRegistry={(next) => {
-                setClassRegistry(next);
-                saveClassRegistry(next);
-              }}
               selectedClassName={selectedClassName}
-              setSelectedClassName={(name) => {
+              onSelectClass={(name) => {
                 setSelectedClassName(name);
                 saveLastClassName(name ?? "");
+
+                if (name) {
+                  // Auto-create and select a new instance for this class
+                  createInstanceForClass(name);
+                }
               }}
-              classCounts={classCounts}
             />
 
-            {/* NEW: instance profiles (class + track_id) */}
+            {/* Instance profiles (class + track_id) */}
             <InstancesPanel
               instances={instanceProfiles}
               selectedInstanceId={selectedInstanceId}
-              selectedClassName={selectedClassName}
-              onAddInstance={() => {
-                if (!selectedClassName) return;
-
-                const keyLower = selectedClassName.toLowerCase();
-
-                // Resolve numeric class_id like normalizeWithMode does
-                const fromRegistryLower = classRegistry[keyLower];
-                const fromRegistryExact = classRegistry[selectedClassName];
-
-                const regIdStr =
-                  fromRegistryLower?.id ?? fromRegistryExact?.id;
-                const regId =
-                  regIdStr !== undefined ? Number(regIdStr) : undefined;
-
-                const fixedId =
-                  FIXED_CLASS_REG[selectedClassName] ??
-                  FIXED_CLASS_REG[keyLower];
-
-                const class_id =
-                  (typeof regId === "number" && !Number.isNaN(regId)
-                    ? regId
-                    : undefined) ??
-                  (typeof fixedId === "number"
-                    ? fixedId
-                    : undefined) ??
-                  1;
-
-                const existingTrackIds = instanceProfiles.map(
-                  (p) => p.track_id
-                );
-                const readable = uniqueReadableId(existingTrackIds);
-                const track_id = canonicalizeTrackId(readable);
-                const id = `${selectedClassName}:${track_id}`;
-
-                const nextInstances: InstanceProfile[] = [
-                  ...instanceProfiles,
-                  { id, class_name: selectedClassName, class_id, track_id }
-                ];
-
-                setInstanceProfiles(nextInstances);
-                setSelectedInstanceId(id);
-
-                if (typeof window !== "undefined") {
-                  const w = window as any;
-                  w.ufoInstanceProfiles = nextInstances;
-                  w.ufoSelectedProfileId = id;
-                  w.ufoSelectedClassName = selectedClassName;
-                  w.ufoSelectedTrackId = track_id;
-                }
-              }}
               onSelectInstance={(id) => {
                 setSelectedInstanceId(id);
                 const inst = instanceProfiles.find((p) => p.id === id);
                 if (inst) {
                   setSelectedClassName(inst.class_name);
+                  saveLastClassName(inst.class_name);
                   if (typeof window !== "undefined") {
                     const w = window as any;
                     w.ufoSelectedProfileId = id;
                     w.ufoSelectedClassName = inst.class_name;
                     w.ufoSelectedTrackId = inst.track_id;
+                    w.ufoNotifySelectionChanged?.();
                   }
                 }
               }}

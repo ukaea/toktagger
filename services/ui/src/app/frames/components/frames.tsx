@@ -101,12 +101,37 @@ export function FrameView({
 }) {
   const bridgeRef = useRef<BridgeHandle | null>(null);
 
+  // Bump this whenever the toolbar changes the selected instance,
+  // so drawingEnabled can react.
+  const [, setSelectionTick] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    (window as any).ufoNotifySelectionChanged = () => {
+      setSelectionTick((tick) => tick + 1);
+    };
+
+    return () => {
+      delete (window as any).ufoNotifySelectionChanged;
+    };
+  }, []);
+
   // Profiles / classes are owned by the left toolbar (global UFO toolbar).
   // We just read the current selection from window so AnnoBridge can use it.
   const getSelectedProfile = useCallback(() => {
     if (typeof window === "undefined") return null;
-    // Toolbar writes this when project.task === "UFO"
-    return (window as any).ufoSelectedProfileId ?? null;
+
+    const w = window as any;
+    const selectedId = w.ufoSelectedProfileId;
+    const list = (w.ufoInstanceProfiles || []) as any[];
+
+    if (!selectedId || !Array.isArray(list)) {
+      return null;
+    }
+
+    const found = list.find((p) => p && p.id === selectedId);
+    return found ?? null;
   }, []);
 
   const getSelectedClassName = useCallback(() => {
@@ -399,8 +424,10 @@ export function FrameView({
 
       {/* Annotorious + image */}
       <Annotorious>
-        {/* Rectangle drawing enabled at all times for now */}
-        <ImageAnnotator tool="rectangle" drawingEnabled={true}>
+        <ImageAnnotator
+          tool="rectangle"
+          drawingEnabled={!!getSelectedProfile()}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`data:image/png;base64,${data.values}`}
