@@ -18,7 +18,7 @@ import {
 } from "@adobe/react-spectrum";
 
 /** ------------------------------------------------------------------
- *  Toolbar — frame navigation UI (Spectrum)
+ *  Toolbar — simple frame navigation controls (Prev/Next/Jump)
  *  ------------------------------------------------------------------ */
 export function Toolbar({
   index,
@@ -63,8 +63,9 @@ export function Toolbar({
 }
 
 /** ------------------------------------------------------------------
- *  ClassPanel — detection/tracking class chooser (Spectrum Picker)
- *  Centralized shared UI for UFO class dropdown.
+ *  ClassPanel — dropdown for detection/tracking class selection
+ *
+ *  Selecting a class enables drawing for detection-only mode.
  *  ------------------------------------------------------------------ */
 export function ClassPanel({
   selectedClassName,
@@ -103,7 +104,7 @@ export function ClassPanel({
 }
 
 /** Profile type used by InstancePanel.
- *  NOTE: This is a UI-level type describing instances/profiles.
+ *  NOTE: This is a UI-level type describing per-instance tracking profiles.
  */
 export type Profile = {
   key: string;
@@ -113,8 +114,12 @@ export type Profile = {
 };
 
 /** ------------------------------------------------------------------
- *  InstancePanel — tracking-mode instances manager (per-profile counts)
- *  Centralized shared UI for instances list + delete-all button.
+ *  InstancePanel — tracking-mode instance manager
+ *
+ *  - Lists all instance profiles (class + track_id)
+ *  - Allows selecting an active profile for new annotations
+ *  - Right-click on a profile to request bulk delete across frames
+ *  - "Delete All Instances" triggers a global wipe for this sample
  *  ------------------------------------------------------------------ */
 export function InstancePanel({
   profiles,
@@ -132,7 +137,7 @@ export function InstancePanel({
   onCreateProfile: (className: string, trackId: string) => void;
   onRequestBulkDelete: (profile: Profile) => void;
   onRequestDeleteAllInstances: () => void;
-  /** cross-frame counts for each profile.key */
+  /** Cross-frame annotation counts for each profile.key */
   profileCounts?: Record<string, number>;
   showCreator?: boolean;
 }) {
@@ -151,12 +156,12 @@ export function InstancePanel({
 
   return (
     <div className="w-full lg:w-48 shrink-0 lg:pl-2">
-      {/* Header */}
+      {/* Header label for the panel */}
       <div className="text-gray-200 text-sm font-medium mb-2">
         {showCreator ? "Class + Track" : "Instances"}
       </div>
 
-      {/* Action button (Quick Add removed) */}
+      {/* Toggle for the "Add Profile" editor */}
       {showCreator && (
         <div className="mb-3">
           <button
@@ -172,7 +177,7 @@ export function InstancePanel({
         </div>
       )}
 
-      {/* Delete all */}
+      {/* Delete all instances button (multi-frame wipe) */}
       <button
         onClick={onRequestDeleteAllInstances}
         disabled={profiles.length === 0}
@@ -186,7 +191,7 @@ export function InstancePanel({
         <span className="text-sm">Delete All Instances</span>
       </button>
 
-      {/* Add Profile editor */}
+      {/* Add Profile editor (class label + auto-generated track ID) */}
       {showCreator && open && (
         <div className="mt-2 rounded-lg border shadow-sm bg-black text-white border-gray-700 p-2 space-y-2">
           <div>
@@ -244,7 +249,7 @@ export function InstancePanel({
         </div>
       )}
 
-      {/* Profiles list */}
+      {/* Profiles list (left-click to select, right-click to request bulk delete) */}
       <div className="rounded-lg border bg-black/60 border-gray-700 shadow-sm max-h-[45vh] overflow-y-auto mt-2">
         {profiles.length === 0 && (
           <div className="p-3 text-sm text-gray-200">
@@ -295,7 +300,7 @@ export function InstancePanel({
 }
 
 /** ------------------------------------------------------------------
- *  ConfirmModal — simple confirm dialog
+ *  ConfirmModal — generic confirm dialog used by destructive flows
  *  ------------------------------------------------------------------ */
 export function ConfirmModal({
   open,
@@ -355,7 +360,7 @@ export function ConfirmModal({
 }
 
 /** ------------------------------------------------------------------
- *  ClassInfoPopup — annotation popup with delete
+ *  ClassInfoPopup — annotation popup showing class/track/size + delete
  *  ------------------------------------------------------------------ */
 export function ClassInfoPopup(props: {
   annotation: ImageAnnotation;
@@ -406,6 +411,7 @@ export function ClassInfoPopup(props: {
 
   const handleDelete = async () => {
     await anno?.removeAnnotation?.(annotation.id);
+    // Two RAFs to ensure Annotorious state has settled before we notify
     await new Promise<void>((r) =>
       requestAnimationFrame(() =>
         requestAnimationFrame(() => r())
@@ -415,7 +421,7 @@ export function ClassInfoPopup(props: {
   };
 
   return (
-    <div className="rounded-lg shadow-md bg-white/95 backdrop-blur px-3 py-2 text-sm leading-tight border border-gray-200">
+    <div className="rounded-lg shadow-md bg白/95 backdrop-blur px-3 py-2 text-sm leading-tight border border-gray-200">
       <div className="flex items-center justify-between gap-3">
         <div>
           {includeTrackIds ? (
@@ -453,7 +459,7 @@ export function ClassInfoPopup(props: {
 }
 
 /** ------------------------------------------------------------------
- *  Toast — simple fixed-position toast
+ *  Toast — centered bottom-of-screen toast for short status messages
  *  ------------------------------------------------------------------ */
 export function Toast({
   open,
