@@ -534,7 +534,7 @@ function SpectrogramThresholdTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
+  }, [project_id, sample_id, active, value, signal_name, setAnnotations, plotProps]);
 
   return (
     <>
@@ -1256,15 +1256,29 @@ export default function ToolBar({
                   w.ufoNotifySelectionChanged?.();
                 }
               }}
-              onRequestBulkDelete={() => {
-                // Not yet implemented in current branch; no-op for now.
+              onRequestBulkDelete={(profile) => {
+                // Right-click on an instance row: ask FrameView to open
+                // the "Delete instance annotations?" modal for this profile.
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(
+                    new CustomEvent("ufo:requestBulkDelete", {
+                      detail: {
+                        profile: {
+                          class_name: profile.class_name,
+                          track_id: profile.track_id
+                        }
+                      }
+                    })
+                  );
+                }
               }}
               onRequestDeleteAllInstances={() => {
-                // Old-pattern event for future phases:
-                dispatchUfoEvent("ufo:deleteAllInstances");
-                // Current branch does not yet implement per-instance
-                // delete-all semantics. Leave as a no-op here to avoid
-                // surprising behavior; this will be wired in later phases.
+                // Trigger global "Delete ALL instances & annotations?" flow.
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(
+                    new CustomEvent("ufo:deleteAllInstances")
+                  );
+                }
               }}
               profileCounts={instanceCounts}
               showCreator={false}
