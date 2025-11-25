@@ -63,6 +63,9 @@ export type ClassRegistry = Record<string, ClassDef>;
 
 export type ClassCounts = Record<string, number>;
 
+// New: per-instance usage counts
+export type InstanceCounts = Record<string, number>; // key: `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
+
 // ---------- JSON helpers ----------
 
 function safeParseJSON<T>(raw: string | null): T | null {
@@ -232,6 +235,73 @@ export function scanCrossFrameCountsChunked(options: {
   };
 
   // Kick off async scan
+  window.setTimeout(step, 0);
+
+  return () => {
+    cancelled = true;
+  };
+}
+
+/**
+ * New: per-instance counts scanner (Phase 9.1)
+ *
+ * key: `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
+ */
+export function scanInstanceCountsChunked(options: {
+  keyPrefix?: string; // e.g. "anno::w3c::app://p/<proj>/s/<sample>/"
+  onUpdate: (counts: InstanceCounts) => void;
+  chunkSize?: number;
+}): () => void {
+  const storage = getStorage();
+  if (!storage) return () => {};
+
+  const allKeys = Object.keys(storage);
+  const keys = options.keyPrefix
+    ? allKeys.filter((k) => k.startsWith(options.keyPrefix))
+    : allKeys;
+
+  const counts: InstanceCounts = {};
+  const chunkSize = options.chunkSize ?? 16;
+
+  let index = 0;
+  let cancelled = false;
+
+  const step = () => {
+    if (cancelled) return;
+
+    const end = Math.min(index + chunkSize, keys.length);
+    for (; index < end; index++) {
+      const key = keys[index];
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(parsed)) continue;
+
+      for (const ann of parsed as any[]) {
+        const label = extractClassLabel(ann);
+        if (!label?.class_name || !label.track_id) continue;
+
+        const cname = label.class_name.toLowerCase();
+        const tid = canonicalizeTrackId(label.track_id);
+        const instKey = `${cname}:${tid}`;
+
+        counts[instKey] = (counts[instKey] ?? 0) + 1;
+      }
+    }
+
+    options.onUpdate({ ...counts });
+
+    if (index < keys.length) {
+      window.setTimeout(step, 0);
+    }
+  };
+
   window.setTimeout(step, 0);
 
   return () => {
