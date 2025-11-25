@@ -3,7 +3,11 @@
 import type { ImageAnnotation } from "@annotorious/react";
 
 /**
- * Profiles, Classes, Cross-frame counts
+ * Shared helpers for:
+ * - Profiles & class registry (toolbar state)
+ * - Cross-frame / per-instance usage counts
+ * - Track ID utilities
+ * - W3C ↔ COCO / backend format conversions
  */
 
 // lib.ts – Profiles, Classes, Cross-frame counts
@@ -23,7 +27,7 @@ function getStorage(): Storage | null {
   }
 }
 
-// ---------- Fixed label map (Phase 7.1) ----------
+// ---------- Fixed label map for UFO categories ----------
 
 export const LABEL_MAP = {
   version: "v1.0",
@@ -63,8 +67,9 @@ export type ClassRegistry = Record<string, ClassDef>;
 
 export type ClassCounts = Record<string, number>;
 
-// New: per-instance usage counts
-export type InstanceCounts = Record<string, number>; // key: `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
+// Per-instance usage counts, keyed as
+// `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
+export type InstanceCounts = Record<string, number>;
 
 // ---------- JSON helpers ----------
 
@@ -145,7 +150,7 @@ export function saveLastClassName(name: string | null): void {
 
 // ---------- Annotation helpers ----------
 
-// Try to pull a class label from a W3C-style annotation.
+// Try to pull a human-readable class label from a W3C-style annotation.
 export function extractClassLabelFromAnnotation(
   annotation: any
 ): string | null {
@@ -185,6 +190,12 @@ export function extractClassLabelFromAnnotation(
 
 // ---------- Cross-frame counts (chunked scanning) ----------
 
+/**
+ * Scan all localStorage keys in small chunks and compute class usage counts,
+ * calling onUpdate(counts) after each chunk.
+ *
+ * Returns a cancel function to stop the scan early.
+ */
 export function scanCrossFrameCountsChunked(options: {
   onUpdate: (counts: ClassCounts) => void;
   chunkSize?: number;
@@ -243,9 +254,12 @@ export function scanCrossFrameCountsChunked(options: {
 }
 
 /**
- * New: per-instance counts scanner (Phase 9.1)
+ * Chunked per-instance counts scanner.
  *
  * key: `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
+ *
+ * Filters localStorage keys by an optional keyPrefix and updates
+ * counts incrementally via onUpdate(counts).
  */
 export function scanInstanceCountsChunked(options: {
   keyPrefix?: string; // e.g. "anno::w3c::app://p/<proj>/s/<sample>/"
@@ -349,7 +363,7 @@ export function extractClassLabel(
   return null;
 }
 
-/** -------------------- Track id helpers (Phase 8.1) -------------------- */
+/** -------------------- Track id helpers -------------------- */
 
 const ADJECTIVES = [
   "bright",
@@ -763,7 +777,7 @@ export function normalizeWithMode(
   return out;
 }
 
-/** ---------- COCO types + converters (ported from old branch) ---------- */
+/** ---------- COCO types + converters ---------- */
 
 export type CocoBBox = {
   x_min: number;
