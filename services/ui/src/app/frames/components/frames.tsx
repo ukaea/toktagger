@@ -1,5 +1,6 @@
 "use client";
-
+// UFO frame annotator view: integrates Annotorious, per-frame storage,
+// toolbar window.* integration, navigation, and bulk-delete / clear flows.
 import React, {
   useState,
   useRef,
@@ -42,7 +43,8 @@ import {
 } from "./ui";
 
 /**
- * Simple Jump control: user types a frame number, we call onJump(n).
+ * Simple "jump to frame N" control.
+ * User types a frame number, we validate and call onJump(n).
  */
 export function FrameSearch({
   onJump
@@ -79,37 +81,14 @@ export function FrameSearch({
 }
 
 /**
- * Phase 3 + 4: Frame annotator + per-frame localStorage + dumb navigation +
- * window helpers for toolbar integration.
+ * FrameView
  *
- * Phase 5 bits:
- * - forward propagation on Next
- * - selected profile / class are read from global UFO toolbar via window.*.
- *
- * Phase 2 bits:
- * - onAutoQuickAdd wiring to auto-create new instances when a duplicate
- *   (class_name, track_id) is drawn.
- *
- * Phase 3 bits:
- * - ImageAnnotationPopup + ClassInfoPopup
- * - onDeleted → save, re-count annotations, empty-instance cleanup flow.
- *
- * Phase 4 bits:
- * - Per-instance bulk delete (right-click) across all frames.
- * - Delete ALL instances & annotations in this sample.
- *
- * - base64 PNG → <img src="data:image/png;base64,...">
- * - Rectangle-only drawing
- * - Per-frame storage via W3CImageFormat + buildSourceKey
- * - Prev/Next/Jump:
- *   - On navigate: save current frame via bridge.persistWorkingNow → adapter.write.
- *   - Then call onPrev/onNext/onJump (which just tweak dataParams upstream).
- * - Expose:
- *   - window.ufoHasUnsavedChanges()
- *   - window.ufoMarkSaved()
- *   - window.ufoCollectForSave()
- *   - window.ufoClearCurrent()
- *   - window.ufoClearAllFrames()
+ * Core UFO frame annotator:
+ * - Renders a single frame image inside Annotorious (rectangle-only for now).
+ * - Persists per-frame annotations to localStorage via W3CImageFormat.
+ * - Coordinates Prev/Next/Jump navigation with upstream callbacks.
+ * - Integrates with the UFO toolbar via window.* helpers and "ufo:*" events.
+ * - Supports bulk delete / clear flows across all frames in a sample.
  */
 export function FrameView({
   data,
@@ -128,8 +107,8 @@ export function FrameView({
 }) {
   const bridgeRef = useRef<BridgeHandle | null>(null);
 
-  // Bump this whenever the toolbar changes the selected instance,
-  // so drawingEnabled can react.
+  // Increment this whenever the toolbar changes the selected instance
+  // so drawingEnabled can react to the latest window.* selection.
   const [, setSelectionTick] = useState(0);
 
   // Local toast for notifications (quick-add, delete, etc.)
@@ -214,7 +193,8 @@ export function FrameView({
   // List of annotations for this frame used by ClassInfoPopup
   const [popupList, setPopupList] = useState<ImageAnnotation[]>([]);
 
-  // Empty-instance cleanup state (Phase 3)
+  // Tracks whether an instance has become empty across all frames,
+  // so we can prompt to delete the instance profile.
   const [emptyInstanceModalOpen, setEmptyInstanceModalOpen] =
     useState(false);
   const [emptyInstanceProfile, setEmptyInstanceProfile] = useState<{
@@ -222,7 +202,7 @@ export function FrameView({
     track_id?: string;
   } | null>(null);
 
-  // Phase 4 – per-instance bulk delete modal
+  // Per-instance bulk delete modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteModalProfile, setDeleteModalProfile] = useState<{
     class_name?: string;
@@ -233,7 +213,7 @@ export function FrameView({
     frames: number;
   } | null>(null);
 
-  // Phase 4 – global delete-all modal
+  // Global delete-all modal and preview state
   const [deleteAllModalOpen, setDeleteAllModalOpen] =
     useState(false);
   const [deleteAllPreview, setDeleteAllPreview] = useState<{
@@ -242,7 +222,8 @@ export function FrameView({
     totalFrames: number;
   } | null>(null);
 
-  // --- Hydrate from localStorage when the annotator is ready ---
+  // Hydrate overlay from localStorage when the annotator is ready.
+  // Reads stored annotations, waits for AnnoBridge readiness, then hydrates.
   useEffect(() => {
     let cancelled = false;
 
@@ -280,7 +261,8 @@ export function FrameView({
     };
   }, [adapter, frameKey]);
 
-  // Helper: persist current frame immediately
+  // Helper: persist current frame immediately (to adapter + popupList) and
+  // mark the bridge as "saved".
   const saveCurrentFrame = useCallback(
     async (): Promise<ImageAnnotation[]> => {
       const bridge = bridgeRef.current;
@@ -301,7 +283,8 @@ export function FrameView({
     [adapter, frameKey]
   );
 
-  // Forward propagation: seed next frame with current annotations if it is empty
+  // Forward propagation: seed the next frame with clones of the current
+  // annotations if that frame has no stored annotations yet.
   const propagateForwardIfEmpty = useCallback(
     async (currentList: ImageAnnotation[], nextFrameNumber: number) => {
       // Nothing to propagate
@@ -339,7 +322,8 @@ export function FrameView({
     [projectId, sampleId]
   );
 
-  // --- Background auto-save loop (small, cheap) ---
+  // Background auto-save loop:
+  // once per second, if the bridge reports unsaved changes, persist them.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -357,7 +341,9 @@ export function FrameView({
     };
   }, [saveCurrentFrame]);
 
-  // --- Expose dirty helpers on window for future toolbar wiring ---
+  // Expose "dirty" helpers on window for toolbar buttons:
+  // - ufoHasUnsavedChanges()
+  // - ufoMarkSaved()
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -374,7 +360,9 @@ export function FrameView({
     };
   }, []);
 
-  // --- Expose save collector on window: flush current frame, then sweep ALL frames in this sample ---
+  // Expose ufoCollectForSave on window:
+  // 1) Flush current frame to localStorage.
+  // 2) Sweep localStorage for ALL frames in this sample and return annotations.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -417,7 +405,8 @@ export function FrameView({
     };
   }, [projectId, sampleId, saveCurrentFrame]);
 
-  // --- Expose Clear Current on window for toolbar integration ---
+  // Expose ufoClearCurrent on window:
+  // clears the current frame's overlay and stored annotations.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -436,7 +425,8 @@ export function FrameView({
     };
   }, [adapter]);
 
-  // --- Expose Clear ALL (multi-frame wipe) on window for toolbar integration ---
+  // Expose ufoClearAllFrames on window:
+  // clears annotations for ALL frames in this sample, plus the current overlay.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -467,7 +457,7 @@ export function FrameView({
     };
   }, [projectId, sampleId]);
 
-  // --- Navigation handlers: save → then call upstream handler ---
+  // Navigation handlers: always save current frame before calling upstream.
   const handlePrev = useCallback(async () => {
     if (!onPrev) return;
     await saveCurrentFrame();
@@ -500,7 +490,7 @@ export function FrameView({
   );
 
   /**
-   * Phase 4 – Count annotations for a given (class_name, track_id)
+   * Count annotations for a given (class_name, track_id)
    * across ALL frames in this sample, with frame counts for preview.
    */
   const countAnnotationsForProfile = useCallback(
@@ -566,7 +556,7 @@ export function FrameView({
     [projectId, sampleId]
   );
 
-  // Phase 3 helper kept: return just the total
+  // Helper: return only the total annotation count for a given instance.
   const countAnnotationsForInstance = useCallback(
     async (info: { class_name?: string; track_id?: string }) => {
       const { total } = await countAnnotationsForProfile(info);
@@ -576,7 +566,8 @@ export function FrameView({
   );
 
   /**
-   * Phase 4 – Delete annotations for a profile across ALL frames.
+   * Delete annotations for a profile across ALL frames.
+   * Returns how many annotations and frames were affected.
    */
   const deleteAnnotationsForProfile = useCallback(
     async (info: { class_name?: string; track_id?: string }) => {
@@ -650,7 +641,8 @@ export function FrameView({
     [projectId, sampleId]
   );
 
-  // Phase 2 – Quick-add-by-drawing (auto instance creation)
+  // Quick-add-by-drawing (auto instance creation) when a duplicate
+  // (class_name, track_id) is drawn. Creates a new profile and updates toolbar.
   const onAutoQuickAdd = useCallback(
     async ({ class_name }: { class_name: string }) => {
       if (typeof window === "undefined") return null;
@@ -751,7 +743,7 @@ export function FrameView({
         new CustomEvent("ufo:state", { detail })
       );
 
-      // Persist last class, as in the old branch
+      // Persist last class so it can be restored in future sessions
       saveLastClassName(prettyClassName);
 
       // Toast to confirm auto-created instance
@@ -765,7 +757,10 @@ export function FrameView({
     [classRegistry, showToast]
   );
 
-  // Phase 3 — onDeleted handler: persist, re-count, empty-instance cleanup
+  // onDeleted handler:
+  // - persist current frame after deletion
+  // - show a toast
+  // - if the instance is now empty across all frames, prompt to delete it
   const handleAnnotationDeleted = useCallback(
     async (label: { class_name?: string; track_id?: string }) => {
       // Persist current frame after deletion
@@ -798,7 +793,9 @@ export function FrameView({
     [saveCurrentFrame, countAnnotationsForInstance, showToast]
   );
 
-  // Phase 3 — ConfirmModal handlers for deleting empty instance profile
+  // ConfirmModal handler for deleting an empty instance profile.
+  // When an instance has no annotations anywhere, we can also remove the
+  // profile from the toolbar list and choose a sensible new selection.
   const confirmDeleteEmptyInstance = useCallback(() => {
     if (
       typeof window === "undefined" ||
@@ -910,8 +907,9 @@ export function FrameView({
   }, []);
 
   /**
-   * Phase 4 – onRequestBulkDelete handler:
-   * called when toolbar dispatches "ufo:requestBulkDelete".
+   * Handler for "ufo:requestBulkDelete" events from the toolbar.
+   * Computes a preview of how many annotations/frames will be affected,
+   * then opens the per-instance bulk delete modal.
    */
   const onRequestBulkDelete = useCallback(
     async (profile: {
@@ -934,7 +932,9 @@ export function FrameView({
   );
 
   /**
-   * Phase 4 – Confirm delete instance annotations across ALL frames.
+   * Confirm bulk delete of instance annotations across ALL frames.
+   * After deletion, refreshes the current frame overlay and optionally
+   * triggers empty-instance cleanup.
    */
   const confirmBulkDelete = useCallback(async () => {
     if (!deleteModalProfile) {
@@ -1004,7 +1004,10 @@ export function FrameView({
   }, []);
 
   /**
-   * Phase 4 – openDeleteAllInstances: compute preview for delete-all.
+   * Compute preview for "Delete ALL instances & annotations" in this sample:
+   * - total annotations
+   * - total instances
+   * - frames with annotations
    */
   const openDeleteAllInstances = useCallback(async () => {
     if (typeof window === "undefined") return;
@@ -1052,7 +1055,9 @@ export function FrameView({
   }, [projectId, sampleId]);
 
   /**
-   * Phase 4 – Confirm delete ALL instances and annotations in this sample.
+   * Confirm delete of ALL instances and annotations in this sample.
+   * Wipes all per-frame keys in localStorage, clears the current overlay,
+   * resets instance profiles on window.*, and notifies the toolbar.
    */
   const confirmDeleteAllInstances = useCallback(async () => {
     if (typeof window === "undefined") {
@@ -1118,9 +1123,9 @@ export function FrameView({
   }, []);
 
   /**
-   * Phase 4 – Event wiring:
-   * - Listen for "ufo:requestBulkDelete" from toolbar right-click.
-   * - Listen for "ufo:deleteAllInstances" from toolbar button.
+   * Event wiring from the toolbar:
+   * - "ufo:requestBulkDelete" → open per-instance delete modal.
+   * - "ufo:deleteAllInstances" → open delete-all modal.
    */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1228,7 +1233,7 @@ export function FrameView({
                 />
               </ImageAnnotator>
 
-              {/* Annotation popup – label + track + Delete */}
+              {/* Annotation popup – shows label + track + Delete for the clicked annotation */}
               <ImageAnnotationPopup
                 popup={(props) => (
                   <ClassInfoPopup
@@ -1254,7 +1259,7 @@ export function FrameView({
         </div>
       </div>
 
-      {/* Phase 4 – Delete instance annotations? */}
+      {/* Modal: delete annotations for a single instance across all frames */}
       <ConfirmModal
         open={deleteModalOpen}
         title="Delete instance annotations?"
@@ -1279,7 +1284,7 @@ export function FrameView({
         onCancel={cancelBulkDelete}
       />
 
-      {/* Phase 4 – Delete ALL instances and annotations? */}
+      {/* Modal: delete ALL instances and annotations in this sample */}
       <ConfirmModal
         open={deleteAllModalOpen}
         title="Delete ALL instances & annotations?"
@@ -1308,7 +1313,7 @@ export function FrameView({
         onCancel={cancelDeleteAllInstances}
       />
 
-      {/* Phase 3 – Delete empty instance? */}
+      {/* Modal: delete empty instance profile once it has no annotations anywhere */}
       <ConfirmModal
         open={emptyInstanceModalOpen}
         title="Delete empty instance?"
@@ -1324,6 +1329,8 @@ export function FrameView({
   );
 }
 
+// Props contract for UFOView; kept aligned with other task views
+// even though some fields are unused here (for now).
 type UFOViewInfo = {
   data: ImageData;
   annotations: Annotations;
@@ -1342,11 +1349,11 @@ type UFOViewInfo = {
 };
 
 /**
- * Phase 3/4 UFOView:
+ * UFOView:
  *
- * - Wraps FrameView.
- * - Still ignores global annotations and toolbar for now.
- * - Adds navigation via onPrev/onNext/onJump.
+ * Thin wrapper around FrameView that keeps the same props surface as
+ * other task views (annotations/dataParams are currently unused here,
+ * but preserved for future integration).
  */
 export const UFOView = ({
   data,
