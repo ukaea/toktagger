@@ -1,10 +1,5 @@
 "use client";
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 import { useState, useEffect } from "react";
-=======
-
-import { use, useState, useEffect } from "react";
->>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
 import {
   Provider,
   defaultTheme,
@@ -40,15 +35,8 @@ type SampleDataBreadCrumbsInfo = {
   project: Project;
   sample: Sample;
 };
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
-const SampleDataBreadCrumbs = ({
-=======
 
-export const SampleDataBreadCrumbs = ({
->>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
-  project,
-  sample,
-}: SampleDataBreadCrumbsInfo) => {
+const SampleDataBreadCrumbs = ({ project, sample }: SampleDataBreadCrumbsInfo) => {
   const navigate = useNavigate();
   return (
     <Provider theme={defaultTheme} router={{ navigate, useHref }}>
@@ -78,9 +66,6 @@ type SampleViewInfo = {
     updater: (dataParams: DataParams) => DataParams | DataParams,
   ) => void;
   plotProps: PlotProps;
-  onPrev?: () => void;
-  onNext?: () => void;
-  onJump?: (n: number) => void;
 };
 
 const SampleView = ({
@@ -92,9 +77,6 @@ const SampleView = ({
   dataParams,
   setDataParams,
   plotProps,
-  onPrev,
-  onNext,
-  onJump,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -121,7 +103,6 @@ const SampleView = ({
       />
     );
   } else if (project.task == "UFO") {
-    console.log({ data });
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for UFO view");
@@ -135,13 +116,9 @@ const SampleView = ({
         setDataParams={setDataParams}
         projectId={project._id}
         sampleId={sample._id}
-        onPrev={onPrev}
-        onNext={onNext}
-        onJump={onJump}
       />
     );
   } else if (project.task == "MHD") {
-    console.log(data);
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
@@ -161,6 +138,8 @@ const SampleView = ({
       />
     );
   }
+
+  return null;
 };
 
 async function getData<T>(url: string): Promise<T> {
@@ -191,23 +170,9 @@ async function getAnnotations(
   );
 }
 
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 export default function SamplePage() {
   const { project_id, sample_id } = useParams();
   const hasIds = project_id !== undefined && sample_id !== undefined;
-=======
-type SampleViewProps = {
-  project_id: string;
-  sample_id: string;
-};
-
-export default function SamplePage({
-  params,
-}: {
-  params: Promise<SampleViewProps>;
-}) {
-  const { project_id, sample_id } = use(params);
->>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
 
   const [project, setProject] = useState<Project | null>(null);
   const [sample, setSample] = useState<Sample | null>(null);
@@ -242,43 +207,24 @@ export default function SamplePage({
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
 
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
       // 2) Build the "view" object we’ll send to the backend
       let effectiveViewParams: ViewParams = currentViewParams;
 
       if (project.task === "MHD") {
         effectiveViewParams = {
           ...currentViewParams,
-=======
-  useEffect(() => {
-    const refreshData = async (
-      currentDataParams: DataParams,
-      currentViewParams: ViewParams,
-    ) => {
-      if (!project || !sample) {
-        return;
-      }
-
-      let effectiveViewParams: ViewParams = currentViewParams;
-
-      if (project.task == "MHD") {
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
-        viewParams = {
-          ...viewParams,
->>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
-=======
-        effectiveViewParams = {
-          ...currentViewParams,
->>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
+      } else if (project.task === "UFO") {
+        effectiveViewParams = {
+          ...currentViewParams,
+          name: "image",
+          resize_fraction: 0.5,
+        } as ImageViewParams;
       }
 
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
       // 3) Fetch data using { params, view }
-=======
->>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
         {
@@ -286,193 +232,27 @@ export default function SamplePage({
           headers: {
             "Content-Type": "application/json",
           },
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
-=======
->>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
           body: JSON.stringify({
             params: currentDataParams,
             view: effectiveViewParams,
           }),
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
-=======
-          body: JSON.stringify({ params: dataParams, view: viewParams }),
->>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
         },
       );
 
       const payload: Data = await response.json();
 
       if (!response.ok) {
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
         ToastQueue.negative("Error:", (payload as any).detail);
       } else {
         setData(payload);
-=======
-        ToastQueue.negative("Error:", (data as any).detail);
-      } else {
-        setData(data);
->>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
       }
     };
 
     refreshData(dataParams, viewParams);
   }, [project_id, sample_id, dataParams, viewParams, hasIds]);
-=======
-        },
-      );
-      const payload: Data = await response.json();
-      if (!response.ok) {
-        ToastQueue.negative("Error:", (payload as any).detail);
-      } else {
-        setData(payload);
-      }
-    };
 
-    const run = async (
-      currentDataParams: DataParams,
-      currentViewParams: ViewParams,
-    ) => {
-      await refreshData(currentDataParams, currentViewParams);
-    };
->>>>>>> e2551668 (Wire navigation in SamplePage via dataParams. dataParams becomes the source of truth: { name: image, frame }. onPrev, onNext, onJump just compute a new frame number and call setDataParams. We pass those into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
-
-<<<<<<< HEAD:toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
   if (!data || !project || !sample || !hasIds) {
-    return;
-=======
-    run(dataParams, viewParams);
-  }, [project, sample, dataParams, viewParams, project_id, sample_id]);
-
-  useEffect(() => {}, [plotProps]);
-
-  // Frame navigation for UFO image tasks, driven by `dataParams.frame`.
-  const currentFrame =
-    data && typeof (data as any).frame === "number"
-      ? ((data as any).frame as number)
-      : undefined;
-
-  // Optional frame bounds from the backend (min/max and/or sparse `available` frames).
-  const frameBounds:
-    | {
-        min?: number;
-        max?: number;
-        available?: number[];
-      }
-    | undefined =
-    (data && (data as any).frameBounds) ||
-    (data && (data as any).frame_bounds) ||
-    undefined;
-
-  // Clamp a requested frame into the valid range, respecting explicit min/max
-  // and, if provided, snapping to the closest available frame index.
-  const clampToBounds = (n: number): number => {
-    if (!Number.isFinite(n)) return 0;
-    let frame = Math.floor(n);
-
-    if (frameBounds) {
-      const { min, max, available } = frameBounds;
-
-      if (typeof min === "number") frame = Math.max(min, frame);
-      if (typeof max === "number") frame = Math.min(max, frame);
-
-      if (Array.isArray(available) && available.length > 0) {
-        const sorted = [...available].sort((a, b) => a - b);
-
-        if (sorted.includes(frame)) return frame;
-
-        const candidate = sorted.find((v) => v >= frame);
-        return candidate ?? sorted[sorted.length - 1];
-      }
-    }
-
-    // Fallback: never go below 0
-    return frame < 0 ? 0 : frame;
-  };
-
-  // Compute the next frame index, respecting any sparse `available` list and max bound.
-  const nextAvailable = (
-    frame: number | undefined
-  ): number | undefined => {
-    if (typeof frame !== "number" || !Number.isFinite(frame))
-      return undefined;
-
-    if (frameBounds) {
-      const { max, available } = frameBounds;
-
-      if (Array.isArray(available) && available.length > 0) {
-        const sorted = [...available].sort((a, b) => a - b);
-        const next = sorted.find((v) => v > frame);
-        return next ?? frame;
-      }
-
-      if (typeof max === "number" && frame >= max) {
-        return frame;
-      }
-    }
-
-    return frame + 1;
-  };
-
-  // Compute the previous frame index, respecting any sparse `available` list and min bound.
-  const prevAvailable = (
-    frame: number | undefined
-  ): number | undefined => {
-    if (typeof frame !== "number" || !Number.isFinite(frame))
-      return undefined;
-
-    if (frameBounds) {
-      const { min, available } = frameBounds;
-
-      if (Array.isArray(available) && available.length > 0) {
-        const sorted = [...available].sort((a, b) => a - b);
-        const reversed = [...sorted].reverse();
-        const prev = reversed.find((v) => v < frame);
-        return prev ?? frame;
-      }
-
-      if (typeof min === "number" && frame <= min) {
-        return frame;
-      }
-    }
-
-    return frame - 1;
-  };
-
-  // Update `dataParams` so the backend returns the requested image frame.
-  const goToFrame = (n: number) => {
-    if (!Number.isFinite(n)) return;
-    const target = clampToBounds(n);
-
-    setDataParams((previous: DataParams | any) => ({
-      ...(previous || {}),
-      name: "image",
-      frame: target,
-    }));
-  };
-
-  // Navigate to the previous valid frame (if any).
-  const onPrev = () => {
-    if (typeof currentFrame !== "number") return;
-    const target = prevAvailable(currentFrame);
-    if (typeof target === "number") goToFrame(target);
-  };
-
-  // Navigate to the next valid frame (if any).
-  const onNext = () => {
-    if (typeof currentFrame !== "number") return;
-    const target = nextAvailable(currentFrame);
-    if (typeof target === "number") goToFrame(target);
-  };
-
-  // Jump handler used by the UFO frame search box.
-  const onJump = (n: number) => {
-    goToFrame(n);
-  };
-
-  if (!data || !project || !sample) {
     return null;
->>>>>>> 29945032 (Give SampleView access to the current sample. Pipe project._id and sample._id into UFOView.):services/ui/src/app/projects/[project_id]/samples/[sample_id]/page.tsx
   }
 
   return (
@@ -502,9 +282,6 @@ export default function SamplePage({
               dataParams={dataParams}
               setDataParams={setDataParams}
               plotProps={plotProps}
-              onPrev={onPrev}
-              onNext={onNext}
-              onJump={onJump}
             />
           </div>
         </div>
