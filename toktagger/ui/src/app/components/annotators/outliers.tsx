@@ -8,7 +8,7 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -16,6 +16,7 @@ type OutlierDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
+  dataParams: DataParams;
   setAnnotations: (
     annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
@@ -25,6 +26,7 @@ export function OutlierDetectionTool({
   project_id,
   sample_id,
   data,
+  dataParams,
   setAnnotations,
 }: OutlierDetectionType) {
   const methodOptions = [
@@ -63,10 +65,13 @@ export function OutlierDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            method: method,
-            threshold: threshold,
-            contamination: contamination,
+            annotator_params: {
+              signal_name: signalName,
+              method: method,
+              threshold: threshold,
+              contamination: contamination,
+            },
+            data_params: dataParams,
           }),
         },
       );

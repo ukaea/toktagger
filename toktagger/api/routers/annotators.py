@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from toktagger.api.schemas.projects import Project, Task
 from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas.data import DataParams
+from toktagger.api.schemas.data import DataParamTypes
 from toktagger.api.schemas.annotators import (
     AnnotatorParamTypes,
     AnnotatorTypes,
@@ -28,8 +28,8 @@ async def create_annotations(
     project_id: str,
     sample_id: str,
     annotator_type: AnnotatorTypes,
-    params: AnnotatorParamTypes,
-    data_params: DataParams,
+    annotator_params: AnnotatorParamTypes,
+    data_params: DataParamTypes,
 ):
     # Use the specified annotator to label this sample for this project
     # Would use the datapool to load and process the data
@@ -53,7 +53,7 @@ async def create_annotations(
     data_loader = LoaderRegistry.get(project.data_loader)(data_params)
     data_item = data_loader.get_sample(sample)
 
-    annotator = annotator_cls(params)
+    annotator = annotator_cls(annotator_params)
     annotations = annotator.predict(data_item)
 
     return annotations

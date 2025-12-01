@@ -8,7 +8,7 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -21,6 +21,7 @@ type ChangePointDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
+  dataParams: DataParams;
   setAnnotations: (
     annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
@@ -30,6 +31,7 @@ export function ChangePointDetectionTool({
   project_id,
   sample_id,
   data,
+  dataParams,
   setAnnotations,
 }: ChangePointDetectionType) {
   const methodOptions = [
@@ -70,11 +72,14 @@ export function ChangePointDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            method: method,
-            penalty: penalty,
-            num_points: numPoints,
-            num_components: numComponents,
+            annotator_params: {
+              signal_name: signalName,
+              method: method,
+              penalty: penalty,
+              num_points: numPoints,
+              num_components: numComponents,
+            },
+            data_params: dataParams,
           }),
         },
       );

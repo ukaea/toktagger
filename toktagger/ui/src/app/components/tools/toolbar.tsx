@@ -25,6 +25,7 @@ import {
   Annotation,
   CompositeDataSchema,
   Data,
+  DataParams,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
   Project,
@@ -264,6 +265,7 @@ type SpectrogramThresholdToolInfo = {
   project_id: string;
   sample_id: string;
   signal_name: string;
+  dataParams: DataParams;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
   setAnnotations: (annotations: Annotation[]) => void;
@@ -273,6 +275,7 @@ function SpectrogramThresholdTool({
   project_id,
   sample_id,
   signal_name,
+  dataParams,
   plotProps,
   setPlotProps,
   setAnnotations,
@@ -309,8 +312,11 @@ function SpectrogramThresholdTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signal_name,
-            percentile: value,
+            annotator_params: {
+              signal_name: signal_name,
+              percentile: value,
+            },
+            data_params: dataParams,
           }),
         },
       );
@@ -388,6 +394,8 @@ type ToolBarInfo = {
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
+  dataParams: DataParams
+  setDataParams: (dataParams: DataParams) => void;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
 };
@@ -399,6 +407,8 @@ export default function ToolBar({
   setAnnotations,
   viewParams,
   setViewParams,
+  dataParams,
+  setDataParams,
   plotProps,
   setPlotProps,
 }: ToolBarInfo) {
@@ -435,6 +445,7 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
+          dataParams={dataParams}
           setAnnotations={setAnnotations}
         ></PeakDetectionTool>
       ),
@@ -447,6 +458,7 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
+          dataParams={dataParams}
           setAnnotations={setAnnotations}
         ></OutlierDetectionTool>
       ),
@@ -459,6 +471,7 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
+          dataParams={dataParams}
           setAnnotations={setAnnotations}
         ></ChangePointDetectionTool>
       ),
@@ -471,6 +484,7 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
+          dataParams={dataParams}
           setAnnotations={setAnnotations}
         ></JumpDetectionTool>
       ),
@@ -517,6 +531,7 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           signal_name={"mirnov"}
+          dataParams={dataParams}
           plotProps={plotProps}
           setPlotProps={setPlotProps}
           setAnnotations={setAnnotations}

@@ -261,6 +261,8 @@ export default function SamplePage() {
             setAnnotations={setAnnotations}
             viewParams={viewParams}
             setViewParams={setViewParams}
+            dataParams={dataParams}
+            setDataParams={setDataParams}
             plotProps={plotProps}
             setPlotProps={setPlotProps}
           />

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
 import {
   Provider,
   defaultTheme,
@@ -18,6 +18,7 @@ type PeakDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
+  dataParams: DataParams;
   setAnnotations: (
     annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
@@ -26,6 +27,7 @@ export function PeakDetectionTool({
   project_id,
   sample_id,
   data,
+  dataParams,
   setAnnotations,
 }: PeakDetectionType) {
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
@@ -79,11 +81,14 @@ export function PeakDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            prominence: prominence,
-            distance: distance,
-            time_min: timeRange.start,
-            time_max: timeRange.end,
+            annotator_params: {
+              signal_name: signalName,
+              prominence: prominence,
+              distance: distance,
+              time_min: timeRange.start,
+              time_max: timeRange.end,
+            },
+            data_params: dataParams,
           }),
         },
       );
