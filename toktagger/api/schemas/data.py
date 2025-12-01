@@ -32,14 +32,13 @@ class ImageData(Data):
     values: str  # Base64 encoded string
 
 
-class DataType(str, Enum):
+class LoaderType(str, Enum):
     IDENTITY = "identity"
-    SPECTROGRAM = "spectrogram"
     IMAGE = "image"
 
 
 class DataParams(ConfiguredModel):
-    name: DataType = DataType.IDENTITY
+    name: LoaderType = LoaderType.IDENTITY
 
 
 class ImageParams(DataParams):
