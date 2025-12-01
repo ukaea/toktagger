@@ -33,16 +33,12 @@ class TimeSeriesFileData(FileData):
     column_names: Optional[list[str]] = None
 
 
-class ImageFileData(FileData):
-    frame: int
-
-
 class ShotData(BaseModel):
     protocol: ShotProtocol
     signal_names: Annotated[list[str], Field(min_items=1)]
 
 
-DataTypes = Union[TimeSeriesFileData, FileData, ShotData, ImageFileData]
+DataTypes = Union[TimeSeriesFileData, FileData, ShotData]
 
 
 class SampleBase(ConfiguredModel):

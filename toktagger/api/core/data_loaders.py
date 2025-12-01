@@ -80,7 +80,7 @@ class ImageDataLoader(DataLoader):
         if self.params.name != "image":  # TODO do we want this?
             file_path = next(dir_path.iterdir())
         else:
-            file_path = dir_path.joinpath(f"{self.params.frame}.{item.type}")
+            file_path = dir_path.joinpath(f"{self.params.frame}.{item.type.value}")
         if not file_path.exists():
             raise FileNotFoundError(
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
@@ -122,12 +122,12 @@ class ParquetDataLoader(DataLoader):
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
-    def __init__(self):
+    def __init__(self, params):
         import pyuda
 
         self.client = pyuda.Client()
 
-        super().__init__()
+        super().__init__(params)
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData)
