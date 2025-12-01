@@ -1,9 +1,6 @@
 "use client";
-import {
-  ImageData,
-  DataParams
-} from "@/types";
-import {SearchField} from '@adobe/react-spectrum'
+import { ImageData, DataParams } from "@/types";
+import { SearchField } from "@adobe/react-spectrum";
 import "react-contexify/ReactContexify.css";
 
 import { useState } from "react";
@@ -18,10 +15,10 @@ export function FrameSearch({ setDataParams }) {
       setErrorMessage("");
       const frame_num = newValue;
       try {
-        setDataParams(prev => ({
+        setDataParams((prev) => ({
           ...prev,
-          name: "image", 
-          frame: Number(frame_num)
+          name: "image",
+          frame: Number(frame_num),
         }));
       } catch (err) {
         console.error("Failed to fetch data:", err);
@@ -51,7 +48,6 @@ export default function ImageDisplay({ imageData }: { imageData: string }) {
   );
 }
 
-
 type UFOViewInfo = {
   data: ImageData;
   setDataParams: (
@@ -60,16 +56,12 @@ type UFOViewInfo = {
 };
 
 export const UFOView = ({ data, setDataParams }: UFOViewInfo) => {
-
   return (
     <div className="flex space-y-3">
       <div className="flex-1 text-center items-center">
-        <p> Frame: {data.frame ?? '?'} </p>
-        <FrameSearch
-          setDataParams={setDataParams}
-        />
-        <ImageDisplay imageData={data.values}>
-        </ImageDisplay>
+        <p> Frame: {data.frame ?? "?"} </p>
+        <FrameSearch setDataParams={setDataParams} />
+        <ImageDisplay imageData={data.values}></ImageDisplay>
       </div>
     </div>
   );

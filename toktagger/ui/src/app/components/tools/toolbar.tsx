@@ -326,7 +326,15 @@ function SpectrogramThresholdTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, active, value, signal_name, dataParams, setAnnotations]);
+  }, [
+    project_id,
+    sample_id,
+    active,
+    value,
+    signal_name,
+    dataParams,
+    setAnnotations,
+  ]);
 
   return (
     <>
@@ -394,7 +402,7 @@ type ToolBarInfo = {
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
-  dataParams: DataParams
+  dataParams: DataParams;
   setDataParams: (dataParams: DataParams) => void;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;

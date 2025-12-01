@@ -20,7 +20,7 @@ import {
   SpectrogramViewParams,
   PlotProps,
   ViewParams,
-  DataParams
+  DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
 import { UFOView } from "@/app/ufos/components/ufos";
@@ -101,17 +101,12 @@ const SampleView = ({
       />
     );
   } else if (project.task == "UFO") {
-    console.log({data})
+    console.log({ data });
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for UFO view");
     }
-    return (
-      <UFOView
-        data={result.data}
-        setDataParams={setDataParams}
-      />
-    );
+    return <UFOView data={result.data} setDataParams={setDataParams} />;
   } else if (project.task == "MHD") {
     console.log(data);
     const result = CompositeDataSchema.safeParse(data);
@@ -195,9 +190,11 @@ export default function SamplePage() {
     refreshSample();
   }, [project_id, sample_id]);
 
-
   useEffect(() => {
-    const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
+    const refreshData = async (
+      dataParams: DataParams,
+      viewParams: ViewParams,
+    ) => {
       if (!project || !sample) {
         return;
       }
@@ -216,16 +213,16 @@ export default function SamplePage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ params: dataParams, view: viewParams}),
+          body: JSON.stringify({ params: dataParams, view: viewParams }),
         },
       );
       const data: Data = await response.json();
       if (!response.ok) {
-        console.error("Error:", data.detail)
-        ToastQueue.negative("Error:", data.detail)
+        console.error("Error:", data.detail);
+        ToastQueue.negative("Error:", data.detail);
       } else {
         setData(data);
-      };
+      }
     };
 
     const run = async (dataParams: DataParams, viewParams: ViewParams) => {

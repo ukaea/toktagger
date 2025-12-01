@@ -54,7 +54,7 @@ export const SpectrogramDataSchema = z.object({
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 export const ImageDataSchema = z.object({
   frame: z.number(),
-  values: z.string()  // base64 PNG
+  values: z.string(), // base64 PNG
 });
 export type ImageData = z.infer<typeof ImageDataSchema>;
 
@@ -62,7 +62,7 @@ export const DataSchema = z.union([
   TimeSeriesDataSchema,
   MultiVariateTimeSeriesDataSchema,
   SpectrogramDataSchema,
-  ImageDataSchema
+  ImageDataSchema,
 ]);
 export type Data = z.infer<typeof DataSchema>;
 
@@ -152,8 +152,8 @@ export const DataParamsSchema = z.object({
 });
 export type DataParams = z.infer<typeof DataParamsSchema>;
 export const ImageDataParamsSchema = DataParamsSchema.extend({
-  frame: z.number()
-})
+  frame: z.number(),
+});
 export type ImageDataParams = z.infer<typeof ImageDataParamsSchema>;
 export const SamplesSummarySchema = z.object({
   total: z.number(),

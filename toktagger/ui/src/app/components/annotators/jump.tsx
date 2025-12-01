@@ -69,7 +69,7 @@ export function JumpDetectionTool({
               smoothing: smoothingValue,
               num_points: numPoints,
             },
-            data_params: dataParams
+            data_params: dataParams,
           }),
         },
       );
