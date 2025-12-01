@@ -1,10 +1,13 @@
 from pathlib import Path
 from typing import Optional, Literal
 from fastapi import HTTPException
-from pydantic import TypeAdapter
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
-from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
+from toktagger.api.schemas.annotations import (
+    AnnotationOutTypes,
+    AnnotationOutTypeAdapter,
+    AnnotationTypes,
+)
 from toktagger.api.schemas.projects import Project, ProjectUpdate
 from toktagger.api.schemas.samples import FileData, Sample, SampleSummary
 
@@ -183,9 +186,7 @@ async def get_annotations(
         limit=count if count is not None else 0,
     )
 
-    annotations = [
-        TypeAdapter(AnnotationOutTypes).validate_python(a) for a in annotations
-    ]
+    annotations = [AnnotationOutTypeAdapter.validate_python(a) for a in annotations]
     return annotations
 
 
