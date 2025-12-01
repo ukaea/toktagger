@@ -1,7 +1,7 @@
 from typing import Union
 from pydantic import BaseModel
 from enum import Enum
-from services.api.schemas import ConfiguredModel
+from toktagger.api.schemas import ConfiguredModel
 
 
 class Data(BaseModel):
