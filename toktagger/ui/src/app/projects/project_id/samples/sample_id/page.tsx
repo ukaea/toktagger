@@ -226,6 +226,7 @@ export default function SamplePage() {
       );
       const data: Data = await response.json();
       if (!response.ok) {
+        console.error("Error:", data.detail)
         ToastQueue.negative("Error:", data.detail)
       } else {
         setData(data);
