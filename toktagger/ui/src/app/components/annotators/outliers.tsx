@@ -95,6 +95,7 @@ export function OutlierDetectionTool({
     method,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

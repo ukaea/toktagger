@@ -18,7 +18,6 @@ import {
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
-  ImageViewParams,
   PlotProps,
   ViewParams,
   DataParams
@@ -74,7 +73,6 @@ const SampleView = ({
   data,
   annotations,
   setAnnotations,
-  dataParams,
   setDataParams,
   plotProps,
 }: SampleViewInfo) => {
@@ -111,9 +109,6 @@ const SampleView = ({
     return (
       <UFOView
         data={result.data}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-        dataParams={dataParams}
         setDataParams={setDataParams}
       />
     );
@@ -215,7 +210,7 @@ export default function SamplePage() {
         } as SpectrogramViewParams;
       }
       const response = await fetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
+        `${BACKEND_API_URL}/projects/${project._id}/samples/${sample._id}/data`,
         {
           method: "POST",
           headers: {

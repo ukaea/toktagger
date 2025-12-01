@@ -326,7 +326,7 @@ function SpectrogramThresholdTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
+  }, [project_id, sample_id, active, value, signal_name, dataParams, setAnnotations]);
 
   return (
     <>
@@ -408,7 +408,6 @@ export default function ToolBar({
   viewParams,
   setViewParams,
   dataParams,
-  setDataParams,
   plotProps,
   setPlotProps,
 }: ToolBarInfo) {

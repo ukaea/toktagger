@@ -1,13 +1,12 @@
 "use client";
 import {
   ImageData,
-  Annotations,
   DataParams
 } from "@/types";
 import {SearchField} from '@adobe/react-spectrum'
 import "react-contexify/ReactContexify.css";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 export function FrameSearch({ setDataParams }) {
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -55,17 +54,12 @@ export default function ImageDisplay({ imageData }: { imageData: string }) {
 
 type UFOViewInfo = {
   data: ImageData;
-  annotations: Annotations;
-  setAnnotations: (
-    updater: (annotations: Annotations) => Annotations | Annotations,
-  ) => void;
-  dataParams: DataParams;
   setDataParams: (
     updater: (dataParams: DataParams) => DataParams | DataParams,
   ) => void;
 };
 
-export const UFOView = ({ data, annotations, setAnnotations, dataParams, setDataParams }: UFOViewInfo) => {
+export const UFOView = ({ data, setDataParams }: UFOViewInfo) => {
 
   return (
     <div className="flex space-y-3">

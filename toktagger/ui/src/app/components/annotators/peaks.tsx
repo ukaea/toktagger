@@ -113,6 +113,7 @@ export function PeakDetectionTool({
     isEnabled,
     signalName,
     validSignal,
+    dataParams,
     setAnnotations,
   ]);
 

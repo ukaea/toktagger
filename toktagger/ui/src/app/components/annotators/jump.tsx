@@ -94,6 +94,7 @@ export function JumpDetectionTool({
     numPoints,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

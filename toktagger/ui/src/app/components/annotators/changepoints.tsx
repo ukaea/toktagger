@@ -104,6 +104,7 @@ export function ChangePointDetectionTool({
     numComponents,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 
