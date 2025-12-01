@@ -1,0 +1,231 @@
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { deleteProject, getProjects } from "@/app/core";
+import Delete from "@spectrum-icons/workflow/Delete";
+import { ProjectConfigEditor } from "./components/project_config";
+import { useNavigate, useHref } from "react-router-dom";
+import {
+  Provider,
+  defaultTheme,
+  Cell,
+  Column,
+  Row,
+  TableView,
+  TableBody,
+  TableHeader,
+  Breadcrumbs,
+  Item,
+  Button,
+  Picker,
+  Flex,
+  SearchField,
+  ToastContainer,
+} from "@adobe/react-spectrum";
+import type { SortDescriptor } from "@react-types/shared";
+import type { Project } from "@/types";
+
+type ProjectsTableProps = {
+  projects: Project[];
+  sortDescriptor: SortDescriptor;
+  onSortChange: (sort: SortDescriptor) => void;
+  onModify?: () => void;
+};
+
+const ProjectsBreadCrumbs = () => {
+  return (
+    <Provider theme={defaultTheme}>
+      <Breadcrumbs>
+        <Item key="projects" href={`/projects/`}>
+          Projects
+        </Item>
+      </Breadcrumbs>
+    </Provider>
+  );
+};
+
+const ProjectsTable = ({
+  projects,
+  sortDescriptor,
+  onSortChange,
+  onModify,
+}: ProjectsTableProps) => {
+  const navigate = useNavigate();
+  const rows = projects.map(({ _id, ...rest }) => ({
+    ...rest,
+    id: _id,
+    _id: _id,
+  }));
+
+  return (
+    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
+      <Flex height="size-5000" width="100%" direction="column">
+        <TableView
+          flex
+          aria-label="Projects"
+          selectionMode="none"
+          selectionStyle="highlight"
+          sortDescriptor={sortDescriptor}
+          onSortChange={onSortChange}
+        >
+          <TableHeader>
+            <Column key="name" allowsSorting>
+              Name
+            </Column>
+            <Column key="task" allowsSorting>
+              Task
+            </Column>
+            <Column key="date_created" allowsSorting>
+              Date Created
+            </Column>
+            <Column key="data_loader" allowsSorting>
+              Loader
+            </Column>
+            <Column key="edit">Edit</Column>
+          </TableHeader>
+          <TableBody items={rows}>
+            {(item) => (
+              <Row href={`/ui/projects/${item._id}`}>
+                <Cell>{item["name"]}</Cell>
+                <Cell>{item["task"]}</Cell>
+                <Cell>{item["timestamp"]}</Cell>
+                <Cell>{item["data_loader"]}</Cell>
+                <Cell>
+                  <Flex direction="row" gap="size-100">
+                    <ProjectConfigEditor project={item} onModify={onModify} />
+                    <Button
+                      variant="negative"
+                      onPress={async () => {
+                        if (item._id == null) {
+                          return;
+                        }
+
+                        deleteProject(item._id).then(() => {
+                          onModify?.();
+                        });
+                      }}
+                    >
+                      <Delete />
+                    </Button>
+                  </Flex>
+                </Cell>
+              </Row>
+            )}
+          </TableBody>
+        </TableView>
+      </Flex>
+    </Provider>
+  );
+};
+
+export default function Projects() {
+  const [projectsPerPage, setProjectsPerPage] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [projectName, setProjectName] = useState<string>("");
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+    column: "_id",
+    direction: "descending",
+  });
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  const refreshProjects = useCallback(async () => {
+    console.log("Refreshing projects...");
+    const projects = await getProjects(
+      sortDescriptor,
+      currentPage,
+      projectsPerPage,
+      projectName,
+    );
+
+    setProjects(projects);
+  }, [sortDescriptor, currentPage, projectsPerPage, projectName, setProjects]);
+
+  useEffect(() => {
+    refreshProjects();
+  }, [
+    sortDescriptor,
+    currentPage,
+    projectsPerPage,
+    projectName,
+    refreshProjects,
+  ]);
+
+  if (!projects) {
+    return;
+  }
+
+  const onSortChange = (newSortDescriptor: SortDescriptor) => {
+    setSortDescriptor(newSortDescriptor);
+  };
+
+  return (
+    <div>
+      <ProjectsBreadCrumbs />
+      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
+        <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
+          <h1 className="text-2xl font-bold mb-4">Projects</h1>
+          <Provider theme={defaultTheme}>
+            <ToastContainer placement="top" />
+            <Flex
+              direction="row"
+              margin="size-100"
+              gap="size-100"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <ProjectConfigEditor onModify={refreshProjects} />
+              <SearchField
+                label="Search By Name"
+                onSubmit={(name) => {
+                  if (name != null) {
+                    setProjectName(name);
+                    setCurrentPage(1);
+                  }
+                }}
+              />
+            </Flex>
+            <ProjectsTable
+              projects={projects}
+              sortDescriptor={sortDescriptor}
+              onSortChange={onSortChange}
+              onModify={refreshProjects}
+            ></ProjectsTable>
+            <div className="flex items-center justify-between pl-4 pr-4">
+              <Button
+                variant="primary"
+                onPress={() => setCurrentPage((p) => p - 1)}
+                isDisabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center justify-center gap-8 pb-2">
+                <p> Page: {currentPage} </p>
+                <Picker
+                  label="Projects per Page:"
+                  onSelectionChange={(selectedKey) => {
+                    if (selectedKey != null) {
+                      setProjectsPerPage(Number(selectedKey) || 10);
+                      setCurrentPage(1);
+                    }
+                  }}
+                  defaultSelectedKey="10"
+                >
+                  <Item key="5">5</Item>
+                  <Item key="10">10</Item>
+                  <Item key="25">25</Item>
+                  <Item key="50">50</Item>
+                </Picker>
+              </div>
+              <Button
+                variant="primary"
+                onPress={() => setCurrentPage((p) => p + 1)}
+                isDisabled={projects.length < projectsPerPage}
+              >
+                Next
+              </Button>
+            </div>
+          </Provider>
+        </div>
+      </div>
+    </div>
+  );
+}

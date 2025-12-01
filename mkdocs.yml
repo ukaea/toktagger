@@ -1,12 +1,23 @@
-site_name: Viz Annotation
+site_name: TokTagger
 theme:
   name: material
   palette:
     scheme: default
+markdown_extensions: 
+- admonition
+- pymdownx.details
+- pymdownx.highlight
+- pymdownx.inlinehilite
+- pymdownx.superfences
+- md_in_html
+- pymdownx.arithmatex:
+    generic: true
 nav:
   - Home: index.md
+  - Annotators: annotators.md
   - Developer Documentation: 
     - Getting Started: dev/developer-setup.md
+    - Adding a Custom Data Loader: dev/custom-data-loaders.md
     - Unit Tests: dev/tests.md
     - Building the Docs: dev/building-the-docs.md
     - API Design: dev/API-Design.md
@@ -18,3 +29,6 @@ nav:
       - Providers: dev/Providers.md
       - Context Menu: dev/Context-Menu-Provider.md
 
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js

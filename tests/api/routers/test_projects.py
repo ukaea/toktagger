@@ -19,6 +19,20 @@ async def test_get_all_projects(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_update_project(api_client, setup_db):
+    in_update = {
+        "name": "updated_project_name",
+    }
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}", json=in_update
+    )
+
+    result = await api_client.get(f"/projects/{setup_db['project_id_1']}")
+    assert response.status_code == 200
+    assert result.json().get("name") == "updated_project_name"
+
+
+@pytest.mark.asyncio
 async def test_get_all_projects_sortby(api_client, setup_db):
     response = await api_client.get("/projects?sort_by=task")
     # Should sort alphabetically by task
@@ -120,7 +134,7 @@ async def test_delete_project(api_client, setup_db, db_client):
 
     # Check samples associated with this project have been deleted
     samples = await db_client.get_all_documents("samples")
-    assert len(samples) == 3  # Samples associated with project 1 still exist
+    assert len(samples) == 2  # Samples associated with project 1 still exist
     # Check sample associated with above project no longer in database
     assert setup_db["sample_id_4"] not in [sample.get("_id") for sample in samples]
 

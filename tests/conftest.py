@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
-from services.api.main import app
-from services.api.crud.db import MongoDBClient
+from toktagger.api.main import Server
+from toktagger.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
@@ -46,6 +46,9 @@ async def api_client(mongo_container):
     # So have to run this manually, however trying to run the close after the yield to close the db connection gives errors
     # So am just going to leave it open, since the db container will be deleted after anyway
     # Any alternative solution ideas are welcome.....
+    server = Server()
+    server._setup_app()
+    app = server.app
     lifespan_ctx = app.router.lifespan_context(app)
     await lifespan_ctx.__aenter__()
     async with AsyncClient(
@@ -72,7 +75,7 @@ async def setup_db(db_client):
     )
     await asyncio.sleep(0.01)
     sample_id_3 = await db_client.insert(
-        "samples", db_definitions.SAMPLE_3, ids={"project_id": ObjectId(project_id_1)}
+        "samples", db_definitions.SAMPLE_3, ids={"project_id": ObjectId(project_id_2)}
     )
     await asyncio.sleep(0.01)
     sample_id_4 = await db_client.insert(

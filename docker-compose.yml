@@ -41,32 +41,18 @@ services:
     depends_on:
       - mongo
     volumes:
-      - ./data/:/data
-      - ./services:/app/services
+      - ./data/:/app/data
+      - ./toktagger:/app/toktagger
+      - ${CUSTOM_SCRIPT:-./toktagger/api/run.py}:/app/run.py
     environment:
       MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
       UDA_HOST: "uda2.mast.l"
       UDA_META_PLUGINNAME: "MASTU_DB"
       UDA_METANEW_PLUGINNAME: "MAST_DB"
+      CUSTOM_SCRIPT: ${CUSTOM_SCRIPT}
+      RELOAD: "false"
     working_dir: /app
-    command: ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
-    networks:
-      - app-network
-
-  ui:
-    container_name: ui_app
-    build: ./services/ui/
-    ports:
-      - "3001:3001"
-    environment:
-      PORT: 3001
-      NODE_ENV: development
-      DATA_API_URL: "http://api_app:8002"
-      NEXT_PUBLIC_API_URL: ""
-    volumes:
-      - ./services/ui:/app
-      - /app/node_modules
-    restart: always
+    command: ["python", "run.py"]
     networks:
       - app-network
 

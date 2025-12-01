@@ -8,11 +8,10 @@ async def test_get_all_samples(api_client, setup_db):
     )
     assert response.status_code == 200
     returned_samples = response.json()
-    assert [sample["shot_id"] for sample in returned_samples] == [1, 3, 2]
+    assert [sample["shot_id"] for sample in returned_samples] == [1, 3]
     assert [sample["_id"] for sample in returned_samples] == [
         setup_db["sample_id_1"],
         setup_db["sample_id_2"],
-        setup_db["sample_id_3"],
     ]
 
 
@@ -26,10 +25,9 @@ async def test_get_all_samples_sortby(api_client, setup_db):
     # Default sort direction is descending, so will return the opposite of this: 2, 3, 1
     assert response.status_code == 200
     returned_samples = response.json()
-    assert [sample["shot_id"] for sample in returned_samples] == [3, 2, 1]
+    assert [sample["shot_id"] for sample in returned_samples] == [3, 1]
     assert [sample["_id"] for sample in returned_samples] == [
         setup_db["sample_id_2"],
-        setup_db["sample_id_3"],
         setup_db["sample_id_1"],
     ]
 
@@ -42,11 +40,8 @@ async def test_get_samples_start(api_client, setup_db):
     # Should return 2 samples
     assert response.status_code == 200
     returned_samples = response.json()
-    assert len(returned_samples) == 2
-    assert [sample["_id"] for sample in returned_samples] == [
-        setup_db["sample_id_2"],
-        setup_db["sample_id_3"],
-    ]
+    assert len(returned_samples) == 1
+    assert [sample["_id"] for sample in returned_samples] == [setup_db["sample_id_2"]]
 
 
 @pytest.mark.asyncio
@@ -243,3 +238,15 @@ async def test_create_sample_invalid(api_client, setup_db, db_client):
     # Check it has not been added to database
     samples = await db_client.get_all_documents("samples")
     assert len(samples) == 4
+
+
+@pytest.mark.asyncio
+async def test_get_samples_summary(api_client, setup_db):
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/summary"
+    )
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary.get("total") == 2
+    assert summary.get("shot_min") == 1
+    assert summary.get("shot_max") == 3
