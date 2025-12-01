@@ -6,25 +6,20 @@ import {
   Breadcrumbs,
   Item,
   ToastContainer,
-  ToastQueue,
 } from "@adobe/react-spectrum";
 import {
   Annotation,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
-  ImageDataSchema,
   Project,
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
-  ImageViewParams,
   PlotProps,
   ViewParams,
-  DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { UFOView } from "@/app/frames/components/frames";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -35,8 +30,10 @@ type SampleDataBreadCrumbsInfo = {
   project: Project;
   sample: Sample;
 };
-
-const SampleDataBreadCrumbs = ({ project, sample }: SampleDataBreadCrumbsInfo) => {
+const SampleDataBreadCrumbs = ({
+  project,
+  sample,
+}: SampleDataBreadCrumbsInfo) => {
   const navigate = useNavigate();
   return (
     <Provider theme={defaultTheme} router={{ navigate, useHref }}>
@@ -55,27 +52,19 @@ const SampleDataBreadCrumbs = ({ project, sample }: SampleDataBreadCrumbsInfo) =
 
 type SampleViewInfo = {
   project: Project;
-  sample: Sample;
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
-  ) => void;
-  dataParams: DataParams;
-  setDataParams: (
-    updater: (dataParams: DataParams) => DataParams | DataParams,
   ) => void;
   plotProps: PlotProps;
 };
 
 const SampleView = ({
   project,
-  sample,
   data,
   annotations,
   setAnnotations,
-  dataParams,
-  setDataParams,
   plotProps,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
@@ -102,23 +91,8 @@ const SampleView = ({
         setAnnotations={setAnnotations}
       />
     );
-  } else if (project.task == "UFO") {
-    const result = ImageDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for UFO view");
-    }
-    return (
-      <UFOView
-        data={result.data}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-        dataParams={dataParams}
-        setDataParams={setDataParams}
-        projectId={project._id}
-        sampleId={sample._id}
-      />
-    );
   } else if (project.task == "MHD") {
+    console.log(data);
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
@@ -138,8 +112,6 @@ const SampleView = ({
       />
     );
   }
-
-  return null;
 };
 
 async function getData<T>(url: string): Promise<T> {
@@ -178,26 +150,19 @@ export default function SamplePage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [dataParams, setDataParams] = useState<DataParams>({
-    name: "identity",
-  });
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });
   const [plotProps, setPlotProps] = useState<PlotProps>({
     colorMap: "Cividis",
-  });
+  }); // Set default color map
 
   useEffect(() => {
-    const refreshData = async (
-      currentDataParams: DataParams,
-      currentViewParams: ViewParams,
-    ) => {
+    const refreshData = async (params: ViewParams) => {
       if (!hasIds) {
         return;
       }
 
-      // 1) Load project, sample, annotations
       const project = await getProject(project_id);
       setProject(project);
 
@@ -207,24 +172,14 @@ export default function SamplePage() {
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
 
-      // 2) Build the "view" object we’ll send to the backend
-      let effectiveViewParams: ViewParams = currentViewParams;
-
-      if (project.task === "MHD") {
-        effectiveViewParams = {
-          ...currentViewParams,
+      if (project.task == "MHD") {
+        params = {
+          ...params,
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
-      } else if (project.task === "UFO") {
-        effectiveViewParams = {
-          ...currentViewParams,
-          name: "image",
-          resize_fraction: 0.5,
-        } as ImageViewParams;
       }
 
-      // 3) Fetch data using { params, view }
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
         {
@@ -232,34 +187,32 @@ export default function SamplePage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            params: currentDataParams,
-            view: effectiveViewParams,
-          }),
+          body: JSON.stringify(params),
         },
       );
-
-      const payload: Data = await response.json();
-
-      if (!response.ok) {
-        ToastQueue.negative("Error:", (payload as any).detail);
-      } else {
-        setData(payload);
-      }
+      const data: Data = await response.json();
+      setData(data);
     };
 
-    refreshData(dataParams, viewParams);
-  }, [project_id, sample_id, dataParams, viewParams, hasIds]);
+    const run = async (viewParams: ViewParams) => {
+      await refreshData(viewParams);
+    };
+
+    run(viewParams);
+  }, [project_id, sample_id, viewParams, hasIds]);
 
   if (!data || !project || !sample || !hasIds) {
-    return null;
+    return;
   }
 
   return (
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
-        <SampleDataBreadCrumbs project={project} sample={sample} />
+        <SampleDataBreadCrumbs
+          project={project}
+          sample={sample}
+        ></SampleDataBreadCrumbs>
         <div className="flex">
           <ToolBar
             project={project}
@@ -272,15 +225,12 @@ export default function SamplePage() {
             plotProps={plotProps}
             setPlotProps={setPlotProps}
           />
-          <div className="flex-1 flex flex-col items-center">
+          <div className="flex-1 justify-center">
             <SampleView
               project={project}
-              sample={sample}
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
-              dataParams={dataParams}
-              setDataParams={setDataParams}
               plotProps={plotProps}
             />
           </div>
