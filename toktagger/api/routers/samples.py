@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request, HTTPException, Query, Path
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import SampleIn, Sample, SampleSummary
-from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas import convert_to_objectid
 from typing import Literal, Optional
 
@@ -81,80 +80,10 @@ async def add_samples(
     ):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
-    # Remove annotations (if they exist), these will be added later
-    all_annotations = [sample.annotations for sample in samples]
-
     # Insert new samples
-    ids = await request.app.state.db_client.insert_many(
+    await request.app.state.db_client.insert_many(
         collection="samples", models=samples, ids={"project_id": project_obj_id}
     )
-
-    all_ids = [
-        {
-            "project_id": project_obj_id,
-            "sample_id": convert_to_objectid(sample_id, "samples"),
-        }
-        for sample_id in ids
-    ]
-
-    annotations = []
-    annotation_ids = []
-    for _ann_list, _id in zip(all_annotations, all_ids):
-        if _ann_list is not None:
-            _ann_list = [(items, _id) for items in _ann_list]
-            _ids = [_id for item in _ann_list]
-            annotations.extend(_ann_list)
-            annotation_ids.extend(_ids)
-
-    # If there are any annotations provided, insert new annotations
-    if annotations:
-        await request.app.state.db_client.insert_many(
-            collection="annotations", models=list(annotations), ids=list(annotation_ids)
-        )
-
-    # If a project has been set, update data pool
-    if request.app.state.project:
-        # Update the query strategy with the new list of samples that can be considered
-        # Get all samples which can be considered - sort by shot ID
-        samples = await request.app.state.db_client.get_filtered_documents(
-            collection="samples",
-            filters={"project_id": project_obj_id},
-            sort_by="shot_id",
-            sort_direction=1,
-        )
-
-        # Then get all non-validated annotations for these samples, sorted by uncertainty:
-        non_validated_annotations = (
-            await request.app.state.db_client.get_filtered_documents(
-                collection="annotations",
-                filters={"project_id": project_obj_id, "validated": False},
-                sort_by="uncertainty",
-                sort_direction=1,
-            )
-        )
-        validated_annotations = (
-            await request.app.state.db_client.get_filtered_documents(
-                collection="annotations",
-                filters={"project_id": project_obj_id, "validated": False},
-            )
-        )
-        validated_sample_ids = [
-            validated_annotation["sample_id"]
-            for validated_annotation in validated_annotations
-        ]
-
-        # Update query strategy in the app state with these
-        request.app.state.data_pool.query_strategy.samples = [
-            Sample.model_validate(sample)
-            for sample in samples
-            if sample["_id"] not in validated_sample_ids
-        ]
-        request.app.state.data_pool.query_strategy.annotations = [
-            Annotation.model_validate(annotation)
-            for annotation in non_validated_annotations
-        ]
-
-    return ids
 
 
 @router.get(
