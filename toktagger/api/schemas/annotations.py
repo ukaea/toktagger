@@ -1,4 +1,4 @@
-from typing import Literal, Tuple, Optional, Union
+from typing import Literal, Optional, Union
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotators import AnnotatorTypes
 from pydantic import Field, TypeAdapter, model_validator, BaseModel
@@ -46,14 +46,16 @@ class TimeRegion(AnnotationIn):
 
 class BoundingBox(AnnotationIn):
     type: Literal["bounding_box"] = "bounding_box"
-    height: Optional[float] = None
-    width: Optional[float] = None
-    centre: Optional[Tuple[float, float]] = None
+    height: int
+    width: int
+    x_min: int
+    y_min: int
 
 
 class VideoBoundingBox(BoundingBox):
     type: Literal["video_bounding_box"] = "video_bounding_box"
     frame: int
+    track_id: str
 
 
 class AnnotationOut(BaseModel):
@@ -87,9 +89,11 @@ class SpectrogramMask(AnnotationIn):
     values: list[list[float]]
 
 
-AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
+AnnotationTypes = Union[
+    AnnotationIn, TimePoint, TimeRegion, BoundingBox, VideoBoundingBox
+]
 AnnotationOutTypes = Union[
-    TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
+    Annotation, TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
 ]
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)

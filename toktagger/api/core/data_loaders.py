@@ -3,12 +3,14 @@ import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
-import numpy as np
+import io
+import base64
 from toktagger.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
     ImageData,
+    DataParamTypes,
 )
 from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 
@@ -23,6 +25,9 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
 
 
 class DataLoader(ABC):
+    def __init__(self, params: DataParamTypes):
+        self.params = params
+
     @abstractmethod
     def get_sample(self, sample: Sample) -> Data:
         pass
@@ -59,16 +64,36 @@ class LoaderRegistry:
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
+    def __init__(self, params: DataParamTypes):
+        super().__init__(params)
+
     def get_sample(self, sample: Sample) -> ImageData:
         assert isinstance(sample.data, FileData)
         item: FileData = sample.data
-        if not pathlib.Path(item.file_name).exists():
+        # Find directory of images
+        dir_path = pathlib.Path(item.file_name)
+        if not dir_path.exists() or not dir_path.is_dir():
             raise FileNotFoundError(
-                f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
+                f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
             )
-        im = Image.open(item.file_name)
-        arr = np.asarray(im)
-        return ImageData(data=arr.tolist())
+        # Open image which represents frame selected
+        if self.params.name != "image":  # TODO do we want this?
+            file_path = next(dir_path.iterdir())
+        else:
+            file_path = dir_path.joinpath(f"{self.params.frame}.{item.type.value}")
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
+            )
+        im = Image.open(file_path)
+        buffer = io.BytesIO()
+        im.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        return ImageData(
+            frame=file_path.name.split(".")[0],
+            values=base64.b64encode(buffer.getvalue()).decode(),
+        )
 
 
 @LoaderRegistry.register("parquet")
@@ -97,10 +122,12 @@ class ParquetDataLoader(DataLoader):
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
-    def __init__(self):
+    def __init__(self, params):
         import pyuda
 
         self.client = pyuda.Client()
+
+        super().__init__(params)
 
     def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData)
