@@ -44,6 +44,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
 
 type TimeSeriesViewInfo = {
   name: string;
+  shot_id: number;
   data: MultiVariateTimeSeriesData;
   annotations: Annotation[];
   setAnnotations: (
@@ -53,6 +54,7 @@ type TimeSeriesViewInfo = {
 
 export const TimeSeriesView = ({
   name,
+  shot_id,
   data,
   annotations,
   setAnnotations,
@@ -163,6 +165,7 @@ export const TimeSeriesView = ({
         <ContextMenuProvider menuId="elm-menu">
           <ZoneProvider
             categories={zoneCategories}
+            shot_id={shot_id}
             task_name={name}
             initialData={zones}
             onModifyZone={updateZones}

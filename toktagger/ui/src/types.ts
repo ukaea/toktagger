@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
+  shot_id: z.number(),
   created_by: z.string().default("manual"),
   timestamp: z.string().optional(),
   validated: z.boolean().optional(),
@@ -73,6 +74,7 @@ export const CategorySchema = z.object({
 export type Category = z.infer<typeof CategorySchema>;
 
 export const BaseDisplayAnnotationSchema = z.object({
+  shot_id: z.number(),
   created_by: z.string().default("manual"),
   selected: z.boolean().default(false),
   task_name: z.string(),

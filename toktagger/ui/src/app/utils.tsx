@@ -29,6 +29,7 @@ export const convertDisplayAnnotationToAnnotation = (
   if (ZoneSchema.safeParse(annotation).success) {
     const zone = ZoneSchema.parse(annotation);
     const timeRegion: TimeRegion = {
+      shot_id: zone.shot_id,
       created_by: zone.created_by,
       task_name: zone.task_name,
       type: "time_region",
@@ -40,6 +41,7 @@ export const convertDisplayAnnotationToAnnotation = (
   } else if (VSpanSchema.safeParse(annotation).success) {
     const vspan = VSpanSchema.parse(annotation);
     const timePoint: TimePoint = {
+      shot_id: vspan.shot_id,
       created_by: vspan.created_by,
       task_name: vspan.task_name,
       type: "time_point",
@@ -59,6 +61,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
+        shot_id: timeRegion.shot_id,
         created_by: timeRegion.created_by,
         selected: false,
         task_name: timeRegion.task_name,
@@ -70,6 +73,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else if (TimePointSchema.safeParse(item).success) {
       const timePoint = TimePointSchema.parse(item);
       const vspan: VSpan = {
+        shot_id: timePoint.shot_id,
         selected: false,
         created_by: timePoint.created_by,
         task_name: timePoint.task_name,

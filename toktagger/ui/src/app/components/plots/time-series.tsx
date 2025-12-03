@@ -83,11 +83,8 @@ export const TimeSeries = ({
     setUpdateTools((current) => (current + 1) % 100);
   };
 
-  if (!disableToolingInteraction) {
-    config = { ...config, scrollZoom: false, dragmode: "pan" };
-  } else {
-    config = { ...config, scrollZoom: true, dragmode: "pan" };
-  }
+  config = { ...config, scrollZoom: true, dragmode: "pan" };
+
   // Main plotly rendering
   useEffect(() => {
     const overplots: string[] = [];

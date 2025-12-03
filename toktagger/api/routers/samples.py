@@ -116,7 +116,9 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
+    samples = await utils.get_samples(
+        db_client, project_id, sort_by="shot_id", sort_direction="ascending"
+    )
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples)
 
     try:
@@ -159,7 +161,9 @@ async def get_previous_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
+    samples = await utils.get_samples(
+        db_client, project_id, sort_by="shot_id", sort_direction="ascending"
+    )
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples)
 
     try:

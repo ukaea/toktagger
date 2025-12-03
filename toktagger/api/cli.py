@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import tomllib
 import webbrowser
@@ -101,7 +102,9 @@ class ProjectBuilder:
         if response.status_code != 200:
             raise RuntimeError(f"Failed to create samples: {response.text}")
 
-        print(f"Created project '{project.name}' with {len(samples)} samples.")
+        print(
+            f"Created project '{project.name}' with id {project_id} and {len(samples)} samples."
+        )
 
 
 def read_project_file(file_name: str) -> ProjectIn:
@@ -112,12 +115,32 @@ def read_project_file(file_name: str) -> ProjectIn:
     return project
 
 
+def read_annotations(file_name: str) -> list[SampleIn]:
+    with Path(file_name).open("rb") as fhandle:
+        config = json.load(fhandle)
+
+    annotations = [SampleIn(**annotation) for annotation in config]
+    return annotations
+
+
 def create_project(file_name: str, host: str, port: int):
     project = read_project_file(file_name)
 
     creator = ProjectBuilder(host, port)
     project_id = creator.create_project(project)
     creator.create_samples(project_id, project)
+
+
+def add_annotations(file_name: str, project_id: str, host: str, port: int):
+    annotations = read_annotations(file_name)
+    base_url = f"http://{host}:{port}"
+    response = requests.post(
+        f"{base_url}/projects/{project_id}/annotations",
+        json=[annotation.model_dump(mode="json") for annotation in annotations],
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Failed to add annotations: {response.text}")
+    print(f"Added {len(annotations)} annotations to project {project_id}.")
 
 
 def main():
@@ -143,10 +166,22 @@ def main():
         "file_name", help="Config file name to create project from."
     )
 
+    add_parser = subparsers.add_parser(
+        "add-annotations", help="Add annotations to a project from the CLI"
+    )
+    add_parser.add_argument(
+        "file_name", help="JSON file name containing annotations to add."
+    )
+    add_parser.add_argument(
+        "project_id", help="ID of the project to add annotations to."
+    )
+
     args = argparser.parse_args()
 
     if args.command == "create":
         create_project(args.file_name, args.host, args.port)
+    elif args.command == "add-annotations":
+        add_annotations(args.file_name, args.project_id, args.host, args.port)
     else:
         run_toktagger(args)
 

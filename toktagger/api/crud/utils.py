@@ -283,16 +283,28 @@ async def import_annotations(
 
     sample_groups = defaultdict(list)
     for annotation in annotations:
-        sample_groups[annotation.sample_id].append(annotation)
+        sample_groups[annotation.shot_id].append(annotation)
 
-    for sample_id, sample_annotations in sample_groups.items():
-        sample_obj_id = convert_to_objectid(sample_id, "samples")
+    for shot_id, sample_annotations in sample_groups.items():
+        found_samples = await db_client.get_filtered_documents(
+            collection="samples",
+            filters={
+                "shot_id": int(shot_id),
+                "project_id": ids["project_id"],
+            },
+            limit=1,
+        )
 
-        if not await db_client.get_document_by_id("samples", sample_obj_id):
+        print(found_samples)
+
+        if len(found_samples) == 0:
             raise HTTPException(
                 status_code=404,
-                detail=f"Sample not found with ID {sample_id} belonging to specified Project.",
+                detail=f"Sample with shot_id {shot_id} not found in this project.",
             )
+
+        sample_id = found_samples[0]["_id"]
+        sample_obj_id = convert_to_objectid(sample_id, "samples")
 
         ids["sample_id"] = sample_obj_id
         await db_client.insert_many(

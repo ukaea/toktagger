@@ -166,7 +166,6 @@ export default function SamplePage() {
       setDataIsLoading(false);
 
       if (task.type === "time_series") {
-        console.log(data);
         const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
         if (!result.success) {
           throw new Error("Invalid data for Time Series view");
@@ -282,6 +281,7 @@ export default function SamplePage() {
                       MultiVariateTimeSeriesDataSchema.safeParse(result)
                         .success && (
                         <TimeSeriesView
+                          shot_id={sample.shot_id}
                           name={item.name}
                           data={result as MultiVariateTimeSeriesData}
                           annotations={annotations}
@@ -292,6 +292,7 @@ export default function SamplePage() {
                       item.type === "spectrogram" &&
                       SpectrogramDataSchema.safeParse(result).success && (
                         <SpectrogramView
+                          shot_id={sample.shot_id}
                           name={item.name}
                           data={result as SpectrogramData}
                           annotations={annotations}

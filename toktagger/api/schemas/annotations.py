@@ -5,12 +5,12 @@ from pydantic import Field, TypeAdapter, model_validator, BaseModel
 
 
 class AnnotationIn(ConfiguredModel):
+    shot_id: int
     label: str
     created_by: AnnotatorTypes
     task_name: str
-    validated: bool = False
+    validated: Optional[bool] = False
     uncertainty: Optional[float] = None
-    sample_id: Optional[str] = None
     project_id: Optional[str] = None
 
     @model_validator(mode="before")
