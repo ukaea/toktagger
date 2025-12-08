@@ -6,6 +6,7 @@ from PIL import Image
 import io
 import base64
 import pydantic
+from typing import Type
 from toktagger.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
@@ -28,6 +29,12 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
 class DataLoader(ABC):
     def __init__(self, params: DataParamTypes):
         self.params = params
+
+    @property
+    @abstractmethod
+    def sample_data_type(self) -> Type[ShotData | FileData | TimeSeriesFileData]:
+        # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
+        pass
 
     @abstractmethod
     def get_sample(
@@ -70,6 +77,10 @@ class ImageDataLoader(DataLoader):
     def __init__(self, params: DataParamTypes):
         super().__init__(params)
 
+    @property
+    def sample_data_type(self) -> Type[FileData]:
+        return FileData
+
     @pydantic.validate_call
     def get_sample(self, shot_id: int, sample_data: FileData) -> ImageData:
         # Find directory of images
@@ -104,6 +115,10 @@ class ImageDataLoader(DataLoader):
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
+    @property
+    def sample_data_type(self) -> Type[TimeSeriesFileData]:
+        return TimeSeriesFileData
+
     @pydantic.validate_call
     def get_sample(
         self, shot_id: int, sample_data: TimeSeriesFileData
@@ -133,6 +148,10 @@ class UDADataLoader(DataLoader):
         self.client = pyuda.Client()
 
         super().__init__(params)
+
+    @property
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
 
     @pydantic.validate_call
     def get_sample(

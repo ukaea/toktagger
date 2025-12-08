@@ -1,5 +1,6 @@
 import toktagger.api.core.data_loaders as data_loaders
 import pytest
+from typing import Type
 from toktagger.api.schemas.samples import (
     Sample,
     FileData,
@@ -144,6 +145,10 @@ async def test_custom_data_loader(api_client):
     # Create a custom data loader
     @data_loaders.LoaderRegistry.register("test")
     class CustomLoader(data_loaders.DataLoader):
+        @property
+        def sample_data_type(self) -> Type[ShotData]:
+            return ShotData
+
         def get_sample(self, shot_id: int, sample_data: ShotData):
             # Return some data, use something from sample to check it is passed in correctly
             return MultiVariateTimeSeriesData(
