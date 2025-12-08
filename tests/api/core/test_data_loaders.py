@@ -2,7 +2,7 @@ import toktagger.api.core.data_loaders as data_loaders
 import pytest
 from toktagger.api.schemas.samples import (
     Sample,
-    ImageFileData,
+    FileData,
     TimeSeriesFileData,
     ShotData,
 )
@@ -10,18 +10,21 @@ from toktagger.api.schemas.data import (
     TimeSeriesData,
     MultiVariateTimeSeriesData,
     ImageData,
+    ImageParams,
+    DataParams,
 )
 import pathlib
 import numpy
+from PIL import Image
+import base64
+import io
 
 
 def test_image_file_loader_jpg():
-    img_file = ImageFileData(
-        file_name=str(pathlib.Path(__file__).parents[2].joinpath("MAST-U.jpg")),
+    img_file = FileData(
+        file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
         type="jpg",
         protocol="file",
-        frame=1,
-        time=0.1,
     )
     sample = Sample(
         shot_id=10000,
@@ -30,19 +33,24 @@ def test_image_file_loader_jpg():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ImageDataLoader()
+    data_loader = data_loaders.ImageDataLoader(
+        params=ImageParams(name="image", frame=1)
+    )
     image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
-    assert numpy.array(image_data.data).shape == (1079, 881, 3)
+    # Check we got back base64 encoded string
+    assert isinstance(image_data.values, str)
+    # Convert back to numpy array
+    base64_decoded = base64.b64decode(image_data.values)
+    image = Image.open(io.BytesIO(base64_decoded))
+    assert numpy.array(image).shape == (1079, 881, 3)
 
 
 def test_image_file_loader_png():
-    img_file = ImageFileData(
-        file_name=str(pathlib.Path(__file__).parents[2].joinpath("MAST-U.png")),
+    img_file = FileData(
+        file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
         type="png",
         protocol="file",
-        frame=1,
-        time=0.1,
     )
     sample = Sample(
         shot_id=10000,
@@ -51,10 +59,17 @@ def test_image_file_loader_png():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ImageDataLoader()
+    data_loader = data_loaders.ImageDataLoader(
+        params=ImageParams(name="image", frame=1)
+    )
     image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
-    assert numpy.array(image_data.data).shape == (1079, 881, 3)
+    # Check we got back base64 encoded string
+    assert isinstance(image_data.values, str)
+    # Convert back to numpy array
+    base64_decoded = base64.b64decode(image_data.values)
+    image = Image.open(io.BytesIO(base64_decoded))
+    assert numpy.array(image).shape == (1079, 881, 3)
 
 
 def test_parquet_file_loader():
@@ -71,7 +86,7 @@ def test_parquet_file_loader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ParquetDataLoader()
+    data_loader = data_loaders.ParquetDataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
@@ -104,7 +119,7 @@ def test_uda_loader(uda_env_vars):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDADataLoader()
+    data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
@@ -135,7 +150,7 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDADataLoader()
+    data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 

@@ -6,20 +6,24 @@ import {
   Breadcrumbs,
   Item,
   ToastContainer,
+  ToastQueue,
 } from "@adobe/react-spectrum";
 import {
   Annotation,
   CompositeDataSchema,
   Data,
   MultiVariateTimeSeriesDataSchema,
+  ImageDataSchema,
   Project,
   Sample,
   SpectrogramDataSchema,
   SpectrogramViewParams,
   PlotProps,
   ViewParams,
+  DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
+import { UFOView } from "@/app/ufos/components/ufos";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -59,6 +63,10 @@ type SampleViewInfo = {
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
+  dataParams: DataParams;
+  setDataParams: (
+    updater: (dataParams: DataParams) => DataParams | DataParams,
+  ) => void;
   plotProps: PlotProps;
 };
 
@@ -67,6 +75,7 @@ const SampleView = ({
   data,
   annotations,
   setAnnotations,
+  setDataParams,
   plotProps,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
@@ -93,6 +102,13 @@ const SampleView = ({
         setAnnotations={setAnnotations}
       />
     );
+  } else if (project.task == "UFO") {
+    console.log({ data });
+    const result = ImageDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for UFO view");
+    }
+    return <UFOView data={result.data} setDataParams={setDataParams} />;
   } else if (project.task == "MHD") {
     console.log(data);
     const result = CompositeDataSchema.safeParse(data);
@@ -152,6 +168,9 @@ export default function SamplePage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [dataParams, setDataParams] = useState<DataParams>({
+    name: "identity",
+  });
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });
@@ -160,11 +179,7 @@ export default function SamplePage() {
   }); // Set default color map
 
   useEffect(() => {
-    const refreshData = async (params: ViewParams) => {
-      if (!hasIds) {
-        return;
-      }
-
+    const refreshSample = async () => {
       const project = await getProject(project_id);
       setProject(project);
 
@@ -173,36 +188,51 @@ export default function SamplePage() {
 
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
-      console.log(dbAnnotations);
+    };
+    refreshSample();
+  }, [project_id, sample_id]);
+
+  useEffect(() => {
+    const refreshData = async (
+      dataParams: DataParams,
+      viewParams: ViewParams,
+    ) => {
+      if (!project || !sample) {
+        return;
+      }
 
       if (project.task == "MHD") {
-        params = {
-          ...params,
+        viewParams = {
+          ...viewParams,
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
       }
-
       const response = await fetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
+        `${BACKEND_API_URL}/projects/${project._id}/samples/${sample._id}/data`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(params),
+          body: JSON.stringify({ params: dataParams, view: viewParams }),
         },
       );
       const data: Data = await response.json();
-      setData(data);
+      if (!response.ok) {
+        console.error("Error:", data.detail);
+        ToastQueue.negative("Error:", data.detail);
+      } else {
+        setData(data);
+      }
     };
 
-    const run = async (viewParams: ViewParams) => {
-      await refreshData(viewParams);
+    const run = async (dataParams: DataParams, viewParams: ViewParams) => {
+      await refreshData(dataParams, viewParams);
     };
 
-    run(viewParams);
-  }, [project_id, sample_id, viewParams, hasIds]);
+    run(dataParams, viewParams);
+  }, [project, sample, dataParams, viewParams]);
 
   if (!data || !project || !sample || !hasIds) {
     return;
@@ -227,6 +257,8 @@ export default function SamplePage() {
             setAnnotations={setAnnotations}
             viewParams={viewParams}
             setViewParams={setViewParams}
+            dataParams={dataParams}
+            setDataParams={setDataParams}
             plotProps={plotProps}
             setPlotProps={setPlotProps}
           />
@@ -236,6 +268,8 @@ export default function SamplePage() {
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
+              dataParams={dataParams}
+              setDataParams={setDataParams}
               plotProps={plotProps}
             />
           </div>
