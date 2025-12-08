@@ -53,6 +53,12 @@ class LoaderRegistry:
                 raise ValueError(
                     f"Loader '{name}' does not inherit from DataLoader base class."
                 )
+            if (sample_data_type := loader_class.sample_data_type()) not in (
+                ShotData | FileData | TimeSeriesFileData
+            ):
+                raise ValueError(
+                    f"Loader '{name}' must expect a supported data type as an input, but got '{sample_data_type}'."
+                )
             cls._registry[name] = loader_class
             return loader_class
 
