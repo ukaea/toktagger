@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from PIL import Image
 import io
 import base64
+import pydantic
 from toktagger.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
@@ -12,7 +13,7 @@ from toktagger.api.schemas.data import (
     ImageData,
     DataParamTypes,
 )
-from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
+from toktagger.api.schemas.samples import FileData, ShotData, TimeSeriesFileData
 
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -29,7 +30,9 @@ class DataLoader(ABC):
         self.params = params
 
     @abstractmethod
-    def get_sample(self, sample: Sample) -> Data:
+    def get_sample(
+        self, shot_id: int, sample_data: ShotData | FileData | TimeSeriesFileData
+    ) -> Data:
         pass
 
 
@@ -67,11 +70,10 @@ class ImageDataLoader(DataLoader):
     def __init__(self, params: DataParamTypes):
         super().__init__(params)
 
-    def get_sample(self, sample: Sample) -> ImageData:
-        assert isinstance(sample.data, FileData)
-        item: FileData = sample.data
+    @pydantic.validate_call
+    def get_sample(self, shot_id: int, sample_data: FileData) -> ImageData:
         # Find directory of images
-        dir_path = pathlib.Path(item.file_name)
+        dir_path = pathlib.Path(sample_data.file_name)
         if not dir_path.exists() or not dir_path.is_dir():
             raise FileNotFoundError(
                 f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
@@ -80,7 +82,9 @@ class ImageDataLoader(DataLoader):
         if self.params.name != "image":  # TODO do we want this?
             file_path = next(dir_path.iterdir())
         else:
-            file_path = dir_path.joinpath(f"{self.params.frame}.{item.type.value}")
+            file_path = dir_path.joinpath(
+                f"{self.params.frame}.{sample_data.type.value}"
+            )
         if not file_path.exists():
             raise FileNotFoundError(
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
@@ -100,14 +104,15 @@ class ImageDataLoader(DataLoader):
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, TimeSeriesFileData)
-        item: TimeSeriesFileData = sample.data
-        if not pathlib.Path(item.file_name).exists():
+    @pydantic.validate_call
+    def get_sample(
+        self, shot_id: int, sample_data: TimeSeriesFileData
+    ) -> MultiVariateTimeSeriesData:
+        if not pathlib.Path(sample_data.file_name).exists():
             raise FileNotFoundError(
-                f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
+                f"Could not find file at '{sample_data.file_name}', relative to {pathlib.Path().cwd()}"
             )
-        df = pd.read_parquet(item.file_name, columns=item.column_names)
+        df = pd.read_parquet(sample_data.file_name, columns=sample_data.column_names)
         df = df.fillna(0)
         data = df.to_dict("list")
         time = df.index.values
@@ -129,14 +134,14 @@ class UDADataLoader(DataLoader):
 
         super().__init__(params)
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, ShotData)
-        item: ShotData = sample.data
-
+    @pydantic.validate_call
+    def get_sample(
+        self, shot_id: int, sample_data: ShotData
+    ) -> MultiVariateTimeSeriesData:
         results = {}
-        for name in item.signal_names:
+        for name in sample_data.signal_names:
             try:
-                signal = self.client.get(name, sample.shot_id)
+                signal = self.client.get(name, shot_id)
                 data = signal.data
                 time = signal.time.data
                 item = TimeSeriesData(time=time, values=data)

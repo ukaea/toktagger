@@ -29,7 +29,7 @@ async def get_data(
 
     data_loader = LoaderRegistry.get(project.data_loader)(params)
     try:
-        data = data_loader.get_sample(sample)
+        data = data_loader.get_sample(sample.shot_id, sample.data)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e))
 
