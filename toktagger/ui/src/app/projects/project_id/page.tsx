@@ -15,6 +15,7 @@ import {
   Button,
   Picker,
   SearchField,
+  ToastContainer
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { getSamples, getProject } from "@/app/core";
@@ -153,7 +154,14 @@ export default function ProjectView() {
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
-            <div className="pl-4">
+            <ToastContainer placement="top" />
+            <Flex
+              direction="row"
+              margin="size-100"
+              gap="size-100"
+              alignItems="center"
+              justifyContent="space-between"
+            >
               <SearchField
                 label="Search By Shot ID"
                 // SearchField should be able to do validation when provided a 'pattern' inside a Form element
@@ -162,7 +170,7 @@ export default function ProjectView() {
                 validationState={errorMessage ? "invalid" : undefined}
                 errorMessage={errorMessage}
               />
-            </div>
+            </Flex>
             <SamplesTable
               project_id={project_id}
               samples={samples}
