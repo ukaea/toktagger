@@ -48,7 +48,7 @@ const QueryStrategies = [
 const FileTypes = [
   { key: "parquet", value: "Parquet" },
   { key: "png", value: "PNG" },
-  { key: "jpg", value: "JPEG" }
+  { key: "jpg", value: "JPEG" },
 ];
 
 const DataLoaderOptionsSchema = z.object({
@@ -80,10 +80,13 @@ const FileDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
 });
 type FileDataLoaderOptions = z.infer<typeof FileDataLoaderOptionsSchema>;
 
-const TimeSeriesFileDataLoaderOptionsSchema = FileDataLoaderOptionsSchema.extend({
-  signal_names: z.array(z.string()),
-})
-type TimeSeriesFileDataLoaderOptions = z.infer<typeof TimeSeriesFileDataLoaderOptionsSchema>;
+const TimeSeriesFileDataLoaderOptionsSchema =
+  FileDataLoaderOptionsSchema.extend({
+    signal_names: z.array(z.string()),
+  });
+type TimeSeriesFileDataLoaderOptions = z.infer<
+  typeof TimeSeriesFileDataLoaderOptionsSchema
+>;
 
 export function useFileLoaderState(
   initialPath: string,
@@ -91,7 +94,9 @@ export function useFileLoaderState(
   fileTypes: { key: string; value: string }[],
 ) {
   const [filePath, setFilePath] = useState<string>(initialPath);
-  const [fileType, setFileType] = useState<string>(initialType || fileTypes[0]?.key);
+  const [fileType, setFileType] = useState<string>(
+    initialType || fileTypes[0]?.key,
+  );
   const [fileNames, setFileNames] = useState<string[]>([]);
   useEffect(() => {
     async function fetchFileList() {
@@ -127,7 +132,6 @@ export function useFileLoaderState(
   };
 }
 
-
 type FileLoaderFieldsProps = {
   fileTypes: { key: string; value: string }[];
   fileType: string;
@@ -136,7 +140,6 @@ type FileLoaderFieldsProps = {
   setFilePath: (path: string) => void;
   fileNames: string[];
 };
-
 
 export function FileDataLoaderFields({
   fileTypes,
@@ -172,7 +175,7 @@ export function FileDataLoaderFields({
       </Flex>
     </Flex>
   );
-};
+}
 
 const SignalNamesUI = ({
   displayName,
@@ -348,18 +351,12 @@ const FileDataLoaderOptionsUI = ({
   dataLoaderOptions: FileDataLoaderOptions;
   setDataLoaderOptions: (options: FileDataLoaderOptions) => void;
 }) => {
-
-  const {
-    filePath,
-    setFilePath,
-    fileType,
-    setFileType,
-    fileNames,
-  } = useFileLoaderState(
-    dataLoaderOptions?.dir_name || "",
-    dataLoaderOptions?.protocol || FileTypes[0].key,
-    FileTypes,
-  );
+  const { filePath, setFilePath, fileType, setFileType, fileNames } =
+    useFileLoaderState(
+      dataLoaderOptions?.dir_name || "",
+      dataLoaderOptions?.protocol || FileTypes[0].key,
+      FileTypes,
+    );
 
   useEffect(() => {
     const options = FileDataLoaderOptionsSchema.safeParse({
@@ -392,7 +389,6 @@ const FileDataLoaderOptionsUI = ({
   );
 };
 
-
 const TimeSeriesFileDataLoaderOptionsUI = ({
   dataLoaderOptions,
   setDataLoaderOptions,
@@ -400,21 +396,15 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
   dataLoaderOptions: TimeSeriesFileDataLoaderOptions;
   setDataLoaderOptions: (options: TimeSeriesFileDataLoaderOptions) => void;
 }) => {
-
-  const {
-    filePath,
-    setFilePath,
-    fileType,
-    setFileType,
-    fileNames,
-  } = useFileLoaderState(
-    dataLoaderOptions?.dir_name || "",
-    dataLoaderOptions?.protocol || FileTypes[0].key,
-    FileTypes,
-  );
+  const { filePath, setFilePath, fileType, setFileType, fileNames } =
+    useFileLoaderState(
+      dataLoaderOptions?.dir_name || "",
+      dataLoaderOptions?.protocol || FileTypes[0].key,
+      FileTypes,
+    );
 
   const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || []
+    dataLoaderOptions?.signal_names || [],
   );
 
   useEffect(() => {
@@ -445,11 +435,11 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
         setFilePath={setFilePath}
         fileNames={fileNames}
       />
-        <SignalNamesUI
-          displayName={"File Columns"}
-          signalNames={signalNames}
-          setSignalNames={setSignalNames}
-        />
+      <SignalNamesUI
+        displayName={"File Columns"}
+        signalNames={signalNames}
+        setSignalNames={setSignalNames}
+      />
     </View>
   );
 };
@@ -462,22 +452,27 @@ const DataLoaderForm = ({
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
   const name = dataLoaderOptions?.name ? dataLoaderOptions.name : null;
-  const [dataLoaders, setDataLoaders] = useState<{ key: string; name: string }[]>([])
+  const [dataLoaders, setDataLoaders] = useState<
+    { key: string; name: string }[]
+  >([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
   const [dataType, setDataType] = useState<string | null>(name || null);
   useEffect(() => {
     async function fetchDataLoaders() {
       try {
-        const response = await fetch(
-          `${BACKEND_API_URL}/meta/dataloader`,
-        );
+        const response = await fetch(`${BACKEND_API_URL}/meta/dataloader`);
         if (response.ok) {
           const dataLoadersList = await response.json();
-          setDataLoaders(dataLoadersList.map((item: string) => ({ key: item, value: item})));
+          setDataLoaders(
+            dataLoadersList.map((item: string) => ({ key: item, value: item })),
+          );
         } else {
-          ToastQueue.negative(`Error fetching available Data Loaders from server.`, {
-            timeout: 3000,
-          });
+          ToastQueue.negative(
+            `Error fetching available Data Loaders from server.`,
+            {
+              timeout: 3000,
+            },
+          );
         }
       } catch (error) {
         ToastQueue.negative(`Error fetching data loaders: ${error}`, {
@@ -501,9 +496,12 @@ const DataLoaderForm = ({
           const dataSchema = await response.json();
           setDataType(dataSchema["title"]);
         } else {
-          ToastQueue.negative(`Error fetching available Data Loaders from server.`, {
-            timeout: 3000,
-          });
+          ToastQueue.negative(
+            `Error fetching available Data Loaders from server.`,
+            {
+              timeout: 3000,
+            },
+          );
         }
       } catch (error) {
         ToastQueue.negative(`Error fetching data loaders: ${error}`, {
@@ -511,9 +509,9 @@ const DataLoaderForm = ({
         });
       }
     }
-    fetchDataType()
+    fetchDataType();
   }, [selectedKey]);
-  
+
   let ui = null;
   if (dataType === "ShotData") {
     const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
