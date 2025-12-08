@@ -186,3 +186,22 @@ async def test_custom_data_loader(api_client):
     assert response.status_code == 200
     assert response.json()["values"]["test_vals"]["time"] == [0, 1]
     assert response.json()["values"]["test_vals"]["values"] == [shot_id, shot_id + 1]
+
+
+@pytest.mark.parametrize(
+    "name,data_loader,sample_data_model",
+    [
+        ("image", data_loaders.ImageDataLoader, FileData),
+        ("parquet", data_loaders.ParquetDataLoader, TimeSeriesFileData),
+        ("uda", data_loaders.UDADataLoader, ShotData),
+    ],
+)
+def test_loader_registry(name, data_loader, sample_data_model):
+    # Check the registry returns the correct class
+    assert data_loaders.LoaderRegistry.get(name) == data_loader
+
+    # Check the registry returns the correct sample data schema
+    assert (
+        data_loaders.LoaderRegistry.get_data_schema(name)
+        == sample_data_model.model_json_schema()
+    )

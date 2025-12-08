@@ -1,6 +1,7 @@
 import pytest
 import pandas as pd
 import pathlib
+from toktagger.api.schemas.samples import ShotData
 
 
 @pytest.mark.asyncio
@@ -18,3 +19,12 @@ async def test_get_data(api_client, setup_db):
     # Load data from parquet, check it matches
     df = pd.read_parquet(pathlib.Path(__file__).parents[2].joinpath("test.parquet"))
     assert data["values"]["Ip"]["values"] == df.Ip.tolist()
+
+
+@pytest.mark.asyncio
+async def test_get_data_schema(api_client, setup_db):
+    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/data")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "ShotData"
+    assert data == ShotData.model_json_schema()
