@@ -8,12 +8,19 @@ from toktagger.api.schemas.data import DataResponseType, DataParams, DataParamTy
 from toktagger.api.schemas.views import ViewParams, ViewParamTypes
 
 
-router = APIRouter(
-    prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"]
-)
+router = APIRouter(prefix="/projects/{project_id}", tags=["Data"])
 
 
-@router.post("", response_model=DataResponseType)
+@router.get("/data")
+async def get_data_schema(request: Request, project_id: str):
+    """Get schema which is required for getting data in this project."""
+    db_client = request.app.state.db_client
+
+    project = await utils.get_project(db_client, project_id)
+    return LoaderRegistry.get_data_schema(project.data_loader)
+
+
+@router.post("/samples/{sample_id}/data", response_model=DataResponseType)
 async def get_data(
     request: Request,
     project_id: str,

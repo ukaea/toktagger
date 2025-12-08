@@ -30,9 +30,9 @@ class DataLoader(ABC):
     def __init__(self, params: DataParamTypes):
         self.params = params
 
-    @property
+    @classmethod
     @abstractmethod
-    def sample_data_type(self) -> Type[ShotData | FileData | TimeSeriesFileData]:
+    def sample_data_type(cls) -> Type[ShotData | FileData | TimeSeriesFileData]:
         # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
         pass
 
@@ -69,6 +69,13 @@ class LoaderRegistry:
     def names(cls):
         return list(cls._registry.keys())
 
+    @classmethod
+    def get_data_schema(cls, name: str):
+        loader_class: DataLoader | None = cls._registry.get(name)
+        if not loader_class:
+            raise ValueError(f"No DataLoader class called '{name}' found in registry!")
+        return loader_class.sample_data_type().model_json_schema()
+
 
 @LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
@@ -77,7 +84,7 @@ class ImageDataLoader(DataLoader):
     def __init__(self, params: DataParamTypes):
         super().__init__(params)
 
-    @property
+    @classmethod
     def sample_data_type(self) -> Type[FileData]:
         return FileData
 
@@ -115,7 +122,7 @@ class ImageDataLoader(DataLoader):
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
-    @property
+    @classmethod
     def sample_data_type(self) -> Type[TimeSeriesFileData]:
         return TimeSeriesFileData
 
@@ -149,7 +156,7 @@ class UDADataLoader(DataLoader):
 
         super().__init__(params)
 
-    @property
+    @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
 

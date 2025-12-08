@@ -145,7 +145,7 @@ async def test_custom_data_loader(api_client):
     # Create a custom data loader
     @data_loaders.LoaderRegistry.register("test")
     class CustomLoader(data_loaders.DataLoader):
-        @property
+        @classmethod
         def sample_data_type(self) -> Type[ShotData]:
             return ShotData
 
