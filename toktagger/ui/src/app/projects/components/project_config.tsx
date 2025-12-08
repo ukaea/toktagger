@@ -40,11 +40,6 @@ const Tasks = [
   { key: "MHD", value: "MHD" },
 ];
 
-const DataLoaders = [
-  { key: "file", value: "Local File" },
-  { key: "uda", value: "UDA" },
-];
-
 const QueryStrategies = [
   { key: "sequential", value: "Sequential" },
   { key: "random", value: "Random" },
@@ -352,10 +347,60 @@ const DataLoaderForm = ({
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
   const name = dataLoaderOptions?.name ? dataLoaderOptions.name : null;
+  const [dataLoaders, setDataLoaders] = useState<{ key: string; name: string }[]>([])
   const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
+  const [dataType, setDataType] = useState<string | null>(name || null);
+  useEffect(() => {
+    async function fetchDataLoaders() {
+      try {
+        const response = await fetch(
+          `${BACKEND_API_URL}/meta/dataloader`,
+        );
+        if (response.ok) {
+          const dataLoadersList = await response.json();
+          setDataLoaders(dataLoadersList.map((item: string) => ({ key: item, value: item})));
+        } else {
+          ToastQueue.negative(`Error fetching available Data Loaders from server.`, {
+            timeout: 3000,
+          });
+        }
+      } catch (error) {
+        ToastQueue.negative(`Error fetching data loaders: ${error}`, {
+          timeout: 3000,
+        });
+      }
+    }
+    fetchDataLoaders();
+  }, []);
 
+  useEffect(() => {
+    if (!selectedKey) {
+      return;
+    }
+    async function fetchDataType() {
+      try {
+        const response = await fetch(
+          `${BACKEND_API_URL}/meta/dataloader/${selectedKey}`,
+        );
+        if (response.ok) {
+          const dataSchema = await response.json();
+          setDataType(dataSchema["title"]);
+        } else {
+          ToastQueue.negative(`Error fetching available Data Loaders from server.`, {
+            timeout: 3000,
+          });
+        }
+      } catch (error) {
+        ToastQueue.negative(`Error fetching data loaders: ${error}`, {
+          timeout: 3000,
+        });
+      }
+    }
+    fetchDataType()
+  }, [selectedKey]);
+  
   let ui = null;
-  if (selectedKey === "uda") {
+  if (dataType === "ShotData") {
     const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
     ui = (
       <UDADataLoaderOptionsUI
@@ -363,7 +408,7 @@ const DataLoaderForm = ({
         setDataLoaderOptions={setDataLoaderOptions}
       />
     );
-  } else if (selectedKey === "file") {
+  } else if (dataType === "TimeSeriesFileData") {
     const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
     ui = (
       <FileDataLoaderOptionsUI
@@ -377,7 +422,7 @@ const DataLoaderForm = ({
     <>
       <ComboBox
         label="Data Loader"
-        items={DataLoaders}
+        items={dataLoaders}
         isRequired
         onSelectionChange={(key) => setSelectedKey(key ? String(key) : null)}
         selectedKey={selectedKey}
