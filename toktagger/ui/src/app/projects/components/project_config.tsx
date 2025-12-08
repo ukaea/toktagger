@@ -45,15 +45,19 @@ const QueryStrategies = [
   { key: "random", value: "Random" },
 ];
 
-const FileTypes = [{ key: "parquet", value: "Parquet" }];
+const FileTypes = [
+  { key: "parquet", value: "Parquet" },
+  { key: "png", value: "PNG" },
+  { key: "jpg", value: "JPEG" }
+];
 
 const DataLoaderOptionsSchema = z.object({
   name: z.string(),
-  signal_names: z.array(z.string()),
 });
 type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
 
 const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
+  signal_names: z.array(z.string()),
   shot_min: z.number(),
   shot_max: z.number(),
 }).refine(
@@ -75,6 +79,100 @@ const FileDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   protocol: z.string().optional(),
 });
 type FileDataLoaderOptions = z.infer<typeof FileDataLoaderOptionsSchema>;
+
+const TimeSeriesFileDataLoaderOptionsSchema = FileDataLoaderOptionsSchema.extend({
+  signal_names: z.array(z.string()),
+})
+type TimeSeriesFileDataLoaderOptions = z.infer<typeof TimeSeriesFileDataLoaderOptionsSchema>;
+
+export function useFileLoaderState(
+  initialPath: string,
+  initialType: string,
+  fileTypes: { key: string; value: string }[],
+) {
+  const [filePath, setFilePath] = useState<string>(initialPath);
+  const [fileType, setFileType] = useState<string>(initialType || fileTypes[0]?.key);
+  const [fileNames, setFileNames] = useState<string[]>([]);
+  useEffect(() => {
+    async function fetchFileList() {
+      if (filePath) {
+        try {
+          const response = await fetch(
+            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
+          );
+          if (response.ok) {
+            const fileList = await response.json();
+            setFileNames(fileList);
+          } else {
+            ToastQueue.negative(`Error fetching files from ${filePath}`, {
+              timeout: 3000,
+            });
+          }
+        } catch (error) {
+          ToastQueue.negative(`Error fetching files: ${error}`, {
+            timeout: 3000,
+          });
+        }
+      }
+    }
+    fetchFileList();
+  }, [filePath, fileType]);
+
+  return {
+    filePath,
+    setFilePath,
+    fileType,
+    setFileType,
+    fileNames,
+  };
+}
+
+
+type FileLoaderFieldsProps = {
+  fileTypes: { key: string; value: string }[];
+  fileType: string;
+  setFileType: (type: string) => void;
+  filePath: string;
+  setFilePath: (path: string) => void;
+  fileNames: string[];
+};
+
+
+export function FileDataLoaderFields({
+  fileTypes,
+  fileType,
+  setFileType,
+  filePath,
+  setFilePath,
+  fileNames,
+}: FileLoaderFieldsProps) {
+  return (
+    <Flex direction="column" gap="size-200">
+      <ComboBox
+        label="File Type"
+        items={fileTypes}
+        selectedKey={fileType}
+        onSelectionChange={(key) => setFileType(key ? String(key) : "")}
+        isRequired
+      >
+        {(item: Record<string, string>) => (
+          <Item key={item.key}>{item.value}</Item>
+        )}
+      </ComboBox>
+      <Flex direction="row" gap="size-200" alignItems="end">
+        <TextField
+          label="File Path"
+          value={filePath}
+          onChange={setFilePath}
+          isRequired
+        ></TextField>
+        <Text>
+          {fileNames.length} {fileType} files found.
+        </Text>
+      </Flex>
+    </Flex>
+  );
+};
 
 const SignalNamesUI = ({
   displayName,
@@ -248,21 +346,79 @@ const FileDataLoaderOptionsUI = ({
   setDataLoaderOptions,
 }: {
   dataLoaderOptions: FileDataLoaderOptions;
-  setDataLoaderOptions: (options: DataLoaderOptions) => void;
+  setDataLoaderOptions: (options: FileDataLoaderOptions) => void;
 }) => {
-  const [filePath, setFilePath] = useState<string>(
+
+  const {
+    filePath,
+    setFilePath,
+    fileType,
+    setFileType,
+    fileNames,
+  } = useFileLoaderState(
     dataLoaderOptions?.dir_name || "",
-  );
-  const [fileType, setFileType] = useState<string>(
     dataLoaderOptions?.protocol || FileTypes[0].key,
+    FileTypes,
   );
-  const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
-  );
-  const [fileNames, setFileNames] = useState<string[]>([]);
 
   useEffect(() => {
     const options = FileDataLoaderOptionsSchema.safeParse({
+      name: "file",
+      file_type: fileType,
+      file_names: fileNames,
+    });
+
+    if (options.success) {
+      setDataLoaderOptions(options.data);
+    }
+  }, [fileNames, fileType, setDataLoaderOptions]);
+
+  return (
+    <View
+      borderWidth="thin"
+      borderColor="dark"
+      borderRadius="medium"
+      padding="size-250"
+    >
+      <FileDataLoaderFields
+        fileTypes={FileTypes}
+        fileType={fileType}
+        setFileType={setFileType}
+        filePath={filePath}
+        setFilePath={setFilePath}
+        fileNames={fileNames}
+      />
+    </View>
+  );
+};
+
+
+const TimeSeriesFileDataLoaderOptionsUI = ({
+  dataLoaderOptions,
+  setDataLoaderOptions,
+}: {
+  dataLoaderOptions: TimeSeriesFileDataLoaderOptions;
+  setDataLoaderOptions: (options: TimeSeriesFileDataLoaderOptions) => void;
+}) => {
+
+  const {
+    filePath,
+    setFilePath,
+    fileType,
+    setFileType,
+    fileNames,
+  } = useFileLoaderState(
+    dataLoaderOptions?.dir_name || "",
+    dataLoaderOptions?.protocol || FileTypes[0].key,
+    FileTypes,
+  );
+
+  const [signalNames, setSignalNames] = useState<string[]>(
+    dataLoaderOptions?.signal_names || []
+  );
+
+  useEffect(() => {
+    const options = TimeSeriesFileDataLoaderOptionsSchema.safeParse({
       name: "file",
       signal_names: signalNames,
       file_type: fileType,
@@ -274,31 +430,6 @@ const FileDataLoaderOptionsUI = ({
     }
   }, [signalNames, fileNames, fileType, setDataLoaderOptions]);
 
-  useEffect(() => {
-    async function fetchFileList() {
-      if (filePath) {
-        try {
-          const response = await fetch(
-            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
-          );
-          if (response.ok) {
-            const fileList = await response.json();
-            setFileNames(fileList);
-          } else {
-            ToastQueue.negative(`Error fetching files from ${filePath}`, {
-              timeout: 3000,
-            });
-          }
-        } catch (error) {
-          ToastQueue.negative(`Error fetching files: ${error}`, {
-            timeout: 3000,
-          });
-        }
-      }
-    }
-    fetchFileList();
-  }, [filePath, fileType]);
-
   return (
     <View
       borderWidth="thin"
@@ -306,35 +437,19 @@ const FileDataLoaderOptionsUI = ({
       borderRadius="medium"
       padding="size-250"
     >
-      <Flex direction="column" gap="size-200">
-        <ComboBox
-          label="File Type"
-          items={FileTypes}
-          selectedKey={fileType}
-          onSelectionChange={(key) => setFileType(key ? String(key) : "")}
-          isRequired
-        >
-          {(item: Record<string, string>) => (
-            <Item key={item.key}>{item.value}</Item>
-          )}
-        </ComboBox>
-        <Flex direction="row" gap="size-200" alignItems="end">
-          <TextField
-            label="File Path"
-            value={filePath}
-            onChange={setFilePath}
-            isRequired
-          ></TextField>
-          <Text>
-            {fileNames.length} {fileType} files found.
-          </Text>
-        </Flex>
+      <FileDataLoaderFields
+        fileTypes={FileTypes}
+        fileType={fileType}
+        setFileType={setFileType}
+        filePath={filePath}
+        setFilePath={setFilePath}
+        fileNames={fileNames}
+      />
         <SignalNamesUI
           displayName={"File Columns"}
           signalNames={signalNames}
           setSignalNames={setSignalNames}
         />
-      </Flex>
     </View>
   );
 };
@@ -408,10 +523,18 @@ const DataLoaderForm = ({
         setDataLoaderOptions={setDataLoaderOptions}
       />
     );
-  } else if (dataType === "TimeSeriesFileData") {
+  } else if (dataType === "FileData") {
     const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
     ui = (
       <FileDataLoaderOptionsUI
+        dataLoaderOptions={fileOptions}
+        setDataLoaderOptions={setDataLoaderOptions}
+      />
+    );
+  } else if (dataType === "TimeSeriesFileData") {
+    const fileOptions = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
+    ui = (
+      <TimeSeriesFileDataLoaderOptionsUI
         dataLoaderOptions={fileOptions}
         setDataLoaderOptions={setDataLoaderOptions}
       />
