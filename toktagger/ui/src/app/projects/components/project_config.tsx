@@ -27,6 +27,7 @@ import {
   Sample,
   SamplesSummary,
   FileData,
+  TimeSeriesFileData,
   ShotData,
   ProjectUpdate,
 } from "@/types";
@@ -53,6 +54,7 @@ const FileTypes = [
 
 const DataLoaderOptionsSchema = z.object({
   name: z.string(),
+  data_type: z.string(),
 });
 type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
 
@@ -251,9 +253,13 @@ const SignalNamesUI = ({
 };
 
 const UDADataLoaderOptionsUI = ({
+  dataLoader,
+  dataType,
   dataLoaderOptions,
   setDataLoaderOptions,
 }: {
+  dataLoader: string;
+  dataType: string;
   dataLoaderOptions: UDADataLoaderOptions;
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
@@ -269,7 +275,8 @@ const UDADataLoaderOptionsUI = ({
 
   useEffect(() => {
     const options = UDADataLoaderOptionsSchema.safeParse({
-      name: "uda",
+      name: dataLoader,
+      data_type: dataType,
       signal_names: signalNames,
       shot_min: shotMin,
       shot_max: shotMax,
@@ -278,7 +285,14 @@ const UDADataLoaderOptionsUI = ({
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [shotMin, shotMax, signalNames, setDataLoaderOptions]);
+  }, [
+    dataLoader,
+    dataType,
+    shotMin,
+    shotMax,
+    signalNames,
+    setDataLoaderOptions,
+  ]);
 
   return (
     <View
@@ -345,9 +359,13 @@ const UDADataLoaderOptionsUI = ({
 };
 
 const FileDataLoaderOptionsUI = ({
+  dataLoader,
+  dataType,
   dataLoaderOptions,
   setDataLoaderOptions,
 }: {
+  dataLoader: string;
+  dataType: string;
   dataLoaderOptions: FileDataLoaderOptions;
   setDataLoaderOptions: (options: FileDataLoaderOptions) => void;
 }) => {
@@ -360,7 +378,8 @@ const FileDataLoaderOptionsUI = ({
 
   useEffect(() => {
     const options = FileDataLoaderOptionsSchema.safeParse({
-      name: "file",
+      name: dataLoader,
+      data_type: dataType,
       file_type: fileType,
       file_names: fileNames,
     });
@@ -368,7 +387,7 @@ const FileDataLoaderOptionsUI = ({
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [fileNames, fileType, setDataLoaderOptions]);
+  }, [dataLoader, dataType, fileNames, fileType, setDataLoaderOptions]);
 
   return (
     <View
@@ -390,9 +409,13 @@ const FileDataLoaderOptionsUI = ({
 };
 
 const TimeSeriesFileDataLoaderOptionsUI = ({
+  dataLoader,
+  dataType,
   dataLoaderOptions,
   setDataLoaderOptions,
 }: {
+  dataLoader: string;
+  dataType: string;
   dataLoaderOptions: TimeSeriesFileDataLoaderOptions;
   setDataLoaderOptions: (options: TimeSeriesFileDataLoaderOptions) => void;
 }) => {
@@ -409,7 +432,8 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
 
   useEffect(() => {
     const options = TimeSeriesFileDataLoaderOptionsSchema.safeParse({
-      name: "file",
+      name: dataLoader,
+      data_type: dataType,
       signal_names: signalNames,
       file_type: fileType,
       file_names: fileNames,
@@ -418,7 +442,14 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [signalNames, fileNames, fileType, setDataLoaderOptions]);
+  }, [
+    dataLoader,
+    dataType,
+    signalNames,
+    fileNames,
+    fileType,
+    setDataLoaderOptions,
+  ]);
 
   return (
     <View
@@ -517,6 +548,8 @@ const DataLoaderForm = ({
     const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
     ui = (
       <UDADataLoaderOptionsUI
+        dataLoader={selectedKey || ""}
+        dataType={dataType}
         dataLoaderOptions={udaOptions}
         setDataLoaderOptions={setDataLoaderOptions}
       />
@@ -525,6 +558,8 @@ const DataLoaderForm = ({
     const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
     ui = (
       <FileDataLoaderOptionsUI
+        dataLoader={selectedKey || ""}
+        dataType={dataType}
         dataLoaderOptions={fileOptions}
         setDataLoaderOptions={setDataLoaderOptions}
       />
@@ -533,6 +568,8 @@ const DataLoaderForm = ({
     const fileOptions = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
     ui = (
       <TimeSeriesFileDataLoaderOptionsUI
+        dataLoader={selectedKey || ""}
+        dataType={dataType}
         dataLoaderOptions={fileOptions}
         setDataLoaderOptions={setDataLoaderOptions}
       />
@@ -626,10 +663,12 @@ const createProject = async (project: Project): Promise<string> => {
 };
 
 const buildSamples = (dataLoaderOptions: DataLoaderOptions): Sample[] => {
-  if (dataLoaderOptions.name === "uda") {
+  if (dataLoaderOptions.data_type === "ShotData") {
     return createUDASamples(dataLoaderOptions);
-  } else if (dataLoaderOptions.name === "file") {
+  } else if (dataLoaderOptions.data_type === "FileData") {
     return createFileSamples(dataLoaderOptions);
+  } else if (dataLoaderOptions.data_type === "TimeSeriesFileData") {
+    return createTimeSeriesFileSamples(dataLoaderOptions);
   } else {
     throw new Error(`Unknown data loader ${dataLoaderOptions.name}`);
   }
@@ -655,10 +694,7 @@ const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
   return samples;
 };
 
-const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
-  const options = dataLoaderOptions as FileDataLoaderOptions;
-  const fileNames = options.file_names;
-
+const parseFileNames = (fileNames: string[]) => {
   if (!fileNames || fileNames.length === 0) {
     throw new Error("Directory must contain at least one file.");
   }
@@ -679,12 +715,40 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
     }
   }
 
+  return shots;
+};
+
+const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
+  const options = dataLoaderOptions as FileDataLoaderOptions;
+  const fileNames = options.file_names;
+  const shots = parseFileNames(fileNames);
+
+  const dataInfo = {
+    file_name: fileNames[0],
+    type: options.file_type,
+    protocol: options.protocol || "file",
+  } as FileData;
+
+  const samples: Sample[] = shots.map((shot_id: number) => ({
+    shot_id: shot_id,
+    timestamp: new Date().toISOString(),
+    data: dataInfo,
+  }));
+
+  return samples;
+};
+
+const createTimeSeriesFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
+  const options = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
+  const fileNames = options.file_names;
+  const shots = parseFileNames(fileNames);
+
   const dataInfo = {
     file_name: fileNames[0],
     type: options.file_type,
     protocol: options.protocol || "file",
     column_names: options.signal_names,
-  } as FileData;
+  } as TimeSeriesFileData;
 
   const samples: Sample[] = shots.map((shot_id: number) => ({
     shot_id: shot_id,
@@ -736,14 +800,9 @@ const buildProject = (
     throw new Error("Task cannot be empty");
   }
 
-  let dataLoaderType = dataLoaderOptions.name;
-  if (dataLoaderOptions.name === "file") {
-    const options = dataLoaderOptions as FileDataLoaderOptions;
-    dataLoaderType = options.protocol ?? "parquet";
-  }
   const project: Project = {
     name: projectName,
-    data_loader: dataLoaderType,
+    data_loader: dataLoaderOptions.name,
     task: task,
     query_strategy: queryStrategy,
     timestamp: new Date().toISOString(),
@@ -820,37 +879,37 @@ export const ProjectConfigEditor = ({
     if (onModify) onModify();
   };
 
-  const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {
-    const dataLoaderName = samplesSummary?.data?.protocol;
+  // const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {
+  //   const dataLoaderName = samplesSummary?.data?.protocol;
 
-    if (dataLoaderName === "uda") {
-      // UDA data loader
-      const dataInfo = samplesSummary.data as ShotData;
-      setDataLoaderOptions({
-        name: dataLoaderName,
-        signal_names: dataInfo.signal_names || [],
-        shot_min: samplesSummary.shot_min || null,
-        shot_max: samplesSummary.shot_max || null,
-      } as UDADataLoaderOptions);
-    } else if (dataLoaderName === "file") {
-      // File data loader
-      const dataInfo = samplesSummary.data as FileData;
-      setDataLoaderOptions({
-        name: dataLoaderName,
-        signal_names: dataInfo.column_names || [],
-        file_type: dataLoaderName,
-        file_names: [],
-        file_name: dataInfo.file_name || [],
-      } as FileDataLoaderOptions);
-    } else {
-      // Unknown data loader
-      setDataLoaderOptions(null);
-    }
-  };
+  //   if (dataLoaderName === "uda") {
+  //     // UDA data loader
+  //     const dataInfo = samplesSummary.data as ShotData;
+  //     setDataLoaderOptions({
+  //       name: dataLoaderName,
+  //       signal_names: dataInfo.signal_names || [],
+  //       shot_min: samplesSummary.shot_min || null,
+  //       shot_max: samplesSummary.shot_max || null,
+  //     } as UDADataLoaderOptions);
+  //   } else if (dataLoaderName === "file") {
+  //     // File data loader
+  //     const dataInfo = samplesSummary.data as FileData;
+  //     setDataLoaderOptions({
+  //       name: dataLoaderName,
+  //       signal_names: dataInfo.column_names || [],
+  //       file_type: dataLoaderName,
+  //       file_names: [],
+  //       file_name: dataInfo.file_name || [],
+  //     } as FileDataLoaderOptions);
+  //   } else {
+  //     // Unknown data loader
+  //     setDataLoaderOptions(null);
+  //   }
+  // };
 
   useEffect(() => {
     if (project && samplesSummary !== null) {
-      updateDataLoaderOptions(samplesSummary);
+      //updateDataLoaderOptions(samplesSummary);
       setProjectName(project.name);
       setQueryStrategy(project.query_strategy);
       setTaskSelection(project.task);
