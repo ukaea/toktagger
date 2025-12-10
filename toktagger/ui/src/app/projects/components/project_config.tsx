@@ -56,7 +56,7 @@ const DataLoaderOptionsSchema = z.object({
   name: z.string(),
   data_type: z.string(),
 });
-type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
+export type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
 
 const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   signal_names: z.array(z.string()),
@@ -475,6 +475,76 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
   );
 };
 
+export const SelectDataLoaderUI = (
+  dataLoader: string | null,
+  dataLoaderOptions: DataLoaderOptions | null,
+  setDataLoaderOptions: (options: DataLoaderOptions) => void,
+) => {
+  const [dataType, setDataType] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dataLoader) {
+      return;
+    }
+    async function fetchDataType() {
+      try {
+        const response = await fetch(
+          `${BACKEND_API_URL}/meta/dataloader/${dataLoader}`,
+        );
+        if (response.ok) {
+          const dataSchema = await response.json();
+          setDataType(dataSchema["title"]);
+        } else {
+          ToastQueue.negative(
+            `Error fetching available Data Loaders from server.`,
+            {
+              timeout: 3000,
+            },
+          );
+        }
+      } catch (error) {
+        ToastQueue.negative(`Error fetching data loaders: ${error}`, {
+          timeout: 3000,
+        });
+      }
+    }
+    fetchDataType();
+  }, [dataLoader]);
+
+  let ui = null;
+  if (dataType === "ShotData") {
+    const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
+    ui = (
+      <UDADataLoaderOptionsUI
+        dataLoader={dataLoader || ""}
+        dataType={dataType}
+        dataLoaderOptions={udaOptions}
+        setDataLoaderOptions={setDataLoaderOptions}
+      />
+    );
+  } else if (dataType === "FileData") {
+    const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
+    ui = (
+      <FileDataLoaderOptionsUI
+        dataLoader={dataLoader || ""}
+        dataType={dataType}
+        dataLoaderOptions={fileOptions}
+        setDataLoaderOptions={setDataLoaderOptions}
+      />
+    );
+  } else if (dataType === "TimeSeriesFileData") {
+    const fileOptions = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
+    ui = (
+      <TimeSeriesFileDataLoaderOptionsUI
+        dataLoader={dataLoader || ""}
+        dataType={dataType}
+        dataLoaderOptions={fileOptions}
+        setDataLoaderOptions={setDataLoaderOptions}
+      />
+    );
+  }
+  return ui;
+};
+
 const DataLoaderForm = ({
   dataLoaderOptions,
   setDataLoaderOptions,
@@ -487,7 +557,6 @@ const DataLoaderForm = ({
     { key: string; name: string }[]
   >([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
-  const [dataType, setDataType] = useState<string | null>(name || null);
   useEffect(() => {
     async function fetchDataLoaders() {
       try {
@@ -513,68 +582,8 @@ const DataLoaderForm = ({
     }
     fetchDataLoaders();
   }, []);
-
-  useEffect(() => {
-    if (!selectedKey) {
-      return;
-    }
-    async function fetchDataType() {
-      try {
-        const response = await fetch(
-          `${BACKEND_API_URL}/meta/dataloader/${selectedKey}`,
-        );
-        if (response.ok) {
-          const dataSchema = await response.json();
-          setDataType(dataSchema["title"]);
-        } else {
-          ToastQueue.negative(
-            `Error fetching available Data Loaders from server.`,
-            {
-              timeout: 3000,
-            },
-          );
-        }
-      } catch (error) {
-        ToastQueue.negative(`Error fetching data loaders: ${error}`, {
-          timeout: 3000,
-        });
-      }
-    }
-    fetchDataType();
-  }, [selectedKey]);
-
   let ui = null;
-  if (dataType === "ShotData") {
-    const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
-    ui = (
-      <UDADataLoaderOptionsUI
-        dataLoader={selectedKey || ""}
-        dataType={dataType}
-        dataLoaderOptions={udaOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  } else if (dataType === "FileData") {
-    const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
-    ui = (
-      <FileDataLoaderOptionsUI
-        dataLoader={selectedKey || ""}
-        dataType={dataType}
-        dataLoaderOptions={fileOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  } else if (dataType === "TimeSeriesFileData") {
-    const fileOptions = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
-    ui = (
-      <TimeSeriesFileDataLoaderOptionsUI
-        dataLoader={selectedKey || ""}
-        dataType={dataType}
-        dataLoaderOptions={fileOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  }
+  ui = SelectDataLoaderUI(selectedKey, dataLoaderOptions, setDataLoaderOptions);
 
   return (
     <>
@@ -662,7 +671,9 @@ const createProject = async (project: Project): Promise<string> => {
   return projectId;
 };
 
-const buildSamples = (dataLoaderOptions: DataLoaderOptions): Sample[] => {
+export const buildSamples = (
+  dataLoaderOptions: DataLoaderOptions,
+): Sample[] => {
   if (dataLoaderOptions.data_type === "ShotData") {
     return createUDASamples(dataLoaderOptions);
   } else if (dataLoaderOptions.data_type === "FileData") {
@@ -759,7 +770,7 @@ const createTimeSeriesFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
   return samples;
 };
 
-const createSamples = async (projectId: string, samples: Sample[]) => {
+export const createSamples = async (projectId: string, samples: Sample[]) => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${projectId}/samples`,
     {
