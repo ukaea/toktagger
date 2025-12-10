@@ -34,7 +34,6 @@ import {
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { BACKEND_API_URL, getSamplesSummary } from "@/app/core";
-import { fileURLToPath } from "url";
 
 const Tasks = [
   { key: "ELM", value: "ELM" },
@@ -286,7 +285,14 @@ const UDADataLoaderOptionsUI = ({
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [dataLoader, dataType, shotMin, shotMax, signalNames, setDataLoaderOptions]);
+  }, [
+    dataLoader,
+    dataType,
+    shotMin,
+    shotMax,
+    signalNames,
+    setDataLoaderOptions,
+  ]);
 
   return (
     <View
@@ -436,7 +442,14 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [dataLoader, dataType, signalNames, fileNames, fileType, setDataLoaderOptions]);
+  }, [
+    dataLoader,
+    dataType,
+    signalNames,
+    fileNames,
+    fileType,
+    setDataLoaderOptions,
+  ]);
 
   return (
     <View
@@ -682,7 +695,6 @@ const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
 };
 
 const parseFileNames = (fileNames: string[]) => {
-
   if (!fileNames || fileNames.length === 0) {
     throw new Error("Directory must contain at least one file.");
   }
@@ -703,14 +715,14 @@ const parseFileNames = (fileNames: string[]) => {
     }
   }
 
-  return shots
-}
+  return shots;
+};
 
 const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
   const options = dataLoaderOptions as FileDataLoaderOptions;
   const fileNames = options.file_names;
   const shots = parseFileNames(fileNames);
-  
+
   const dataInfo = {
     file_name: fileNames[0],
     type: options.file_type,

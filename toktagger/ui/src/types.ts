@@ -128,13 +128,10 @@ export const FileDataSchema = z.object({
 });
 export type FileData = z.infer<typeof FileDataSchema>;
 
-export const TimeSeriesFileDataSchema =
-  FileDataSchema.extend({
-    column_names: z.array(z.string()),
-  });
-export type TimeSeriesFileData = z.infer<
-  typeof TimeSeriesFileDataSchema
->;
+export const TimeSeriesFileDataSchema = FileDataSchema.extend({
+  column_names: z.array(z.string()),
+});
+export type TimeSeriesFileData = z.infer<typeof TimeSeriesFileDataSchema>;
 
 export const ShotDataSchema = z.object({
   protocol: z.string(),
