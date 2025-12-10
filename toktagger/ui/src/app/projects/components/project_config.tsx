@@ -34,6 +34,7 @@ import {
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { BACKEND_API_URL, getSamplesSummary } from "@/app/core";
+import { fileURLToPath } from "url";
 
 const Tasks = [
   { key: "ELM", value: "ELM" },
@@ -680,10 +681,7 @@ const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
   return samples;
 };
 
-const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
-  const options = dataLoaderOptions as FileDataLoaderOptions;
-  const fileNames = options.file_names;
-  console.log(fileNames)
+const parseFileNames = (fileNames: string[]) => {
 
   if (!fileNames || fileNames.length === 0) {
     throw new Error("Directory must contain at least one file.");
@@ -705,6 +703,14 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
     }
   }
 
+  return shots
+}
+
+const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
+  const options = dataLoaderOptions as FileDataLoaderOptions;
+  const fileNames = options.file_names;
+  const shots = parseFileNames(fileNames);
+  
   const dataInfo = {
     file_name: fileNames[0],
     type: options.file_type,
@@ -723,26 +729,7 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
 const createTimeSeriesFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
   const options = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
   const fileNames = options.file_names;
-
-  if (!fileNames || fileNames.length === 0) {
-    throw new Error("Directory must contain at least one file.");
-  }
-
-  // Assumption!: the file name must be the shot number.
-  const shots = fileNames.map((name: string) => {
-    const lastDotIndex = name.lastIndexOf(".");
-    const lastSlashIndex = name.lastIndexOf("/");
-    const shotName = name.substring(lastSlashIndex + 1, lastDotIndex);
-    const shotId = parseInt(shotName, 10);
-    return shotId;
-  });
-
-  for (let i = 0; i < shots.length; i++) {
-    const shot = shots[i];
-    if (Number.isNaN(shot)) {
-      throw new Error(`Invalid shot ID: ${shot} for file ${fileNames[i]}`);
-    }
-  }
+  const shots = parseFileNames(fileNames);
 
   const dataInfo = {
     file_name: fileNames[0],
