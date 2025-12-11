@@ -39,6 +39,7 @@ const Tasks = [
   { key: "ELM", value: "ELM" },
   { key: "disruption", value: "Disruption" },
   { key: "MHD", value: "MHD" },
+  { key: "UFO", value: "UFO" },
 ];
 
 const QueryStrategies = [
@@ -349,7 +350,7 @@ const UDADataLoaderOptionsUI = ({
           />
         </Flex>
         <SignalNamesUI
-          displayName={"UDA Signal Names"}
+          displayName={"Signal Names"}
           signalNames={signalNames}
           setSignalNames={setSignalNames}
         />
