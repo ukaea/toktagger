@@ -3,6 +3,7 @@ from bson.objectid import ObjectId
 from toktagger.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, SAMPLE_1, ANNOTATION_1, ANNOTATION_2
 from toktagger.api.schemas.samples import SampleUpdate
+from toktagger.api.schemas.models import ModelUpdate, ModelIn
 import toktagger.api.crud.utils as utils
 from fastapi import HTTPException
 import tempfile
@@ -315,3 +316,68 @@ async def test_get_models_by_status(db_client, setup_db):
     # Check this is the correct model
     assert models[0].version == 3
     assert models[0].type == "disruption_cnn"
+
+
+@pytest.mark.asyncio
+async def test_get_model(db_client, setup_db):
+    model = await utils.get_model(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        model_type="mock_disruption_cnn",
+        version=2,
+    )
+    assert model.id == setup_db["model_id_2"]
+
+
+@pytest.mark.asyncio
+async def test_get_model_doesnt_exist(db_client, setup_db):
+    with pytest.raises(
+        HTTPException,
+        match="No models found of that version and type for this project!",
+    ):
+        await utils.get_model(
+            db_client,
+            project_id=setup_db["project_id_1"],
+            model_type="mock_disruption_cnn",
+            version=4,
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_model(db_client, setup_db):
+    model_updates = ModelUpdate(training_status="completed", progress=100, score=80)
+    await utils.update_model(
+        db_client, model_id=setup_db["model_id_3"], updates=model_updates
+    )
+    # Check model has been updates
+    model_updated = await db_client.get_document_by_id(
+        "models", ObjectId(setup_db["model_id_1"])
+    )
+    assert model_updated["training_status"] == "completed"
+    assert model_updated["progress"] == 100
+    assert model_updated["score"] == 80
+
+
+@pytest.mark.asyncio
+async def test_add_model(db_client, setup_db):
+    model = ModelIn(
+        type="mock_disruption_cnn",
+        version=3,
+        training_status="queued",
+        progress=0,
+        score=0,
+    )
+    await utils.add_model(db_client, project_id=setup_db["project_id_1"], model=model)
+    # Check a new model has been added
+    models = await db_client.get_all_documents(collection="models")
+    assert len(models) == 4
+
+
+@pytest.mark.asyncio
+async def test_delete_model(db_client, setup_db):
+    await utils.delete_model(
+        db_client, setup_db["project_id_1"], setup_db["model_id_1"]
+    )
+    models = await db_client.get_filtered_documents("models")
+    assert len(models) == 2
+    assert setup_db["model_id_1"] not in [model["_id"] for model in models]

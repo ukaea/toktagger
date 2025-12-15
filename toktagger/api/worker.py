@@ -14,7 +14,6 @@ from toktagger.api.core.sender import (
 import logging
 
 logger = logging.getLogger("ray")
-logger.setLevel("DEBUG")
 
 
 def get_actor(project, model):
