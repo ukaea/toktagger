@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Provider,
   defaultTheme,
@@ -56,25 +56,42 @@ const SampleDataBreadCrumbs = ({
 
 type SampleViewInfo = {
   project: Project;
+  sample: Sample;
+  projectId: string;
+  sampleId: string;
+
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
+
   dataParams: DataParams;
   setDataParams: (
     updater: (dataParams: DataParams) => DataParams | DataParams,
   ) => void;
+
   plotProps: PlotProps;
+
+  onPrev?: () => void;
+  onNext?: () => void;
+  onJump?: (n: number) => void;
 };
 
 const SampleView = ({
   project,
+  sample: _sample,
+  projectId,
+  sampleId,
   data,
   annotations,
   setAnnotations,
+  dataParams,
   setDataParams,
   plotProps,
+  onPrev,
+  onNext,
+  onJump,
 }: SampleViewInfo) => {
   if (project.task == "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -106,16 +123,27 @@ const SampleView = ({
     if (!result.success) {
       throw new Error("Invalid data for UFO view");
     }
-    return <UFOView data={result.data} setDataParams={setDataParams} />;
+    return (
+      <UFOView
+        data={result.data}
+        annotations={annotations}
+        setAnnotations={setAnnotations}
+        dataParams={dataParams}
+        setDataParams={setDataParams}
+        projectId={projectId}
+        sampleId={sampleId}
+        onPrev={onPrev}
+        onNext={onNext}
+        onJump={onJump}
+      />
+    );
   } else if (project.task == "MHD") {
     console.log(data);
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
     }
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"],
-    );
+    const mhdData = SpectrogramDataSchema.safeParse(result.data.values["mirnov"]);
     if (!mhdData.success) {
       throw new Error("Invalid data for MHD view");
     }
@@ -136,10 +164,7 @@ async function getData<T>(url: string): Promise<T> {
   return payload as T;
 }
 
-async function getSample(
-  project_id: string,
-  sample_id: string,
-): Promise<Sample> {
+async function getSample(project_id: string, sample_id: string): Promise<Sample> {
   return await getData<Sample>(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
   );
@@ -176,25 +201,194 @@ export default function SamplePage() {
     colorMap: "Cividis",
   }); // Set default color map
 
+  // ------------------------------
+  // UFO frame navigation driver
+  // ------------------------------
+  const ufoInitRef = useRef(false);
+
+  type FrameBounds = {
+    min?: number;
+    max?: number;
+    available?: number[];
+  };
+
+  const [frameBounds, setFrameBounds] = useState<FrameBounds | null>(null);
+
+  const isUfo = project?.task === "UFO";
+
+  const currentFrame = useMemo(() => {
+    if (!isUfo) return 0;
+
+    if (data) {
+      const parsed = ImageDataSchema.safeParse(data);
+      if (parsed.success && typeof parsed.data.frame === "number") {
+        return parsed.data.frame;
+      }
+    }
+
+    const f = (dataParams as any)?.frame;
+    return typeof f === "number" ? f : 0;
+  }, [isUfo, data, dataParams]);
+
+  const clampToBounds = useCallback(
+    (n: number) => {
+      const min = Number.isFinite(frameBounds?.min as any)
+        ? (frameBounds!.min as number)
+        : 0;
+      const max = Number.isFinite(frameBounds?.max as any)
+        ? (frameBounds!.max as number)
+        : undefined;
+
+      let target = Number.isFinite(n) ? n : min;
+      if (target < min) target = min;
+      if (typeof max === "number" && target > max) target = max;
+      return target;
+    },
+    [frameBounds],
+  );
+
+  const nextAvailable = useCallback(
+    (from: number) => {
+      const avail = frameBounds?.available;
+      if (Array.isArray(avail) && avail.length > 0) {
+        const sorted = Array.from(
+          new Set(
+            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
+          ),
+        ).sort((a, b) => a - b);
+
+        for (const f of sorted) if (f > from) return f;
+        return from;
+      }
+
+      const max = frameBounds?.max;
+      const candidate = from + 1;
+      if (typeof max === "number" && Number.isFinite(max) && candidate > max)
+        return from;
+      return candidate;
+    },
+    [frameBounds],
+  );
+
+  const prevAvailable = useCallback(
+    (from: number) => {
+      const avail = frameBounds?.available;
+      if (Array.isArray(avail) && avail.length > 0) {
+        const sorted = Array.from(
+          new Set(
+            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
+          ),
+        ).sort((a, b) => a - b);
+
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          if (sorted[i] < from) return sorted[i];
+        }
+        return from;
+      }
+
+      const min = frameBounds?.min ?? 0;
+      const candidate = from - 1;
+      if (candidate < min) return from;
+      return candidate;
+    },
+    [frameBounds],
+  );
+
+  const goToFrame = useCallback(
+    (n: number) => {
+      const target = clampToBounds(n);
+      setDataParams(
+        () =>
+          ({
+            name: "image",
+            frame: target,
+          } as any),
+      );
+    },
+    [clampToBounds, setDataParams],
+  );
+
+  const onPrev = useCallback(() => {
+    if (!isUfo) return;
+    goToFrame(prevAvailable(currentFrame));
+  }, [isUfo, goToFrame, prevAvailable, currentFrame]);
+
+  const onNext = useCallback(() => {
+    if (!isUfo) return;
+    goToFrame(nextAvailable(currentFrame));
+  }, [isUfo, goToFrame, nextAvailable, currentFrame]);
+
+  const onJump = useCallback(
+    (n: number) => {
+      if (!isUfo) return;
+      goToFrame(n);
+    },
+    [isUfo, goToFrame],
+  );
+
   useEffect(() => {
+    if (!isUfo || !data) return;
+
+    const b = (data as any)?.frame_bounds ?? (data as any)?.frameBounds ?? null;
+    if (!b || typeof b !== "object") return;
+
+    const min =
+      (typeof (b as any).min === "number" && (b as any).min) ??
+      (typeof (b as any).min_frame === "number" && (b as any).min_frame) ??
+      undefined;
+
+    const max =
+      (typeof (b as any).max === "number" && (b as any).max) ??
+      (typeof (b as any).max_frame === "number" && (b as any).max_frame) ??
+      undefined;
+
+    const available = Array.isArray((b as any).available)
+      ? (b as any).available
+      : Array.isArray((b as any).available_frames)
+        ? (b as any).available_frames
+        : undefined;
+
+    if (min !== undefined || max !== undefined || available !== undefined) {
+      setFrameBounds({ min, max, available });
+    }
+  }, [isUfo, data]);
+
+  // ------------------------------
+  // Sample/project refresh
+  // ------------------------------
+  useEffect(() => {
+    if (!hasIds) return;
+
+    ufoInitRef.current = false;
+    setFrameBounds(null);
+
     const refreshSample = async () => {
-      const project = await getProject(project_id);
+      const project = await getProject(project_id as string);
       setProject(project);
 
-      const sample = await getSample(project_id, sample_id);
+      if (project.task === "UFO" && !ufoInitRef.current) {
+        ufoInitRef.current = true;
+        setDataParams({ name: "image", frame: 292 } as any);
+      }
+
+      const sample = await getSample(project_id as string, sample_id as string);
       setSample(sample);
 
-      const dbAnnotations = await getAnnotations(project_id, sample_id);
+      const dbAnnotations = await getAnnotations(
+        project_id as string,
+        sample_id as string,
+      );
       setAnnotations(dbAnnotations);
     };
-    refreshSample();
-  }, [project_id, sample_id]);
 
+    refreshSample();
+  }, [project_id, sample_id, hasIds]);
+
+  // ------------------------------
+  // Data refresh
+  // ------------------------------
   useEffect(() => {
-    const refreshData = async (
-      dataParams: DataParams,
-      viewParams: ViewParams,
-    ) => {
+    const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
       if (!project || !sample) {
         return;
       }
@@ -206,6 +400,7 @@ export default function SamplePage() {
           nperseg: 256,
         } as SpectrogramViewParams;
       }
+
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project._id}/samples/${sample._id}/data`,
         {
@@ -216,10 +411,11 @@ export default function SamplePage() {
           body: JSON.stringify({ params: dataParams, view: viewParams }),
         },
       );
+
       const data: Data = await response.json();
       if (!response.ok) {
-        console.error("Error:", data.detail);
-        ToastQueue.negative("Error:", data.detail);
+        console.error("Error:", (data as any).detail);
+        ToastQueue.negative("Error:", (data as any).detail);
       } else {
         setData(data);
       }
@@ -240,10 +436,7 @@ export default function SamplePage() {
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
-        <SampleDataBreadCrumbs
-          project={project}
-          sample={sample}
-        ></SampleDataBreadCrumbs>
+        <SampleDataBreadCrumbs project={project} sample={sample} />
         <div className="flex">
           <ToolBar
             project={project}
@@ -261,12 +454,18 @@ export default function SamplePage() {
           <div className="flex-1 justify-center">
             <SampleView
               project={project}
+              sample={sample}
+              projectId={project._id ?? (project_id as string)}
+              sampleId={sample._id ?? (sample_id as string)}
               data={data}
               annotations={annotations}
               setAnnotations={setAnnotations}
               dataParams={dataParams}
               setDataParams={setDataParams}
               plotProps={plotProps}
+              onPrev={onPrev}
+              onNext={onNext}
+              onJump={onJump}
             />
           </div>
         </div>

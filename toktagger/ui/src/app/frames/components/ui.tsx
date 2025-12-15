@@ -7,7 +7,7 @@ import {
   LABEL_MAP,
   extractClassLabel,
   rectToDims
-} from "../../../../frames/components/lib";
+} from "./lib";
 import {
   ActionGroup,
   Item,
