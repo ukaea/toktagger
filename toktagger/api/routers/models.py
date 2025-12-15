@@ -9,7 +9,6 @@ import itertools
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
-from toktagger.api.schemas import convert_to_objectid
 from toktagger.api.worker import train_model, get_predictions
 
 import logging
@@ -72,7 +71,6 @@ async def delete_models(
     ),
 ):
     db_client = request.app.state.db_client
-    convert_to_objectid(project_id, "projects")
 
     await utils.get_project(db_client, project_id)
 
@@ -235,7 +233,7 @@ async def stop_model_training(
         )
         if model.training_status not in ("started", "queued"):
             raise HTTPException(
-                status_code=404,
+                status_code=409,
                 detail="Model training is not in progress for this model!",
             )
         models = [model]

@@ -146,4 +146,5 @@ MODEL_3 = ModelIn(
     training_status="started",
     progress=50,
     score=60,
+    task_id="abc123",
 )

@@ -1,6 +1,5 @@
 import pytest
 import pytest_asyncio
-import tempfile
 import random
 import pathlib
 from toktagger.api.schemas.projects import ProjectIn
@@ -53,68 +52,73 @@ async def send_to_url(api_client, url, method):
 
 @pytest_asyncio.fixture(scope="function")
 async def setup_model_db(db_client):
-    with tempfile.TemporaryDirectory() as tempd:
-        os.environ["MODEL_STORAGE"] = tempd
-        # Create sample data for training / predicting a Disruption model
-        project = ProjectIn(
-            name="Test",
-            task="disruption",
-            query_strategy="random",
-            data_loader="parquet",
-        )
-        project_id = await db_client.insert("projects", project)
-        sample_ids = []
-        for i in range(20):
-            # Generate sample data
-            disruption_time = random.randint(80, 120)
-            annotation = TimePoint(
-                validated=True,
-                label="Disruption",
-                time=disruption_time,
-                created_by="manual",
-            )
-
-            sample = SampleIn(
-                shot_id=i,
-                data=TimeSeriesFileData(
-                    file_name=f"{i}.parquet",
-                    type="parquet",
-                ),
-                annotations=[annotation] if i < 10 else None,
-            )
-            sample_id = await db_client.insert(
-                "samples", sample, ids={"project_id": ObjectId(project_id)}
-            )
-            sample_ids.append(sample_id)
-
-            if i < 10:
-                await db_client.insert(
-                    "annotations",
-                    annotation,
-                    ids={
-                        "project_id": ObjectId(project_id),
-                        "sample_id": ObjectId(sample_ids[i]),
-                    },
-                )
-
-        model_id_1 = await db_client.insert(
-            "models", MODEL_1, ids={"project_id": ObjectId(project_id)}
+    # Create sample data for training / predicting a Disruption model
+    project = ProjectIn(
+        name="Test",
+        task="disruption",
+        query_strategy="random",
+        data_loader="parquet",
+    )
+    project_id = await db_client.insert("projects", project)
+    sample_ids = []
+    for i in range(20):
+        # Generate sample data
+        disruption_time = random.randint(80, 120)
+        annotation = TimePoint(
+            validated=True,
+            label="Disruption",
+            time=disruption_time,
+            created_by="manual" if i < 5 else "disruption_cnn",
         )
 
-        model_id_2 = await db_client.insert(
-            "models", MODEL_2, ids={"project_id": ObjectId(project_id)}
+        sample = SampleIn(
+            shot_id=i,
+            data=TimeSeriesFileData(
+                file_name=f"{i}.parquet",
+                type="parquet",
+            ),
+            annotations=[annotation] if i < 10 else None,
         )
+        sample_id = await db_client.insert(
+            "samples", sample, ids={"project_id": ObjectId(project_id)}
+        )
+        sample_ids.append(sample_id)
 
-        yield {
-            "project_id": project_id,
-            "sample_ids": sample_ids,
-            "model_id_1": model_id_1,
-            "model_id_2": model_id_2,
-        }
+        if i < 10:
+            await db_client.insert(
+                "annotations",
+                annotation,
+                ids={
+                    "project_id": ObjectId(project_id),
+                    "sample_id": ObjectId(sample_ids[i]),
+                },
+            )
+
+    model_id_1 = await db_client.insert(
+        "models", MODEL_1, ids={"project_id": ObjectId(project_id)}
+    )
+
+    model_id_2 = await db_client.insert(
+        "models", MODEL_2, ids={"project_id": ObjectId(project_id)}
+    )
+
+    yield {
+        "project_id": project_id,
+        "sample_ids": sample_ids,
+        "model_id_1": model_id_1,
+        "model_id_2": model_id_2,
+    }
+
+
+KILL_COUNT = 0
 
 
 def mock_wait(*args, **kwargs):
     return [], ["waiting"]
+
+
+def kill(*args, **kwargs):
+    print("killed")
 
 
 @pytest.mark.asyncio
@@ -338,3 +342,140 @@ async def test_model_start_training(api_client, db_client, setup_model_db):
     assert (
         pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id}.model").exists()
     )
+
+
+# Test delete model
+@pytest.mark.asyncio
+async def test_model_delete_type(api_client, db_client, setup_db):
+    response = await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn"
+    )
+    assert response.status_code == 200
+
+    # Check there is one model left in the database
+    models = await db_client.get_all_documents("models")
+    assert len(models) == 1
+
+    # Check it is not of type 'mock_disruption_cnn'
+    assert models[0]["type"] != "mock_disruption_cnn"
+
+    # Check for models 1 and 2, their file no longer exists
+    assert (
+        not pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_db['model_id_1']}.model")
+        .exists()
+    )
+    assert (
+        not pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_db['model_id_2']}.model")
+        .exists()
+    )
+    # And for model 3 it does still exist
+    assert (
+        pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_db['model_id_3']}.model")
+        .exists()
+    )
+
+
+@pytest.mark.asyncio
+async def test_model_delete_type_version(api_client, db_client, setup_db):
+    response = await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn?version=2"
+    )
+    assert response.status_code == 200
+
+    # Check there is one model left in the database
+    models = await db_client.get_all_documents("models")
+    assert len(models) == 2
+    # Check model version 1 of mock_disruption_cnn still exists
+    assert models[0]["type"] == "mock_disruption_cnn" and models[0]["version"] == 1
+    # Check the other one is type 'disruption_cnn'
+    assert models[1]["type"] == "disruption_cnn"
+
+    # Check for model 2, their file no longer exists
+    assert (
+        not pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_db['model_id_2']}.model")
+        .exists()
+    )
+    # And for models 1 and 3 it does still exist
+    assert (
+        pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_db['model_id_1']}.model")
+        .exists()
+    )
+    assert (
+        pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_db['model_id_3']}.model")
+        .exists()
+    )
+
+
+@pytest.mark.asyncio
+@patch("ray.kill")
+async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
+    response = await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/models/disruption_cnn/train"
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    deleted_id = response.json()[0]
+    assert deleted_id == setup_db["model_id_3"]
+
+    # Check it is aborted in database
+    models = await db_client.get_filtered_documents(
+        "models", {"type": "disruption_cnn"}
+    )
+    model = models[0]
+    assert model["training_status"] == "aborted"
+
+    assert mock_func.call_count > 0
+
+
+@pytest.mark.asyncio
+@patch("ray.kill")
+async def test_model_stop_training_not_in_progress(
+    mock_func, api_client, db_client, setup_db
+):
+    response = await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn/train?version=1"
+    )
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"] == "Model training is not in progress for this model!"
+    )
+
+    # Check no models show as aborted
+    models = await db_client.get_all_documents("models")
+    assert all(model["training_status"] != "aborted" for model in models)
+
+    assert mock_func.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_model_delete_predictions(api_client, db_client, setup_model_db):
+    await api_client.delete(
+        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict"
+    )
+
+    # Should be 5 annotations remaining since half were created by 'manual'
+    annotations = await db_client.get_all_documents(collection="annotations")
+    assert len(annotations) == 5
+    assert all(annotation["created_by"] == "manual" for annotation in annotations)
+
+
+@pytest.mark.asyncio
+async def test_model_delete_no_predictions(api_client, db_client, setup_model_db):
+    response = await api_client.delete(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
+    )
+
+    # Nothing created by this model, so should return 404 and not delete anything
+    assert response.status_code == 404
+    assert (
+        response.json()["detail"]
+        == "No annotations produced by mock_disruption_cnn could be found for this Project."
+    )
+    annotations = await db_client.get_all_documents(collection="annotations")
+    assert len(annotations) == 10

@@ -5,7 +5,8 @@ from toktagger.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
-
+import tempfile
+import pathlib
 import asyncio
 from httpx import AsyncClient, ASGITransport
 import os
@@ -27,12 +28,13 @@ def mongo_container():
 
 @pytest.fixture(scope="session", autouse=True)
 def ray_session():
-    os.environ["MODEL_STORAGE"] = "Test"
-    ray.init(
-        ignore_reinit_error=True, local_mode=True, runtime_env={"working_dir": None}
-    )
-    yield
-    ray.shutdown()
+    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
+        os.environ["MODEL_STORAGE"] = tempd
+        ray.init(
+            ignore_reinit_error=True, local_mode=True, runtime_env={"working_dir": None}
+        )
+        yield
+        ray.shutdown()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -62,6 +64,7 @@ async def api_client(mongo_container):
     app = server.app
     lifespan_ctx = app.router.lifespan_context(app)
     await lifespan_ctx.__aenter__()
+    app.state.task_registry.tasks = {"abc123": "Ray Task Object"}
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -129,18 +132,21 @@ async def setup_db(db_client):
         db_definitions.MODEL_1,
         ids={"project_id": ObjectId(project_id_1)},
     )
+    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_1}.model").touch()
     await asyncio.sleep(0.01)
     model_id_2 = await db_client.insert(
         "models",
         db_definitions.MODEL_2,
         ids={"project_id": ObjectId(project_id_1)},
     )
+    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_2}.model").touch()
     await asyncio.sleep(0.01)
     model_id_3 = await db_client.insert(
         "models",
         db_definitions.MODEL_3,
         ids={"project_id": ObjectId(project_id_1)},
     )
+    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_3}.model").touch()
     yield {
         "project_id_1": project_id_1,
         "project_id_2": project_id_2,
