@@ -45,6 +45,13 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
+// UFO converters + label map (used for class_id + correct save payload)
+import {
+  LABEL_MAP,
+  w3cToCocoFrames,
+  cocoFramesToVideoBBoxes,
+} from "@/app/frames/components/lib";
+
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
@@ -366,10 +373,16 @@ function SpectrogramThresholdTool({
 
 /** ---------------------- UFO support (layout + minimal state) ---------------------- */
 
+/**
+ * IMPORTANT: this matches what FrameView expects via window.ufoInstanceProfiles:
+ * { id, class_name, class_id, track_id } (displayName is UI-only).
+ */
 type InstanceProfile = {
-  key: string;
-  className: string;
-  displayName: string;
+  id: string; // `${class_name}:${track_id}`
+  class_name: string;
+  class_id: number;
+  track_id: string;
+  displayName: string; // UI only
 };
 
 function safeLocalStorageGet(key: string): string | null {
@@ -449,7 +462,7 @@ function ClassPanel({
 
 type InstancePanelProps = {
   profiles: InstanceProfile[];
-  selectedKey: string | null;
+  selectedKey: string | null; // holds profile.id
   onSelect: (key: string) => void;
   onCreateProfile: (className: string, label: string) => void;
   onRequestBulkDelete: (keys: string[]) => void;
@@ -500,11 +513,11 @@ function InstancePanel({
             </View>
           ) : (
             profiles.map((p) => {
-              const isSelected = p.key === selectedKey;
-              const count = profileCounts[p.key] ?? 0;
+              const isSelected = p.id === selectedKey;
+              const count = profileCounts[p.id] ?? 0;
               return (
                 <Flex
-                  key={p.key}
+                  key={p.id}
                   direction="row"
                   justifyContent="space-between"
                   alignItems="center"
@@ -513,7 +526,7 @@ function InstancePanel({
                     variant={isSelected ? "primary" : "secondary"}
                     isQuiet={!isSelected}
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
-                    onPress={() => onSelect(p.key)}
+                    onPress={() => onSelect(p.id)}
                   >
                     {p.displayName}
                     {Number.isFinite(count) ? ` (${count})` : ""}
@@ -523,7 +536,7 @@ function InstancePanel({
                     variant="negative"
                     isQuiet
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
-                    onPress={() => onRequestBulkDelete([p.key])}
+                    onPress={() => onRequestBulkDelete([p.id])}
                   >
                     Delete
                   </Button>
@@ -706,7 +719,7 @@ export default function ToolBar({
     setAnnotations([]);
   };
 
-  /** UFO minimal state */
+  /** UFO minimal state (MIRRORED to window.* for FrameView) */
   const [selectedClassName, setSelectedClassName] = useState<string | null>(
     null,
   );
@@ -752,11 +765,11 @@ export default function ToolBar({
     // If your UFO annotator stores per-instance counts elsewhere, wire it in here.
     // For now, keep a stable shape.
     const counts: Record<string, number> = {};
-    for (const p of profiles) counts[p.key] = counts[p.key] ?? 0;
+    for (const p of profiles) counts[p.id] = counts[p.id] ?? 0;
     return counts;
   }, [profiles]);
 
-  const saveLastClassName = (name: string) => {
+  const saveLastClassNameForProject = (name: string) => {
     safeLocalStorageSet(`anno::ufo::last-class::${project_id}`, name);
   };
 
@@ -768,76 +781,208 @@ export default function ToolBar({
     }
   }, [isUfo, project_id]);
 
+  // ---- (1) Mirror toolbar state to window.* so FrameView can draw + normalize ----
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+
+    const w = window as any;
+
+    w.ufoInstanceProfiles = profiles;
+    w.ufoSelectedProfileId = selectedKey;
+    w.ufoSelectedClassName = selectedClassName;
+
+    w.ufoSelectedTrackId =
+      profiles.find((p) => p.id === selectedKey)?.track_id ?? null;
+
+    w.ufoNotifySelectionChanged?.();
+  }, [isUfo, profiles, selectedKey, selectedClassName]);
+
+  // Optional: seed initial toolbar state from any existing window globals
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+
+    const w = window as any;
+    const list = Array.isArray(w.ufoInstanceProfiles)
+      ? (w.ufoInstanceProfiles as any[])
+      : [];
+
+    if (list.length === 0) return;
+
+    const nextProfiles: InstanceProfile[] = list
+      .map((p: any) => {
+        if (!p) return null;
+
+        const class_name = String(p.class_name ?? "");
+        const track_id = String(p.track_id ?? "");
+        const class_id = Number(p.class_id ?? 1) || 1;
+
+        if (!class_name || !track_id) return null;
+
+        const id = String(p.id ?? `${class_name}:${track_id}`);
+        const displayName = String(
+          p.displayName ?? `${class_name} ${track_id}`,
+        );
+
+        return { id, class_name, class_id, track_id, displayName };
+      })
+      .filter(Boolean) as InstanceProfile[];
+
+    if (nextProfiles.length > 0) {
+      setProfiles(nextProfiles);
+      const sel = String(w.ufoSelectedProfileId ?? "");
+      setSelectedKey(sel || null);
+
+      const selProfile = nextProfiles.find((p) => p.id === sel) || null;
+      if (selProfile) setSelectedClassName(selProfile.class_name);
+    }
+  }, [isUfo]);
+
+  // ---- (2) Listen to FrameView "ufo:state" so toolbar UI stays in sync ----
+  useEffect(() => {
+    if (!isUfo) return;
+    if (typeof window === "undefined") return;
+
+    const onState = (e: any) => {
+      const d = e?.detail;
+      if (!d) return;
+
+      const nextProfiles: InstanceProfile[] = (d.profiles ?? []).map((p: any) => {
+        const class_name = String(p.class_name ?? "");
+        const track_id = String(p.track_id ?? "");
+        const class_id = Number(p.class_id ?? 1) || 1;
+        const id = `${class_name}:${track_id}`;
+        return {
+          id,
+          class_name,
+          class_id,
+          track_id,
+          displayName: `${class_name} ${track_id}`,
+        };
+      });
+
+      setProfiles(nextProfiles);
+
+      const sel = String(d.selectedKey ?? "");
+      const [c0, t0] = sel.split(":");
+      const match = nextProfiles.find(
+        (p) => p.class_name.toLowerCase() === String(c0 || "").toLowerCase() && p.track_id === String(t0 || ""),
+      );
+
+      setSelectedKey(match?.id ?? null);
+      setSelectedClassName(d.selectedClassName ?? null);
+    };
+
+    window.addEventListener("ufo:state", onState as any);
+    return () => window.removeEventListener("ufo:state", onState as any);
+  }, [isUfo]);
+
   const onSelectInstanceKey = (key: string) => {
     setSelectedKey(key);
+    const p = profiles.find((x) => x.id === key) || null;
+    if (p) {
+      setSelectedClassName(p.class_name);
+      saveLastClassNameForProject(p.class_name);
+    }
   };
 
   const onCreateProfile = (className: string, _label: string) => {
     const cls = (className || "").trim();
     if (!cls) return;
 
+    const class_id =
+      (LABEL_MAP as any)?.categories?.find?.((c: any) => c?.name === cls)?.id ??
+      1;
+
     const n = getAndBumpInstanceSeed(cls);
-    const key = `${cls}::${n}`;
-    const displayName = `${cls} ${n}`;
+    const track_id = String(n); // ok for now
+    const id = `${cls}:${track_id}`;
+    const displayName = `${cls} ${track_id}`;
 
     setProfiles((prev) => {
       // avoid duplicates if called twice quickly
-      if (prev.some((p) => p.key === key)) return prev;
-      return [...prev, { key, className: cls, displayName }];
+      if (prev.some((p) => p.id === id)) return prev;
+      return [...prev, { id, class_name: cls, class_id, track_id, displayName }];
     });
-    setSelectedKey(key);
+
+    setSelectedKey(id);
+    setSelectedClassName(cls);
+    saveLastClassNameForProject(cls);
   };
 
+  // ---- (3) Delete flows: delegate to FrameView via events ----
   const onRequestBulkDelete = (keys: string[]) => {
-    setProfiles((prev) => prev.filter((p) => !keys.includes(p.key)));
-    setSelectedKey((prev) => {
-      if (!prev) return prev;
-      return keys.includes(prev) ? null : prev;
-    });
+    if (typeof window === "undefined") return;
+
+    for (const k of keys) {
+      const p = profiles.find((x) => x.id === k);
+      if (!p) continue;
+
+      window.dispatchEvent(
+        new CustomEvent("ufo:requestBulkDelete", {
+          detail: { profile: { class_name: p.class_name, track_id: p.track_id } },
+        }),
+      );
+    }
   };
 
   const onRequestDeleteAllInstances = () => {
-    setProfiles([]);
-    setSelectedKey(null);
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("ufo:deleteAllInstances"));
   };
 
+  // ---- (3) Clear flows: call FrameView window API (NOT local annotations) ----
   const ufoClearCurrent = async () => {
-    clearAnnotations();
-    // If you have a per-frame local persistence key, remove it here.
-    // This keeps it safe/non-destructive by default.
+    await (window as any).ufoClearCurrent?.();
   };
 
   const ufoClearAllFrames = async () => {
-    // Conservative: only remove keys that look UFO-related.
-    try {
-      const toRemove: string[] = [];
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const k = window.localStorage.key(i);
-        if (!k) continue;
-        const lk = k.toLowerCase();
-        if (
-          lk.startsWith("anno::ufo::") ||
-          lk.startsWith("ufo::") ||
-          lk.includes("ufo")
-        ) {
-          toRemove.push(k);
-        }
-      }
-      toRemove.forEach((k) => safeLocalStorageRemove(k));
-      clearAnnotations();
-    } catch {
-      // handled by caller toast
-      throw new Error("localStorage purge failed");
+    await (window as any).ufoClearAllFrames?.();
+  };
+
+  // ---- (4) UFO Save/Next/Jump: save from ufoCollectForSave(), not annotations[] ----
+  const collectUfoPayloadForBackend = async (): Promise<Annotation[]> => {
+    if (typeof window === "undefined") return annotations;
+
+    const w = window as any;
+    if (typeof w.ufoCollectForSave !== "function") {
+      // fallback (should not happen once FrameView mounts)
+      return annotations;
     }
+
+    const w3c = await w.ufoCollectForSave();
+    const toCocoFrames = (w3cToCocoFrames as any) ?? null;
+    const toVideoBBoxes = (cocoFramesToVideoBBoxes as any) ?? null;
+
+    if (typeof toCocoFrames !== "function" || typeof toVideoBBoxes !== "function") {
+      // fallback
+      return annotations;
+    }
+
+    // Pass extra context as optional params (safe even if ignored)
+    const cocoFrames = toCocoFrames(w3c, {
+      projectId: project_id,
+      sampleId: sample_id,
+      labelMap: LABEL_MAP,
+    });
+
+    const videoBBoxes = toVideoBBoxes(cocoFrames, {
+      projectId: project_id,
+      sampleId: sample_id,
+    });
+
+    return Array.isArray(videoBBoxes) ? (videoBBoxes as Annotation[]) : [];
   };
 
   const handleUfoSave = async () => {
     try {
-      const response = await saveAnnotations(project_id, sample_id, annotations);
+      const payload = await collectUfoPayloadForBackend();
+      const response = await saveAnnotations(project_id, sample_id, payload);
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
+      ToastQueue.positive(`Saved ${payload.length} annotations!`, {
         timeout: 5000,
       });
     } catch (err) {
@@ -851,7 +996,9 @@ export default function ToolBar({
 
   const handleUfoNextSample = async () => {
     try {
-      await saveAnnotations(project_id, sample_id, annotations);
+      const payload = await collectUfoPayloadForBackend();
+      await saveAnnotations(project_id, sample_id, payload);
+
       const next = await getNextSample(project_id);
       const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${next._id}`;
       navigate(NEXT_SAMPLE_URL);
@@ -873,7 +1020,9 @@ export default function ToolBar({
         try {
           const nextSample = await getShotSample(project_id, shot_id);
           if (nextSample !== null) {
-            await saveAnnotations(project_id, sample_id, annotations);
+            const payload = await collectUfoPayloadForBackend();
+            await saveAnnotations(project_id, sample_id, payload);
+
             const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
             navigate(NEXT_SAMPLE_URL);
           } else {
@@ -925,7 +1074,11 @@ export default function ToolBar({
             <div className="max-w-[16rem] mx-auto mb-4">
               <div className="mb-2">
                 <Flex gap="size-100" alignItems="center" wrap>
-                  <Button isQuiet isDisabled UNSAFE_className="!px-2.5 !py-1.5 text-xs">
+                  <Button
+                    isQuiet
+                    isDisabled
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                  >
                     Rectangle
                   </Button>
                 </Flex>
@@ -942,7 +1095,7 @@ export default function ToolBar({
                     onPress={async () => {
                       try {
                         await ufoClearAllFrames();
-                        ToastQueue.positive("Cleared all frames (local).", {
+                        ToastQueue.positive("Cleared all frames.", {
                           timeout: 2500,
                         });
                       } catch {
@@ -991,7 +1144,7 @@ export default function ToolBar({
                     return;
                   }
                   setSelectedClassName(next);
-                  saveLastClassName(next);
+                  saveLastClassNameForProject(next);
                   // Backup behavior: picking a class immediately creates a new instance
                   onCreateProfile(next, "");
                 }}
