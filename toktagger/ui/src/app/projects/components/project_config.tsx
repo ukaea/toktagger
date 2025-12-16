@@ -715,7 +715,7 @@ export const ProjectConfigEditor = ({
 
   return (
     <DialogTrigger>
-      <Button variant={editMode ? "accent" : "primary"}>
+      <Button variant={editMode ? "accent" : "primary"} aria-label={text}>
         {icon}
         {!editMode ? <Text>{text}</Text> : <></>}
       </Button>

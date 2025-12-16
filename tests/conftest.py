@@ -5,10 +5,12 @@ from toktagger.api.crud.db import MongoDBClient
 from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
-
 import asyncio
 from httpx import AsyncClient, ASGITransport
 import os
+import multiprocessing
+import requests
+import time
 
 
 @pytest.fixture(scope="function")
@@ -150,3 +152,31 @@ async def setup_db_small(db_client):
     await db_client.delete_filtered_documents("projects")
     await db_client.delete_filtered_documents("samples")
     await db_client.delete_filtered_documents("annotations")
+
+
+@pytest.fixture(scope="package")
+def start_server(mongo_container):
+    os.environ["MONGO_URL"] = mongo_container
+    server = Server()
+    proc = multiprocessing.Process(target=server.run)
+    proc.start()
+    # Wait for server to start
+    server_up = False
+    for t in range(10):
+        try:
+            response = requests.get(
+                "http://localhost:8002/projects",
+            )
+            if response.status_code == 200:
+                server_up = True
+                break
+            time.sleep(1)
+        except requests.exceptions.ConnectionError:
+            time.sleep(1)
+
+    if not server_up:
+        proc.terminate()
+        pytest.exit("Server failed to start for End-to-End tests to run!")
+
+    yield
+    proc.terminate()
