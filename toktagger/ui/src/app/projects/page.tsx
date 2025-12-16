@@ -93,7 +93,8 @@ const ProjectsTable = ({
                   <Flex direction="row" gap="size-100">
                     <ProjectConfigEditor project={item} onModify={onModify} />
                     <Button
-                      variant="negative" aria-label="Delete"
+                      variant="negative"
+                      aria-label="Delete"
                       onPress={async () => {
                         if (item._id == null) {
                           return;
