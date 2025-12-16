@@ -174,3 +174,43 @@ def test_page_navigation(server_setup, page: Page):
     # And both buttons disabled
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
     expect(page.get_by_role("button", name="Next")).to_be_disabled()
+
+
+def test_sorting(server_setup, page: Page):
+    def sort(page, col_name, expected_first, expected_second):
+        # Sort by given column
+        page.get_by_role("columnheader", name=col_name).click()
+
+        # Check projects in correct order
+        expect(page.get_by_role("row").nth(1)).to_contain_text(expected_first)
+        expect(page.get_by_role("row").nth(2)).to_contain_text(expected_second)
+
+        # Click again, sort in opposite direction
+        page.get_by_role("columnheader", name=col_name).click()
+
+        # PCheck projects in reverse direction
+        expect(page.get_by_role("row").nth(1)).to_contain_text(expected_second)
+        expect(page.get_by_role("row").nth(2)).to_contain_text(expected_first)
+
+    # Create some projects
+    create_project("A Project", "ELM", "uda")
+    time.sleep(0.1)
+    create_project("B Project", "MHD", "parquet")
+
+    # Navigate to page
+    page.goto("http://localhost:8002")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Sort by Name: A should be first, then B
+    sort(page, "Name", "A Project", "B Project")
+
+    # Sort by Task, A should be first (ELM), then B (MHD)
+    sort(page, "Task", "A Project", "B Project")
+
+    # Sort by Timestamp, A should be first (oldest - so lowest timestamp), then B (newest - highest timestamp)
+    sort(page, "Date Created", "A Project", "B Project")
+
+    # Sort by Loader, B should be first (parquet), then A (uda)
+    sort(page, "Loader", "B Project", "A Project")

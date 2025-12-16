@@ -74,7 +74,7 @@ const ProjectsTable = ({
             <Column key="task" allowsSorting>
               Task
             </Column>
-            <Column key="date_created" allowsSorting>
+            <Column key="timestamp" allowsSorting>
               Date Created
             </Column>
             <Column key="data_loader" allowsSorting>
