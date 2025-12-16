@@ -107,6 +107,9 @@ jobs:
       - name: Install dependencies (with dev extras)
         run: uv sync
 
+      - name: Install playwright
+        run: uv run python -m playwright install --with-deps
+
       - name: Run tests
         run: uv run pytest
   build:
