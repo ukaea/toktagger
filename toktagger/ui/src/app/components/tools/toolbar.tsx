@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useCallback, useRef, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -43,27 +44,6 @@ import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
-
-// UFO imports (frame annotator stack)
-import {
-  w3cToCocoFrames,
-  cocoFramesToVideoBBoxes,
-  loadClassRegistry,
-  loadLastClassName,
-  saveLastClassName,
-  scanInstanceCountsChunked,
-  canonicalizeTrackId,
-  uniqueReadableId,
-  LABEL_MAP,
-  FIXED_CLASS_REG,
-  type ClassRegistry,
-  type VideoBoundingBox,
-} from "@/app/frames/components/lib";
-import {
-  ClassPanel,
-  InstancePanel,
-  type Profile as InstancePanelProfile,
-} from "@/app/frames/components/ui";
 
 async function saveAnnotations(
   project_id: string,
@@ -186,7 +166,7 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
       onSubmit={onSearchSubmit}
       validationState={errorMessage ? "invalid" : undefined}
       errorMessage={errorMessage}
-    ></SearchField>
+    />
   );
 }
 
@@ -229,17 +209,18 @@ function AmplitudeSlider({
     return `${Math.round(Math.pow(10, val) * largePrecisionFactor) / largePrecisionFactor}`;
   };
 
-  const ampRangeTool = (
+  return (
     <DataRangeSlider
       name={"Amplitude Range"}
       data={ampValues}
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
-        `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(val.end)}`
+        `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
+          val.end,
+        )}`
       }
     />
   );
-  return ampRangeTool;
 }
 
 type ColorMapPickerInfo = {
@@ -383,104 +364,180 @@ function SpectrogramThresholdTool({
   );
 }
 
-// ------------------------------
-// UFO helpers + UI wiring
-// ------------------------------
+/** ---------------------- UFO support (layout + minimal state) ---------------------- */
 
-type UfoInstanceProfile = {
-  id: string; // stable ID used by FrameView selection: `${class_name}:${track_id}`
-  class_id: number;
-  class_name: string;
-  track_id: string; // canonicalized
+type InstanceProfile = {
+  key: string;
+  className: string;
+  displayName: string;
 };
 
-function resolveClassId(className: string, classRegistry: ClassRegistry): number {
-  const keyLower = (className || "").toLowerCase();
-  const fromLabelMap =
-    LABEL_MAP.categories.find((c) => c.name.toLowerCase() === keyLower)?.id ??
-    undefined;
+function safeLocalStorageGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
 
-  const fromRegistry = classRegistry[keyLower]?.id ?? classRegistry[className]?.id;
-  const regId = fromRegistry !== undefined ? Number(fromRegistry) : undefined;
+function safeLocalStorageSet(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
 
-  const fixed = FIXED_CLASS_REG[keyLower] ?? FIXED_CLASS_REG[className.toLowerCase()];
-  const fixedId = typeof fixed === "number" ? fixed : undefined;
+function safeLocalStorageRemove(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Backup-ish behavior: keep per-class instance seed in localStorage.
+ * Key matches the naming style used elsewhere in the project ("anno::instance-seed::*").
+ */
+function getAndBumpInstanceSeed(className: string): number {
+  const seedKey = `anno::instance-seed::${className}`;
+  const raw = safeLocalStorageGet(seedKey);
+  const current = raw ? Number(raw) : 0;
+  const next = Number.isFinite(current) ? current + 1 : 1;
+  safeLocalStorageSet(seedKey, String(next));
+  return next;
+}
+
+type ClassPanelProps = {
+  selectedClassName: string | null;
+  setSelectedClassName: (name: string | null) => void;
+  classOptions: { id: string; name: string }[];
+};
+
+function ClassPanel({
+  selectedClassName,
+  setSelectedClassName,
+  classOptions,
+}: ClassPanelProps) {
+  const onSelectionChange = (key: Key | null) => {
+    if (!key) {
+      setSelectedClassName(null);
+      return;
+    }
+    const k = key.toString();
+    const found = classOptions.find((c) => c.id === k);
+    setSelectedClassName(found ? found.name : k);
+  };
 
   return (
-    (typeof fromLabelMap === "number" ? fromLabelMap : undefined) ??
-    (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
-    fixedId ??
-    1
+    <ComboBox
+      label="Class"
+      defaultItems={classOptions}
+      inputValue={selectedClassName ?? ""}
+      onSelectionChange={onSelectionChange}
+      onInputChange={(val) => {
+        // allow typing a class name directly
+        setSelectedClassName(val && val.trim().length ? val : null);
+      }}
+      allowsCustomValue
+    >
+      {(item) => <Item key={item.id}>{item.name}</Item>}
+    </ComboBox>
   );
 }
 
-function makeProfileId(className: string, trackId: string): string {
-  // Keep className human-friendly; track id canonical
-  return `${className}:${canonicalizeTrackId(trackId)}`;
+type InstancePanelProps = {
+  profiles: InstanceProfile[];
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+  onCreateProfile: (className: string, label: string) => void;
+  onRequestBulkDelete: (keys: string[]) => void;
+  onRequestDeleteAllInstances: () => void;
+  profileCounts: Record<string, number>;
+  showCreator: boolean;
+};
+
+function InstancePanel({
+  profiles,
+  selectedKey,
+  onSelect,
+  onRequestBulkDelete,
+  onRequestDeleteAllInstances,
+  profileCounts,
+  showCreator,
+}: InstancePanelProps) {
+  // showCreator exists to match your backup API; backup wants it off.
+  // We do not render any creator UI when showCreator === false.
+  return (
+    <View>
+      <Flex direction="column" gap="size-100">
+        <Flex direction="row" justifyContent="space-between" alignItems="center">
+          <Header height="size-300" marginBottom="size-100">
+            <span style={{ fontSize: "1rem" }}>Instances</span>
+          </Header>
+
+          <Button
+            isQuiet
+            variant="negative"
+            UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+            onPress={() => onRequestDeleteAllInstances()}
+          >
+            Delete All
+          </Button>
+        </Flex>
+
+        {showCreator ? (
+          <View UNSAFE_className="text-xs opacity-70">
+            {/* Intentionally blank in this project’s backup mode */}
+          </View>
+        ) : null}
+
+        <Flex direction="column" gap="size-50">
+          {profiles.length === 0 ? (
+            <View UNSAFE_className="text-sm opacity-70">
+              No instances yet. Pick a class to create one.
+            </View>
+          ) : (
+            profiles.map((p) => {
+              const isSelected = p.key === selectedKey;
+              const count = profileCounts[p.key] ?? 0;
+              return (
+                <Flex
+                  key={p.key}
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Button
+                    variant={isSelected ? "primary" : "secondary"}
+                    isQuiet={!isSelected}
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                    onPress={() => onSelect(p.key)}
+                  >
+                    {p.displayName}
+                    {Number.isFinite(count) ? ` (${count})` : ""}
+                  </Button>
+
+                  <Button
+                    variant="negative"
+                    isQuiet
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                    onPress={() => onRequestBulkDelete([p.key])}
+                  >
+                    Delete
+                  </Button>
+                </Flex>
+              );
+            })
+          )}
+        </Flex>
+      </Flex>
+    </View>
+  );
 }
 
-function makeCountsKey(className: string, trackId: string): string {
-  return `${(className || "").toLowerCase()}:${canonicalizeTrackId(trackId)}`;
-}
-
-async function saveUfoAnnotations(project_id: string, sample_id: string): Promise<{
-  boxes: VideoBoundingBox[];
-}> {
-  if (typeof window === "undefined") {
-    throw new Error("UFO save is only available in the browser.");
-  }
-
-  const collect = (window as any).ufoCollectForSave as undefined | (() => Promise<any[]>);
-  if (!collect) {
-    throw new Error("UFO annotator not ready (missing window.ufoCollectForSave).");
-  }
-
-  // Collect all frames (and force-save current frame inside FrameView)
-  const w3cList = (await collect()) ?? [];
-
-  const cocoFrames = w3cToCocoFrames(w3cList as any[], true);
-  const boxes = cocoFramesToVideoBBoxes(cocoFrames as any[]) as VideoBoundingBox[];
-
-  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
-  const response = await fetch(ANNOTATIONS_URL, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    // Backend expects VideoBoundingBox[] for UFO; keep TS relaxed here.
-    body: JSON.stringify(boxes),
-  });
-
-  if (!response.ok) {
-    let detail: string | undefined;
-    try {
-      const payload = await response.json();
-      detail = (payload as any)?.detail;
-    } catch {
-      detail = undefined;
-    }
-    throw new Error(detail ? `Failed to save: ${detail}` : `Failed to save: ${response.statusText}`);
-  }
-
-  (window as any).ufoMarkSaved?.();
-
-  return { boxes };
-}
-
-function ufoHasUnsavedChanges(): boolean {
-  if (typeof window === "undefined") return false;
-  return Boolean((window as any).ufoHasUnsavedChanges?.());
-}
-
-async function ufoClearCurrent(): Promise<void> {
-  if (typeof window === "undefined") return;
-  await (window as any).ufoClearCurrent?.();
-}
-
-async function ufoClearAllFrames(): Promise<void> {
-  if (typeof window === "undefined") return;
-  await (window as any).ufoClearAllFrames?.();
-}
+/** ---------------------- Main ToolBar ---------------------- */
 
 type ToolBarInfo = {
   project: Project;
@@ -507,325 +564,15 @@ export default function ToolBar({
   viewParams,
   setViewParams,
   dataParams,
-  setDataParams,
   plotProps,
   setPlotProps,
 }: ToolBarInfo) {
   const navigate = useNavigate();
 
-  const project_id = project._id as string;
-  const sample_id = sample._id as string;
+  const project_id = project._id;
+  const sample_id = sample._id;
 
   const isUfo = project.task === "UFO";
-
-  // ------------------------------
-  // UFO instance state (toolbar-owned)
-  // ------------------------------
-  const [classRegistry, setClassRegistry] = useState<ClassRegistry>(() =>
-    loadClassRegistry(),
-  );
-
-  const [selectedClassName, setSelectedClassName] = useState<string | null>(() => {
-    const last = loadLastClassName();
-    return last && last.trim().length > 0 ? last : null;
-  });
-
-  const [instanceProfiles, setInstanceProfiles] = useState<UfoInstanceProfile[]>([]);
-  // SelectedKey is the *counts key* (lowercased class + canonical track id) because
-  // scanInstanceCountsChunked uses that key shape.
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-
-  const [instanceCounts, setInstanceCounts] = useState<Record<string, number>>({});
-
-  const keyPrefix = useMemo(() => {
-    if (!isUfo || !project_id || !sample_id) return undefined;
-    return `anno::w3c::app://p/${project_id}/s/${sample_id}/`;
-  }, [isUfo, project_id, sample_id]);
-
-  const pushUfoGlobals = useCallback(
-    (profiles: UfoInstanceProfile[], nextSelectedKey: string | null, nextSelectedClass: string | null) => {
-      if (typeof window === "undefined") return;
-
-      const w = window as any;
-
-      // Publish profiles in the format FrameView expects: list objects with `.id` and label fields
-      w.ufoInstanceProfiles = profiles.map((p) => ({
-        id: p.id,
-        class_name: p.class_name,
-        class_id: p.class_id,
-        track_id: p.track_id,
-      }));
-
-      const selectedProfile =
-        nextSelectedKey &&
-        profiles.find((p) => makeCountsKey(p.class_name, p.track_id) === nextSelectedKey);
-
-      w.ufoSelectedProfileId = selectedProfile ? selectedProfile.id : null;
-      w.ufoSelectedClassName = selectedProfile ? selectedProfile.class_name : nextSelectedClass ?? null;
-      w.ufoSelectedTrackId = selectedProfile ? selectedProfile.track_id : null;
-
-      // Notify FrameView to re-check selection/drawingEnabled
-      w.ufoNotifySelectionChanged?.();
-
-      // Dispatch state snapshot so any listener can sync
-      const profilePayload = profiles.map((p) => ({
-        class_name: p.class_name,
-        class_id: p.class_id,
-        track_id: p.track_id,
-      }));
-
-      window.dispatchEvent(
-        new CustomEvent("ufo:state", {
-          detail: {
-            includeTrackIds: true,
-            profiles: profilePayload,
-            selectedKey: nextSelectedKey,
-            selectedClassName: w.ufoSelectedClassName ?? null,
-            lastClassName: nextSelectedClass ?? w.ufoSelectedClassName ?? null,
-            classRegistry,
-          },
-        }),
-      );
-    },
-    [classRegistry],
-  );
-
-  // Sync selection + class changes into window/globals
-  useEffect(() => {
-    if (!isUfo) return;
-    saveLastClassName(selectedClassName ?? "");
-  }, [isUfo, selectedClassName]);
-
-  useEffect(() => {
-    if (!isUfo) return;
-    pushUfoGlobals(instanceProfiles, selectedKey, selectedClassName);
-  }, [isUfo, instanceProfiles, selectedKey, selectedClassName, pushUfoGlobals]);
-
-  // Listen for FrameView-emitted ufo:state updates (auto quick-add, deletes)
-  useEffect(() => {
-    if (!isUfo || typeof window === "undefined") return;
-
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<any>).detail;
-      if (!detail || typeof detail !== "object") return;
-
-      const nextRegistry = detail.classRegistry;
-      if (nextRegistry && typeof nextRegistry === "object") {
-        setClassRegistry(nextRegistry as ClassRegistry);
-      } else {
-        // Fallback: refresh from localStorage (AnnoBridge may have updated it)
-        setClassRegistry(loadClassRegistry());
-      }
-
-      const profArr = Array.isArray(detail.profiles) ? detail.profiles : [];
-      const rebuilt: UfoInstanceProfile[] = profArr
-        .map((p: any) => {
-          const class_name = typeof p?.class_name === "string" ? p.class_name : null;
-          const track_id = typeof p?.track_id === "string" ? canonicalizeTrackId(p.track_id) : null;
-          const class_id = typeof p?.class_id === "number" ? p.class_id : null;
-          if (!class_name || !track_id || !class_id) return null;
-
-          return {
-            id: makeProfileId(class_name, track_id),
-            class_name,
-            class_id,
-            track_id,
-          } as UfoInstanceProfile;
-        })
-        .filter(Boolean) as UfoInstanceProfile[];
-
-      setInstanceProfiles(rebuilt);
-
-      const nextSelectedKey = typeof detail.selectedKey === "string" ? detail.selectedKey : null;
-      setSelectedKey(nextSelectedKey);
-
-      const nextSelectedClass =
-        typeof detail.selectedClassName === "string" && detail.selectedClassName.trim().length > 0
-          ? detail.selectedClassName
-          : null;
-      if (nextSelectedClass !== null) {
-        setSelectedClassName(nextSelectedClass);
-      }
-    };
-
-    window.addEventListener("ufo:state", handler as any);
-    return () => {
-      window.removeEventListener("ufo:state", handler as any);
-    };
-  }, [isUfo]);
-
-  // Cross-frame instance count scanner (chunked)
-  useEffect(() => {
-    if (!isUfo || !keyPrefix) return;
-
-    setInstanceCounts({});
-
-    let cancelScan: (() => void) | null = null;
-    let interval: number | null = null;
-
-    const startScan = () => {
-      cancelScan?.();
-      cancelScan = scanInstanceCountsChunked({
-        keyPrefix,
-        onUpdate: (counts) => setInstanceCounts(counts),
-        chunkSize: 24,
-      });
-    };
-
-    startScan();
-
-    interval = window.setInterval(() => {
-      startScan();
-    }, 2000);
-
-    return () => {
-      cancelScan?.();
-      if (interval) window.clearInterval(interval);
-    };
-  }, [isUfo, keyPrefix]);
-
-  // Ensure we have a sensible initial selection when profiles appear
-  useEffect(() => {
-    if (!isUfo) return;
-
-    if (instanceProfiles.length === 0) {
-      setSelectedKey(null);
-      return;
-    }
-
-    if (selectedKey) {
-      const exists = instanceProfiles.some(
-        (p) => makeCountsKey(p.class_name, p.track_id) === selectedKey,
-      );
-      if (exists) return;
-    }
-
-    const last = instanceProfiles[instanceProfiles.length - 1];
-    setSelectedKey(makeCountsKey(last.class_name, last.track_id));
-  }, [isUfo, instanceProfiles, selectedKey]);
-
-  const instancePanelProfiles: InstancePanelProfile[] = useMemo(() => {
-    return instanceProfiles.map((p) => ({
-      key: makeCountsKey(p.class_name, p.track_id),
-      class_id: p.class_id,
-      class_name: p.class_name,
-      track_id: p.track_id,
-    }));
-  }, [instanceProfiles]);
-
-  const onSelectInstanceKey = useCallback((key: string) => {
-    setSelectedKey(key);
-  }, []);
-
-  const onCreateProfile = useCallback(
-    (classNameRaw: string, _trackIdRaw: string) => {
-      const className = (classNameRaw || "").trim();
-      if (!className) return;
-
-      // Make track IDs readable + unique within the class (backup behavior)
-      const existingForClass = instanceProfiles
-        .filter((p) => p.class_name.toLowerCase() === className.toLowerCase())
-        .map((p) => p.track_id);
-
-      const readable = uniqueReadableId(existingForClass);
-      const track_id = canonicalizeTrackId(readable);
-
-      const class_id = resolveClassId(className, classRegistry);
-
-      const next: UfoInstanceProfile = {
-        id: makeProfileId(className, track_id),
-        class_name: className,
-        class_id,
-        track_id,
-      };
-
-      setInstanceProfiles((prev) => [...prev, next]);
-      setSelectedClassName(className);
-      setSelectedKey(makeCountsKey(className, track_id));
-
-      ToastQueue.positive(`New ${className} instance: #${track_id}`, { timeout: 2500 });
-    },
-    [instanceProfiles, classRegistry],
-  );
-
-  const onRequestBulkDelete = useCallback((profile: InstancePanelProfile) => {
-    if (typeof window === "undefined") return;
-
-    window.dispatchEvent(
-      new CustomEvent("ufo:requestBulkDelete", {
-        detail: {
-          profile: {
-            class_name: profile.class_name,
-            track_id: profile.track_id,
-          },
-        },
-      }),
-    );
-  }, []);
-
-  const onRequestDeleteAllInstances = useCallback(() => {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(new CustomEvent("ufo:deleteAllInstances"));
-  }, []);
-
-  const maybeSaveUfoBestEffort = useCallback(async () => {
-    if (!isUfo) return;
-
-    // Best-effort: only try when dirty, but still safe if the bridge chooses to mark dirty often.
-    const shouldSave = ufoHasUnsavedChanges();
-
-    if (!shouldSave) return;
-
-    try {
-      const { boxes } = await saveUfoAnnotations(project_id, sample_id);
-      ToastQueue.positive(`Saved ${boxes.length} boxes (all frames).`, { timeout: 3500 });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save UFO annotations.";
-      ToastQueue.negative(msg, { timeout: 5000 });
-      // still "best effort" — do not throw, so Next/Jump can proceed if you want
-    }
-  }, [isUfo, project_id, sample_id]);
-
-  const handleUfoSave = useCallback(async () => {
-    try {
-      const { boxes } = await saveUfoAnnotations(project_id, sample_id);
-      ToastQueue.positive(`Saved ${boxes.length} boxes (all frames).`, { timeout: 3500 });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save UFO annotations.";
-      ToastQueue.negative(msg, { timeout: 5000 });
-    }
-  }, [project_id, sample_id]);
-
-  const handleUfoNextSample = useCallback(async () => {
-    await maybeSaveUfoBestEffort();
-    try {
-      const next = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${next._id}`;
-      navigate(NEXT_SAMPLE_URL);
-    } catch (err) {
-      console.error("Failed to fetch next sample:", err);
-      ToastQueue.negative("Failed to load next sample.", { timeout: 5000 });
-    }
-  }, [maybeSaveUfoBestEffort, navigate, project_id]);
-
-  const handleUfoShotJump = useCallback(
-    async (shot_id: string) => {
-      await maybeSaveUfoBestEffort();
-
-      const sampleHit = await getShotSample(project_id, shot_id);
-      if (sampleHit !== null) {
-        const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sampleHit._id}`;
-        navigate(NEXT_SAMPLE_URL);
-      } else {
-        throw new Error("Shot not found!");
-      }
-    },
-    [maybeSaveUfoBestEffort, navigate, project_id],
-  );
-
-  const clearAnnotations = () => {
-    setAnnotations([]);
-  };
 
   const tools: { name: string; component: React.ReactNode }[] = [];
 
@@ -848,7 +595,7 @@ export default function ToolBar({
             labels={labels}
             annotations={annotations}
             setAnnotations={setAnnotations}
-          ></ShotLabels>
+          />
         ),
       });
 
@@ -861,7 +608,7 @@ export default function ToolBar({
             data={tsData}
             dataParams={dataParams}
             setAnnotations={setAnnotations}
-          ></PeakDetectionTool>
+          />
         ),
       });
 
@@ -874,7 +621,7 @@ export default function ToolBar({
             data={tsData}
             dataParams={dataParams}
             setAnnotations={setAnnotations}
-          ></OutlierDetectionTool>
+          />
         ),
       });
 
@@ -887,7 +634,7 @@ export default function ToolBar({
             data={tsData}
             dataParams={dataParams}
             setAnnotations={setAnnotations}
-          ></ChangePointDetectionTool>
+          />
         ),
       });
 
@@ -900,7 +647,7 @@ export default function ToolBar({
             data={tsData}
             dataParams={dataParams}
             setAnnotations={setAnnotations}
-          ></JumpDetectionTool>
+          />
         ),
       });
     } else if (project.task == "MHD") {
@@ -955,27 +702,189 @@ export default function ToolBar({
     }
   }
 
-  // UFO-aware ShotSearch component (awaits best-effort save before navigating)
-  const UfoShotSearch = () => {
+  const clearAnnotations = () => {
+    setAnnotations([]);
+  };
+
+  /** UFO minimal state */
+  const [selectedClassName, setSelectedClassName] = useState<string | null>(
+    null,
+  );
+  const [profiles, setProfiles] = useState<InstanceProfile[]>([]);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  const instancePanelProfiles = profiles;
+
+  const classOptions = useMemo(() => {
+    // Try to derive class list from project (supports multiple possible shapes).
+    // If none exist, still allow custom class entry in ComboBox.
+    const anyProject: any = project as any;
+
+    const raw =
+      anyProject?.classes ??
+      anyProject?.class_names ??
+      anyProject?.labels ??
+      anyProject?.label_names ??
+      [];
+
+    if (Array.isArray(raw)) {
+      // strings
+      if (raw.every((x) => typeof x === "string")) {
+        return (raw as string[]).map((name) => ({
+          id: name,
+          name: name,
+        }));
+      }
+      // objects with name/id-ish
+      return raw
+        .map((x: any, idx: number) => {
+          const name = x?.name ?? x?.label ?? x?.id ?? String(idx);
+          const id = x?.id ?? x?.name ?? x?.label ?? String(idx);
+          return { id: String(id), name: String(name) };
+        })
+        .filter((x: any) => x && x.id && x.name);
+    }
+
+    return [] as { id: string; name: string }[];
+  }, [project]);
+
+  const instanceCounts = useMemo(() => {
+    // If your UFO annotator stores per-instance counts elsewhere, wire it in here.
+    // For now, keep a stable shape.
+    const counts: Record<string, number> = {};
+    for (const p of profiles) counts[p.key] = counts[p.key] ?? 0;
+    return counts;
+  }, [profiles]);
+
+  const saveLastClassName = (name: string) => {
+    safeLocalStorageSet(`anno::ufo::last-class::${project_id}`, name);
+  };
+
+  useEffect(() => {
+    if (!isUfo) return;
+    const last = safeLocalStorageGet(`anno::ufo::last-class::${project_id}`);
+    if (last && last.trim().length) {
+      setSelectedClassName(last.trim());
+    }
+  }, [isUfo, project_id]);
+
+  const onSelectInstanceKey = (key: string) => {
+    setSelectedKey(key);
+  };
+
+  const onCreateProfile = (className: string, _label: string) => {
+    const cls = (className || "").trim();
+    if (!cls) return;
+
+    const n = getAndBumpInstanceSeed(cls);
+    const key = `${cls}::${n}`;
+    const displayName = `${cls} ${n}`;
+
+    setProfiles((prev) => {
+      // avoid duplicates if called twice quickly
+      if (prev.some((p) => p.key === key)) return prev;
+      return [...prev, { key, className: cls, displayName }];
+    });
+    setSelectedKey(key);
+  };
+
+  const onRequestBulkDelete = (keys: string[]) => {
+    setProfiles((prev) => prev.filter((p) => !keys.includes(p.key)));
+    setSelectedKey((prev) => {
+      if (!prev) return prev;
+      return keys.includes(prev) ? null : prev;
+    });
+  };
+
+  const onRequestDeleteAllInstances = () => {
+    setProfiles([]);
+    setSelectedKey(null);
+  };
+
+  const ufoClearCurrent = async () => {
+    clearAnnotations();
+    // If you have a per-frame local persistence key, remove it here.
+    // This keeps it safe/non-destructive by default.
+  };
+
+  const ufoClearAllFrames = async () => {
+    // Conservative: only remove keys that look UFO-related.
+    try {
+      const toRemove: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (!k) continue;
+        const lk = k.toLowerCase();
+        if (
+          lk.startsWith("anno::ufo::") ||
+          lk.startsWith("ufo::") ||
+          lk.includes("ufo")
+        ) {
+          toRemove.push(k);
+        }
+      }
+      toRemove.forEach((k) => safeLocalStorageRemove(k));
+      clearAnnotations();
+    } catch {
+      // handled by caller toast
+      throw new Error("localStorage purge failed");
+    }
+  };
+
+  const handleUfoSave = async () => {
+    try {
+      const response = await saveAnnotations(project_id, sample_id, annotations);
+      if (!response.ok) {
+        throw new Error(`Failed to save annotations: ${response.statusText}`);
+      }
+      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
+        timeout: 5000,
+      });
+    } catch (err) {
+      if (err instanceof Error) {
+        ToastQueue.negative(`${err.message}`, { timeout: 5000 });
+      } else {
+        ToastQueue.negative("Failed to save annotations.", { timeout: 5000 });
+      }
+    }
+  };
+
+  const handleUfoNextSample = async () => {
+    try {
+      await saveAnnotations(project_id, sample_id, annotations);
+      const next = await getNextSample(project_id);
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${next._id}`;
+      navigate(NEXT_SAMPLE_URL);
+    } catch (err) {
+      console.error("Failed to fetch next sample:", err);
+      ToastQueue.negative("Failed to load next sample.", { timeout: 5000 });
+    }
+  };
+
+  function UfoShotSearch() {
     const [errorMessage, setErrorMessage] = useState<string>("");
 
     const onSearchSubmit = async (newValue: string) => {
-      if (newValue === "") {
+      if (newValue == "") {
         setErrorMessage("");
-        return;
-      }
-
-      if (!/^[0-9]*$/.test(newValue)) {
+      } else if (/^[0-9]*$/.test(newValue)) {
+        setErrorMessage("");
+        const shot_id = newValue;
+        try {
+          const nextSample = await getShotSample(project_id, shot_id);
+          if (nextSample !== null) {
+            await saveAnnotations(project_id, sample_id, annotations);
+            const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
+            navigate(NEXT_SAMPLE_URL);
+          } else {
+            setErrorMessage("Shot not found!");
+          }
+        } catch (err) {
+          console.error("Failed to fetch data:", err);
+          setErrorMessage("Failed to fetch shot.");
+        }
+      } else {
         setErrorMessage("Please enter a number.");
-        return;
-      }
-
-      setErrorMessage("");
-      try {
-        await handleUfoShotJump(newValue);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Shot not found!";
-        setErrorMessage(msg);
       }
     };
 
@@ -987,142 +896,179 @@ export default function ToolBar({
         errorMessage={errorMessage}
       />
     );
-  };
+  }
 
   return (
     <Provider theme={defaultTheme} height="100vh">
-      <View overflow="auto" height="100vh">
-        <Flex
-          direction="column"
-          alignItems="center"
-          justifyContent="center"
-          gap="size-100"
-          width="100%"
-        >
+      {isUfo ? (
+        // ---------------- UFO (backup layout restored) ----------------
+        <div className="h-screen text-center w-72 shrink-0 overflow-y-auto">
+          {/* Top: Save / Next (ONLY) */}
+          <div className="pl-4 pr-4 pt-4">
+            <ButtonGroup>
+              <Button variant="primary" onPress={handleUfoSave}>
+                Save
+              </Button>
+              <Button variant="primary" onPress={handleUfoNextSample}>
+                Next
+              </Button>
+            </ButtonGroup>
+          </div>
+
+          {/* Jump to Shot */}
+          <div className="pl-4 pr-4 pb-4 pt-2">
+            <UfoShotSearch />
+          </div>
+
+          {/* Frame controls block: Rectangle + Clear buttons */}
+          <div className="pl-4 pr-4 pb-4">
+            <div className="max-w-[16rem] mx-auto mb-4">
+              <div className="mb-2">
+                <Flex gap="size-100" alignItems="center" wrap>
+                  <Button isQuiet isDisabled UNSAFE_className="!px-2.5 !py-1.5 text-xs">
+                    Rectangle
+                  </Button>
+                </Flex>
+              </div>
+
+              <hr className="m-4 h-px opacity-30 border-gray-200" />
+
+              <div className="mb-1">
+                <Flex gap="size-100" alignItems="center" wrap>
+                  <Button
+                    variant="negative"
+                    isQuiet
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                    onPress={async () => {
+                      try {
+                        await ufoClearAllFrames();
+                        ToastQueue.positive("Cleared all frames (local).", {
+                          timeout: 2500,
+                        });
+                      } catch {
+                        ToastQueue.negative("Failed to clear all frames.", {
+                          timeout: 5000,
+                        });
+                      }
+                    }}
+                  >
+                    Clear ALL
+                  </Button>
+
+                  <Button
+                    isQuiet
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                    onPress={async () => {
+                      try {
+                        await ufoClearCurrent();
+                        ToastQueue.positive("Cleared current frame.", {
+                          timeout: 2500,
+                        });
+                      } catch {
+                        ToastQueue.negative("Failed to clear current frame.", {
+                          timeout: 5000,
+                        });
+                      }
+                    }}
+                  >
+                    Clear Current
+                  </Button>
+                </Flex>
+              </div>
+
+              <hr className="m-4 h-px opacity-30 border-gray-200" />
+            </div>
+
+            {/* Class picker (selecting a class creates/selects an instance like backup) */}
+            <div className="mb-3">
+              <ClassPanel
+                selectedClassName={selectedClassName}
+                classOptions={classOptions}
+                setSelectedClassName={(name) => {
+                  const next = (name || "").trim();
+                  if (!next) {
+                    setSelectedClassName(null);
+                    return;
+                  }
+                  setSelectedClassName(next);
+                  saveLastClassName(next);
+                  // Backup behavior: picking a class immediately creates a new instance
+                  onCreateProfile(next, "");
+                }}
+              />
+            </div>
+
+            {/* Instances list (NO "Add Profile" editor in backup) */}
+            <InstancePanel
+              profiles={instancePanelProfiles}
+              selectedKey={selectedKey}
+              onSelect={onSelectInstanceKey}
+              onCreateProfile={onCreateProfile}
+              onRequestBulkDelete={onRequestBulkDelete}
+              onRequestDeleteAllInstances={onRequestDeleteAllInstances}
+              profileCounts={instanceCounts}
+              showCreator={false}
+            />
+          </div>
+        </div>
+      ) : (
+        // ---------------- Non-UFO (existing UI preserved) ----------------
+        <View overflow="auto" height="100vh">
           <Flex
             direction="column"
             alignItems="center"
             justifyContent="center"
             gap="size-100"
+            width="100%"
           >
-            <Header height="size-300" marginBottom="size-100">
-              <span style={{ fontSize: "1.2rem" }}>Controls</span>
-            </Header>
-
-            {isUfo ? (
-              <>
-                {/* UFO instance manager UI */}
-                <div className="w-full px-2">
-                  <div className="mb-3">
-                    <ClassPanel
-                      selectedClassName={selectedClassName}
-                      setSelectedClassName={setSelectedClassName}
-                    />
-                  </div>
-
-                  <div className="mb-2">
-                    <InstancePanel
-                      profiles={instancePanelProfiles}
-                      selectedKey={selectedKey}
-                      onSelect={onSelectInstanceKey}
-                      onCreateProfile={onCreateProfile}
-                      onRequestBulkDelete={onRequestBulkDelete}
-                      onRequestDeleteAllInstances={onRequestDeleteAllInstances}
-                      profileCounts={instanceCounts}
-                      showCreator={true}
-                    />
-                  </div>
-                </div>
-
-                {/* UFO controls row */}
-                <ButtonGroup>
-                  <Button variant="primary" onPress={handleUfoSave}>
-                    Save
-                  </Button>
-
-                  <Button variant="primary" onPress={handleUfoNextSample}>
-                    Next
-                  </Button>
-
-                  <Button
-                    variant="primary"
-                    onPress={async () => {
-                      try {
-                        await ufoClearCurrent();
-                        ToastQueue.positive("Cleared current frame.", { timeout: 2500 });
-                      } catch {
-                        ToastQueue.negative("Failed to clear current frame.", { timeout: 5000 });
-                      }
-                    }}
-                  >
-                    Clear Frame
-                  </Button>
-
-                  <Button
-                    variant="primary"
-                    onPress={async () => {
-                      try {
-                        await ufoClearAllFrames();
-                        ToastQueue.positive("Cleared all frames (local).", { timeout: 2500 });
-                      } catch {
-                        ToastQueue.negative("Failed to clear all frames.", { timeout: 5000 });
-                      }
-                    }}
-                  >
-                    Clear All
-                  </Button>
-                </ButtonGroup>
-
-                <UfoShotSearch />
-              </>
-            ) : (
-              <>
-                <ButtonGroup>
-                  <SaveButton
-                    project_id={project_id}
-                    sample_id={sample_id}
-                    annotations={annotations}
-                  />
-                  <NextButton
-                    project_id={project_id}
-                    sample_id={sample_id}
-                    annotations={annotations}
-                  />
-                  <Button variant="primary" onPress={clearAnnotations}>
-                    Clear
-                  </Button>
-                </ButtonGroup>
-
-                <ShotSearch
+            <Flex
+              direction="column"
+              alignItems="center"
+              justifyContent="center"
+              gap="size-100"
+            >
+              <Header height="size-300" marginBottom="size-100">
+                <span style={{ fontSize: "1.2rem" }}>Controls</span>
+              </Header>
+              <ButtonGroup>
+                <SaveButton
                   project_id={project_id}
                   sample_id={sample_id}
                   annotations={annotations}
                 />
-              </>
-            )}
+                <NextButton
+                  project_id={project_id}
+                  sample_id={sample_id}
+                  annotations={annotations}
+                />
+                <Button variant="primary" onPress={clearAnnotations}>
+                  Clear
+                </Button>
+              </ButtonGroup>
+              <ShotSearch
+                project_id={project_id}
+                sample_id={sample_id}
+                annotations={annotations}
+              />
+            </Flex>
+            <Flex justifyContent="center" alignItems="center">
+              <Header height="size-300" marginBottom="size-100">
+                <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+              </Header>
+            </Flex>
+            <Accordion allowsMultipleExpanded={true} width="100%">
+              {tools.map((item, i) => (
+                <Disclosure key={i}>
+                  <DisclosureTitle>
+                    <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                  </DisclosureTitle>
+                  <DisclosurePanel>{item.component}</DisclosurePanel>
+                </Disclosure>
+              ))}
+            </Accordion>
           </Flex>
-
-          {!isUfo && (
-            <>
-              <Flex justifyContent="center" alignItems="center">
-                <Header height="size-300" marginBottom="size-100">
-                  <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
-                </Header>
-              </Flex>
-              <Accordion allowsMultipleExpanded={true} width="100%">
-                {tools.map((item, i) => (
-                  <Disclosure key={i}>
-                    <DisclosureTitle>
-                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                    </DisclosureTitle>
-                    <DisclosurePanel>{item.component}</DisclosurePanel>
-                  </Disclosure>
-                ))}
-              </Accordion>
-            </>
-          )}
-        </Flex>
-      </View>
+        </View>
+      )}
     </Provider>
   );
 }
