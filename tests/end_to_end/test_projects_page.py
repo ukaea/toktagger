@@ -111,7 +111,6 @@ def test_page_navigation(server_setup, page: Page):
     # Create 6 projects
     for i in range(1, 7):
         create_project(f"Test Project {i}", "disruption", "uda")
-        time.sleep(0.1)
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -214,3 +213,68 @@ def test_sorting(server_setup, page: Page):
 
     # Sort by Loader, B should be first (parquet), then A (uda)
     sort(page, "Loader", "B Project", "A Project")
+
+
+def test_search(server_setup, page: Page):
+    # Create some projects with different names
+    create_project("Project A", "ELM", "uda")
+    create_project("Project B", "ELM", "uda")
+    create_project("project C", "ELM", "uda")
+    create_project("Test Project", "ELM", "uda")
+    create_project("Projection", "ELM", "uda")
+    create_project("New UDA ELMs", "ELM", "uda")
+
+    # Navigate to page
+    page.goto("http://localhost:8002")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    searchbox = page.get_by_role("searchbox", name="Search By Name")
+
+    # Search for Project 1
+    searchbox.fill("Project A")
+    searchbox.press("Enter")
+
+    # Check there is only one row
+    expect(page.get_by_role("row").nth(1)).to_contain_text("Project A")
+    expect(page.get_by_role("row").nth(2)).to_be_hidden()
+
+    # Search for project
+    searchbox.fill("project")
+    searchbox.press("Enter")
+
+    # Search should be case insensitive, find any entries which contain that phrase
+    # So 5 projects, not 'New UDA Elms'
+    # In newest first order
+    expect(page.get_by_role("row").nth(1)).to_contain_text("Projection")
+    expect(page.get_by_role("row").nth(2)).to_contain_text("Test Project")
+    expect(page.get_by_role("row").nth(3)).to_contain_text("project C")
+    expect(page.get_by_role("row").nth(4)).to_contain_text("Project B")
+    expect(page.get_by_role("row").nth(5)).to_contain_text("Project A")
+    expect(page.get_by_role("row").nth(6)).to_be_hidden()
+
+    # Search for 'Project ', with a space
+    searchbox.fill("Project ")
+    searchbox.press("Enter")
+
+    # Should find Project A, Project B, Project C
+    expect(page.get_by_role("row").nth(1)).to_contain_text("project C")
+    expect(page.get_by_role("row").nth(2)).to_contain_text("Project B")
+    expect(page.get_by_role("row").nth(3)).to_contain_text("Project A")
+    expect(page.get_by_role("row").nth(4)).to_be_hidden()
+
+    # Search for 'wrong'
+    searchbox.fill("wrong")
+    searchbox.press("Enter")
+
+    # Should find nothing
+    expect(page.get_by_role("row").nth(1)).to_be_hidden()
+
+    # Enter blank string (delete search)
+    searchbox.fill("")
+    searchbox.press("Enter")
+
+    # Should find all 6 entries
+    expect(page.get_by_role("row").nth(6)).to_contain_text("Project A")
+    expect(page.get_by_role("row").nth(7)).to_be_hidden()
