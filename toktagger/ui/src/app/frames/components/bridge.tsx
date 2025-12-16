@@ -19,7 +19,8 @@ import {
   writeClassAndTrack,
   loadClassRegistry,
   saveClassRegistry,
-  extractClassLabelFromAnnotation
+  extractClassLabelFromAnnotation,
+  FIXED_CLASS_REG
 } from "./lib";
 import type { ClassRegistry } from "./lib";
 
@@ -30,7 +31,7 @@ import type { ClassRegistry } from "./lib";
  * - Keep annotations rectangle-only and normalized (class/track stamping).
  * - Track dirty state for background auto-save.
  * - Expose a small API for reading, hydrating, and clearing the overlay.
- * - Optionally auto-create instance profiles when duplicate (class, track) is drawn.
+ * - Optionally auto-create instance profiles when duplicate (class,track) is drawn.
  */
 export type BridgeHandle = {
   /** Read current overlay, stamp to currentKey, normalize, and return the list (no storage writes). */
@@ -186,18 +187,15 @@ export const AnnoBridge = Object.assign(
           // Load current registry from localStorage
           let registry: ClassRegistry = loadClassRegistry();
 
-          if (!registry[selectedClass]) {
+          const keyLower = selectedClass.toLowerCase();
+          if (!registry[keyLower]) {
             const profileId = getSelectedProfile?.() ?? null;
 
+            const fixedId = FIXED_CLASS_REG[keyLower] ?? 1;
             registry = {
               ...registry,
-              [selectedClass]: {
-                id: selectedClass,
-                name: selectedClass,
-                profileId
-              }
+              [keyLower]: { id: String(fixedId), name: selectedClass, profileId }
             };
-
             saveClassRegistry(registry);
           }
         } catch (err) {
@@ -210,7 +208,7 @@ export const AnnoBridge = Object.assign(
     useImperativeHandle(
       ref,
       () =>
-        ([ 
+        ([
           "isAnnotatorReady",
           "persistWorkingNow",
           "clearOverlaySilently",

@@ -637,7 +637,7 @@ export default function ToolBar({
   }, [isUfo]);
 
   /**
-   * Initial load of registry + last-used class (shared with FrameView via lib.ts helpers).
+   * Initial load of registry + last-used class (shared with FrameView via localStorage).
    */
   useEffect(() => {
     if (!isUfo) return;
@@ -682,8 +682,7 @@ export default function ToolBar({
   }, [isUfo, project_id, sample_id]);
 
   /**
-   * Create (or select) an instance for the chosen class, using the original
-   * registry + readable track id flow.
+   * Create (or select) an instance for the chosen class, using readable track ids (old behavior).
    */
   const createInstanceForClass = (
     clsName: string,
@@ -699,12 +698,14 @@ export default function ToolBar({
     const regIdStr = fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
     const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
-    const fixedId = (FIXED_CLASS_REG as any)[clsName] ?? (FIXED_CLASS_REG as any)[keyLower];
+    const fixedId =
+      (FIXED_CLASS_REG as any)[clsName] ?? (FIXED_CLASS_REG as any)[keyLower];
 
     const class_id =
       (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
       (typeof fixedId === "number" ? fixedId : undefined) ??
-      ((LABEL_MAP as any)?.categories?.find?.((c: any) => c?.name === clsName)?.id ?? 1);
+      ((LABEL_MAP as any)?.categories?.find?.((c: any) => c?.name === clsName)?.id ??
+        1);
 
     // Ensure class is in registry
     if (!fromRegistryLower && !fromRegistryExact) {
@@ -734,13 +735,11 @@ export default function ToolBar({
       }
     }
 
-    // Generate a new readable track id for this class
-    const existingTrackIds = instanceProfiles
-      .filter((p) => p.class_name === clsName)
-      .map((p) => p.track_id);
-
+    // Generate a new readable track id (old behavior)
+    const existingTrackIds = instanceProfiles.map((p) => p.track_id);
     const readable = uniqueReadableId(existingTrackIds);
     const track_id = canonicalizeTrackId(readable);
+
     const id = `${clsName}:${track_id}`;
 
     const nextInstances: InstanceProfile[] = [
@@ -773,7 +772,8 @@ export default function ToolBar({
     w.ufoSelectedProfileId = selectedInstanceId ?? null;
     w.ufoSelectedClassName = selectedClassName ?? null;
 
-    const sel = instanceProfiles.find((p) => p.id === selectedInstanceId) || null;
+    const sel =
+      instanceProfiles.find((p) => p.id === selectedInstanceId) || null;
     w.ufoSelectedTrackId = sel?.track_id ?? null;
 
     w.ufoNotifySelectionChanged?.();
@@ -789,7 +789,9 @@ export default function ToolBar({
 
     window.dispatchEvent(
       new CustomEvent("ufo:requestBulkDelete", {
-        detail: { profile: { class_name: profile.class_name, track_id: profile.track_id } },
+        detail: {
+          profile: { class_name: profile.class_name, track_id: profile.track_id },
+        },
       }),
     );
   };
@@ -909,6 +911,11 @@ export default function ToolBar({
     );
   }
 
+  const selectedInstanceKey = (() => {
+    const inst = instanceProfiles.find((p) => p.id === selectedInstanceId);
+    return inst ? instanceKey(inst) : null;
+  })();
+
   return (
     <Provider theme={defaultTheme} height="100vh">
       {isUfo ? (
@@ -1009,10 +1016,7 @@ export default function ToolBar({
                 class_name: inst.class_name,
                 track_id: inst.track_id,
               }))}
-              selectedKey={() => {
-                const inst = instanceProfiles.find((p) => p.id === selectedInstanceId);
-                return inst ? instanceKey(inst) : null;
-              }}
+              selectedKey={selectedInstanceKey}
               onSelect={(key) => {
                 const inst = instanceProfiles.find((p) => instanceKey(p) === key);
                 if (!inst) return;
@@ -1037,7 +1041,8 @@ export default function ToolBar({
                 const fromRegistryLower = classRegistry[keyLower];
                 const fromRegistryExact = (classRegistry as any)[cls];
 
-                const regIdStr = fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
+                const regIdStr =
+                  fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
                 const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
                 const fixedId =
@@ -1046,7 +1051,8 @@ export default function ToolBar({
                 const class_id =
                   (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
                   (typeof fixedId === "number" ? fixedId : undefined) ??
-                  ((LABEL_MAP as any)?.categories?.find?.((c: any) => c?.name === cls)?.id ?? 1);
+                  ((LABEL_MAP as any)?.categories?.find?.((c: any) => c?.name === cls)?.id ??
+                    1);
 
                 const existingTrackIds = instanceProfiles.map((p) => p.track_id);
                 const canonicalTrackId =

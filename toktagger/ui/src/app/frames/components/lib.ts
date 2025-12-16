@@ -16,6 +16,8 @@ export const PROFILES_KEY = "ufo::profiles";
 export const CLASS_REG_KEY = "ufo::class-registry";
 export const LAST_CLASS_KEY = "ufo::last-class-name";
 
+export const INSTANCE_SEED_PREFIX = "anno::instance-seed::";
+
 const isBrowser = typeof window !== "undefined";
 
 function getStorage(): Storage | null {
@@ -454,6 +456,32 @@ export function canonicalizeTrackId(input: string): string {
     .toLowerCase();
 }
 
+export function nextNumericTrackId(
+  className: string,
+  existingTrackIds: string[]
+): string {
+  const storage = getStorage();
+  const key = `${INSTANCE_SEED_PREFIX}${className.toLowerCase()}`;
+
+  const used = new Set(
+    (existingTrackIds || []).map((id) => canonicalizeTrackId(String(id)))
+  );
+
+  let seed = 0;
+  if (storage) {
+    const raw = storage.getItem(key);
+    const n = raw ? Number(raw) : 0;
+    seed = Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  let candidate = seed + 1;
+  let guard = 0;
+  while (used.has(String(candidate)) && guard++ < 10000) candidate++;
+
+  if (storage) storage.setItem(key, String(candidate));
+  return String(candidate);
+}
+
 /**
  * Generate a readable, unique track_id like "silent comet-3" that does not
  * collide (after canonicalization) with any of the existing track IDs.
@@ -631,16 +659,6 @@ export function normalizeWithMode(
   includeTrackIds: boolean,
   classRegistry: ClassRegistry
 ): ImageAnnotation[] {
-  /**
-   * TRACKING MODE (includeTrackIds = true)
-   *
-   * - For existing rectangles (id in knownById):
-   *   If they lost class/track info due to editing, restore from the previous label.
-   *
-   * - For new rectangles (id not in knownById):
-   *   If there is a selected profile, stamp its { class_id, class_name, track_id }
-   *   using writeClassAndTrack.
-   */
   if (includeTrackIds) {
     const out: ImageAnnotation[] = [];
 
@@ -650,7 +668,6 @@ export function normalizeWithMode(
       let next = a;
 
       if (seen) {
-        // Existing annotation: restore label/track if the current one is missing
         const prev = (extractClassLabel(seen) || {}) as any;
         const hasNow = (extractClassLabel(next) || {}) as any;
 
@@ -680,7 +697,6 @@ export function normalizeWithMode(
         continue;
       }
 
-      // New annotation: inherit from currently selected instance profile, if any
       const selected = getSelectedProfile?.() as
         | { class_id?: number; class_name?: string; track_id?: string }
         | null
@@ -706,15 +722,6 @@ export function normalizeWithMode(
     return out;
   }
 
-  /**
-   * DETECTION MODE (includeTrackIds = false)
-   *
-   * - If an annotation ID already exists in knownById, we copy its previous
-   *   class label forward (class_id + class_name) via writeClassOnly.
-   * - Else, if getSelectedClassName() returns a class name, we look up its
-   *   numeric ID from the classRegistry (if present) or FIXED_CLASS_REG,
-   *   and stamp that onto the annotation via writeClassOnly.
-   */
   const out: ImageAnnotation[] = [];
 
   for (const a of rawList) {
@@ -722,7 +729,6 @@ export function normalizeWithMode(
     const seen = id ? knownById[id] : undefined;
     let next = a;
 
-    // --- 1) Existing annotation: keep its previous class label stable ---
     if (seen) {
       const prev = extractClassLabel(seen);
       if (prev?.class_name && typeof prev.class_id === "number") {
@@ -735,12 +741,10 @@ export function normalizeWithMode(
       continue;
     }
 
-    // --- 2) New annotation: inherit current toolbar class, if any ---
     const selected = getSelectedClassName();
     if (selected) {
       const keyLower = selected.toLowerCase();
 
-      // Our new ClassRegistry stores defs like { id: string, name: string, ... }
       const fromRegistryLower = classRegistry[keyLower];
       const fromRegistryExact = classRegistry[selected];
 
@@ -752,7 +756,6 @@ export function normalizeWithMode(
       const regId =
         regIdStr !== undefined ? Number(regIdStr) : undefined;
 
-      // Fallback to fixed map if registry doesn't have it
       const fixedId =
         FIXED_CLASS_REG[selected] ?? FIXED_CLASS_REG[keyLower];
 
@@ -763,10 +766,8 @@ export function normalizeWithMode(
         (typeof fixedId === "number" ? fixedId : undefined) ??
         1;
 
-      // Stamp the selected class onto the new rectangle
       next = writeClassOnly(next, {
         id: finalId,
-        // Keep the human-facing label as selected (e.g. "UFO", "Minor UFO", "Marfe")
         name: selected
       });
     }
@@ -823,15 +824,9 @@ export function rectToDims(a: any): SelSize | null {
   return { w: box.width, h: box.height };
 }
 
-/**
- * rectangle → CocoBBox (supports:
- *  - W3C selector string "xywh=pixel:x,y,w,h" or "xywh=percent:x,y,w,h"
- *  - Annotorious RECTANGLE geometry/bounds)
- */
 export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
   const selector = a?.target?.selector;
 
-  // W3C selector string
   if (selector && typeof selector.value === "string") {
     const match = selector.value.match(
       /xywh=(pixel|percent):([\d.]+),([\d.]+),([\d.]+),([\d.]+)/i
@@ -860,7 +855,6 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
     }
   }
 
-  // Annotorious RECTANGLE geometry/bounds
   if (selector && selector.type === "RECTANGLE") {
     const geometry = selector.geometry || {};
     if (
@@ -894,16 +888,10 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
   return null;
 }
 
-/**
- * polygon → CocoPolygon (supports:
- *  - Annotorious POLYGON geometry (points + bounds)
- *  - W3C selector value containing an SVG <polygon ... points="x,y ..." />
- */
 export function polyToCoco(a: any): CocoPolygon | null {
   const selector = a?.target?.selector;
   if (!selector) return null;
 
-  // Annotorious POLYGON
   if (selector.type === "POLYGON" && selector.geometry?.points?.length) {
     const points: number[][] = selector.geometry.points as number[][];
     const flat = points.flatMap(([x, y]) => [Math.round(x), Math.round(y)]);
@@ -930,7 +918,6 @@ export function polyToCoco(a: any): CocoPolygon | null {
     return { segmentation: [flat], bbox };
   }
 
-  // SVG <polygon> selector string
   if (typeof selector.value === "string" && /<polygon/i.test(selector.value)) {
     const match = selector.value.match(/points\s*=\s*["']([^"']+)["']/i);
     if (match) {
@@ -986,10 +973,6 @@ export function augmentLabelForExport(a: any, includeTracks: boolean) {
   };
 }
 
-/**
- * W3C list → grouped per-frame COCO payload (rectangles + polygons)
- * Shape: CocoFrame[] = { frame, bboxes: CocoBBox[], polygons: CocoPolygon[] }[]
- */
 export function w3cToCocoFrames(
   list: ImageAnnotation[],
   includeTracks = true
@@ -1018,7 +1001,6 @@ export function w3cToCocoFrames(
     }
   }
 
-  // stable order by frame id
   return Object.values(byFrame).sort((a, b) => a.frame - b.frame);
 }
 
@@ -1036,7 +1018,6 @@ export type VideoBoundingBox = {
   track_id?: string;
 };
 
-// Rectangles-only: ignore polygons entirely
 export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
   const out: VideoBoundingBox[] = [];
 
