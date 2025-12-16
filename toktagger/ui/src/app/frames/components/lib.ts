@@ -153,9 +153,7 @@ export function saveLastClassName(name: string | null): void {
 // ---------- Annotation helpers ----------
 
 // Try to pull a human-readable class label from a W3C-style annotation.
-export function extractClassLabelFromAnnotation(
-  annotation: any
-): string | null {
+export function extractClassLabelFromAnnotation(annotation: any): string | null {
   if (!annotation) return null;
 
   const body = (annotation as any).body;
@@ -179,10 +177,8 @@ export function extractClassLabelFromAnnotation(
   // Fallbacks: some structures store a label in properties
   const props = (annotation as any).properties;
   if (props) {
-    const fromClass =
-      typeof props.class === "string" ? props.class : undefined;
-    const fromLabel =
-      typeof props.label === "string" ? props.label : undefined;
+    const fromClass = typeof props.class === "string" ? props.class : undefined;
+    const fromLabel = typeof props.label === "string" ? props.label : undefined;
     const candidate = fromClass ?? fromLabel;
     if (candidate && candidate.trim()) return candidate.trim();
   }
@@ -434,8 +430,7 @@ const NOUNS = [
 ];
 
 function randomReadableId(): string {
-  const adjective =
-    ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const adjective = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
   const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
   const digit = Math.floor(Math.random() * 9) + 1;
   return `${adjective} ${noun}-${digit}`;
@@ -748,21 +743,14 @@ export function normalizeWithMode(
       const fromRegistryLower = classRegistry[keyLower];
       const fromRegistryExact = classRegistry[selected];
 
-      const regIdStr =
-        fromRegistryLower?.id ??
-        fromRegistryExact?.id ??
-        undefined;
+      const regIdStr = fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
 
-      const regId =
-        regIdStr !== undefined ? Number(regIdStr) : undefined;
+      const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
-      const fixedId =
-        FIXED_CLASS_REG[selected] ?? FIXED_CLASS_REG[keyLower];
+      const fixedId = FIXED_CLASS_REG[selected] ?? FIXED_CLASS_REG[keyLower];
 
       const finalId =
-        (typeof regId === "number" && !Number.isNaN(regId)
-          ? regId
-          : undefined) ??
+        (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
         (typeof fixedId === "number" ? fixedId : undefined) ??
         1;
 
@@ -872,9 +860,7 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
     const bounds = geometry.bounds;
     if (
       bounds &&
-      ["minX", "minY", "maxX", "maxY"].every(
-        (k) => typeof (bounds as any)[k] === "number"
-      )
+      ["minX", "minY", "maxX", "maxY"].every((k) => typeof (bounds as any)[k] === "number")
     ) {
       return {
         x_min: Math.round(bounds.minX),
@@ -907,12 +893,10 @@ export function polyToCoco(a: any): CocoPolygon | null {
           Math.round(Math.min(...points.map((p) => p[0]))),
           Math.round(Math.min(...points.map((p) => p[1]))),
           Math.round(
-            Math.max(...points.map((p) => p[0])) -
-              Math.min(...points.map((p) => p[0]))
+            Math.max(...points.map((p) => p[0])) - Math.min(...points.map((p) => p[0]))
           ),
           Math.round(
-            Math.max(...points.map((p) => p[1])) -
-              Math.min(...points.map((p) => p[1]))
+            Math.max(...points.map((p) => p[1])) - Math.min(...points.map((p) => p[1]))
           )
         ] as [number, number, number, number]);
     return { segmentation: [flat], bbox };
@@ -925,12 +909,7 @@ export function polyToCoco(a: any): CocoPolygon | null {
         .trim()
         .split(/\s+/)
         .map((pair) => pair.split(/[,\s]+/).map(Number))
-        .filter(
-          (p) =>
-            p.length === 2 &&
-            Number.isFinite(p[0]) &&
-            Number.isFinite(p[1])
-        ) as number[][];
+        .filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])) as number[][];
       if (coords.length >= 3) {
         const flat = coords.flatMap(([x, y]) => [Math.round(x), Math.round(y)]);
         const xs = coords.map((p) => p[0]);
@@ -973,10 +952,7 @@ export function augmentLabelForExport(a: any, includeTracks: boolean) {
   };
 }
 
-export function w3cToCocoFrames(
-  list: ImageAnnotation[],
-  includeTracks = true
-): CocoFrame[] {
+export function w3cToCocoFrames(list: ImageAnnotation[], includeTracks = true): CocoFrame[] {
   const byFrame: Record<number, CocoFrame> = {};
 
   for (const a of Array.isArray(list) ? list : []) {
@@ -1007,6 +983,8 @@ export function w3cToCocoFrames(
 /** ---------- Rectangles-only adapter to backend VideoBoundingBox format ---------- */
 
 export type VideoBoundingBox = {
+  type: "video_bounding_box";
+  created_by: string; // ideally a union of allowed values
   validated: boolean;
   uncertainty: number;
   label: string;
@@ -1015,7 +993,7 @@ export type VideoBoundingBox = {
   x_min: number;
   y_min: number;
   frame: number;
-  track_id: string; // ✅ require it
+  track_id: string;
 };
 
 export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
@@ -1024,9 +1002,7 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
   for (const frameEntry of Array.isArray(coco) ? coco : []) {
     const frameIndex = Number(frameEntry?.frame) | 0;
 
-    for (const b of (Array.isArray(frameEntry?.bboxes)
-      ? frameEntry.bboxes
-      : []) as any[]) {
+    for (const b of (Array.isArray(frameEntry?.bboxes) ? frameEntry.bboxes : []) as any[]) {
       const x = Math.round(b.x_min ?? 0);
       const y = Math.round(b.y_min ?? 0);
       const width = Math.round(b.width ?? 0);
@@ -1041,6 +1017,8 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
       if (!tid) continue; // or set a fallback if you prefer
 
       out.push({
+        type: "video_bounding_box",
+        created_by: "human", // <-- must match backend AnnotatorTypes
         validated: true,
         uncertainty: 0,
         label: labelValue.toString(),
