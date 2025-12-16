@@ -11,6 +11,7 @@ import os
 import multiprocessing
 import requests
 import time
+from pymongo import MongoClient
 
 
 @pytest.fixture(scope="function")
@@ -180,3 +181,11 @@ def start_server(mongo_container):
 
     yield
     proc.terminate()
+
+
+@pytest.fixture(scope="function")
+def server_setup(start_server):
+    yield
+    client = MongoClient(os.environ["MONGO_URL"])
+    client.drop_database("annotate_db")
+    client.close()
