@@ -1015,7 +1015,7 @@ export type VideoBoundingBox = {
   x_min: number;
   y_min: number;
   frame: number;
-  track_id?: string;
+  track_id: string; // ✅ require it
 };
 
 export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
@@ -1037,6 +1037,9 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
         b.class_name ??
         (typeof b.class_id === "number" ? String(b.class_id) : "unknown");
 
+      const tid = typeof b.track_id === "string" ? b.track_id : "";
+      if (!tid) continue; // or set a fallback if you prefer
+
       out.push({
         validated: true,
         uncertainty: 0,
@@ -1046,7 +1049,7 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
         x_min: x,
         y_min: y,
         frame: frameIndex,
-        track_id: b.track_id || undefined
+        track_id: tid,
       });
     }
   }
