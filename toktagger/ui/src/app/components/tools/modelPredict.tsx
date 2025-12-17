@@ -61,7 +61,7 @@ export function ModelPredictModal({ project }: Project) {
     return () => {
       if (poll) clearInterval(poll);
     };
-  }, [modalOpen]);
+  }, [project._id, modalOpen]);
 
   if (!project) {
     return;

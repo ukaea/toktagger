@@ -48,7 +48,7 @@ export function ModelPredictTool({
       }
     };
     scheduleTask();
-  }, [selectedModel]);
+  }, [project._id, sample_id, selectedModel]);
 
   useEffect(() => {
     const fetchData = async () => {
