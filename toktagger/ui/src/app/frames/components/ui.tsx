@@ -155,7 +155,7 @@ export function InstancePanel({
   }, [open]);
 
   return (
-    <div className="w-full lg:w-48 shrink-0 lg:pl-2">
+    <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
       {/* Header label for the panel */}
       <div className="text-gray-200 text-sm font-medium mb-2">
         {showCreator ? "Class + Track" : "Instances"}
