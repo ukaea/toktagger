@@ -29,6 +29,24 @@ function getStorage(): Storage | null {
   }
 }
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null;
+}
+
+function asArray<T>(v: T | T[] | null | undefined): T[] {
+  return Array.isArray(v) ? v : v != null ? [v] : [];
+}
+
+function getString(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+function getNumber(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
 // ---------- Fixed label map for UFO categories ----------
 
 export const LABEL_MAP = {
@@ -153,30 +171,35 @@ export function saveLastClassName(name: string | null): void {
 // ---------- Annotation helpers ----------
 
 // Try to pull a human-readable class label from a W3C-style annotation.
-export function extractClassLabelFromAnnotation(annotation: any): string | null {
-  if (!annotation) return null;
+export function extractClassLabelFromAnnotation(annotation: unknown): string | null {
+  if (!annotation || !isRecord(annotation)) return null;
 
-  const body = (annotation as any).body;
+  const body = annotation.body;
   if (!body) return null;
 
-  const bodies = Array.isArray(body) ? body : [body];
+  const bodies = asArray(body);
 
   for (const b of bodies) {
     if (!b) continue;
-    if (typeof b === "string" && b.trim()) {
-      return b.trim();
+
+    if (typeof b === "string") {
+      const s = b.trim();
+      if (s) return s;
+      continue;
     }
-    if (typeof b === "object") {
-      const value = (b as any).value ?? (b as any).label;
-      if (typeof value === "string" && value.trim()) {
-        return value.trim();
+
+    if (isRecord(b)) {
+      const value = b.value ?? b.label;
+      if (typeof value === "string") {
+        const s = value.trim();
+        if (s) return s;
       }
     }
   }
 
   // Fallbacks: some structures store a label in properties
-  const props = (annotation as any).properties;
-  if (props) {
+  const props = annotation.properties;
+  if (isRecord(props)) {
     const fromClass = typeof props.class === "string" ? props.class : undefined;
     const fromLabel = typeof props.label === "string" ? props.label : undefined;
     const candidate = fromClass ?? fromLabel;
@@ -227,7 +250,7 @@ export function scanCrossFrameCountsChunked(options: {
 
       if (!Array.isArray(parsed)) continue;
 
-      for (const ann of parsed as any[]) {
+      for (const ann of parsed) {
         const label = extractClassLabelFromAnnotation(ann);
         if (!label) continue;
         counts[label] = (counts[label] ?? 0) + 1;
@@ -295,7 +318,7 @@ export function scanInstanceCountsChunked(options: {
       }
       if (!Array.isArray(parsed)) continue;
 
-      for (const ann of parsed as any[]) {
+      for (const ann of parsed) {
         const label = extractClassLabel(ann);
         if (!label?.class_name || !label.track_id) continue;
 
@@ -330,31 +353,36 @@ export function scanInstanceCountsChunked(options: {
  * and falls back to a plain string value as { class_name }.
  */
 export function extractClassLabel(
-  a: any
+  a: unknown
 ): { class_id?: number; class_name?: string; track_id?: string } | null {
-  const collect = (src: any) => (Array.isArray(src) ? src : src ? [src] : []);
-  const candidates = [...collect(a?.bodies), ...collect(a?.body)];
+  if (!a || !isRecord(a)) return null;
+
+  const candidates = [...asArray(a.bodies), ...asArray(a.body)];
 
   for (const b of candidates) {
-    if (b?.purpose && (b.purpose === "tagging" || b.purpose === "classifying")) {
-      if (b?.value && typeof b.value === "object" && b.value.type === "class") {
-        const trk =
-          typeof b.value.track_id === "string" && b.value.track_id.length > 0
-            ? b.value.track_id
-            : typeof b.value.instance === "number"
-            ? String(b.value.instance)
-            : undefined;
+    if (!isRecord(b)) continue;
 
-        return {
-          class_id: b.value.id,
-          class_name: b.value.name,
-          track_id: trk
-        };
-      }
+    const purpose = getString(b.purpose);
+    if (purpose !== "tagging" && purpose !== "classifying") continue;
 
-      if (typeof b?.value === "string") {
-        return { class_name: b.value };
-      }
+    const v = b.value;
+
+    if (isRecord(v) && v.type === "class") {
+      const id = getNumber(v.id) ?? undefined;
+      const name = getString(v.name) ?? undefined;
+
+      const track_id =
+        (typeof v.track_id === "string" && v.track_id.length > 0
+          ? v.track_id
+          : typeof v.instance === "number"
+          ? String(v.instance)
+          : undefined) ?? undefined;
+
+      return { class_id: id, class_name: name, track_id };
+    }
+
+    if (typeof v === "string") {
+      return { class_name: v };
     }
   }
 
@@ -499,56 +527,50 @@ export function uniqueReadableId(existingTrackIds: string[]): string {
  * Write / update a W3C class body including track_id on both body & bodies.
  */
 export function writeClassAndTrack(
-  a: any,
+  a: ImageAnnotation,
   cls: { id: number; name: string },
   track_id: string
-): any {
+): ImageAnnotation {
   const classBody = () => ({
     purpose: "tagging",
     value: { type: "class", id: cls.id, name: cls.name, track_id }
   });
 
-  const arr = (x: any) => (Array.isArray(x) ? x : x ? [x] : []);
-
-  const patch = (list: any[]) => {
+  const patch = (list: unknown[]) => {
     let found = false;
 
     const mapped = list.map((b) => {
-      if (b?.purpose && (b.purpose === "tagging" || b.purpose === "classifying")) {
-        if (b?.value && typeof b.value === "object" && b.value.type === "class") {
-          found = true;
-          return {
-            ...b,
-            value: {
-              ...b.value,
-              id: cls.id,
-              name: cls.name,
-              track_id
-            }
-          };
-        }
+      if (!isRecord(b)) return b;
 
-        if (typeof b?.value === "string") {
-          found = true;
-          return {
-            ...b,
-            value: {
-              type: "class",
-              id: cls.id,
-              name: cls.name,
-              track_id
-            }
-          };
-        }
+      const purpose = getString(b.purpose);
+      if (purpose !== "tagging" && purpose !== "classifying") return b;
+
+      const v = b.value;
+
+      if (isRecord(v) && v.type === "class") {
+        found = true;
+        return {
+          ...b,
+          value: { ...v, id: cls.id, name: cls.name, track_id }
+        };
       }
+
+      if (typeof v === "string") {
+        found = true;
+        return {
+          ...b,
+          value: { type: "class", id: cls.id, name: cls.name, track_id }
+        };
+      }
+
       return b;
     });
 
     return { mapped, found };
   };
 
-  const bodiesIn = arr(a?.bodies);
-  const bodyIn = arr(a?.body);
+  const bodiesIn = asArray((a as unknown as UnknownRecord).bodies);
+  const bodyIn = asArray((a as unknown as UnknownRecord).body);
 
   const pb = patch(bodiesIn);
   const p = patch(bodyIn);
@@ -564,54 +586,50 @@ export function writeClassAndTrack(
   }
 
   return {
-    ...a,
+    ...(a as unknown as UnknownRecord),
     bodies: bodiesOut,
     body: bodyOut
-  };
+  } as ImageAnnotation;
 }
 
 /**
  * Write / update a W3C class body without track_id (detection mode).
  */
-export function writeClassOnly(a: any, cls: { id: number; name: string }): any {
+export function writeClassOnly(
+  a: ImageAnnotation,
+  cls: { id: number; name: string }
+): ImageAnnotation {
   const classBody = () => ({
     purpose: "tagging",
     value: { type: "class", id: cls.id, name: cls.name }
   });
 
-  const arr = (x: any) => (Array.isArray(x) ? x : x ? [x] : []);
-
   let found = false;
 
-  const patch = (list: any[]) =>
+  const patch = (list: unknown[]) =>
     list.map((b) => {
-      if (b?.purpose && (b.purpose === "tagging" || b.purpose === "classifying")) {
-        if (b?.value && typeof b.value === "object" && b.value.type === "class") {
-          found = true;
-          const { id, name } = b.value;
-          return {
-            ...b,
-            value: {
-              type: "class",
-              id: cls.id ?? id,
-              name: cls.name ?? name
-            }
-          };
-        }
+      if (!isRecord(b)) return b;
 
-        if (typeof b?.value === "string") {
-          found = true;
-          return {
-            ...b,
-            value: { type: "class", id: cls.id, name: cls.name }
-          };
-        }
+      const purpose = getString(b.purpose);
+      if (purpose !== "tagging" && purpose !== "classifying") return b;
+
+      const v = b.value;
+
+      if (isRecord(v) && v.type === "class") {
+        found = true;
+        return { ...b, value: { ...v, id: cls.id, name: cls.name } };
       }
+
+      if (typeof v === "string") {
+        found = true;
+        return { ...b, value: { type: "class", id: cls.id, name: cls.name } };
+      }
+
       return b;
     });
 
-  const bodiesOut = patch(arr(a?.bodies));
-  const bodyOut = patch(arr(a?.body));
+  const bodiesOut = patch(asArray((a as unknown as UnknownRecord).bodies));
+  const bodyOut = patch(asArray((a as unknown as UnknownRecord).body));
 
   if (!found) {
     const cb = classBody();
@@ -620,10 +638,10 @@ export function writeClassOnly(a: any, cls: { id: number; name: string }): any {
   }
 
   return {
-    ...a,
+    ...(a as unknown as UnknownRecord),
     bodies: bodiesOut,
     body: bodyOut
-  };
+  } as ImageAnnotation;
 }
 
 /**
@@ -646,10 +664,14 @@ export function writeClassOnly(a: any, cls: { id: number; name: string }): any {
  *   numeric ID from the classRegistry (if present) or FIXED_CLASS_REG,
  *   and stamp that onto the annotation via writeClassOnly.
  */
+type SelectedProfile =
+  | { class_id?: number; class_name?: string; track_id?: string }
+  | null;
+
 export function normalizeWithMode(
   rawList: ImageAnnotation[],
   knownById: Record<string, ImageAnnotation>,
-  getSelectedProfile: () => any | null,
+  getSelectedProfile: () => SelectedProfile,
   getSelectedClassName: () => string | null,
   includeTrackIds: boolean,
   classRegistry: ClassRegistry
@@ -658,21 +680,17 @@ export function normalizeWithMode(
     const out: ImageAnnotation[] = [];
 
     for (const a of rawList) {
-      const id = (a as any).id as string | undefined;
-      const seen = id ? knownById[id] : undefined;
+      const seen = knownById[a.id];
       let next = a;
 
       if (seen) {
-        const prev = (extractClassLabel(seen) || {}) as any;
-        const hasNow = (extractClassLabel(next) || {}) as any;
+        const prev = extractClassLabel(seen) ?? {};
+        const hasNow = extractClassLabel(next) ?? {};
 
         const missing =
           !hasNow.class_name ||
           typeof hasNow.class_id !== "number" ||
-          !(
-            typeof hasNow.track_id === "string" &&
-            hasNow.track_id.length > 0
-          );
+          !(typeof hasNow.track_id === "string" && hasNow.track_id.length > 0);
 
         if (
           missing &&
@@ -692,10 +710,7 @@ export function normalizeWithMode(
         continue;
       }
 
-      const selected = getSelectedProfile?.() as
-        | { class_id?: number; class_name?: string; track_id?: string }
-        | null
-        | undefined;
+      const selected = getSelectedProfile?.();
 
       if (
         selected &&
@@ -720,17 +735,13 @@ export function normalizeWithMode(
   const out: ImageAnnotation[] = [];
 
   for (const a of rawList) {
-    const id = (a as any).id as string | undefined;
-    const seen = id ? knownById[id] : undefined;
+    const seen = knownById[a.id];
     let next = a;
 
     if (seen) {
       const prev = extractClassLabel(seen);
       if (prev?.class_name && typeof prev.class_id === "number") {
-        next = writeClassOnly(next, {
-          id: prev.class_id,
-          name: prev.class_name
-        });
+        next = writeClassOnly(next, { id: prev.class_id, name: prev.class_name });
       }
       out.push(next);
       continue;
@@ -744,7 +755,6 @@ export function normalizeWithMode(
       const fromRegistryExact = classRegistry[selected];
 
       const regIdStr = fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
-
       const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
       const fixedId = FIXED_CLASS_REG[selected] ?? FIXED_CLASS_REG[keyLower];
@@ -754,10 +764,7 @@ export function normalizeWithMode(
         (typeof fixedId === "number" ? fixedId : undefined) ??
         1;
 
-      next = writeClassOnly(next, {
-        id: finalId,
-        name: selected
-      });
+      next = writeClassOnly(next, { id: finalId, name: selected });
     }
 
     out.push(next);
@@ -806,17 +813,34 @@ export function frameFromSourceKey(src?: string): number | null {
 export type SelSize = { w: number; h: number };
 
 /** Simple helper: get width/height in pixels from a rectangle annotation. */
-export function rectToDims(a: any): SelSize | null {
+export function rectToDims(a: unknown): SelSize | null {
   const box = rectToCoco(a);
   if (!box) return null;
   return { w: box.width, h: box.height };
 }
 
-export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
-  const selector = a?.target?.selector;
+type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
 
-  if (selector && typeof selector.value === "string") {
-    const match = selector.value.match(
+function isBounds(v: unknown): v is Bounds {
+  return (
+    isRecord(v) &&
+    typeof v.minX === "number" &&
+    typeof v.minY === "number" &&
+    typeof v.maxX === "number" &&
+    typeof v.maxY === "number"
+  );
+}
+
+export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
+  if (!isRecord(a)) return null;
+
+  const target = isRecord(a.target) ? a.target : null;
+  const selector = target && isRecord(target.selector) ? target.selector : null;
+  if (!selector) return null;
+
+  const selValue = getString(selector.value);
+  if (selValue) {
+    const match = selValue.match(
       /xywh=(pixel|percent):([\d.]+),([\d.]+),([\d.]+),([\d.]+)/i
     );
     if (match) {
@@ -843,25 +867,25 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
     }
   }
 
-  if (selector && selector.type === "RECTANGLE") {
-    const geometry = selector.geometry || {};
-    if (
-      [geometry.x, geometry.y, geometry.w, geometry.h].every(
-        (n: any) => typeof n === "number"
-      )
-    ) {
+  if (selector.type === "RECTANGLE") {
+    const geometry = isRecord(selector.geometry) ? selector.geometry : null;
+
+    const x = geometry ? getNumber(geometry.x) : null;
+    const y = geometry ? getNumber(geometry.y) : null;
+    const w = geometry ? getNumber(geometry.w) : null;
+    const h = geometry ? getNumber(geometry.h) : null;
+
+    if (x != null && y != null && w != null && h != null) {
       return {
-        x_min: Math.round(geometry.x),
-        y_min: Math.round(geometry.y),
-        width: Math.round(geometry.w),
-        height: Math.round(geometry.h)
+        x_min: Math.round(x),
+        y_min: Math.round(y),
+        width: Math.round(w),
+        height: Math.round(h)
       };
     }
-    const bounds = geometry.bounds;
-    if (
-      bounds &&
-      ["minX", "minY", "maxX", "maxY"].every((k) => typeof (bounds as any)[k] === "number")
-    ) {
+
+    const bounds = geometry ? geometry.bounds : null;
+    if (isBounds(bounds)) {
       return {
         x_min: Math.round(bounds.minX),
         y_min: Math.round(bounds.minY),
@@ -874,42 +898,62 @@ export function rectToCoco(a: any, naturalSize?: SelSize): CocoBBox | null {
   return null;
 }
 
-export function polyToCoco(a: any): CocoPolygon | null {
-  const selector = a?.target?.selector;
+export function polyToCoco(a: unknown): CocoPolygon | null {
+  if (!isRecord(a)) return null;
+
+  const target = isRecord(a.target) ? a.target : null;
+  const selector = target && isRecord(target.selector) ? target.selector : null;
   if (!selector) return null;
 
-  if (selector.type === "POLYGON" && selector.geometry?.points?.length) {
-    const points: number[][] = selector.geometry.points as number[][];
-    const flat = points.flatMap(([x, y]) => [Math.round(x), Math.round(y)]);
-    const bounds = selector.geometry.bounds;
-    const bbox: [number, number, number, number] = bounds
-      ? [
-          Math.round(bounds.minX),
-          Math.round(bounds.minY),
-          Math.round(bounds.maxX - bounds.minX),
-          Math.round(bounds.maxY - bounds.minY)
-        ]
-      : ([
-          Math.round(Math.min(...points.map((p) => p[0]))),
-          Math.round(Math.min(...points.map((p) => p[1]))),
-          Math.round(
-            Math.max(...points.map((p) => p[0])) - Math.min(...points.map((p) => p[0]))
-          ),
-          Math.round(
-            Math.max(...points.map((p) => p[1])) - Math.min(...points.map((p) => p[1]))
-          )
-        ] as [number, number, number, number]);
-    return { segmentation: [flat], bbox };
+  if (selector.type === "POLYGON") {
+    const geom = isRecord(selector.geometry) ? selector.geometry : null;
+    const points = geom && Array.isArray(geom.points) ? geom.points : null;
+
+    if (points && points.length) {
+      const coords: number[][] = points
+        .map((p) => (Array.isArray(p) ? p : []))
+        .filter(
+          (p) =>
+            p.length === 2 && typeof p[0] === "number" && typeof p[1] === "number"
+        ) as number[][];
+
+      if (coords.length < 3) return null;
+
+      const flat = coords.flatMap(([x, y]) => [Math.round(x), Math.round(y)]);
+
+      const bounds = geom ? geom.bounds : null;
+      const bbox: [number, number, number, number] = isBounds(bounds)
+        ? [
+            Math.round(bounds.minX),
+            Math.round(bounds.minY),
+            Math.round(bounds.maxX - bounds.minX),
+            Math.round(bounds.maxY - bounds.minY)
+          ]
+        : ([
+            Math.round(Math.min(...coords.map((p) => p[0]))),
+            Math.round(Math.min(...coords.map((p) => p[1]))),
+            Math.round(
+              Math.max(...coords.map((p) => p[0])) - Math.min(...coords.map((p) => p[0]))
+            ),
+            Math.round(
+              Math.max(...coords.map((p) => p[1])) - Math.min(...coords.map((p) => p[1]))
+            )
+          ] as [number, number, number, number]);
+
+      return { segmentation: [flat], bbox };
+    }
   }
 
-  if (typeof selector.value === "string" && /<polygon/i.test(selector.value)) {
-    const match = selector.value.match(/points\s*=\s*["']([^"']+)["']/i);
+  const selValue = getString(selector.value);
+  if (selValue && /<polygon/i.test(selValue)) {
+    const match = selValue.match(/points\s*=\s*["']([^"']+)["']/i);
     if (match) {
       const coords = match[1]
         .trim()
         .split(/\s+/)
         .map((pair) => pair.split(/[,\s]+/).map(Number))
         .filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])) as number[][];
+
       if (coords.length >= 3) {
         const flat = coords.flatMap(([x, y]) => [Math.round(x), Math.round(y)]);
         const xs = coords.map((p) => p[0]);
@@ -938,13 +982,14 @@ export function numericFromTrackId(track_id?: string): number | null {
 /**
  * Add track/class info to the exported label.
  */
-export function augmentLabelForExport(a: any, includeTracks: boolean) {
-  const label = extractClassLabel(a) || {};
+export function augmentLabelForExport(a: unknown, includeTracks: boolean) {
+  const label = extractClassLabel(a) ?? {};
+
   if (!includeTracks) {
-    const { class_id, class_name } = label as any;
-    return { class_id, class_name };
+    return { class_id: label.class_id, class_name: label.class_name };
   }
-  const track_numeric = numericFromTrackId((label as any).track_id);
+
+  const track_numeric = numericFromTrackId(label.track_id);
   return {
     ...label,
     track_numeric: track_numeric ?? undefined,
@@ -996,38 +1041,46 @@ export type VideoBoundingBox = {
   track_id: string;
 };
 
-export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
+export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
   const out: VideoBoundingBox[] = [];
+  if (!Array.isArray(coco)) return out;
 
-  for (const frameEntry of Array.isArray(coco) ? coco : []) {
-    const frameIndex = Number(frameEntry?.frame) | 0;
+  for (const frameEntry of coco) {
+    if (!isRecord(frameEntry)) continue;
 
-    for (const b of (Array.isArray(frameEntry?.bboxes) ? frameEntry.bboxes : []) as any[]) {
-      const x = Math.round(b.x_min ?? 0);
-      const y = Math.round(b.y_min ?? 0);
-      const width = Math.round(b.width ?? 0);
-      const height = Math.round(b.height ?? 0);
+    const frameIndex = typeof frameEntry.frame === "number" ? (frameEntry.frame | 0) : 0;
+    const bboxes = Array.isArray(frameEntry.bboxes) ? frameEntry.bboxes : [];
+
+    for (const b of bboxes) {
+      if (!isRecord(b)) continue;
+
+      const x = Math.round((typeof b.x_min === "number" ? b.x_min : 0) ?? 0);
+      const y = Math.round((typeof b.y_min === "number" ? b.y_min : 0) ?? 0);
+      const width = Math.round((typeof b.width === "number" ? b.width : 0) ?? 0);
+      const height = Math.round((typeof b.height === "number" ? b.height : 0) ?? 0);
       if (width <= 0 || height <= 0) continue;
 
+      const class_name = typeof b.class_name === "string" ? b.class_name : undefined;
+      const class_id = typeof b.class_id === "number" ? b.class_id : undefined;
+
       const labelValue =
-        b.class_name ??
-        (typeof b.class_id === "number" ? String(b.class_id) : "unknown");
+        class_name ?? (typeof class_id === "number" ? String(class_id) : "unknown");
 
       const tid = typeof b.track_id === "string" ? b.track_id : "";
-      if (!tid) continue; // or set a fallback if you prefer
+      if (!tid) continue;
 
       out.push({
         type: "video_bounding_box",
-        created_by: "manual", 
+        created_by: "manual",
         validated: true,
         uncertainty: 0,
-        label: labelValue.toString(),
+        label: String(labelValue),
         height,
         width,
         x_min: x,
         y_min: y,
         frame: frameIndex,
-        track_id: tid,
+        track_id: tid
       });
     }
   }
