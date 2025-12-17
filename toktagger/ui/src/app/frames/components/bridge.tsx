@@ -5,12 +5,12 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useRef
+  useRef,
 } from "react";
 import {
   useAnnotator,
   type ImageAnnotation,
-  ImageAnnotationPopup
+  ImageAnnotationPopup,
 } from "@annotorious/react";
 import {
   normalizeWithMode,
@@ -20,7 +20,7 @@ import {
   loadClassRegistry,
   saveClassRegistry,
   extractClassLabelFromAnnotation,
-  FIXED_CLASS_REG
+  FIXED_CLASS_REG,
 } from "./lib";
 import type { ClassRegistry } from "./lib";
 
@@ -41,7 +41,7 @@ export type BridgeHandle = {
   /** Silently hydrate overlay with a given list, retargeting all annotations to currentKey. */
   hydrateOverlay: (
     list: ImageAnnotation[],
-    currentKey: string
+    currentKey: string,
   ) => Promise<boolean>;
   /** Has the annotator been mounted and is ready to accept calls? */
   isAnnotatorReady: () => boolean;
@@ -51,12 +51,52 @@ export type BridgeHandle = {
   markSaved: () => void;
 };
 
+type SelectedProfile =
+  | { class_id?: number; class_name?: string; track_id?: string }
+  | null;
+
+type AnnotatorApi = {
+  getAnnotations?: () => unknown;
+  setAnnotations?: (anns: ImageAnnotation[], replace?: boolean) => void;
+  on?: (event: string, cb: (...args: unknown[]) => void) => void;
+  off?: (event: string, cb: (...args: unknown[]) => void) => void;
+};
+
+function asAnnotatorApi(a: unknown): AnnotatorApi | null {
+  if (!a || (typeof a !== "object" && typeof a !== "function")) return null;
+  return a as AnnotatorApi;
+}
+
+function isImageAnnotation(v: unknown): v is ImageAnnotation {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    "id" in v &&
+    typeof (v as { id: unknown }).id === "string"
+  );
+}
+
+function toAnnoList(got: unknown): ImageAnnotation[] {
+  if (Array.isArray(got)) return got.filter(isImageAnnotation);
+  if (got && typeof got === "object" && "list" in got) {
+    const list = (got as { list?: unknown }).list;
+    if (Array.isArray(list)) return list.filter(isImageAnnotation);
+  }
+  return [];
+}
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 // --- Rectangle-only guard (filters out polygons or unknown shapes) ---
-function isRectangleAnno(a: any): boolean {
-  const sel = a?.target?.selector;
-  if (!sel) return false;
-  if (sel.type === "RECTANGLE") return true;
-  if (typeof sel.value === "string") return /xywh=(pixel|percent):/i.test(sel.value);
+function isRectangleAnno(a: unknown): boolean {
+  const sel = (a as { target?: { selector?: unknown } } | null)?.target?.selector;
+  if (!sel || typeof sel !== "object") return false;
+
+  const s = sel as { type?: unknown; value?: unknown };
+  if (s.type === "RECTANGLE") return true;
+  if (typeof s.value === "string") return /xywh=(pixel|percent):/i.test(s.value);
   return false;
 }
 
@@ -64,14 +104,16 @@ export const AnnoBridge = Object.assign(
   forwardRef<
     BridgeHandle,
     {
-      getSelectedProfile: () => string | null;
+      getSelectedProfile: () => SelectedProfile;
       getSelectedClassName: () => string | null;
       includeTrackIds: boolean;
       classRegistry: ClassRegistry;
-      onAutoQuickAdd?: (
-        hint: { class_name: string }
-      ) => Promise<{ class_id: number; class_name: string; track_id: string } | null>;
-      popup?: React.ComponentType<any>;
+      onAutoQuickAdd?: (hint: { class_name: string }) => Promise<{
+        class_id: number;
+        class_name: string;
+        track_id: string;
+      } | null>;
+      popup?: React.ComponentType<Record<string, unknown>>;
     }
   >(function Bridge(props, ref) {
     const {
@@ -79,7 +121,7 @@ export const AnnoBridge = Object.assign(
       getSelectedClassName,
       includeTrackIds,
       classRegistry,
-      onAutoQuickAdd
+      onAutoQuickAdd,
     } = props;
 
     const anno = useAnnotator();
@@ -101,13 +143,13 @@ export const AnnoBridge = Object.assign(
 
     const sig = (anns: ImageAnnotation[]) =>
       JSON.stringify(
-        anns.map((a) => ({ id: (a as any).id, t: a.type, tSrc: a.target?.source }))
+        anns.map((a) => ({ id: a.id, t: a.type, tSrc: a.target?.source })),
       );
 
     // Double-RAF to ensure Annotorious has settled before re-enabling event handling
     const doubleRAF = useCallback(async () => {
       await new Promise<void>((r) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => r()))
+        requestAnimationFrame(() => requestAnimationFrame(() => r())),
       );
     }, []);
 
@@ -122,7 +164,7 @@ export const AnnoBridge = Object.assign(
           suppressPersistRef.current = false;
         }
       },
-      [doubleRAF]
+      [doubleRAF],
     );
 
     // Once-per-frame overlay flush with signature guard to avoid redundant setAnnotations calls
@@ -140,7 +182,8 @@ export const AnnoBridge = Object.assign(
       if (batch && anno) {
         const s = sig(batch);
         if (s !== lastAppliedRef.current) {
-          await runSilently(() => (anno as any).setAnnotations?.(batch, true));
+          const api = asAnnotatorApi(anno);
+          await runSilently(() => api?.setAnnotations?.(batch, true));
           lastAppliedRef.current = s;
         }
       }
@@ -159,14 +202,14 @@ export const AnnoBridge = Object.assign(
           getSelectedProfile,
           getSelectedClassName,
           includeTrackIds,
-          classRegistry
+          classRegistry,
         );
         const byId: Record<string, ImageAnnotation> = {};
-        for (const a of ensured) byId[a.id as string] = a;
+        for (const a of ensured) byId[a.id] = a;
         lastByIdRef.current = byId;
         return ensured;
       },
-      [getSelectedProfile, getSelectedClassName, includeTrackIds, classRegistry]
+      [getSelectedProfile, getSelectedClassName, includeTrackIds, classRegistry],
     );
 
     // Auto-quick-add: ensure a class entry exists in the registry whenever a new annotation is created
@@ -194,7 +237,7 @@ export const AnnoBridge = Object.assign(
             const fixedId = FIXED_CLASS_REG[keyLower] ?? 1;
             registry = {
               ...registry,
-              [keyLower]: { id: String(fixedId), name: selectedClass, profileId }
+              [keyLower]: { id: String(fixedId), name: selectedClass, profileId },
             };
             saveClassRegistry(registry);
           }
@@ -202,87 +245,71 @@ export const AnnoBridge = Object.assign(
           console.warn("Auto quick-add class failed:", err);
         }
       },
-      [getSelectedClassName, getSelectedProfile]
+      [getSelectedClassName, getSelectedProfile],
     );
 
     useImperativeHandle(
       ref,
-      () =>
-        ([
-          "isAnnotatorReady",
-          "persistWorkingNow",
-          "clearOverlaySilently",
-          "hydrateOverlay",
-          "hasUnsaved",
-          "markSaved"
-        ] as const).reduce(
-          (api, _key) => api,
-          {
-            isAnnotatorReady: () => !!anno,
+      (): BridgeHandle => ({
+        isAnnotatorReady: () => !!anno,
 
-            persistWorkingNow: async (currentKey: string) => {
-              if (!anno) return [];
-              currentKeyRef.current = currentKey;
-              await doubleRAF();
+        persistWorkingNow: async (currentKey: string) => {
+          const api = asAnnotatorApi(anno);
+          if (!api) return [];
 
-              let raw: any[] = [];
-              try {
-                const got: any = (anno as any).getAnnotations?.();
-                raw = Array.isArray(got) ? got : Array.isArray(got?.list) ? got.list : [];
-              } catch {
-                raw = [];
-              }
+          currentKeyRef.current = currentKey;
+          await doubleRAF();
 
-              const stamped = raw.map((a: any) => ({
-                ...(typeof a === "object" && a ? JSON.parse(JSON.stringify(a)) : a),
-                target: { ...((a && a.target) || {}), source: currentKey }
-              })) as ImageAnnotation[];
+          const raw = toAnnoList(api.getAnnotations?.());
+          const stamped: ImageAnnotation[] = raw.map((a) => ({
+            ...deepClone(a),
+            target: { ...(a.target ?? {}), source: currentKey },
+          }));
 
-              return normalizeWrite(stamped);
-            },
+          return normalizeWrite(stamped);
+        },
 
-            clearOverlaySilently: async () => {
-              if (!anno) return;
-              await runSilently(() => {
-                (anno as any).setAnnotations?.([], true);
-                lastByIdRef.current = {};
-                dirtyRef.current = true;
-              });
-            },
+        clearOverlaySilently: async () => {
+          const api = asAnnotatorApi(anno);
+          if (!api) return;
 
-            hydrateOverlay: async (list: ImageAnnotation[], currentKey: string) => {
-              if (!anno) return false;
-              currentKeyRef.current = currentKey;
+          await runSilently(() => {
+            api.setAnnotations?.([], true);
+            lastByIdRef.current = {};
+            dirtyRef.current = true;
+          });
+        },
 
-              // Rectangle-only on hydrate as well
-              const src: any[] = Array.isArray(list)
-                ? list.filter(isRectangleAnno)
-                : [];
-              const stamped = src.map((a: any) => ({
-                ...(typeof a === "object" && a ? JSON.parse(JSON.stringify(a)) : a),
-                target: { ...((a && a.target) || {}), source: currentKey }
-              })) as ImageAnnotation[];
+        hydrateOverlay: async (list: ImageAnnotation[], currentKey: string) => {
+          const api = asAnnotatorApi(anno);
+          if (!api) return false;
 
-              // Seed lastById for consistent normalization on subsequent edits
-              const seed: Record<string, ImageAnnotation> = {};
-              for (const a of stamped) seed[a.id as string] = a;
-              lastByIdRef.current = seed;
+          currentKeyRef.current = currentKey;
 
-              await runSilently(() => {
-                (anno as any).setAnnotations?.(stamped, true);
-              });
-              // Hydration reflects previously saved state -> keep dirty=false
-              return true;
-            },
+          const src = Array.isArray(list) ? list.filter(isRectangleAnno) : [];
+          const stamped: ImageAnnotation[] = src.map((a) => ({
+            ...deepClone(a),
+            target: { ...(a.target ?? {}), source: currentKey },
+          }));
 
-            hasUnsaved: () => dirtyRef.current,
+          const seed: Record<string, ImageAnnotation> = {};
+          for (const a of stamped) seed[a.id] = a;
+          lastByIdRef.current = seed;
 
-            markSaved: () => {
-              dirtyRef.current = false;
-            }
-          } as any
-        ),
-      [anno, doubleRAF, runSilently, normalizeWrite]
+          await runSilently(() => {
+            api.setAnnotations?.(stamped, true);
+          });
+
+          return true;
+        },
+
+        hasUnsaved: () => dirtyRef.current,
+
+        markSaved: () => {
+          dirtyRef.current = false;
+        },
+      }),
+      [anno, doubleRAF, normalizeWrite, runSilently],
     );
 
     // Subscribe to create/update/delete events -> normalize + optional auto-quick-add (rectangles only)
@@ -295,16 +322,16 @@ export const AnnoBridge = Object.assign(
         // Any create/update/delete from the user marks this sample dirty
         dirtyRef.current = true;
 
+        const api = asAnnotatorApi(anno);
+        const rawFull = toAnnoList(api?.getAnnotations?.());
         const key = currentKeyRef.current;
-        const got: any = (anno as any).getAnnotations?.() ?? [];
-        const rawFull: any[] = Array.isArray(got) ? got : got?.list || [];
-        // Drop non-rectangles at the source and retarget to the current frame key
-        const raw = rawFull
+
+        const raw: ImageAnnotation[] = rawFull
           .filter(isRectangleAnno)
-          .map((a: any) => ({
-            ...(typeof a === "object" && a ? JSON.parse(JSON.stringify(a)) : a),
-            target: { ...((a && a.target) || {}), source: key }
-          })) as ImageAnnotation[];
+          .map((a) => ({
+            ...deepClone(a),
+            target: { ...(a.target ?? {}), source: key },
+          }));
 
         // Normalize first so fresh shapes inherit current label/instance
         let normalized = normalizeWithMode(
@@ -313,7 +340,7 @@ export const AnnoBridge = Object.assign(
           getSelectedProfile,
           getSelectedClassName,
           includeTrackIds,
-          classRegistry
+          classRegistry,
         );
 
         // Auto quick-add logic; no-op when onAutoQuickAdd is not provided
@@ -322,14 +349,15 @@ export const AnnoBridge = Object.assign(
           let duplicateAnno: ImageAnnotation | null = null;
 
           for (const a of normalized) {
-            const lbl = extractClassLabel(a) || {};
-            const cname = (lbl.class_name || "").toLowerCase();
+            const lbl = extractClassLabel(a) ?? {};
+            const cname = (lbl.class_name ?? "").toLowerCase();
             const tid = lbl.track_id ? canonicalizeTrackId(lbl.track_id) : "";
             if (!cname || !tid) continue;
+
             const instKey = `${cname}:${tid}`;
             const aid = String(a.id);
             if (firstByInstance.has(instKey)) {
-              duplicateAnno = a as ImageAnnotation;
+              duplicateAnno = a;
               break;
             } else {
               firstByInstance.set(instKey, aid);
@@ -337,18 +365,18 @@ export const AnnoBridge = Object.assign(
           }
 
           if (duplicateAnno) {
-            const dupLbl = extractClassLabel(duplicateAnno) || {};
-            const cname = (dupLbl.class_name || "").toLowerCase();
+            const dupLbl = extractClassLabel(duplicateAnno) ?? {};
+            const cname = (dupLbl.class_name ?? "").toLowerCase();
             const newProf = await onAutoQuickAdd({ class_name: cname });
             if (newProf) {
               normalized = normalized.map((a) =>
-                a.id === duplicateAnno!.id
-                  ? (writeClassAndTrack(
+                a.id === duplicateAnno.id
+                  ? writeClassAndTrack(
                       a,
                       { id: newProf.class_id, name: newProf.class_name },
-                      newProf.track_id
-                    ) as ImageAnnotation)
-                  : a
+                      newProf.track_id,
+                    )
+                  : a,
               );
             }
           }
@@ -356,7 +384,7 @@ export const AnnoBridge = Object.assign(
 
         // Keep lastById in sync (even if overlay does not need re-apply)
         const byId: Record<string, ImageAnnotation> = {};
-        for (const a of normalized) byId[a.id as string] = a;
+        for (const a of normalized) byId[a.id] = a;
         lastByIdRef.current = byId;
 
         // Optional: skip buffering if nothing actually changed
@@ -375,13 +403,15 @@ export const AnnoBridge = Object.assign(
         await onAnyChange();
       };
 
-      anno.on?.("createAnnotation", onCreate);
-      anno.on?.("updateAnnotation", onAnyChange);
-      anno.on?.("deleteAnnotation", onAnyChange);
+      const api = asAnnotatorApi(anno);
+      api?.on?.("createAnnotation", onCreate);
+      api?.on?.("updateAnnotation", onAnyChange);
+      api?.on?.("deleteAnnotation", onAnyChange);
+
       return () => {
-        anno.off?.("createAnnotation", onCreate);
-        anno.off?.("updateAnnotation", onAnyChange);
-        anno.off?.("deleteAnnotation", onAnyChange);
+        api?.off?.("createAnnotation", onCreate);
+        api?.off?.("updateAnnotation", onAnyChange);
+        api?.off?.("deleteAnnotation", onAnyChange);
       };
     }, [
       anno,
@@ -391,10 +421,10 @@ export const AnnoBridge = Object.assign(
       getSelectedClassName,
       onAutoQuickAdd,
       flushOverlay,
-      handleCreate
+      handleCreate,
     ]);
 
     return null;
   }),
-  { Popup: ImageAnnotationPopup }
+  { Popup: ImageAnnotationPopup },
 );
