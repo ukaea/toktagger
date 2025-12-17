@@ -12,8 +12,19 @@ from toktagger.api.core.sender import (
     send_model_updates,
 )
 import logging
+from platformdirs import user_cache_dir
+
 
 logger = logging.getLogger("ray")
+logger.setLevel("DEBUG")
+
+models_dir_default = pathlib.Path(user_cache_dir("toktagger", "ukaea")).joinpath(
+    "models"
+)
+models_dir_default.mkdir(parents=True, exist_ok=True)
+
+# Set model storage to default path if not already set
+os.environ["MODEL_STORAGE"] = os.environ.get("MODEL_STORAGE", str(models_dir_default))
 
 
 def get_actor(project, model):
