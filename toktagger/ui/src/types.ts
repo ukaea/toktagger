@@ -38,7 +38,7 @@ export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 export const VideoBoundingBoxSchema = BoundingBoxSchema.extend({
   type: z.literal("video_bounding_box"),
   frame: z.number().int(),
-  track_id: z.string(), // ✅ force string
+  track_id: z.string(), // force string
 });
 
 export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;

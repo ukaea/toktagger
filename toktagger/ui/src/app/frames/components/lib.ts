@@ -1018,7 +1018,7 @@ export function cocoFramesToVideoBBoxes(coco: any[]): VideoBoundingBox[] {
 
       out.push({
         type: "video_bounding_box",
-        created_by: "human", // <-- must match backend AnnotatorTypes
+        created_by: "manual", 
         validated: true,
         uncertainty: 0,
         label: labelValue.toString(),
