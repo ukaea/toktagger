@@ -31,7 +31,7 @@ export const convertDisplayAnnotationToAnnotation = (
     const timeRegion: TimeRegion = {
       shot_id: zone.shot_id,
       created_by: zone.created_by,
-      task_name: zone.task_name,
+      task_name: zone.task_name ? zone.task_name : "",
       type: "time_region",
       time_min: zone.x0,
       time_max: zone.x1,
@@ -43,7 +43,7 @@ export const convertDisplayAnnotationToAnnotation = (
     const timePoint: TimePoint = {
       shot_id: vspan.shot_id,
       created_by: vspan.created_by,
-      task_name: vspan.task_name,
+      task_name: vspan.task_name ? vspan.task_name : "",
       type: "time_point",
       time: vspan.x,
       label: vspan.category.name,
@@ -58,13 +58,15 @@ export const createAnnotationToDisplayAnnotationFunc = (
   colors: Record<string, string>
 ) => {
   const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
+    console.log("Converting annotation:", item);
+    console.log(TimeRegionSchema.safeParse(item).error?.message);
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
         shot_id: timeRegion.shot_id,
         created_by: timeRegion.created_by,
         selected: false,
-        task_name: timeRegion.task_name,
+        task_name: timeRegion.task_name ? timeRegion.task_name : "",
         x0: timeRegion.time_min,
         x1: timeRegion.time_max,
         category: { name: timeRegion.label, color: colors[timeRegion.label] },
@@ -76,7 +78,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
         shot_id: timePoint.shot_id,
         selected: false,
         created_by: timePoint.created_by,
-        task_name: timePoint.task_name,
+        task_name: timePoint.task_name ? timePoint.task_name : "",
         x: timePoint.time,
         category: { name: timePoint.label, color: colors[timePoint.label] },
       };
@@ -85,8 +87,9 @@ export const createAnnotationToDisplayAnnotationFunc = (
       const schema = SpectrogramMaskSchema.parse(item);
       const spectrogramMask: SpectrogramMask = {
         selected: false,
-        created_by: item.created_by,
-        task_name: schema.task_name,
+        shot_id: schema.shot_id,
+        created_by: schema.created_by,
+        task_name: schema.task_name ? schema.task_name : "",
         values: schema.values,
       };
       return spectrogramMask;

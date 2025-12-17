@@ -158,6 +158,7 @@ export default function SamplePage() {
 
       if (!response.ok) {
         setDataLoadingFailed(true);
+        setDataIsLoading(false);
         return;
       }
 
@@ -273,7 +274,7 @@ export default function SamplePage() {
                           FileDataLoaderSchema.parse(project.data_loader)
                             .file_path
                         }
-                        . Check file path.
+                        .
                       </Text>
                     )}
                     {data &&

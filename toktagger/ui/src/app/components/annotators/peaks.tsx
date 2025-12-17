@@ -74,7 +74,7 @@ export function PeakDetectionTool({
       }
 
       const response = await fetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/peak_detection`,
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/peak_detection?task_name=${task_name}`,
         {
           method: "POST",
           headers: {
@@ -112,6 +112,7 @@ export function PeakDetectionTool({
     signalName,
     validSignal,
     setAnnotations,
+    task_name,
   ]);
 
   return (

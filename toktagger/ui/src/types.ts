@@ -8,7 +8,7 @@ export const BaseAnnotationSchema = z.object({
   uncertainty: z.number().optional(),
   label: z.string(),
   type: z.string(),
-  task_name: z.string(),
+  task_name: z.string().optional(),
 });
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 export const ClassLabelSchema = BaseAnnotationSchema;
@@ -77,7 +77,7 @@ export const BaseDisplayAnnotationSchema = z.object({
   shot_id: z.number(),
   created_by: z.string().default("manual"),
   selected: z.boolean().default(false),
-  task_name: z.string(),
+  task_name: z.string().optional(),
 });
 
 export const ZoneSchema = BaseDisplayAnnotationSchema.extend({

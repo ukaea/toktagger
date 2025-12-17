@@ -8,9 +8,9 @@ class AnnotationIn(ConfiguredModel):
     shot_id: int
     label: str
     created_by: AnnotatorTypes
-    task_name: str
+    task_name: Optional[str] = None
     validated: Optional[bool] = False
-    uncertainty: Optional[float] = None
+    uncertainty: Optional[float] = 0
     project_id: Optional[str] = None
 
     @model_validator(mode="before")
@@ -18,9 +18,7 @@ class AnnotationIn(ConfiguredModel):
         if isinstance(values, dict):
             if values.get("validated") in values and values["validated"]:
                 values["uncertainty"] = 0
-            elif (
-                not values.get("validated", False) and values.get("uncertainty") is None
-            ):
+            else:
                 values["uncertainty"] = 1
         return values
 

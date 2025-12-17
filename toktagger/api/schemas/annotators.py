@@ -18,7 +18,7 @@ class DataTypes(Enum):
 
 
 class AnnotatorParams(BaseModel):
-    task_name: str
+    task_name: Optional[str] = None
 
 
 class PeakDetectionParams(AnnotatorParams):

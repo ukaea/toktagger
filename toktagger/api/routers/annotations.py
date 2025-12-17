@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Path, Query
-from typing import Literal
+from typing import Literal, Optional
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import (
     AnnotationTypes,
@@ -125,7 +125,7 @@ async def get_annotations(
     request: Request,
     project_id: str = Path(description="The ID of the project to get samples from."),
     sample_id: str = Path(description="The ID of the sample to get annotations from."),
-    task_name: str = Query(
+    task_name: Optional[str] = Query(
         None,
         description="The name of the task to filter annotations by, leave blank to return annotations for all tasks",
     ),
@@ -192,7 +192,7 @@ async def update_annotations(
     sample_id: str = Path(
         description="The ID of the sample to update annotations for."
     ),
-    task_name: str = Query(
+    task_name: Optional[str] = Query(
         None,
         description="The name of the task to filter annotations by, leave blank to update annotations for all tasks",
     ),

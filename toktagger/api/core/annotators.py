@@ -197,7 +197,8 @@ class PeakDetectionAnnotator(DataAnnotator):
     >>> regions = annotator.predict(data)
     """
 
-    def __init__(self, params: PeakDetectionParams):
+    def __init__(self, shot_id: int, params: PeakDetectionParams):
+        self.shot_id = shot_id
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
@@ -234,6 +235,7 @@ class PeakDetectionAnnotator(DataAnnotator):
             peak_time = time[idx]
             if peak_time >= tmin and peak_time <= tmax:
                 region = TimeRegion(
+                    shot_id=self.shot_id,
                     label="Unknown",
                     time_min=max(float(peak_time - width), np.min(time)),
                     time_max=min(float(peak_time + width), np.max(time)),
@@ -271,7 +273,8 @@ class OutlierDetectionAnnotator(DataAnnotator):
         If an unknown outlier detection method is specified in `params`.
     """
 
-    def __init__(self, params: OutlierDetectionParams):
+    def __init__(self, shot_id: int, params: OutlierDetectionParams):
+        self.shot_id = shot_id
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
@@ -307,6 +310,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
         bounds = binary_runs_to_tuples(outliers)
         bounds = [
             TimeRegion(
+                shot_id=self.shot_id,
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Unknown",
@@ -333,6 +337,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
         bounds = binary_runs_to_tuples(outliers)
         bounds = [
             TimeRegion(
+                shot_id=self.shot_id,
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Unknown",
@@ -372,7 +377,8 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         Applies a Hidden Markov Model to detect change points in the signal.
     """
 
-    def __init__(self, params: ChangePointDetectionParams):
+    def __init__(self, shot_id: int, params: ChangePointDetectionParams):
+        self.shot_id = shot_id
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
@@ -424,6 +430,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
                 task_name=self.params.task_name,
+                shot_id=self.shot_id,
             )
             for imin, imax in zip(result, result[1:])
         ]
@@ -463,6 +470,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
                 task_name=self.params.task_name,
+                shot_id=self.shot_id,
             )
             for (tmin, tmax) in bounds
         ]
@@ -500,7 +508,8 @@ class JumpDetectionAnnotator(DataAnnotator):
     >>> regions = annotator.predict(data)
     """
 
-    def __init__(self, params: JumpDetectionParams):
+    def __init__(self, shot_id: int, params: JumpDetectionParams):
+        self.shot_id = shot_id
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[TimeRegion]:
@@ -548,6 +557,7 @@ class JumpDetectionAnnotator(DataAnnotator):
                     label="Unknown",
                     created_by=AnnotatorTypes.JUMP_DETECTION,
                     task_name=self.params.task_name,
+                    shot_id=self.shot_id,
                 )
             )
 
@@ -555,7 +565,8 @@ class JumpDetectionAnnotator(DataAnnotator):
 
 
 class SpectrogramThresholdAnnotator:
-    def __init__(self, params: SpectrogramThresholdParams):
+    def __init__(self, shot_id: int, params: SpectrogramThresholdParams):
+        self.shot_id = shot_id
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> SpectrogramMask:
@@ -568,6 +579,7 @@ class SpectrogramThresholdAnnotator:
             values=threshold_mask.tolist(),
             created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD,
             task_name=self.params.task_name,
+            shot_id=self.params.shot_id,
         )
 
 

@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 import "react-contexify/ReactContexify.css";
 import { useContextMenuProvider } from "./annotation-provider";
+import { on } from "events";
 
 interface ZoneContextInfo {
   zones: Zone[];
@@ -87,6 +88,7 @@ export const ZoneProvider = ({
       return zone;
     });
     triggerZoneUpdate();
+    onModifyZone?.(zones.current);
   };
 
   const addZone = (x0: number, x1: number, category: Category) => {

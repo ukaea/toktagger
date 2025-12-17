@@ -134,6 +134,13 @@ export async function saveSampleAnnotations(
   task_name: string,
   annotations: Annotation[]
 ) {
+  // Mark all annotations as validated
+  annotations.forEach((annotation) => {
+    annotation.validated = true;
+    annotation.created_by = "manual";
+    annotation.uncertainty = 0;
+  });
+
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations?task_name=${task_name}`;
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
