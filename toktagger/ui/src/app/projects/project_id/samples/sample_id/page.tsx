@@ -30,14 +30,30 @@ import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
+type UnknownRecord = Record<string, unknown>;
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null;
+}
+function finiteNumber(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+function detailMessage(payload: unknown): string {
+  if (!isRecord(payload)) return "Unknown error";
+  const d = payload.detail;
+  if (typeof d === "string" && d.trim()) return d;
+  if (Array.isArray(d)) {
+    const first = d.find((x) => typeof x === "string" && x.trim());
+    if (typeof first === "string") return first;
+  }
+  return "Unknown error";
+}
+
 type SampleDataBreadCrumbsInfo = {
   project: Project;
   sample: Sample;
 };
-const SampleDataBreadCrumbs = ({
-  project,
-  sample,
-}: SampleDataBreadCrumbsInfo) => {
+
+const SampleDataBreadCrumbs = ({ project, sample }: SampleDataBreadCrumbsInfo) => {
   const navigate = useNavigate();
   return (
     <Provider theme={defaultTheme} router={{ navigate, useHref }}>
@@ -93,7 +109,7 @@ const SampleView = ({
   onNext,
   onJump,
 }: SampleViewInfo) => {
-  if (project.task == "disruption") {
+  if (project.task === "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for disruption view");
@@ -105,7 +121,9 @@ const SampleView = ({
         setAnnotations={setAnnotations}
       />
     );
-  } else if (project.task == "ELM") {
+  }
+
+  if (project.task === "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for ELM view");
@@ -117,8 +135,9 @@ const SampleView = ({
         setAnnotations={setAnnotations}
       />
     );
-  } else if (project.task == "UFO") {
-    console.log({ data });
+  }
+
+  if (project.task === "UFO") {
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for UFO view");
@@ -137,13 +156,15 @@ const SampleView = ({
         onJump={onJump}
       />
     );
-  } else if (project.task == "MHD") {
-    console.log(data);
+  }
+
+  if (project.task === "MHD") {
     const result = CompositeDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for MHD view");
     }
-    const mhdData = SpectrogramDataSchema.safeParse(result.data.values["mirnov"]);
+    const mirnov = (result.data.values as UnknownRecord)["mirnov"];
+    const mhdData = SpectrogramDataSchema.safeParse(mirnov);
     if (!mhdData.success) {
       throw new Error("Invalid data for MHD view");
     }
@@ -156,11 +177,13 @@ const SampleView = ({
       />
     );
   }
+
+  return null;
 };
 
 async function getData<T>(url: string): Promise<T> {
   const response = await fetch(url);
-  const payload = await response.json();
+  const payload = (await response.json()) as unknown;
   return payload as T;
 }
 
@@ -199,7 +222,7 @@ export default function SamplePage() {
   });
   const [plotProps, setPlotProps] = useState<PlotProps>({
     colorMap: "Cividis",
-  }); // Set default color map
+  });
 
   // ------------------------------
   // UFO frame navigation driver
@@ -226,18 +249,27 @@ export default function SamplePage() {
       }
     }
 
-    const f = (dataParams as any)?.frame;
-    return typeof f === "number" ? f : 0;
+    // Fallback: read frame from dataParams if present
+    const dp = dataParams as unknown;
+    if (isRecord(dp)) {
+      const f = finiteNumber(dp.frame);
+      if (typeof f === "number") return f;
+    }
+
+    return 0;
   }, [isUfo, data, dataParams]);
 
   const clampToBounds = useCallback(
     (n: number) => {
-      const min = Number.isFinite(frameBounds?.min as any)
-        ? (frameBounds!.min as number)
-        : 0;
-      const max = Number.isFinite(frameBounds?.max as any)
-        ? (frameBounds!.max as number)
-        : undefined;
+      const min =
+        typeof frameBounds?.min === "number" && Number.isFinite(frameBounds.min)
+          ? frameBounds.min
+          : 0;
+
+      const max =
+        typeof frameBounds?.max === "number" && Number.isFinite(frameBounds.max)
+          ? frameBounds.max
+          : undefined;
 
       let target = Number.isFinite(n) ? n : min;
       if (target < min) target = min;
@@ -252,9 +284,7 @@ export default function SamplePage() {
       const avail = frameBounds?.available;
       if (Array.isArray(avail) && avail.length > 0) {
         const sorted = Array.from(
-          new Set(
-            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
-          ),
+          new Set(avail.filter((x) => typeof x === "number" && Number.isFinite(x))),
         ).sort((a, b) => a - b);
 
         for (const f of sorted) if (f > from) return f;
@@ -263,8 +293,7 @@ export default function SamplePage() {
 
       const max = frameBounds?.max;
       const candidate = from + 1;
-      if (typeof max === "number" && Number.isFinite(max) && candidate > max)
-        return from;
+      if (typeof max === "number" && Number.isFinite(max) && candidate > max) return from;
       return candidate;
     },
     [frameBounds],
@@ -275,9 +304,7 @@ export default function SamplePage() {
       const avail = frameBounds?.available;
       if (Array.isArray(avail) && avail.length > 0) {
         const sorted = Array.from(
-          new Set(
-            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
-          ),
+          new Set(avail.filter((x) => typeof x === "number" && Number.isFinite(x))),
         ).sort((a, b) => a - b);
 
         for (let i = sorted.length - 1; i >= 0; i--) {
@@ -297,15 +324,9 @@ export default function SamplePage() {
   const goToFrame = useCallback(
     (n: number) => {
       const target = clampToBounds(n);
-      setDataParams(
-        () =>
-          ({
-            name: "image",
-            frame: target,
-          } as any),
-      );
+      setDataParams(() => ({ name: "image", frame: target } as DataParams));
     },
-    [clampToBounds, setDataParams],
+    [clampToBounds],
   );
 
   const onPrev = useCallback(() => {
@@ -329,24 +350,27 @@ export default function SamplePage() {
   useEffect(() => {
     if (!isUfo || !data) return;
 
-    const b = (data as any)?.frame_bounds ?? (data as any)?.frameBounds ?? null;
-    if (!b || typeof b !== "object") return;
+    const d = data as unknown;
+    if (!isRecord(d)) return;
+
+    const rawBounds = isRecord(d.frame_bounds)
+      ? d.frame_bounds
+      : isRecord(d.frameBounds)
+        ? d.frameBounds
+        : null;
+
+    if (!rawBounds) return;
 
     const min =
-      (typeof (b as any).min === "number" && (b as any).min) ??
-      (typeof (b as any).min_frame === "number" && (b as any).min_frame) ??
-      undefined;
+      finiteNumber(rawBounds.min) ?? finiteNumber(rawBounds.min_frame) ?? undefined;
 
     const max =
-      (typeof (b as any).max === "number" && (b as any).max) ??
-      (typeof (b as any).max_frame === "number" && (b as any).max_frame) ??
-      undefined;
+      finiteNumber(rawBounds.max) ?? finiteNumber(rawBounds.max_frame) ?? undefined;
 
-    const available = Array.isArray((b as any).available)
-      ? (b as any).available
-      : Array.isArray((b as any).available_frames)
-        ? (b as any).available_frames
-        : undefined;
+    const rawAvail = rawBounds.available ?? rawBounds.available_frames;
+    const available = Array.isArray(rawAvail)
+      ? rawAvail.filter((x): x is number => typeof x === "number" && Number.isFinite(x))
+      : undefined;
 
     if (min !== undefined || max !== undefined || available !== undefined) {
       setFrameBounds({ min, max, available });
@@ -363,16 +387,16 @@ export default function SamplePage() {
     setFrameBounds(null);
 
     const refreshSample = async () => {
-      const project = await getProject(project_id as string);
-      setProject(project);
+      const proj = await getProject(project_id as string);
+      setProject(proj);
 
-      if (project.task === "UFO" && !ufoInitRef.current) {
+      if (proj.task === "UFO" && !ufoInitRef.current) {
         ufoInitRef.current = true;
-        setDataParams({ name: "image", frame: 292 } as any);
+        setDataParams({ name: "image", frame: 292 } as DataParams);
       }
 
-      const sample = await getSample(project_id as string, sample_id as string);
-      setSample(sample);
+      const samp = await getSample(project_id as string, sample_id as string);
+      setSample(samp);
 
       const dbAnnotations = await getAnnotations(
         project_id as string,
@@ -381,21 +405,21 @@ export default function SamplePage() {
       setAnnotations(dbAnnotations);
     };
 
-    refreshSample();
+    void refreshSample();
   }, [project_id, sample_id, hasIds]);
 
   // ------------------------------
   // Data refresh
   // ------------------------------
   useEffect(() => {
-    const refreshData = async (dataParams: DataParams, viewParams: ViewParams) => {
-      if (!project || !sample) {
-        return;
-      }
+    const refreshData = async (dp: DataParams, vp: ViewParams) => {
+      if (!project || !sample) return;
 
-      if (project.task == "MHD") {
-        viewParams = {
-          ...viewParams,
+      let nextViewParams: ViewParams = vp;
+
+      if (project.task === "MHD") {
+        nextViewParams = {
+          ...vp,
           name: "spectrogram",
           nperseg: 256,
         } as SpectrogramViewParams;
@@ -408,28 +432,27 @@ export default function SamplePage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ params: dataParams, view: viewParams }),
+          body: JSON.stringify({ params: dp, view: nextViewParams }),
         },
       );
 
-      const data: Data = await response.json();
+      const payload = (await response.json()) as unknown;
+
       if (!response.ok) {
-        console.error("Error:", (data as any).detail);
-        ToastQueue.negative("Error:", (data as any).detail);
-      } else {
-        setData(data);
+        const msg = detailMessage(payload);
+        console.error("Error:", msg);
+        ToastQueue.negative(`Error: ${msg}`);
+        return;
       }
+
+      setData(payload as Data);
     };
 
-    const run = async (dataParams: DataParams, viewParams: ViewParams) => {
-      await refreshData(dataParams, viewParams);
-    };
-
-    run(dataParams, viewParams);
+    void refreshData(dataParams, viewParams);
   }, [project, sample, dataParams, viewParams]);
 
   if (!data || !project || !sample || !hasIds) {
-    return;
+    return null;
   }
 
   return (
