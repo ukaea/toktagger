@@ -1,6 +1,7 @@
+from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import TimePoint
-from toktagger.api.schemas.data import TimeSeriesData
+from toktagger.api.schemas.data import TimeSeriesData, DataParams
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 import torch.nn as nn
 import torch
@@ -15,8 +16,13 @@ logger = logging.getLogger("ray")
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
-    def __init__(self, project, samples, annotations):
-        self.data_loader = LoaderRegistry.get(project.data_loader)()
+    def __init__(
+        self,
+        project: Project,
+        samples: list[Sample],
+        annotations: list[list[Annotation]],
+    ):
+        self.data_loader = LoaderRegistry.get(project.data_loader)(DataParams())
         self.samples = samples
         self.annotations = annotations
         self.current_scaling = []
@@ -26,9 +32,9 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> tuple[torch.tensor, int]:
-        data: TimeSeriesData = self.data_loader.get_sample(self.samples[idx]).values[
-            "ip"
-        ]
+        data: TimeSeriesData = self.data_loader.get_sample(
+            self.samples[idx].shot_id, self.samples[idx].data
+        ).values["ip"]
         # Scale data to be between 0 and 1...
         plasma_current = torch.tensor(data.values, dtype=torch.float32)
         self.current_scaling.append(plasma_current.max())
