@@ -84,7 +84,7 @@ async def predict_sample(
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
     data_loader = LoaderRegistry(project.data_loader)()
-    data_item = data_loader.get_sample(sample)
+    data_item = data_loader.get_sample(sample.shot_id, sample.data)
 
     tagger = PeakDetectionAnnotator(params)
     annotations = tagger.predict(data_item)
