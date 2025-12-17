@@ -278,3 +278,80 @@ def test_search(server_setup, page: Page):
     # Should find all 6 entries
     expect(page.get_by_role("row").nth(6)).to_contain_text("Project A")
     expect(page.get_by_role("row").nth(7)).to_be_hidden()
+
+
+def test_delete(server_setup, page: Page):
+    # Create some projects
+    create_project("Project A", "ELM", "uda")
+    create_project("Project B", "disruption", "parquet")
+
+    # Navigate to page
+    page.goto("http://localhost:8002")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Press delete next to project B
+    page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
+
+    # Check row 1 is now Project A, and it is the only row
+    expect(page.get_by_role("row").nth(1)).to_contain_text("Project A")
+    expect(page.get_by_role("row").nth(2)).to_be_hidden()
+
+    # Now delete project A
+    page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
+
+    # Check no projects remain
+    expect(page.get_by_role("row").nth(1)).to_be_hidden()
+
+
+def test_edit(server_setup, page: Page):
+    # Create some projects
+    create_project("Test Project", "ELM", "uda")
+
+    # Navigate to page
+    page.goto("http://localhost:8002")
+
+    # Press edit button
+    page.get_by_role("row").nth(1).get_by_role("button", name="Edit").click()
+
+    # Modal should have opened
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+
+    # Check edit project modal has opened
+    expect(modal.get_by_role("heading", name="Edit Project")).to_be_visible()
+    expect(modal.get_by_role("button", name="Edit")).to_be_visible()
+    expect(modal.get_by_role("button", name="Close")).to_be_visible()
+
+    # Check you can edit project name and query strategy
+    expect(modal.get_by_text("Project Name")).to_be_visible()
+    expect(modal.get_by_text("Query Strategy")).to_be_visible()
+
+    # Edit the project name
+    modal.get_by_role("textbox", name="Project Name").fill("Updated Project")
+
+    # Change the query strategy
+    modal.get_by_role("radio", name="Sequential").click()
+
+    # Save changes
+    modal.get_by_role("button", name="Edit").click()
+
+    # Check modal has closed
+    check_base_page(page)
+
+    # Check project name updated
+    expect(page.get_by_role("row").nth(1)).to_contain_text("Updated Project")
+
+    # Get back project from server to check it updated
+    response = requests.get("http://localhost:8002/projects")
+    project = response.json()[0]
+    assert project["name"] == "Updated Project"
+    assert project["query_strategy"] == "sequential"
+    assert project["task"] == "ELM"
+    assert project["data_loader"] == "uda"
+
+
+def test_my_new_functionality(server_setup, page: Page):
+    # Navigate to page
+    page.goto("http://localhost:8002")
