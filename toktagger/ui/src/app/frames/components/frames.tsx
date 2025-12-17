@@ -28,6 +28,52 @@ import {
 } from "./lib";
 import { Toast, ClassInfoPopup, ConfirmModal } from "./ui";
 
+type InstanceProfile = {
+  id: string;
+  class_name: string;
+  class_id: number;
+  track_id: string;
+};
+
+type SelectedProfile =
+  | { class_id?: number; class_name?: string; track_id?: string }
+  | null;
+
+type BulkDeleteRequestDetail = {
+  profile?: { class_name?: string; track_id?: string };
+};
+
+function isImageAnnotation(v: unknown): v is ImageAnnotation {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    "id" in v &&
+    typeof (v as { id: unknown }).id === "string"
+  );
+}
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+declare global {
+  interface Window {
+    ufoNotifySelectionChanged?: () => void;
+
+    ufoInstanceProfiles?: InstanceProfile[];
+    ufoSelectedProfileId?: string | null;
+    ufoSelectedClassName?: string | null;
+    ufoSelectedTrackId?: string | null;
+
+    ufoHasUnsavedChanges?: () => boolean;
+    ufoMarkSaved?: () => void;
+
+    ufoCollectForSave?: () => Promise<ImageAnnotation[]>;
+    ufoClearCurrent?: () => Promise<void>;
+    ufoClearAllFrames?: () => Promise<void>;
+  }
+}
+
 /**
  * Simple "jump to frame N" control.
  * User types a frame number, we validate and call onJump(n).
@@ -107,32 +153,31 @@ export function FrameView({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    (window as any).ufoNotifySelectionChanged = () => {
+    window.ufoNotifySelectionChanged = () => {
       setSelectionTick((tick) => tick + 1);
     };
 
     return () => {
-      delete (window as any).ufoNotifySelectionChanged;
+      delete window.ufoNotifySelectionChanged;
     };
   }, []);
 
   // Profiles / classes are owned by the left toolbar (global UFO toolbar).
   // We just read the current selection from window so AnnoBridge can use it.
-  const getSelectedProfile = useCallback(() => {
+  const getSelectedProfile = useCallback((): SelectedProfile => {
     if (typeof window === "undefined") return null;
 
-    const w = window as any;
-    const selectedId = w.ufoSelectedProfileId;
-    const list = (w.ufoInstanceProfiles || []) as any[];
+    const selectedId = window.ufoSelectedProfileId ?? null;
+    const list = window.ufoInstanceProfiles ?? [];
 
-    if (!selectedId || !Array.isArray(list)) return null;
-    const found = list.find((p) => p && p.id === selectedId);
+    if (!selectedId) return null;
+    const found = list.find((p) => p.id === selectedId);
     return found ?? null;
   }, []);
 
-  const getSelectedClassName = useCallback(() => {
+  const getSelectedClassName = useCallback((): string | null => {
     if (typeof window === "undefined") return null;
-    return (window as any).ufoSelectedClassName ?? null;
+    return window.ufoSelectedClassName ?? null;
   }, []);
 
   // Tracking mode: enable track IDs for UFO
@@ -256,9 +301,7 @@ export function FrameView({
       if (Array.isArray(existing) && existing.length > 0) return;
 
       const seeded = currentList.map((annotation) => ({
-        ...(typeof annotation === "object" && annotation
-          ? JSON.parse(JSON.stringify(annotation))
-          : annotation),
+        ...deepClone(annotation),
         target: {
           ...(annotation.target || {}),
           source: nextKey,
@@ -287,16 +330,15 @@ export function FrameView({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    (window as any).ufoHasUnsavedChanges = () =>
-      bridgeRef.current?.hasUnsaved?.() ?? false;
+    window.ufoHasUnsavedChanges = () => bridgeRef.current?.hasUnsaved?.() ?? false;
 
-    (window as any).ufoMarkSaved = () => {
+    window.ufoMarkSaved = () => {
       bridgeRef.current?.markSaved?.();
     };
 
     return () => {
-      delete (window as any).ufoHasUnsavedChanges;
-      delete (window as any).ufoMarkSaved;
+      delete window.ufoHasUnsavedChanges;
+      delete window.ufoMarkSaved;
     };
   }, []);
 
@@ -304,7 +346,7 @@ export function FrameView({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    (window as any).ufoCollectForSave = async () => {
+    window.ufoCollectForSave = async () => {
       await saveCurrentFrame();
 
       const storage = window.localStorage;
@@ -327,7 +369,9 @@ export function FrameView({
         }
 
         if (Array.isArray(parsed)) {
-          for (const ann of parsed as any[]) all.push(ann as ImageAnnotation);
+          for (const ann of parsed) {
+            if (isImageAnnotation(ann)) all.push(ann);
+          }
         }
       }
 
@@ -335,7 +379,7 @@ export function FrameView({
     };
 
     return () => {
-      delete (window as any).ufoCollectForSave;
+      delete window.ufoCollectForSave;
     };
   }, [projectId, sampleId, saveCurrentFrame]);
 
@@ -343,7 +387,7 @@ export function FrameView({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    (window as any).ufoClearCurrent = async () => {
+    window.ufoClearCurrent = async () => {
       const bridge = bridgeRef.current;
       if (!bridge) return;
       await bridge.clearOverlaySilently();
@@ -352,7 +396,7 @@ export function FrameView({
     };
 
     return () => {
-      delete (window as any).ufoClearCurrent;
+      delete window.ufoClearCurrent;
     };
   }, [adapter]);
 
@@ -360,7 +404,7 @@ export function FrameView({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    (window as any).ufoClearAllFrames = async () => {
+    window.ufoClearAllFrames = async () => {
       const storage = window.localStorage;
       const prefix = "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
 
@@ -377,7 +421,7 @@ export function FrameView({
     };
 
     return () => {
-      delete (window as any).ufoClearAllFrames;
+      delete window.ufoClearAllFrames;
     };
   }, [projectId, sampleId]);
 
@@ -439,8 +483,10 @@ export function FrameView({
         if (!Array.isArray(parsed)) continue;
 
         let frameHas = false;
-        for (const ann of parsed as any[]) {
-          const label = extractClassLabel(ann as ImageAnnotation);
+        for (const ann of parsed) {
+          if (!isImageAnnotation(ann)) continue;
+
+          const label = extractClassLabel(ann);
           if (!label) continue;
 
           const annClass = (label.class_name || "").toLowerCase();
@@ -502,20 +548,37 @@ export function FrameView({
 
         if (!Array.isArray(parsed)) continue;
 
-        const original = parsed as any[];
+        const original = parsed as unknown[];
 
-        const filtered = original.filter((ann: any) => {
-          const label = extractClassLabel(ann as ImageAnnotation);
-          if (!label) return true;
+        let changed = false;
+        const filtered: unknown[] = [];
+
+        for (const ann of original) {
+          if (!isImageAnnotation(ann)) {
+            filtered.push(ann);
+            continue;
+          }
+
+          const label = extractClassLabel(ann);
+          if (!label) {
+            filtered.push(ann);
+            continue;
+          }
 
           const annClass = (label.class_name || "").toLowerCase();
           const annTrack = canonicalizeTrackId(label.track_id || "");
           const match = annClass === className && annTrack === trackKey;
-          if (match) totalDeleted += 1;
-          return !match;
-        });
 
-        if (filtered.length !== original.length) {
+          if (match) {
+            totalDeleted += 1;
+            changed = true;
+            continue;
+          }
+
+          filtered.push(ann);
+        }
+
+        if (changed) {
           framesTouched += 1;
           if (filtered.length > 0) storage.setItem(key, JSON.stringify(filtered));
           else storage.removeItem(key);
@@ -535,25 +598,21 @@ export function FrameView({
       const cnameKey = (class_name || "").toLowerCase();
       if (!cnameKey) return null;
 
-      const w = window as any;
-      const existingProfiles = Array.isArray(w.ufoInstanceProfiles)
-        ? (w.ufoInstanceProfiles as any[])
-        : [];
+      const existingProfiles = window.ufoInstanceProfiles ?? [];
 
       const labelDef =
-        LABEL_MAP.categories.find((c) => c.name.toLowerCase() === cnameKey) ||
-        null;
+        LABEL_MAP.categories.find((c) => c.name.toLowerCase() === cnameKey) || null;
 
       const prettyClassName = labelDef?.name ?? class_name;
 
       const existingTrackIds = existingProfiles
         .filter(
           (p) =>
-            typeof p?.class_name === "string" &&
+            typeof p.class_name === "string" &&
             p.class_name.toLowerCase() === cnameKey &&
-            typeof p?.track_id === "string",
+            typeof p.track_id === "string",
         )
-        .map((p) => p.track_id as string);
+        .map((p) => p.track_id);
 
       const readable = uniqueReadableId(existingTrackIds);
       const track_id = canonicalizeTrackId(readable);
@@ -565,8 +624,7 @@ export function FrameView({
         regEntry && typeof regEntry.id === "string" ? Number(regEntry.id) : undefined;
 
       const fixedId =
-        FIXED_CLASS_REG[cnameKey] ??
-        FIXED_CLASS_REG[prettyClassName.toLowerCase()];
+        FIXED_CLASS_REG[cnameKey] ?? FIXED_CLASS_REG[prettyClassName.toLowerCase()];
 
       const class_id =
         (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
@@ -575,18 +633,18 @@ export function FrameView({
 
       const id = `${prettyClassName}:${track_id}`;
 
-      const nextProfiles = [
+      const nextProfiles: InstanceProfile[] = [
         ...existingProfiles,
         { id, class_name: prettyClassName, class_id, track_id },
       ];
 
-      w.ufoInstanceProfiles = nextProfiles;
-      w.ufoSelectedProfileId = id;
-      w.ufoSelectedClassName = prettyClassName;
-      w.ufoSelectedTrackId = track_id;
-      w.ufoNotifySelectionChanged?.();
+      window.ufoInstanceProfiles = nextProfiles;
+      window.ufoSelectedProfileId = id;
+      window.ufoSelectedClassName = prettyClassName;
+      window.ufoSelectedTrackId = track_id;
+      window.ufoNotifySelectionChanged?.();
 
-      const profilePayload = nextProfiles.map((p: any) => ({
+      const profilePayload = nextProfiles.map((p) => ({
         class_name: p.class_name,
         class_id: p.class_id,
         track_id: p.track_id,
@@ -646,49 +704,48 @@ export function FrameView({
       return;
     }
 
-    const w = window as any;
     const classNameKey = (emptyInstanceProfile.class_name || "").toLowerCase();
     const trackKey = canonicalizeTrackId(emptyInstanceProfile.track_id || "");
 
-    const existingProfiles = Array.isArray(w.ufoInstanceProfiles)
-      ? (w.ufoInstanceProfiles as any[])
-      : [];
+    const existingProfiles = window.ufoInstanceProfiles ?? [];
 
-    const remaining = existingProfiles.filter((p: any) => {
+    const remaining = existingProfiles.filter((p) => {
       const pClass = (p.class_name || "").toLowerCase();
       const pTrack = canonicalizeTrackId(p.track_id || "");
       return !(pClass === classNameKey && pTrack === trackKey);
     });
 
-    let selectedProfileId: string | null = w.ufoSelectedProfileId ?? null;
+    let selectedProfileId: string | null = window.ufoSelectedProfileId ?? null;
 
     if (selectedProfileId) {
-      const removedWasSelected = existingProfiles.some((p: any) => {
+      const removedWasSelected = existingProfiles.some((p) => {
         const pClass = (p.class_name || "").toLowerCase();
         const pTrack = canonicalizeTrackId(p.track_id || "");
-        return p.id === selectedProfileId && pClass === classNameKey && pTrack === trackKey;
+        return (
+          p.id === selectedProfileId && pClass === classNameKey && pTrack === trackKey
+        );
       });
 
       if (removedWasSelected) {
         if (remaining.length > 0) {
           const last = remaining[remaining.length - 1];
           selectedProfileId = last.id;
-          w.ufoSelectedProfileId = last.id;
-          w.ufoSelectedClassName = last.class_name;
-          w.ufoSelectedTrackId = last.track_id;
+          window.ufoSelectedProfileId = last.id;
+          window.ufoSelectedClassName = last.class_name;
+          window.ufoSelectedTrackId = last.track_id;
         } else {
           selectedProfileId = null;
-          w.ufoSelectedProfileId = null;
-          w.ufoSelectedClassName = null;
-          w.ufoSelectedTrackId = null;
+          window.ufoSelectedProfileId = null;
+          window.ufoSelectedClassName = null;
+          window.ufoSelectedTrackId = null;
         }
       }
     }
 
-    w.ufoInstanceProfiles = remaining;
-    w.ufoNotifySelectionChanged?.();
+    window.ufoInstanceProfiles = remaining;
+    window.ufoNotifySelectionChanged?.();
 
-    const profilePayload = remaining.map((p: any) => ({
+    const profilePayload = remaining.map((p) => ({
       class_name: p.class_name,
       class_id: p.class_id,
       track_id: p.track_id,
@@ -696,7 +753,7 @@ export function FrameView({
 
     let selectedKey: string | null = null;
     if (selectedProfileId && remaining.length > 0) {
-      const matched = remaining.find((p: any) => p.id === selectedProfileId);
+      const matched = remaining.find((p) => p.id === selectedProfileId);
       if (matched) {
         selectedKey = `${String(matched.class_name).toLowerCase()}:${canonicalizeTrackId(
           matched.track_id || "",
@@ -710,8 +767,8 @@ export function FrameView({
           includeTrackIds: true,
           profiles: profilePayload,
           selectedKey,
-          selectedClassName: w.ufoSelectedClassName ?? null,
-          lastClassName: w.ufoSelectedClassName ?? null,
+          selectedClassName: window.ufoSelectedClassName ?? null,
+          lastClassName: window.ufoSelectedClassName ?? null,
           classRegistry,
         },
       }),
@@ -794,10 +851,7 @@ export function FrameView({
   const openDeleteAllInstances = useCallback(async () => {
     if (typeof window === "undefined") return;
 
-    const w = window as any;
-    const instanceProfiles = Array.isArray(w.ufoInstanceProfiles)
-      ? (w.ufoInstanceProfiles as any[])
-      : [];
+    const instanceProfiles = window.ufoInstanceProfiles ?? [];
 
     const storage = window.localStorage;
     const prefix = "anno::w3c::" + `app://p/${projectId}/s/${sampleId}/f/`;
@@ -821,7 +875,7 @@ export function FrameView({
 
       if (!Array.isArray(parsed)) continue;
 
-      const anns = parsed as any[];
+      const anns = parsed as unknown[];
       if (anns.length > 0) {
         totalFrames += 1;
         totalAnnotations += anns.length;
@@ -857,12 +911,11 @@ export function FrameView({
     await bridgeRef.current?.clearOverlaySilently?.();
     setPopupList([]);
 
-    const w = window as any;
-    w.ufoInstanceProfiles = [];
-    w.ufoSelectedProfileId = null;
-    w.ufoSelectedClassName = null;
-    w.ufoSelectedTrackId = null;
-    w.ufoNotifySelectionChanged?.();
+    window.ufoInstanceProfiles = [];
+    window.ufoSelectedProfileId = null;
+    window.ufoSelectedClassName = null;
+    window.ufoSelectedTrackId = null;
+    window.ufoNotifySelectionChanged?.();
 
     window.dispatchEvent(
       new CustomEvent("ufo:state", {
@@ -895,15 +948,15 @@ export function FrameView({
     if (typeof window === "undefined") return;
 
     const bulkHandler = (e: Event) => {
-      const detail = (e as CustomEvent<any>).detail;
+      const detail = (e as CustomEvent<BulkDeleteRequestDetail>).detail;
       const profile = detail?.profile;
       if (!profile) return;
       void onRequestBulkDelete(profile);
     };
 
-    window.addEventListener("ufo:requestBulkDelete", bulkHandler as any);
+    window.addEventListener("ufo:requestBulkDelete", bulkHandler);
     return () => {
-      window.removeEventListener("ufo:requestBulkDelete", bulkHandler as any);
+      window.removeEventListener("ufo:requestBulkDelete", bulkHandler);
     };
   }, [onRequestBulkDelete]);
 
@@ -914,9 +967,9 @@ export function FrameView({
       void openDeleteAllInstances();
     };
 
-    window.addEventListener("ufo:deleteAllInstances", handler as any);
+    window.addEventListener("ufo:deleteAllInstances", handler);
     return () => {
-      window.removeEventListener("ufo:deleteAllInstances", handler as any);
+      window.removeEventListener("ufo:deleteAllInstances", handler);
     };
   }, [openDeleteAllInstances]);
 
@@ -950,6 +1003,7 @@ export function FrameView({
           <div className="overflow-visible">
             <Annotorious>
               <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`data:image/png;base64,${data.values}`}
                   alt={`Frame ${frameLabel}`}
@@ -974,7 +1028,7 @@ export function FrameView({
               />
 
               <AnnoBridge
-                ref={bridgeRef as any}
+                ref={bridgeRef}
                 getSelectedProfile={getSelectedProfile}
                 getSelectedClassName={getSelectedClassName}
                 includeTrackIds={includeTrackIds}
