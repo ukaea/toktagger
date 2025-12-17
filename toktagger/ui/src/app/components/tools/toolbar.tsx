@@ -159,7 +159,11 @@ function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
 function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   const handleClick = async () => {
     try {
-      const response = await saveAnnotations(project_id, sample_id, annotations);
+      const response = await saveAnnotations(
+        project_id,
+        sample_id,
+        annotations,
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
@@ -576,7 +580,10 @@ export default function ToolBar({
           tools.push({
             name: "Color Map",
             component: (
-              <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
+              <ColorMapPicker
+                plotProps={plotProps}
+                setPlotProps={setPlotProps}
+              />
             ),
           });
 
@@ -606,10 +613,16 @@ export default function ToolBar({
   /** ---------------- UFO state (restored to backup behavior) ---------------- */
 
   const [classRegistry, setClassRegistry] = useState<ClassRegistry>({});
-  const [selectedClassName, setSelectedClassName] = useState<string | null>(null);
+  const [selectedClassName, setSelectedClassName] = useState<string | null>(
+    null,
+  );
 
-  const [instanceProfiles, setInstanceProfiles] = useState<InstanceProfile[]>([]);
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [instanceProfiles, setInstanceProfiles] = useState<InstanceProfile[]>(
+    [],
+  );
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
+    null,
+  );
 
   const [instanceCounts, setInstanceCounts] = useState<Record<string, number>>(
     {},
@@ -624,9 +637,9 @@ export default function ToolBar({
 
     const onState = (e: Event) => {
       const detail = (e as CustomEvent<unknown>).detail;
-      const d = (detail && typeof detail === "object"
-        ? (detail as UfoStateDetail)
-        : {}) as UfoStateDetail;
+      const d = (
+        detail && typeof detail === "object" ? (detail as UfoStateDetail) : {}
+      ) as UfoStateDetail;
 
       if (Array.isArray(d.profiles)) {
         const next: InstanceProfile[] = d.profiles.map((p) => ({
@@ -727,7 +740,8 @@ export default function ToolBar({
     const fromRegistryLower = classRegistry[keyLower];
     const fromRegistryExact = classRegistry[clsName];
 
-    const regIdStr = fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
+    const regIdStr =
+      fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
     const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
     const fixedId = FIXED_CLASS_REG[keyLower];
@@ -1045,7 +1059,9 @@ export default function ToolBar({
               }))}
               selectedKey={selectedInstanceKey}
               onSelect={(key) => {
-                const inst = instanceProfiles.find((p) => instanceKey(p) === key);
+                const inst = instanceProfiles.find(
+                  (p) => instanceKey(p) === key,
+                );
                 if (!inst) return;
 
                 setSelectedInstanceId(inst.id);
@@ -1070,7 +1086,8 @@ export default function ToolBar({
 
                 const regIdStr =
                   fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
-                const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
+                const regId =
+                  regIdStr !== undefined ? Number(regIdStr) : undefined;
 
                 const fixedId = FIXED_CLASS_REG[keyLower];
 
@@ -1086,7 +1103,9 @@ export default function ToolBar({
                   (typeof labelMapId === "number" ? labelMapId : undefined) ??
                   1;
 
-                const existingTrackIds = instanceProfiles.map((p) => p.track_id);
+                const existingTrackIds = instanceProfiles.map(
+                  (p) => p.track_id,
+                );
                 const canonicalTrackId =
                   canonicalizeTrackId(trackId) ||
                   canonicalizeTrackId(uniqueReadableId(existingTrackIds));

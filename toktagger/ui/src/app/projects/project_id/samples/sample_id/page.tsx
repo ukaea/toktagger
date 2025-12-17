@@ -53,7 +53,10 @@ type SampleDataBreadCrumbsInfo = {
   sample: Sample;
 };
 
-const SampleDataBreadCrumbs = ({ project, sample }: SampleDataBreadCrumbsInfo) => {
+const SampleDataBreadCrumbs = ({
+  project,
+  sample,
+}: SampleDataBreadCrumbsInfo) => {
   const navigate = useNavigate();
   return (
     <Provider theme={defaultTheme} router={{ navigate, useHref }}>
@@ -187,7 +190,10 @@ async function getData<T>(url: string): Promise<T> {
   return payload as T;
 }
 
-async function getSample(project_id: string, sample_id: string): Promise<Sample> {
+async function getSample(
+  project_id: string,
+  sample_id: string,
+): Promise<Sample> {
   return await getData<Sample>(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
   );
@@ -284,7 +290,9 @@ export default function SamplePage() {
       const avail = frameBounds?.available;
       if (Array.isArray(avail) && avail.length > 0) {
         const sorted = Array.from(
-          new Set(avail.filter((x) => typeof x === "number" && Number.isFinite(x))),
+          new Set(
+            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
+          ),
         ).sort((a, b) => a - b);
 
         for (const f of sorted) if (f > from) return f;
@@ -293,7 +301,8 @@ export default function SamplePage() {
 
       const max = frameBounds?.max;
       const candidate = from + 1;
-      if (typeof max === "number" && Number.isFinite(max) && candidate > max) return from;
+      if (typeof max === "number" && Number.isFinite(max) && candidate > max)
+        return from;
       return candidate;
     },
     [frameBounds],
@@ -304,7 +313,9 @@ export default function SamplePage() {
       const avail = frameBounds?.available;
       if (Array.isArray(avail) && avail.length > 0) {
         const sorted = Array.from(
-          new Set(avail.filter((x) => typeof x === "number" && Number.isFinite(x))),
+          new Set(
+            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
+          ),
         ).sort((a, b) => a - b);
 
         for (let i = sorted.length - 1; i >= 0; i--) {
@@ -324,7 +335,7 @@ export default function SamplePage() {
   const goToFrame = useCallback(
     (n: number) => {
       const target = clampToBounds(n);
-      setDataParams(() => ({ name: "image", frame: target } as DataParams));
+      setDataParams(() => ({ name: "image", frame: target }) as DataParams);
     },
     [clampToBounds],
   );
@@ -362,14 +373,20 @@ export default function SamplePage() {
     if (!rawBounds) return;
 
     const min =
-      finiteNumber(rawBounds.min) ?? finiteNumber(rawBounds.min_frame) ?? undefined;
+      finiteNumber(rawBounds.min) ??
+      finiteNumber(rawBounds.min_frame) ??
+      undefined;
 
     const max =
-      finiteNumber(rawBounds.max) ?? finiteNumber(rawBounds.max_frame) ?? undefined;
+      finiteNumber(rawBounds.max) ??
+      finiteNumber(rawBounds.max_frame) ??
+      undefined;
 
     const rawAvail = rawBounds.available ?? rawBounds.available_frames;
     const available = Array.isArray(rawAvail)
-      ? rawAvail.filter((x): x is number => typeof x === "number" && Number.isFinite(x))
+      ? rawAvail.filter(
+          (x): x is number => typeof x === "number" && Number.isFinite(x),
+        )
       : undefined;
 
     if (min !== undefined || max !== undefined || available !== undefined) {

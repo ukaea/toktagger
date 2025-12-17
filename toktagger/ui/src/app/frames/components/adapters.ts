@@ -53,7 +53,7 @@ export function W3CImageFormat(sourceKey: string) {
 export function buildSourceKey({
   projectId,
   sampleId,
-  frame
+  frame,
 }: {
   projectId: string;
   sampleId: string;

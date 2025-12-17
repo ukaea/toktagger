@@ -3,18 +3,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
 import { useAnnotator } from "@annotorious/react";
-import {
-  LABEL_MAP,
-  extractClassLabel,
-  rectToDims
-} from "./lib";
+import { LABEL_MAP, extractClassLabel, rectToDims } from "./lib";
 import {
   ActionGroup,
   Item,
   SearchField,
   Flex,
   Text,
-  Picker
+  Picker,
 } from "@adobe/react-spectrum";
 
 /** ------------------------------------------------------------------
@@ -24,7 +20,7 @@ export function Toolbar({
   index,
   onPrev,
   onNext,
-  onJump
+  onJump,
 }: {
   index: number;
   onPrev: () => void | Promise<void>;
@@ -37,12 +33,7 @@ export function Toolbar({
   };
 
   return (
-    <Flex
-      gap="size-200"
-      alignItems="center"
-      marginBottom="size-200"
-      wrap
-    >
+    <Flex gap="size-200" alignItems="center" marginBottom="size-200" wrap>
       <ActionGroup
         isQuiet
         onAction={(key) => (key === "prev" ? onPrev() : onNext())}
@@ -69,16 +60,14 @@ export function Toolbar({
  *  ------------------------------------------------------------------ */
 export function ClassPanel({
   selectedClassName,
-  setSelectedClassName
+  setSelectedClassName,
 }: {
   selectedClassName: string | null;
   setSelectedClassName: (v: string | null) => void;
 }) {
   return (
     <div className="rounded-xl border border-gray-700 bg-black shadow-sm p-3 w-48 mx-auto">
-      <Text
-        UNSAFE_className="text-sm font-medium mb-2 block text-white"
-      >
+      <Text UNSAFE_className="text-sm font-medium mb-2 block text-white">
         Class
       </Text>
       <Picker
@@ -94,9 +83,7 @@ export function ClassPanel({
           <Item key={c.name}>{c.name}</Item>
         ))}
       </Picker>
-      <Text
-        UNSAFE_className="text-xs mt-2 block text-white/80"
-      >
+      <Text UNSAFE_className="text-xs mt-2 block text-white/80">
         Drawing is enabled after you pick a class.
       </Text>
     </div>
@@ -129,7 +116,7 @@ export function InstancePanel({
   onRequestBulkDelete,
   onRequestDeleteAllInstances,
   profileCounts,
-  showCreator = true
+  showCreator = true,
 }: {
   profiles: Profile[];
   selectedKey: string | null;
@@ -143,15 +130,12 @@ export function InstancePanel({
 }) {
   const [open, setOpen] = useState(false);
   const [className, setClassName] = useState<string>(
-    LABEL_MAP.categories[0].name
+    LABEL_MAP.categories[0].name,
   );
   const [trackId, setTrackId] = useState<string>("");
 
   useEffect(() => {
-    if (open)
-      setTrackId(
-        `auto-${Math.random().toString(36).slice(2, 7)}`
-      );
+    if (open) setTrackId(`auto-${Math.random().toString(36).slice(2, 7)}`);
   }, [open]);
 
   return (
@@ -169,9 +153,7 @@ export function InstancePanel({
             className="w-full rounded-lg border shadow-sm px-2.5 py-1.5 text-left bg-black text-white border-gray-600 hover:bg-gray-800 flex items-center justify-between"
             title="Create a new class/track profile"
           >
-            <span className="font-medium text-sm">
-              Add Profile
-            </span>
+            <span className="font-medium text-sm">Add Profile</span>
             <span className="text-lg leading-none">+</span>
           </button>
         </div>
@@ -195,14 +177,10 @@ export function InstancePanel({
       {showCreator && open && (
         <div className="mt-2 rounded-lg border shadow-sm bg-black text-white border-gray-700 p-2 space-y-2">
           <div>
-            <label className="text-xs text-gray-300">
-              Class Label
-            </label>
+            <label className="text-xs text-gray-300">Class Label</label>
             <select
               value={className}
-              onChange={(e) =>
-                setClassName(e.target.value)
-              }
+              onChange={(e) => setClassName(e.target.value)}
               className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none bg-gray-900 text-white border-gray-700"
             >
               {LABEL_MAP.categories.map((c) => (
@@ -214,9 +192,7 @@ export function InstancePanel({
           </div>
 
           <div>
-            <label className="text-xs text-gray-300">
-              Track ID
-            </label>
+            <label className="text-xs text-gray-300">Track ID</label>
             <input
               type="text"
               value={trackId}
@@ -310,7 +286,7 @@ export function ConfirmModal({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   onConfirm,
-  onCancel
+  onCancel,
 }: {
   open: boolean;
   title: string;
@@ -326,19 +302,11 @@ export function ConfirmModal({
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
       <div className="w-full max-w-md rounded-xl bg-white shadow-xl border">
         <div className="px-4 py-3 border-b">
-          <h2 className="text-base font-semibold">
-            {title}
-          </h2>
+          <h2 className="text-base font-semibold">{title}</h2>
         </div>
         <div className="px-4 py-3 space-y-2">
-          <p className="text-sm text-gray-800">
-            {message}
-          </p>
-          {details && (
-            <div className="text-xs text-gray-600">
-              {details}
-            </div>
-          )}
+          <p className="text-sm text-gray-800">{message}</p>
+          {details && <div className="text-xs text-gray-600">{details}</div>}
         </div>
         <div className="px-4 py-3 border-t flex gap-2 justify-end">
           <button
@@ -365,45 +333,34 @@ export function ConfirmModal({
 export function ClassInfoPopup(props: {
   annotation: ImageAnnotation;
   list: ImageAnnotation[];
-  onDeleted?: (label: {
-    class_name?: string;
-    track_id?: string;
-  }) => void;
+  onDeleted?: (label: { class_name?: string; track_id?: string }) => void;
   includeTrackIds: boolean;
 }) {
-  const { annotation, list, onDeleted, includeTrackIds } =
-    props;
+  const { annotation, list, onDeleted, includeTrackIds } = props;
   const anno = useAnnotator();
 
   const ownLabel = extractClassLabel(annotation);
   const fromList = useMemo(() => {
-    const found = (list || []).find(
-      (a) => a.id === annotation.id
-    );
+    const found = (list || []).find((a) => a.id === annotation.id);
     return found ? extractClassLabel(found) : null;
   }, [list, annotation.id]);
 
-  const effectiveLabel =
-    (fromList &&
-      (fromList.class_id ||
-        fromList.class_name ||
-        fromList.track_id
-        ? fromList
-        : null)) ||
+  const effectiveLabel = (fromList &&
+    (fromList.class_id || fromList.class_name || fromList.track_id
+      ? fromList
+      : null)) ||
     (ownLabel &&
-      (ownLabel.class_id ||
-        ownLabel.class_name ||
-        ownLabel.track_id
+      (ownLabel.class_id || ownLabel.class_name || ownLabel.track_id
         ? ownLabel
         : null)) || {
       class_id: undefined,
-      class_name: "undefined" as const
+      class_name: "undefined" as const,
     };
 
   const track_id =
     (fromList &&
-      typeof fromList.track_id === "string" &&
-      fromList.track_id.length > 0
+    typeof fromList.track_id === "string" &&
+    fromList.track_id.length > 0
       ? fromList.track_id
       : ownLabel?.track_id) || "—";
 
@@ -413,9 +370,7 @@ export function ClassInfoPopup(props: {
     await anno?.removeAnnotation?.(annotation.id);
     // Two RAFs to ensure Annotorious state has settled before we notify
     await new Promise<void>((r) =>
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => r())
-      )
+      requestAnimationFrame(() => requestAnimationFrame(() => r())),
     );
     onDeleted?.(effectiveLabel || {});
   };
@@ -426,11 +381,7 @@ export function ClassInfoPopup(props: {
         <div>
           {includeTrackIds ? (
             <div className="text-xs text-gray-500 mb-0.5">
-              track:{" "}
-              <span className="font-medium">
-                {track_id}
-              </span>{" "}
-              (class “
+              track: <span className="font-medium">{track_id}</span> (class “
               {effectiveLabel.class_name ?? "undefined"}”)
             </div>
           ) : null}
@@ -464,7 +415,7 @@ export function ClassInfoPopup(props: {
 export function Toast({
   open,
   message,
-  kind = "info"
+  kind = "info",
 }: {
   open: boolean;
   message: string;
@@ -477,9 +428,5 @@ export function Toast({
     kind === "error"
       ? "bg-red-50 border-red-200 text-red-800"
       : "bg-gray-50 border-gray-200 text-gray-800";
-  return (
-    <div className={`${base} ${palette}`}>
-      {message}
-    </div>
-  );
+  return <div className={`${base} ${palette}`}>{message}</div>;
 }

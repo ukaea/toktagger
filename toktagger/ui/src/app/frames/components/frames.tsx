@@ -1,7 +1,13 @@
 "use client";
 // UFO frame annotator view: integrates Annotorious, per-frame storage,
 // toolbar window.* integration, navigation, and bulk-delete / clear flows.
-import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import {
   Annotorious,
   ImageAnnotator,
@@ -35,9 +41,11 @@ type InstanceProfile = {
   track_id: string;
 };
 
-type SelectedProfile =
-  | { class_id?: number; class_name?: string; track_id?: string }
-  | null;
+type SelectedProfile = {
+  class_id?: number;
+  class_name?: string;
+  track_id?: string;
+} | null;
 
 type BulkDeleteRequestDetail = {
   profile?: { class_name?: string; track_id?: string };
@@ -330,7 +338,8 @@ export function FrameView({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    window.ufoHasUnsavedChanges = () => bridgeRef.current?.hasUnsaved?.() ?? false;
+    window.ufoHasUnsavedChanges = () =>
+      bridgeRef.current?.hasUnsaved?.() ?? false;
 
     window.ufoMarkSaved = () => {
       bridgeRef.current?.markSaved?.();
@@ -580,7 +589,8 @@ export function FrameView({
 
         if (changed) {
           framesTouched += 1;
-          if (filtered.length > 0) storage.setItem(key, JSON.stringify(filtered));
+          if (filtered.length > 0)
+            storage.setItem(key, JSON.stringify(filtered));
           else storage.removeItem(key);
         }
       }
@@ -601,7 +611,8 @@ export function FrameView({
       const existingProfiles = window.ufoInstanceProfiles ?? [];
 
       const labelDef =
-        LABEL_MAP.categories.find((c) => c.name.toLowerCase() === cnameKey) || null;
+        LABEL_MAP.categories.find((c) => c.name.toLowerCase() === cnameKey) ||
+        null;
 
       const prettyClassName = labelDef?.name ?? class_name;
 
@@ -621,13 +632,18 @@ export function FrameView({
       const regEntry = reg[cnameKey] || reg[prettyClassName] || undefined;
 
       const regId =
-        regEntry && typeof regEntry.id === "string" ? Number(regEntry.id) : undefined;
+        regEntry && typeof regEntry.id === "string"
+          ? Number(regEntry.id)
+          : undefined;
 
       const fixedId =
-        FIXED_CLASS_REG[cnameKey] ?? FIXED_CLASS_REG[prettyClassName.toLowerCase()];
+        FIXED_CLASS_REG[cnameKey] ??
+        FIXED_CLASS_REG[prettyClassName.toLowerCase()];
 
       const class_id =
-        (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
+        (typeof regId === "number" && !Number.isNaN(regId)
+          ? regId
+          : undefined) ??
         (typeof fixedId === "number" ? fixedId : undefined) ??
         1;
 
@@ -722,7 +738,9 @@ export function FrameView({
         const pClass = (p.class_name || "").toLowerCase();
         const pTrack = canonicalizeTrackId(p.track_id || "");
         return (
-          p.id === selectedProfileId && pClass === classNameKey && pTrack === trackKey
+          p.id === selectedProfileId &&
+          pClass === classNameKey &&
+          pTrack === trackKey
         );
       });
 
@@ -788,7 +806,10 @@ export function FrameView({
       if (!profile.class_name || !profile.track_id) return;
 
       const { total, frames } = await countAnnotationsForProfile(profile);
-      setDeleteModalProfile({ class_name: profile.class_name, track_id: profile.track_id });
+      setDeleteModalProfile({
+        class_name: profile.class_name,
+        track_id: profile.track_id,
+      });
       setDeletePreviewCounts({ total, frames });
       setDeleteModalOpen(true);
     },
@@ -802,7 +823,8 @@ export function FrameView({
       return;
     }
 
-    const { totalDeleted } = await deleteAnnotationsForProfile(deleteModalProfile);
+    const { totalDeleted } =
+      await deleteAnnotationsForProfile(deleteModalProfile);
 
     try {
       const updated = await adapter.read();
@@ -980,20 +1002,30 @@ export function FrameView({
           <div className="flex flex-col items-center gap-2">
             {onJump && (
               <div className="w-60 text-center">
-                <div className="text-[13px] text-gray-200 mb-1">Jump to Frame</div>
+                <div className="text-[13px] text-gray-200 mb-1">
+                  Jump to Frame
+                </div>
                 <FrameSearch onJump={handleJump} />
               </div>
             )}
 
             <div className="flex justify-center">
               <ButtonGroup>
-                <Button variant="primary" onPress={handlePrev} isDisabled={!onPrev}>
+                <Button
+                  variant="primary"
+                  onPress={handlePrev}
+                  isDisabled={!onPrev}
+                >
                   Prev
                 </Button>
                 <Button variant="primary" isDisabled>
                   Frame {frameLabel}
                 </Button>
-                <Button variant="primary" onPress={handleNext} isDisabled={!onNext}>
+                <Button
+                  variant="primary"
+                  onPress={handleNext}
+                  isDisabled={!onNext}
+                >
                   Next
                 </Button>
               </ButtonGroup>
@@ -1070,13 +1102,16 @@ export function FrameView({
           deleteAllPreview ? (
             <div className="space-y-1">
               <div>
-                <strong>Total instances:</strong> {deleteAllPreview.totalInstances}
+                <strong>Total instances:</strong>{" "}
+                {deleteAllPreview.totalInstances}
               </div>
               <div>
-                <strong>Total annotations:</strong> {deleteAllPreview.totalAnnotations}
+                <strong>Total annotations:</strong>{" "}
+                {deleteAllPreview.totalAnnotations}
               </div>
               <div>
-                <strong>Frames with annotations:</strong> {deleteAllPreview.totalFrames}
+                <strong>Frames with annotations:</strong>{" "}
+                {deleteAllPreview.totalFrames}
               </div>
             </div>
           ) : null
@@ -1106,9 +1141,13 @@ export function FrameView({
 type UFOViewInfo = {
   data: ImageData;
   annotations: Annotation[];
-  setAnnotations: (updater: (annotations: Annotation[]) => Annotation[] | Annotation[]) => void;
+  setAnnotations: (
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+  ) => void;
   dataParams: DataParams;
-  setDataParams: (updater: (dataParams: DataParams) => DataParams | DataParams) => void;
+  setDataParams: (
+    updater: (dataParams: DataParams) => DataParams | DataParams,
+  ) => void;
   projectId: string;
   sampleId: string;
   onPrev?: () => void;

@@ -51,9 +51,11 @@ export type BridgeHandle = {
   markSaved: () => void;
 };
 
-type SelectedProfile =
-  | { class_id?: number; class_name?: string; track_id?: string }
-  | null;
+type SelectedProfile = {
+  class_id?: number;
+  class_name?: string;
+  track_id?: string;
+} | null;
 
 type AnnotatorApi = {
   getAnnotations?: () => unknown;
@@ -91,12 +93,14 @@ function deepClone<T>(value: T): T {
 
 // --- Rectangle-only guard (filters out polygons or unknown shapes) ---
 function isRectangleAnno(a: unknown): boolean {
-  const sel = (a as { target?: { selector?: unknown } } | null)?.target?.selector;
+  const sel = (a as { target?: { selector?: unknown } } | null)?.target
+    ?.selector;
   if (!sel || typeof sel !== "object") return false;
 
   const s = sel as { type?: unknown; value?: unknown };
   if (s.type === "RECTANGLE") return true;
-  if (typeof s.value === "string") return /xywh=(pixel|percent):/i.test(s.value);
+  if (typeof s.value === "string")
+    return /xywh=(pixel|percent):/i.test(s.value);
   return false;
 }
 
@@ -209,7 +213,12 @@ export const AnnoBridge = Object.assign(
         lastByIdRef.current = byId;
         return ensured;
       },
-      [getSelectedProfile, getSelectedClassName, includeTrackIds, classRegistry],
+      [
+        getSelectedProfile,
+        getSelectedClassName,
+        includeTrackIds,
+        classRegistry,
+      ],
     );
 
     // Auto-quick-add: ensure a class entry exists in the registry whenever a new annotation is created
@@ -237,7 +246,11 @@ export const AnnoBridge = Object.assign(
             const fixedId = FIXED_CLASS_REG[keyLower] ?? 1;
             registry = {
               ...registry,
-              [keyLower]: { id: String(fixedId), name: selectedClass, profileId },
+              [keyLower]: {
+                id: String(fixedId),
+                name: selectedClass,
+                profileId,
+              },
             };
             saveClassRegistry(registry);
           }

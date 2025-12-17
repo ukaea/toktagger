@@ -57,12 +57,12 @@ export const LABEL_MAP = {
     { id: 3, name: "Major UFO" },
     { id: 4, name: "Disruption" },
     { id: 5, name: "Marfe" },
-    { id: 6, name: "Other Anomaly" }
-  ]
+    { id: 6, name: "Other Anomaly" },
+  ],
 } as const;
 
 export const FIXED_CLASS_REG: Record<string, number> = Object.fromEntries(
-  LABEL_MAP.categories.map((c) => [c.name.toLowerCase(), c.id])
+  LABEL_MAP.categories.map((c) => [c.name.toLowerCase(), c.id]),
 );
 
 // ---------- Types ----------
@@ -117,9 +117,10 @@ export function saveProfiles(profiles: ProfileMap): void {
 }
 
 // Ensure at least one default profile exists
-export function ensureDefaultProfile(
-  profiles: ProfileMap
-): { profiles: ProfileMap; defaultId: ProfileId } {
+export function ensureDefaultProfile(profiles: ProfileMap): {
+  profiles: ProfileMap;
+  defaultId: ProfileId;
+} {
   const ids = Object.keys(profiles);
   if (ids.length > 0) {
     return { profiles, defaultId: ids[0] };
@@ -129,8 +130,8 @@ export function ensureDefaultProfile(
   const next: ProfileMap = {
     [defaultId]: {
       id: defaultId,
-      name: "Default"
-    }
+      name: "Default",
+    },
   };
 
   return { profiles: next, defaultId };
@@ -171,7 +172,9 @@ export function saveLastClassName(name: string | null): void {
 // ---------- Annotation helpers ----------
 
 // Try to pull a human-readable class label from a W3C-style annotation.
-export function extractClassLabelFromAnnotation(annotation: unknown): string | null {
+export function extractClassLabelFromAnnotation(
+  annotation: unknown,
+): string | null {
   if (!annotation || !isRecord(annotation)) return null;
 
   const body = annotation.body;
@@ -353,7 +356,7 @@ export function scanInstanceCountsChunked(options: {
  * and falls back to a plain string value as { class_name }.
  */
 export function extractClassLabel(
-  a: unknown
+  a: unknown,
 ): { class_id?: number; class_name?: string; track_id?: string } | null {
   if (!a || !isRecord(a)) return null;
 
@@ -375,8 +378,8 @@ export function extractClassLabel(
         (typeof v.track_id === "string" && v.track_id.length > 0
           ? v.track_id
           : typeof v.instance === "number"
-          ? String(v.instance)
-          : undefined) ?? undefined;
+            ? String(v.instance)
+            : undefined) ?? undefined;
 
       return { class_id: id, class_name: name, track_id };
     }
@@ -421,7 +424,7 @@ const ADJECTIVES = [
   "young",
   "zealous",
   "ancient",
-  "brave"
+  "brave",
 ];
 
 const NOUNS = [
@@ -454,7 +457,7 @@ const NOUNS = [
   "trail",
   "blip",
   "sparkle",
-  "cluster"
+  "cluster",
 ];
 
 function randomReadableId(): string {
@@ -481,13 +484,13 @@ export function canonicalizeTrackId(input: string): string {
 
 export function nextNumericTrackId(
   className: string,
-  existingTrackIds: string[]
+  existingTrackIds: string[],
 ): string {
   const storage = getStorage();
   const key = `${INSTANCE_SEED_PREFIX}${className.toLowerCase()}`;
 
   const used = new Set(
-    (existingTrackIds || []).map((id) => canonicalizeTrackId(String(id)))
+    (existingTrackIds || []).map((id) => canonicalizeTrackId(String(id))),
   );
 
   let seed = 0;
@@ -529,11 +532,11 @@ export function uniqueReadableId(existingTrackIds: string[]): string {
 export function writeClassAndTrack(
   a: ImageAnnotation,
   cls: { id: number; name: string },
-  track_id: string
+  track_id: string,
 ): ImageAnnotation {
   const classBody = () => ({
     purpose: "tagging",
-    value: { type: "class", id: cls.id, name: cls.name, track_id }
+    value: { type: "class", id: cls.id, name: cls.name, track_id },
   });
 
   const patch = (list: unknown[]) => {
@@ -551,7 +554,7 @@ export function writeClassAndTrack(
         found = true;
         return {
           ...b,
-          value: { ...v, id: cls.id, name: cls.name, track_id }
+          value: { ...v, id: cls.id, name: cls.name, track_id },
         };
       }
 
@@ -559,7 +562,7 @@ export function writeClassAndTrack(
         found = true;
         return {
           ...b,
-          value: { type: "class", id: cls.id, name: cls.name, track_id }
+          value: { type: "class", id: cls.id, name: cls.name, track_id },
         };
       }
 
@@ -588,7 +591,7 @@ export function writeClassAndTrack(
   return {
     ...(a as unknown as UnknownRecord),
     bodies: bodiesOut,
-    body: bodyOut
+    body: bodyOut,
   } as ImageAnnotation;
 }
 
@@ -597,11 +600,11 @@ export function writeClassAndTrack(
  */
 export function writeClassOnly(
   a: ImageAnnotation,
-  cls: { id: number; name: string }
+  cls: { id: number; name: string },
 ): ImageAnnotation {
   const classBody = () => ({
     purpose: "tagging",
-    value: { type: "class", id: cls.id, name: cls.name }
+    value: { type: "class", id: cls.id, name: cls.name },
   });
 
   let found = false;
@@ -640,7 +643,7 @@ export function writeClassOnly(
   return {
     ...(a as unknown as UnknownRecord),
     bodies: bodiesOut,
-    body: bodyOut
+    body: bodyOut,
   } as ImageAnnotation;
 }
 
@@ -664,9 +667,11 @@ export function writeClassOnly(
  *   numeric ID from the classRegistry (if present) or FIXED_CLASS_REG,
  *   and stamp that onto the annotation via writeClassOnly.
  */
-type SelectedProfile =
-  | { class_id?: number; class_name?: string; track_id?: string }
-  | null;
+type SelectedProfile = {
+  class_id?: number;
+  class_name?: string;
+  track_id?: string;
+} | null;
 
 export function normalizeWithMode(
   rawList: ImageAnnotation[],
@@ -674,7 +679,7 @@ export function normalizeWithMode(
   getSelectedProfile: () => SelectedProfile,
   getSelectedClassName: () => string | null,
   includeTrackIds: boolean,
-  classRegistry: ClassRegistry
+  classRegistry: ClassRegistry,
 ): ImageAnnotation[] {
   if (includeTrackIds) {
     const out: ImageAnnotation[] = [];
@@ -702,7 +707,7 @@ export function normalizeWithMode(
           next = writeClassAndTrack(
             next,
             { id: prev.class_id, name: prev.class_name },
-            prev.track_id
+            prev.track_id,
           );
         }
 
@@ -722,7 +727,7 @@ export function normalizeWithMode(
         next = writeClassAndTrack(
           next,
           { id: selected.class_id, name: selected.class_name },
-          selected.track_id
+          selected.track_id,
         );
       }
 
@@ -741,7 +746,10 @@ export function normalizeWithMode(
     if (seen) {
       const prev = extractClassLabel(seen);
       if (prev?.class_name && typeof prev.class_id === "number") {
-        next = writeClassOnly(next, { id: prev.class_id, name: prev.class_name });
+        next = writeClassOnly(next, {
+          id: prev.class_id,
+          name: prev.class_name,
+        });
       }
       out.push(next);
       continue;
@@ -754,13 +762,16 @@ export function normalizeWithMode(
       const fromRegistryLower = classRegistry[keyLower];
       const fromRegistryExact = classRegistry[selected];
 
-      const regIdStr = fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
+      const regIdStr =
+        fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
       const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
       const fixedId = FIXED_CLASS_REG[selected] ?? FIXED_CLASS_REG[keyLower];
 
       const finalId =
-        (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
+        (typeof regId === "number" && !Number.isNaN(regId)
+          ? regId
+          : undefined) ??
         (typeof fixedId === "number" ? fixedId : undefined) ??
         1;
 
@@ -841,7 +852,7 @@ export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
   const selValue = getString(selector.value);
   if (selValue) {
     const match = selValue.match(
-      /xywh=(pixel|percent):([\d.]+),([\d.]+),([\d.]+),([\d.]+)/i
+      /xywh=(pixel|percent):([\d.]+),([\d.]+),([\d.]+),([\d.]+)/i,
     );
     if (match) {
       const unit = match[1].toLowerCase();
@@ -862,7 +873,7 @@ export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
         x_min: Math.round(x),
         y_min: Math.round(y),
         width: Math.round(w),
-        height: Math.round(h)
+        height: Math.round(h),
       };
     }
   }
@@ -880,7 +891,7 @@ export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
         x_min: Math.round(x),
         y_min: Math.round(y),
         width: Math.round(w),
-        height: Math.round(h)
+        height: Math.round(h),
       };
     }
 
@@ -890,7 +901,7 @@ export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
         x_min: Math.round(bounds.minX),
         y_min: Math.round(bounds.minY),
         width: Math.round(bounds.maxX - bounds.minX),
-        height: Math.round(bounds.maxY - bounds.minY)
+        height: Math.round(bounds.maxY - bounds.minY),
       };
     }
   }
@@ -914,7 +925,9 @@ export function polyToCoco(a: unknown): CocoPolygon | null {
         .map((p) => (Array.isArray(p) ? p : []))
         .filter(
           (p) =>
-            p.length === 2 && typeof p[0] === "number" && typeof p[1] === "number"
+            p.length === 2 &&
+            typeof p[0] === "number" &&
+            typeof p[1] === "number",
         ) as number[][];
 
       if (coords.length < 3) return null;
@@ -927,17 +940,19 @@ export function polyToCoco(a: unknown): CocoPolygon | null {
             Math.round(bounds.minX),
             Math.round(bounds.minY),
             Math.round(bounds.maxX - bounds.minX),
-            Math.round(bounds.maxY - bounds.minY)
+            Math.round(bounds.maxY - bounds.minY),
           ]
         : ([
             Math.round(Math.min(...coords.map((p) => p[0]))),
             Math.round(Math.min(...coords.map((p) => p[1]))),
             Math.round(
-              Math.max(...coords.map((p) => p[0])) - Math.min(...coords.map((p) => p[0]))
+              Math.max(...coords.map((p) => p[0])) -
+                Math.min(...coords.map((p) => p[0])),
             ),
             Math.round(
-              Math.max(...coords.map((p) => p[1])) - Math.min(...coords.map((p) => p[1]))
-            )
+              Math.max(...coords.map((p) => p[1])) -
+                Math.min(...coords.map((p) => p[1])),
+            ),
           ] as [number, number, number, number]);
 
       return { segmentation: [flat], bbox };
@@ -952,7 +967,10 @@ export function polyToCoco(a: unknown): CocoPolygon | null {
         .trim()
         .split(/\s+/)
         .map((pair) => pair.split(/[,\s]+/).map(Number))
-        .filter((p) => p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])) as number[][];
+        .filter(
+          (p) =>
+            p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]),
+        ) as number[][];
 
       if (coords.length >= 3) {
         const flat = coords.flatMap(([x, y]) => [Math.round(x), Math.round(y)]);
@@ -962,7 +980,7 @@ export function polyToCoco(a: unknown): CocoPolygon | null {
           Math.round(Math.min(...xs)),
           Math.round(Math.min(...ys)),
           Math.round(Math.max(...xs) - Math.min(...xs)),
-          Math.round(Math.max(...ys) - Math.min(...ys))
+          Math.round(Math.max(...ys) - Math.min(...ys)),
         ];
         return { segmentation: [flat], bbox };
       }
@@ -993,11 +1011,14 @@ export function augmentLabelForExport(a: unknown, includeTracks: boolean) {
   return {
     ...label,
     track_numeric: track_numeric ?? undefined,
-    instance: track_numeric ?? undefined
+    instance: track_numeric ?? undefined,
   };
 }
 
-export function w3cToCocoFrames(list: ImageAnnotation[], includeTracks = true): CocoFrame[] {
+export function w3cToCocoFrames(
+  list: ImageAnnotation[],
+  includeTracks = true,
+): CocoFrame[] {
   const byFrame: Record<number, CocoFrame> = {};
 
   for (const a of Array.isArray(list) ? list : []) {
@@ -1048,7 +1069,8 @@ export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
   for (const frameEntry of coco) {
     if (!isRecord(frameEntry)) continue;
 
-    const frameIndex = typeof frameEntry.frame === "number" ? (frameEntry.frame | 0) : 0;
+    const frameIndex =
+      typeof frameEntry.frame === "number" ? frameEntry.frame | 0 : 0;
     const bboxes = Array.isArray(frameEntry.bboxes) ? frameEntry.bboxes : [];
 
     for (const b of bboxes) {
@@ -1056,15 +1078,21 @@ export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
 
       const x = Math.round((typeof b.x_min === "number" ? b.x_min : 0) ?? 0);
       const y = Math.round((typeof b.y_min === "number" ? b.y_min : 0) ?? 0);
-      const width = Math.round((typeof b.width === "number" ? b.width : 0) ?? 0);
-      const height = Math.round((typeof b.height === "number" ? b.height : 0) ?? 0);
+      const width = Math.round(
+        (typeof b.width === "number" ? b.width : 0) ?? 0,
+      );
+      const height = Math.round(
+        (typeof b.height === "number" ? b.height : 0) ?? 0,
+      );
       if (width <= 0 || height <= 0) continue;
 
-      const class_name = typeof b.class_name === "string" ? b.class_name : undefined;
+      const class_name =
+        typeof b.class_name === "string" ? b.class_name : undefined;
       const class_id = typeof b.class_id === "number" ? b.class_id : undefined;
 
       const labelValue =
-        class_name ?? (typeof class_id === "number" ? String(class_id) : "unknown");
+        class_name ??
+        (typeof class_id === "number" ? String(class_id) : "unknown");
 
       const tid = typeof b.track_id === "string" ? b.track_id : "";
       if (!tid) continue;
@@ -1080,7 +1108,7 @@ export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
         x_min: x,
         y_min: y,
         frame: frameIndex,
-        track_id: tid
+        track_id: tid,
       });
     }
   }
