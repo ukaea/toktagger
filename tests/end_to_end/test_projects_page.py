@@ -312,6 +312,9 @@ def test_edit(server_setup, page: Page):
     # Navigate to page
     page.goto("http://localhost:8002")
 
+    # Check basic structure of page is correct
+    check_base_page(page)
+
     # Press edit button
     page.get_by_role("row").nth(1).get_by_role("button", name="Edit").click()
 
@@ -352,6 +355,79 @@ def test_edit(server_setup, page: Page):
     assert project["data_loader"] == "uda"
 
 
-def test_my_new_functionality(server_setup, page: Page):
+def test_create_shot_data(server_setup, page: Page):
     # Navigate to page
     page.goto("http://localhost:8002")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Press create button
+    page.get_by_role("button", name="Create").click()
+
+    # Check modal has opened
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+
+    # Check it appears as expected
+    expect(modal.get_by_role("heading", name="Create Project")).to_be_visible()
+    expect(modal.get_by_role("button", name="Create")).to_be_visible()
+    expect(modal.get_by_role("button", name="Close")).to_be_visible()
+    # Check form contains required fields
+    expect(modal.get_by_text("Project Name")).to_be_visible()
+    expect(modal.get_by_text("Data Loader")).to_be_visible()
+    expect(modal.get_by_text("Task")).to_be_visible()
+    expect(modal.get_by_text("Query Strategy")).to_be_visible()
+
+    # Select UDA data loader - should open ShotData form
+    modal.get_by_role("button", name="Data Loader").click()
+    page.get_by_role("option", name="UDA").click()
+
+    # Check we can now see Shot Min, Shot Max, and UDA Signal Names
+    expect(modal.get_by_text("Shot Min", exact=True)).to_be_visible()
+    expect(modal.get_by_text("Shot Max", exact=True)).to_be_visible()
+    expect(modal.get_by_text("UDA Signal Names")).to_be_visible()
+
+    # Fill in these fields
+    modal.get_by_role("textbox", name="Shot Min").fill("12380")
+    modal.get_by_role("textbox", name="Shot Max").fill("12385")
+
+    # Add signal name
+    modal.get_by_role("textbox", name="UDA Signal Names").fill("ANE_DENSITY")
+    modal.get_by_role("button", name="Add").click()
+    expect(modal.get_by_text("ANE_DENSITY")).to_be_visible()
+
+    # Check it can be removed
+    modal.get_by_role("button", name="Remove").click()
+    expect(modal.get_by_text("ANE_DENSITY")).to_be_hidden()
+
+    # Add another signal name
+    modal.get_by_role("textbox", name="UDA Signal Names").fill("ip")
+    modal.get_by_role("button", name="Add").click()
+    expect(modal.get_by_text("ip")).to_be_visible()
+
+    # Fill in the rest of the info
+    modal.get_by_role("textbox", name="Project Name").fill("Test Project")
+    modal.get_by_role("button", name="Task").click()
+    page.get_by_role("option", name="disruption").click()
+    modal.get_by_role("radio", name="Random").click()
+
+    # Create project
+    modal.get_by_role("button", name="Create").click()
+
+    # Check project added to table
+    expect(page.get_by_role("row").nth(1)).to_contain_text("Test Project")
+
+    # Get project from API, check details are all correct
+    response = requests.get("http://localhost:8002/projects")
+    project = response.json()[0]
+    assert project["name"] == "Test Project"
+    assert project["query_strategy"] == "random"
+    assert project["task"] == "disruption"
+    assert project["data_loader"] == "uda"
+
+    # Check 6 samples added (12380 to 12385 inclusive)
+    response = requests.get(f"http://localhost:8002/projects/{project['_id']}/samples")
+    samples = response.json()
+    assert len(samples) == 6
+    assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
