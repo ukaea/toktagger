@@ -379,6 +379,12 @@ def test_create_shot_data(server_setup, page: Page):
     expect(modal.get_by_text("Task")).to_be_visible()
     expect(modal.get_by_text("Query Strategy")).to_be_visible()
 
+    # Fill in common info
+    modal.get_by_role("button", name="Task").click()
+    page.get_by_role("option", name="disruption").click()
+    modal.get_by_role("radio", name="Random").click()
+    modal.get_by_role("textbox", name="Project Name").fill("Test Project")
+
     # Select UDA data loader - should open ShotData form
     modal.get_by_role("button", name="Data Loader").click()
     page.get_by_role("option", name="UDA").click()
@@ -405,12 +411,6 @@ def test_create_shot_data(server_setup, page: Page):
     modal.get_by_role("textbox", name="UDA Signal Names").fill("ip")
     modal.get_by_role("button", name="Add").click()
     expect(modal.get_by_text("ip")).to_be_visible()
-
-    # Fill in the rest of the info
-    modal.get_by_role("textbox", name="Project Name").fill("Test Project")
-    modal.get_by_role("button", name="Task").click()
-    page.get_by_role("option", name="disruption").click()
-    modal.get_by_role("radio", name="Random").click()
 
     # Create project
     modal.get_by_role("button", name="Create").click()
