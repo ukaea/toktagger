@@ -3,6 +3,8 @@ from playwright.sync_api import Page, expect
 import re
 from datetime import datetime
 import time
+import tempfile
+import pathlib
 
 
 def create_project(name: str, task: str, data_loader: str) -> str:
@@ -53,6 +55,33 @@ def check_base_page(page):
 
     # Expect to be on page 1
     expect(page.get_by_text("Page: 1")).to_be_visible()
+
+
+def check_create_modal(page):
+    # Press create button
+    page.get_by_role("button", name="Create").click()
+
+    # Check modal has opened
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+
+    # Check it appears as expected
+    expect(modal.get_by_role("heading", name="Create Project")).to_be_visible()
+    expect(modal.get_by_role("button", name="Create")).to_be_visible()
+    expect(modal.get_by_role("button", name="Close")).to_be_visible()
+    # Check form contains required fields
+    expect(modal.get_by_text("Project Name")).to_be_visible()
+    expect(modal.get_by_text("Data Loader")).to_be_visible()
+    expect(modal.get_by_text("Task")).to_be_visible()
+    expect(modal.get_by_text("Query Strategy")).to_be_visible()
+
+    # Fill in common info
+    modal.get_by_role("button", name="Task").click()
+    page.get_by_role("option", name="disruption").click()
+    modal.get_by_role("radio", name="Random").click()
+    modal.get_by_role("textbox", name="Project Name").fill("Test Project")
+
+    return modal
 
 
 def test_empty_projects_table(server_setup, page: Page):
@@ -365,25 +394,7 @@ def test_create_shot_data(server_setup, page: Page):
     # Press create button
     page.get_by_role("button", name="Create").click()
 
-    # Check modal has opened
-    modal = page.get_by_role("dialog")
-    expect(modal).to_be_visible()
-
-    # Check it appears as expected
-    expect(modal.get_by_role("heading", name="Create Project")).to_be_visible()
-    expect(modal.get_by_role("button", name="Create")).to_be_visible()
-    expect(modal.get_by_role("button", name="Close")).to_be_visible()
-    # Check form contains required fields
-    expect(modal.get_by_text("Project Name")).to_be_visible()
-    expect(modal.get_by_text("Data Loader")).to_be_visible()
-    expect(modal.get_by_text("Task")).to_be_visible()
-    expect(modal.get_by_text("Query Strategy")).to_be_visible()
-
-    # Fill in common info
-    modal.get_by_role("button", name="Task").click()
-    page.get_by_role("option", name="disruption").click()
-    modal.get_by_role("radio", name="Random").click()
-    modal.get_by_role("textbox", name="Project Name").fill("Test Project")
+    modal = check_create_modal(page)
 
     # Select UDA data loader - should open ShotData form
     modal.get_by_role("button", name="Data Loader").click()
@@ -431,3 +442,72 @@ def test_create_shot_data(server_setup, page: Page):
     samples = response.json()
     assert len(samples) == 6
     assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
+
+
+def test_create_file_data(server_setup, page: Page):
+    # Navigate to page
+    page.goto("http://localhost:8002")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    modal = check_create_modal(page)
+
+    # Create some Parquet files
+    with tempfile.TemporaryDirectory() as tempd:
+        pathlib.Path(tempd).joinpath("10000.parquet").touch()
+        pathlib.Path(tempd).joinpath("10001.parquet").touch()
+
+        # Select Local File data loader - should open FileData form
+        modal.get_by_role("button", name="Data Loader").click()
+        page.get_by_role("option", name="Local File").click()
+
+        # Check we can now see File Type, File Path, and File Columns visible
+        expect(modal.get_by_text("File Type")).to_be_visible()
+        expect(modal.get_by_text("File Path")).to_be_visible()
+        expect(modal.get_by_text("File Columns")).to_be_visible()
+
+        # Fill in these fields
+        modal.get_by_role("button", name="File Type").click()
+        page.get_by_role("option", name="Parquet").click()
+
+        # Add temp dir as file path, check 2 files are found
+        modal.get_by_role("textbox", name="File Path").fill(tempd)
+        expect(modal.get_by_text("2 parquet files found.")).to_be_visible()
+
+        # Add column name
+        modal.get_by_role("textbox", name="File Columns").fill("ANE_DENSITY")
+        modal.get_by_role("button", name="Add").click()
+        expect(modal.get_by_text("ANE_DENSITY")).to_be_visible()
+
+        # Check it can be removed
+        modal.get_by_role("button", name="Remove").click()
+        expect(modal.get_by_text("ANE_DENSITY")).to_be_hidden()
+
+        # Add another column name
+        modal.get_by_role("textbox", name="File Columns").fill("ip")
+        modal.get_by_role("button", name="Add").click()
+        expect(modal.get_by_text("ip")).to_be_visible()
+
+        # Create project
+        modal.get_by_role("button", name="Create").click()
+
+        # Check project added to table
+        expect(page.get_by_role("row").nth(1)).to_contain_text("Test Project")
+
+        # Get project from API, check details are all correct
+        response = requests.get("http://localhost:8002/projects")
+        project = response.json()[0]
+        assert project["name"] == "Test Project"
+        assert project["query_strategy"] == "random"
+        assert project["task"] == "disruption"
+        assert project["data_loader"] == "parquet"
+
+        # Check 6 samples added (12380 to 12385 inclusive)
+        response = requests.get(
+            f"http://localhost:8002/projects/{project['_id']}/samples"
+        )
+        samples = response.json()
+        assert len(samples) == 2
+        assert all(sample["data"]["column_names"][0] == "ip" for sample in samples)
+        assert sorted(sample["shot_id"] for sample in samples) == [10000, 10001]
