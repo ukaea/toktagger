@@ -345,11 +345,10 @@ export function ClassInfoPopup(props: {
     return found ? extractClassLabel(found) : null;
   }, [list, annotation.id]);
 
-  const effectiveLabel =
-    (fromList &&
-      (fromList.class_id || fromList.class_name || fromList.track_id
-        ? fromList
-        : null)) ||
+  const effectiveLabel = (fromList &&
+    (fromList.class_id || fromList.class_name || fromList.track_id
+      ? fromList
+      : null)) ||
     (ownLabel &&
       (ownLabel.class_id || ownLabel.class_name || ownLabel.track_id
         ? ownLabel

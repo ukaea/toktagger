@@ -159,7 +159,11 @@ function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
 function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   const handleClick = async () => {
     try {
-      const response = await saveAnnotations(project_id, sample_id, annotations);
+      const response = await saveAnnotations(
+        project_id,
+        sample_id,
+        annotations,
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
@@ -968,7 +972,9 @@ export default function ToolBar({
               }))}
               selectedKey={selectedInstanceKey}
               onSelect={(key) => {
-                const inst = instanceProfiles.find((p) => instanceKey(p) === key);
+                const inst = instanceProfiles.find(
+                  (p) => instanceKey(p) === key,
+                );
                 if (!inst) return;
 
                 setSelectedInstanceId(inst.id);
@@ -1011,7 +1017,9 @@ export default function ToolBar({
                   (typeof labelMapId === "number" ? labelMapId : undefined) ??
                   1;
 
-                const existingTrackIds = instanceProfiles.map((p) => p.track_id);
+                const existingTrackIds = instanceProfiles.map(
+                  (p) => p.track_id,
+                );
                 const canonicalTrackId =
                   canonicalizeTrackId(trackId) ||
                   canonicalizeTrackId(uniqueReadableId(existingTrackIds));
