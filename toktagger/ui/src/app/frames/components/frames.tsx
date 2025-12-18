@@ -72,6 +72,7 @@ declare global {
     ufoSelectedProfileId?: string | null;
     ufoSelectedClassName?: string | null;
     ufoSelectedTrackId?: string | null;
+    ufoSelectionSource?: "auto" | "explicit" | null;
 
     ufoHasUnsavedChanges?: () => boolean;
     ufoMarkSaved?: () => void;
@@ -435,28 +436,75 @@ export function FrameView({
     };
   }, [projectId, sampleId]);
 
+  const clearInstanceSelectionUnlessExplicit = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const w = window;
+    const source = w.ufoSelectionSource ?? null;
+
+    // If user explicitly picked an instance, keep it across frames.
+    if (source === "explicit") return;
+
+    // Clear only the instance selection; keep class armed.
+    w.ufoSelectedProfileId = null;
+    w.ufoSelectedTrackId = null;
+    w.ufoSelectionSource = null;
+
+    w.ufoNotifySelectionChanged?.();
+
+    // Also tell the toolbar to clear the highlighted instance row.
+    const profiles = (w.ufoInstanceProfiles ?? []).map((p) => ({
+      class_name: p.class_name,
+      class_id: p.class_id,
+      track_id: p.track_id,
+    }));
+
+    w.dispatchEvent(
+      new CustomEvent("ufo:state", {
+        detail: {
+          includeTrackIds: true,
+          profiles,
+          selectedKey: null,
+          selectedClassName: w.ufoSelectedClassName ?? null,
+          lastClassName: w.ufoSelectedClassName ?? null,
+          classRegistry,
+        },
+      }),
+    );
+  }, [classRegistry]);
+
   // Navigation handlers: always save current frame before calling upstream.
   const handlePrev = useCallback(async () => {
     if (!onPrev) return;
     await saveCurrentFrame();
+    clearInstanceSelectionUnlessExplicit();
     onPrev();
-  }, [onPrev, saveCurrentFrame]);
+  }, [onPrev, saveCurrentFrame, clearInstanceSelectionUnlessExplicit]);
 
   const handleNext = useCallback(async () => {
     if (!onNext) return;
 
     const currentList = await saveCurrentFrame();
     await propagateForwardIfEmpty(currentList, frameNumber + 1);
+
+    clearInstanceSelectionUnlessExplicit();
     onNext();
-  }, [onNext, saveCurrentFrame, propagateForwardIfEmpty, frameNumber]);
+  }, [
+    onNext,
+    saveCurrentFrame,
+    propagateForwardIfEmpty,
+    frameNumber,
+    clearInstanceSelectionUnlessExplicit,
+  ]);
 
   const handleJump = useCallback(
     async (n: number) => {
       if (!onJump) return;
       await saveCurrentFrame();
+      clearInstanceSelectionUnlessExplicit();
       onJump(n);
     },
-    [onJump, saveCurrentFrame],
+    [onJump, saveCurrentFrame, clearInstanceSelectionUnlessExplicit],
   );
 
   /**
@@ -659,6 +707,7 @@ export function FrameView({
       window.ufoSelectedProfileId = id;
       window.ufoSelectedClassName = prettyClassName;
       window.ufoSelectedTrackId = track_id;
+      window.ufoSelectionSource = "auto";
       window.ufoNotifySelectionChanged?.();
 
       const profilePayload = nextProfiles.map((p) => ({
@@ -752,11 +801,13 @@ export function FrameView({
           window.ufoSelectedProfileId = last.id;
           window.ufoSelectedClassName = last.class_name;
           window.ufoSelectedTrackId = last.track_id;
+          window.ufoSelectionSource = "auto";
         } else {
           selectedProfileId = null;
           window.ufoSelectedProfileId = null;
           window.ufoSelectedClassName = null;
           window.ufoSelectedTrackId = null;
+          window.ufoSelectionSource = null;
         }
       }
     }
@@ -938,6 +989,7 @@ export function FrameView({
     window.ufoSelectedProfileId = null;
     window.ufoSelectedClassName = null;
     window.ufoSelectedTrackId = null;
+    window.ufoSelectionSource = null;
     window.ufoNotifySelectionChanged?.();
 
     window.dispatchEvent(
