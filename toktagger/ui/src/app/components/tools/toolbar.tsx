@@ -159,11 +159,7 @@ function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
 function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   const handleClick = async () => {
     try {
-      const response = await saveAnnotations(
-        project_id,
-        sample_id,
-        annotations,
-      );
+      const response = await saveAnnotations(project_id, sample_id, annotations);
 
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
@@ -580,10 +576,7 @@ export default function ToolBar({
           tools.push({
             name: "Color Map",
             component: (
-              <ColorMapPicker
-                plotProps={plotProps}
-                setPlotProps={setPlotProps}
-              />
+              <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
             ),
           });
 
@@ -613,13 +606,9 @@ export default function ToolBar({
   /** ---------------- UFO state (restored to backup behavior) ---------------- */
 
   const [classRegistry, setClassRegistry] = useState<ClassRegistry>({});
-  const [selectedClassName, setSelectedClassName] = useState<string | null>(
-    null,
-  );
+  const [selectedClassName, setSelectedClassName] = useState<string | null>(null);
 
-  const [instanceProfiles, setInstanceProfiles] = useState<InstanceProfile[]>(
-    [],
-  );
+  const [instanceProfiles, setInstanceProfiles] = useState<InstanceProfile[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
     null,
   );
@@ -740,8 +729,7 @@ export default function ToolBar({
     const fromRegistryLower = classRegistry[keyLower];
     const fromRegistryExact = classRegistry[clsName];
 
-    const regIdStr =
-      fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
+    const regIdStr = fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
     const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
     const fixedId = FIXED_CLASS_REG[keyLower];
@@ -819,8 +807,7 @@ export default function ToolBar({
     w.ufoSelectedProfileId = selectedInstanceId ?? null;
     w.ufoSelectedClassName = selectedClassName ?? null;
 
-    const sel =
-      instanceProfiles.find((p) => p.id === selectedInstanceId) || null;
+    const sel = instanceProfiles.find((p) => p.id === selectedInstanceId) || null;
     w.ufoSelectedTrackId = sel?.track_id ?? null;
 
     w.ufoNotifySelectionChanged?.();
@@ -828,10 +815,7 @@ export default function ToolBar({
 
   /** ---------------- UFO delete/clear/save navigation (unchanged) ---------------- */
 
-  const onRequestBulkDelete = (profile: {
-    class_name?: string;
-    track_id?: string;
-  }) => {
+  const onRequestBulkDelete = (profile: { class_name?: string; track_id?: string }) => {
     if (typeof window === "undefined") return;
 
     window.dispatchEvent(
@@ -853,10 +837,6 @@ export default function ToolBar({
 
   const ufoClearCurrent = async () => {
     await window.ufoClearCurrent?.();
-  };
-
-  const ufoClearAllFrames = async () => {
-    await window.ufoClearAllFrames?.();
   };
 
   const collectUfoPayloadForBackend = async (): Promise<Annotation[]> => {
@@ -993,27 +973,7 @@ export default function ToolBar({
               <hr className="m-4 h-px opacity-30 border-gray-200" />
 
               <div className="mb-1">
-                <Flex gap="size-100" alignItems="center" wrap>
-                  <Button
-                    variant="negative"
-                    isQuiet
-                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
-                    onPress={async () => {
-                      try {
-                        await ufoClearAllFrames();
-                        ToastQueue.positive("Cleared all frames.", {
-                          timeout: 2500,
-                        });
-                      } catch {
-                        ToastQueue.negative("Failed to clear all frames.", {
-                          timeout: 5000,
-                        });
-                      }
-                    }}
-                  >
-                    Clear ALL
-                  </Button>
-
+                <Flex gap="size-100" alignItems="center" justifyContent="center" wrap>
                   <Button
                     isQuiet
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
@@ -1030,7 +990,7 @@ export default function ToolBar({
                       }
                     }}
                   >
-                    Clear Current
+                    Clear Current Frame
                   </Button>
                 </Flex>
               </div>
@@ -1050,6 +1010,8 @@ export default function ToolBar({
 
                 // Important: selecting a class should NOT keep stamping onto an old instance.
                 setSelectedInstanceId(null);
+
+                // Do NOT call createInstanceForClass here anymore.
               }}
             />
 
@@ -1063,9 +1025,7 @@ export default function ToolBar({
               }))}
               selectedKey={selectedInstanceKey}
               onSelect={(key) => {
-                const inst = instanceProfiles.find(
-                  (p) => instanceKey(p) === key,
-                );
+                const inst = instanceProfiles.find((p) => instanceKey(p) === key);
                 if (!inst) return;
 
                 setSelectedInstanceId(inst.id);
@@ -1090,14 +1050,11 @@ export default function ToolBar({
 
                 const regIdStr =
                   fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
-                const regId =
-                  regIdStr !== undefined ? Number(regIdStr) : undefined;
+                const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
 
                 const fixedId = FIXED_CLASS_REG[keyLower];
 
-                const labelMapId = LABEL_MAP.categories.find(
-                  (c) => c.name === cls,
-                )?.id;
+                const labelMapId = LABEL_MAP.categories.find((c) => c.name === cls)?.id;
 
                 const class_id =
                   (typeof regId === "number" && !Number.isNaN(regId)
@@ -1107,9 +1064,7 @@ export default function ToolBar({
                   (typeof labelMapId === "number" ? labelMapId : undefined) ??
                   1;
 
-                const existingTrackIds = instanceProfiles.map(
-                  (p) => p.track_id,
-                );
+                const existingTrackIds = instanceProfiles.map((p) => p.track_id);
                 const canonicalTrackId =
                   canonicalizeTrackId(trackId) ||
                   canonicalizeTrackId(uniqueReadableId(existingTrackIds));
