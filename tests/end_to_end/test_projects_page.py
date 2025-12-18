@@ -5,24 +5,7 @@ from datetime import datetime
 import time
 import tempfile
 import pathlib
-
-
-def create_project(name: str, task: str, data_loader: str) -> str:
-    project = {
-        "name": name,
-        "task": task,
-        "query_strategy": "random",
-        "data_loader": data_loader,
-    }
-
-    response = requests.post(
-        "http://localhost:8002/projects",
-        json=project,
-    )
-    assert response.status_code == 200
-
-    project_id = response.json()["_id"]
-    return project_id
+from tests.endpoints import create_project
 
 
 def check_base_page(page):
@@ -391,9 +374,6 @@ def test_create_shot_data(server_setup, page: Page):
     # Check basic structure of page is correct
     check_base_page(page)
 
-    # Press create button
-    page.get_by_role("button", name="Create").click()
-
     modal = check_create_modal(page)
 
     # Select UDA data loader - should open ShotData form
@@ -466,10 +446,6 @@ def test_create_file_data(server_setup, page: Page):
         expect(modal.get_by_text("File Type")).to_be_visible()
         expect(modal.get_by_text("File Path")).to_be_visible()
         expect(modal.get_by_text("File Columns")).to_be_visible()
-
-        # Fill in these fields
-        modal.get_by_role("button", name="File Type").click()
-        page.get_by_role("option", name="Parquet").click()
 
         # Add temp dir as file path, check 2 files are found
         modal.get_by_role("textbox", name="File Path").fill(tempd)
