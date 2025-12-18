@@ -42,7 +42,8 @@ class DataParams(ConfiguredModel):
 
 
 class ImageParams(DataParams):
-    frame: int
+    name: LoaderType = LoaderType.IMAGE
+    frame: int | None
 
 
 DataResponseType = Union[

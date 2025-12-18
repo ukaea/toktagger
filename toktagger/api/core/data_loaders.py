@@ -105,7 +105,9 @@ class ImageDataLoader(DataLoader):
                 f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
             )
         # Open image which represents frame selected
-        if self.params.name != "image":  # TODO do we want this?
+        if self.params.name != "image":
+            raise ValueError("Must provide image data parameters!")
+        elif self.params.frame is None:
             file_path = next(dir_path.iterdir())
         else:
             file_path = dir_path.joinpath(
