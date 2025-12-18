@@ -90,7 +90,7 @@ export const AddSamplesEditor = ({
               Close
             </Button>
             <Button variant="primary" onPress={async () => onFormSubmit(close)}>
-              {"Add"}
+              {"Create"}
             </Button>
           </ButtonGroup>
         </Dialog>

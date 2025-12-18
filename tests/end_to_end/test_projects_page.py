@@ -119,7 +119,7 @@ def test_single_project(server_setup, page: Page):
     )
 
 
-def test_page_navigation(server_setup, page: Page):
+def test_projects_page_navigation(server_setup, page: Page):
     # Create 6 projects
     for i in range(1, 7):
         create_project(f"Test Project {i}", "disruption", "uda")
@@ -187,7 +187,7 @@ def test_page_navigation(server_setup, page: Page):
     expect(page.get_by_role("button", name="Next")).to_be_disabled()
 
 
-def test_sorting(server_setup, page: Page):
+def test_projects_sorting(server_setup, page: Page):
     def sort(page, col_name, expected_first, expected_second):
         # Sort by given column
         page.get_by_role("columnheader", name=col_name).click()
@@ -227,7 +227,7 @@ def test_sorting(server_setup, page: Page):
     sort(page, "Loader", "B Project", "A Project")
 
 
-def test_search(server_setup, page: Page):
+def test_projects_search(server_setup, page: Page):
     # Create some projects with different names
     create_project("Project A", "ELM", "uda")
     create_project("Project B", "ELM", "uda")
@@ -292,7 +292,7 @@ def test_search(server_setup, page: Page):
     expect(page.get_by_role("row").nth(7)).to_be_hidden()
 
 
-def test_delete(server_setup, page: Page):
+def test_delete_project(server_setup, page: Page):
     # Create some projects
     create_project("Project A", "ELM", "uda")
     create_project("Project B", "disruption", "parquet")
@@ -317,7 +317,7 @@ def test_delete(server_setup, page: Page):
     expect(page.get_by_role("row").nth(1)).to_be_hidden()
 
 
-def test_edit(server_setup, page: Page):
+def test_edit_project(server_setup, page: Page):
     # Create some projects
     create_project("Test Project", "ELM", "uda")
 
@@ -367,7 +367,7 @@ def test_edit(server_setup, page: Page):
     assert project["data_loader"] == "uda"
 
 
-def test_create_shot_data(server_setup, page: Page):
+def test_create_project_shot_data(server_setup, page: Page):
     # Navigate to page
     page.goto("http://localhost:8002")
 
@@ -383,14 +383,14 @@ def test_create_shot_data(server_setup, page: Page):
     # Check we can now see Shot Min, Shot Max, and UDA Signal Names
     expect(modal.get_by_text("Shot Min", exact=True)).to_be_visible()
     expect(modal.get_by_text("Shot Max", exact=True)).to_be_visible()
-    expect(modal.get_by_text("UDA Signal Names")).to_be_visible()
+    expect(modal.get_by_text("Signal Names")).to_be_visible()
 
     # Fill in these fields
     modal.get_by_role("textbox", name="Shot Min").fill("12380")
     modal.get_by_role("textbox", name="Shot Max").fill("12385")
 
     # Add signal name
-    modal.get_by_role("textbox", name="UDA Signal Names").fill("ANE_DENSITY")
+    modal.get_by_role("textbox", name="Signal Names").fill("ANE_DENSITY")
     modal.get_by_role("button", name="Add").click()
     expect(modal.get_by_text("ANE_DENSITY")).to_be_visible()
 
@@ -399,7 +399,7 @@ def test_create_shot_data(server_setup, page: Page):
     expect(modal.get_by_text("ANE_DENSITY")).to_be_hidden()
 
     # Add another signal name
-    modal.get_by_role("textbox", name="UDA Signal Names").fill("ip")
+    modal.get_by_role("textbox", name="Signal Names").fill("ip")
     modal.get_by_role("button", name="Add").click()
     expect(modal.get_by_text("ip")).to_be_visible()
 
@@ -424,7 +424,7 @@ def test_create_shot_data(server_setup, page: Page):
     assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
 
 
-def test_create_file_data(server_setup, page: Page):
+def test_create_project_file_data(server_setup, page: Page):
     # Navigate to page
     page.goto("http://localhost:8002")
 
@@ -440,7 +440,7 @@ def test_create_file_data(server_setup, page: Page):
 
         # Select Local File data loader - should open FileData form
         modal.get_by_role("button", name="Data Loader").click()
-        page.get_by_role("option", name="Local File").click()
+        page.get_by_role("option", name="parquet").click()
 
         # Check we can now see File Type, File Path, and File Columns visible
         expect(modal.get_by_text("File Type")).to_be_visible()
@@ -479,7 +479,7 @@ def test_create_file_data(server_setup, page: Page):
         assert project["task"] == "disruption"
         assert project["data_loader"] == "parquet"
 
-        # Check 6 samples added (12380 to 12385 inclusive)
+        # Check 2 samples added (10000 and 10001)
         response = requests.get(
             f"http://localhost:8002/projects/{project['_id']}/samples"
         )
