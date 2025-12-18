@@ -75,7 +75,10 @@ export function workingKey(projectId: string, sampleId: string) {
   return `${WORKING_PREFIX}${projectId}::${sampleId}`;
 }
 
-export function isUfoWorkingDirty(projectId: string, sampleId: string): boolean {
+export function isUfoWorkingDirty(
+  projectId: string,
+  sampleId: string,
+): boolean {
   if (typeof window === "undefined") return false;
   return window.localStorage.getItem(workingKey(projectId, sampleId)) === "1";
 }

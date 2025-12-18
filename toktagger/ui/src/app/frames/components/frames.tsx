@@ -307,7 +307,7 @@ export function FrameView({
       const class_id =
         typeof lbl.class_id === "number" && Number.isFinite(lbl.class_id)
           ? lbl.class_id
-          : FIXED_CLASS_REG[class_name.toLowerCase()] ?? 1;
+          : (FIXED_CLASS_REG[class_name.toLowerCase()] ?? 1);
 
       const track_id = canonicalizeTrackId(lbl.track_id);
       const id = `${class_name}:${track_id}`;
