@@ -1117,20 +1117,21 @@ export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
   return out;
 }
 
-// lib.ts
 // If your backend Annotation[] is a union, we guard it.
-function isVideoBoundingBox(a: any): a is VideoBoundingBox {
+function isVideoBoundingBox(a: unknown): a is VideoBoundingBox {
+  if (!a || typeof a !== "object") return false;
+
+  const v = a as Record<string, unknown>;
+
   return (
-    a &&
-    typeof a === "object" &&
-    a.type === "video_bounding_box" &&
-    typeof a.frame === "number" &&
-    typeof a.x_min === "number" &&
-    typeof a.y_min === "number" &&
-    typeof a.width === "number" &&
-    typeof a.height === "number" &&
-    typeof a.label === "string" &&
-    typeof a.track_id === "string"
+    v.type === "video_bounding_box" &&
+    typeof v.frame === "number" &&
+    typeof v.x_min === "number" &&
+    typeof v.y_min === "number" &&
+    typeof v.width === "number" &&
+    typeof v.height === "number" &&
+    typeof v.label === "string" &&
+    typeof v.track_id === "string"
   );
 }
 
@@ -1144,7 +1145,6 @@ function inferClassId(label: string): number {
 
   return 1;
 }
-
 export function videoBBoxesToW3CByFrame(opts: {
   projectId: string;
   sampleId: string;
@@ -1176,7 +1176,7 @@ export function videoBBoxesToW3CByFrame(opts: {
     // Deterministic-ish id so edits/deletes behave predictably after reload
     const id = `db-${frame}-${track_id}-${x}-${y}-${w}-${h}-${i++}`;
 
-    const anno: ImageAnnotation = {
+    const anno = {
       id,
       target: {
         source,
@@ -1203,7 +1203,7 @@ export function videoBBoxesToW3CByFrame(opts: {
           value: { type: "class", id: class_id, name: class_name, track_id },
         },
       ],
-    } as any;
+    } as unknown as ImageAnnotation;
 
     const cur = byFrame.get(frame) ?? [];
     cur.push(anno);
