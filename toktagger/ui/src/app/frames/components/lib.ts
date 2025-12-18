@@ -1,6 +1,7 @@
 "use client";
 
 import type { ImageAnnotation } from "@annotorious/react";
+import { buildSourceKey } from "./adapters";
 
 /**
  * Shared helpers for:
@@ -1114,4 +1115,100 @@ export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
   }
 
   return out;
+}
+
+// lib.ts
+// If your backend Annotation[] is a union, we guard it.
+function isVideoBoundingBox(a: any): a is VideoBoundingBox {
+  return (
+    a &&
+    typeof a === "object" &&
+    a.type === "video_bounding_box" &&
+    typeof a.frame === "number" &&
+    typeof a.x_min === "number" &&
+    typeof a.y_min === "number" &&
+    typeof a.width === "number" &&
+    typeof a.height === "number" &&
+    typeof a.label === "string" &&
+    typeof a.track_id === "string"
+  );
+}
+
+function inferClassId(label: string): number {
+  const key = label.toLowerCase().trim();
+  const fixed = FIXED_CLASS_REG[key];
+  if (typeof fixed === "number") return fixed;
+
+  const asNum = Number(label);
+  if (Number.isFinite(asNum)) return asNum;
+
+  return 1;
+}
+
+export function videoBBoxesToW3CByFrame(opts: {
+  projectId: string;
+  sampleId: string;
+  annotations: unknown[];
+}): Map<number, ImageAnnotation[]> {
+  const { projectId, sampleId, annotations } = opts;
+
+  const byFrame = new Map<number, ImageAnnotation[]>();
+
+  const list = Array.isArray(annotations) ? annotations : [];
+  let i = 0;
+
+  for (const raw of list) {
+    if (!isVideoBoundingBox(raw)) continue;
+
+    const frame = raw.frame | 0;
+    const x = Math.round(raw.x_min);
+    const y = Math.round(raw.y_min);
+    const w = Math.round(raw.width);
+    const h = Math.round(raw.height);
+    if (w <= 0 || h <= 0) continue;
+
+    const class_name = raw.label;
+    const class_id = inferClassId(class_name);
+    const track_id = canonicalizeTrackId(raw.track_id);
+
+    const source = buildSourceKey({ projectId, sampleId, frame });
+
+    // Deterministic-ish id so edits/deletes behave predictably after reload
+    const id = `db-${frame}-${track_id}-${x}-${y}-${w}-${h}-${i++}`;
+
+    const anno: ImageAnnotation = {
+      id,
+      target: {
+        source,
+        selector: {
+          type: "RECTANGLE",
+          geometry: {
+            x,
+            y,
+            w,
+            h,
+            bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h },
+          },
+        },
+      },
+      bodies: [
+        {
+          purpose: "tagging",
+          value: { type: "class", id: class_id, name: class_name, track_id },
+        },
+      ],
+      body: [
+        {
+          purpose: "tagging",
+          value: { type: "class", id: class_id, name: class_name, track_id },
+        },
+      ],
+    } as any;
+
+    const cur = byFrame.get(frame) ?? [];
+    cur.push(anno);
+    byFrame.set(frame, cur);
+  }
+
+  return byFrame;
 }

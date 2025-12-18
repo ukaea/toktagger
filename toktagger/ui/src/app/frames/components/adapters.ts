@@ -61,3 +61,47 @@ export function buildSourceKey({
 }): string {
   return `app://p/${projectId}/s/${sampleId}/f/${frame}`;
 }
+
+// adapters.ts
+
+export const W3C_KEY_PREFIX = "anno::w3c::";
+const WORKING_PREFIX = "ufo::working::";
+
+export function sampleFramePrefix(projectId: string, sampleId: string) {
+  return `${W3C_KEY_PREFIX}app://p/${projectId}/s/${sampleId}/f/`;
+}
+
+export function workingKey(projectId: string, sampleId: string) {
+  return `${WORKING_PREFIX}${projectId}::${sampleId}`;
+}
+
+export function isUfoWorkingDirty(projectId: string, sampleId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(workingKey(projectId, sampleId)) === "1";
+}
+
+export function setUfoWorkingDirty(
+  projectId: string,
+  sampleId: string,
+  dirty: boolean,
+) {
+  if (typeof window === "undefined") return;
+  const key = workingKey(projectId, sampleId);
+  if (dirty) window.localStorage.setItem(key, "1");
+  else window.localStorage.removeItem(key);
+}
+
+export function clearW3CForSample(projectId: string, sampleId: string) {
+  if (typeof window === "undefined") return;
+
+  const storage = window.localStorage;
+  const prefix = sampleFramePrefix(projectId, sampleId);
+
+  const keysToDelete: string[] = [];
+  for (let i = 0; i < storage.length; i++) {
+    const k = storage.key(i);
+    if (k && k.startsWith(prefix)) keysToDelete.push(k);
+  }
+
+  for (const k of keysToDelete) storage.removeItem(k);
+}

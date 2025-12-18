@@ -21,7 +21,14 @@ import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 import "react-contexify/ReactContexify.css";
 
 import { AnnoBridge, type BridgeHandle } from "./bridge";
-import { W3CImageFormat, buildSourceKey } from "./adapters";
+import {
+  W3CImageFormat,
+  buildSourceKey,
+  clearW3CForSample,
+  isUfoWorkingDirty,
+  sampleFramePrefix,
+  setUfoWorkingDirty,
+} from "./adapters";
 import {
   loadClassRegistry,
   type ClassRegistry,
@@ -31,6 +38,7 @@ import {
   uniqueReadableId,
   saveLastClassName,
   extractClassLabel,
+  videoBBoxesToW3CByFrame,
 } from "./lib";
 import { Toast, ClassInfoPopup, ConfirmModal } from "./ui";
 
@@ -129,6 +137,7 @@ export function FrameView({
   data,
   projectId,
   sampleId,
+  dbAnnotations,
   onPrev,
   onNext,
   onJump,
@@ -136,6 +145,7 @@ export function FrameView({
   data: ImageData;
   projectId: string;
   sampleId: string;
+  dbAnnotations: Annotation[];
   onPrev?: () => void;
   onNext?: () => void;
   onJump?: (n: number) => void;
@@ -244,6 +254,163 @@ export function FrameView({
     totalFrames: number;
   } | null>(null);
 
+  // Refresh behavior safety: on browser reload, clear local cache + marker.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const nav = performance.getEntriesByType?.("navigation")?.[0] as any;
+    const navType = nav?.type as string | undefined;
+
+    if (navType === "reload") {
+      clearW3CForSample(projectId, sampleId);
+      setUfoWorkingDirty(projectId, sampleId, false);
+    }
+  }, [projectId, sampleId]);
+
+  const bootstrapInstancesFromStorage = useCallback(async () => {
+    if (typeof window === "undefined") return;
+
+    const storage = window.localStorage;
+    const prefix = sampleFramePrefix(projectId, sampleId);
+
+    const all: ImageAnnotation[] = [];
+
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const ann of parsed) {
+            if (isImageAnnotation(ann)) all.push(ann);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Derive unique profiles from annotations
+    const map = new Map<string, InstanceProfile>();
+    for (const ann of all) {
+      const lbl = extractClassLabel(ann);
+      if (!lbl?.class_name || !lbl.track_id) continue;
+
+      const class_name = lbl.class_name;
+      const class_id =
+        typeof lbl.class_id === "number" && Number.isFinite(lbl.class_id)
+          ? lbl.class_id
+          : FIXED_CLASS_REG[class_name.toLowerCase()] ?? 1;
+
+      const track_id = canonicalizeTrackId(lbl.track_id);
+      const id = `${class_name}:${track_id}`;
+
+      if (!map.has(id)) {
+        map.set(id, { id, class_name, class_id, track_id });
+      }
+    }
+
+    const profiles = Array.from(map.values());
+
+    // Update window + notify toolbar
+    window.ufoInstanceProfiles = profiles;
+
+    const classRegistryWire: Record<string, number> = {};
+    for (const def of Object.values(classRegistry)) {
+      const n = Number(def.id);
+      classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("ufo:state", {
+        detail: {
+          includeTrackIds: true,
+          profiles: profiles.map((p) => ({
+            class_name: p.class_name,
+            class_id: p.class_id,
+            track_id: p.track_id,
+          })),
+          selectedKey: null,
+          selectedClassName: window.ufoSelectedClassName ?? null,
+          lastClassName: window.ufoSelectedClassName ?? null,
+          classRegistry: classRegistryWire,
+        },
+      }),
+    );
+  }, [projectId, sampleId, classRegistry]);
+
+  useEffect(() => {
+    void bootstrapInstancesFromStorage();
+  }, [bootstrapInstancesFromStorage]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const seedFromBackendIfNeeded = async () => {
+      if (typeof window === "undefined") return;
+
+      // If user has an in-progress local session, do NOT overwrite it.
+      if (isUfoWorkingDirty(projectId, sampleId)) return;
+
+      // Clear any leftover per-frame cache to avoid conflicts
+      clearW3CForSample(projectId, sampleId);
+
+      // Convert db → W3C grouped by frame
+      const byFrame = videoBBoxesToW3CByFrame({
+        projectId,
+        sampleId,
+        annotations: dbAnnotations as unknown[],
+      });
+
+      // Write to localStorage per frame so your existing system works
+      for (const [frame, list] of byFrame.entries()) {
+        const key = buildSourceKey({ projectId, sampleId, frame });
+        const a = W3CImageFormat(key);
+        await a.write(list);
+      }
+
+      if (cancelled) return;
+
+      // Hydrate current frame overlay immediately (so user sees boxes on first visit)
+      const listForCurrent = byFrame.get(frameNumber) ?? [];
+      if (listForCurrent.length > 0) {
+        setPopupList(listForCurrent);
+
+        const attemptHydrate = async () => {
+          if (cancelled) return;
+          const ready = bridgeRef.current?.isAnnotatorReady?.() ?? false;
+          if (!ready) {
+            setTimeout(attemptHydrate, 32);
+            return;
+          }
+          await bridgeRef.current?.hydrateOverlay?.(listForCurrent, frameKey);
+        };
+
+        void attemptHydrate();
+      }
+
+      // Populate Instances list from seeded storage
+      await bootstrapInstancesFromStorage();
+    };
+
+    void seedFromBackendIfNeeded();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    projectId,
+    sampleId,
+    dbAnnotations,
+    frameNumber,
+    frameKey,
+    bootstrapInstancesFromStorage,
+  ]);
+
   // Hydrate overlay from localStorage when the annotator is ready.
   useEffect(() => {
     let cancelled = false;
@@ -286,6 +453,7 @@ export function FrameView({
     try {
       const list = await bridge.persistWorkingNow(frameKey);
       await adapter.write(list);
+      setUfoWorkingDirty(projectId, sampleId, true);
       setPopupList(list as ImageAnnotation[]);
       bridge.markSaved();
       return list;
@@ -293,7 +461,7 @@ export function FrameView({
       console.error("Auto-save failed:", err);
       return [];
     }
-  }, [adapter, frameKey]);
+  }, [adapter, frameKey, projectId, sampleId]);
 
   // Forward propagation: seed the next frame if empty.
   const propagateForwardIfEmpty = useCallback(
@@ -459,6 +627,12 @@ export function FrameView({
       track_id: p.track_id,
     }));
 
+    const classRegistryWire: Record<string, number> = {};
+    for (const def of Object.values(classRegistry)) {
+      const n = Number(def.id);
+      classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
+    }
+
     w.dispatchEvent(
       new CustomEvent("ufo:state", {
         detail: {
@@ -467,7 +641,7 @@ export function FrameView({
           selectedKey: null,
           selectedClassName: w.ufoSelectedClassName ?? null,
           lastClassName: w.ufoSelectedClassName ?? null,
-          classRegistry,
+          classRegistry: classRegistryWire,
         },
       }),
     );
@@ -718,6 +892,12 @@ export function FrameView({
 
       const selectedKey = `${prettyClassName.toLowerCase()}:${track_id}`;
 
+      const classRegistryWire: Record<string, number> = {};
+      for (const def of Object.values(classRegistry)) {
+        const n = Number(def.id);
+        classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
+      }
+
       window.dispatchEvent(
         new CustomEvent("ufo:state", {
           detail: {
@@ -726,7 +906,7 @@ export function FrameView({
             selectedKey,
             selectedClassName: prettyClassName,
             lastClassName: prettyClassName,
-            classRegistry,
+            classRegistry: classRegistryWire,
           },
         }),
       );
@@ -831,6 +1011,12 @@ export function FrameView({
       }
     }
 
+    const classRegistryWire: Record<string, number> = {};
+    for (const def of Object.values(classRegistry)) {
+      const n = Number(def.id);
+      classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
+    }
+
     window.dispatchEvent(
       new CustomEvent("ufo:state", {
         detail: {
@@ -839,7 +1025,7 @@ export function FrameView({
           selectedKey,
           selectedClassName: window.ufoSelectedClassName ?? null,
           lastClassName: window.ufoSelectedClassName ?? null,
-          classRegistry,
+          classRegistry: classRegistryWire,
         },
       }),
     );
@@ -992,6 +1178,12 @@ export function FrameView({
     window.ufoSelectionSource = null;
     window.ufoNotifySelectionChanged?.();
 
+    const classRegistryWire: Record<string, number> = {};
+    for (const def of Object.values(classRegistry)) {
+      const n = Number(def.id);
+      classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
+    }
+
     window.dispatchEvent(
       new CustomEvent("ufo:state", {
         detail: {
@@ -1000,7 +1192,7 @@ export function FrameView({
           selectedKey: null,
           selectedClassName: null,
           lastClassName: null,
-          classRegistry,
+          classRegistry: classRegistryWire,
         },
       }),
     );
@@ -1211,12 +1403,11 @@ type UFOViewInfo = {
 /**
  * UFOView:
  * Thin wrapper around FrameView. Keeps the same props surface as backup.
- * (annotations/dataParams are unused here but preserved for compatibility.)
+ * (dataParams are unused here but preserved for compatibility.)
  */
 export const UFOView = ({
   data,
-  // unused for now but kept to match backup contracts:
-  annotations: _annotations,
+  annotations,
   setAnnotations: _setAnnotations,
   dataParams: _dataParams,
   setDataParams: _setDataParams,
@@ -1232,6 +1423,7 @@ export const UFOView = ({
         data={data}
         projectId={projectId}
         sampleId={sampleId}
+        dbAnnotations={annotations}
         onPrev={onPrev}
         onNext={onNext}
         onJump={onJump}

@@ -64,6 +64,7 @@ import {
   ClassPanel as UFOClassPanel,
   InstancePanel as UFOInstancePanel,
 } from "@/app/frames/components/ui";
+import { setUfoWorkingDirty } from "@/app/frames/components/adapters";
 
 type UfoWireProfile = {
   class_name: string;
@@ -803,6 +804,9 @@ export default function ToolBar({
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
+
+      setUfoWorkingDirty(project_id, sample_id, false);
+
       ToastQueue.positive(`Saved ${payload.length} annotations!`, {
         timeout: 5000,
       });
@@ -819,6 +823,8 @@ export default function ToolBar({
     try {
       const payload = await collectUfoPayloadForBackend();
       await saveAnnotations(project_id, sample_id, payload);
+
+      setUfoWorkingDirty(project_id, sample_id, false);
 
       const next = await getNextSample(project_id);
       const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${next._id}`;
@@ -843,6 +849,8 @@ export default function ToolBar({
           if (nextSample !== null) {
             const payload = await collectUfoPayloadForBackend();
             await saveAnnotations(project_id, sample_id, payload);
+
+            setUfoWorkingDirty(project_id, sample_id, false);
 
             const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
             navigate(NEXT_SAMPLE_URL);
