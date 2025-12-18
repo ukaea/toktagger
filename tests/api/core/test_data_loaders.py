@@ -62,7 +62,7 @@ def test_image_file_loader_png():
 
 def test_parquet_file_loader():
     parquet_file = TimeSeriesFileData(
-        file_name=str(pathlib.Path(__file__).parents[2].joinpath("test.parquet")),
+        file_name=str(pathlib.Path(__file__).parents[2].joinpath("10000.parquet")),
         type="parquet",
         protocol="file",
         column_names=["Ip", "dalpha"],

@@ -187,7 +187,7 @@ async def test_create_samples(api_client, setup_db, db_client):
             "data": {
                 "protocol": "file",
                 "type": "parquet",
-                "file_name": "test.parquet",
+                "file_name": "10000.parquet",
                 "column_names": ["Ip", "dalpha"],
             },
         },

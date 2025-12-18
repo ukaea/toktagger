@@ -39,7 +39,7 @@ SAMPLE_4 = SampleIn(
     shot_id=4,
     data=TimeSeriesFileData(
         file_name=str(
-            pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()
+            pathlib.Path(__file__).parent.joinpath("10000.parquet").absolute()
         ),
         type="parquet",
         protocol="file",
