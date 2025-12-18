@@ -729,87 +729,6 @@ export default function ToolBar({
   }, [isUfo, project_id, sample_id]);
 
   /**
-   * Create (or select) an instance for the chosen class, using readable track ids (old behavior).
-   */
-  const createInstanceForClass = (
-    clsName: string,
-    opts: { reselectOnlyIfExisting?: boolean } = {},
-  ) => {
-    if (!clsName) return;
-
-    const keyLower = clsName.toLowerCase();
-
-    const fromRegistryLower = classRegistry[keyLower];
-    const fromRegistryExact = classRegistry[clsName];
-
-    const regIdStr =
-      fromRegistryLower?.id ?? fromRegistryExact?.id ?? undefined;
-    const regId = regIdStr !== undefined ? Number(regIdStr) : undefined;
-
-    const fixedId = FIXED_CLASS_REG[keyLower];
-
-    const labelMapId = LABEL_MAP.categories.find((c) => c.name === clsName)?.id;
-
-    const class_id =
-      (typeof regId === "number" && !Number.isNaN(regId) ? regId : undefined) ??
-      (typeof fixedId === "number" ? fixedId : undefined) ??
-      (typeof labelMapId === "number" ? labelMapId : undefined) ??
-      1;
-
-    // Ensure class is in registry
-    if (!fromRegistryLower && !fromRegistryExact) {
-      const nextRegistry: ClassRegistry = {
-        ...classRegistry,
-        [keyLower]: { id: String(class_id), name: clsName },
-      };
-      setClassRegistry(nextRegistry);
-      saveClassRegistry(nextRegistry);
-    }
-
-    // Optionally reselect an existing instance for that class
-    if (opts.reselectOnlyIfExisting) {
-      const existing = instanceProfiles.filter((p) => p.class_name === clsName);
-      if (existing.length > 0) {
-        const last = existing[existing.length - 1];
-        setSelectedInstanceId(last.id);
-
-        if (typeof window !== "undefined") {
-          const w = window;
-          w.ufoSelectedProfileId = last.id;
-          w.ufoSelectedClassName = last.class_name;
-          w.ufoSelectedTrackId = last.track_id;
-          w.ufoNotifySelectionChanged?.();
-        }
-        return;
-      }
-    }
-
-    // Generate a new readable track id (old behavior)
-    const existingTrackIds = instanceProfiles.map((p) => p.track_id);
-    const readable = uniqueReadableId(existingTrackIds);
-    const track_id = canonicalizeTrackId(readable);
-
-    const id = `${clsName}:${track_id}`;
-
-    const nextInstances: InstanceProfile[] = [
-      ...instanceProfiles,
-      { id, class_name: clsName, class_id, track_id },
-    ];
-
-    setInstanceProfiles(nextInstances);
-    setSelectedInstanceId(id);
-
-    if (typeof window !== "undefined") {
-      const w = window;
-      w.ufoInstanceProfiles = nextInstances;
-      w.ufoSelectedProfileId = id;
-      w.ufoSelectedClassName = clsName;
-      w.ufoSelectedTrackId = track_id;
-      w.ufoNotifySelectionChanged?.();
-    }
-  };
-
-  /**
    * Mirror toolbar selection + profiles into window.* for FrameView/AnnoBridge.
    */
   useEffect(() => {
@@ -1037,8 +956,6 @@ export default function ToolBar({
                 if (typeof window !== "undefined") {
                   window.ufoSelectionSource = null;
                 }
-
-                // Do NOT call createInstanceForClass here anymore.
               }}
             />
 
