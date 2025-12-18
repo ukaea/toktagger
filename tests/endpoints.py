@@ -42,4 +42,8 @@ def create_local_samples(
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    response = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    assert response.status_code == 200
+    return response.json()
