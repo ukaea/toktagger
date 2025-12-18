@@ -62,8 +62,6 @@ export function buildSourceKey({
   return `app://p/${projectId}/s/${sampleId}/f/${frame}`;
 }
 
-// adapters.ts
-
 export const W3C_KEY_PREFIX = "anno::w3c::";
 const WORKING_PREFIX = "ufo::working::";
 
