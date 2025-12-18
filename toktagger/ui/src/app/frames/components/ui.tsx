@@ -231,7 +231,7 @@ export function InstancePanel({
           <div className="p-3 text-sm text-gray-200">
             {showCreator
               ? "No profiles yet. Click “Add Profile”."
-              : "No instances yet. Pick a class above to create one."}
+              : "No instances yet. Pick a class above, then draw to create one."}
           </div>
         )}
         {profiles.map((p) => {
@@ -345,10 +345,11 @@ export function ClassInfoPopup(props: {
     return found ? extractClassLabel(found) : null;
   }, [list, annotation.id]);
 
-  const effectiveLabel = (fromList &&
-    (fromList.class_id || fromList.class_name || fromList.track_id
-      ? fromList
-      : null)) ||
+  const effectiveLabel =
+    (fromList &&
+      (fromList.class_id || fromList.class_name || fromList.track_id
+        ? fromList
+        : null)) ||
     (ownLabel &&
       (ownLabel.class_id || ownLabel.class_name || ownLabel.track_id
         ? ownLabel

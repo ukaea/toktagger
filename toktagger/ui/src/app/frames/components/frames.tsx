@@ -194,7 +194,8 @@ export function FrameView({
   // Use the persisted class registry (shared with the toolbar via localStorage)
   const classRegistry: ClassRegistry = useMemo(() => loadClassRegistry(), []);
 
-  const drawingEnabled = !!getSelectedProfile();
+  // Enable drawing if user has selected a class (armed), even if no instance exists yet.
+  const drawingEnabled = !!getSelectedProfile() || !!getSelectedClassName();
 
   const frameNumber: number = typeof data.frame === "number" ? data.frame : 0;
   const frameLabel = Number.isFinite(frameNumber) ? frameNumber : "?";

@@ -1043,9 +1043,13 @@ export default function ToolBar({
               selectedClassName={selectedClassName}
               setSelectedClassName={(name) => {
                 if (!name) return;
+
+                // “Armed class” only — no instance created yet.
                 setSelectedClassName(name);
-                saveLastClassName(name ?? "");
-                createInstanceForClass(name);
+                saveLastClassName(name);
+
+                // Important: selecting a class should NOT keep stamping onto an old instance.
+                setSelectedInstanceId(null);
               }}
             />
 
