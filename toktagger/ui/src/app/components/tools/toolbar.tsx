@@ -53,7 +53,6 @@ import {
   w3cToCocoFrames,
   cocoFramesToVideoBBoxes,
   loadClassRegistry,
-  saveClassRegistry,
   loadLastClassName,
   saveLastClassName,
   FIXED_CLASS_REG,
