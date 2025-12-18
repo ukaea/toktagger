@@ -60,6 +60,7 @@ def create_local_samples(
 
     requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
+
 def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
     samples = []
     for shot_id in shot_ids:
@@ -68,16 +69,18 @@ def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
                 "project_id": project_id,
                 "shot_id": int(shot_id),
                 "data": {
-                    "file_name": image_dir,   # directory, not a file
-                    "type": "png",            # extension
-                    "protocol": "file",       # MUST be file or s3
+                    "file_name": str(image_dir),  # directory, not a file
+                    "type": "png",  # extension
+                    "protocol": "file",  # MUST be file or s3
                 },
             }
         )
 
-    r = requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
-    print("create_image_samples:", r.status_code, r.text)
+    r = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
     r.raise_for_status()
+
 
 def main():
     parser = ArgumentParser()
@@ -111,7 +114,7 @@ def main():
     )
     # ---- Image / UFO demo project ----
     project_id = create_project("Frame Project", "UFO", "image")
-    create_image_samples(project_id, [104522], "/data/jet_images")
+    create_image_samples(project_id, [30000], Path("./data/images"))
 
 
 if __name__ == "__main__":
