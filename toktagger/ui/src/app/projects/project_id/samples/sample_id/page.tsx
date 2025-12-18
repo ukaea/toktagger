@@ -409,7 +409,7 @@ export default function SamplePage() {
 
       if (proj.task === "UFO" && !ufoInitRef.current) {
         ufoInitRef.current = true;
-        setDataParams({ name: "image", frame: 200 } as DataParams); // this is where you define the frame number to start with?
+        setDataParams({ name: "image", frame: null } as DataParams); // this is where you define the frame number to start with?
       }
 
       const samp = await getSample(project_id as string, sample_id as string);
