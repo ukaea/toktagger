@@ -1,5 +1,6 @@
 import toktagger.api.core.data_loaders as data_loaders
 import pytest
+from typing import Type
 from toktagger.api.schemas.samples import (
     Sample,
     FileData,
@@ -30,7 +31,7 @@ def test_image_file_loader_jpg():
     data_loader = data_loaders.ImageDataLoader(
         params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample)
+    image_data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -50,7 +51,7 @@ def test_image_file_loader_png():
     data_loader = data_loaders.ImageDataLoader(
         params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample)
+    image_data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -69,7 +70,7 @@ def test_parquet_file_loader():
     )
     sample = Sample(shot_id=10000, data=parquet_file, _id="test", project_id="test")
     data_loader = data_loaders.ParquetDataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -96,7 +97,7 @@ def test_uda_loader(uda_env_vars):
     uda_shot = ShotData(protocol="uda", signal_names=["ip", "ANE_DENSITY"])
     sample = Sample(shot_id=14892, data=uda_shot, _id="test", project_id="test")
     data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -121,7 +122,7 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
     uda_shot = ShotData(protocol="uda", signal_names=["doesnt_exist"])
     sample = Sample(shot_id=10000, data=uda_shot, _id="test", project_id="test")
     data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present, but filled with Nones
@@ -144,12 +145,16 @@ async def test_custom_data_loader(api_client):
     # Create a custom data loader
     @data_loaders.LoaderRegistry.register("test")
     class CustomLoader(data_loaders.DataLoader):
-        def get_sample(self, sample):
+        @classmethod
+        def sample_data_type(self) -> Type[ShotData]:
+            return ShotData
+
+        def get_sample(self, shot_id: int, sample_data: ShotData):
             # Return some data, use something from sample to check it is passed in correctly
             return MultiVariateTimeSeriesData(
                 values={
                     "test_vals": TimeSeriesData(
-                        time=[0, 1], values=[sample.shot_id, sample.shot_id + 1]
+                        time=[0, 1], values=[shot_id, shot_id + 1]
                     )
                 }
             )
@@ -181,3 +186,22 @@ async def test_custom_data_loader(api_client):
     assert response.status_code == 200
     assert response.json()["values"]["test_vals"]["time"] == [0, 1]
     assert response.json()["values"]["test_vals"]["values"] == [shot_id, shot_id + 1]
+
+
+@pytest.mark.parametrize(
+    "name,data_loader,sample_data_model",
+    [
+        ("image", data_loaders.ImageDataLoader, FileData),
+        ("parquet", data_loaders.ParquetDataLoader, TimeSeriesFileData),
+        ("uda", data_loaders.UDADataLoader, ShotData),
+    ],
+)
+def test_loader_registry(name, data_loader, sample_data_model):
+    # Check the registry returns the correct class
+    assert data_loaders.LoaderRegistry.get(name) == data_loader
+
+    # Check the registry returns the correct sample data schema
+    assert (
+        data_loaders.LoaderRegistry.get_data_schema(name)
+        == sample_data_model.model_json_schema()
+    )

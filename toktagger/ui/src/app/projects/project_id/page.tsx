@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Provider,
   defaultTheme,
@@ -15,8 +15,10 @@ import {
   Button,
   Picker,
   SearchField,
+  ToastContainer,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
+import { AddSamplesEditor } from "./components/add_samples";
 import { getSamples, getProject } from "@/app/core";
 import type { Project, Sample } from "@/types";
 import { useHref, useNavigate, useParams } from "react-router-dom";
@@ -105,24 +107,32 @@ export default function ProjectView() {
 
   const [project, setProject] = useState<Project | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!hasId) {
-        return;
-      }
-      const samples = await getSamples(
-        sortDescriptor,
-        project_id,
-        currentPage,
-        samplesPerPage,
-        shotId,
-      );
-      setSamples(samples);
-      const project = await getProject(project_id);
-      setProject(project);
-    };
-    fetchData();
+  const refreshSamples = useCallback(async () => {
+    if (!hasId) {
+      return;
+    }
+    const samples = await getSamples(
+      sortDescriptor,
+      project_id,
+      currentPage,
+      samplesPerPage,
+      shotId,
+    );
+    setSamples(samples);
+    const project = await getProject(project_id);
+    setProject(project);
   }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
+  useEffect(() => {
+    refreshSamples();
+  }, [
+    refreshSamples,
+    project_id,
+    shotId,
+    currentPage,
+    samplesPerPage,
+    sortDescriptor,
+    hasId,
+  ]);
 
   if (!project || !hasId) {
     return;
@@ -153,7 +163,15 @@ export default function ProjectView() {
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
-            <div className="pl-4">
+            <ToastContainer placement="top" />
+            <Flex
+              direction="row"
+              margin="size-100"
+              gap="size-100"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <AddSamplesEditor project={project} onModify={refreshSamples} />
               <SearchField
                 label="Search By Shot ID"
                 // SearchField should be able to do validation when provided a 'pattern' inside a Form element
@@ -162,7 +180,7 @@ export default function ProjectView() {
                 validationState={errorMessage ? "invalid" : undefined}
                 errorMessage={errorMessage}
               />
-            </div>
+            </Flex>
             <SamplesTable
               project_id={project_id}
               samples={samples}
