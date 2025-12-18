@@ -258,8 +258,11 @@ export function FrameView({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const nav = performance.getEntriesByType?.("navigation")?.[0] as any;
-    const navType = nav?.type as string | undefined;
+    const nav = performance.getEntriesByType?.("navigation")?.[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+
+    const navType = nav?.type;
 
     if (navType === "reload") {
       clearW3CForSample(projectId, sampleId);
