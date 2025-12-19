@@ -21,10 +21,10 @@ import base64
 import io
 
 
-def test_image_file_loader_jpg():
+def test_image_file_loader_jpeg():
     img_file = FileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
-        type="jpg",
+        type="jpeg",
         protocol="file",
     )
     sample = Sample(shot_id=10000, data=img_file, _id="test", project_id="test")

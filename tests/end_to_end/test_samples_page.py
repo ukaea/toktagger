@@ -6,6 +6,7 @@ from tests.endpoints import create_project, create_local_samples, create_uda_sam
 import time
 import requests
 import tempfile
+import pytest
 
 
 def check_base_page(page):
@@ -76,7 +77,7 @@ def test_single_sample(server_setup, page: Page):
     expect(page.get_by_role("button", name="Next")).to_be_disabled()
 
     # Check sample information is shown
-    expect(page.get_by_text("10000")).to_be_visible()
+    expect(page.get_by_text("10000", exact=True)).to_be_visible()
     expect(page.get_by_text(re.compile(f"^{datetime.now().date()}*"))).to_be_visible()
 
     # Expect that I can click on the row in the table and it takes me to a ELM view page
@@ -108,16 +109,16 @@ def test_sample_page_navigation(server_setup, page: Page):
     expect(page.get_by_role("button", name="Next")).to_be_disabled()
 
     # Check all samples available
-    expect(page.get_by_text("10001")).to_be_visible()
-    expect(page.get_by_text("10006")).to_be_visible()
+    expect(page.get_by_text("10001", exact=True)).to_be_visible()
+    expect(page.get_by_text("10006", exact=True)).to_be_visible()
 
     # Try clicking Samples per Page dropdown
     page.get_by_role("button", name="Samples per Page:").click()
     page.get_by_role("option", name="5", exact=True).click()
 
     # By default the samples appear shot ID low to high, so 10006 shoidnt be on list
-    expect(page.get_by_text("10001")).to_be_visible()
-    expect(page.get_by_text("10006")).to_be_hidden()
+    expect(page.get_by_text("10001", exact=True)).to_be_visible()
+    expect(page.get_by_text("10006", exact=True)).to_be_hidden()
 
     # Previous button should still be disabled, next button should be enabled
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
@@ -128,8 +129,8 @@ def test_sample_page_navigation(server_setup, page: Page):
     expect(page.get_by_text("Page: 2")).to_be_visible()
 
     # Check sample 10006 is visible, 10005 is not
-    expect(page.get_by_text("10006")).to_be_visible()
-    expect(page.get_by_text("10005")).to_be_hidden()
+    expect(page.get_by_text("10006", exact=True)).to_be_visible()
+    expect(page.get_by_text("10005", exact=True)).to_be_hidden()
 
     # Check Previous button enabled, Next button is not
     expect(page.get_by_role("button", name="Previous")).to_be_enabled()
@@ -139,8 +140,8 @@ def test_sample_page_navigation(server_setup, page: Page):
     page.get_by_role("button", name="Previous").click()
     expect(page.get_by_text("Page: 1")).to_be_visible()
 
-    expect(page.get_by_text("10001")).to_be_visible()
-    expect(page.get_by_text("10006")).to_be_hidden()
+    expect(page.get_by_text("10001", exact=True)).to_be_visible()
+    expect(page.get_by_text("10006", exact=True)).to_be_hidden()
 
     # Press Next
     page.get_by_role("button", name="Next").click()
@@ -152,8 +153,8 @@ def test_sample_page_navigation(server_setup, page: Page):
 
     # Should be back to page 1 with all samples visible
     expect(page.get_by_text("Page: 1")).to_be_visible()
-    expect(page.get_by_text("10001")).to_be_visible()
-    expect(page.get_by_text("10006")).to_be_visible()
+    expect(page.get_by_text("10001", exact=True)).to_be_visible()
+    expect(page.get_by_text("10006", exact=True)).to_be_visible()
 
     # And both buttons disabled
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
@@ -343,10 +344,10 @@ def test_create_samples_file_data(server_setup, page: Page):
         modal.get_by_role("button", name="Add").click()
         expect(modal.get_by_text("ip")).to_be_visible()
 
-        # Create project
+        # Create samples
         modal.get_by_role("button", name="Create").click()
 
-        # Check project added to table
+        # Check sample added to table
         expect(page.get_by_role("row").nth(1)).to_contain_text("10000")
         expect(page.get_by_role("row").nth(2)).to_contain_text("10001")
 
@@ -356,3 +357,52 @@ def test_create_samples_file_data(server_setup, page: Page):
         assert len(samples) == 2
         assert all(sample["data"]["column_names"][0] == "ip" for sample in samples)
         assert sorted(sample["shot_id"] for sample in samples) == [10000, 10001]
+
+
+@pytest.mark.parametrize("file_type", ["PNG", "JPEG"])
+def test_create_samples_image_data(server_setup, page: Page, file_type: str):
+    # Create a project
+    project_id = create_project("Test Project", "UFO", "image")
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Press create button
+    page.get_by_role("button", name="Create").click()
+
+    # Check modal has opened
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    expect(modal.get_by_role("heading", name="Add Samples")).to_be_visible()
+
+    # Create some image files
+    with tempfile.TemporaryDirectory() as tempd:
+        pathlib.Path(tempd).joinpath("104000").mkdir()
+        pathlib.Path(tempd).joinpath("104000", "101.png").touch()
+        pathlib.Path(tempd).joinpath("104000", "102.png").touch()
+        pathlib.Path(tempd).joinpath("104000", "101.jpeg").touch()
+        pathlib.Path(tempd).joinpath("104000", "102.jpeg").touch()
+
+        # Check we can see File Type, File Path, and NOT File Columns
+        expect(modal.get_by_text("File Type")).to_be_visible()
+        expect(modal.get_by_text("File Path")).to_be_visible()
+        expect(modal.get_by_text("File Columns")).to_be_hidden()
+
+        # Choose the relevant file type
+        modal.get_by_role("button", name="File Type").click()
+        page.get_by_role("option", name=file_type).click()
+
+        # Add temp dir as file path, check 2 files are found
+        modal.get_by_role("textbox", name="File Path").fill(
+            pathlib.Path(tempd).joinpath("104000")
+        )
+        expect(modal.get_by_text(f"2 {file_type.lower()} files found.")).to_be_visible()
+
+        # Create sample
+        modal.get_by_role("button", name="Create").click()
+
+        # Check sample added to table - currently must add one sample at a time since each one is a directory of images
+        expect(page.get_by_role("row").nth(1)).to_contain_text("104000")

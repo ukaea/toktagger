@@ -10,7 +10,7 @@ class FileType(str, Enum):
     PARQUET = "parquet"
     MP4 = "mp4"
     PNG = "png"
-    JPG = "jpg"
+    JPEG = "jpeg"
 
 
 class FileProtocol(str, Enum):

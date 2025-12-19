@@ -50,7 +50,7 @@ const QueryStrategies = [
 const FileTypes = [
   { key: "parquet", value: "Parquet" },
   { key: "png", value: "PNG" },
-  { key: "jpg", value: "JPEG" },
+  { key: "jpeg", value: "JPEG" },
 ];
 
 const DataLoaderOptionsSchema = z.object({
@@ -383,12 +383,13 @@ const FileDataLoaderOptionsUI = ({
       data_type: dataType,
       file_type: fileType,
       file_names: fileNames,
+      dir_name: filePath
     });
 
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [dataLoader, dataType, fileNames, fileType, setDataLoaderOptions]);
+  }, [dataLoader, dataType, fileNames, fileType, filePath, setDataLoaderOptions]);
 
   return (
     <View
@@ -715,7 +716,12 @@ const parseFileNames = (fileNames: string[]) => {
   const shots = fileNames.map((name: string) => {
     const lastDotIndex = name.lastIndexOf(".");
     const lastSlashIndex = name.lastIndexOf("/");
-    const shotName = name.substring(lastSlashIndex + 1, lastDotIndex);
+    let shotName: string = ""
+    if (lastDotIndex === -1){
+      shotName = name.substring(lastSlashIndex + 1);
+    } else {
+      shotName = name.substring(lastSlashIndex + 1, lastDotIndex);
+    }
     const shotId = parseInt(shotName, 10);
     return shotId;
   });
@@ -733,20 +739,33 @@ const parseFileNames = (fileNames: string[]) => {
 const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
   const options = dataLoaderOptions as FileDataLoaderOptions;
   const fileNames = options.file_names;
-  const shots = parseFileNames(fileNames);
+  let samples: Sample[] = []
 
-  const dataInfo = {
-    file_name: fileNames[0],
-    type: options.file_type,
-    protocol: options.protocol || "file",
-  } as FileData;
-
-  const samples: Sample[] = shots.map((shot_id: number) => ({
-    shot_id: shot_id,
-    timestamp: new Date().toISOString(),
-    data: dataInfo,
-  }));
-
+  if (options.file_type === "png" || options.file_type === "jpeg") {
+    const shot_id = parseFileNames([options.dir_name])[0]
+    samples = [
+      {
+        shot_id: shot_id,
+        timestamp: new Date().toISOString(),
+        data: {
+          file_name: options.dir_name,
+          type: options.file_type,
+          protocol: options.protocol || "file",
+        } as FileData,
+      }
+    ]
+  } else {
+    const shots = parseFileNames(fileNames);
+    samples = shots.map((shot_id: number, i: number) => ({
+      shot_id: shot_id,
+      timestamp: new Date().toISOString(),
+      data: {
+        file_name: fileNames[i],
+        type: options.file_type,
+        protocol: options.protocol || "file",
+      } as FileData,
+      }));
+  }
   return samples;
 };
 
