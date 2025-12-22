@@ -46,11 +46,12 @@ import { NavigationBar } from "./nav";
 async function saveAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotation[],
+  annotations: Annotation[]
 ) {
   // user has validated the annotations, so set created_by to "manual"
   const updatedAnnotations = annotations.map((annotation: Annotation) => {
     annotation.created_by = "manual";
+    annotation.validated = true;
     return annotation;
   });
 
@@ -151,7 +152,7 @@ function AmplitudeSlider({
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor)),
+    Math.log10(Math.max(x, smallPrecisionFactor))
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -166,7 +167,7 @@ function AmplitudeSlider({
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end,
+          val.end
         )}`
       }
     />
@@ -260,7 +261,7 @@ function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        },
+        }
       );
 
       const payload = await response.json();
@@ -332,7 +333,7 @@ type ToolBarInfo = {
   data: Data;
   annotations: Annotation[];
   setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
   ) => void;
   viewParams: ViewParams;
   setViewParams: (viewParams: ViewParams) => void;
@@ -431,7 +432,7 @@ export default function ToolBar({
     }
 
     const resultSpec = SpectrogramDataSchema.safeParse(
-      resultComposite.data.values["mirnov"],
+      resultComposite.data.values["mirnov"]
     );
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");

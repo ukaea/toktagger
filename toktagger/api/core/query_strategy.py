@@ -9,11 +9,15 @@ from toktagger.api.schemas.projects import QueryStrategyType
 
 
 class QueryStrategy(ABC):
+    """Base class for query strategies"""
+
     def __init__(self, samples: list[Sample], annotations: list[Annotation]):
         self.samples = samples
         self.annotations = annotations
 
     def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
+        """Get the next sample based on the current sample ID"""
+
         if current_sample_id is None:
             if len(self.samples) == 0:
                 raise RuntimeError("No samples available!")
@@ -27,11 +31,13 @@ class QueryStrategy(ABC):
 
         return self.samples[next_index]
 
-    def get_previous_sample(self, current_sample_id: str) -> Sample:
+    def get_previous_sample(self, current_sample_id: Optional[str] = None) -> Sample:
+        """Get the previous sample based on the current sample ID"""
+
         if current_sample_id is None:
-            raise RuntimeError(
-                "Current sample ID must be provided to get previous sample!"
-            )
+            if len(self.samples) == 0:
+                raise RuntimeError("No samples available!")
+            return self.samples[-1]
 
         index = self._get_matching_sample(current_sample_id)
         previous_index = index - 1
@@ -93,9 +99,7 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
     def __init__(self, samples, annotations, seed: int = 42):
         super().__init__(samples, annotations)
 
-        if len(self.annotations) == 0:
-            self._random_shuffle_samples(seed)
-        else:
+        if len(self.annotations) != 0:
             self.annotations = sorted(
                 self.annotations, key=lambda ann: ann.uncertainty, reverse=True
             )

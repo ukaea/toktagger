@@ -192,8 +192,8 @@ async def get_next_sample(
 
     try:
         sample = query_strategy.get_next_sample(current_sample_id)
-    except RuntimeError:
-        raise HTTPException(status_code=204, detail="No more samples available!")
+    except RuntimeError as e:
+        raise HTTPException(status_code=204, detail="No next sample available!") from e
 
     return sample
 
@@ -230,13 +230,17 @@ async def get_previous_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
+    samples = await utils.get_samples(
+        db_client, project_id, sort_by="shot_id", sort_direction="descending"
+    )
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples)
 
     try:
         sample = query_strategy.get_previous_sample(current_sample_id)
-    except RuntimeError:
-        raise HTTPException(status_code=204, detail="No more samples available!")
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=204, detail="No previous sample available!"
+        ) from e
 
     return sample
 
