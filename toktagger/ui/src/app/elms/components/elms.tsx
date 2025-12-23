@@ -7,6 +7,7 @@ import {
   ZoneSchema,
   TimeRegionSchema,
   Annotation,
+  TimeSeriesData,
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
@@ -58,188 +59,36 @@ export const ELMView = ({ data, annotations, setAnnotations }: ELMViewInfo) => {
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
   };
 
-  const dataTrace: Partial<Plotly.PlotData> = {
-    name: "Dalpha",
-    x: data.values.dalpha.time,
-    y: data.values.dalpha.values,
-    mode: "lines",
-  };
+  const plotData: Partial<Plotly.PlotData>[] = Object.entries(data.values).map(
+    ([signalName, item], index) => ({
+      x: (item as TimeSeriesData).time,
+      y: (item as TimeSeriesData).values,
+      name: signalName,
+      xaxis: `x${index + 1}`,
+      yaxis: `y${index + 1}`,
+      mode: "lines"
+    }),
+  );
 
-  const ipTrace: Partial<Plotly.PlotData> = {
-    name: "Ip",
-    x: data.values.ip.time,
-    y: data.values.ip.values,
-    xaxis: "x2",
-    yaxis: "y2",
-    mode: "lines",
-  };
-
-  const n_e_lineTrace: Partial<Plotly.PlotData> = {
-    name: "Density",
-    x: data.values.n_e_line.time,
-    y: data.values.n_e_line.values,
-    xaxis: "x4",
-    yaxis: "y4",
-    mode: "lines",
-  };
-
-  const powerNBITrace: Partial<Plotly.PlotData> = {
-    name: "NBI Power",
-    x: data.values.power_nbi.time,
-    y: data.values.power_nbi.values,
-    xaxis: "x3",
-    yaxis: "y3",
-    mode: "lines",
-  };
-
-  const sxrTrace: Partial<Plotly.PlotData> = {
-    name: "Soft X-Ray",
-    x: data.values.sxr.time,
-    y: data.values.sxr.values,
-    xaxis: "x6",
-    yaxis: "y6",
-    mode: "lines",
-  };
-
-  const t_e_coreTrace: Partial<Plotly.PlotData> = {
-    name: "Te Core",
-    x: data.values.t_e_core.time,
-    y: data.values.t_e_core.values,
-    xaxis: "x5",
-    yaxis: "y5",
-    mode: "lines",
-  };
-
-  const plotData: Partial<Plotly.PlotData>[] = [
-    dataTrace,
-    ipTrace,
-    n_e_lineTrace,
-    powerNBITrace,
-    t_e_coreTrace,
-    sxrTrace,
-  ];
+  let axes = Object.entries(data.values).map((_, index) => {
+    const axName = `xaxis${index + 1}`;
+    return { [axName]: { matches: "x" } };
+  });
+  axes = Object.assign({}, ...axes);
 
   const plotLayout: Partial<Plotly.Layout> = {
+    grid: {
+      rows: Object.entries(data.values).length,
+      columns: 1,
+      pattern: "independent",
+    },
     uirevision: "true",
-    grid: { rows: 6, columns: 1, pattern: "independent" },
-    dragmode: false, // Disable default drag behavior
+    showlegend: true,
+    dragmode: false,
+    margin: {t: 80, b: 80, l: 80, r: 80},
     width: 1100,
-    height: 800,
-    xaxis: {
-      title: {
-        text: "Time [s]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    yaxis: {
-      title: {
-        text: "Dalpha [V]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    xaxis2: {
-      matches: "x",
-      title: {
-        text: "Time [s]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    yaxis2: {
-      title: {
-        text: "Ip [kA]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    xaxis3: {
-      matches: "x",
-      title: {
-        text: "Time [s]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    yaxis3: {
-      title: {
-        text: "NBI Power [W]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    xaxis4: {
-      matches: "x",
-      title: {
-        text: "Time [s]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    yaxis4: {
-      title: {
-        text: "Density",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    xaxis5: {
-      matches: "x",
-      title: {
-        text: "Time [s]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    xaxis6: {
-      matches: "x",
-      title: {
-        text: "Time [s]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
-    yaxis6: {
-      title: {
-        text: "SXR [arb]",
-        font: {
-          family: "Courier New, monospace",
-          size: 12,
-          color: "#7f7f7f",
-        },
-      },
-    },
+    height: (Object.entries(data.values).length * 150) + 160,
+    ...axes,
   };
 
   return (
