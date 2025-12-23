@@ -61,3 +61,56 @@ def test_disruption_navigation(data_loader, request, server_setup, page: Page):
     expect(page.get_by_role("columnheader", name="Zone Category")).to_be_visible()
     expect(page.get_by_role("columnheader", name="X0")).to_be_visible()
     expect(page.get_by_role("columnheader", name="X1")).to_be_visible()
+
+
+@pytest.mark.parametrize("data_loader", ["parquet", "uda"])
+def test_elm_navigation(data_loader, request, server_setup, page: Page):
+    # Create Project
+    project_id = create_project("Test Project", "ELM", data_loader)
+    # And a sample for disruption
+    if data_loader == "uda":
+        request.getfixturevalue("uda_test")
+        ids = create_uda_samples(project_id, [10000], ["Ip"])
+    else:
+        ids = create_local_samples(
+            project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+        )
+
+    sample_id = ids[0]
+
+    # Navigate to Samples page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Click on sample
+    page.get_by_role("rowheader", name="10000").click()
+
+    # Check I've navigated to the correct page
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}", timeout=3
+    )
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Check time series plot rendered
+    expect(page.get_by_label("time-series")).to_be_visible()
+
+    # Check Ip trace rendered
+    expect(page.get_by_text("Ip", exact=True)).to_be_visible()
+
+    # Check Toolbox rendered
+    expect(page.get_by_text("Toolbox")).to_be_visible()
+
+    # Check toolbox buttons exist, clicking them opens the relevent group, can then be closed
+    for tool in (
+        "Shot Labels",
+        "Peak Detection",
+        "Outlier Detection",
+        "Change Point Detection",
+        "Jump Detection",
+    ):
+        expect(page.get_by_role("button", name=tool)).to_be_visible()
+        page.get_by_role("button", name=tool).click()
+        expect(page.get_by_role("group", name=tool)).to_be_visible()
+        page.get_by_role("button", name=tool).click()
+        expect(page.get_by_role("group", name=tool)).to_be_hidden()
