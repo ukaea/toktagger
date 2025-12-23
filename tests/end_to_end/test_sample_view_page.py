@@ -122,7 +122,7 @@ def test_elm_navigation(data_loader, request, server_setup, page: Page):
 
 
 @pytest.mark.parametrize("img_type", ["png", "jpeg"])
-def test_ufo_navigation(img_type, request, server_setup, page: Page):
+def test_ufo_navigation(img_type, server_setup, page: Page):
     # Create Project
     project_id = create_project("Test Project", "UFO", "image")
 
@@ -155,3 +155,6 @@ def test_ufo_navigation(img_type, request, server_setup, page: Page):
 
     # Check image displayed
     expect(page.get_by_role("img")).to_be_visible()
+
+
+# TODO: Test Next button with each query strategy

@@ -2,11 +2,13 @@ import requests
 import pathlib
 
 
-def create_project(name: str, task: str, data_loader: str) -> str:
+def create_project(
+    name: str, task: str, data_loader: str, query_strategy: str = "random"
+) -> str:
     project = {
         "name": name,
         "task": task,
-        "query_strategy": "random",
+        "query_strategy": query_strategy,
         "data_loader": data_loader,
     }
 
