@@ -49,6 +49,32 @@ def create_local_samples(
     return response.json()
 
 
+def create_image_samples(
+    project_id: str,
+    shot_id: int,
+    base_path: str,
+    file_type: str,
+):
+    samples = []
+
+    sample = {
+        "project_id": project_id,
+        "shot_id": shot_id,
+        "data": {
+            "file_name": str(base_path),
+            "type": file_type,
+            "protocol": "file",
+        },
+    }
+    samples.append(sample)
+
+    response = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
 def create_uda_samples(
     project_id: str,
     shot_ids: list[int],
