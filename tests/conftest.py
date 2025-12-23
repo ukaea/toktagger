@@ -14,11 +14,21 @@ import time
 from pymongo import MongoClient
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def uda_env_vars():
     os.environ.setdefault("UDA_HOST", "uda2.mast.l")
     os.environ.setdefault("UDA_META_PLUGINNAME", "MASTU_DB")
     os.environ.setdefault("UDA_METANEW_PLUGINNAME", "MAST_DB")
+
+
+@pytest.fixture(scope="function")
+def uda_test(uda_env_vars):
+    try:
+        import pyuda
+
+        pyuda.Client().get("help::help()")
+    except Exception:
+        pytest.skip("Could not contact UDA server")
 
 
 @pytest.fixture(scope="session")

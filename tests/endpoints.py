@@ -49,17 +49,26 @@ def create_local_samples(
     return response.json()
 
 
-def create_uda_samples(project_id: str, shot_ids: list[int]):
+def create_uda_samples(
+    project_id: str,
+    shot_ids: list[int],
+    signal_names: list[str] = ["ip", "ANE_DENSITY"],
+):
     samples = []
     for shot_id in shot_ids:
         sample = {
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["ip", "ANE_DENSITY"],
+                "signal_names": signal_names,
                 "protocol": "uda",
             },
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    response = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+
+    assert response.status_code == 200
+    return response.json()

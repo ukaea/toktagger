@@ -86,7 +86,7 @@ def test_parquet_file_loader():
     assert len(numpy.where(numpy.isclose(ip_values, 1000))[0]) == 4
 
 
-def test_uda_loader(uda_env_vars):
+def test_uda_loader(uda_test):
     try:
         import pyuda
 
@@ -111,7 +111,7 @@ def test_uda_loader(uda_env_vars):
     assert numpy.max(times) < 1.5
 
 
-def test_uda_loader_data_doesnt_exist(uda_env_vars):
+def test_uda_loader_data_doesnt_exist(uda_test):
     try:
         import pyuda
 
