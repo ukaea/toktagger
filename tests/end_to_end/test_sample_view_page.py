@@ -21,7 +21,7 @@ def check_base_page(page):
     expect(page.get_by_text("Controls")).to_be_visible()
     expect(page.get_by_role("button", name="Save")).to_be_visible()
     expect(page.get_by_role("button", name="Next")).to_be_visible()
-    expect(page.get_by_role("button", name="Clear")).to_be_visible()
+    expect(page.get_by_role("button", name="Clear", exact=True)).to_be_visible()
     expect(page.get_by_role("searchbox", name="Jump to Shot")).to_be_visible()
 
 
@@ -48,7 +48,8 @@ def test_disruption_navigation(data_loader, request, server_setup, page: Page):
 
     # Check I've navigated to the correct page
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}", timeout=3
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}",
+        timeout=3000,
     )
 
     # Check basic structure of page is correct
@@ -91,7 +92,8 @@ def test_elm_navigation(data_loader, request, server_setup, page: Page):
 
     # Check I've navigated to the correct page
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}", timeout=3
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}",
+        timeout=3000,
     )
 
     # Check basic structure of page is correct
@@ -143,7 +145,8 @@ def test_ufo_navigation(img_type, server_setup, page: Page):
 
     # Check I've navigated to the correct page
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}", timeout=3
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}",
+        timeout=3000,
     )
 
     # Check basic structure of page is correct
@@ -155,6 +158,68 @@ def test_ufo_navigation(img_type, server_setup, page: Page):
 
     # Check image displayed
     expect(page.get_by_role("img")).to_be_visible()
+
+
+@pytest.mark.parametrize("data_loader", ["parquet", "uda"])
+@pytest.mark.parametrize("task", ["disruption", "ELM"])
+def test_search_for_shot(request, data_loader, task, server_setup, page: Page):
+    # Create Project
+    project_id = create_project("Test Project", task, data_loader)
+    # And a sample for disruption
+    if data_loader == "uda":
+        request.getfixturevalue("uda_test")
+        shot_10000_id = create_uda_samples(project_id, [10000], ["Ip"])[0]
+        shot_10001_id = create_uda_samples(project_id, [10001], ["Ip"])[0]
+    else:
+        shot_10000_id = create_local_samples(
+            project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+        )[0]
+        shot_10001_id = create_local_samples(
+            project_id, [10001], pathlib.Path(__file__).parents[1]
+        )[0]
+
+    # Navigate to Samples page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Click on sample
+    page.get_by_role("rowheader", name="10000").click()
+
+    # Check I've navigated to the correct page
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10000_id}",
+        timeout=3000,
+    )
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Search by shot - go to 10001
+    searchbox = page.get_by_role("searchbox", name="Jump to Shot")
+
+    # Search for sample 10001
+    searchbox.fill("10001")
+    searchbox.press("Enter")
+
+    # Check I've navigated to new page
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10001_id}",
+        timeout=3000,
+    )
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Try to navigate to non existent shot
+    searchbox.fill("10002")
+    searchbox.press("Enter")
+
+    # Check I've not been moved off of the current page
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10001_id}",
+        timeout=3000,
+    )
+    # Check error message shown
+    expect(page.get_by_text("Shot not found!")).to_be_visible()
 
 
 # TODO: Test Next button with each query strategy

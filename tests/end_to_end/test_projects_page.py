@@ -115,7 +115,7 @@ def test_single_project(server_setup, page: Page):
     # Try clicking the row
     table_row.click()
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}", timeout=3
+        f"http://localhost:8002/ui/projects/{project_id}", timeout=3000
     )
 
 

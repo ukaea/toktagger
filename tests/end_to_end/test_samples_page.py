@@ -54,7 +54,7 @@ def test_empty_samples_table(server_setup, page: Page):
 
     # Check we can navigate back to Projects page via breadcrumbs
     page.get_by_role("link", name="Projects").click()
-    expect(page).to_have_url("http://localhost:8002/ui/projects", timeout=3)
+    expect(page).to_have_url("http://localhost:8002/ui/projects", timeout=3000)
 
 
 def test_single_sample(server_setup, page: Page):
@@ -88,7 +88,8 @@ def test_single_sample(server_setup, page: Page):
     # Try clicking the row
     table_row.click()
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}", timeout=3
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}",
+        timeout=3000,
     )
 
 

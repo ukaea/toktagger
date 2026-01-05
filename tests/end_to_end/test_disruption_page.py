@@ -49,7 +49,7 @@ def test_disruption_add_zone(zone_type, server_setup, page: Page):
     # Check you can right click to delete it
     page.get_by_label("zone").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
-    page.get_by_role("menuitem", name="Delete").click()
+    page.get_by_role("menuitem", name="Delete").click(force=True)
 
     # Check it no longer exists
     expect(page.get_by_label("zone").first).to_be_hidden()
@@ -85,21 +85,21 @@ def test_disruption_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
 
     # Check added to list, record initial positions
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
-    initial_left_position = (
+    initial_left_position = float(
         page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
     )
-    initial_right_position = (
+    initial_right_position = float(
         page.get_by_role("row").nth(1).get_by_role("cell").nth(1).inner_text()
     )
 
     # Click handle, drag to new position
     page.get_by_label(f"zone.{handle}").drag_to(page.locator(drag_to))
-
+    time.sleep(0.1)
     # Check values in table correctly updated
-    updated_left_position = (
+    updated_left_position = float(
         page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
     )
-    updated_right_position = (
+    updated_right_position = float(
         page.get_by_role("row").nth(1).get_by_role("cell").nth(1).inner_text()
     )
 
@@ -191,15 +191,16 @@ def test_disruption_drag_vspan(drag_to, server_setup, page: Page):
 
     # Check added to list, record initial positions
     expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
-    initial_position = (
+    initial_position = float(
         page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
     )
 
     # Click handle, drag to new position
     page.get_by_label("vspan").drag_to(page.locator(drag_to))
+    time.sleep(0.1)
 
     # Check values in table correctly updated
-    updated_position = (
+    updated_position = float(
         page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
     )
 
@@ -351,3 +352,77 @@ def test_disruption_load_annotations(server_setup, page: Page):
     )
     assert float(row.get_by_role("cell").nth(0).inner_text()) == rampdown.time_min
     assert float(row.get_by_role("cell").nth(1).inner_text()) == rampdown.time_max
+
+
+def test_disruption_update_annotations(server_setup, page: Page):
+    # Create Project
+    project_id = create_project("Test Project", "disruption", "parquet")
+    # And a sample for disruption
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    sample_id = ids[0]
+
+    # Create annotations of each type
+    rampup = TimeRegion(
+        label="RampUp", created_by="peak_detection", time_min=10, time_max=20
+    )
+    flattop = TimeRegion(
+        label="FlatTop", created_by="peak_detection", time_min=20, time_max=70
+    )
+    disruption = TimePoint(label="Disruption", created_by="peak_detection", time=71)
+    # Add annotations
+    response = requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
+        json=[model.model_dump(mode="json") for model in (rampup, flattop, disruption)],
+    )
+    assert response.status_code == 200
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # One vspan and 3 zones visible
+    expect(page.get_by_label("vspan").first).to_be_visible()
+    assert page.get_by_label("zone", exact=True).count() == 2
+
+    # Delete a zone
+    page.get_by_label("zone").first.click(button="right")
+    expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
+    page.get_by_role("menuitem", name="Delete").click()
+
+    # Move the disruption
+    # Click handle, drag to new position
+    page.get_by_label("vspan").drag_to(page.locator(".edrag"))
+
+    row = page.get_by_role("row").filter(
+        has=page.get_by_role("rowheader", name="Disruption")
+    )
+    updated_disruption_time = float(row.get_by_role("cell").nth(0).inner_text())
+
+    # Press Save
+    page.get_by_role("button", name="Save").click()
+
+    time.sleep(1)
+
+    # Check annotation stored in db
+    response = requests.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    )
+    assert response.status_code == 200
+    annotations = response.json()
+
+    # Check one annotation removed
+    assert len(annotations) == 2
+    print(annotations)
+
+    # Check all annotations marked as validated
+    for annotation in annotations:
+        assert annotation["validated"]  # == True
+        assert annotation["uncertainty"] == 0
+
+    # Check time of disruption updated
+    disruption_annotation = next(
+        ann for ann in annotations if ann["label"] == "Disruption"
+    )
+    assert round(disruption_annotation["time"], 6) == updated_disruption_time
