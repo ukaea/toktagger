@@ -161,3 +161,48 @@ def test_disruption_add_vspan(server_setup, page: Page):
     # Check it no longer exists
     expect(page.get_by_label("vspan").first).to_be_hidden()
     expect(page.get_by_role("rowheader", name="Disruption")).to_be_hidden()
+
+
+@pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
+def test_disruption_drag_vspan(drag_to, server_setup, page: Page):
+    # Create Project
+    project_id = create_project("Test Project", "disruption", "parquet")
+    # And a sample for disruption
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    sample_id = ids[0]
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # Check time series plot rendered
+    expect(page.get_by_label("time-series")).to_be_visible()
+
+    # Add a new zone
+    page.get_by_label("time-series").click(button="right")
+    page.get_by_role("menuitem", name="Add Disruption").click()
+
+    expect(page.get_by_label("vspan").first).to_be_visible()
+
+    # Check added to list, record initial positions
+    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+    initial_position = (
+        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+    )
+
+    # Click handle, drag to new position
+    page.get_by_label("vspan").drag_to(page.locator(drag_to))
+
+    # Check values in table correctly updated
+    updated_position = (
+        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+    )
+
+    if drag_to == ".wdrag":
+        # Dragging left, position should have reduced
+        assert updated_position < initial_position
+    else:
+        # Dragging right, position should be increased
+        assert updated_position > initial_position
