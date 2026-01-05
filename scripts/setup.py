@@ -85,8 +85,10 @@ def main():
     project_id = create_project("UDA Disruption Project", "disruption", "uda", "random")
     create_uda_samples(project_id, shot_ids)
 
-    project_id = create_project("Local ELM Project", "ELM", "parquet")
-    create_local_samples(project_id, shot_ids, base_path=base_path / "summary")
+    project_id = create_project("Local ELM Project", "ELM", "parquet", "random")
+    create_local_samples(
+        project_id, shot_ids, base_path=base_path / "summary", file_type="parquet"
+    )
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
