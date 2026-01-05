@@ -432,14 +432,16 @@ export default function ToolBar({
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  const modelPredictTool = (
+  tools.push({
+    "name": "Model Prediction",
+    "component": (
     <ModelPredictTool
       project={project}
       sample_id={sample_id}
       setAnnotations={setAnnotations}
     ></ModelPredictTool>
-  );
-  tools.push(modelPredictTool);
+    ),
+  });
 
   if (project.task == "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);

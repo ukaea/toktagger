@@ -31,6 +31,7 @@ export const AnnotationSchema = z.union([
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
 export const AnnotationsSchema = z.array(AnnotationSchema);
+export type Annotations = z.infer<typeof AnnotationsSchema>;
 
 export const TimeSeriesDataSchema = z.object({
   time: z.array(z.number()),
