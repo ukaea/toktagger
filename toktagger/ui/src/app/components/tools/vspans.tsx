@@ -132,6 +132,7 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
         graphGroup
           .append("rect")
+          .attr('aria-label', 'vspan')
           .attr("class", "vspan disable-on-modifier")
           .attr("x", x - 10)
           .attr("y", upperLimit)
