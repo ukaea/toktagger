@@ -50,12 +50,17 @@ async function saveAnnotations(
   annotations: Annotation[],
 ) {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+  const validated_annotations: Annotation[] = annotations.map((annotation: Annotation) => ({
+    ...annotation,
+    validated: true,
+    uncertainty: 0.0
+  }))
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(annotations),
+    body: JSON.stringify(validated_annotations),
   });
   return response;
 }
