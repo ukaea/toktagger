@@ -38,18 +38,18 @@ def test_disruption_add_zone(zone_type, server_setup, page: Page):
 
     # Choose each type, check a new zone is added
     page.get_by_role("menuitem", name=zone_type, exact=True).click()
-    expect(page.locator(".zone").first).to_be_visible()
+    expect(page.get_by_label("zone").first).to_be_visible()
 
     # Check added to list
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
 
     # Check you can right click to delete it
-    page.locator(".zone").first.click(button="right")
+    page.get_by_label("zone").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
     page.get_by_role("menuitem", name="Delete").click()
 
     # Check it no longer exists
-    expect(page.locator(".zone").first).to_be_hidden()
+    expect(page.get_by_label("zone").first).to_be_hidden()
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
 
 
@@ -78,7 +78,7 @@ def test_disruption_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
 
     # Choose each type, check a new zone is added
     page.get_by_role("menuitem", name=zone_type, exact=True).click()
-    expect(page.locator(".zone").first).to_be_visible()
+    expect(page.get_by_label("zone").first).to_be_visible()
 
     # Check added to list, record initial positions
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
@@ -90,7 +90,7 @@ def test_disruption_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
     )
 
     # Click handle, drag to new position
-    page.locator(f".zone.{handle}").drag_to(page.locator(drag_to))
+    page.get_by_label(f"zone.{handle}").drag_to(page.locator(drag_to))
 
     # Check values in table correctly updated
     updated_left_position = (
@@ -120,3 +120,44 @@ def test_disruption_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
         else:
             # If right handle dragged, left position should be unchanged
             assert updated_left_position == initial_left_position
+
+
+def test_disruption_add_vspan(server_setup, page: Page):
+    # Create Project
+    project_id = create_project("Test Project", "disruption", "parquet")
+    # And a sample for disruption
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    sample_id = ids[0]
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # Check time series plot rendered
+    expect(page.get_by_label("time-series")).to_be_visible()
+
+    # Right click on it, check menu renders
+    page.get_by_label("time-series").click(button="right")
+
+    expect(page.get_by_role("menuitem", name="Add zone")).to_be_visible()
+    expect(page.get_by_role("menuitem", name="Add Disruption")).to_be_visible()
+
+    # Choose add disruption
+    page.get_by_role("menuitem", name="Add Disruption").click()
+
+    # Check disruption Vspan has been added
+    expect(page.get_by_label("vspan").first).to_be_visible()
+
+    # Check added to list
+    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+
+    # Check you can right click to delete it
+    page.get_by_label("vspan").first.click(button="right")
+    expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
+    page.get_by_role("menuitem", name="Delete").click()
+
+    # Check it no longer exists
+    expect(page.get_by_label("vspan").first).to_be_hidden()
+    expect(page.get_by_role("rowheader", name="Disruption")).to_be_hidden()
