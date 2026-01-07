@@ -10,7 +10,6 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
-  SearchField,
   ComboBox,
   Item,
   Key,
@@ -277,11 +276,11 @@ export default function ToolBar({
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  if (project.task == "ELM") {
+  if (project.task == "time-series") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
     if (!result.success) {
-      console.warn("ELM data is not available");
+      console.warn("Time series data is not available");
       return;
     }
 
@@ -346,10 +345,10 @@ export default function ToolBar({
         ></JumpDetectionTool>
       ),
     });
-  } else if (project.task == "MHD") {
+  } else if (project.task == "spectrogram") {
     const resultComposite = CompositeDataSchema.safeParse(data);
     if (!resultComposite.success) {
-      console.warn("MHD data is not available");
+      console.warn("Spectrogram data is not available");
       return;
     }
 

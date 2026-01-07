@@ -24,7 +24,6 @@ import {
 } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
-import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
@@ -76,28 +75,22 @@ const SampleView = ({
   >(null);
 
   useEffect(() => {
-    if (project.task == "disruption") {
+    if (project.task == "time-series") {
       const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
       if (!result.success) {
-        throw new Error("Invalid data for disruption view");
+        throw new Error("Invalid data for time series view");
       }
       setResult(result.data);
-    } else if (project.task == "ELM") {
-      const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-      if (!result.success) {
-        throw new Error("Invalid data for ELM view");
-      }
-      setResult(result.data);
-    } else if (project.task == "MHD") {
+    } else if (project.task == "spectrogram") {
       const result = CompositeDataSchema.safeParse(data);
       if (!result.success) {
-        throw new Error("Invalid data for MHD view");
+        throw new Error("Invalid data for spectrogram view");
       }
       const mhdData = SpectrogramDataSchema.safeParse(
         result.data.values["mirnov"]
       );
       if (!mhdData.success) {
-        throw new Error("Invalid data for MHD view");
+        throw new Error("Invalid data for spectrogram view");
       }
       setResult(result.data);
     }
@@ -107,15 +100,7 @@ const SampleView = ({
     return null;
   }
 
-  if (project.task == "disruption") {
-    return (
-      <DisruptionView
-        data={result as MultiVariateTimeSeriesData}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-      />
-    );
-  } else if (project.task == "ELM") {
+  if (project.task == "time-series") {
     return (
       <TimeSeriesView
         data={result as MultiVariateTimeSeriesData}
@@ -123,7 +108,7 @@ const SampleView = ({
         setAnnotations={setAnnotations}
       />
     );
-  } else if (project.task == "MHD") {
+  } else if (project.task == "spectrogram") {
     return (
       <SpectrogramView
         data={result as SpectrogramData}

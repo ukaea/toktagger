@@ -575,18 +575,12 @@ ANNOTATORS = {
 # Currently only allowing these annotators to task mapping
 # Might want user to be able to specify a choice when making the project down the line?
 ANNOTATORS_PER_TASK = {
-    Task.ELM: [
+    Task.TIME_SERIES: [
         AnnotatorTypes.PEAK_DETECTION,
         AnnotatorTypes.OUTLIER_DETECTION,
         AnnotatorTypes.CHANGE_POINT_DETECTION,
         AnnotatorTypes.JUMP_DETECTION,
     ],
-    Task.DISRUPTION: [
-        AnnotatorTypes.PEAK_DETECTION,
-        AnnotatorTypes.OUTLIER_DETECTION,
-        AnnotatorTypes.CHANGE_POINT_DETECTION,
-        AnnotatorTypes.JUMP_DETECTION,
-    ],
-    Task.MHD: [AnnotatorTypes.SPECTROGRAM_THRESHOLD],
-    Task.UFO: [],
+    Task.SPECTROGRAM: [AnnotatorTypes.SPECTROGRAM_THRESHOLD],
+    Task.VIDEO: [],
 }

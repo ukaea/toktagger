@@ -10,6 +10,7 @@ import Plotly, {
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
+import { set } from "zod/v4";
 
 type InjectedProps = {
   plotId: string;
@@ -24,7 +25,7 @@ interface PlotConfiguration {
   config?: Partial<Config>;
 }
 
-type DisruptionPlotProps = {
+type TimeSeriesPlotProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
   children:
@@ -61,7 +62,7 @@ export const TimeSeries = ({
     },
   },
   children,
-}: DisruptionPlotProps) => {
+}: TimeSeriesPlotProps) => {
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
     null
   );
@@ -225,7 +226,6 @@ export const TimeSeries = ({
       plot.on("plotly_selected", function (eventData) {
         if (eventData && eventData.range) {
           setSelectedXRange(eventData.range.x);
-          relayout(plot, { selections: [] }); // clear selection
         }
       });
       plot.on("plotly_deselect", function () {
@@ -258,6 +258,17 @@ export const TimeSeries = ({
     allowRelayout,
     disableToolingInteraction,
   ]);
+
+  useEffect(() => {
+    const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+    if (!plot) {
+      return;
+    }
+    if (allowRelayout.current) {
+      relayout(plot, { selections: [] }); // clear selection
+      setSelectedXRange(null);
+    }
+  }, [config, plotId]);
 
   // Handles context menu creation
   useEffect(() => {
@@ -409,7 +420,7 @@ export const TimeSeries = ({
       dragElement.addEventListener("mousemove", updateTool);
     });
 
-    // document.addEventListener("keyup", cancelToolCreation);
+    document.addEventListener("keyup", cancelToolCreation);
 
     return () => {
       // remove listener on effect cleanup

@@ -8,6 +8,9 @@ import {
   TimeRegionSchema,
   Annotation,
   TimeSeriesData,
+  VSpanSchema,
+  VSpan,
+  TimePointSchema,
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
@@ -20,6 +23,8 @@ import {
   updateAnnotations,
 } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
+import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
+import { VSpans } from "@/app/components/tools/vspans";
 
 const zoneCategories: Category[] = [
   { name: "ELM", color: "#FF5733" },
@@ -32,6 +37,12 @@ const zoneCategories: Category[] = [
   { name: "Locked Mode", color: "#8DFF33" },
   { name: "VDE", color: "#FF3380" },
   { name: "Unknown", color: "#B0B0B0" },
+];
+
+const vspanCategories: Category[] = [
+  { name: "Disruption", color: "#FFAA33" },
+  { name: "Thermal Quench", color: "#33FFAA" },
+  { name: "Current Quench", color: "#AA33FF" },
 ];
 
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
@@ -65,6 +76,14 @@ export const TimeSeriesView = ({
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+
+  const vspans: VSpan[] = displayAnnotations
+    .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
+    .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
+
+  const updateVSpans = (newVSpans: Array<VSpan>) => {
+    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
+  };
 
   const updateZones = (newZones: Array<Zone>) => {
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
@@ -164,12 +183,19 @@ export const TimeSeriesView = ({
             initialData={zones}
             onModifyZone={updateZones}
           >
-            <TimeSeries
-              plotId="TimesSeriesView"
-              plotConfig={{ data: plotData, layout: plotLayout }}
+            <VSpanProvider
+              categories={vspanCategories}
+              initialData={vspans}
+              onModifyVSpan={updateVSpans}
             >
-              <Zones onZoneUpdate={updateZones} />
-            </TimeSeries>
+              <TimeSeries
+                plotId="TimesSeriesView"
+                plotConfig={{ data: plotData, layout: plotLayout }}
+              >
+                <Zones onUpdate={updateZones} />
+                <VSpans onUpdate={updateVSpans} />
+              </TimeSeries>
+            </VSpanProvider>
           </ZoneProvider>
         </ContextMenuProvider>
       </div>

@@ -78,16 +78,16 @@ def main():
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
 
-    project_id = create_project("UDA Disruption Project", "disruption", "uda")
+    project_id = create_project("UDA Disruption Project", "time-series", "uda")
     create_uda_samples(project_id, shot_ids)
 
-    project_id = create_project("Local ELM Project", "ELM", "parquet")
+    project_id = create_project("Local ELM Project", "time-series", "parquet")
     create_local_samples(project_id, shot_ids, base_path=base_path / "summary")
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
-    project_id = create_project("Local MHD Project", "MHD", "parquet")
+    project_id = create_project("Local MHD Project", "spectrogram", "parquet")
     create_local_samples(
         project_id, shot_ids, base_path=base_path / "mhd", columns=["mirnov"]
     )

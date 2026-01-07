@@ -31,6 +31,10 @@ export const convertDisplayAnnotationToAnnotation = (
     const timeRegion: TimeRegion = {
       created_by: zone.created_by,
       type: "time_region",
+      project_id: null,
+      sample_id: null,
+      validated: false,
+      uncertainty: 1,
       time_min: zone.x0,
       time_max: zone.x1,
       label: zone.category.name,
@@ -39,6 +43,10 @@ export const convertDisplayAnnotationToAnnotation = (
   } else if (VSpanSchema.safeParse(annotation).success) {
     const vspan = VSpanSchema.parse(annotation);
     const timePoint: TimePoint = {
+      project_id: null,
+      sample_id: null,
+      validated: false,
+      uncertainty: 1,
       created_by: vspan.created_by,
       type: "time_point",
       time: vspan.x,

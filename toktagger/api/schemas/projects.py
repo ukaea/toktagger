@@ -1,18 +1,23 @@
-from pydantic import Field, field_validator
-from typing import Optional
 from enum import Enum
-from toktagger.api.schemas import ConfiguredModel
+from typing import Optional
+
+from pydantic import Field, field_validator
+
 from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.schemas import ConfiguredModel
 
 
 class Task(Enum):
-    ELM = "ELM"
-    DISRUPTION = "disruption"
-    MHD = "MHD"
-    UFO = "UFO"
+    """The type of labelling task for a project."""
+
+    TIME_SERIES = "time-series"
+    SPECTROGRAM = "spectrogram"
+    VIDEO = "video"
 
 
 class QueryStrategyType(str, Enum):
+    """The strategy to use when selecting the next sample to annotate."""
+
     RANDOM = "random"
     SEQUENTIAL = "sequential"
     UNCERTAINTY = "uncertainty"

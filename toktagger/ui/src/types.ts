@@ -3,10 +3,10 @@ import { z } from "zod/v4";
 export const BaseAnnotationSchema = z.object({
   project_id: z.string().nullable().default(null),
   sample_id: z.string().nullable().default(null),
-  created_by: z.string().default("manual"),
   timestamp: z.string().nullable().default(null),
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(null),
+  created_by: z.string().default("manual"),
   label: z.string(),
   type: z.string(),
 });
@@ -105,10 +105,12 @@ export const DisplayAnnotationSchema = z.union([
 ]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
+const TaskSchema = z.enum(["time-series", "spectrogram", "video"]);
+
 export const ProjectSchema = z.object({
   _id: z.string().nullable(),
   name: z.string(),
-  task: z.string(),
+  task: TaskSchema,
   query_strategy: z.string(),
   data_loader: z.string(),
   timestamp: z.string().optional(),
@@ -117,7 +119,7 @@ export type Project = z.infer<typeof ProjectSchema>;
 
 export const ProjectUpdateSchema = z.object({
   name: z.string().optional(),
-  task: z.string().optional(),
+  task: TaskSchema.optional(),
   query_strategy: z.string().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
@@ -177,7 +179,7 @@ export type ToolingProps = {
   plotId?: string;
   plotReady?: boolean;
   forceUpdate?: number;
-  onZoneUpdate?: CallableFunction;
+  onUpdate?: CallableFunction;
   selectedXRange?: [number, number];
 };
 

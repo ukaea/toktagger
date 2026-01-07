@@ -69,15 +69,16 @@ export const VSpanProvider = ({
     onModifyVSpan?.(spans.current);
   };
 
-  const handleDelete = (input: unknown) => {
+  const handleVSpanDelete = (input: unknown) => {
     spans.current = spans.current.filter((span) => span !== input);
+    spans.current = spans.current.filter((span) => !span.selected);
     triggerVSpanUpdate();
     onModifyVSpan?.(spans.current);
   };
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     spans.current = spans.current.map((span) => {
       if (span === props.vspan) {
@@ -90,10 +91,13 @@ export const VSpanProvider = ({
 
   const addVSpan = (x: number, category: Category) => {
     spans.current.push({
+      created_by: "manual",
+      selected: false,
       category,
       x,
     });
     triggerVSpanUpdate();
+    onModifyVSpan?.(spans.current);
   };
 
   const activateTooling = () => {
@@ -108,8 +112,8 @@ export const VSpanProvider = ({
       },
       end: (x, _y) => {
         spans.current[spans.current.length - 1].x = x;
-        handleVSpanDragFinish();
         triggerVSpanUpdate();
+        handleVSpanDragFinish();
       },
     });
   };
@@ -118,6 +122,8 @@ export const VSpanProvider = ({
   useEffect(() => {
     const add = (x: number, category: Category) => {
       spans.current.push({
+        created_by: "manual",
+        selected: false,
         category,
         x,
       });
@@ -158,7 +164,7 @@ export const VSpanProvider = ({
         </Item>
       ) : (
         // multiple-category branch
-        <Submenu key="vspan-submenu" label="Add VSpan">
+        <Submenu key="vspan-submenu" label="Add Time Point">
           {addVSpanItems}
         </Submenu>
       );
@@ -193,6 +199,17 @@ export const VSpanProvider = ({
     );
   });
 
+  // Delete selected zones on Delete/Backspace keypress
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Delete" || e.key == "Backspace") {
+      e.preventDefault(); // Prevent default delete behavior
+      const selectedZones = spans.current.filter((span) => span.selected);
+      for (const span of selectedZones) {
+        handleVSpanDelete(span);
+      }
+    }
+  });
+
   // The context provider is responsible for rendering the context menu relating to VSpans
   return (
     <VSpanContext.Provider
@@ -210,7 +227,7 @@ export const VSpanProvider = ({
         <Item
           id="delete"
           onClick={({ props }: ItemParams) => {
-            handleDelete(props.vspan);
+            handleVSpanDelete(props.vspan);
           }}
         >
           Delete
