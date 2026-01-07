@@ -9,7 +9,8 @@ import Plotly, {
   react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
-import React, { useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
+import { set } from "zod/v4";
 
 type InjectedProps = {
   plotId: string;
@@ -54,16 +55,16 @@ export const TimeSeries = ({
           "resetScale2d",
         ],
       ],
-      dragmode: false,
+      dragmode: "pan",
       displaylogo: false,
       displayModeBar: true,
-      scrollZoom: false,
+      scrollZoom: true,
     },
   },
   children,
 }: DisruptionPlotProps) => {
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
-    null,
+    null
   );
   const [updateTools, setUpdateTools] = useState(0);
   const [plotReady, setPlotReady] = useState(false);
@@ -82,12 +83,6 @@ export const TimeSeries = ({
   const triggerToolUpdate = () => {
     setUpdateTools((current) => (current + 1) % 100);
   };
-
-  if (!disableToolingInteraction) {
-    config = { ...config, scrollZoom: false, dragmode: "pan" };
-  } else {
-    config = { ...config, scrollZoom: true, dragmode: "pan" };
-  }
   // Main plotly rendering
   useEffect(() => {
     const overplots: string[] = [];
@@ -96,7 +91,7 @@ export const TimeSeries = ({
       // Get all subplot elements and extract the subplot name (xy for example) from the class list
       const subplots = plot.querySelectorAll(".subplot");
       const subplotNames = [...subplots].map((el) =>
-        [...el.classList].find((cls) => cls !== "subplot"),
+        [...el.classList].find((cls) => cls !== "subplot")
       );
 
       // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
@@ -114,7 +109,7 @@ export const TimeSeries = ({
           // ensure only one custom overlay group is present
           const svg = document.createElementNS(
             "http://www.w3.org/2000/svg",
-            "g",
+            "g"
           );
           svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`);
           svg.setAttribute("fill", "none");
@@ -123,6 +118,7 @@ export const TimeSeries = ({
         }
       });
 
+      // Use setTimeout to ensure DOM has fully updated before signaling ready
       setPlotReady(true);
     };
 
@@ -197,9 +193,6 @@ export const TimeSeries = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-      // triggers re-render of overlay tools when axes change
-      triggerToolUpdate();
-
       // This makes use of the first graph displayed but this should be fine
       if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
         // for zoom and pan events
@@ -210,6 +203,7 @@ export const TimeSeries = ({
       } else {
         rescale(); // for initial load & autoscale
       }
+      triggerToolUpdate();
     };
 
     const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
@@ -225,7 +219,6 @@ export const TimeSeries = ({
       plot.removeAllListeners("plotly_doubleclick");
       plot.removeAllListeners("plotly_selected");
       plot.removeAllListeners("plotly_deselect");
-
       plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
       plot.on("plotly_doubleclick", rescale);
 
@@ -244,14 +237,65 @@ export const TimeSeries = ({
 
     initGraph();
 
+    if (!disableToolingInteraction) {
+      plot.style.pointerEvents = "auto";
+    } else {
+      plot.style.pointerEvents = "none";
+    }
+
     return () => {
-      // // cleanup on unmount / Fast-Refresh
+      // cleanup on unmount / Fast-Refresh
       overplots.forEach((overplot) => {
         plot?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
       });
       setPlotReady(false); // reset ready state
     };
-  }, [plotId, config, data, layout, plotReady, allowRelayout]);
+  }, [
+    plotId,
+    config,
+    data,
+    layout,
+    plotReady,
+    allowRelayout,
+    disableToolingInteraction,
+  ]);
+
+  // Re-render zones whenever tools are updated
+  useEffect(() => {
+    if (!plotReady) {
+      return;
+    }
+
+    const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+    if (!plot) {
+      return;
+    }
+
+    // Get all subplot elements and extract the subplot name (xy for example) from the class list
+    const subplots = plot.querySelectorAll(".subplot");
+    const subplotNames = [...subplots].map((el) =>
+      [...el.classList].find((cls) => cls !== "subplot")
+    );
+
+    // Ensure overplot elements exist for each subplot
+    subplotNames.forEach((coordinateSystem) => {
+      const subplot = plot
+        .querySelector(`.subplot.${coordinateSystem}`)
+        ?.querySelector(".overplot")
+        ?.querySelector(`.${coordinateSystem}`) as HTMLElement;
+
+      if (!subplot) {
+        return;
+      }
+
+      if (!subplot.querySelector(`.${plotId}-overplot-${coordinateSystem}`)) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`);
+        svg.setAttribute("fill", "none");
+        subplot.appendChild(svg);
+      }
+    });
+  }, [plotId, plotReady, updateTools]);
 
   // Handles context menu creation
   useEffect(() => {
@@ -403,7 +447,7 @@ export const TimeSeries = ({
       dragElement.addEventListener("mousemove", updateTool);
     });
 
-    document.addEventListener("keyup", cancelToolCreation);
+    // document.addEventListener("keyup", cancelToolCreation);
 
     return () => {
       // remove listener on effect cleanup
@@ -415,7 +459,7 @@ export const TimeSeries = ({
       });
       document.removeEventListener("keyup", cancelToolCreation);
     };
-  }, [plotId, plotReady, toolingCallbacks]);
+  }, [plotId, plotReady, toolingCallbacks, updateTools]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">

@@ -28,7 +28,7 @@ export const useContextMenuProvider = () => {
   const context = useContext(ContextMenuContext);
   if (!context) {
     throw new Error(
-      "useRegisterContextMenuItem must be used within a ContextMenuProvider",
+      "useRegisterContextMenuItem must be used within a ContextMenuProvider"
     );
   }
   return context;
@@ -67,7 +67,7 @@ export const ContextMenuProvider = ({
         return newMap;
       });
     },
-    [],
+    []
   );
 
   // Set up listeners to toggle tooling interaction

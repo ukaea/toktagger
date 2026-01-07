@@ -49,7 +49,7 @@ export const Zones = ({
     // Get a reference to all subplots and find the name of the axis
     const subplots = plot.querySelectorAll(".subplot");
     const subplotNames = [...subplots].map((el) =>
-      [...el.classList].find((cls) => cls !== "subplot"),
+      [...el.classList].find((cls) => cls !== "subplot")
     );
 
     // For each subplot carry out the tooling generation
@@ -60,14 +60,11 @@ export const Zones = ({
       }
 
       const overplot = document.getElementsByClassName(
-        `${plotId}-overplot-${subplotId}`,
+        `${plotId}-overplot-${subplotId}`
       )[0];
 
       if (!overplot) {
-        console.error(
-          `Could not locate D3 overplot to generate zones: ${plotId}-overplot-${subplotId}`,
-        );
-        handleZoneUpdate();
+        // Silently skip if overplot not found yet - it will be available on next render
         return;
       }
 
@@ -161,7 +158,7 @@ export const Zones = ({
 
           const x0 = xaxis.p2d(newX);
           const x1 = xaxis.p2d(
-            newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0)),
+            newX + Math.abs(xaxis.d2p(d.x1) - xaxis.d2p(d.x0))
           );
           const x0Left = d.x0 < d.x1;
           d.x0 = x0Left ? x0 : x1;
@@ -205,7 +202,7 @@ export const Zones = ({
         // inside portion per side; shrink when zone is tiny to keep a center gap
         const inner = Math.max(
           0,
-          Math.min(INNER_HANDLE_MAX_PX, (spanWidth - MIN_CENTER_DRAG_PX) / 2),
+          Math.min(INNER_HANDLE_MAX_PX, (spanWidth - MIN_CENTER_DRAG_PX) / 2)
         );
         const totalHandleWidth = OUTER_HANDLE_PX + inner;
 
@@ -255,7 +252,7 @@ export const Zones = ({
           .attr("height", height)
           .attr("fill", "transparent")
           .attr("style", `pointer-events: ${pointerEvent}`)
-          .style("cursor", "move")
+          .style("cursor", "w-resize")
           .datum(zone)
           .on("contextmenu", handleContextMenu)
           .call(getBoundaryHandler(true));
@@ -271,7 +268,7 @@ export const Zones = ({
           .attr("height", height)
           .attr("fill", "transparent")
           .attr("style", `pointer-events: ${pointerEvent}`)
-          .style("cursor", "move")
+          .style("cursor", "e-resize")
           .datum(zone)
           .on("contextmenu", handleContextMenu)
           .call(getBoundaryHandler(false));

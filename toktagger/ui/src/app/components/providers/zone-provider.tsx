@@ -60,6 +60,7 @@ export const ZoneProvider = ({
   };
 
   const handleZoneDragFinish = () => {
+    triggerZoneUpdate();
     onModifyZone?.(zones.current);
   };
 
@@ -73,7 +74,7 @@ export const ZoneProvider = ({
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     zones.current = zones.current.map((zone) => {
       if (zone === props.zone || zone.selected) {
