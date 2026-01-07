@@ -333,7 +333,7 @@ async def test_get_model(db_client, setup_db):
 async def test_get_model_doesnt_exist(db_client, setup_db):
     with pytest.raises(
         HTTPException,
-        match="No models found of that version and type for this project!",
+        match="No trained models found of that type for this project!",
     ):
         await utils.get_model(
             db_client,

@@ -179,7 +179,7 @@ async def get_model(
     if not models:
         raise HTTPException(
             status_code=404,
-            detail="No models found of that version and type for this project!",
+            detail="No trained models found of that type for this project!",
         )
 
     return Model(**models[0])

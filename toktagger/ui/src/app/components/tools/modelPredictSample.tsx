@@ -6,6 +6,7 @@ import {
   Item,
   Flex,
   ProgressCircle,
+  Switch,
 } from "@adobe/react-spectrum";
 import { Project, Annotations, Annotation } from "@/types";
 import { startSamplePredictions, getSamplePredictions } from "@/app/core";
@@ -13,7 +14,9 @@ import { startSamplePredictions, getSamplePredictions } from "@/app/core";
 type ModelPredictInfo = {
   project: Project;
   sample_id: string;
-  setAnnotations: (annotations: Annotations) => void;
+  setAnnotations: (
+    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
+  ) => void;
 };
 
 export function ModelPredictTool({
@@ -21,8 +24,7 @@ export function ModelPredictTool({
   sample_id,
   setAnnotations,
 }: ModelPredictInfo) {
-  // all of this should be typed, waiting on Sam's PR
-
+  const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export function ModelPredictTool({
 
   useEffect(() => {
     const scheduleTask = async () => {
-      if (selectedModel == null) {
+      if (selectedModel == null || !isEnabled) {
         return;
       }
       const response = await startSamplePredictions(
@@ -43,16 +45,24 @@ export function ModelPredictTool({
       if (response.ok) {
         setIsLoading(true);
         setTaskId(payload.task_id);
+        setErrorMessage(null);
       } else {
         setErrorMessage(payload.detail);
       }
     };
     scheduleTask();
-  }, [project._id, sample_id, selectedModel]);
+  }, [project._id, sample_id, selectedModel, isEnabled]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (taskId == null) {
+      if (taskId == null || !isEnabled) {
+        // Remove previous annotations from this model
+        setAnnotations((previousAnnotations: Annotations) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) => annotation.created_by !== selectedModel,
+          );
+          return otherAnnotations;
+        });
         return;
       }
       let pollCounter = 0;
@@ -85,6 +95,7 @@ export function ModelPredictTool({
           });
           clearInterval(interval);
           setIsLoading(false);
+          setErrorMessage(null);
         } else {
           setErrorMessage(payload.detail);
           clearInterval(interval);
@@ -93,25 +104,32 @@ export function ModelPredictTool({
       }, 1000);
     };
     fetchData();
-  }, [taskId]);
+  }, [
+    project._id,
+    sample_id,
+    selectedModel,
+    taskId,
+    setAnnotations,
+    isEnabled,
+  ]);
 
   return (
     <Provider theme={defaultTheme}>
       <div className="m-4">
         <Flex direction="column">
+          <Switch isSelected={isEnabled} onChange={setIsEnabled}>
+            Enable Tool
+          </Switch>
           <ComboBox
             label="Select Model Type"
             validationState={errorMessage ? "invalid" : ""}
             errorMessage={errorMessage}
             onSelectionChange={setSelectedModel}
+            isDisabled={!isEnabled}
           >
-            {project.model_types.map(
-              (
-                model_type, // doesnt know the type of this, should be defined what getProject returns, imagine this is the case in more recent branch? Needs updating with model_type regardless
-              ) => (
-                <Item key={model_type}>{model_type}</Item>
-              ),
-            )}
+            {project.model_types.map((model_type) => (
+              <Item key={model_type}>{model_type}</Item>
+            ))}
           </ComboBox>
           <br />
           {isLoading ? (

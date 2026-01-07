@@ -433,13 +433,13 @@ export default function ToolBar({
   const tools: { name: string; component: React.ReactNode }[] = [];
 
   tools.push({
-    "name": "Model Prediction",
-    "component": (
-    <ModelPredictTool
-      project={project}
-      sample_id={sample_id}
-      setAnnotations={setAnnotations}
-    ></ModelPredictTool>
+    name: "Model Prediction",
+    component: (
+      <ModelPredictTool
+        project={project}
+        sample_id={sample_id}
+        setAnnotations={setAnnotations}
+      ></ModelPredictTool>
     ),
   });
 
