@@ -15,7 +15,7 @@ class AnnotationIn(ConfiguredModel):
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
         if isinstance(values, dict):
-            if values["validated"]:
+            if "validated" in values and values["validated"]:
                 values["uncertainty"] = 0
             elif values.get("uncertainty") is None:
                 values["uncertainty"] = 1

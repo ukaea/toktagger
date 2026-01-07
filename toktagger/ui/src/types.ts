@@ -1,12 +1,12 @@
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
-  project_id: z.string().optional(),
-  sample_id: z.string().optional(),
+  project_id: z.string().nullable().default(null),
+  sample_id: z.string().nullable().default(null),
   created_by: z.string().default("manual"),
-  timestamp: z.string().optional(),
-  validated: z.boolean().optional(),
-  uncertainty: z.number().optional(),
+  timestamp: z.string().nullable().default(null),
+  validated: z.boolean().nullable().default(null),
+  uncertainty: z.number().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -106,7 +106,7 @@ export const DisplayAnnotationSchema = z.union([
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export const ProjectSchema = z.object({
-  _id: z.string().optional(),
+  _id: z.string().nullable(),
   name: z.string(),
   task: z.string(),
   query_strategy: z.string(),
