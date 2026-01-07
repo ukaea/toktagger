@@ -159,7 +159,7 @@ def test_disruption_add_vspan(server_setup, page: Page):
     # Check you can right click to delete it
     page.get_by_label("vspan").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
-    page.get_by_role("menuitem", name="Delete").click()
+    page.get_by_role("menuitem", name="Delete").click(force=True)
 
     # Check it no longer exists
     expect(page.get_by_label("vspan").first).to_be_hidden()
