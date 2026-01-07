@@ -9,8 +9,7 @@ import Plotly, {
   react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
-import React, { use, useEffect, useRef, useState } from "react";
-import { set } from "zod/v4";
+import React, { useEffect, useRef, useState } from "react";
 
 type InjectedProps = {
   plotId: string;
@@ -259,43 +258,6 @@ export const TimeSeries = ({
     allowRelayout,
     disableToolingInteraction,
   ]);
-
-  // Re-render zones whenever tools are updated
-  useEffect(() => {
-    if (!plotReady) {
-      return;
-    }
-
-    const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
-    if (!plot) {
-      return;
-    }
-
-    // Get all subplot elements and extract the subplot name (xy for example) from the class list
-    const subplots = plot.querySelectorAll(".subplot");
-    const subplotNames = [...subplots].map((el) =>
-      [...el.classList].find((cls) => cls !== "subplot")
-    );
-
-    // Ensure overplot elements exist for each subplot
-    subplotNames.forEach((coordinateSystem) => {
-      const subplot = plot
-        .querySelector(`.subplot.${coordinateSystem}`)
-        ?.querySelector(".overplot")
-        ?.querySelector(`.${coordinateSystem}`) as HTMLElement;
-
-      if (!subplot) {
-        return;
-      }
-
-      if (!subplot.querySelector(`.${plotId}-overplot-${coordinateSystem}`)) {
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`);
-        svg.setAttribute("fill", "none");
-        subplot.appendChild(svg);
-      }
-    });
-  }, [plotId, plotReady, updateTools]);
 
   // Handles context menu creation
   useEffect(() => {
