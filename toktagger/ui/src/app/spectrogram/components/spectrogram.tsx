@@ -27,15 +27,15 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
-import { useEffect } from "react";
 
-const lockedModeCategories: Category[] = [
-  { name: "Locked Mode", color: "rgb(255, 0, 0)" },
+const vspanCategories: Category[] = [
+  { name: "Mode Locked", color: "rgb(255, 0, 0)" },
 ];
 
 const zoneCategories: Category[] = [
   { name: "NTM", color: "rgb(0, 255, 255)" },
   { name: "LLM", color: "rgb(200, 100, 100)" },
+  { name: "Sawteeth", color: "rgb(100, 200, 100)" },
 ];
 
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
@@ -46,12 +46,13 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
   {}
 );
 
-const lockedModeCategoryColors = lockedModeCategories.reduce<
-  Record<string, string>
->((acc, curr) => {
-  acc[curr.name] = curr.color;
-  return acc;
-}, {});
+const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
+  (acc, curr) => {
+    acc[curr.name] = curr.color;
+    return acc;
+  },
+  {}
+);
 
 const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
 
@@ -70,13 +71,6 @@ export const SpectrogramView = ({
   setAnnotations,
   plotProps,
 }: SpectrogramViewInfo) => {
-  useEffect(() => {
-    console.log("SpectrogramView plotProps updated:", plotProps);
-    console.log("Threshold active:", plotProps.thresholdActive);
-  }, [plotProps]);
-
-  console.log(annotations);
-
   const convertAnnotationToDisplayAnnotation =
     createAnnotationToDisplayAnnotationFunc(colorMapping);
 
@@ -87,9 +81,11 @@ export const SpectrogramView = ({
   const zones: Zone[] = displayAnnotations
     .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+
   const vspans: VSpan[] = displayAnnotations
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
+
   const mask: SpectrogramMask = displayAnnotations
     .filter(
       (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success
@@ -109,8 +105,8 @@ export const SpectrogramView = ({
 
   const amplitude_og = data.amplitude;
   let amplitude: Array<Array<number>> = [];
+
   if (plotProps.thresholdActive) {
-    console.log("Applying threshold mask to amplitude data");
     amplitude = data.amplitude.map((row: Array<number>, rowIndex: number) =>
       row.map((value: number, colIndex: number) => {
         let maskValue = mask?.values[rowIndex]?.[colIndex];
@@ -123,6 +119,7 @@ export const SpectrogramView = ({
   } else {
     amplitude = data.amplitude;
   }
+
   const ampMin = Math.max(smallPrecisionFactor, Math.min(...amplitude.flat()));
   const ampMax = Math.max(...amplitude.flat());
 
@@ -328,7 +325,7 @@ export const SpectrogramView = ({
     <div className="flex flex-col items-center space-y-3">
       <ContextMenuProvider menuId="locked-mode-menu">
         <VSpanProvider
-          categories={lockedModeCategories}
+          categories={vspanCategories}
           initialData={vspans}
           onModifyVSpan={updateVSpans}
         >
@@ -338,7 +335,7 @@ export const SpectrogramView = ({
             onModifyZone={updateZones}
           >
             <TimeSeries
-              plotId="LockedMode"
+              plotId="SpectrogramView"
               plotConfig={{
                 data: plotData,
                 config: plotConfig,

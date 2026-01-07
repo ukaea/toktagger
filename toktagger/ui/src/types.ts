@@ -105,7 +105,17 @@ export const DisplayAnnotationSchema = z.union([
 ]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
-const TaskSchema = z.enum(["time-series", "spectrogram", "video"]);
+export enum TaskType {
+  TimeSeries = "time-series",
+  Spectrogram = "spectrogram",
+  Video = "video",
+}
+
+export const TaskSchema = z.enum([
+  TaskType.TimeSeries,
+  TaskType.Spectrogram,
+  TaskType.Video,
+]);
 
 export const ProjectSchema = z.object({
   _id: z.string().nullable(),

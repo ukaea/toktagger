@@ -92,7 +92,7 @@ const SampleView = ({
       if (!mhdData.success) {
         throw new Error("Invalid data for spectrogram view");
       }
-      setResult(result.data);
+      setResult(mhdData.data);
     }
   }, [data, project.task]);
 
@@ -178,7 +178,7 @@ export default function SamplePage() {
       const dbAnnotations = await getAnnotations(project_id, sample_id);
       setAnnotations(dbAnnotations);
 
-      if (project.task == "MHD") {
+      if (project.task == "spectrogram") {
         params = {
           ...params,
           name: "spectrogram",

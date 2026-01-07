@@ -29,16 +29,16 @@ import {
   FileData,
   ShotData,
   ProjectUpdate,
+  TaskType,
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { BACKEND_API_URL, getSamplesSummary } from "@/app/core";
 
-const Tasks = [
-  { key: "ELM", value: "ELM" },
-  { key: "disruption", value: "Disruption" },
-  { key: "MHD", value: "MHD" },
-];
+const Tasks = Object.values(TaskType).map((task) => ({
+  key: task,
+  value: task,
+}));
 
 const DataLoaders = [
   { key: "file", value: "Local File" },
@@ -69,7 +69,7 @@ const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   {
     message: "shot min must be less than or equal to shot max",
     path: ["shot_max"], // attach error to `max`
-  },
+  }
 );
 type UDADataLoaderOptions = z.infer<typeof UDADataLoaderOptionsSchema>;
 
@@ -162,13 +162,13 @@ const UDADataLoaderOptionsUI = ({
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
   const [shotMin, setShotMin] = useState<number | null>(
-    dataLoaderOptions?.shot_min || null,
+    dataLoaderOptions?.shot_min || null
   );
   const [shotMax, setShotMax] = useState<number | null>(
-    dataLoaderOptions?.shot_max || null,
+    dataLoaderOptions?.shot_max || null
   );
   const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
+    dataLoaderOptions?.signal_names || []
   );
 
   useEffect(() => {
@@ -256,13 +256,13 @@ const FileDataLoaderOptionsUI = ({
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
   const [filePath, setFilePath] = useState<string>(
-    dataLoaderOptions?.dir_name || "",
+    dataLoaderOptions?.dir_name || ""
   );
   const [fileType, setFileType] = useState<string>(
-    dataLoaderOptions?.protocol || FileTypes[0].key,
+    dataLoaderOptions?.protocol || FileTypes[0].key
   );
   const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
+    dataLoaderOptions?.signal_names || []
   );
   const [fileNames, setFileNames] = useState<string[]>([]);
 
@@ -284,7 +284,7 @@ const FileDataLoaderOptionsUI = ({
       if (filePath) {
         try {
           const response = await fetch(
-            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
+            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`
           );
           if (response.ok) {
             const fileList = await response.json();
@@ -422,7 +422,7 @@ const TaskLoaderForm = ({
 
 const editProject = async (
   projectId: string,
-  project: ProjectUpdate,
+  project: ProjectUpdate
 ): Promise<string> => {
   const response = await fetch(`${BACKEND_API_URL}/projects/${projectId}`, {
     method: "PUT",
@@ -474,7 +474,7 @@ const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
 
   const shots = Array.from(
     { length: shot_max - shot_min + 1 },
-    (_, i) => i + shot_min,
+    (_, i) => i + shot_min
   );
   const shotData = {
     signal_names: dataLoaderOptions.signal_names,
@@ -538,7 +538,7 @@ const createSamples = async (projectId: string, samples: Sample[]) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(samples),
-    },
+    }
   );
 
   if (!response.ok) {
@@ -556,7 +556,7 @@ const buildProject = (
   projectName: string,
   dataLoaderOptions: DataLoaderOptions,
   task: string,
-  queryStrategy: string,
+  queryStrategy: string
 ): Project => {
   if (projectName === "") {
     throw new Error("Project name cannot be empty");
@@ -598,13 +598,13 @@ export const ProjectConfigEditor = ({
   const icon = editMode ? <Edit /> : <AddCircle />;
   const [projectName, setProjectName] = useState<string>(project?.name || "");
   const [queryStrategy, setQueryStrategy] = useState<string>(
-    project?.query_strategy || QueryStrategies[0].key,
+    project?.query_strategy || QueryStrategies[0].key
   );
   const [taskSelection, setTaskSelection] = useState<string>(Tasks[0].key);
   const [dataLoaderOptions, setDataLoaderOptions] =
     useState<DataLoaderOptions | null>(null);
   const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(
-    null,
+    null
   );
 
   useEffect(() => {
@@ -644,7 +644,7 @@ export const ProjectConfigEditor = ({
       projectName,
       dataLoaderOptions,
       taskSelection || "",
-      queryStrategy,
+      queryStrategy
     );
 
     const samples = buildSamples(dataLoaderOptions);
