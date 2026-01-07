@@ -165,7 +165,7 @@ export const TimeSeriesView = ({
             onModifyZone={updateZones}
           >
             <TimeSeries
-              plotId="ELMs"
+              plotId="TimesSeriesView"
               plotConfig={{ data: plotData, layout: plotLayout }}
             >
               <Zones onZoneUpdate={updateZones} />

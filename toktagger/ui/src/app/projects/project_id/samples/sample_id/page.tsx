@@ -22,7 +22,7 @@ import {
   MultiVariateTimeSeriesData,
   SpectrogramData,
 } from "@/types";
-import { TimeSeriesView } from "@/app/time_series/components/time_series";
+import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";

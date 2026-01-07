@@ -24,6 +24,8 @@ import {
 } from "@/app/core";
 import { useNavigate } from "react-router-dom";
 
+const TOAST_TIMEOUT = 5000;
+
 async function getNextSample(project_id: string, current_sample_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next?current_sample_id=${current_sample_id}`;
   const sampleResult = await fetch(NEXT_URL);
@@ -71,7 +73,9 @@ function NextButton({
     );
     const sample = await getNextSample(project_id, sample_id);
     if (!sample) {
-      ToastQueue.negative("No more samples available!", { timeout: 3000 });
+      ToastQueue.negative("No more samples available!", {
+        timeout: TOAST_TIMEOUT,
+      });
       return;
     }
     const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
@@ -118,7 +122,9 @@ function PreviousButton({
 
     const sample = await getPreviousSample(project_id, sample_id);
     if (!sample) {
-      ToastQueue.negative("No earlier samples available!", { timeout: 3000 });
+      ToastQueue.negative("No earlier samples available!", {
+        timeout: TOAST_TIMEOUT,
+      });
       return;
     }
     const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
@@ -157,11 +163,11 @@ function SaveButton({
     try {
       await saveSampleAnnotations(project_id, sample_id, annotations, true);
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
-        timeout: 5000,
+        timeout: TOAST_TIMEOUT,
       });
     } catch (err) {
       ToastQueue.negative(`Failed to save annotations: ${err.message}`, {
-        timeout: 5000,
+        timeout: TOAST_TIMEOUT,
       });
     }
   };
