@@ -11,9 +11,13 @@ from toktagger.api.schemas.projects import QueryStrategyType
 class QueryStrategy(ABC):
     """Base class for query strategies"""
 
-    def __init__(self, samples: list[Sample], annotations: list[Annotation]):
+    def __init__(
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+    ):
         self.samples = samples
-        self.annotations = annotations
+        self.annotations = annotations if annotations is not None else []
 
     def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
         """Get the next sample based on the current sample ID"""
@@ -67,6 +71,14 @@ class SequentialQueryStrategy(QueryStrategy):
     Chooses the next sample from the ordered list of samples
     """
 
+    def __init__(
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+    ):
+        samples = sorted(samples, key=lambda s: s.shot_id)
+        super().__init__(samples, annotations)
+
 
 class RandomQueryStrategy(QueryStrategy):
     """Random query strategy
@@ -75,7 +87,10 @@ class RandomQueryStrategy(QueryStrategy):
     """
 
     def __init__(
-        self, samples: list[Sample], annotations: list[Annotation] = [], seed: int = 42
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+        seed: int = 42,
     ):
         super().__init__(samples, annotations)
         # simply shuffle the samples at the start

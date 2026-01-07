@@ -1,6 +1,8 @@
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
+  project_id: z.string().optional(),
+  sample_id: z.string().optional(),
   created_by: z.string().default("manual"),
   timestamp: z.string().optional(),
   validated: z.boolean().optional(),
@@ -8,6 +10,7 @@ export const BaseAnnotationSchema = z.object({
   label: z.string(),
   type: z.string(),
 });
+
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 export const ClassLabelSchema = BaseAnnotationSchema;
 export type ClassLabel = z.infer<typeof ClassLabelSchema>;
@@ -71,18 +74,21 @@ export const CategorySchema = z.object({
 });
 export type Category = z.infer<typeof CategorySchema>;
 
-export const ZoneSchema = z.object({
-  selected: z.boolean().default(false),
+export const BaseDisplayAnnotationSchema = z.object({
   created_by: z.string().default("manual"),
+  selected: z.boolean().default(false),
   category: CategorySchema,
+});
+
+export type BaseDisplayAnnotation = z.infer<typeof BaseDisplayAnnotationSchema>;
+
+export const ZoneSchema = BaseDisplayAnnotationSchema.extend({
   x0: z.number(),
   x1: z.number(),
 });
 export type Zone = z.infer<typeof ZoneSchema>;
 
-export const VSpanSchema = z.object({
-  created_by: z.string().default("manual"),
-  category: CategorySchema,
+export const VSpanSchema = BaseDisplayAnnotationSchema.extend({
   x: z.number(),
 });
 export type VSpan = z.infer<typeof VSpanSchema>;

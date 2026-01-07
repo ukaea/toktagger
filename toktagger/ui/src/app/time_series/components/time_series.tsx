@@ -39,14 +39,14 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {},
+  {}
 );
 
 type TimeSeriesViewInfo = {
   data: MultiVariateTimeSeriesData;
   annotations: Annotation[];
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
 };
 
@@ -83,12 +83,12 @@ export const TimeSeriesView = ({
           y: value.values,
           mode: "lines",
         };
-      },
+      }
     );
 
     const yAxesNames = Array.from(
       { length: numRows },
-      (_, i) => `y${i === 0 ? "" : i + 1}`,
+      (_, i) => `y${i === 0 ? "" : i + 1}`
     ).reverse();
 
     // Dynamically generate y-axis titles based on plotData names
@@ -102,12 +102,12 @@ export const TimeSeriesView = ({
   const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
     const maxTime = plotData.reduce(
       (max, trace) => Math.max(max, Math.max(...(trace.x as number[]))),
-      -Infinity,
+      -Infinity
     );
 
     const minTime = plotData.reduce(
       (min, trace) => Math.min(min, Math.min(...(trace.x as number[]))),
-      Infinity,
+      Infinity
     );
 
     const numRows = plotData.length;
@@ -126,7 +126,7 @@ export const TimeSeriesView = ({
         acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true };
         return acc;
       },
-      {} as Record<string, unknown>,
+      {} as Record<string, unknown>
     );
 
     return {

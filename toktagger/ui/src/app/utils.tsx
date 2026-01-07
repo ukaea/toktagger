@@ -24,7 +24,7 @@ export const linspace = (start: number, end: number, num: number) => {
 };
 
 export const convertDisplayAnnotationToAnnotation = (
-  annotation: DisplayAnnotation,
+  annotation: DisplayAnnotation
 ): Annotation => {
   if (ZoneSchema.safeParse(annotation).success) {
     const zone = ZoneSchema.parse(annotation);
@@ -51,12 +51,13 @@ export const convertDisplayAnnotationToAnnotation = (
 };
 
 export const createAnnotationToDisplayAnnotationFunc = (
-  colors: Record<string, string>,
+  colors: Record<string, string>
 ) => {
   const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
+        selected: false,
         created_by: timeRegion.created_by,
         x0: timeRegion.time_min,
         x1: timeRegion.time_max,
@@ -66,6 +67,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else if (TimePointSchema.safeParse(item).success) {
       const timePoint = TimePointSchema.parse(item);
       const vspan: VSpan = {
+        selected: false,
         created_by: timePoint.created_by,
         x: timePoint.time,
         category: { name: timePoint.label, color: colors[timePoint.label] },
@@ -78,6 +80,10 @@ export const createAnnotationToDisplayAnnotationFunc = (
       };
       return spectrogramMask;
     } else {
+      console.log(
+        "annotation",
+        TimeRegionSchema.safeParse(item).error?.message
+      );
       throw new Error("Unsupported annotation type");
     }
   };
@@ -86,17 +92,17 @@ export const createAnnotationToDisplayAnnotationFunc = (
 
 export function updateAnnotations<T>(
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void,
   newDisplayAnnotations: DisplayAnnotation[],
-  schema: ZodSchema<T>,
+  schema: ZodSchema<T>
 ): void {
   setAnnotations((prevAnnotations: Annotation[]) => {
     const otherAnnotations: Annotation[] = prevAnnotations.filter(
-      (item: Annotation) => !schema.safeParse(item).success,
+      (item: Annotation) => !schema.safeParse(item).success
     );
     let newAnnotations: Annotation[] = newDisplayAnnotations.map(
-      convertDisplayAnnotationToAnnotation,
+      convertDisplayAnnotationToAnnotation
     );
     newAnnotations = newAnnotations.concat(otherAnnotations);
     return newAnnotations;

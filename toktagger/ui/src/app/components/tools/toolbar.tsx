@@ -38,87 +38,9 @@ import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
-import { useNavigate } from "react-router-dom";
 import { ExportTool } from "./export";
 import { ImportTool } from "./import";
 import { NavigationBar } from "./nav";
-
-async function saveAnnotations(
-  project_id: string,
-  sample_id: string,
-  annotations: Annotation[]
-) {
-  // user has validated the annotations, so set created_by to "manual"
-  const updatedAnnotations = annotations.map((annotation: Annotation) => {
-    annotation.created_by = "manual";
-    annotation.validated = true;
-    return annotation;
-  });
-
-  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
-  const response = await fetch(ANNOTATIONS_URL, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(updatedAnnotations),
-  });
-  return response;
-}
-
-async function getShotSample(project_id: string, shot_id: string) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
-  const sampleResult = await fetch(NEXT_URL);
-  const sampleArray = await sampleResult.json();
-  let sample = null;
-  if (sampleArray.length > 0) {
-    sample = sampleArray[0];
-  }
-  return sample;
-}
-
-type SaveInfo = {
-  project_id: string;
-  sample_id: string;
-  annotations: Annotation[];
-};
-
-export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
-  const navigate = useNavigate();
-  const [errorMessage, setErrorMessage] = useState<string>("");
-
-  const onSearchSubmit = async (newValue: string) => {
-    if (newValue == "") {
-      setErrorMessage("");
-    } else if (/^[0-9]*$/.test(newValue)) {
-      setErrorMessage("");
-      const shot_id = newValue;
-      try {
-        const sample = await getShotSample(project_id, shot_id);
-        if (sample !== null) {
-          await saveAnnotations(project_id, sample_id, annotations);
-          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-          navigate(NEXT_SAMPLE_URL);
-        } else {
-          setErrorMessage("Shot not found!");
-        }
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
-      }
-    } else {
-      setErrorMessage("Please enter a number.");
-    }
-  };
-
-  return (
-    <SearchField
-      label="Jump to Shot"
-      onSubmit={onSearchSubmit}
-      validationState={errorMessage ? "invalid" : undefined}
-      errorMessage={errorMessage}
-    ></SearchField>
-  );
-}
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -503,11 +425,6 @@ export default function ToolBar({
               sample_id={sample_id}
               annotations={annotations}
               setAnnotations={setAnnotations}
-            />
-            <ShotSearch
-              project_id={project_id}
-              sample_id={sample_id}
-              annotations={annotations}
             />
             <Accordion allowsMultipleExpanded={true} width="100%">
               <Disclosure>
