@@ -29,9 +29,7 @@ class QueryStrategy(ABC):
 
         index = self._get_matching_sample(current_sample_id)
         next_index = index + 1
-
-        if next_index >= len(self.samples):
-            raise RuntimeError("No more samples to label!")
+        next_index = next_index % len(self.samples)
 
         return self.samples[next_index]
 
@@ -45,9 +43,7 @@ class QueryStrategy(ABC):
 
         index = self._get_matching_sample(current_sample_id)
         previous_index = index - 1
-
-        if previous_index < 0:
-            raise RuntimeError("No previous sample available!")
+        previous_index = previous_index % len(self.samples)
 
         return self.samples[previous_index]
 
@@ -77,7 +73,8 @@ class SequentialQueryStrategy(QueryStrategy):
         annotations: Optional[list[Annotation]] = None,
     ):
         samples = sorted(samples, key=lambda s: s.shot_id)
-        super().__init__(samples, annotations)
+        self.samples = samples
+        self.annotations = annotations if annotations is not None else []
 
 
 class RandomQueryStrategy(QueryStrategy):
@@ -92,16 +89,45 @@ class RandomQueryStrategy(QueryStrategy):
         annotations: Optional[list[Annotation]] = None,
         seed: int = 42,
     ):
-        super().__init__(samples, annotations)
+        # need to sort to ensure return order from database is consistent
+        samples = sorted(samples, key=lambda s: s.shot_id)
+        self.samples = samples
+        self.annotations = annotations if annotations is not None else []
         # simply shuffle the samples at the start
         # seed is used to ensure consistent shuffling between calls
         self._random_shuffle_samples(seed)
 
     def _random_shuffle_samples(self, seed: int):
-        idx = np.arange(len(self.samples))
         rng = np.random.default_rng(seed=seed)
-        rng.shuffle(idx)
-        self.samples = [self.samples[i] for i in idx]
+        self.samples = rng.permutation(self.samples)
+
+    def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
+        """Get the next sample based on the current sample ID"""
+
+        if current_sample_id is None:
+            if len(self.samples) == 0:
+                raise RuntimeError("No samples available!")
+            return self.samples[0]
+
+        index = self._get_matching_sample(current_sample_id)
+        next_index = index + 1
+        next_index = next_index % len(self.samples)
+
+        return self.samples[next_index]
+
+    def get_previous_sample(self, current_sample_id: Optional[str] = None) -> Sample:
+        """Get the previous sample based on the current sample ID"""
+
+        if current_sample_id is None:
+            if len(self.samples) == 0:
+                raise RuntimeError("No samples available!")
+            return self.samples[-1]
+
+        index = self._get_matching_sample(current_sample_id)
+        previous_index = index - 1
+        previous_index = previous_index % len(self.samples)
+
+        return self.samples[previous_index]
 
 
 class UncertaintyQueryStrategy(RandomQueryStrategy):

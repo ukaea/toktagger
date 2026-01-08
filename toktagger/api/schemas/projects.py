@@ -7,7 +7,7 @@ from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas import ConfiguredModel
 
 
-class Task(Enum):
+class Task(str, Enum):
     """The type of labelling task for a project."""
 
     TIME_SERIES = "time-series"
