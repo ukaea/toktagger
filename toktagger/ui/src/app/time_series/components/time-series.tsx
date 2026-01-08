@@ -25,6 +25,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { VSpans } from "@/app/components/tools/vspans";
+import { ca } from "zod/v4/locales";
 
 const zoneCategories: Category[] = [
   { name: "ELM", color: "#FF5733" },
@@ -40,18 +41,18 @@ const zoneCategories: Category[] = [
 ];
 
 const vspanCategories: Category[] = [
-  { name: "Disruption", color: "#FFAA33" },
-  { name: "Thermal Quench", color: "#33FFAA" },
+  { name: "Disruption", color: "#33FFAA" },
+  { name: "Thermal Quench", color: "#FFAA33" },
   { name: "Current Quench", color: "#AA33FF" },
+  { name: "Control Loss", color: "#FF3333" },
 ];
 
-const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
-  (acc, curr) => {
+const categoryColors = zoneCategories
+  .concat(vspanCategories)
+  .reduce<Record<string, string>>((acc, curr) => {
     acc[curr.name] = curr.color;
     return acc;
-  },
-  {}
-);
+  }, {});
 
 type TimeSeriesViewInfo = {
   data: MultiVariateTimeSeriesData;
@@ -67,7 +68,7 @@ export const TimeSeriesView = ({
   setAnnotations,
 }: TimeSeriesViewInfo) => {
   const convertAnnotationToDisplayAnnotation =
-    createAnnotationToDisplayAnnotationFunc(zoneCategoryColors);
+    createAnnotationToDisplayAnnotationFunc(categoryColors);
 
   const displayAnnotations: DisplayAnnotation[] = annotations
     .filter((x: Annotation) => x.type !== "class_label")
