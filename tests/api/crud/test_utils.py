@@ -78,17 +78,17 @@ async def test_get_samples(db_client, setup_db):
     # Check three samples returned
     assert len(samples) == 2
     # Check returned in correct order - reverse order of created
-    assert [sample.shot_id for sample in samples] == [3, 1]
+    assert [sample.shot_id for sample in samples] == [2, 1]
 
 
 @pytest.mark.asyncio
 async def test_get_samples_by_shot_id(db_client, setup_db):
     samples = await utils.get_samples(
-        db_client, project_id=setup_db["project_id_1"], shot_id=3
+        db_client, project_id=setup_db["project_id_1"], shot_id=1
     )
     # Should do an exact search for this shot_id
     assert len(samples) == 1
-    assert samples[0].shot_id == 3
+    assert samples[0].shot_id == 1
 
 
 @pytest.mark.asyncio
@@ -121,7 +121,7 @@ async def test_get_sample_summary(db_client, setup_db):
     )
     assert summary.total == 2
     assert summary.shot_min == 1
-    assert summary.shot_max == 3
+    assert summary.shot_max == 2
     assert summary.data is not None
 
 

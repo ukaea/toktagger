@@ -11,8 +11,8 @@ def samples():
     # Samples, sorted by shot_id, ascending
     sample_ins = [
         db_definitions.SAMPLE_1,
+        db_definitions.SAMPLE_2,
         db_definitions.SAMPLE_3,
-        db_definitions.SAMPLE_1,
         db_definitions.SAMPLE_4,
     ]
     samples = [
@@ -54,14 +54,15 @@ def test_sequential_strategy(samples, annotations):
     )
 
     next_sample_id = None
+    print([s.shot_id for s in samples])
     for i in range(len(samples)):
         next_sample = strategy.get_next_sample(next_sample_id)
         next_sample_id = next_sample.id
         assert next_sample == samples[i]
 
-    # Should raise an error when you get to the end
-    with pytest.raises(RuntimeError, match="No more samples to label!"):
-        strategy.get_next_sample(next_sample_id)
+    # Should cycle back to start
+    next_sample = strategy.get_next_sample(next_sample_id)
+    assert next_sample == samples[0]
 
 
 def test_random_strategy(samples, annotations):
@@ -95,6 +96,7 @@ def test_uncertainty_strategy(samples, annotations):
     assert next_sample.id == "sample_4"
     next_sample = strategy.get_next_sample("sample_4")
     assert next_sample.id == "sample_3"
-    # Should raise an error when you get to the end
-    with pytest.raises(RuntimeError, match="No more samples to label!"):
-        strategy.get_next_sample("sample_3")
+
+    # Should cycle back to start
+    next_sample = strategy.get_next_sample("sample_3")
+    assert next_sample.id == "sample_2"

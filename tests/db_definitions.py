@@ -2,23 +2,24 @@ from toktagger.api.schemas.annotators import AnnotatorTypes
 from toktagger.api.schemas.projects import ProjectIn
 from toktagger.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
 from toktagger.api.schemas.annotations import AnnotationIn, TimePoint, TimeRegion
+from toktagger.api.schemas.projects import Task
 import pathlib
 
 # Define some common things to add to db
 PROJECT_1 = ProjectIn(
     name="test_project_0",
-    task="disruption",
+    task=Task.TIME_SERIES,
     query_strategy="sequential",
     data_loader="uda",
 )
 PROJECT_2 = ProjectIn(
     name="test_project_1",
-    task="ELM",
+    task=Task.TIME_SERIES,
     query_strategy="sequential",
     data_loader="parquet",
 )
 PROJECT_3 = ProjectIn(
-    name="project_2", task="UFO", query_strategy="uncertainty", data_loader="image"
+    name="project_2", task=Task.VIDEO, query_strategy="uncertainty", data_loader="image"
 )
 
 
@@ -26,10 +27,10 @@ SAMPLE_1 = SampleIn(
     shot_id=1, data=ShotData(protocol="uda", signal_names=["Ip"]), annotations=None
 )
 SAMPLE_2 = SampleIn(
-    shot_id=3, data=ShotData(protocol="sal", signal_names=["Ip"]), annotations=None
+    shot_id=2, data=ShotData(protocol="sal", signal_names=["Ip"]), annotations=None
 )
 SAMPLE_3 = SampleIn(
-    shot_id=2,
+    shot_id=3,
     data=TimeSeriesFileData(
         file_name="test.csv", type="csv", protocol="s3", column_names=["Ip"]
     ),

@@ -1,5 +1,6 @@
 import toktagger.api.core.data_loaders as data_loaders
 import pytest
+from toktagger.api.schemas.projects import Task
 from toktagger.api.schemas.samples import (
     Sample,
     ImageFileData,
@@ -118,7 +119,7 @@ async def test_custom_data_loader(api_client):
     # Check that you cannot create a project with 'test' data loader
     in_project = {
         "name": "test_project",
-        "task": "UFO",
+        "task": Task.VIDEO,
         "query_strategy": "random",
         "data_loader": "test",  # <--- invalid
     }
