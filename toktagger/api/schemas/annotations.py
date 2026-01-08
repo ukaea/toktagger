@@ -81,12 +81,19 @@ class ModelAnnotation(AnnotationIn):
 
 
 class SpectrogramMask(AnnotationIn):
+    type: Literal["spectrogram_mask"] = "spectrogram_mask"
     values: list[list[float]]
 
 
-AnnotationTypes = Union[TimePoint, TimeRegion, BoundingBox, VideoBoundingBox]
+class SpectrogramMaskOut(SpectrogramMask, Annotation):
+    pass
+
+
+AnnotationTypes = Union[
+    TimePoint, TimeRegion, BoundingBox, VideoBoundingBox, SpectrogramMask
+]
 AnnotationOutTypes = Union[
-    TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
+    TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut, SpectrogramMaskOut
 ]
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)

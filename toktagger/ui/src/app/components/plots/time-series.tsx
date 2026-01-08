@@ -10,7 +10,6 @@ import Plotly, {
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
-import { set } from "zod/v4";
 
 type InjectedProps = {
   plotId: string;
@@ -28,6 +27,7 @@ interface PlotConfiguration {
 type TimeSeriesPlotProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
+  rescaleOnZoom?: boolean;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -61,6 +61,7 @@ export const TimeSeries = ({
       scrollZoom: true,
     },
   },
+  rescaleOnZoom = true,
   children,
 }: TimeSeriesPlotProps) => {
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
@@ -193,15 +194,17 @@ export const TimeSeries = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-      // This makes use of the first graph displayed but this should be fine
-      if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
-        // for zoom and pan events
-        rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
-      } else if ("xaxis.range" in eventData) {
-        // for range slider events
-        rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
-      } else {
-        rescale(); // for initial load & autoscale
+      if (rescaleOnZoom) {
+        // This makes use of the first graph displayed but this should be fine
+        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+          // for zoom and pan events
+          rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
+        } else if ("xaxis.range" in eventData) {
+          // for range slider events
+          rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
+        } else {
+          rescale(); // for initial load & autoscale
+        }
       }
       triggerToolUpdate();
     };
@@ -257,6 +260,7 @@ export const TimeSeries = ({
     plotReady,
     allowRelayout,
     disableToolingInteraction,
+    rescaleOnZoom,
   ]);
 
   useEffect(() => {

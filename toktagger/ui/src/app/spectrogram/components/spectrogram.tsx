@@ -1,6 +1,5 @@
 "use client";
 
-import { SpectrogramViewTable } from "./spectrogram-table";
 import {
   SpectrogramData,
   Category,
@@ -341,11 +340,11 @@ export const SpectrogramView = ({
                 config: plotConfig,
                 layout: plotLayout,
               }}
+              rescaleOnZoom={false}
             >
               <Zones onUpdate={updateZones} />
               <VSpans onUpdate={updateVSpans} />
             </TimeSeries>
-            <SpectrogramViewTable />
           </ZoneProvider>
         </VSpanProvider>
       </ContextMenuProvider>

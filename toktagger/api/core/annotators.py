@@ -549,6 +549,28 @@ class JumpDetectionAnnotator(DataAnnotator):
 
 
 class SpectrogramThresholdAnnotator:
+    """
+    SpectrogramThresholdAnnotator for generating a spectrogram mask based on thresholding.
+    This annotator computes the Short-Time Fourier Transform (STFT) of a specified signal
+    from multivariate time series data, applies a percentile-based threshold to the
+    spectrogram values, and generates a binary mask indicating regions exceeding the threshold.
+
+    Parameters
+    ----------
+    params : SpectrogramThresholdParams
+        Configuration parameters for spectrogram thresholding, including signal name and percentile.
+
+    Methods
+    -------
+    predict(data: MultiVariateTimeSeriesData) -> SpectrogramMask
+        Computes the spectrogram mask based on the specified thresholding parameters.
+
+    Examples
+    --------
+    >>> annotator = SpectrogramThresholdAnnotator(params)
+    >>> mask = annotator.predict(data)
+    """
+
     def __init__(self, params: SpectrogramThresholdParams):
         self.params = params
 
