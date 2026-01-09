@@ -275,3 +275,62 @@ async def test_create_annotation_invalid(api_client, setup_db, db_client):
     assert setup_db["sample_id_3"] not in [
         annotation["sample_id"] for annotation in annotations
     ]
+
+
+@pytest.mark.asyncio
+async def test_export_annotations(api_client, setup_db):
+    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/annotations")
+    assert response.status_code == 200
+    exported_data = response.json()
+
+    # Check that all annotations for the sample are exported
+    assert len(exported_data) == 4
+    # Verify annotation IDs match
+    exported_ids = [annotation["_id"] for annotation in exported_data]
+    assert setup_db["annotation_id_1"] in exported_ids
+    assert setup_db["annotation_id_2"] in exported_ids
+    assert setup_db["annotation_id_3"] in exported_ids
+
+
+@pytest.mark.asyncio
+async def test_import_annotations(api_client, setup_db, db_client):
+    import_data = [
+        {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_2"],
+            "label": "new_annotation",
+            "time_min": 0.3,
+            "time_max": 0.4,
+            "created_by": "manual",
+            "type": "time_region",
+            "validated": False,
+        },
+        {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_2"],
+            "label": "another_annotation",
+            "time": 0.6,
+            "created_by": "manual",
+            "type": "time_point",
+            "validated": True,
+        },
+    ]
+
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/annotations",
+        json=import_data,
+    )
+    assert response.status_code == 200
+
+    # Check annotations were added to database
+    annotations = await db_client.get_all_documents("annotations")
+    assert len(annotations) == 7
+
+    # Verify imported annotations
+    db_annotations = await db_client.get_filtered_documents(
+        "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_2"])}
+    )
+    imported_annotations = [
+        ann for ann in db_annotations if ann["created_by"] == "manual"
+    ]
+    assert len(imported_annotations) == 2

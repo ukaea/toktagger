@@ -260,3 +260,99 @@ async def test_delete_specific_annotation(db_client, setup_db):
     assert setup_db["annotation_id_1"] not in [
         str(annotation["_id"] for annotation in annotations)
     ]
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_success(db_client, setup_db):
+    # Create new annotations with sample_id references
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+        ANNOTATION_2.model_copy(update={"sample_id": setup_db["sample_id_2"]}),
+    ]
+
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=new_annotations,
+    )
+
+    # Verify annotations were added
+    all_annotations = await db_client.get_filtered_documents("annotations")
+    assert len(all_annotations) == 7  # 5 existing + 2 new
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_empty_list(db_client, setup_db):
+    # Should handle empty list gracefully
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=[],
+    )
+
+    # Verify no changes
+    all_annotations = await db_client.get_filtered_documents("annotations")
+    assert len(all_annotations) == 5
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_project_not_found(db_client, setup_db):
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+    ]
+
+    with pytest.raises(HTTPException, match="Project not found with that ID"):
+        await utils.import_annotations(
+            db_client,
+            project_id=str(ObjectId()),
+            annotations=new_annotations,
+        )
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_sample_not_found(db_client, setup_db):
+    # Use invalid sample_id
+    invalid_sample_id = str(ObjectId())
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": invalid_sample_id}),
+    ]
+
+    with pytest.raises(
+        HTTPException, match=f"Sample not found with ID {invalid_sample_id}"
+    ):
+        await utils.import_annotations(
+            db_client,
+            project_id=setup_db["project_id_1"],
+            annotations=new_annotations,
+        )
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_multiple_samples(db_client, setup_db):
+    # Import annotations for multiple samples
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+        ANNOTATION_2.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_2"]}),
+    ]
+
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=new_annotations,
+    )
+
+    # Verify annotations were added correctly
+    sample1_annotations = await utils.get_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
+    )
+    sample2_annotations = await utils.get_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_2"],
+    )
+
+    assert len(sample1_annotations) == 5  # 3 existing + 2 new
+    assert len(sample2_annotations) == 2  # 1 existing + 1 new

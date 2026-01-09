@@ -130,7 +130,7 @@ async def test_custom_data_loader(api_client):
     # Create a custom data loader
     @data_loaders.LoaderRegistry.register("test")
     class CustomLoader(data_loaders.DataLoader):
-        def get_sample(self, sample):
+        def get_sample(self, sample, **kwargs):
             # Return some data, use something from sample to check it is passed in correctly
             return MultiVariateTimeSeriesData(
                 values={
