@@ -31,7 +31,7 @@ import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
 import { ExportTool } from "./export";
-import { ImportTool } from "./import";
+import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
@@ -296,7 +296,7 @@ export default function ToolBar() {
                   <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
                 </DisclosureTitle>
                 <DisclosurePanel>
-                  <ImportTool
+                  <ImportButton
                     project_id={project_id}
                     refreshAnnotations={refreshAnnotations}
                   />

@@ -8,7 +8,7 @@ import {
 } from "@adobe/react-spectrum";
 import Import from "@spectrum-icons/workflow/Import";
 
-export function ImportTool({
+export function ImportButton({
   project_id,
   refreshAnnotations,
 }: {
@@ -22,7 +22,7 @@ export function ImportTool({
         importJSONFile(project_id, file, refreshAnnotations);
         ToastQueue.positive(
           `Annotations imported successfully from ${file.name}`,
-          { timeout: 5000 },
+          { timeout: 5000 }
         );
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);

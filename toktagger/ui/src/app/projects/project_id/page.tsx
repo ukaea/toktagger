@@ -15,11 +15,14 @@ import {
   Button,
   Picker,
   SearchField,
+  View,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { getSamples, getProject } from "@/app/core";
 import type { Project, Sample } from "@/types";
 import { useHref, useNavigate, useParams } from "react-router-dom";
+import { ImportButton } from "@/app/components/tools/import";
+import { ExportButton, ExportTool } from "@/app/components/tools/export";
 
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
@@ -115,7 +118,7 @@ export default function ProjectView() {
         project_id,
         currentPage,
         samplesPerPage,
-        shotId,
+        shotId
       );
       setSamples(samples);
       const project = await getProject(project_id);
@@ -153,7 +156,7 @@ export default function ProjectView() {
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
-            <div className="pl-4">
+            <div className="pl-4 flex items-center justify-between pr-4 mb-4">
               <SearchField
                 label="Search By Shot ID"
                 // SearchField should be able to do validation when provided a 'pattern' inside a Form element
@@ -162,6 +165,10 @@ export default function ProjectView() {
                 validationState={errorMessage ? "invalid" : undefined}
                 errorMessage={errorMessage}
               />
+              <Flex gap="size-100">
+                <ImportButton project_id={project_id} />
+                <ExportButton project={project} />
+              </Flex>
             </div>
             <SamplesTable
               project_id={project_id}
