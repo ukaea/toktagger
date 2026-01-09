@@ -2,7 +2,7 @@ import { Flex, Header, ProgressCircle, View } from "@adobe/react-spectrum";
 
 export default function LoadingView() {
   return (
-    <View>
+    <View width="100%">
       <Flex
         direction="column"
         gap="size-200"

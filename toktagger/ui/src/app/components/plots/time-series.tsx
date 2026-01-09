@@ -1,6 +1,7 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { useSample } from "@/app/contexts/SampleContext";
 import Plotly, {
   Config,
   Layout,
@@ -9,7 +10,7 @@ import Plotly, {
   react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
-import React, { useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
 
 type InjectedProps = {
   plotId: string;
@@ -226,7 +227,8 @@ export const TimeSeries = ({
       plot.on("plotly_doubleclick", rescale);
 
       // attach listener for selection events
-      plot.on("plotly_selected", function (eventData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      plot.on("plotly_selected", function (eventData: any) {
         if (eventData && eventData.range) {
           setSelectedXRange(eventData.range.x);
         }

@@ -26,8 +26,7 @@ export const Zones = ({
   });
 
   // Hook to pull in data from context provider
-  const { zones, handleZoneUpdate, handleZoneDragFinish, triggerUpdate } =
-    useZoneContext();
+  const { zones, handleZoneUpdate, handleZoneDragFinish } = useZoneContext();
   const { disableToolingInteraction } = useContextMenuProvider();
 
   // Main rendering effect
@@ -64,7 +63,11 @@ export const Zones = ({
       )[0];
 
       if (!overplot) {
-        // Silently skip if overplot not found yet - it will be available on next render
+        // Retry after a short delay if overplot not found yet
+        console.warn("Overplot not ready for zones; will retry...");
+        setTimeout(() => {
+          handleZoneUpdate();
+        }, 100);
         return;
       }
 
@@ -280,7 +283,6 @@ export const Zones = ({
     plotReady,
     showZoneMenu,
     zones,
-    triggerUpdate,
     forceUpdate,
     handleZoneDragFinish,
     disableToolingInteraction,

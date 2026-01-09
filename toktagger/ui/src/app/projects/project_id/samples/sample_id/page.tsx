@@ -6,22 +6,14 @@ import {
   Item,
   ToastContainer,
 } from "@adobe/react-spectrum";
-import {
-  CompositeDataSchema,
-  MultiVariateTimeSeriesDataSchema,
-  Project,
-  Sample,
-  SpectrogramDataSchema,
-  MultiVariateTimeSeriesData,
-  SpectrogramData,
-} from "@/types";
+import { Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
-import { SampleProvider, useSample } from "@/app/contexts/sampleContext";
+import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
 import React from "react";
 
 type SampleDataBreadCrumbsInfo = {
@@ -49,73 +41,40 @@ const SampleDataBreadCrumbs = ({
 };
 
 const SampleView = () => {
-  const { project, data, annotations, setAnnotations, plotProps } = useSample();
-  if (!data || !project) {
-    return;
+  const { project, isLoading, error } = useSample();
+
+  if (!project) {
+    return null;
   }
 
-  let viewData: MultiVariateTimeSeriesData | SpectrogramData | undefined =
-    undefined;
-
-  if (project.task == "time-series") {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for time series view");
-    }
-    viewData = result.data;
-  } else if (project.task == "spectrogram") {
-    const result = CompositeDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for spectrogram view");
-    }
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"]
-    );
-    if (!mhdData.success) {
-      throw new Error("Invalid data for spectrogram view");
-    }
-    viewData = mhdData.data;
+  if (isLoading) {
+    return <LoadingView />;
   }
 
-  if (viewData === undefined) {
-    return;
+  if (error) {
+    return <ErrorView message={error} />;
   }
 
-  if (project.task == "time-series") {
-    return (
-      <TimeSeriesView
-        data={viewData as MultiVariateTimeSeriesData}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-      />
-    );
-  } else if (project.task == "spectrogram") {
-    return (
-      <SpectrogramView
-        data={viewData as SpectrogramData}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-        plotProps={plotProps}
-      />
-    );
+  if (project.task == TaskType.TimeSeries) {
+    return <TimeSeriesView />;
+  } else if (project.task == TaskType.Spectrogram) {
+    return <SpectrogramView />;
   }
 };
 
 function SamplePageContent() {
-  const { project, sample, isLoading, error } = useSample();
+  const { project, sample, isLoading } = useSample();
+
+  if (!project && !isLoading) {
+    return <ErrorView message="Project not found." />;
+  }
+
+  if (!sample && !isLoading) {
+    return <ErrorView message="Sample not found." />;
+  }
 
   if (!project || !sample) {
     return null;
-  }
-
-  let view: React.ReactNode = <SampleView />;
-
-  if (isLoading) {
-    view = <LoadingView />;
-  }
-
-  if (error) {
-    view = <ErrorView message={error} />;
   }
 
   return (
@@ -125,7 +84,7 @@ function SamplePageContent() {
         <SampleDataBreadCrumbs project={project} sample={sample} />
         <div className="flex">
           <ToolBar />
-          <div className="flex-1 justify-center">{view}</div>
+          <SampleView />
         </div>
       </Provider>
     </div>

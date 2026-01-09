@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -15,12 +15,12 @@ import {
   Key,
 } from "@adobe/react-spectrum";
 import {
-  CompositeDataSchema,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
   SpectrogramData,
   SpectrogramDataSchema,
   SpectrogramViewParamsSchema,
+  TaskType,
   ViewParams,
 } from "@/types";
 import { getAnnotationsForSample } from "@/app/core";
@@ -33,7 +33,7 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { ExportTool } from "./export";
 import { ImportTool } from "./import";
 import { NavigationBar } from "./nav";
-import { useSample } from "@/app/contexts/sampleContext";
+import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
 
 type AmplitudeSliderInfo = {
@@ -139,6 +139,7 @@ export default function ToolBar() {
   } = useSample();
 
   if (!project || !sample) {
+    console.warn("Project or sample not found in ToolBar");
     return null;
   }
 
@@ -146,12 +147,13 @@ export default function ToolBar() {
   const sample_id = sample._id;
 
   if (!project_id || !sample_id) {
+    console.warn("Invalid project_id or sample_id in ToolBar");
     return null;
   }
 
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  if (data && project.task == "time-series") {
+  if (data && project.task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
     if (!result.success) {
@@ -161,7 +163,7 @@ export default function ToolBar() {
 
     const tsData = result.data;
 
-    const labels = ["No ELMs", "Type I", "Type II", "Type III"];
+    const labels = ["Valid Shot", "Invalid Shot"];
     tools.push({
       name: "Shot Labels",
       component: <ShotLabels labels={labels}></ShotLabels>,
@@ -210,16 +212,8 @@ export default function ToolBar() {
         ></JumpDetectionTool>
       ),
     });
-  } else if (data && project.task == "spectrogram") {
-    const resultComposite = CompositeDataSchema.safeParse(data);
-    if (!resultComposite.success) {
-      console.warn("Spectrogram data is not available");
-      return;
-    }
-
-    const resultSpec = SpectrogramDataSchema.safeParse(
-      resultComposite.data.values["mirnov"]
-    );
+  } else if (data && project.task == TaskType.Spectrogram) {
+    const resultSpec = SpectrogramDataSchema.safeParse(data);
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");
       return;
@@ -283,12 +277,7 @@ export default function ToolBar() {
             <Header height="size-300" marginBottom="size-100">
               <span style={{ fontSize: "1.2rem" }}>Controls</span>
             </Header>
-            <NavigationBar
-              project_id={project_id}
-              sample_id={sample_id}
-              annotations={annotations}
-              setAnnotations={setAnnotations}
-            />
+            <NavigationBar project_id={project_id} sample_id={sample_id} />
             <Accordion allowsMultipleExpanded={true} width="100%">
               <Disclosure>
                 <DisclosureTitle>

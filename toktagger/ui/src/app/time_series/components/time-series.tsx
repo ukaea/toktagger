@@ -25,7 +25,8 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { VSpans } from "@/app/components/tools/vspans";
-import { ca } from "zod/v4/locales";
+import { useSample } from "@/app/contexts/SampleContext";
+import { Flex, View } from "@adobe/react-spectrum";
 
 const zoneCategories: Category[] = [
   { name: "ELM", color: "#FF5733" },
@@ -54,33 +55,36 @@ const categoryColors = zoneCategories
     return acc;
   }, {});
 
-type TimeSeriesViewInfo = {
-  data: MultiVariateTimeSeriesData;
-  annotations: Annotation[];
-  setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
-  ) => void;
-};
+export const TimeSeriesView = () => {
+  const { data, annotations, setAnnotations } = useSample();
 
-export const TimeSeriesView = ({
-  data,
-  annotations,
-  setAnnotations,
-}: TimeSeriesViewInfo) => {
-  const convertAnnotationToDisplayAnnotation =
-    createAnnotationToDisplayAnnotationFunc(categoryColors);
+  const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [vspans, setVSpans] = useState<VSpan[]>([]);
 
-  const displayAnnotations: DisplayAnnotation[] = annotations
-    .filter((x: Annotation) => x.type !== "class_label")
-    .map(convertAnnotationToDisplayAnnotation);
+  const viewData = data as MultiVariateTimeSeriesData | null;
 
-  const zones: Zone[] = displayAnnotations
-    .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-    .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+  useEffect(() => {
+    if (!annotations || !viewData) return;
 
-  const vspans: VSpan[] = displayAnnotations
-    .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
-    .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
+    const convertAnnotationToDisplayAnnotation =
+      createAnnotationToDisplayAnnotationFunc(categoryColors);
+
+    const displayAnnotations: DisplayAnnotation[] = annotations
+      .filter((x: Annotation) => x.type !== "class_label")
+      .map(convertAnnotationToDisplayAnnotation);
+
+    const newZones: Zone[] = displayAnnotations
+      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
+      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+
+    const newVSpans: VSpan[] = displayAnnotations
+      .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
+      .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
+
+    setZones(newZones);
+    setVSpans(newVSpans);
+  }, [annotations, viewData]);
 
   const updateVSpans = (newVSpans: Array<VSpan>) => {
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
@@ -90,12 +94,12 @@ export const TimeSeriesView = ({
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
   };
 
-  const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
-
   useEffect(() => {
-    const numRows = Object.keys(data.values).length;
+    if (!viewData) return;
 
-    let plotData: Plotly.Data[] = Object.entries(data.values).map(
+    const numRows = Object.keys(viewData.values).length;
+
+    let plotData: Plotly.Data[] = Object.entries(viewData.values).map(
       ([key, value]: [string, TimeSeriesData]) => {
         return {
           name: key,
@@ -117,7 +121,7 @@ export const TimeSeriesView = ({
       yaxis: yAxesNames[index],
     }));
     setPlotData(plotData);
-  }, [data]);
+  }, [data, viewData]);
 
   const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
     const maxTime = plotData.reduce(
@@ -175,10 +179,14 @@ export const TimeSeriesView = ({
     };
   }, [plotData]);
 
+  if (!viewData) {
+    return null;
+  }
+
   return (
-    <div className="flex space-y-3">
-      <div className="flex-1 text-center items-center">
-        <ContextMenuProvider menuId="elm-menu">
+    <View width="100%">
+      <Flex justifyContent="center" alignItems="center">
+        <ContextMenuProvider menuId="time-series-menu">
           <ZoneProvider
             categories={zoneCategories}
             initialData={zones}
@@ -199,7 +207,7 @@ export const TimeSeriesView = ({
             </VSpanProvider>
           </ZoneProvider>
         </ContextMenuProvider>
-      </div>
-    </div>
+      </Flex>
+    </View>
   );
 };

@@ -65,6 +65,10 @@ export const VSpans = ({
 
       if (!overplot) {
         // Silently skip if overplot not found yet - it will be available on next render
+        console.warn("Could not find overplot for vspan rendering");
+        setTimeout(() => {
+          handleVSpanUpdate();
+        }, 100);
         return;
       }
 

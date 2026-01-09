@@ -3,4 +3,5 @@ export enum AnnotatorTypes {
   CHANGE_POINT_DETECTION = "change_point_detection",
   JUMP_DETECTION = "jump_detection",
   OUTLIER_DETECTION = "outlier_detection",
+  SPECTROGRAM_THRESHOLD = "spectrogram_threshold",
 }

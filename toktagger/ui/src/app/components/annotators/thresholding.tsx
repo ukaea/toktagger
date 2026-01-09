@@ -1,8 +1,9 @@
-import { useSample } from "@/app/contexts/sampleContext";
+import { useSample } from "@/app/contexts/SampleContext";
 import { BACKEND_API_URL } from "@/app/core";
-import { PlotProps } from "@/types";
+import { Annotation, PlotProps } from "@/types";
 import { ActionButton, Flex, NumberField, Switch } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
+import { AnnotatorTypes } from "./types";
 
 type SpectrogramThresholdToolInfo = {
   project_id: string;
@@ -40,7 +41,14 @@ export default function SpectrogramThresholdTool({
   useEffect(() => {
     const fetchData = async () => {
       if (!active) {
-        setAnnotations([]);
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
+          );
+          return otherAnnotations;
+        });
         return;
       }
 
@@ -58,8 +66,14 @@ export default function SpectrogramThresholdTool({
         }
       );
 
-      const payload = await response.json();
-      setAnnotations([payload]);
+      const payload: Annotation[] = await response.json();
+      setAnnotations((previousAnnotations: Annotation[]) => {
+        const otherAnnotations = previousAnnotations.filter(
+          (annotation: Annotation) =>
+            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
+        );
+        return otherAnnotations.concat(payload);
+      });
     };
 
     fetchData();

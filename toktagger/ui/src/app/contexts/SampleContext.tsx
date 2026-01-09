@@ -14,6 +14,12 @@ import {
   ViewParams,
   PlotProps,
   SpectrogramViewParams,
+  MultiVariateTimeSeriesData,
+  SpectrogramData,
+  MultiVariateTimeSeriesDataSchema,
+  CompositeDataSchema,
+  SpectrogramDataSchema,
+  TaskType,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -66,6 +72,31 @@ async function getAnnotations(
   );
 }
 
+async function parseData(
+  data: Data,
+  task: TaskType
+): Promise<MultiVariateTimeSeriesData | SpectrogramData | undefined> {
+  if (task == TaskType.TimeSeries) {
+    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for time series view");
+    }
+    return result.data;
+  } else if (task == TaskType.Spectrogram) {
+    const result = CompositeDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for spectrogram view");
+    }
+    const mhdData = SpectrogramDataSchema.safeParse(
+      result.data.values["mirnov"]
+    );
+    if (!mhdData.success) {
+      throw new Error("Invalid data for spectrogram view");
+    }
+    return mhdData.data;
+  }
+}
+
 export function SampleProvider({
   projectId,
   sampleId,
@@ -84,23 +115,26 @@ export function SampleProvider({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Consolidated data fetching - fetch everything together
   useEffect(() => {
     const refreshData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const projectData = await getProject(projectId);
+        // Fetch project, sample, and annotations in parallel
+        const [projectData, sampleData, dbAnnotations] = await Promise.all([
+          getProject(projectId),
+          getSample(projectId, sampleId),
+          getAnnotations(projectId, sampleId),
+        ]);
+
         setProject(projectData);
-
-        const sampleData = await getSample(projectId, sampleId);
         setSample(sampleData);
-
-        const dbAnnotations = await getAnnotations(projectId, sampleId);
         setAnnotations(dbAnnotations);
 
         let params = viewParams;
-        if (projectData.task === "spectrogram") {
+        if (projectData.task === TaskType.Spectrogram) {
           params = {
             ...params,
             name: "spectrogram",
@@ -128,7 +162,14 @@ export function SampleProvider({
         }
 
         const fetchedData: Data = await response.json();
-        setData(fetchedData);
+
+        const viewData = await parseData(fetchedData, projectData.task);
+        if (!viewData) {
+          setError("Data could not read the data for the selected view");
+          return;
+        }
+
+        setData(viewData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {

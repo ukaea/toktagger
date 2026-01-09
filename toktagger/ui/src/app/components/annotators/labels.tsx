@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ListView, Item } from "@adobe/react-spectrum";
 import { Annotation } from "@/types";
 import { Selection } from "@react-types/shared";
-import { useSample } from "@/app/contexts/sampleContext";
+import { useSample } from "@/app/contexts/SampleContext";
 
 export type ShotLabelsType = {
   labels: string[];
