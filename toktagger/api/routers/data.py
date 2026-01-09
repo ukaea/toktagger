@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Request, HTTPException
 from typing import Optional
-from toktagger.api.core.views import DATA_VIEWS
-from toktagger.api.core.data_loaders import DataLoaderError, LoaderRegistry
-from toktagger.api.crud import utils
-from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas.data import DataResponseType
-from toktagger.api.schemas.views import ViewParams, ViewParamTypes
 
+from fastapi import APIRouter, HTTPException, Request
+
+from toktagger.api.core.data_loaders import DataLoaderError, LoaderRegistry
+from toktagger.api.core.views import DATA_VIEWS
+from toktagger.api.crud import utils
+from toktagger.api.schemas.data import DataResponseType
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.views import ViewParams, ViewParamTypes
 
 router = APIRouter(
     prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"]

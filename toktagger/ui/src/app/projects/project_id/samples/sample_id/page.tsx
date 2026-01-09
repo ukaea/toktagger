@@ -18,7 +18,6 @@ import {
   SpectrogramViewParams,
   PlotProps,
   ViewParams,
-  CompositeData,
   MultiVariateTimeSeriesData,
   SpectrogramData,
 } from "@/types";
@@ -28,7 +27,7 @@ import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import ErrorView from "@/app/views/error";
-import { set } from "zod/v4";
+import LoadingView from "@/app/views/loading";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -56,7 +55,7 @@ const SampleDataBreadCrumbs = ({
 
 type SampleViewInfo = {
   project: Project;
-  data: Data | null;
+  data: Data;
   annotations: Annotation[];
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
@@ -72,43 +71,41 @@ const SampleView = ({
   setAnnotations,
   plotProps,
 }: SampleViewInfo) => {
-  const [result, setResult] = useState<
-    MultiVariateTimeSeriesData | CompositeData | SpectrogramData | null
-  >(null);
+  if (!data) {
+    return;
+  }
 
-  useEffect(() => {
-    if (!data) {
-      return;
-    }
-    if (project.task == "time-series") {
-      const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-      if (!result.success) {
-        throw new Error("Invalid data for time series view");
-      }
-      setResult(result.data);
-    } else if (project.task == "spectrogram") {
-      const result = CompositeDataSchema.safeParse(data);
-      if (!result.success) {
-        throw new Error("Invalid data for spectrogram view");
-      }
-      const mhdData = SpectrogramDataSchema.safeParse(
-        result.data.values["mirnov"]
-      );
-      if (!mhdData.success) {
-        throw new Error("Invalid data for spectrogram view");
-      }
-      setResult(mhdData.data);
-    }
-  }, [data, project.task]);
+  let viewData: MultiVariateTimeSeriesData | SpectrogramData | undefined =
+    undefined;
 
-  if (result == null) {
-    return <ErrorView />;
+  if (project.task == "time-series") {
+    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for time series view");
+    }
+    viewData = result.data;
+  } else if (project.task == "spectrogram") {
+    const result = CompositeDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for spectrogram view");
+    }
+    const mhdData = SpectrogramDataSchema.safeParse(
+      result.data.values["mirnov"]
+    );
+    if (!mhdData.success) {
+      throw new Error("Invalid data for spectrogram view");
+    }
+    viewData = mhdData.data;
+  }
+
+  if (viewData === undefined) {
+    return;
   }
 
   if (project.task == "time-series") {
     return (
       <TimeSeriesView
-        data={result as MultiVariateTimeSeriesData}
+        data={viewData as MultiVariateTimeSeriesData}
         annotations={annotations}
         setAnnotations={setAnnotations}
       />
@@ -116,7 +113,7 @@ const SampleView = ({
   } else if (project.task == "spectrogram") {
     return (
       <SpectrogramView
-        data={result as SpectrogramData}
+        data={viewData as SpectrogramData}
         annotations={annotations}
         setAnnotations={setAnnotations}
         plotProps={plotProps}
@@ -168,13 +165,18 @@ export default function SamplePage() {
     colorMap: "Cividis",
   }); // Set default color map
 
-  const [dataLoadingError, setDataLoadingError] = useState<string | null>(null);
+  const [view, setView] = useState<React.ReactNode | null>(null);
 
   useEffect(() => {
     const refreshData = async (params: ViewParams) => {
+      let view: React.ReactNode = null;
+
       if (!hasIds) {
         return;
       }
+
+      view = <LoadingView />;
+      setView(view);
 
       const project = await getProject(project_id);
       setProject(project);
@@ -204,16 +206,28 @@ export default function SamplePage() {
         }
       );
 
-      console.log("Data response:", response);
       if (!response.ok) {
+        console.error("Failed to fetch data:", response.statusText);
         const body = await response.json();
-        setDataLoadingError(`${body.detail}`);
+        view = <ErrorView message={`${body.detail}`} />;
         setData(null);
+        setView(view);
         return;
       }
 
       const data: Data = await response.json();
+      view = (
+        <SampleView
+          project={project}
+          data={data}
+          annotations={dbAnnotations}
+          setAnnotations={setAnnotations}
+          plotProps={plotProps}
+        ></SampleView>
+      );
+
       setData(data);
+      setView(view);
     };
 
     const run = async (viewParams: ViewParams) => {
@@ -221,7 +235,7 @@ export default function SamplePage() {
     };
 
     run(viewParams);
-  }, [project_id, sample_id, viewParams, hasIds]);
+  }, [project_id, sample_id, viewParams, hasIds, plotProps]);
 
   if (!project || !sample || !hasIds) {
     return;
@@ -247,19 +261,7 @@ export default function SamplePage() {
             plotProps={plotProps}
             setPlotProps={setPlotProps}
           />
-          <div className="flex-1 justify-center">
-            {dataLoadingError ? (
-              <ErrorView message={dataLoadingError || ""} />
-            ) : (
-              <SampleView
-                project={project}
-                data={data}
-                annotations={annotations}
-                setAnnotations={setAnnotations}
-                plotProps={plotProps}
-              />
-            )}
-          </div>
+          <div className="flex-1 justify-center">{view}</div>
         </div>
       </Provider>
     </div>
