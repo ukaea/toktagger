@@ -7,6 +7,8 @@ export const BaseAnnotationSchema = z.object({
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(null),
   created_by: z.string().default("manual"),
+  time_min: z.number().nullable().default(null),
+  time_max: z.number().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -124,6 +126,8 @@ export const ProjectSchema = z.object({
   query_strategy: z.string(),
   data_loader: z.string(),
   timestamp: z.string().optional(),
+  time_min: z.number().nullable().optional(),
+  time_max: z.number().nullable().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -131,6 +135,8 @@ export const ProjectUpdateSchema = z.object({
   name: z.string().optional(),
   task: TaskSchema.optional(),
   query_strategy: z.string().optional(),
+  time_min: z.number().nullable().optional(),
+  time_max: z.number().nullable().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 

@@ -251,7 +251,7 @@ function SpectrogramThresholdTool({
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
-  data: Data;
+  data: Data | null;
   annotations: Annotation[];
   setAnnotations: (
     annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
@@ -276,7 +276,7 @@ export default function ToolBar({
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  if (project.task == "time-series") {
+  if (data && project.task == "time-series") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
     if (!result.success) {
@@ -345,7 +345,7 @@ export default function ToolBar({
         ></JumpDetectionTool>
       ),
     });
-  } else if (project.task == "spectrogram") {
+  } else if (data && project.task == "spectrogram") {
     const resultComposite = CompositeDataSchema.safeParse(data);
     if (!resultComposite.success) {
       console.warn("Spectrogram data is not available");
@@ -451,21 +451,25 @@ export default function ToolBar({
               </Disclosure>
             </Accordion>
           </Flex>
-          <Flex justifyContent="center" alignItems="center">
-            <Header height="size-300" marginBottom="size-100">
-              <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
-            </Header>
-          </Flex>
-          <Accordion allowsMultipleExpanded={true} width="100%">
-            {tools.map((item, i) => (
-              <Disclosure key={i}>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                </DisclosureTitle>
-                <DisclosurePanel>{item.component}</DisclosurePanel>
-              </Disclosure>
-            ))}
-          </Accordion>
+          {tools.length > 0 && (
+            <>
+              <Flex justifyContent="center" alignItems="center">
+                <Header height="size-300" marginBottom="size-100">
+                  <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+                </Header>
+              </Flex>
+              <Accordion allowsMultipleExpanded={true} width="100%">
+                {tools.map((item, i) => (
+                  <Disclosure key={i}>
+                    <DisclosureTitle>
+                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                    </DisclosureTitle>
+                    <DisclosurePanel>{item.component}</DisclosurePanel>
+                  </Disclosure>
+                ))}
+              </Accordion>
+            </>
+          )}
         </Flex>
       </View>
     </Provider>

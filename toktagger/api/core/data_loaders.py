@@ -1,17 +1,19 @@
 import os
-import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
-from PIL import Image
+from typing import Optional
+
 import numpy as np
+import pandas as pd
+from PIL import Image
+
 from toktagger.api.schemas.data import (
     Data,
+    ImageData,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
-    ImageData,
 )
 from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
-
 
 # Set up UDA environment variables with defaults if not already set. This is required for
 # the pyuda client to work correctly outside of Freia.
@@ -22,9 +24,15 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
 )
 
 
+class DataLoaderError(Exception):
+    """Custom exception for data loader errors."""
+
+    pass
+
+
 class DataLoader(ABC):
     @abstractmethod
-    def get_sample(self, sample: Sample) -> Data:
+    def get_sample(self, sample: Sample, **kwargs) -> Data:
         pass
 
 
@@ -59,7 +67,7 @@ class LoaderRegistry:
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
-    def get_sample(self, sample: Sample) -> ImageData:
+    def get_sample(self, sample: Sample, **kwargs) -> ImageData:
         assert isinstance(sample.data, FileData)
         item: FileData = sample.data
         if not pathlib.Path(item.file_name).exists():
@@ -75,7 +83,13 @@ class ImageDataLoader(DataLoader):
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+    def get_sample(
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        **kwargs,
+    ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, TimeSeriesFileData)
         item: TimeSeriesFileData = sample.data
         if not pathlib.Path(item.file_name).exists():
@@ -84,8 +98,16 @@ class ParquetDataLoader(DataLoader):
             )
         df = pd.read_parquet(item.file_name, columns=item.column_names)
         df = df.fillna(0)
-        data = df.to_dict("list")
+
+        if time_min is not None:
+            df = df[df.index >= time_min]
+
+        if time_max is not None:
+            df = df[df.index <= time_max]
+
         time = df.index.values
+
+        data = df.to_dict("list")
         results = {}
         for key, value in data.items():
             results[key] = TimeSeriesData(time=time, values=value)
@@ -102,7 +124,13 @@ class UDADataLoader(DataLoader):
 
         self.client = pyuda.Client()
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
+    def get_sample(
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        **kwargs,
+    ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData)
         item: ShotData = sample.data
 
@@ -112,9 +140,25 @@ class UDADataLoader(DataLoader):
                 signal = self.client.get(name, sample.shot_id)
                 data = signal.data
                 time = signal.time.data
+
+                if time_min is not None:
+                    mask = time >= time_min
+                    time = time[mask]
+                    data = data[mask]
+
+                if time_max is not None:
+                    mask = time <= time_max
+                    time = time[mask]
+                    data = data[mask]
+
                 item = TimeSeriesData(time=time, values=data)
                 results[name] = item
             except Exception:
                 results[name] = None
+
+        if all(values is None for values in results.values()):
+            raise DataLoaderError(
+                f"Could not load any signals for shot ID '{sample.shot_id}'. Check UDA connectivity and signal names."
+            )
 
         return MultiVariateTimeSeriesData(values=results)

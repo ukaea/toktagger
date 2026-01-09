@@ -27,6 +27,8 @@ import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
+import ErrorView from "@/app/views/error";
+import { set } from "zod/v4";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -54,7 +56,7 @@ const SampleDataBreadCrumbs = ({
 
 type SampleViewInfo = {
   project: Project;
-  data: Data;
+  data: Data | null;
   annotations: Annotation[];
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
@@ -75,6 +77,9 @@ const SampleView = ({
   >(null);
 
   useEffect(() => {
+    if (!data) {
+      return;
+    }
     if (project.task == "time-series") {
       const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
       if (!result.success) {
@@ -97,7 +102,7 @@ const SampleView = ({
   }, [data, project.task]);
 
   if (result == null) {
-    return null;
+    return <ErrorView />;
   }
 
   if (project.task == "time-series") {
@@ -163,6 +168,8 @@ export default function SamplePage() {
     colorMap: "Cividis",
   }); // Set default color map
 
+  const [dataLoadingError, setDataLoadingError] = useState<string | null>(null);
+
   useEffect(() => {
     const refreshData = async (params: ViewParams) => {
       if (!hasIds) {
@@ -196,6 +203,15 @@ export default function SamplePage() {
           body: JSON.stringify(params),
         }
       );
+
+      console.log("Data response:", response);
+      if (!response.ok) {
+        const body = await response.json();
+        setDataLoadingError(`${body.detail}`);
+        setData(null);
+        return;
+      }
+
       const data: Data = await response.json();
       setData(data);
     };
@@ -207,7 +223,7 @@ export default function SamplePage() {
     run(viewParams);
   }, [project_id, sample_id, viewParams, hasIds]);
 
-  if (!data || !project || !sample || !hasIds) {
+  if (!project || !sample || !hasIds) {
     return;
   }
 
@@ -232,13 +248,17 @@ export default function SamplePage() {
             setPlotProps={setPlotProps}
           />
           <div className="flex-1 justify-center">
-            <SampleView
-              project={project}
-              data={data}
-              annotations={annotations}
-              setAnnotations={setAnnotations}
-              plotProps={plotProps}
-            />
+            {dataLoadingError ? (
+              <ErrorView message={dataLoadingError || ""} />
+            ) : (
+              <SampleView
+                project={project}
+                data={data}
+                annotations={annotations}
+                setAnnotations={setAnnotations}
+                plotProps={plotProps}
+              />
+            )}
           </div>
         </div>
       </Provider>

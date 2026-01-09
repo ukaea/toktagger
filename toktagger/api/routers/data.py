@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from typing import Optional
 from toktagger.api.core.views import DATA_VIEWS
-from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.core.data_loaders import DataLoaderError, LoaderRegistry
 from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.data import DataResponseType
@@ -27,9 +27,13 @@ async def get_data(
 
     data_loader = LoaderRegistry.get(project.data_loader)()
     try:
-        data = data_loader.get_sample(sample)
+        data = data_loader.get_sample(
+            sample, time_min=project.time_min, time_max=project.time_max
+        )
     except FileNotFoundError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
+    except DataLoaderError as e:
+        raise HTTPException(404, str(e)) from e
 
     data_view = DATA_VIEWS[view.name](view)
     data = data_view(data)

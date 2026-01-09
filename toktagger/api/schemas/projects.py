@@ -34,6 +34,14 @@ class ProjectIn(ConfiguredModel):
         ...,
         description="The type of data which will need to be loaded for this project.",
     )
+    time_min: Optional[float] = Field(
+        None,
+        description="The minimum time (in seconds) for samples in this project.",
+    )
+    time_max: Optional[float] = Field(
+        None,
+        description="The maximum time (in seconds) for samples in this project.",
+    )
 
     @field_validator("data_loader")
     def check_data_loader(cls, value):

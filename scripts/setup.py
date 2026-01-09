@@ -10,6 +10,8 @@ def create_project(name: str, task: str, data_loader: str) -> str:
         "task": task,
         "query_strategy": "random",
         "data_loader": data_loader,
+        "time_min": -0.1,
+        "time_max": 0.8,
     }
 
     response = requests.post(
