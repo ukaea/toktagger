@@ -13,7 +13,7 @@ import {
 } from "@adobe/react-spectrum";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
-import { useSample } from "@/app/contexts/SampleContext";
+import { useSample } from "@/app/contexts/sampleContext";
 
 type PeakDetectionType = {
   project_id: string;

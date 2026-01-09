@@ -33,7 +33,7 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { ExportTool } from "./export";
 import { ImportTool } from "./import";
 import { NavigationBar } from "./nav";
-import { useSample } from "@/app/contexts/SampleContext";
+import { useSample } from "@/app/contexts/sampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
 
 type AmplitudeSliderInfo = {

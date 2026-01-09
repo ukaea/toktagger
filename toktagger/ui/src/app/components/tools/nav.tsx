@@ -23,7 +23,7 @@ import {
   saveSampleAnnotations,
 } from "@/app/core";
 import { useNavigate } from "react-router-dom";
-import { useSample } from "@/app/contexts/SampleContext";
+import { useSample } from "@/app/contexts/sampleContext";
 
 const TOAST_TIMEOUT = 5000;
 

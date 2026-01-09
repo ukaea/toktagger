@@ -1,4 +1,4 @@
-import { useSample } from "@/app/contexts/SampleContext";
+import { useSample } from "@/app/contexts/sampleContext";
 import { BACKEND_API_URL } from "@/app/core";
 import { PlotProps } from "@/types";
 import { ActionButton, Flex, NumberField, Switch } from "@adobe/react-spectrum";

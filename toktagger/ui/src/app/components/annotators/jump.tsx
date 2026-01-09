@@ -11,7 +11,7 @@ import {
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
-import { useSample } from "@/app/contexts/SampleContext";
+import { useSample } from "@/app/contexts/sampleContext";
 
 type JumpDetectionType = {
   project_id: string;

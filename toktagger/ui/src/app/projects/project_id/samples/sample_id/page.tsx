@@ -21,7 +21,7 @@ import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
-import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
+import { SampleProvider, useSample } from "@/app/contexts/sampleContext";
 import React from "react";
 
 type SampleDataBreadCrumbsInfo = {
