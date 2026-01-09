@@ -11,22 +11,20 @@ import {
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type JumpDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function JumpDetectionTool({
   project_id,
   sample_id,
   data,
-  setAnnotations,
 }: JumpDetectionType) {
+  const { setAnnotations } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [signalName, setSignalName] = useState<string | null>(null);
   const signalOptions = Object.keys(data.values).map((value, index) => ({
@@ -45,7 +43,7 @@ export function JumpDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
           );
           return otherAnnotations;
         });
@@ -66,14 +64,14 @@ export function JumpDetectionTool({
             smoothing: smoothingValue,
             num_points: numPoints,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
         );
         return otherAnnotations.concat(payload);
       });

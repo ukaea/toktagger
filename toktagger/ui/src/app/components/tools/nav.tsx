@@ -23,6 +23,7 @@ import {
   saveSampleAnnotations,
 } from "@/app/core";
 import { useNavigate } from "react-router-dom";
+import { useSample } from "@/app/contexts/SampleContext";
 
 const TOAST_TIMEOUT = 5000;
 
@@ -83,7 +84,7 @@ function NextButton({
   }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
 
   useEffect(() => {
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       // Check for Shift + Right Arrow
       if (e.shiftKey && e.key === "ArrowRight") {
         e.preventDefault();
@@ -132,7 +133,7 @@ function PreviousButton({
   }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
 
   useEffect(() => {
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       // Check for Shift + Left Arrow
       if (e.shiftKey && e.key === "ArrowLeft") {
         e.preventDefault();
@@ -157,6 +158,7 @@ function SaveButton({
   project_id,
   sample_id,
   annotations,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   validateOnNavigate,
 }: ButtonInfo) {
   const handleClick = async () => {
@@ -166,7 +168,8 @@ function SaveButton({
         timeout: TOAST_TIMEOUT,
       });
     } catch (err) {
-      ToastQueue.negative(`Failed to save annotations: ${err.message}`, {
+      const message = err instanceof Error ? err.message : String(err);
+      ToastQueue.negative(`Failed to save annotations: ${message}`, {
         timeout: TOAST_TIMEOUT,
       });
     }
@@ -185,10 +188,12 @@ function SaveButton({
 function ClearButton({
   setAnnotations,
 }: {
-  setAnnotations: (annotations: Annotation[]) => void;
+  setAnnotations: (
+    updater: (annotations: Annotation[]) => Annotation[]
+  ) => void;
 }) {
   const handleClick = () => {
-    setAnnotations([]);
+    setAnnotations(() => []);
   };
 
   return (
@@ -258,15 +263,9 @@ export function ShotSearch({
 type NavigationBarInfo = {
   project_id: string;
   sample_id: string;
-  annotations: Annotation[];
-  setAnnotations: (annotations: Annotation[]) => void;
 };
-export function NavigationBar({
-  project_id,
-  sample_id,
-  annotations,
-  setAnnotations,
-}: NavigationBarInfo) {
+export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
+  const { annotations, setAnnotations } = useSample();
   const [validateOnNavigate, setValidateOnNavigate] = useState(true);
   return (
     <Flex alignItems="center" direction="column" gap="size-100">

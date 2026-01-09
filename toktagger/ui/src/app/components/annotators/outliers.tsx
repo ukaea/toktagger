@@ -11,22 +11,21 @@ import {
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type OutlierDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function OutlierDetectionTool({
   project_id,
   sample_id,
   data,
-  setAnnotations,
 }: OutlierDetectionType) {
+  const { setAnnotations } = useSample();
+
   const methodOptions = [
     { id: 0, name: "mad" },
     { id: 1, name: "isoforest" },
@@ -48,7 +47,7 @@ export function OutlierDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION,
+              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
           );
           return otherAnnotations;
         });
@@ -68,14 +67,14 @@ export function OutlierDetectionTool({
             threshold: threshold,
             contamination: contamination,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION,
+            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
         );
         return otherAnnotations.concat(payload);
       });

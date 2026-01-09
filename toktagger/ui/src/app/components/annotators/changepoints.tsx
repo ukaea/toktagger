@@ -11,6 +11,7 @@ import {
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 enum ChangePointMethod {
   PELT = "pelt",
@@ -21,17 +22,15 @@ type ChangePointDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function ChangePointDetectionTool({
   project_id,
   sample_id,
   data,
-  setAnnotations,
 }: ChangePointDetectionType) {
+  const { setAnnotations } = useSample();
+
   const methodOptions = [
     { id: 0, name: ChangePointMethod.PELT },
     { id: 1, name: ChangePointMethod.HMM },
@@ -55,7 +54,7 @@ export function ChangePointDetectionTool({
         setAnnotations((previousAnnotations) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
+              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
           );
           return otherAnnotations;
         });
@@ -76,14 +75,14 @@ export function ChangePointDetectionTool({
             num_points: numPoints,
             num_components: numComponents,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
+            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
         );
         return otherAnnotations.concat(payload);
       });

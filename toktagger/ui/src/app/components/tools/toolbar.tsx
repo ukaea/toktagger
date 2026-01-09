@@ -13,24 +13,17 @@ import {
   ComboBox,
   Item,
   Key,
-  Switch,
-  NumberField,
-  ActionButton,
 } from "@adobe/react-spectrum";
 import {
-  Annotation,
   CompositeDataSchema,
-  Data,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
-  Project,
-  Sample,
   SpectrogramData,
   SpectrogramDataSchema,
   SpectrogramViewParamsSchema,
   ViewParams,
 } from "@/types";
-import { BACKEND_API_URL, getAnnotationsForSample } from "@/app/core";
+import { getAnnotationsForSample } from "@/app/core";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 import { ShotLabels } from "../annotators/labels";
@@ -40,6 +33,8 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { ExportTool } from "./export";
 import { ImportTool } from "./import";
 import { NavigationBar } from "./nav";
+import { useSample } from "@/app/contexts/SampleContext";
+import SpectrogramThresholdTool from "../annotators/thresholding";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -130,150 +125,30 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
   );
 }
 
-type SpectrogramThresholdToolInfo = {
-  project_id: string;
-  sample_id: string;
-  signal_name: string;
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
-  setAnnotations: (annotations: Annotation[]) => void;
-};
+export default function ToolBar() {
+  const {
+    project,
+    sample,
+    data,
+    annotations,
+    setAnnotations,
+    viewParams,
+    setViewParams,
+    plotProps,
+    setPlotProps,
+  } = useSample();
 
-function SpectrogramThresholdTool({
-  project_id,
-  sample_id,
-  signal_name,
-  plotProps,
-  setPlotProps,
-  setAnnotations,
-}: SpectrogramThresholdToolInfo) {
-  const [active, setActive] = useState(false);
-  const [value, setValue] = useState(95);
+  if (!project || !sample) {
+    return null;
+  }
 
-  const onThresholdChange = (value: boolean) => {
-    setActive(value);
-    setPlotProps({ ...plotProps, thresholdActive: value });
-  };
-
-  const incrementValue = (increment: number) => {
-    setValue((prevValue) => {
-      const newValue = prevValue + increment;
-      if (newValue < 0) return 0;
-      if (newValue > 99) return 99;
-      return newValue;
-    });
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!active) {
-        setAnnotations([]);
-        return;
-      }
-
-      const response = await fetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            signal_name: signal_name,
-            percentile: value,
-          }),
-        }
-      );
-
-      const payload = await response.json();
-      setAnnotations([payload]);
-    };
-
-    fetchData();
-  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
-
-  return (
-    <>
-      <Switch isSelected={active} onChange={onThresholdChange}>
-        Thresholding
-      </Switch>
-      {active && (
-        <Flex
-          direction="column"
-          gap="size-100"
-          margin={"size-200"}
-          alignItems={"center"}
-        >
-          <NumberField
-            label="Percentile"
-            value={value}
-            onChange={setValue}
-            minValue={0}
-            maxValue={99}
-            hideStepper={true}
-          />
-          <Flex direction="row" gap="size-100">
-            <ActionButton
-              onPress={() => {
-                incrementValue(-5);
-              }}
-            >
-              -5
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(-1);
-              }}
-            >
-              -1
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(1);
-              }}
-            >
-              +1
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(5);
-              }}
-            >
-              +5
-            </ActionButton>
-          </Flex>
-        </Flex>
-      )}
-    </>
-  );
-}
-
-type ToolBarInfo = {
-  project: Project;
-  sample: Sample;
-  data: Data | null;
-  annotations: Annotation[];
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
-  ) => void;
-  viewParams: ViewParams;
-  setViewParams: (viewParams: ViewParams) => void;
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
-};
-export default function ToolBar({
-  project,
-  sample,
-  data,
-  annotations,
-  setAnnotations,
-  viewParams,
-  setViewParams,
-  plotProps,
-  setPlotProps,
-}: ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
+
+  if (!project_id || !sample_id) {
+    return null;
+  }
+
   const tools: { name: string; component: React.ReactNode }[] = [];
 
   if (data && project.task == "time-series") {
@@ -289,13 +164,7 @@ export default function ToolBar({
     const labels = ["No ELMs", "Type I", "Type II", "Type III"];
     tools.push({
       name: "Shot Labels",
-      component: (
-        <ShotLabels
-          labels={labels}
-          annotations={annotations}
-          setAnnotations={setAnnotations}
-        ></ShotLabels>
-      ),
+      component: <ShotLabels labels={labels}></ShotLabels>,
     });
 
     tools.push({
@@ -305,7 +174,6 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          setAnnotations={setAnnotations}
         ></PeakDetectionTool>
       ),
     });
@@ -317,7 +185,6 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          setAnnotations={setAnnotations}
         ></OutlierDetectionTool>
       ),
     });
@@ -329,7 +196,6 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          setAnnotations={setAnnotations}
         ></ChangePointDetectionTool>
       ),
     });
@@ -341,7 +207,6 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          setAnnotations={setAnnotations}
         ></JumpDetectionTool>
       ),
     });
@@ -389,7 +254,6 @@ export default function ToolBar({
           signal_name={"mirnov"}
           plotProps={plotProps}
           setPlotProps={setPlotProps}
-          setAnnotations={setAnnotations}
         />
       ),
     });
@@ -397,7 +261,7 @@ export default function ToolBar({
 
   const refreshAnnotations = async () => {
     const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
-    setAnnotations(dbAnnotations);
+    setAnnotations(() => dbAnnotations);
   };
 
   return (
