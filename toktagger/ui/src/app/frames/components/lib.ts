@@ -295,9 +295,8 @@ export function scanInstanceCountsChunked(options: {
   if (!storage) return () => {};
 
   const allKeys = Object.keys(storage);
-  const keys = options.keyPrefix
-    ? allKeys.filter((k) => k.startsWith(options.keyPrefix))
-    : allKeys;
+  const prefix = options.keyPrefix;
+  const keys = prefix ? allKeys.filter((k) => k.startsWith(prefix)) : allKeys;
 
   const counts: InstanceCounts = {};
   const chunkSize = options.chunkSize ?? 16;
