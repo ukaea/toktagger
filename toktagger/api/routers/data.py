@@ -30,7 +30,12 @@ async def get_data(
 
     data_loader = LoaderRegistry.get(project.data_loader)(params)
     try:
-        data = data_loader.get_sample(sample.shot_id, sample.data)
+        data = data_loader.get_sample(
+            sample,
+            time_min=project.time_min,
+            time_max=project.time_max,
+            min_time_step=project.min_time_step,
+        )
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except DataLoaderError as e:

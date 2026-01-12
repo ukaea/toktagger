@@ -63,7 +63,7 @@ def main():
     data = create_mock_data(base_path, list(range(1, num_samples + 1)))
 
     project_id = create_project(
-        "Mock Disruption Project", "disruption", "parquet", "uncertainty"
+        "Mock Disruption Project", "time-series", "parquet", "uncertainty"
     )
     # Make annotations to add at same time as sample
     annotations = {

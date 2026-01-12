@@ -197,15 +197,17 @@ export default function ProjectView() {
               alignItems="center"
               justifyContent="space-between"
             >
-              <AddSamplesEditor project={project} onModify={refreshSamples} />
-              <SearchField
-                label="Search By Shot ID"
-                // SearchField should be able to do validation when provided a 'pattern' inside a Form element
-                // But I could not for the life of me get that to work, so will do it manually...
-                onSubmit={onSearchSubmit}
-                validationState={errorMessage ? "invalid" : undefined}
-                errorMessage={errorMessage}
-              />
+              <Flex gap="size-100" alignItems="center" justifyContent="start">
+                <AddSamplesEditor project={project} onModify={refreshSamples} />
+                <SearchField
+                  label="Search By Shot ID"
+                  // SearchField should be able to do validation when provided a 'pattern' inside a Form element
+                  // But I could not for the life of me get that to work, so will do it manually...
+                  onSubmit={onSearchSubmit}
+                  validationState={errorMessage ? "invalid" : undefined}
+                  errorMessage={errorMessage}
+                />
+              </Flex>
               <Flex gap="size-100">
                 <ImportButton project_id={project_id} />
                 <ExportButton project={project} />

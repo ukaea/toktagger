@@ -11,7 +11,7 @@ import random
 
 # Create a mock model for use in our model definitions
 @ray.remote
-@ModelRegistry.register("mock_disruption_cnn", ["disruption"])
+@ModelRegistry.register("mock_disruption_cnn", ["time-series"])
 class MockDisruptionCNN(Model):
     def define_model(self):
         return None

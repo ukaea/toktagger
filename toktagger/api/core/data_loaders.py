@@ -32,8 +32,6 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
 class DataLoaderError(Exception):
     """Custom exception for data loader errors."""
 
-    pass
-
 
 class DataLoader(ABC):
     def __init__(self, params: DataParamTypes):
@@ -48,7 +46,6 @@ class DataLoader(ABC):
     @abstractmethod
     def get_sample(
         self,
-        shot_id: int,
         sample: ShotData | FileData | TimeSeriesFileData,
         **kwargs,
     ) -> Data:
@@ -109,7 +106,14 @@ class ImageDataLoader(DataLoader):
         return FileData
 
     @pydantic.validate_call
-    def get_sample(self, shot_id: int, sample_data: FileData, **kwargs) -> ImageData:
+    def get_sample(self, sample_data: Sample, **kwargs) -> ImageData:
+        sample_data: FileData = sample_data.data
+
+        if not isinstance(sample_data, FileData):
+            raise TypeError(
+                f"Expected sample data of type 'FileData' but got '{type(sample_data)}'"
+            )
+
         # Find directory of images
         dir_path = pathlib.Path(sample_data.file_name)
         if not dir_path.exists() or not dir_path.is_dir():
@@ -158,24 +162,30 @@ class ParquetDataLoader(DataLoader):
         assert isinstance(sample.data, TimeSeriesFileData)
         sample_data: TimeSeriesFileData = sample.data
 
+        if not isinstance(sample_data, TimeSeriesFileData):
+            raise TypeError(
+                f"Expected sample data of type 'TimeSeriesFileData' but got '{type(sample_data)}'"
+            )
+
         if not pathlib.Path(sample_data.file_name).exists():
             raise FileNotFoundError(
                 f"Could not find file at '{sample_data.file_name}', relative to {pathlib.Path().cwd()}"
             )
         df = pd.read_parquet(sample_data.file_name, columns=sample_data.signal_names)
         df = df.fillna(0)
-        df.index = pd.to_timedelta(df.index, unit="s")
 
-        if min_time_step is not None and df.index.freq > pd.to_timedelta(
-            min_time_step, unit="s"
-        ):
+        df.index = pd.to_timedelta(df.index, unit="s")
+        mean_diff = df.index.to_series().diff().dropna().mean().total_seconds()
+        print(mean_diff, min_time_step)
+
+        if min_time_step is not None and mean_diff < min_time_step:
             df = df.resample(rule=f"{min_time_step}s").interpolate(method="linear")
 
         if time_min is not None:
-            df = df[df.index >= time_min]
+            df = df[df.index >= pd.to_timedelta(time_min, unit="s")]
 
         if time_max is not None:
-            df = df[df.index <= time_max]
+            df = df[df.index <= pd.to_timedelta(time_max, unit="s")]
 
         data = df.to_dict(orient="list")
         time = df.index.total_seconds().to_list()
@@ -209,13 +219,17 @@ class UDADataLoader(DataLoader):
         min_time_step: Optional[float] = None,
         **kwargs,
     ) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, ShotData)
         sample_data: ShotData = sample.data
+
+        if not isinstance(sample_data, ShotData):
+            raise TypeError(
+                f"Expected sample data of type 'ShotData' but got '{type(sample_data)}'"
+            )
 
         results = {}
         for name in sample_data.signal_names:
             try:
-                signal = self.client.get(name, sample_data.shot_id)
+                signal = self.client.get(name, sample.shot_id)
                 data = signal.data
                 time = signal.time.data
 

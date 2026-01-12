@@ -4,7 +4,13 @@ from typing import Optional
 import requests
 
 
-def create_project(name: str, task: str, data_loader: str, query_strategy: str) -> str:
+def create_project(
+    name: str,
+    task: str,
+    data_loader: str,
+    query_strategy: str,
+    min_time_step: float = 0.0001,
+) -> str:
     project = {
         "name": name,
         "task": task,
@@ -12,7 +18,7 @@ def create_project(name: str, task: str, data_loader: str, query_strategy: str) 
         "data_loader": data_loader,
         "time_min": -0.1,
         "time_max": 0.8,
-        "min_time_step": 0.0001,
+        "min_time_step": min_time_step,
     }
 
     response = requests.post(
@@ -100,7 +106,9 @@ def main():
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
-    project_id = create_project("Local MHD Project", "spectrogram", "parquet", "random")
+    project_id = create_project(
+        "Local MHD Project", "spectrogram", "parquet", "random", 0.000001
+    )
     create_local_samples(
         project_id,
         shot_ids,
