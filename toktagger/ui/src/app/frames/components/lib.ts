@@ -572,8 +572,9 @@ export function writeClassAndTrack(
     return { mapped, found };
   };
 
-  const bodiesIn = asArray((a as unknown as UnknownRecord).bodies);
-  const bodyIn = asArray((a as unknown as UnknownRecord).body);
+  // Treat body/bodies as unknown payloads, but avoid casting the whole annotation.
+  const bodiesIn = asArray((a as unknown as { bodies?: unknown }).bodies);
+  const bodyIn = asArray((a as unknown as { body?: unknown }).body);
 
   const pb = patch(bodiesIn);
   const p = patch(bodyIn);
@@ -589,10 +590,10 @@ export function writeClassAndTrack(
   }
 
   return {
-    ...(a as unknown as UnknownRecord),
+    ...a,
     bodies: bodiesOut,
     body: bodyOut,
-  } as ImageAnnotation;
+  };
 }
 
 /**
