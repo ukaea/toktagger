@@ -17,7 +17,7 @@ class MongoDBClient:
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
-            cache_dir = user_cache_dir("viz-annotation", "ukaea")
+            cache_dir = user_cache_dir("toktagger", "ukaea")
             cache_dir = Path(cache_dir)
             cache_dir.mkdir(parents=True, exist_ok=True)
             file_name = cache_dir / db_name
@@ -69,7 +69,7 @@ class MongoDBClient:
         # Add updates to db entry
         updated_document = {
             **document,
-            **model.model_dump(mode="python", exclude_unset=True),
+            **model.model_dump(mode="python", exclude_unset=True, exclude_none=True),
         }
 
         return await self.db[collection].update_one(

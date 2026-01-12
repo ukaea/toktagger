@@ -1,7 +1,7 @@
+from pydantic import Field, field_validator, computed_field
+from typing import Optional, List
 from enum import Enum
-from typing import Optional
 
-from pydantic import Field, field_validator
 
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas import ConfiguredModel
@@ -50,6 +50,13 @@ class ProjectIn(ConfiguredModel):
         None,
         description="The minimum time step (in seconds) between samples in this project.",
     )
+
+    @computed_field
+    @property
+    def model_types(self) -> List[str]:
+        from toktagger.api.models.base import ModelRegistry
+
+        return ModelRegistry.names(Task(self.task))
 
     @field_validator("data_loader")
     def check_data_loader(cls, value):

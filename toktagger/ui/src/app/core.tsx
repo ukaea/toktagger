@@ -1,6 +1,12 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import type { Project, Sample, SamplesSummary, Annotation } from "@/types";
+import type {
+  Project,
+  Sample,
+  SamplesSummary,
+  Annotation,
+  Model,
+} from "@/types";
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -216,4 +222,99 @@ export const exportAnnotations = async (project: Project) => {
   getAnnotations(project._id).then((annotations: Annotation[]) => {
     saveJSONToFile(annotations, `${project.name}_annotations.json`);
   });
+};
+
+export const startTraining = async (
+  project_id: string,
+  selected_model: string
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response;
+};
+
+export const stopTraining = async (
+  project_id: string,
+  selected_model: string,
+  version: number
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?version=${version}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response;
+};
+
+export const startPredictions = async (
+  project_id: string,
+  selected_model: string,
+  version: number,
+  num_predictions: number
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response;
+};
+
+export const startSamplePredictions = async (
+  project_id: string,
+  sample_id: string,
+  selected_model: string
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response;
+};
+
+export const getSamplePredictions = async (
+  project_id: string,
+  sample_id: string,
+  selected_model: string,
+  task_id: string
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict/${task_id}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response;
+};
+
+export const getModels = async (project_id: string): Promise<Model[]> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models`
+  );
+  const data = await response.json();
+  const models = data as Model[];
+  return models;
 };

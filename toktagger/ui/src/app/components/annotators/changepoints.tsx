@@ -29,7 +29,7 @@ export function ChangePointDetectionTool({
   sample_id,
   data,
 }: ChangePointDetectionType) {
-  const { setAnnotations } = useSample();
+  const { dataParams, setAnnotations } = useSample();
 
   const methodOptions = [
     { id: 0, name: ChangePointMethod.PELT },
@@ -69,11 +69,14 @@ export function ChangePointDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            method: method,
-            penalty: penalty,
-            num_points: numPoints,
-            num_components: numComponents,
+            annotator_params: {
+              signal_name: signalName,
+              method: method,
+              penalty: penalty,
+              num_points: numPoints,
+              num_components: numComponents,
+            },
+            data_params: dataParams,
           }),
         }
       );
@@ -98,6 +101,7 @@ export function ChangePointDetectionTool({
     numComponents,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

@@ -1,7 +1,7 @@
 [project]
 name = "toktagger"
 version = "2025.0.0"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.14"
 authors = [
 ]
 maintainers = [
@@ -35,6 +35,8 @@ dependencies = [
   "filelock>=3.19.1",
   "ruptures>=1.1.10",
   "hmmlearn>=0.3.3",
+  "torch>=2.8.0",
+  "ray>=2.51.1",
 ]
 
 [tool.setuptools.packages.find]

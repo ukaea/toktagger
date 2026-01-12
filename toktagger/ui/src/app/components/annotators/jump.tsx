@@ -24,7 +24,7 @@ export function JumpDetectionTool({
   sample_id,
   data,
 }: JumpDetectionType) {
-  const { setAnnotations } = useSample();
+  const { dataParams, setAnnotations } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [signalName, setSignalName] = useState<string | null>(null);
   const signalOptions = Object.keys(data.values).map((value, index) => ({
@@ -58,11 +58,14 @@ export function JumpDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            threshold: threshold,
-            min_distance: minDistance,
-            smoothing: smoothingValue,
-            num_points: numPoints,
+            annotator_params: {
+              signal_name: signalName,
+              threshold: threshold,
+              min_distance: minDistance,
+              smoothing: smoothingValue,
+              num_points: numPoints,
+            },
+            data_params: dataParams,
           }),
         }
       );
@@ -87,6 +90,7 @@ export function JumpDetectionTool({
     numPoints,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

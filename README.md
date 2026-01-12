@@ -4,8 +4,8 @@
 
 An open source, interactive annotation platform for Tokamak diagnostic data.
 
-[![Workflow: CI](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml/badge.svg)](https://github.com/ukaea/viz-annotation/actions/workflows/ci.yml)
-[![Workflow: Dependabot](https://img.shields.io/badge/Dependabot-enabled-34d058?logo=github)](https://github.com/ukaea/viz-annotation/actions/workflows/dependabot/dependabot-updates)
+[![Workflow: CI](https://github.com/ukaea/toktagger/actions/workflows/ci.yml/badge.svg)](https://github.com/ukaea/toktagger/actions/workflows/ci.yml)
+[![Workflow: Dependabot](https://img.shields.io/badge/Dependabot-enabled-34d058?logo=github)](https://github.com/ukaea/toktagger/actions/workflows/dependabot/dependabot-updates)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Linting: ruff](https://img.shields.io/badge/linting-ruff-purple)](https://github.com/astral-sh/ruff)
 [![Testing: pytest](https://img.shields.io/badge/testing-pytest-red)](https://github.com/pylint-dev/pylint-pytest)
@@ -66,7 +66,7 @@ npm --prefix toktagger/ui run install
 3. Run the backend API service in development mode. The backend API will be accessible at `http://localhost:8002`.
 
 ```sh
-uvicorn toktagger.api.main:app --host 0.0.0.0 --port 8002 --reload
+API_URL=http://0.0.0.0:8002 uvicorn toktagger.api.cli:app --host 0.0.0.0 --port 8002 --reload
 ```
 
 4. Run the frontend UI service in development mode. The UI will be accessible at `http://localhost:5173`

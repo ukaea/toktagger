@@ -20,6 +20,7 @@ import {
   CompositeDataSchema,
   SpectrogramDataSchema,
   TaskType,
+  DataParams,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -28,6 +29,7 @@ interface SampleContextType {
   sample: Sample | null;
   data: Data | null;
   annotations: Annotation[];
+  dataParams: DataParams;
   viewParams: ViewParams;
   plotProps: PlotProps;
   isLoading: boolean;
@@ -35,6 +37,7 @@ interface SampleContextType {
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
+  setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
 }
@@ -106,12 +109,19 @@ export function SampleProvider({
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });
+
+  const [dataParams, setDataParams] = useState<DataParams>({
+    name: "identity",
+  });
+
   const [plotProps, setPlotProps] = useState<PlotProps>({
     colorMap: "Cividis",
   });
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,7 +159,7 @@ export function SampleProvider({
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify(params),
+            body: JSON.stringify({ params: dataParams, view: params }),
           }
         );
 
@@ -178,20 +188,22 @@ export function SampleProvider({
     };
 
     refreshData();
-  }, [projectId, sampleId, viewParams, plotProps]);
+  }, [projectId, sampleId, dataParams, viewParams, plotProps]);
 
   const value: SampleContextType = {
     project,
     sample,
     data,
     annotations,
+    dataParams,
     viewParams,
     plotProps,
     isLoading,
     error,
     setAnnotations,
-    setViewParams,
     setPlotProps,
+    setViewParams,
+    setDataParams,
   };
 
   return (

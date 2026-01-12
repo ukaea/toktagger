@@ -1,5 +1,4 @@
 "use client";
-import { use, useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -26,6 +25,7 @@ import {
 import { getAnnotationsForSample } from "@/app/core";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
@@ -210,6 +210,16 @@ export default function ToolBar() {
           sample_id={sample_id}
           data={tsData}
         ></JumpDetectionTool>
+      ),
+    });
+
+    tools.push({
+      name: "Model Prediction",
+      component: (
+        <ModelPredictTool
+          project_id={project_id}
+          sample_id={sample_id}
+        ></ModelPredictTool>
       ),
     });
   } else if (data && project.task == TaskType.Spectrogram) {

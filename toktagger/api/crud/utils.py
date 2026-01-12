@@ -5,9 +5,16 @@ from fastapi import HTTPException
 from pydantic import TypeAdapter
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
-from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
+from toktagger.api.schemas.annotations import (
+    AnnotationIn,
+    AnnotationOutTypes,
+    AnnotationTypes,
+    AnnotationOutTypeAdapter,
+)
 from toktagger.api.schemas.projects import Project, ProjectUpdate
-from toktagger.api.schemas.samples import FileData, Sample, SampleSummary
+from toktagger.api.schemas.samples import FileData, Sample, SampleUpdate, SampleSummary
+from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
+from toktagger.api.models.base import ModelRegistry
 
 
 async def get_projects(
@@ -52,6 +59,7 @@ async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
 async def get_samples(
     db_client: MongoDBClient,
     project_id: str,
+    validated: Optional[bool] = None,
     shot_id: Optional[int] = None,
     sort_by: str = "_id",
     sort_direction: Literal["ascending", "descending"] = "descending",
@@ -66,7 +74,10 @@ async def get_samples(
 
     filters = {"project_id": project_obj_id}
 
-    if shot_id is not None:
+    if validated is not None:
+        filters["validated_annotations"] = validated
+
+    if shot_id:
         filters["shot_id"] = shot_id
 
     samples = await db_client.get_filtered_documents(
@@ -80,6 +91,148 @@ async def get_samples(
 
     samples = [TypeAdapter(Sample).validate_python(s) for s in samples]
     return samples
+
+
+async def update_sample(
+    db_client: MongoDBClient, sample_id: str, updates: SampleUpdate
+):
+    sample_obj_id = convert_to_objectid(sample_id, "samples")
+
+    # Check sample already exists
+    if not await db_client.get_document_by_id(
+        collection="samples", object_id=sample_obj_id
+    ):
+        raise HTTPException(
+            status_code=404, detail="Tried to update a sample which does not exist!"
+        )
+
+    # Update sample
+    result = await db_client.update(
+        collection="samples", model=updates, object_id=sample_obj_id
+    )
+
+    if result.matched_count != 1:
+        raise HTTPException(status_code=500, detail="Failed to update sample")
+
+
+async def get_models(
+    db_client: MongoDBClient,
+    project_id: str,
+    model_type: Optional[str] = None,
+    status: Optional[
+        Literal["queued", "started", "failed", "completed", "aborted"]
+    ] = None,
+    start: int = 0,
+    end: Optional[int] = None,
+) -> list[Model]:
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    filters = {"project_id": project_obj_id}
+    if model_type:
+        if model_type not in (model_types := ModelRegistry.names()):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid model type! Available model types are {model_types}.",
+            )
+        filters["type"] = model_type
+    if status:
+        filters["training_status"] = status
+
+    if not await db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    models = await db_client.get_filtered_documents(
+        collection="models",
+        filters=filters,
+        sort_by="version",
+        sort_direction=-1,
+        start=start,
+        limit=end - start + 1 if end is not None else 0,
+    )
+    return [Model(**model) for model in models]
+
+
+async def get_model(
+    db_client: MongoDBClient,
+    project_id: str,
+    model_type: str,
+    version: int = None,
+    status: Optional[
+        Literal["queued", "started", "failed", "completed", "aborted"]
+    ] = None,
+) -> Model:
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    if model_type not in (model_types := ModelRegistry.names()):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid model type! Available model types are {model_types}.",
+        )
+    filters = {"project_id": project_obj_id, "type": model_type}
+    if version:
+        filters["version"] = version
+    if status:
+        filters["training_status"] = status
+    if not await db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    models = await db_client.get_filtered_documents(
+        collection="models",
+        filters=filters,
+        sort_by="version",
+        sort_direction=-1,
+    )
+    if not models:
+        raise HTTPException(
+            status_code=404,
+            detail="No trained models found of that type for this project!",
+        )
+
+    return Model(**models[0])
+
+
+async def update_model(db_client: MongoDBClient, model_id: str, updates: ModelUpdate):
+    model_obj_id = convert_to_objectid(model_id, "models")
+
+    # Check model already exists
+    if not await db_client.get_document_by_id(
+        collection="models", object_id=model_obj_id
+    ):
+        raise HTTPException(
+            status_code=404, detail="Tried to update a model which does not exist!"
+        )
+
+    # Update model
+    result = await db_client.update(
+        collection="models", model=updates, object_id=model_obj_id
+    )
+
+    if result.matched_count != 1:
+        raise HTTPException(status_code=500, detail="Failed to update model")
+
+
+async def add_model(db_client: MongoDBClient, project_id: str, model: ModelIn):
+    project_obj_id = convert_to_objectid(project_id, "projects")
+
+    return await db_client.insert(
+        collection="models", model=model, ids={"project_id": project_obj_id}
+    )
+
+
+async def delete_model(
+    db_client: MongoDBClient, project_id: str, model_id: str
+) -> None:
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    model_obj_id = convert_to_objectid(model_id, "models")
+
+    filters = {"project_id": project_obj_id, "_id": model_obj_id}
+
+    result = await db_client.delete_filtered_documents(
+        collection="models", filters=filters
+    )
+
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=404, detail="Model not found belonging to this Project."
+        )
 
 
 async def update_project(
@@ -162,6 +315,7 @@ async def get_annotations(
     project_id: str,
     sample_id: Optional[str] = None,
     validated: Optional[bool] = None,
+    created_by: Optional[str] = None,
     sort_by: str = "_id",
     sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
@@ -174,6 +328,8 @@ async def get_annotations(
 
     if validated is not None:
         db_filters["validated"] = validated
+    if created_by is not None:
+        db_filters["created_by"] = created_by
 
     annotations = await db_client.get_filtered_documents(
         collection="annotations",
@@ -183,11 +339,7 @@ async def get_annotations(
         start=start,
         limit=count if count is not None else 0,
     )
-
-    annotations = [
-        TypeAdapter(AnnotationOutTypes).validate_python(a) for a in annotations
-    ]
-    return annotations
+    return [AnnotationOutTypeAdapter.validate_python(a) for a in annotations]
 
 
 async def add_annotations(
@@ -228,6 +380,32 @@ async def delete_annotations(
             status_code=404,
             detail="Annotations not found belonging to this Sample and/or Project.",
         )
+
+
+async def update_annotations(
+    db_client: MongoDBClient,
+    project_id: str,
+    sample_id: str,
+    annotations: list[AnnotationIn],
+) -> list[str]:
+    # Delete previous annotations, if they exist
+    try:
+        await delete_annotations(
+            db_client=db_client, project_id=project_id, sample_id=sample_id
+        )
+    except HTTPException:
+        pass
+
+    if len(annotations) == 0:
+        # Nothing to add!
+        return
+
+    return await add_annotations(
+        db_client=db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        annotations=annotations,
+    )
 
 
 async def get_files(dir_path: str, file_type: str) -> list[str]:

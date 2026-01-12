@@ -86,4 +86,7 @@ class SpectrogramView:
         )
 
 
-DATA_VIEWS = {ViewType.IDENTITY: IdentityView, ViewType.SPECTROGRAM: SpectrogramView}
+DATA_VIEWS = {
+    ViewType.IDENTITY: IdentityView,
+    ViewType.SPECTROGRAM: SpectrogramView,
+}

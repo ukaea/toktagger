@@ -1,4 +1,3 @@
-import { min } from "d3";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
@@ -37,6 +36,7 @@ export const AnnotationSchema = z.union([
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
 export const AnnotationsSchema = z.array(AnnotationSchema);
+export type Annotations = z.infer<typeof AnnotationsSchema>;
 
 export const TimeSeriesDataSchema = z.object({
   time: z.array(z.number()),
@@ -58,11 +58,17 @@ export const SpectrogramDataSchema = z.object({
   threshold_mask: z.array(z.array(z.number())).optional(),
 });
 export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
+export const ImageDataSchema = z.object({
+  frame: z.number(),
+  values: z.string(), // base64 PNG
+});
+export type ImageData = z.infer<typeof ImageDataSchema>;
 
 export const DataSchema = z.union([
   TimeSeriesDataSchema,
   MultiVariateTimeSeriesDataSchema,
   SpectrogramDataSchema,
+  ImageDataSchema,
 ]);
 export type Data = z.infer<typeof DataSchema>;
 
@@ -130,6 +136,7 @@ export const ProjectSchema = z.object({
   time_min: z.number().nullable().optional(),
   time_max: z.number().nullable().optional(),
   min_time_step: z.number().nullable().optional(),
+  model_types: z.array(z.string()),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -147,9 +154,13 @@ export const FileDataSchema = z.object({
   file_name: z.string(),
   type: z.string(),
   protocol: z.string(),
-  column_names: z.array(z.string()),
 });
 export type FileData = z.infer<typeof FileDataSchema>;
+
+export const TimeSeriesFileDataSchema = FileDataSchema.extend({
+  column_names: z.array(z.string()),
+});
+export type TimeSeriesFileData = z.infer<typeof TimeSeriesFileDataSchema>;
 
 export const ShotDataSchema = z.object({
   protocol: z.string(),
@@ -169,6 +180,26 @@ export const SampleSchema = z.object({
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
+export const ModelSchema = z.object({
+  _id: z.string(),
+  timestamp: z.string(),
+  project_id: z.string(),
+  type: z.string(),
+  training_status: z.string(),
+  progress: z.number(),
+  accuracy: z.number(),
+  task_id: z.string(),
+});
+
+export type Model = z.infer<typeof ModelSchema>;
+export const DataParamsSchema = z.object({
+  name: z.string(),
+});
+export type DataParams = z.infer<typeof DataParamsSchema>;
+export const ImageDataParamsSchema = DataParamsSchema.extend({
+  frame: z.number(),
+});
+export type ImageDataParams = z.infer<typeof ImageDataParamsSchema>;
 export const SamplesSummarySchema = z.object({
   total: z.number(),
   shot_min: z.number().optional(),

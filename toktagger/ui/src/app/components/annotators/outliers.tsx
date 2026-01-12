@@ -8,7 +8,7 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -16,15 +16,13 @@ import { useSample } from "@/app/contexts/SampleContext";
 type OutlierDetectionType = {
   project_id: string;
   sample_id: string;
-  data: MultiVariateTimeSeriesData;
 };
 
 export function OutlierDetectionTool({
   project_id,
   sample_id,
-  data,
 }: OutlierDetectionType) {
-  const { setAnnotations } = useSample();
+  const { dataParams, data, setAnnotations } = useSample();
 
   const methodOptions = [
     { id: 0, name: "mad" },
@@ -32,14 +30,14 @@ export function OutlierDetectionTool({
   ];
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [signalName, setSignalName] = useState<string | null>(null);
-  const signalOptions = Object.keys(data.values).map((value, index) => ({
+  const signalOptions = Object.keys(data?.values).map((value, index) => ({
     id: index,
     name: value,
   }));
   const [threshold, setThreshold] = useState<number>(3);
   const [contamination, setContamination] = useState<number>(0);
   const [method, setMethod] = useState<string>("mad");
-  const validSignalName = signalName && signalName in data.values;
+  const validSignalName = signalName && signalName in data?.values;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -62,10 +60,13 @@ export function OutlierDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            method: method,
-            threshold: threshold,
-            contamination: contamination,
+            annotator_params: {
+              signal_name: signalName,
+              method: method,
+              threshold: threshold,
+              contamination: contamination,
+            },
+            data_params: dataParams,
           }),
         }
       );
@@ -89,6 +90,7 @@ export function OutlierDetectionTool({
     method,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

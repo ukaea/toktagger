@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Provider,
   defaultTheme,
@@ -15,14 +15,17 @@ import {
   Button,
   Picker,
   SearchField,
-  View,
+  ToastContainer,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
+import { AddSamplesEditor } from "./components/add_samples";
 import { getSamples, getProject } from "@/app/core";
 import type { Project, Sample } from "@/types";
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
-import { ExportButton, ExportTool } from "@/app/components/tools/export";
+import { ExportButton } from "@/app/components/tools/export";
 
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
@@ -127,6 +130,34 @@ export default function ProjectView() {
     fetchData();
   }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
 
+  const refreshSamples = useCallback(async () => {
+    if (!hasId) {
+      return;
+    }
+    const samples = await getSamples(
+      sortDescriptor,
+      project_id,
+      currentPage,
+      samplesPerPage,
+      shotId
+    );
+    setSamples(samples);
+    const project = await getProject(project_id);
+    setProject(project);
+  }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
+
+  useEffect(() => {
+    refreshSamples();
+  }, [
+    refreshSamples,
+    project_id,
+    shotId,
+    currentPage,
+    samplesPerPage,
+    sortDescriptor,
+    hasId,
+  ]);
+
   if (!project || !hasId) {
     return;
   }
@@ -152,11 +183,21 @@ export default function ProjectView() {
   return (
     <div>
       <SampleBreadCrumbs project={project} />
+      <ModelTrainModal project={project}></ModelTrainModal>
+      <ModelPredictModal project={project}></ModelPredictModal>
       <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
-            <div className="pl-4 flex items-center justify-between pr-4 mb-4">
+            <ToastContainer placement="top" />
+            <Flex
+              direction="row"
+              margin="size-100"
+              gap="size-100"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <AddSamplesEditor project={project} onModify={refreshSamples} />
               <SearchField
                 label="Search By Shot ID"
                 // SearchField should be able to do validation when provided a 'pattern' inside a Form element
@@ -169,7 +210,7 @@ export default function ProjectView() {
                 <ImportButton project_id={project_id} />
                 <ExportButton project={project} />
               </Flex>
-            </div>
+            </Flex>
             <SamplesTable
               project_id={project_id}
               samples={samples}
