@@ -1,11 +1,11 @@
-from pydantic import Field, field_validator
-from typing import Optional
+from pydantic import Field, field_validator, computed_field
+from typing import Optional, List
 from enum import Enum
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.core.data_loaders import LoaderRegistry
 
 
-class Task(Enum):
+class Task(str, Enum):
     ELM = "ELM"
     DISRUPTION = "disruption"
     MHD = "MHD"
@@ -29,6 +29,13 @@ class ProjectIn(ConfiguredModel):
         ...,
         description="The type of data which will need to be loaded for this project.",
     )
+
+    @computed_field
+    @property
+    def model_types(self) -> List[str]:
+        from toktagger.api.models.base import ModelRegistry
+
+        return ModelRegistry.names(Task(self.task))
 
     @field_validator("data_loader")
     def check_data_loader(cls, value):

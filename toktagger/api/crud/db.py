@@ -69,7 +69,7 @@ class MongoDBClient:
         # Add updates to db entry
         updated_document = {
             **document,
-            **model.model_dump(mode="python", exclude_unset=True),
+            **model.model_dump(mode="python", exclude_unset=True, exclude_none=True),
         }
 
         return await self.db[collection].update_one(

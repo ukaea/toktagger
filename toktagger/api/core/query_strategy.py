@@ -5,11 +5,15 @@ from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas.projects import QueryStrategyType
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class QueryStrategy(ABC):
     def __init__(self, samples: list[Sample], annotations: list[Annotation]):
-        # Samples should be listed by shot ID - low to high
-        # Annotations should be listed by uncertaity, low to high (for consistency?)
+        # Samples should be listed by timestamp, high to low
+        # Annotations should be listed by uncertaity, high to low
         self.samples = samples
         self.annotations = annotations
 
@@ -51,8 +55,8 @@ class UncertaintyQueryStrategy(QueryStrategy):
             raise RuntimeError("No more samples to label!")
 
         if len(self.annotations) == 0:
-            print(
-                "Warning: No unvalidated annotations available - falling back to random sample selection."
+            logger.warning(
+                "No unvalidated annotations available - falling back to random sample selection."
             )
             index = random.randint(0, len(self.samples) - 1)
             return self.samples.pop(index)
@@ -67,7 +71,9 @@ class UncertaintyQueryStrategy(QueryStrategy):
                 None,
             )
             if index is None:
-                print("Error: Most uncertain annotation does not link to a sample")
+                logger.warning(
+                    "Most uncertain annotation does not link to a sample - falling back to random sample selection."
+                )
                 index = random.randint(0, len(self.samples) - 1)
             return self.samples.pop(index)
 

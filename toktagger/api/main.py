@@ -16,6 +16,77 @@ from toktagger.api.routers.meta import router as meta_router
 from toktagger.api.crud.db import MongoDBClient
 from contextlib import asynccontextmanager
 import uvicorn
+import ray
+import uuid
+
+
+class TaskRegistry:
+    """Registry to keep track of Ray actors, and the task they are associated with."""
+
+    def __init__(self, max_actors: int):
+        """Create task registry
+
+        Parameters
+        ----------
+        max_actors : int
+            Maximum number of actors to keep alive simultaneously
+        """
+        self.max_actors = max_actors
+        self.tasks = {}
+        self.actors = []
+
+    def register(self, task_ref: ray.ObjectRef) -> str:
+        """Store a Ray task reference in the registry and associate with a UUID.
+
+        Parameters
+        ----------
+        task_ref : ray.ObjectRef
+            The reference to the Ray task
+
+        Returns
+        -------
+        str
+            A unique identifier for this task
+        """
+        task_id = str(uuid.uuid4())
+        self.tasks[task_id] = task_ref
+        return task_id
+
+    def get(self, task_id: str) -> ray.ObjectRef | None:
+        """Convert a task ID back into the Ray task reference
+
+        Parameters
+        ----------
+        task_id : str
+            The unique identifier for this task
+
+        Returns
+        -------
+        ray.ObjectRef | None
+            The Ray task reference, if it exists in the Registry
+        """
+        return self.tasks.get(task_id)
+
+    def update_actors(self, actor_name: str) -> None:
+        """Record that a Ray Actor has been accessed, and kill any stale Actors.
+
+        Parameters
+        ----------
+        actor_name : str
+            The name of the Ray Actor
+        """
+        if actor_name in self.actors:
+            self.actors.remove(actor_name)
+
+        self.actors.append(actor_name)
+
+        if len(self.actors) > self.max_actors:
+            stale_actor = self.actors.pop(0)
+            try:
+                actor = ray.get_actor(stale_actor)
+                ray.kill(actor)
+            except ValueError:
+                return
 
 
 @asynccontextmanager
@@ -25,6 +96,10 @@ async def lifespan(app: FastAPI):
 
     app.state.db_client = MongoDBClient(mongo_url, db_name)
     app.state.project = None
+
+    if not ray.is_initialized():
+        ray.init()
+    app.state.task_registry = TaskRegistry(max_actors=5)
 
     yield
 
@@ -75,4 +150,5 @@ class Server:
         port: int = 8002,
     ):
         self._setup_app()
+        os.environ["API_URL"] = f"http://{host}:{port}"
         uvicorn.run(self.app, host=host, port=port)

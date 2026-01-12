@@ -27,6 +27,8 @@ import { UFOView } from "@/app/ufos/components/ufos";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -244,6 +246,8 @@ export default function SamplePage() {
           project={project}
           sample={sample}
         ></SampleDataBreadCrumbs>
+        <ModelTrainModal project={project}></ModelTrainModal>
+        <ModelPredictModal project={project}></ModelPredictModal>
         <div className="flex">
           <ToolBar
             project={project}

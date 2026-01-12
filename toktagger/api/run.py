@@ -2,6 +2,7 @@ import uvicorn
 import os
 
 if __name__ == "__main__":
+    os.environ["API_URL"] = "http://0.0.0.0:8002"
     uvicorn.run(
         "toktagger.api.cli:app",
         host="0.0.0.0",

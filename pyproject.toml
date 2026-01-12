@@ -35,6 +35,8 @@ dependencies = [
   "filelock>=3.19.1",
   "ruptures>=1.1.10",
   "hmmlearn>=0.3.3",
+  "torch>=2.8.0",
+  "ray>=2.51.1",
 ]
 
 [tool.setuptools.packages.find]
