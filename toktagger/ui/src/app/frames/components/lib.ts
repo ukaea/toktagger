@@ -699,49 +699,113 @@ export function writeClassOnly(
   a: ImageAnnotation,
   cls: { id: number; name: string },
 ): ImageAnnotation {
-  const classBody = () => ({
+  // Legacy shape used in the custom `body` field (kept for back-compat storage).
+  const legacyClassBody = () => ({
     purpose: "tagging",
     value: { type: "class", id: cls.id, name: cls.name },
   });
 
+  // Proper Annotorious body type for `bodies: AnnotationBody[]`.
+  // Note: AnnotationBody.value is typed as string in @annotorious/react,
+  // so we store our class payload as an encoded JSON string (same as writeClassAndTrack).
+  const typedClassBody = (): AnnotationBody =>
+    makeClassBody(a.id, { type: "class", id: cls.id, name: cls.name });
+
   let found = false;
 
-  const patch = (list: unknown[]) =>
+  // Patch the real Annotorious `bodies` array (typed end-to-end).
+  const patchBodies = (list: AnnotationBody[]): AnnotationBody[] =>
+    list.map((b) => {
+      const purpose = getString(b.purpose);
+      if (purpose !== "tagging" && purpose !== "classifying") return b;
+
+      const v = b.value;
+
+      // Preferred: decode structured class payload (JSON string or legacy object)
+      const parsed = decodeClassValue(v);
+      if (parsed) {
+        found = true;
+        return {
+          ...b,
+          value: encodeClassValue({
+            type: "class",
+            id: cls.id,
+            name: cls.name,
+          }),
+        };
+      }
+
+      // Fallback: if value is a plain string label, upgrade it to structured payload
+      if (typeof v === "string") {
+        found = true;
+        return {
+          ...b,
+          value: encodeClassValue({
+            type: "class",
+            id: cls.id,
+            // keep the selected name (this function is explicitly "write class only")
+            name: cls.name,
+          }),
+        };
+      }
+
+      return b;
+    });
+
+  // Patch the legacy `body` field while preserving non-object entries exactly.
+  const patchLegacyBody = (list: unknown[]): unknown[] =>
     list.map((b) => {
       if (!isRecord(b)) return b;
 
       const purpose = getString(b.purpose);
       if (purpose !== "tagging" && purpose !== "classifying") return b;
 
-      const v = b.value;
+      const v = (b as UnknownRecord).value;
 
-      if (isRecord(v) && v.type === "class") {
+      const parsed = decodeClassValue(v);
+      if (parsed) {
         found = true;
-        return { ...b, value: { ...v, id: cls.id, name: cls.name } };
+        return {
+          ...b,
+          value: encodeClassValue({
+            type: "class",
+            id: cls.id,
+            name: cls.name,
+          }),
+        };
       }
 
       if (typeof v === "string") {
         found = true;
-        return { ...b, value: { type: "class", id: cls.id, name: cls.name } };
+        return {
+          ...b,
+          value: encodeClassValue({
+            type: "class",
+            id: cls.id,
+            name: cls.name,
+          }),
+        };
       }
 
       return b;
     });
 
-  const bodiesOut = patch(asArray((a as unknown as UnknownRecord).bodies));
-  const bodyOut = patch(asArray((a as unknown as UnknownRecord).body));
+  const bodiesOut = patchBodies(a.bodies ?? []);
+  const bodyOut = patchLegacyBody(asArray((a as unknown as UnknownRecord).body));
 
   if (!found) {
-    const cb = classBody();
-    bodiesOut.push(cb);
-    bodyOut.push(cb);
+    bodiesOut.push(typedClassBody());
+    bodyOut.push(legacyClassBody());
   }
 
-  return {
-    ...(a as unknown as UnknownRecord),
+  // Build a proper ImageAnnotation (keeps id/target/etc intact) and only override bodies.
+  const base: ImageAnnotation = {
+    ...a,
     bodies: bodiesOut,
-    body: bodyOut,
-  } as ImageAnnotation;
+  };
+
+  // Preserve custom legacy `body` field for back-compat storage.
+  return ({ ...base, body: bodyOut } as unknown) as ImageAnnotation;
 }
 
 /**
