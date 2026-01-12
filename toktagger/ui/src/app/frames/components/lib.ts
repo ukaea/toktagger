@@ -630,7 +630,12 @@ export function writeClassAndTrack(
   track_id: string,
 ): ImageAnnotation {
   const classBody = (): AnnotationBody =>
-    makeClassBody(a.id, { type: "class", id: cls.id, name: cls.name, track_id });
+    makeClassBody(a.id, {
+      type: "class",
+      id: cls.id,
+      name: cls.name,
+      track_id,
+    });
 
   const patch = (list: AnnotationBody[]) => {
     let found = false;
@@ -681,7 +686,9 @@ export function writeClassAndTrack(
   const pb = patch(a.bodies ?? []);
 
   // `body` is not part of ImageAnnotation; keep it as an optional custom field.
-  const bodyIn = asArray((a as unknown as { body?: unknown }).body) as AnnotationBody[];
+  const bodyIn = asArray(
+    (a as unknown as { body?: unknown }).body,
+  ) as AnnotationBody[];
   const p = patch(bodyIn);
 
   const bodiesOut = [...pb.mapped];
@@ -699,7 +706,7 @@ export function writeClassAndTrack(
   };
 
   // Return as ImageAnnotation, but preserve custom `body` field for your storage/back-compat.
-  return ({ ...base, body: bodyOut } as unknown) as ImageAnnotation;
+  return { ...base, body: bodyOut } as unknown as ImageAnnotation;
 }
 
 /**
@@ -801,7 +808,9 @@ export function writeClassOnly(
     });
 
   const bodiesOut = patchBodies(a.bodies ?? []);
-  const bodyOut = patchLegacyBody(asArray((a as unknown as UnknownRecord).body));
+  const bodyOut = patchLegacyBody(
+    asArray((a as unknown as UnknownRecord).body),
+  );
 
   if (!found) {
     bodiesOut.push(typedClassBody());
@@ -815,7 +824,7 @@ export function writeClassOnly(
   };
 
   // Preserve custom legacy `body` field for back-compat storage.
-  return ({ ...base, body: bodyOut } as unknown) as ImageAnnotation;
+  return { ...base, body: bodyOut } as unknown as ImageAnnotation;
 }
 
 /**
