@@ -12,6 +12,7 @@ def create_project(name: str, task: str, data_loader: str) -> str:
         "data_loader": data_loader,
         "time_min": -0.1,
         "time_max": 0.8,
+        "min_time_step": 0.0001,
     }
 
     response = requests.post(
@@ -29,7 +30,7 @@ def create_uda_samples(project_id: str, shot_ids: list[int]):
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["ip", "ANE_DENSITY"],
+                "signal_names": ["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"],
                 "protocol": "uda",
             },
         }

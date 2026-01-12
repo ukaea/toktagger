@@ -88,6 +88,7 @@ class ParquetDataLoader(DataLoader):
         sample: Sample,
         time_min: Optional[float] = None,
         time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
         **kwargs,
     ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, TimeSeriesFileData)
@@ -98,6 +99,12 @@ class ParquetDataLoader(DataLoader):
             )
         df = pd.read_parquet(item.file_name, columns=item.column_names)
         df = df.fillna(0)
+        df.index = pd.to_timedelta(df.index, unit="s")
+
+        if min_time_step is not None and df.index.freq > pd.to_timedelta(
+            min_time_step, unit="s"
+        ):
+            df = df.resample(rule=f"{min_time_step}s").interpolate(method="linear")
 
         if time_min is not None:
             df = df[df.index >= time_min]
@@ -105,9 +112,9 @@ class ParquetDataLoader(DataLoader):
         if time_max is not None:
             df = df[df.index <= time_max]
 
-        time = df.index.values
+        data = df.to_dict(orient="list")
+        time = df.index.total_seconds().to_list()
 
-        data = df.to_dict("list")
         results = {}
         for key, value in data.items():
             results[key] = TimeSeriesData(time=time, values=value)
@@ -129,6 +136,7 @@ class UDADataLoader(DataLoader):
         sample: Sample,
         time_min: Optional[float] = None,
         time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
         **kwargs,
     ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData)
@@ -150,6 +158,15 @@ class UDADataLoader(DataLoader):
                     mask = time <= time_max
                     time = time[mask]
                     data = data[mask]
+
+                if (
+                    min_time_step is not None
+                    and len(time) > 1
+                    and np.diff(time).mean() < min_time_step
+                ):
+                    time_base = np.arange(time[0], time[-1], min_time_step)
+                    data = np.interp(time_base, time, data)
+                    time = time_base
 
                 item = TimeSeriesData(time=time, values=data)
                 results[name] = item

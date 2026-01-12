@@ -116,3 +116,23 @@ export function updateAnnotations<T>(
     return newAnnotations;
   });
 }
+
+// Utility function to find the maximum value in an array
+// Handles very large arrays efficiently
+export function arrayMax(arr: number[]): number {
+  let traceMax = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] > traceMax) traceMax = arr[i];
+  }
+  return traceMax;
+}
+
+// Utility function to find the minimum value in an array
+// Handles very large arrays efficiently
+export function arrayMin(arr: number[]): number {
+  let traceMin = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] < traceMin) traceMin = arr[i];
+  }
+  return traceMin;
+}

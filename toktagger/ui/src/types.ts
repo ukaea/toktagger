@@ -1,3 +1,4 @@
+import { min } from "d3";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
@@ -128,6 +129,7 @@ export const ProjectSchema = z.object({
   timestamp: z.string().optional(),
   time_min: z.number().nullable().optional(),
   time_max: z.number().nullable().optional(),
+  min_time_step: z.number().nullable().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -137,6 +139,7 @@ export const ProjectUpdateSchema = z.object({
   query_strategy: z.string().optional(),
   time_min: z.number().nullable().optional(),
   time_max: z.number().nullable().optional(),
+  min_time_step: z.number().nullable().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 

@@ -30,17 +30,25 @@ class ProjectIn(ConfiguredModel):
         ...,
         description="The strategy to use when selecting the next sample to annotate.",
     )
+
     data_loader: str = Field(
         ...,
         description="The type of data which will need to be loaded for this project.",
     )
+
     time_min: Optional[float] = Field(
         None,
         description="The minimum time (in seconds) for samples in this project.",
     )
+
     time_max: Optional[float] = Field(
         None,
         description="The maximum time (in seconds) for samples in this project.",
+    )
+
+    min_time_step: Optional[float] = Field(
+        None,
+        description="The minimum time step (in seconds) between samples in this project.",
     )
 
     @field_validator("data_loader")
@@ -61,3 +69,6 @@ class ProjectUpdate(ConfiguredModel):
     name: Optional[str] = None
     task: Optional[Task] = None
     query_strategy: Optional[QueryStrategyType] = None
+    time_min: Optional[float] = None
+    time_max: Optional[float] = None
+    min_time_step: Optional[float] = None

@@ -37,6 +37,7 @@ import { BACKEND_API_URL, getSamplesSummary } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
 } from "@/app/components/ui/numerical_range";
+import { min } from "d3";
 
 const Tasks = Object.values(TaskType).map((task) => ({
   key: task,
@@ -519,7 +520,8 @@ const buildProject = (
   dataLoaderOptions: DataLoaderOptions,
   task: string,
   queryStrategy: string,
-  timeRange: NumericalRangeType
+  timeRange: NumericalRangeType,
+  minTimeStep: number
 ): Project => {
   if (projectName === "") {
     throw new Error("Project name cannot be empty");
@@ -546,6 +548,7 @@ const buildProject = (
     timestamp: new Date().toISOString(),
     time_min: timeRange.min,
     time_max: timeRange.max,
+    min_time_step: minTimeStep,
   };
 
   return project;
@@ -566,6 +569,9 @@ export const ProjectConfigEditor = ({
     min: project?.time_min || null,
     max: project?.time_max || null,
   });
+  const [minTimeStep, setMinTimeStep] = useState<number>(
+    project?.min_time_step || 0.0001
+  );
   const [queryStrategy, setQueryStrategy] = useState<string>(
     project?.query_strategy || QueryStrategies[0].key
   );
@@ -604,6 +610,7 @@ export const ProjectConfigEditor = ({
       task: project.task,
       time_min: timeRange.min,
       time_max: timeRange.max,
+      min_time_step: minTimeStep,
     };
 
     await editProject(projectId, updatedProject);
@@ -615,7 +622,9 @@ export const ProjectConfigEditor = ({
       projectName,
       dataLoaderOptions,
       taskSelection || "",
-      queryStrategy
+      queryStrategy,
+      timeRange,
+      minTimeStep
     );
 
     const samples = buildSamples(dataLoaderOptions);
@@ -738,6 +747,24 @@ export const ProjectConfigEditor = ({
                 onChange={setTimeRange}
                 isRequired={false}
               />
+              <Flex direction="row" gap="size-200" alignItems="center">
+                <NumberField
+                  label="Min Time Step (s)"
+                  defaultValue={minTimeStep}
+                  onChange={setMinTimeStep}
+                  isRequired={false}
+                  validate={(value: number) => {
+                    if (!Number.isNaN(value) && minTimeStep <= 0) {
+                      return `Min Time Step must be greater than 0`;
+                    } else {
+                      return true;
+                    }
+                  }}
+                  formatOptions={{
+                    maximumFractionDigits: 10,
+                  }}
+                />
+              </Flex>
             </Form>
           </Content>
           <ButtonGroup>

@@ -19,6 +19,8 @@ import { Zones } from "@/app/components/tools/zones";
 import "react-contexify/ReactContexify.css";
 
 import {
+  arrayMax,
+  arrayMin,
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
@@ -124,15 +126,18 @@ export const TimeSeriesView = () => {
   }, [data, viewData]);
 
   const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
-    const maxTime = plotData.reduce(
-      (max, trace) => Math.max(max, Math.max(...(trace.x as number[]))),
-      -Infinity
-    );
+    let maxTime = -Infinity;
+    let minTime = Infinity;
 
-    const minTime = plotData.reduce(
-      (min, trace) => Math.min(min, Math.min(...(trace.x as number[]))),
-      Infinity
-    );
+    for (const trace of plotData) {
+      const xData = trace.x as number[];
+      if (xData && xData.length > 0) {
+        const traceMax = arrayMax(xData);
+        const traceMin = arrayMin(xData);
+        if (traceMax > maxTime) maxTime = traceMax;
+        if (traceMin < minTime) minTime = traceMin;
+      }
+    }
 
     const numRows = plotData.length;
     const domainHeight = 1 / numRows;

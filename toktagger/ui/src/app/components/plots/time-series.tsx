@@ -1,7 +1,7 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { useSample } from "@/app/contexts/SampleContext";
+import { arrayMax, arrayMin } from "@/app/utils";
 import Plotly, {
   Config,
   Layout,
@@ -10,7 +10,8 @@ import Plotly, {
   react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
-import React, { use, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { array } from "zod/v4";
 
 type InjectedProps = {
   plotId: string;
@@ -175,8 +176,8 @@ export const TimeSeries = ({
         }
 
         if (yValues.length > 0) {
-          const yMin = Math.min(...yValues);
-          const yMax = Math.max(...yValues);
+          const yMin = arrayMin(yValues);
+          const yMax = arrayMax(yValues);
           const offset = 0.1 * (yMax - yMin); // 10 % offset
 
           configUpdate = {
