@@ -211,6 +211,16 @@ export function saveLastClassName(name: string | null): void {
 
 // ---------- Annotation helpers ----------
 
+function getTargetSource(a: unknown): string | null {
+  if (!isRecord(a)) return null;
+
+  const target = (a as UnknownRecord).target;
+  if (!isRecord(target)) return null;
+
+  // W3C target.source is commonly a string
+  return getString((target as UnknownRecord).source);
+}
+
 function makeBodyId(aid: string): string {
   // deterministic-ish, avoids randomness, good for diffs
   return `b-${aid}-${Math.random().toString(36).slice(2, 10)}`;
@@ -1183,8 +1193,8 @@ export function w3cToCocoFrames(
   const byFrame: Record<number, CocoFrame> = {};
 
   for (const a of Array.isArray(list) ? list : []) {
-    const src = a?.target?.source;
-    const frame = frameFromSourceKey(typeof src === "string" ? src : "");
+    const src = getTargetSource(a);
+    const frame = frameFromSourceKey(src ?? "");
     if (frame == null) continue;
 
     if (!byFrame[frame]) {
