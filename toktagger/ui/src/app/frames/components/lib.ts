@@ -1,6 +1,6 @@
 "use client";
 
-import type { ImageAnnotation } from "@annotorious/react";
+import type { ImageAnnotation, AnnotationBody } from "@annotorious/react";
 import { buildSourceKey } from "./adapters";
 
 /**
@@ -92,6 +92,13 @@ export type ClassCounts = Record<string, number>;
 // `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
 export type InstanceCounts = Record<string, number>;
 
+type ClassValuePayload = {
+  type: "class";
+  id: number;
+  name: string;
+  track_id?: string;
+};
+
 // ---------- JSON helpers ----------
 
 function safeParseJSON<T>(raw: string | null): T | null {
@@ -101,6 +108,38 @@ function safeParseJSON<T>(raw: string | null): T | null {
   } catch {
     return null;
   }
+}
+
+function encodeClassValue(v: ClassValuePayload): string {
+  return JSON.stringify(v);
+}
+
+function decodeClassValue(v: unknown): ClassValuePayload | null {
+  // Back-compat: older annotations may have stored the object directly
+  if (isRecord(v) && v.type === "class") {
+    const id = getNumber(v.id);
+    const name = getString(v.name);
+    const track_id = getString(v.track_id) ?? undefined;
+    if (id != null && name) return { type: "class", id, name, track_id };
+    return null;
+  }
+
+  if (typeof v !== "string") return null;
+
+  // New format: JSON string
+  try {
+    const parsed: unknown = JSON.parse(v);
+    if (isRecord(parsed) && parsed.type === "class") {
+      const id = getNumber(parsed.id);
+      const name = getString(parsed.name);
+      const track_id = getString(parsed.track_id) ?? undefined;
+      if (id != null && name) return { type: "class", id, name, track_id };
+    }
+  } catch {
+    // Not JSON -> treat as plain label elsewhere
+  }
+
+  return null;
 }
 
 // ---------- Profiles ----------
@@ -172,13 +211,30 @@ export function saveLastClassName(name: string | null): void {
 
 // ---------- Annotation helpers ----------
 
+function makeBodyId(aid: string): string {
+  // deterministic-ish, avoids randomness, good for diffs
+  return `b-${aid}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function makeClassBody(
+  annotationId: string,
+  payload: ClassValuePayload,
+): AnnotationBody {
+  return {
+    id: makeBodyId(annotationId),
+    annotation: annotationId,
+    purpose: "tagging",
+    value: encodeClassValue(payload),
+  };
+}
+
 // Try to pull a human-readable class label from a W3C-style annotation.
 export function extractClassLabelFromAnnotation(
   annotation: unknown,
 ): string | null {
   if (!annotation || !isRecord(annotation)) return null;
 
-  const body = annotation.body;
+  const body = (annotation as UnknownRecord).body;
   if (!body) return null;
 
   const bodies = asArray(body);
@@ -186,14 +242,29 @@ export function extractClassLabelFromAnnotation(
   for (const b of bodies) {
     if (!b) continue;
 
+    // If the body itself is a string, it could be:
+    // - a plain label ("UFO")
+    // - a JSON string of our structured class payload
     if (typeof b === "string") {
+      const parsed = decodeClassValue(b);
+      if (parsed?.name) return parsed.name;
+
       const s = b.trim();
       if (s) return s;
       continue;
     }
 
+    // If the body is an object, check common fields
     if (isRecord(b)) {
-      const value = b.value ?? b.label;
+      const value = (b as UnknownRecord).value ?? (b as UnknownRecord).label;
+
+      // `value` can be:
+      // - a plain string label
+      // - a JSON string payload
+      // - (legacy) a structured object payload
+      const parsed = decodeClassValue(value);
+      if (parsed?.name) return parsed.name;
+
       if (typeof value === "string") {
         const s = value.trim();
         if (s) return s;
@@ -202,10 +273,18 @@ export function extractClassLabelFromAnnotation(
   }
 
   // Fallbacks: some structures store a label in properties
-  const props = annotation.properties;
+  const props = (annotation as UnknownRecord).properties;
   if (isRecord(props)) {
-    const fromClass = typeof props.class === "string" ? props.class : undefined;
-    const fromLabel = typeof props.label === "string" ? props.label : undefined;
+    const fromClass =
+      typeof (props as UnknownRecord).class === "string"
+        ? ((props as UnknownRecord).class as string)
+        : undefined;
+
+    const fromLabel =
+      typeof (props as UnknownRecord).label === "string"
+        ? ((props as UnknownRecord).label as string)
+        : undefined;
+
     const candidate = fromClass ?? fromLabel;
     if (candidate && candidate.trim()) return candidate.trim();
   }
@@ -360,30 +439,34 @@ export function extractClassLabel(
 ): { class_id?: number; class_name?: string; track_id?: string } | null {
   if (!a || !isRecord(a)) return null;
 
-  const candidates = [...asArray(a.bodies), ...asArray(a.body)];
+  const aRec = a as UnknownRecord;
+
+  const candidates = [
+    ...asArray(aRec.bodies),
+    ...asArray(aRec.body), // custom/back-compat field (not on ImageAnnotation type)
+  ];
 
   for (const b of candidates) {
     if (!isRecord(b)) continue;
 
-    const purpose = getString(b.purpose);
+    const bRec = b as UnknownRecord;
+
+    const purpose = getString(bRec.purpose);
     if (purpose !== "tagging" && purpose !== "classifying") continue;
 
-    const v = b.value;
+    const v = bRec.value;
 
-    if (isRecord(v) && v.type === "class") {
-      const id = getNumber(v.id) ?? undefined;
-      const name = getString(v.name) ?? undefined;
-
-      const track_id =
-        (typeof v.track_id === "string" && v.track_id.length > 0
-          ? v.track_id
-          : typeof v.instance === "number"
-            ? String(v.instance)
-            : undefined) ?? undefined;
-
-      return { class_id: id, class_name: name, track_id };
+    // Preferred: decode structured class payload (JSON string or legacy object)
+    const parsed = decodeClassValue(v);
+    if (parsed) {
+      return {
+        class_id: parsed.id,
+        class_name: parsed.name,
+        track_id: parsed.track_id,
+      };
     }
 
+    // Fallback: if value is a plain string, treat it as just the class name
     if (typeof v === "string") {
       return { class_name: v };
     }
@@ -527,19 +610,19 @@ export function uniqueReadableId(existingTrackIds: string[]): string {
 }
 
 /**
- * Write / update a W3C class body including track_id on both body & bodies.
+ * Ensure an annotation carries the selected class + track_id in its W3C bodies.
+ * Updates any existing tagging/classifying body (string or encoded payload) to the latest values.
+ * If none exists, appends a new tagging body. Also mirrors the same update into the legacy body field for back-compat storage.
  */
 export function writeClassAndTrack(
   a: ImageAnnotation,
   cls: { id: number; name: string },
   track_id: string,
 ): ImageAnnotation {
-  const classBody = () => ({
-    purpose: "tagging",
-    value: { type: "class", id: cls.id, name: cls.name, track_id },
-  });
+  const classBody = (): AnnotationBody =>
+    makeClassBody(a.id, { type: "class", id: cls.id, name: cls.name, track_id });
 
-  const patch = (list: unknown[]) => {
+  const patch = (list: AnnotationBody[]) => {
     let found = false;
 
     const mapped = list.map((b) => {
@@ -550,19 +633,32 @@ export function writeClassAndTrack(
 
       const v = b.value;
 
-      if (isRecord(v) && v.type === "class") {
+      // If it's already our structured payload (object or JSON string), update it
+      const parsed = decodeClassValue(v);
+      if (parsed) {
         found = true;
         return {
           ...b,
-          value: { ...v, id: cls.id, name: cls.name, track_id },
+          value: encodeClassValue({
+            type: "class",
+            id: cls.id,
+            name: cls.name,
+            track_id,
+          }),
         };
       }
 
+      // If it's a plain string label, upgrade it to structured payload
       if (typeof v === "string") {
         found = true;
         return {
           ...b,
-          value: { type: "class", id: cls.id, name: cls.name, track_id },
+          value: encodeClassValue({
+            type: "class",
+            id: cls.id,
+            name: cls.name,
+            track_id,
+          }),
         };
       }
 
@@ -572,28 +668,28 @@ export function writeClassAndTrack(
     return { mapped, found };
   };
 
-  // Treat body/bodies as unknown payloads, but avoid casting the whole annotation.
-  const bodiesIn = asArray((a as unknown as { bodies?: unknown }).bodies);
-  const bodyIn = asArray((a as unknown as { body?: unknown }).body);
+  const pb = patch(a.bodies ?? []);
 
-  const pb = patch(bodiesIn);
+  // `body` is not part of ImageAnnotation; keep it as an optional custom field.
+  const bodyIn = asArray((a as unknown as { body?: unknown }).body) as AnnotationBody[];
   const p = patch(bodyIn);
 
   const bodiesOut = [...pb.mapped];
   const bodyOut = [...p.mapped];
 
-  // If no existing class body was found, append one to both body & bodies
   if (!pb.found && !p.found) {
     const cb = classBody();
     bodiesOut.push(cb);
     bodyOut.push(cb);
   }
 
-  return {
-    ...a,
+  const base: ImageAnnotation = {
+    ...(a as ImageAnnotation),
     bodies: bodiesOut,
-    body: bodyOut,
   };
+
+  // Return as ImageAnnotation, but preserve custom `body` field for your storage/back-compat.
+  return ({ ...base, body: bodyOut } as unknown) as ImageAnnotation;
 }
 
 /**
