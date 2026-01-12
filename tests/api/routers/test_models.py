@@ -2,7 +2,7 @@ import pytest
 import pytest_asyncio
 import random
 import pathlib
-from toktagger.api.schemas.projects import ProjectIn
+from toktagger.api.schemas.projects import ProjectIn, Task
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
 from toktagger.api.schemas.annotations import TimePoint
 from toktagger.api.schemas.models import ModelUpdate
@@ -55,7 +55,7 @@ async def setup_model_db(db_client):
     # Create sample data for training / predicting a Disruption model
     project = ProjectIn(
         name="Test",
-        task="disruption",
+        task=Task.TIME_SERIES,
         query_strategy="random",
         data_loader="parquet",
     )

@@ -35,7 +35,7 @@ class TimeSeriesFileData(FileData):
 
 class ShotData(BaseModel):
     protocol: ShotProtocol
-    signal_names: Annotated[list[str], Field(min_items=1)]
+    signal_names: Annotated[list[str], Field(min_length=1)]
 
 
 DataTypes = Union[TimeSeriesFileData, FileData, ShotData]

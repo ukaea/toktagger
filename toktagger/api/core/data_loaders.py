@@ -106,8 +106,8 @@ class ImageDataLoader(DataLoader):
         return FileData
 
     @pydantic.validate_call
-    def get_sample(self, sample_data: Sample, **kwargs) -> ImageData:
-        sample_data: FileData = sample_data.data
+    def get_sample(self, sample: Sample, **kwargs) -> ImageData:
+        sample_data: FileData = sample.data
 
         if not isinstance(sample_data, FileData):
             raise TypeError(
@@ -176,7 +176,6 @@ class ParquetDataLoader(DataLoader):
 
         df.index = pd.to_timedelta(df.index, unit="s")
         mean_diff = df.index.to_series().diff().dropna().mean().total_seconds()
-        print(mean_diff, min_time_step)
 
         if min_time_step is not None and mean_diff < min_time_step:
             df = df.resample(rule=f"{min_time_step}s").interpolate(method="linear")

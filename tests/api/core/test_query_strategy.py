@@ -54,7 +54,7 @@ def test_sequential_strategy(samples, annotations):
     )
 
     next_sample_id = None
-    print([s.shot_id for s in samples])
+
     for i in range(len(samples)):
         next_sample = strategy.get_next_sample(next_sample_id)
         next_sample_id = next_sample.id
