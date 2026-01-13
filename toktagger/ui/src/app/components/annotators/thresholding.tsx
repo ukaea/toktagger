@@ -45,7 +45,7 @@ export default function SpectrogramThresholdTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
+              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
           );
           return otherAnnotations;
         });
@@ -63,14 +63,14 @@ export default function SpectrogramThresholdTool({
             signal_name: signal_name,
             percentile: value,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
+            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
         );
         return otherAnnotations.concat(payload);
       });

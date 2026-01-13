@@ -43,7 +43,7 @@ export function JumpDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
+              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
           );
           return otherAnnotations;
         });
@@ -67,14 +67,14 @@ export function JumpDetectionTool({
             },
             data_params: dataParams,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
         );
         return otherAnnotations.concat(payload);
       });

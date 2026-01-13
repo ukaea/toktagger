@@ -22,7 +22,7 @@ export function ImportButton({
         importJSONFile(project_id, file, refreshAnnotations);
         ToastQueue.positive(
           `Annotations imported successfully from ${file.name}`,
-          { timeout: 5000 }
+          { timeout: 5000 },
         );
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);

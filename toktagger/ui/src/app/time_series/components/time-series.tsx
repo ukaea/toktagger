@@ -109,12 +109,12 @@ export const TimeSeriesView = () => {
           y: value.values,
           mode: "lines",
         };
-      }
+      },
     );
 
     const yAxesNames = Array.from(
       { length: numRows },
-      (_, i) => `y${i === 0 ? "" : i + 1}`
+      (_, i) => `y${i === 0 ? "" : i + 1}`,
     ).reverse();
 
     // Dynamically generate y-axis titles based on plotData names
@@ -155,7 +155,7 @@ export const TimeSeriesView = () => {
         acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true };
         return acc;
       },
-      {} as Record<string, unknown>
+      {} as Record<string, unknown>,
     );
 
     return {

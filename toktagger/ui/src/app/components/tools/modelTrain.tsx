@@ -44,7 +44,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
       setMessage("Model training added to job queue!");
       setMessageColour("positive");
       setMessageIcon(
-        <CheckmarkCircle aria-label="Success" color="positive" size="S" />
+        <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
     } else {
       const errorMessage = await response.json();

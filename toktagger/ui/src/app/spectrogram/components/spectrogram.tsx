@@ -44,7 +44,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {}
+  {},
 );
 
 const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
@@ -52,7 +52,7 @@ const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {}
+  {},
 );
 
 const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
@@ -86,7 +86,7 @@ export const SpectrogramView = () => {
 
     // Extract mask from annotations
     const maskAnnotations = annotations.filter(
-      (x: Annotation) => SpectrogramMaskSchema.safeParse(x).success
+      (x: Annotation) => SpectrogramMaskSchema.safeParse(x).success,
     );
     const newMask =
       maskAnnotations.length > 0
@@ -124,7 +124,7 @@ export const SpectrogramView = () => {
           maskValue = 1; // Default to 1 if mask value is undefined
         }
         return value * maskValue;
-      })
+      }),
     );
   } else {
     amplitude = viewData.amplitude;
@@ -134,13 +134,13 @@ export const SpectrogramView = () => {
   const ampMax = Math.max(...amplitude.flat());
 
   const logAmplitude_og = amplitude_og.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
+    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor))),
   );
   const logAmpMin = Math.min(...logAmplitude_og.flat());
   const logAmpMax = Math.max(...logAmplitude_og.flat());
 
   const logAmplitude = amplitude.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
+    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor))),
   );
 
   const generateLogTicks = (min: number, max: number) => {
@@ -302,7 +302,7 @@ export const SpectrogramView = () => {
     // Handle dark mode styling
     // We should probably move all the styling to this central component
     const isDarkMode = window.matchMedia(
-      "(prefers-color-scheme: dark)"
+      "(prefers-color-scheme: dark)",
     ).matches;
     if (isDarkMode) {
       layout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };

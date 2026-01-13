@@ -39,7 +39,7 @@ async function getNextSample(project_id: string, current_sample_id: string) {
 
 async function getPreviousSample(
   project_id: string,
-  current_sample_id: string
+  current_sample_id: string,
 ) {
   const PREVIOUS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/previous?current_sample_id=${current_sample_id}`;
   const sampleResult = await fetch(PREVIOUS_URL);
@@ -70,7 +70,7 @@ function NextButton({
       project_id,
       sample_id,
       annotations,
-      validateOnNavigate
+      validateOnNavigate,
     );
     const sample = await getNextSample(project_id, sample_id);
     if (!sample) {
@@ -118,7 +118,7 @@ function PreviousButton({
       project_id,
       sample_id,
       annotations,
-      validateOnNavigate
+      validateOnNavigate,
     );
 
     const sample = await getPreviousSample(project_id, sample_id);
@@ -189,7 +189,7 @@ function ClearButton({
   setAnnotations,
 }: {
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[],
   ) => void;
 }) {
   const handleClick = () => {
@@ -235,7 +235,7 @@ export function ShotSearch({
             project_id,
             sample_id,
             annotations,
-            validateOnNavigate
+            validateOnNavigate,
           );
           const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
           navigate(NEXT_SAMPLE_URL);

@@ -35,7 +35,7 @@ interface SampleContextType {
   isLoading: boolean;
   error: string | null;
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
@@ -58,7 +58,7 @@ async function getData<T>(url: string): Promise<T> {
 
 async function getSample(projectId: string, sampleId: string): Promise<Sample> {
   return await getData<Sample>(
-    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}`
+    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}`,
   );
 }
 
@@ -68,16 +68,16 @@ async function getProject(projectId: string): Promise<Project> {
 
 async function getAnnotations(
   projectId: string,
-  sampleId: string
+  sampleId: string,
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/annotations`
+    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/annotations`,
   );
 }
 
 async function parseData(
   data: Data,
-  task: TaskType
+  task: TaskType,
 ): Promise<MultiVariateTimeSeriesData | SpectrogramData | undefined> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -91,7 +91,7 @@ async function parseData(
       throw new Error("Invalid data for spectrogram view");
     }
     const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"]
+      result.data.values["mirnov"],
     );
     if (!mhdData.success) {
       throw new Error("Invalid data for spectrogram view");
@@ -160,7 +160,7 @@ export function SampleProvider({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({ params: dataParams, view: params }),
-          }
+          },
         );
 
         if (!response.ok) {

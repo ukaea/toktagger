@@ -15,7 +15,7 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
 
   useEffect(() => {
     const defaultAnnotations = annotations.filter(
-      (annotation: Annotation) => annotation.type === "class_label"
+      (annotation: Annotation) => annotation.type === "class_label",
     );
     const defaultSelectedKeys = defaultAnnotations
       .map((annotation: Annotation) => {
@@ -39,7 +39,7 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
       setAnnotations((prevAnnotations: Annotation[]) => {
         let newAnnotations = prevAnnotations || [];
         newAnnotations = newAnnotations.filter(
-          (annotation) => annotation.type !== "class_label"
+          (annotation) => annotation.type !== "class_label",
         );
         newKeys.forEach((key: string) => {
           const item = items.find((item) => item.id.toString() === key) || null;
@@ -58,7 +58,7 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
         return newAnnotations;
       });
     },
-    [items, setAnnotations]
+    [items, setAnnotations],
   );
 
   useEffect(() => {

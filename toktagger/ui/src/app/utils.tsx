@@ -24,7 +24,7 @@ export const linspace = (start: number, end: number, num: number) => {
 };
 
 export const convertDisplayAnnotationToAnnotation = (
-  annotation: DisplayAnnotation
+  annotation: DisplayAnnotation,
 ): Annotation => {
   if (ZoneSchema.safeParse(annotation).success) {
     const zone = ZoneSchema.parse(annotation);
@@ -59,7 +59,7 @@ export const convertDisplayAnnotationToAnnotation = (
 };
 
 export const createAnnotationToDisplayAnnotationFunc = (
-  colors: Record<string, string>
+  colors: Record<string, string>,
 ) => {
   const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
     if (TimeRegionSchema.safeParse(item).success) {
@@ -91,7 +91,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else {
       console.log(
         "annotation",
-        TimeRegionSchema.safeParse(item).error?.message
+        TimeRegionSchema.safeParse(item).error?.message,
       );
       throw new Error("Unsupported annotation type");
     }
@@ -101,17 +101,17 @@ export const createAnnotationToDisplayAnnotationFunc = (
 
 export function updateAnnotations<T>(
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void,
   newDisplayAnnotations: DisplayAnnotation[],
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
 ): void {
   setAnnotations((prevAnnotations: Annotation[]) => {
     const otherAnnotations: Annotation[] = prevAnnotations.filter(
-      (item: Annotation) => !schema.safeParse(item).success
+      (item: Annotation) => !schema.safeParse(item).success,
     );
     let newAnnotations: Annotation[] = newDisplayAnnotations.map(
-      convertDisplayAnnotationToAnnotation
+      convertDisplayAnnotationToAnnotation,
     );
     newAnnotations = newAnnotations.concat(otherAnnotations);
     return newAnnotations;

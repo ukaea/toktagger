@@ -72,20 +72,20 @@ export function ModelPredictModal({ project }: { project: Project }) {
       return;
     }
     const selectedModel = models.find(
-      (model) => model._id === selectedKeys.values().next().value
+      (model) => model._id === selectedKeys.values().next().value,
     );
 
     const response = await startPredictions(
       project._id,
       selectedModel.type,
       selectedModel.version,
-      Number(numPredictions)
+      Number(numPredictions),
     );
 
     if (response.ok) {
       setMessage("Model predictions added to job queue!");
       setMessageIcon(
-        <CheckmarkCircle aria-label="Success" color="positive" size="S" />
+        <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
       setSelectedKeys(new Set());
     } else {
@@ -100,19 +100,19 @@ export function ModelPredictModal({ project }: { project: Project }) {
       return;
     }
     const selectedModel = models.find(
-      (model) => model._id === selectedKeys.values().next().value
+      (model) => model._id === selectedKeys.values().next().value,
     );
 
     const response = await stopTraining(
       project._id,
       selectedModel.type,
-      selectedModel.version
+      selectedModel.version,
     );
 
     if (response.ok) {
       setMessage("Model training has been stopped!");
       setMessageIcon(
-        <CheckmarkCircle aria-label="Success" color="positive" size="S" />
+        <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
       setSelectedKeys(new Set());
     } else {
@@ -162,8 +162,8 @@ export function ModelPredictModal({ project }: { project: Project }) {
                     !["training", "queued"].includes(
                       models.find(
                         (model) =>
-                          model._id === selectedKeys.values().next().value
-                      ).training_status
+                          model._id === selectedKeys.values().next().value,
+                      ).training_status,
                     )
                   }
                   onPress={stopTrainingJob}
@@ -218,7 +218,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   selectedKeys.size === 0 ||
                   !models ||
                   models.find(
-                    (model) => model._id === selectedKeys.values().next().value
+                    (model) => model._id === selectedKeys.values().next().value,
                   ).training_status != "completed"
                 }
                 onPress={submitPredictJob}
