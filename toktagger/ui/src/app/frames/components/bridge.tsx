@@ -194,12 +194,12 @@ export const AnnoBridge = Object.assign(
     const flushingRef = useRef(false);
     const lastAppliedRef = useRef<string>(""); // JSON signature of last applied overlay
 
-    const sig = (anns: readonly AnnoSigView[]) =>
+    const sig = (anns: readonly ImageAnnotation[]) =>
       JSON.stringify(
         anns.map((a) => ({
           id: a.id,
-          t: a.type,
-          tSrc: a.target?.source,
+          // selector is present in the ImageAnnotation type 
+          sel: (a.target?.selector as unknown) ?? null,
         })),
       );
 
@@ -239,9 +239,7 @@ export const AnnoBridge = Object.assign(
       if (batch && anno) {
         const s = sig(batch);
         if (s !== lastAppliedRef.current) {
-          if (isAnnotatorApi(anno)) {
-            await runSilently(() => anno.setAnnotations?.(batch, true));
-          }
+          await runSilently(() => anno.setAnnotations(batch, true));
           lastAppliedRef.current = s;
         }
       }
