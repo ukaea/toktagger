@@ -323,13 +323,12 @@ export const AnnoBridge = Object.assign(
         isAnnotatorReady: () => !!anno,
 
         persistWorkingNow: async (currentKey: string) => {
-          if (!isAnnotatorApi(anno)) return;
-          const api = anno;
+          if (!anno) return [];
 
           currentKeyRef.current = currentKey;
           await doubleRAF();
 
-          const raw = toAnnoList(api.getAnnotations?.());
+          const raw = toAnnoList(anno.getAnnotations());
           const stamped: ImageAnnotation[] = raw.map((a) => ({
             ...deepClone(a),
             target: { ...(a.target ?? {}), source: currentKey },
