@@ -400,38 +400,42 @@ export const AnnoBridge = Object.assign(
 
         // Auto quick-add logic; no-op when onAutoQuickAdd is not provided
         if (includeTrackIds && normalized.length > 0 && onAutoQuickAdd) {
-          const firstByInstance = new Map<string, string>();
-          let duplicateAnno: ImageAnnotation | null = null;
+          const firstAnnotationIdByInstanceKey = new Map<string, string>();
+          let duplicateAnnotation: ImageAnnotation | null = null;
 
-          for (const a of normalized) {
-            const lbl = extractClassLabel(a) ?? {};
-            const cname = (lbl.class_name ?? "").toLowerCase();
-            const tid = lbl.track_id ? canonicalizeTrackId(lbl.track_id) : "";
-            if (!cname || !tid) continue;
+          for (const annotation of normalized) {
+            const label = extractClassLabel(annotation) ?? {};
+            const className = (label.class_name ?? "").toLowerCase();
+            const trackId = label.track_id
+              ? canonicalizeTrackId(label.track_id)
+              : "";
+            if (!className || !trackId) continue;
 
-            const instKey = `${cname}:${tid}`;
-            const aid = String(a.id);
-            if (firstByInstance.has(instKey)) {
-              duplicateAnno = a;
+            const instanceKey = `${className}:${trackId}`;
+            const annotationId = String(annotation.id);
+
+            if (firstAnnotationIdByInstanceKey.has(instanceKey)) {
+              duplicateAnnotation = annotation;
               break;
-            } else {
-              firstByInstance.set(instKey, aid);
             }
+
+            firstAnnotationIdByInstanceKey.set(instanceKey, annotationId);
           }
 
-          if (duplicateAnno) {
-            const dupLbl = extractClassLabel(duplicateAnno) ?? {};
-            const cname = (dupLbl.class_name ?? "").toLowerCase();
-            const newProf = await onAutoQuickAdd({ class_name: cname });
+          if (duplicateAnnotation) {
+            const duplicateLabel = extractClassLabel(duplicateAnnotation) ?? {};
+            const className = (duplicateLabel.class_name ?? "").toLowerCase();
+            const newProf = await onAutoQuickAdd({ class_name: className });
+
             if (newProf) {
-              normalized = normalized.map((a) =>
-                a.id === duplicateAnno.id
+              normalized = normalized.map((annotation) =>
+                annotation.id === duplicateAnnotation.id
                   ? writeClassAndTrack(
-                      a,
+                      annotation,
                       { id: newProf.class_id, name: newProf.class_name },
                       newProf.track_id,
                     )
-                  : a,
+                  : annotation,
               );
             }
           }
@@ -439,7 +443,7 @@ export const AnnoBridge = Object.assign(
 
         // Keep lastById in sync (even if overlay does not need re-apply)
         const byId: Record<string, ImageAnnotation> = {};
-        for (const a of normalized) byId[a.id] = a;
+        for (const annotation of normalized) byId[annotation.id] = annotation;
         lastByIdRef.current = byId;
 
         // Optional: skip buffering if nothing actually changed
