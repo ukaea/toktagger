@@ -633,9 +633,7 @@ export default function ToolBar({
 
     const onState = (e: Event) => {
       const detail = (e as CustomEvent<unknown>).detail;
-      const d = (
-        detail && typeof detail === "object" ? (detail as UfoStateDetail) : {}
-      ) as UfoStateDetail;
+      const d = (detail && typeof detail === "object" ? detail : {}) as UfoStateDetail;
 
       if (Array.isArray(d.profiles)) {
         const next: InstanceProfile[] = d.profiles.map((p) => ({
