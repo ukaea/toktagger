@@ -46,7 +46,6 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
-// UFO converters + class/registry helpers (restore the known-good dropdown + instance panel)
 import type { ClassRegistry } from "@/app/frames/components/lib";
 import {
   LABEL_MAP,
@@ -417,8 +416,6 @@ function SpectrogramThresholdTool({
   );
 }
 
-/** ---------------------- UFO support (restore known-good ClassPanel + InstancePanel) ---------------------- */
-
 /**
  * Toolbar-side instance profiles used by FrameView via window.ufoInstanceProfiles.
  * FrameView expects: { id, class_name, class_id, track_id }.
@@ -611,8 +608,6 @@ export default function ToolBar({
     setAnnotations([]);
   };
 
-  /** ---------------- UFO state (restored to backup behavior) ---------------- */
-
   const [classRegistry, setClassRegistry] = useState<ClassRegistry>({});
   const [selectedClassName, setSelectedClassName] = useState<string | null>(
     null,
@@ -656,7 +651,6 @@ export default function ToolBar({
             const inst = next.find((p) => instanceKey(p) === d.selectedKey);
             setSelectedInstanceId(inst ? inst.id : null);
           } else if (d.selectedKey == null) {
-            // allow FrameView to clear selection
             setSelectedInstanceId(null);
           }
         }
@@ -750,8 +744,6 @@ export default function ToolBar({
 
     w.ufoNotifySelectionChanged?.();
   }, [isUfo, instanceProfiles, selectedInstanceId, selectedClassName]);
-
-  /** ---------------- UFO delete/clear/save navigation (unchanged) ---------------- */
 
   const onRequestBulkDelete = (profile: {
     class_name?: string;
@@ -951,17 +943,14 @@ export default function ToolBar({
               <hr className="m-4 h-px opacity-30 border-gray-200" />
             </div>
 
-            {/* Restored: shared ClassPanel (hardcoded/registry-driven; no custom typing hack) */}
             <UFOClassPanel
               selectedClassName={selectedClassName}
               setSelectedClassName={(name) => {
                 if (!name) return;
 
-                // “Armed class” only — no instance created yet.
                 setSelectedClassName(name);
                 saveLastClassName(name);
 
-                // Important: selecting a class should NOT keep stamping onto an old instance.
                 setSelectedInstanceId(null);
 
                 if (typeof window !== "undefined") {
@@ -970,7 +959,6 @@ export default function ToolBar({
               }}
             />
 
-            {/* Restored: shared InstancePanel (vertical list, auto-scroll via container) */}
             <UFOInstancePanel
               profiles={instanceProfiles.map((inst) => ({
                 key: instanceKey(inst),
@@ -999,7 +987,6 @@ export default function ToolBar({
                 }
               }}
               onCreateProfile={(className: string, trackId: string) => {
-                // Creator UI is off, but keep wiring compatible.
                 const cls = className;
 
                 const keyLower = cls.toLowerCase();
