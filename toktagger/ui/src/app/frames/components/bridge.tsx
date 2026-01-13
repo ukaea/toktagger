@@ -327,7 +327,7 @@ export const AnnoBridge = Object.assign(
         },
 
         hydrateOverlay: async (list: ImageAnnotation[], currentKey: string) => {
-          if (!isAnnotatorApi(anno)) return;
+          if (!isAnnotatorApi(anno)) return false;
           const api = anno;
 
           currentKeyRef.current = currentKey;
