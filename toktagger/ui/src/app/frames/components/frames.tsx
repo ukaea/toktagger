@@ -104,13 +104,15 @@ export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
       return;
     }
 
-    if (/^[0-9]*$/.test(newValue)) {
+    const n = Number(newValue);
+
+    if (Number.isInteger(n) && n >= 0) {
       setErrorMessage("");
-      const n = Number(newValue);
-      if (Number.isFinite(n)) onJump(n);
-    } else {
-      setErrorMessage("Please enter a number.");
+      onJump(n);
+      return;
     }
+
+    setErrorMessage("Please enter a number.");
   };
 
   return (
