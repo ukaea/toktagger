@@ -961,9 +961,10 @@ export default function ToolBar({
               <div className="mb-2">
                 <Flex gap="size-100" alignItems="center" wrap>
                   <Button
-                    isQuiet
-                    isDisabled
-                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                      variant="secondary"
+                      style="outline" 
+                      isDisabled
+                      UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                   >
                     Rectangle
                   </Button>
@@ -980,7 +981,8 @@ export default function ToolBar({
                   wrap
                 >
                   <Button
-                    isQuiet
+                    variant="primary"
+                    style="outline"
                     UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                     onPress={async () => {
                       try {
