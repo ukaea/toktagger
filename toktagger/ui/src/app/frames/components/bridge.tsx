@@ -338,11 +338,10 @@ export const AnnoBridge = Object.assign(
         },
 
         clearOverlaySilently: async () => {
-          if (!isAnnotatorApi(anno)) return;
-          const api = anno;
+          if (!anno) return;
 
           await runSilently(() => {
-            api.setAnnotations?.([], true);
+            anno.setAnnotations([], true);
             lastByIdRef.current = {};
             dirtyRef.current = true;
           });
