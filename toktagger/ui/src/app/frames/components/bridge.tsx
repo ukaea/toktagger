@@ -77,6 +77,14 @@ type AnnotatorApi = {
   off?: (event: string, cb: (...args: unknown[]) => void) => void;
 };
 
+type AnnoSigView = {
+  id: string;
+  type?: unknown; // not part of @annotorious/react ImageAnnotation typing
+  target?: {
+    source?: unknown; // not part of ImageAnnotationTarget typing
+  };
+};
+
 function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
   return typeof v === "function";
 }
@@ -147,7 +155,6 @@ function isRectangleAnno(a: ImageAnnotation): boolean {
 
 export const AnnoBridge = Object.assign(
   function Bridge(props: {
-    // React 19: ref is passed as a normal prop (no forwardRef needed)
     ref?: React.Ref<BridgeHandle>;
 
     getSelectedProfile: () => SelectedProfile;
@@ -187,9 +194,13 @@ export const AnnoBridge = Object.assign(
     const flushingRef = useRef(false);
     const lastAppliedRef = useRef<string>(""); // JSON signature of last applied overlay
 
-    const sig = (anns: ImageAnnotation[]) =>
+    const sig = (anns: readonly AnnoSigView[]) =>
       JSON.stringify(
-        anns.map((a) => ({ id: a.id, t: a.type, tSrc: a.target?.source })),
+        anns.map((a) => ({
+          id: a.id,
+          t: a.type,
+          tSrc: a.target?.source,
+        })),
       );
 
     // Double-RAF to ensure Annotorious has settled before re-enabling event handling
