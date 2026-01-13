@@ -825,6 +825,14 @@ export default function ToolBar({
   };
 
   const handleUfoNextSample = async () => {
+    // Guard against incomplete project/sample objects.
+    if (!project_id || !sample_id) {
+      ToastQueue.negative("Cannot load next sample: missing project or sample id.", {
+        timeout: 5000,
+      });
+      return;
+    }
+
     try {
       const payload = await collectUfoPayloadForBackend();
       await saveAnnotations(project_id, sample_id, payload);
@@ -849,6 +857,15 @@ export default function ToolBar({
       } else if (/^[0-9]*$/.test(newValue)) {
         setErrorMessage("");
         const shot_id = newValue;
+
+        // Guard against incomplete project/sample objects.
+        if (!project_id || !sample_id) {
+          ToastQueue.negative("Cannot jump to shot: missing project or sample id.", {
+            timeout: 5000,
+          });
+          return;
+        }
+
         try {
           const nextSample = await getShotSample(project_id, shot_id);
           if (nextSample !== null) {
