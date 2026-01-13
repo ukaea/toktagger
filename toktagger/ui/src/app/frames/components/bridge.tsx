@@ -146,20 +146,7 @@ function isRectangleAnno(a: ImageAnnotation): boolean {
 }
 
 export const AnnoBridge = Object.assign(
-  function Bridge(props: {
-    ref?: React.Ref<BridgeHandle>;
-
-    getSelectedProfile: () => SelectedProfile;
-    getSelectedClassName: () => string | null;
-    includeTrackIds: boolean;
-    classRegistry: ClassRegistry;
-    onAutoQuickAdd?: (hint: { class_name: string }) => Promise<{
-      class_id: number;
-      class_name: string;
-      track_id: string;
-    } | null>;
-    popup?: React.ComponentType<Record<string, unknown>>;
-  }) {
+  function Bridge(props: BridgeProps) {
     const {
       ref: bridgeRef,
       getSelectedProfile,
