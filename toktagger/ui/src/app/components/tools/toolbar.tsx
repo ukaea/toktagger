@@ -987,9 +987,6 @@ export default function ToolBar({
                     onPress={async () => {
                       try {
                         await ufoClearCurrent();
-                        ToastQueue.positive("Cleared current frame.", {
-                          timeout: 2500,
-                        });
                       } catch {
                         ToastQueue.negative("Failed to clear current frame.", {
                           timeout: 5000,
