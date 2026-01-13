@@ -794,8 +794,17 @@ export default function ToolBar({
   };
 
   const handleUfoSave = async () => {
+    // Guard against incomplete project/sample objects.
+    if (!project_id || !sample_id) {
+      ToastQueue.negative("Cannot save: missing project or sample id.", {
+        timeout: 5000,
+      });
+      return;
+    }
+
     try {
       const payload = await collectUfoPayloadForBackend();
+
       const response = await saveAnnotations(project_id, sample_id, payload);
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
