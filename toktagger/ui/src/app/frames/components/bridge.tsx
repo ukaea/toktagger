@@ -77,14 +77,6 @@ type AnnotatorApi = {
   off?: (event: string, cb: (...args: unknown[]) => void) => void;
 };
 
-type AnnoSigView = {
-  id: string;
-  type?: unknown; // not part of @annotorious/react ImageAnnotation typing
-  target?: {
-    source?: unknown; // not part of ImageAnnotationTarget typing
-  };
-};
-
 function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
   return typeof v === "function";
 }
