@@ -338,24 +338,40 @@ async def test_import_annotations(api_client, setup_db, db_client):
 
 @pytest.mark.asyncio
 async def test_batch_update_annotations(api_client, setup_db, db_client):
+    """Test batch updating annotations by first deleting existing ones then importing new ones."""
+    # First delete existing annotations for the samples we're updating
+    await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations"
+    )
+    await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_2']}/annotations"
+    )
+
     annotations_batch = [
         {
+            "project_id": setup_db["project_id_1"],
             "sample_id": setup_db["sample_id_1"],
-            "annotations": [
-                {"label": "TestAnnotation1", "time": 1, "created_by": "disruption_cnn"},
-                {"label": "TestAnnotation2", "time": 2, "created_by": "disruption_cnn"},
-            ],
+            "type": "time_point",
+            "label": "TestAnnotation1",
+            "time": 1,
+            "created_by": "disruption_cnn",
         },
         {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_1"],
+            "type": "time_point",
+            "label": "TestAnnotation2",
+            "time": 2,
+            "created_by": "disruption_cnn",
+        },
+        {
+            "project_id": setup_db["project_id_1"],
             "sample_id": setup_db["sample_id_2"],
-            "annotations": [
-                {
-                    "label": "TestAnnotation",
-                    "time_min": 1,
-                    "time_max": 2,
-                    "created_by": "disruption_cnn",
-                },
-            ],
+            "label": "TestAnnotation",
+            "type": "time_region",
+            "time_min": 1,
+            "time_max": 2,
+            "created_by": "disruption_cnn",
         },
     ]
 
@@ -371,6 +387,7 @@ async def test_batch_update_annotations(api_client, setup_db, db_client):
         sort_by="time",
         sort_direction="ascending",
     )
+    print(annotations_sample_1)
     assert len(annotations_sample_1) == 2
     assert annotations_sample_1[0]["label"] == "TestAnnotation1"
     assert annotations_sample_1[0]["time"] == 1

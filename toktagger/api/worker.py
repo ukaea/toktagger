@@ -4,7 +4,11 @@ import pathlib
 import typing
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
-from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationBatchItem
+from toktagger.api.schemas.annotations import (
+    AnnotationBatchInputTypeAdapter,
+    AnnotationOutTypes,
+)
+from pydantic import ValidationError
 from toktagger.api.schemas.models import Model, ModelUpdate
 from toktagger.api.core.sender import (
     send_batch_samples,
@@ -126,10 +130,18 @@ def get_predictions(
         )
         for sample in samples
     ]
-    annotations_batch = [
-        AnnotationBatchItem(sample_id=sample.id, annotations=annotations)
-        for sample, annotations in zip(samples, predictions)
-    ]
+
+    annotations_batch = []
+    for sample, annotations in zip(samples, predictions):
+        for annotation in annotations:
+            annotation = annotation.model_dump(mode="python")
+            annotation["sample_id"] = sample.id
+            annotation["project_id"] = project.id
+            try:
+                annotation = AnnotationBatchInputTypeAdapter.validate_python(annotation)
+            except ValidationError as e:
+                logger.error(f"Failed to validate annotation: {e}")
+            annotations_batch.append(annotation)
 
     # Return predictions over rest API to server
     send_batch_samples(project.id, samples_batch)
@@ -141,10 +153,5 @@ def get_predictions(
         "project_id": project.id,
         "model_type": model.type,
         "sample_ids": [sample.id for sample in samples],
-        "annotations": {
-            sample.id: [
-                annotation.model_dump(mode="python") for annotation in annotations
-            ]
-            for sample, annotations in zip(samples, predictions)
-        },
+        "annotations": annotations_batch,
     }

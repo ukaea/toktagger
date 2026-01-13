@@ -264,6 +264,7 @@ async def test_model_get_sample_prediction_wrong_sample(
     get_response = await api_client.get(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_disruption_cnn/predict/{task_id}"
     )
+    print(get_response.json())
 
     # Check it returns 404 with appropriate message
     assert get_response.status_code == 404

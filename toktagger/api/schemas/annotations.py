@@ -1,12 +1,14 @@
 from typing import Literal, Optional, Union
+
+from pydantic import Field, TypeAdapter, field_validator, model_validator
+
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotators import AnnotatorTypes
-from pydantic import Field, TypeAdapter, model_validator, BaseModel, field_validator
 
 
 class AnnotationIn(ConfiguredModel):
     label: str
-    created_by: AnnotatorTypes
+    created_by: str
     validated: bool = False
     uncertainty: Optional[float] = None
     sample_id: Optional[str] = None
@@ -20,11 +22,6 @@ class AnnotationIn(ConfiguredModel):
             elif values.get("uncertainty") is None:
                 values["uncertainty"] = 1
         return values
-
-    validated: bool = False
-    uncertainty: Optional[float] = None
-    label: str
-    created_by: str
 
     @field_validator("created_by")
     def check_created_by(cls, value):
@@ -72,26 +69,25 @@ class VideoBoundingBox(BoundingBox):
     track_id: str
 
 
-class AnnotationOut(BaseModel):
-    id: str = Field(..., alias="_id")
-    created_by: AnnotatorTypes
-    project_id: str
-    sample_id: str
+class AnnotationOut(AnnotationIn):
+    id: Optional[str] = Field(None, alias="_id")
+    project_id: Optional[str] = None
+    sample_id: Optional[str] = None
 
 
-class TimePointOut(TimePoint, Annotation):
+class TimePointOut(TimePoint, AnnotationOut):
     pass
 
 
-class TimeRegionOut(TimeRegion, Annotation):
+class TimeRegionOut(TimeRegion, AnnotationOut):
     pass
 
 
-class BoundingBoxOut(BoundingBox, Annotation):
+class BoundingBoxOut(BoundingBox, AnnotationOut):
     pass
 
 
-class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
+class VideoBoundingBoxOut(VideoBoundingBox, AnnotationOut):
     pass
 
 
@@ -115,15 +111,8 @@ AnnotationTypes = Union[
 AnnotationOutTypes = Union[
     TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut, SpectrogramMaskOut
 ]
-AnnotationOutTypes = Union[
-    Annotation, TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
-]
-
-
-class AnnotationBatchItem(ConfiguredModel):
-    sample_id: str
-    annotations: list[AnnotationTypes]
-
+AnnotationBatchInputTypes = AnnotationOutTypes
 
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)
+AnnotationBatchInputTypeAdapter = TypeAdapter(AnnotationBatchInputTypes)

@@ -3,9 +3,8 @@ from typing import Literal
 from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import SampleUpdate
 from toktagger.api.schemas.annotations import (
-    AnnotationTypes,
+    AnnotationBatchInputTypes,
     AnnotationOutTypes,
-    AnnotationBatchItem,
 )
 
 router = APIRouter(
@@ -74,11 +73,12 @@ async def get_all_annotations(
     responses={
         200: {"description": "Annotations for this project updated successfully."},
         404: {"description": "Project not found with that ID."},
+        422: {"description": "Invalid annotation data provided."},
     },
 )
 async def import_annotations(
     request: Request,
-    annotations: list[AnnotationTypes],
+    annotations: list[AnnotationBatchInputTypes],
     project_id: str = Path(
         description="The ID of the project to update annotations for"
     ),
@@ -113,47 +113,6 @@ async def delete_all_annotations(
     await utils.get_project(db_client=db_client, project_id=project_id)
     # Delete all annotations for this project
     await utils.delete_annotations(db_client=db_client, project_id=project_id)
-
-
-@router.put(
-    "/annotations",
-    responses={
-        200: {
-            "description": "Successfully updated annotations for a batch of samples."
-        },
-        404: {"description": "Project or Sample not found with that ID."},
-    },
-)
-async def batch_update_annotations(
-    request: Request,
-    annotations_batch: list[AnnotationBatchItem],
-    project_id: str = Path(
-        description="The ID of the project to update annotations for."
-    ),
-):
-    """
-    Update the list of annotations for a batch of samples for a specified project. Will overwrite existing annotations.
-    --------------------------------------------------------------------------------------------------------------------
-    """
-    db_client = request.app.state.db_client
-
-    # Check project and sample exist
-    await utils.get_project(db_client=db_client, project_id=project_id)
-
-    for annotation_batch_item in annotations_batch:
-        await utils.get_sample(
-            db_client=db_client,
-            project_id=project_id,
-            sample_id=annotation_batch_item.sample_id,
-        )
-
-        # Delete previous annotations, if they exist, and add new ones
-        await utils.update_annotations(
-            db_client,
-            project_id,
-            annotation_batch_item.sample_id,
-            annotation_batch_item.annotations,
-        )
 
 
 @router.get(
@@ -228,7 +187,7 @@ async def get_annotations(
 )
 async def update_annotations(
     request: Request,
-    annotations: list[AnnotationTypes],
+    annotations: list[AnnotationBatchInputTypes],
     project_id: str = Path(
         description="The ID of the project to update annotations for."
     ),
