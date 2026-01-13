@@ -293,7 +293,11 @@ export const AnnoBridge = Object.assign(
 
           const keyLower = selectedClass.toLowerCase();
           if (!registry[keyLower]) {
-            const profileId = getSelectedProfile?.() ?? null;
+            const selectedProfile = getSelectedProfile?.() ?? null;
+            // Prefer track_id when available (it’s the instance identifier), otherwise fall back to class_id.
+            const profileId: string | null =
+              selectedProfile?.track_id ??
+              (selectedProfile?.class_id != null ? String(selectedProfile.class_id) : null);
 
             const fixedId = FIXED_CLASS_REG[keyLower] ?? 1;
             registry = {
