@@ -251,7 +251,7 @@ export const AnnoBridge = Object.assign(
     const normalizeWrite = useCallback(
       (raw: ImageAnnotation[]) => {
         // Rectangle-only: drop anything not a rectangle
-        const rects = (raw || []).filter(isRectangleAnno);
+        const rects = raw.filter(isRectangleAnno);
         const ensured = normalizeWithMode(
           rects,
           lastByIdRef.current,
