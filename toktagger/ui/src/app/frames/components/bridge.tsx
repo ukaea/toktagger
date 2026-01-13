@@ -91,12 +91,21 @@ function isAnnotatorApi(a: unknown): a is AnnotatorApi {
 }
 
 function isImageAnnotation(v: unknown): v is ImageAnnotation {
-  return (
-    !!v &&
-    typeof v === "object" &&
-    "id" in v &&
-    typeof (v as { id: unknown }).id === "string"
-  );
+  if (!v || typeof v !== "object") return false;
+
+  // safe to index after the object check
+  const rec = v as Record<string, unknown>;
+
+  if (typeof rec.id !== "string") return false;
+
+  // ImageAnnotation requires a target; and our downstream code expects selector shape
+  const target = rec.target;
+  if (!target || typeof target !== "object") return false;
+
+  const selector = (target as Record<string, unknown>).selector;
+  if (!selector || typeof selector !== "object") return false;
+
+  return true;
 }
 
 function toAnnoList(got: unknown): ImageAnnotation[] {
