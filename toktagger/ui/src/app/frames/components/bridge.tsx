@@ -122,16 +122,14 @@ function deepClone<T>(value: T): T {
 }
 
 // --- Rectangle-only guard (filters out polygons or unknown shapes) ---
-function isRectangleAnno(a: unknown): boolean {
-  const sel = (a as { target?: { selector?: unknown } } | null)?.target
-    ?.selector;
+function isRectangleAnno(a: ImageAnnotation): boolean {
+  const sel = a.target?.selector;
   if (!sel || typeof sel !== "object") return false;
 
   const s = sel as { type?: unknown; value?: unknown };
   if (s.type === "RECTANGLE") return true;
-  if (typeof s.value === "string")
-    return /xywh=(pixel|percent):/i.test(s.value);
-  return false;
+
+  return typeof s.value === "string" && /xywh=(pixel|percent):/i.test(s.value);
 }
 
 export const AnnoBridge = Object.assign(
