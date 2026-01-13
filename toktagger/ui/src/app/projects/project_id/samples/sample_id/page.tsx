@@ -29,22 +29,26 @@ import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
+import { z } from "zod";
 
 type UnknownRecord = Record<string, unknown>;
-function isRecord(v: unknown): v is UnknownRecord {
-  return typeof v === "object" && v !== null;
-}
-function finiteNumber(v: unknown): number | undefined {
-  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
-}
+
+const ErrorPayloadSchema = z.object({
+  detail: z.union([z.string(), z.array(z.unknown())]).optional(),
+});
+
 function detailMessage(payload: unknown): string {
-  if (!isRecord(payload)) return "Unknown error";
-  const d = payload.detail;
+  const parsed = ErrorPayloadSchema.safeParse(payload);
+  if (!parsed.success) return "Unknown error";
+
+  const d = parsed.data.detail;
   if (typeof d === "string" && d.trim()) return d;
+
   if (Array.isArray(d)) {
     const first = d.find((x) => typeof x === "string" && x.trim());
     if (typeof first === "string") return first;
   }
+
   return "Unknown error";
 }
 
@@ -235,120 +239,44 @@ export default function SamplePage() {
   // ------------------------------
   const ufoInitRef = useRef(false);
 
-  type FrameBounds = {
-    min?: number;
-    max?: number;
-    available?: number[];
-  };
-
-  const [frameBounds, setFrameBounds] = useState<FrameBounds | null>(null);
-
   const isUfo = project?.task === "UFO";
 
   const currentFrame = useMemo(() => {
     if (!isUfo) return 0;
 
+    // Preferred: trust backend-returned ImageData.frame
     if (data) {
       const parsed = ImageDataSchema.safeParse(data);
-      if (parsed.success && typeof parsed.data.frame === "number") {
-        return parsed.data.frame;
-      }
+      if (parsed.success) return parsed.data.frame;
     }
 
-    // Fallback: read frame from dataParams if present
-    const dp = dataParams as unknown;
-    if (isRecord(dp)) {
-      const f = finiteNumber(dp.frame);
-      if (typeof f === "number") return f;
-    }
-
-    return 0;
+    // Fallback: best-effort read from dataParams if it happens to carry a numeric frame
+    const maybe = dataParams as Partial<{ frame?: unknown }>;
+    return typeof maybe.frame === "number" && Number.isFinite(maybe.frame)
+      ? maybe.frame
+      : 0;
   }, [isUfo, data, dataParams]);
-
-  const clampToBounds = useCallback(
-    (n: number) => {
-      const min =
-        typeof frameBounds?.min === "number" && Number.isFinite(frameBounds.min)
-          ? frameBounds.min
-          : 0;
-
-      const max =
-        typeof frameBounds?.max === "number" && Number.isFinite(frameBounds.max)
-          ? frameBounds.max
-          : undefined;
-
-      let target = Number.isFinite(n) ? n : min;
-      if (target < min) target = min;
-      if (typeof max === "number" && target > max) target = max;
-      return target;
-    },
-    [frameBounds],
-  );
-
-  const nextAvailable = useCallback(
-    (from: number) => {
-      const avail = frameBounds?.available;
-      if (Array.isArray(avail) && avail.length > 0) {
-        const sorted = Array.from(
-          new Set(
-            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
-          ),
-        ).sort((a, b) => a - b);
-
-        for (const f of sorted) if (f > from) return f;
-        return from;
-      }
-
-      const max = frameBounds?.max;
-      const candidate = from + 1;
-      if (typeof max === "number" && Number.isFinite(max) && candidate > max)
-        return from;
-      return candidate;
-    },
-    [frameBounds],
-  );
-
-  const prevAvailable = useCallback(
-    (from: number) => {
-      const avail = frameBounds?.available;
-      if (Array.isArray(avail) && avail.length > 0) {
-        const sorted = Array.from(
-          new Set(
-            avail.filter((x) => typeof x === "number" && Number.isFinite(x)),
-          ),
-        ).sort((a, b) => a - b);
-
-        for (let i = sorted.length - 1; i >= 0; i--) {
-          if (sorted[i] < from) return sorted[i];
-        }
-        return from;
-      }
-
-      const min = frameBounds?.min ?? 0;
-      const candidate = from - 1;
-      if (candidate < min) return from;
-      return candidate;
-    },
-    [frameBounds],
-  );
 
   const goToFrame = useCallback(
     (n: number) => {
-      const target = clampToBounds(n);
+      // Intentionally do NOT clamp to backend bounds (we don’t receive them today),
+      // but we do prevent obviously invalid negatives.
+      if (!Number.isFinite(n)) return;
+      const target = Math.max(0, Math.trunc(n));
       setDataParams(() => ({ name: "image", frame: target }) as DataParams);
     },
-    [clampToBounds],
+    [setDataParams],
   );
 
   const onPrev = useCallback(() => {
     if (!isUfo) return;
-    goToFrame(prevAvailable(currentFrame));
-  }, [isUfo, goToFrame, prevAvailable, currentFrame]);
+    goToFrame(currentFrame - 1);
+  }, [isUfo, goToFrame, currentFrame]);
 
   const onNext = useCallback(() => {
     if (!isUfo) return;
-    goToFrame(nextAvailable(currentFrame));
-  }, [isUfo, goToFrame, nextAvailable, currentFrame]);
+    goToFrame(currentFrame + 1);
+  }, [isUfo, goToFrame, currentFrame]);
 
   const onJump = useCallback(
     (n: number) => {
@@ -358,42 +286,6 @@ export default function SamplePage() {
     [isUfo, goToFrame],
   );
 
-  useEffect(() => {
-    if (!isUfo || !data) return;
-
-    const d = data as unknown;
-    if (!isRecord(d)) return;
-
-    const rawBounds = isRecord(d.frame_bounds)
-      ? d.frame_bounds
-      : isRecord(d.frameBounds)
-        ? d.frameBounds
-        : null;
-
-    if (!rawBounds) return;
-
-    const min =
-      finiteNumber(rawBounds.min) ??
-      finiteNumber(rawBounds.min_frame) ??
-      undefined;
-
-    const max =
-      finiteNumber(rawBounds.max) ??
-      finiteNumber(rawBounds.max_frame) ??
-      undefined;
-
-    const rawAvail = rawBounds.available ?? rawBounds.available_frames;
-    const available = Array.isArray(rawAvail)
-      ? rawAvail.filter(
-          (x): x is number => typeof x === "number" && Number.isFinite(x),
-        )
-      : undefined;
-
-    if (min !== undefined || max !== undefined || available !== undefined) {
-      setFrameBounds({ min, max, available });
-    }
-  }, [isUfo, data]);
-
   // ------------------------------
   // Sample/project refresh
   // ------------------------------
@@ -401,15 +293,15 @@ export default function SamplePage() {
     if (!hasIds) return;
 
     ufoInitRef.current = false;
-    setFrameBounds(null);
 
     const refreshSample = async () => {
       const proj = await getProject(project_id as string);
       setProject(proj);
 
+      // KEEP OLD BEHAVIOR: let backend pick the initial frame
       if (proj.task === "UFO" && !ufoInitRef.current) {
         ufoInitRef.current = true;
-        setDataParams({ name: "image", frame: null } as DataParams); // this is where you define the frame number to start with?
+        setDataParams({ name: "image", frame: null } as DataParams);
       }
 
       const samp = await getSample(project_id as string, sample_id as string);
