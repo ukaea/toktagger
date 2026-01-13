@@ -85,7 +85,7 @@ declare global {
     ufoHasUnsavedChanges?: () => boolean;
     ufoMarkSaved?: () => void;
 
-    ufoCollectForSave?: () => Promise<ImageAnnotation[]>;
+    ufoCollectForSave?: () => Promise<unknown>;
     ufoClearCurrent?: () => Promise<void>;
     ufoClearAllFrames?: () => Promise<void>;
   }
