@@ -353,7 +353,7 @@ export const AnnoBridge = Object.assign(
 
           currentKeyRef.current = currentKey;
 
-          const src = Array.isArray(list) ? list.filter(isRectangleAnno) : [];
+          const src = list.filter(isRectangleAnno);
           const stamped: ImageAnnotation[] = src.map((a) => ({
             ...deepClone(a),
             target: { ...(a.target ?? {}), source: currentKey },
