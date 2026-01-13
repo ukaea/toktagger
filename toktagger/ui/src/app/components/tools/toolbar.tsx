@@ -1100,25 +1100,31 @@ export default function ToolBar({
                 <span style={{ fontSize: "1.2rem" }}>Controls</span>
               </Header>
               <ButtonGroup>
-                <SaveButton
-                  project_id={project_id}
-                  sample_id={sample_id}
-                  annotations={annotations}
-                />
-                <NextButton
-                  project_id={project_id}
-                  sample_id={sample_id}
-                  annotations={annotations}
-                />
+                {project_id && sample_id ? (
+                  <>
+                    <SaveButton
+                      project_id={project_id}
+                      sample_id={sample_id}
+                      annotations={annotations}
+                    />
+                    <NextButton
+                      project_id={project_id}
+                      sample_id={sample_id}
+                      annotations={annotations}
+                    />
+                  </>
+                ) : null}
                 <Button variant="primary" onPress={clearAnnotations}>
                   Clear
                 </Button>
               </ButtonGroup>
-              <ShotSearch
-                project_id={project_id}
-                sample_id={sample_id}
-                annotations={annotations}
-              />
+              {project_id && sample_id ? (
+                <ShotSearch
+                  project_id={project_id}
+                  sample_id={sample_id}
+                  annotations={annotations}
+                />
+              ) : null}
             </Flex>
 
             <Flex justifyContent="center" alignItems="center">
