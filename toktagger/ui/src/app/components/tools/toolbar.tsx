@@ -44,6 +44,7 @@ import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
+import type { NavigateFunction } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
 import type { ClassRegistry } from "@/app/frames/components/lib";
@@ -217,6 +218,80 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   return (
     <SearchField
       label="Jump to Shot"
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    />
+  );
+}
+
+type UfoShotSearchProps = {
+  project_id?: string;
+  sample_id?: string;
+  navigate: NavigateFunction;
+  collectUfoPayloadForBackend: () => Promise<Annotation[]>;
+};
+
+function UfoShotSearch({
+  project_id,
+  sample_id,
+  navigate,
+  collectUfoPayloadForBackend,
+}: UfoShotSearchProps) {
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [shotQuery, setShotQuery] = useState<string>("");
+
+  const onSearchSubmit = async (rawValue: string) => {
+    const newValue = rawValue.trim();
+
+    if (newValue === "") {
+      setErrorMessage("");
+      setShotQuery("");
+      return;
+    }
+
+    if (!/^[0-9]+$/.test(newValue)) {
+      setErrorMessage("Please enter a number.");
+      return;
+    }
+
+    if (!project_id || !sample_id) {
+      ToastQueue.negative("Cannot jump to shot: missing project or sample id.", {
+        timeout: 5000,
+      });
+      return;
+    }
+
+    try {
+      const nextSample = await getShotSample(project_id, newValue);
+      if (nextSample !== null) {
+        const payload = await collectUfoPayloadForBackend();
+        await saveAnnotations(project_id, sample_id, payload);
+
+        setUfoWorkingDirty(project_id, sample_id, false);
+
+        const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
+        navigate(NEXT_SAMPLE_URL);
+
+        setShotQuery("");
+        setErrorMessage("");
+      } else {
+        setErrorMessage("Shot not found!");
+      }
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setErrorMessage("Failed to fetch shot.");
+    }
+  };
+
+  return (
+    <SearchField
+      label="Jump to Shot"
+      value={shotQuery}
+      onChange={(v) => {
+        setShotQuery(v);
+        if (errorMessage) setErrorMessage("");
+      }}
       onSubmit={onSearchSubmit}
       validationState={errorMessage ? "invalid" : undefined}
       errorMessage={errorMessage}
@@ -848,56 +923,6 @@ export default function ToolBar({
     }
   };
 
-  function UfoShotSearch() {
-    const [errorMessage, setErrorMessage] = useState<string>("");
-
-    const onSearchSubmit = async (newValue: string) => {
-      if (newValue == "") {
-        setErrorMessage("");
-      } else if (/^[0-9]*$/.test(newValue)) {
-        setErrorMessage("");
-        const shot_id = newValue;
-
-        // Guard against incomplete project/sample objects.
-        if (!project_id || !sample_id) {
-          ToastQueue.negative("Cannot jump to shot: missing project or sample id.", {
-            timeout: 5000,
-          });
-          return;
-        }
-
-        try {
-          const nextSample = await getShotSample(project_id, shot_id);
-          if (nextSample !== null) {
-            const payload = await collectUfoPayloadForBackend();
-            await saveAnnotations(project_id, sample_id, payload);
-
-            setUfoWorkingDirty(project_id, sample_id, false);
-
-            const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
-            navigate(NEXT_SAMPLE_URL);
-          } else {
-            setErrorMessage("Shot not found!");
-          }
-        } catch (err) {
-          console.error("Failed to fetch data:", err);
-          setErrorMessage("Failed to fetch shot.");
-        }
-      } else {
-        setErrorMessage("Please enter a number.");
-      }
-    };
-
-    return (
-      <SearchField
-        label="Jump to Shot"
-        onSubmit={onSearchSubmit}
-        validationState={errorMessage ? "invalid" : undefined}
-        errorMessage={errorMessage}
-      />
-    );
-  }
-
   const selectedInstanceKey = (() => {
     const inst = instanceProfiles.find((p) => p.id === selectedInstanceId);
     return inst ? instanceKey(inst) : null;
@@ -923,7 +948,12 @@ export default function ToolBar({
           </div>
 
           <div className="pl-4 pr-4 pb-4 pt-2">
-            <UfoShotSearch />
+            <UfoShotSearch
+              project_id={project_id}
+              sample_id={sample_id}
+              navigate={navigate}
+              collectUfoPayloadForBackend={collectUfoPayloadForBackend}
+            />
           </div>
 
           <div className="pl-4 pr-4 pb-4">
