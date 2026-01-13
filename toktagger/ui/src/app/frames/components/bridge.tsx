@@ -1,7 +1,6 @@
 "use client";
 
 import React, {
-  forwardRef,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -49,6 +48,20 @@ export type BridgeHandle = {
   hasUnsaved: () => boolean;
   /** Mark current overlay as saved (called after a successful PUT to the backend). */
   markSaved: () => void;
+};
+
+type BridgeProps = {
+  getSelectedProfile: () => SelectedProfile;
+  getSelectedClassName: () => string | null;
+  includeTrackIds: boolean;
+  classRegistry: ClassRegistry;
+  onAutoQuickAdd?: (hint: { class_name: string }) => Promise<{
+    class_id: number;
+    class_name: string;
+    track_id: string;
+  } | null>;
+  popup?: React.ComponentType<Record<string, unknown>>;
+  ref?: React.Ref<BridgeHandle>; // React 19: ref is a normal prop
 };
 
 type SelectedProfile = {
@@ -133,22 +146,23 @@ function isRectangleAnno(a: ImageAnnotation): boolean {
 }
 
 export const AnnoBridge = Object.assign(
-  forwardRef<
-    BridgeHandle,
-    {
-      getSelectedProfile: () => SelectedProfile;
-      getSelectedClassName: () => string | null;
-      includeTrackIds: boolean;
-      classRegistry: ClassRegistry;
-      onAutoQuickAdd?: (hint: { class_name: string }) => Promise<{
-        class_id: number;
-        class_name: string;
-        track_id: string;
-      } | null>;
-      popup?: React.ComponentType<Record<string, unknown>>;
-    }
-  >(function Bridge(props, ref) {
+  function Bridge(props: {
+    // React 19: ref is passed as a normal prop (no forwardRef needed)
+    ref?: React.Ref<BridgeHandle>;
+
+    getSelectedProfile: () => SelectedProfile;
+    getSelectedClassName: () => string | null;
+    includeTrackIds: boolean;
+    classRegistry: ClassRegistry;
+    onAutoQuickAdd?: (hint: { class_name: string }) => Promise<{
+      class_id: number;
+      class_name: string;
+      track_id: string;
+    } | null>;
+    popup?: React.ComponentType<Record<string, unknown>>;
+  }) {
     const {
+      ref: bridgeRef,
       getSelectedProfile,
       getSelectedClassName,
       includeTrackIds,
@@ -291,7 +305,7 @@ export const AnnoBridge = Object.assign(
     );
 
     useImperativeHandle(
-      ref,
+      bridgeRef,
       (): BridgeHandle => ({
         isAnnotatorReady: () => !!anno,
 
@@ -373,7 +387,6 @@ export const AnnoBridge = Object.assign(
             ...deepClone(a),
             target: { ...(a.target ?? {}), source: key },
           }));
-
 
         // Normalize first so fresh shapes inherit current label/instance
         let normalized = normalizeWithMode(
@@ -477,6 +490,6 @@ export const AnnoBridge = Object.assign(
     ]);
 
     return null;
-  }),
+  },
   { Popup: ImageAnnotationPopup },
 );
