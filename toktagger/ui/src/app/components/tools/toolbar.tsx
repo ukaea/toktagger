@@ -698,24 +698,32 @@ export default function ToolBar({
     if (!isUfo) return;
     if (typeof window === "undefined") return;
 
+    // Prefix for all per-frame W3C annotation entries in localStorage for this project/sample.
+    // scanInstanceCountsChunked uses this to find and count instance usage.
     const keyPrefix = "anno::w3c::" + `app://p/${project_id}/s/${sample_id}/`;
 
+    // Handle returned by scanInstanceCountsChunked to cancel any in-flight chunked scan.
     let stopScan: (() => void) | null = null;
 
+    // Start a fresh scan, cancelling the previous one to avoid overlapping work.
     const startScan = () => {
       if (stopScan) stopScan();
       stopScan = scanInstanceCountsChunked({
         keyPrefix,
-        onUpdate: (counts) => setInstanceCounts(counts),
+        // Update badge counts in the UI as the scan progresses.
+        onUpdate: setInstanceCounts,
       });
     };
 
+    // Run immediately on mount / when project/sample changes.
     startScan();
 
+    // Periodically rescan so badge counts stay in sync with ongoing edits.
     const intervalId = window.setInterval(() => {
       startScan();
     }, 1000);
 
+    // Cleanup: cancel scan and stop periodic refresh.
     return () => {
       if (stopScan) stopScan();
       window.clearInterval(intervalId);
