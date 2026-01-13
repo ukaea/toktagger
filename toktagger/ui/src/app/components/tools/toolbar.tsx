@@ -654,9 +654,7 @@ export default function ToolBar({
         }
       }
 
-      if ("selectedClassName" in d) {
-        setSelectedClassName(d.selectedClassName ?? null);
-      }
+      setSelectedClassName(d.selectedClassName ?? null);
 
       if ("lastClassName" in d && d.lastClassName) {
         saveLastClassName(d.lastClassName);
