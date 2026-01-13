@@ -356,7 +356,7 @@ export const AnnoBridge = Object.assign(
           const src = list.filter(isRectangleAnno);
           const stamped: ImageAnnotation[] = src.map((a) => ({
             ...deepClone(a),
-            target: { ...(a.target ?? {}), source: currentKey },
+            target: { ...a.target, source: currentKey },
           }));
 
           const seed: Record<string, ImageAnnotation> = {};
