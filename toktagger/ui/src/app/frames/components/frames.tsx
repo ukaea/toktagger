@@ -166,9 +166,7 @@ export function FrameView({
     setToastMessage(msg);
     setToastOpen(true);
 
-    if (typeof window !== "undefined") {
-      window.setTimeout(() => setToastOpen(false), 2000);
-    }
+    setTimeout(() => setToastOpen(false), 2000);
   }, []);
 
   useEffect(() => {
