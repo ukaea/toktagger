@@ -208,7 +208,7 @@ export function FrameView({
   // Enable drawing if user has selected a class (armed), even if no instance exists yet.
   const drawingEnabled = !!getSelectedProfile() || !!getSelectedClassName();
 
-  const frameNumber: number = typeof data.frame === "number" ? data.frame : 0;
+  const frameNumber = data.frame;
   const frameLabel = Number.isFinite(frameNumber) ? frameNumber : "?";
 
   // Stable per-frame identity -> adapter for localStorage
