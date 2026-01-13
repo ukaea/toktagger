@@ -64,9 +64,30 @@ type AnnotatorApi = {
   off?: (event: string, cb: (...args: unknown[]) => void) => void;
 };
 
-function asAnnotatorApi(a: unknown): AnnotatorApi | null {
-  if (!a || (typeof a !== "object" && typeof a !== "function")) return null;
-  return a as AnnotatorApi;
+function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
+  return typeof v === "function";
+}
+
+function isAnnotatorApi(a: unknown): a is AnnotatorApi {
+  if (!a || (typeof a !== "object" && typeof a !== "function")) return false;
+
+  const rec = a as Record<string, unknown>;
+
+  // If present, these must be functions. If absent, that's fine (optional API surface).
+  if ("getAnnotations" in rec && rec.getAnnotations != null && !isFunction(rec.getAnnotations)) {
+    return false;
+  }
+  if ("setAnnotations" in rec && rec.setAnnotations != null && !isFunction(rec.setAnnotations)) {
+    return false;
+  }
+  if ("on" in rec && rec.on != null && !isFunction(rec.on)) {
+    return false;
+  }
+  if ("off" in rec && rec.off != null && !isFunction(rec.off)) {
+    return false;
+  }
+
+  return true;
 }
 
 function isImageAnnotation(v: unknown): v is ImageAnnotation {
@@ -186,8 +207,9 @@ export const AnnoBridge = Object.assign(
       if (batch && anno) {
         const s = sig(batch);
         if (s !== lastAppliedRef.current) {
-          const api = asAnnotatorApi(anno);
-          await runSilently(() => api?.setAnnotations?.(batch, true));
+          if (isAnnotatorApi(anno)) {
+            await runSilently(() => anno.setAnnotations?.(batch, true));
+          }
           lastAppliedRef.current = s;
         }
       }
@@ -267,8 +289,8 @@ export const AnnoBridge = Object.assign(
         isAnnotatorReady: () => !!anno,
 
         persistWorkingNow: async (currentKey: string) => {
-          const api = asAnnotatorApi(anno);
-          if (!api) return [];
+          if (!isAnnotatorApi(anno)) return;
+          const api = anno;
 
           currentKeyRef.current = currentKey;
           await doubleRAF();
@@ -283,8 +305,8 @@ export const AnnoBridge = Object.assign(
         },
 
         clearOverlaySilently: async () => {
-          const api = asAnnotatorApi(anno);
-          if (!api) return;
+          if (!isAnnotatorApi(anno)) return;
+          const api = anno;
 
           await runSilently(() => {
             api.setAnnotations?.([], true);
@@ -294,8 +316,8 @@ export const AnnoBridge = Object.assign(
         },
 
         hydrateOverlay: async (list: ImageAnnotation[], currentKey: string) => {
-          const api = asAnnotatorApi(anno);
-          if (!api) return false;
+          if (!isAnnotatorApi(anno)) return;
+          const api = anno;
 
           currentKeyRef.current = currentKey;
 
@@ -327,16 +349,15 @@ export const AnnoBridge = Object.assign(
 
     // Subscribe to create/update/delete events -> normalize + optional auto-quick-add (rectangles only)
     useEffect(() => {
-      if (!anno) return;
+      if (!anno || !isAnnotatorApi(anno)) return;
+      const api = anno;
 
       const onAnyChange = async () => {
         if (suppressPersistRef.current) return;
 
-        // Any create/update/delete from the user marks this sample dirty
         dirtyRef.current = true;
 
-        const api = asAnnotatorApi(anno);
-        const rawFull = toAnnoList(api?.getAnnotations?.());
+        const rawFull = toAnnoList(api.getAnnotations?.());
         const key = currentKeyRef.current;
 
         const raw: ImageAnnotation[] = rawFull
@@ -345,6 +366,7 @@ export const AnnoBridge = Object.assign(
             ...deepClone(a),
             target: { ...(a.target ?? {}), source: key },
           }));
+
 
         // Normalize first so fresh shapes inherit current label/instance
         let normalized = normalizeWithMode(
@@ -427,15 +449,14 @@ export const AnnoBridge = Object.assign(
         await onAnyChange();
       };
 
-      const api = asAnnotatorApi(anno);
-      api?.on?.("createAnnotation", onCreate);
-      api?.on?.("updateAnnotation", onAnyChange);
-      api?.on?.("deleteAnnotation", onAnyChange);
+      api.on?.("createAnnotation", onCreate);
+      api.on?.("updateAnnotation", onAnyChange);
+      api.on?.("deleteAnnotation", onAnyChange);
 
       return () => {
-        api?.off?.("createAnnotation", onCreate);
-        api?.off?.("updateAnnotation", onAnyChange);
-        api?.off?.("deleteAnnotation", onAnyChange);
+        api.off?.("createAnnotation", onCreate);
+        api.off?.("updateAnnotation", onAnyChange);
+        api.off?.("deleteAnnotation", onAnyChange);
       };
     }, [
       anno,
