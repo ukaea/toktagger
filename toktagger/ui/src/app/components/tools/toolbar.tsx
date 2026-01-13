@@ -790,7 +790,7 @@ export default function ToolBar({
     const cocoFrames = w3cToCocoFrames(w3cList, true);
     const videoBBoxes = cocoFramesToVideoBBoxes(cocoFrames);
 
-    return videoBBoxes as unknown as Annotation[];
+    return videoBBoxes as Annotation[];
   };
 
   const handleUfoSave = async () => {
