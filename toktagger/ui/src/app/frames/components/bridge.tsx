@@ -87,10 +87,18 @@ function isAnnotatorApi(a: unknown): a is AnnotatorApi {
   const rec = a as Record<string, unknown>;
 
   // If present, these must be functions. If absent, that's fine (optional API surface).
-  if ("getAnnotations" in rec && rec.getAnnotations != null && !isFunction(rec.getAnnotations)) {
+  if (
+    "getAnnotations" in rec &&
+    rec.getAnnotations != null &&
+    !isFunction(rec.getAnnotations)
+  ) {
     return false;
   }
-  if ("setAnnotations" in rec && rec.setAnnotations != null && !isFunction(rec.setAnnotations)) {
+  if (
+    "setAnnotations" in rec &&
+    rec.setAnnotations != null &&
+    !isFunction(rec.setAnnotations)
+  ) {
     return false;
   }
   if ("on" in rec && rec.on != null && !isFunction(rec.on)) {
@@ -177,7 +185,7 @@ export const AnnoBridge = Object.assign(
       JSON.stringify(
         anns.map((a) => ({
           id: a.id,
-          // selector is present in the ImageAnnotation type 
+          // selector is present in the ImageAnnotation type
           sel: (a.target?.selector as unknown) ?? null,
         })),
       );
@@ -276,7 +284,9 @@ export const AnnoBridge = Object.assign(
             // Prefer track_id when available (it’s the instance identifier), otherwise fall back to class_id.
             const profileId: string | null =
               selectedProfile?.track_id ??
-              (selectedProfile?.class_id != null ? String(selectedProfile.class_id) : null);
+              (selectedProfile?.class_id != null
+                ? String(selectedProfile.class_id)
+                : null);
 
             const fixedId = FIXED_CLASS_REG[keyLower] ?? 1;
             registry = {
