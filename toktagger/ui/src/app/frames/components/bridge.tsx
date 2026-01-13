@@ -443,20 +443,25 @@ export const AnnoBridge = Object.assign(
         void flushOverlay();
       };
 
-      const onCreate = async (w3c: ImageAnnotation) => {
-        // create/select a new instance profile ONLY when the first box is drawn.
-        if (includeTrackIds && onAutoQuickAdd) {
-          const selectedProfile = getSelectedProfile?.();
-          const selectedClass = getSelectedClassName?.();
+      const onCreate = (annoMaybe: unknown) => {
+        if (!isImageAnnotation(annoMaybe)) return;
+        const w3c = annoMaybe;
 
-          if (!selectedProfile && selectedClass) {
-            // This will create & select a new instance profile (and notify toolbar).
-            await onAutoQuickAdd({ class_name: selectedClass });
+        void (async () => {
+          // create/select a new instance profile ONLY when the first box is drawn.
+          if (includeTrackIds && onAutoQuickAdd) {
+            const selectedProfile = getSelectedProfile?.();
+            const selectedClass = getSelectedClassName?.();
+
+            if (!selectedProfile && selectedClass) {
+              // This will create & select a new instance profile (and notify toolbar).
+              await onAutoQuickAdd({ class_name: selectedClass });
+            }
           }
-        }
 
-        await handleCreate(w3c);
-        await onAnyChange();
+          await handleCreate(w3c);
+          await onAnyChange();
+        })();
       };
 
       api.on?.("createAnnotation", onCreate);
