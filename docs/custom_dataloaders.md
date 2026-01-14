@@ -15,7 +15,7 @@ A data loader is responsible for:
 ### Step 1: Import Required Components
 
 ```python
-from toktagger import DataLoader, LoaderRegistry
+from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
 from toktagger.api.schemas.data import Data, MultiVariateTimeSeriesData, TimeSeriesData
 from toktagger.api.schemas.samples import ShotData, FileData, TimeSeriesFileData
 from typing import Type
@@ -61,154 +61,41 @@ class MyCustomLoader(DataLoader):
 
 The `@LoaderRegistry.register("my_custom_loader")` decorator automatically registers your loader with TokTagger. The name you provide becomes the identifier used in project configurations.
 
-### Step 4: Install Your Custom Loader
+### Step 4: Run Server with Custom Loader
 
-Create a Python package with your custom loader and install it in your environment:
-
-```python
-# my_loader_package/__init__.py
-from my_loader_package.loader import MyCustomLoader
-
-# Importing this package will automatically register the loader
-```
-
-Then install it:
-
-```bash
-pip install -e /path/to/my_loader_package
-```
-
-## Complete Example: CSV Time Series Loader
-
-Here's a complete example of a custom loader for CSV time series files:
+If you have added your own data loaders, you must make sure they have been loaded before the server is run. You can run the server from within a Python script by initializing the `Server` class, and running `server.run()`. For example, your script for adding a data loader and running the server may look like this:
 
 ```python
-import pandas as pd
-import pathlib
-from typing import Type
-import pydantic
+from viz_annotation import DataLoader, LoaderRegistry, Server
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.data import TimeSeriesData
 
-from toktagger import DataLoader, LoaderRegistry
-from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
-from toktagger.api.schemas.samples import TimeSeriesFileData
+# Say we have a python module which can load data from our Tokamak's data backend:
+import my_tokamak_data_backend
 
+# Decorate your class using the Loader Registry, 
+# providing a string which you want to refer to your data loader as:
+@LoaderRegistry.register("my_tokamak")
+class MyDataLoader(DataLoader):
 
-@LoaderRegistry.register("csv_timeseries")
-class CSVTimeSeriesLoader(DataLoader):
-    """DataLoader for retrieving time series data from CSV files"""
-    
-    @classmethod
-    def sample_data_type(cls) -> Type[TimeSeriesFileData]:
-        # This loader expects file paths with optional signal names
-        return TimeSeriesFileData
-    
-    @pydantic.validate_call
-    def get_sample(
-        self, 
-        shot_id: int, 
-        sample_data: TimeSeriesFileData
-    ) -> MultiVariateTimeSeriesData:
-        """
-        Load time series data from a CSV file.
-        
-        Expected CSV format:
-        - First column: time values
-        - Remaining columns: signal values with column headers
-        """
-        # Verify file exists
-        file_path = pathlib.Path(sample_data.file_name)
-        if not file_path.exists():
-            raise FileNotFoundError(
-                f"Could not find CSV file at '{file_path}'"
+    def get_sample(self, sample: Sample) -> TimeSeriesData:
+        # Here you add the logic for how to obtain the data for your given sample
+        loaded: dict = my_tokamak_data_backend.get(
+            shot_id = sample.shot_id, 
+            signal_name = sample.signal_names[0]
             )
-        
-        # Read CSV file
-        df = pd.read_csv(file_path, index_col=0)  # First column is time
-        
-        # Filter to requested signals if specified
-        if sample_data.signal_names:
-            df = df[sample_data.signal_names]
-        
-        # Handle missing values
-        df = df.fillna(0)
-        
-        # Extract time values from index
-        time = df.index.values.tolist()
-        
-        # Convert each column to TimeSeriesData format
-        results = {}
-        for column_name in df.columns:
-            results[column_name] = TimeSeriesData(
-                time=time,
-                values=df[column_name].values.tolist()
+
+        # Format it into the Data schema which you want to use
+        # For example, if we are loading time series data:
+        return TimeSeriesData(
+            time=loaded["time"], 
+            values=loaded["values"]
             )
-        
-        return MultiVariateTimeSeriesData(values=results)
-```
 
-## Example: Database Loader
-
-Here's an example of loading data from a SQL database:
-
-```python
-import sqlalchemy as sa
-from typing import Type
-import pydantic
-
-from toktagger import DataLoader, LoaderRegistry
-from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
-from toktagger.api.schemas.samples import ShotData
-
-
-@LoaderRegistry.register("sql_database")
-class SQLDatabaseLoader(DataLoader):
-    """DataLoader for retrieving data from a SQL database"""
-    
-    def __init__(self, params):
-        # Initialize database connection
-        # Connection string should be in environment variable
-        import os
-        connection_string = os.environ.get("DATABASE_URL")
-        self.engine = sa.create_engine(connection_string)
-        super().__init__(params)
-    
-    @classmethod
-    def sample_data_type(cls) -> Type[ShotData]:
-        return ShotData
-    
-    @pydantic.validate_call
-    def get_sample(
-        self, 
-        shot_id: int, 
-        sample_data: ShotData
-    ) -> MultiVariateTimeSeriesData:
-        """Load time series data from database"""
-        results = {}
-        
-        with self.engine.connect() as conn:
-            for signal_name in sample_data.signal_names:
-                # Query time series data for this shot and signal
-                query = sa.text("""
-                    SELECT time, value 
-                    FROM timeseries_data 
-                    WHERE shot_id = :shot_id AND signal_name = :signal_name
-                    ORDER BY time
-                """)
-                
-                result = conn.execute(
-                    query, 
-                    {"shot_id": shot_id, "signal_name": signal_name}
-                )
-                rows = result.fetchall()
-                
-                if rows:
-                    time = [row[0] for row in rows]
-                    values = [row[1] for row in rows]
-                    results[signal_name] = TimeSeriesData(time=time, values=values)
-                else:
-                    results[signal_name] = None
-        
-        return MultiVariateTimeSeriesData(values=results)
+# Create and run a server in the same file, 
+# so that your data loader is correctly added to the registry:
+server = Server()
+server.run()
 ```
 
 ## Data Types and Schemas
@@ -290,65 +177,171 @@ class SpectrogramData(Data):
     amplitude: list[list[float]]  # 2D array
 ```
 
-## Using Your Custom Loader
 
-### 1. Create a Project with Your Loader
+## Complete Example: CSV Time Series Loader
 
-```python
-import requests
+Here's a complete example of a custom loader for CSV time series files.
 
-project = {
-    "name": "My Custom Project",
-    "task": "time-series",
-    "query_strategy": "random",
-    "data_loader": "my_custom_loader"  # Your loader's registered name
-}
+This examples assumes the CSV file has the following format:
+- First column: time values
+- Remaining columns: signal values with column headers
 
-response = requests.post(
-    "http://localhost:8002/projects",
-    json=project
-)
-project_id = response.json()["_id"]
+For example:
+
+```csv
+time,signal1,signal2
+0.0,1.0,2.0
+0.1,1.5,2.5
+0.2,2.0,3.0
 ```
 
-### 2. Add Samples Using Your Loader
-
-For shot-based loaders:
 
 ```python
-samples = [
-    {
-        "shot_id": 12345,
-        "data": {
-            "signal_names": ["ip", "dalpha", "temperature"],
-            "protocol": "custom"
-        }
-    }
-]
+import pandas as pd
+import pathlib
+from typing import Type
+import pydantic
 
-requests.post(
-    f"http://localhost:8002/projects/{project_id}/samples",
-    json=samples
+from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
+from toktagger.api.schemas.samples import TimeSeriesFileData
+
+
+@LoaderRegistry.register("csv_timeseries")
+class CSVTimeSeriesLoader(DataLoader):
+    """DataLoader for retrieving time series data from CSV files"""
+    
+    @classmethod
+    def sample_data_type(cls) -> Type[TimeSeriesFileData]:
+        # This loader expects file paths with optional signal names
+        return TimeSeriesFileData
+    
+    @pydantic.validate_call
+    def get_sample(
+        self, 
+        shot_id: int, 
+        sample_data: TimeSeriesFileData
+    ) -> MultiVariateTimeSeriesData:
+        """
+        Load time series data from a CSV file.
+        
+        Expected CSV format:
+        - First column: time values
+        - Remaining columns: signal values with column headers
+        """
+        # Verify file exists
+        file_path = pathlib.Path(sample_data.file_name)
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Could not find CSV file at '{file_path}'"
+            )
+        
+        # Read CSV file
+        df = pd.read_csv(file_path, index_col=0)  # First column is time
+        
+        # Filter to requested signals if specified
+        if sample_data.signal_names:
+            df = df[sample_data.signal_names]
+        
+        # Handle missing values
+        df = df.fillna(0)
+        
+        # Extract time values from index
+        time = df.index.values.tolist()
+        
+        # Convert each column to TimeSeriesData format
+        results = {}
+        for column_name in df.columns:
+            results[column_name] = TimeSeriesData(
+                time=time,
+                values=df[column_name].values.tolist()
+            )
+        
+        return MultiVariateTimeSeriesData(values=results)
+```
+
+## Example: Database Loader
+
+Here's an example of loading data from a SQL database:
+
+```python
+import sqlalchemy as sa
+from typing import Type
+import pydantic
+
+from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
+from toktagger.api.schemas.samples import ShotData
+
+
+@LoaderRegistry.register("sql_database")
+class SQLDatabaseLoader(DataLoader):
+    """DataLoader for retrieving data from a SQL database"""
+    
+    def __init__(self, params):
+        # Initialize database connection
+        # Connection string should be in environment variable
+        import os
+        connection_string = os.environ.get("DATABASE_URL")
+        self.engine = sa.create_engine(connection_string)
+        super().__init__(params)
+    
+    @classmethod
+    def sample_data_type(cls) -> Type[ShotData]:
+        return ShotData
+    
+    @pydantic.validate_call
+    def get_sample(
+        self, 
+        shot_id: int, 
+        sample_data: ShotData
+    ) -> MultiVariateTimeSeriesData:
+        """Load time series data from database"""
+        results = {}
+        
+        with self.engine.connect() as conn:
+            for signal_name in sample_data.signal_names:
+                # Query time series data for this shot and signal
+                query = sa.text("""
+                    SELECT time, value 
+                    FROM timeseries_data 
+                    WHERE shot_id = :shot_id AND signal_name = :signal_name
+                    ORDER BY time
+                """)
+                
+                result = conn.execute(
+                    query, 
+                    {"shot_id": shot_id, "signal_name": signal_name}
+                )
+                rows = result.fetchall()
+                
+                if rows:
+                    time = [row[0] for row in rows]
+                    values = [row[1] for row in rows]
+                    results[signal_name] = TimeSeriesData(time=time, values=values)
+                else:
+                    results[signal_name] = None
+        
+        return MultiVariateTimeSeriesData(values=results)
+```
+
+## Using Docker
+If you are using the docker compose option to run the server, you can provide a custom script similar to the one above to add your own data loaders. To do this, create a file similar to the one above, but making sure to pass the following arguments into `server.run()`:
+
+```python
+server.run(
+    host="0.0.0.0",
+    port=8002
 )
 ```
 
-For file-based loaders:
+You can then provide the path to your script when running docker compose. For example, say we have the above script in a file called `custom_toktagger.py` - We simply need to add `CUSTOM_SCRIPT=./custom_toktagger.py` before the docker compose command!
 
-```python
-samples = [
-    {
-        "shot_id": 12345,
-        "data": {
-            "file_name": "/path/to/data/12345.csv",
-            "type": "csv",
-            "protocol": "file",
-            "signal_names": ["ip", "dalpha"]
-        }
-    }
-]
-
-requests.post(
-    f"http://localhost:8002/projects/{project_id}/samples",
-    json=samples
-)
+```sh
+CUSTOM_SCRIPT=./custom_toktagger.py docker compose --env-file .env.dev -f docker-compose.dev.yml up --build
 ```
+
+!!! tip
+    Make sure you provide the **path** to your script, and not a string. 
+    
+    e.g, provide `CUSTOM_SCRIPT=./custom_toktagger.py`, and **not** `CUSTOM_SCRIPT=custom_toktagger.py`.
