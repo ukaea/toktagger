@@ -6,15 +6,22 @@ import { useAnnotator } from "@annotorious/react";
 import { LABEL_MAP, extractClassLabel, rectToDims } from "./lib";
 import { Item, Text, Picker } from "@adobe/react-spectrum";
 
+/** Minimal category shape needed by ClassPanel (keeps this component decoupled from LABEL_MAP). */
+type ClassCategoryItem = {
+  name: string;
+};
+
 /** ------------------------------------------------------------------
  *  ClassPanel — dropdown for detection/tracking class selection
  *
  *  Selecting a class enables drawing for detection-only mode.
  *  ------------------------------------------------------------------ */
 export function ClassPanel({
+  items,
   selectedClassName,
   setSelectedClassName,
 }: {
+  items: Iterable<ClassCategoryItem>;
   selectedClassName: string | null;
   setSelectedClassName: (v: string | null) => void;
 }) {
@@ -25,7 +32,7 @@ export function ClassPanel({
       </Text>
       <Picker
         aria-label="Class"
-        items={LABEL_MAP.categories}
+        items={items}
         selectedKey={selectedClassName}
         onSelectionChange={(key) =>
           setSelectedClassName((key as string) || null)

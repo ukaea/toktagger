@@ -1003,6 +1003,7 @@ export default function ToolBar({
             </div>
 
             <UFOClassPanel
+              items={LABEL_MAP.categories}
               selectedClassName={selectedClassName}
               setSelectedClassName={(name) => {
                 if (!name) return;
