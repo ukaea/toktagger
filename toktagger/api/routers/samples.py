@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.crud import utils
-from toktagger.api.schemas.samples import SampleIn, Sample, SampleSummary
+from toktagger.api.schemas.samples import (
+    SampleIn,
+    Sample,
+    SampleSummary,
+    SampleUpdateBatchItem,
+)
 from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas import convert_to_objectid
 from typing import Literal, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
@@ -46,7 +54,13 @@ async def get_samples(
     """
     db_client = request.app.state.db_client
     samples = await utils.get_samples(
-        db_client, project_id, shot_id, sort_by, sort_direction, start, count
+        db_client=db_client,
+        project_id=project_id,
+        shot_id=shot_id,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        start=start,
+        count=count,
     )
     return samples
 
@@ -101,7 +115,6 @@ async def add_samples(
     annotation_ids = []
     for _ann_list, _id in zip(all_annotations, all_ids):
         if _ann_list is not None:
-            _ann_list = [(items, _id) for items in _ann_list]
             _ids = [_id for item in _ann_list]
             annotations.extend(_ann_list)
             annotation_ids.extend(_ids)
@@ -157,6 +170,35 @@ async def add_samples(
     return ids
 
 
+@router.put(
+    "",
+    responses={
+        200: {"description": "Samples have been updated successfully."},
+        404: {"description": "Project or Sample(s) not found with that ID."},
+    },
+)
+async def update_samples(
+    request: Request,
+    sample_batch: list[SampleUpdateBatchItem],
+    project_id: str = Path(
+        description="The project ID to associate these samples with."
+    ),
+):
+    """
+    Update a list of samples (provided with their IDs) for this project.
+    ---------------------------------------------------------------------
+    """
+    db_client = request.app.state.db_client
+    await utils.get_project(db_client, project_id)
+
+    for sample_batch_item in sample_batch:
+        await utils.update_sample(
+            db_client=db_client,
+            sample_id=sample_batch_item.id,
+            updates=sample_batch_item.updates,
+        )
+
+
 @router.get(
     "/next",
     response_model=Sample,
@@ -187,54 +229,22 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
-    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples)
+
+    # Only consider samples that have not been human annotated
+    samples = await utils.get_samples(
+        db_client, project_id, validated=False, sort_by="shot_id"
+    )
+    annotations = await utils.get_annotations(
+        db_client, project_id, validated=False, sort_by="uncertainty"
+    )
+
+    logger.debug(f"found {len(samples)} non validated samples")
+    logger.debug(f"found {len(annotations)} non validated annotations")
+
+    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
 
     try:
         sample = query_strategy.get_next_sample(current_sample_id)
-    except RuntimeError:
-        raise HTTPException(status_code=204, detail="No more samples available!")
-
-    return sample
-
-
-@router.get(
-    "/previous",
-    response_model=Sample,
-    responses={
-        200: {
-            "description": "The previous sample to annotate has been returned, according to the project's query strategy."
-        },
-        204: {
-            "description": "No more samples are available to annotate for this project."
-        },
-        409: {"description": "Server is not setup to use the selected project."},
-    },
-)
-async def get_previous_sample(
-    request: Request,
-    project_id: str = Path(
-        description="The project to return the previous sample from."
-    ),
-    current_sample_id: Optional[str] = Query(
-        None, description="The ID of the current sample being annotated."
-    ),
-) -> Sample:
-    """
-    Get the next sample to annotate for this project, according to query strategy.
-    ------------------------------------------------------------------------------
-    """
-    # Return the previous sample for human validation for this project
-    # Should use the query strategy, which access the database to determine the previous sample to annotate
-    # This should then be passed in to the /data endpoint to get required data for visualisation
-    # And the /annotation endpoint to get initial prediction (if available)
-    db_client = request.app.state.db_client
-    project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
-    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples)
-
-    try:
-        sample = query_strategy.get_previous_sample(current_sample_id)
     except RuntimeError:
         raise HTTPException(status_code=204, detail="No more samples available!")
 

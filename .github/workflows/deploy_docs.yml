@@ -1,0 +1,30 @@
+name: Deploy Docs
+
+on: 
+  workflow_dispatch: 
+  push: 
+    branches: [ main ] 
+permissions:
+  contents: read 
+  pages: write 
+  id-token: write 
+jobs: 
+  deploy: 
+    runs-on: ubuntu-latest 
+
+    steps: 
+      - name: Check out repository 
+        uses: actions/checkout@v4 
+      - name: Set up Python 
+        uses: actions/setup-python@v5 
+        with: 
+          python-version: '3.x' 
+      - name: Install MkDocs and plugins 
+        run: pip install mkdocs mkdocs-material mkdocs-material-extensions
+      - name: Build site 
+        run: mkdocs build 
+      - uses: actions/upload-pages-artifact@v3 
+        with: 
+          path: 'site' 
+      - name: Deploy to Github Pages
+        uses: actions/deploy-pages@v4

@@ -3,14 +3,18 @@ import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
 from PIL import Image
-import numpy as np
+import io
+import base64
+import pydantic
+from typing import Type
 from toktagger.api.schemas.data import (
     Data,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
     ImageData,
+    DataParamTypes,
 )
-from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
+from toktagger.api.schemas.samples import FileData, ShotData, TimeSeriesFileData
 
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -23,8 +27,19 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
 
 
 class DataLoader(ABC):
+    def __init__(self, params: DataParamTypes):
+        self.params = params
+
+    @classmethod
     @abstractmethod
-    def get_sample(self, sample: Sample) -> Data:
+    def sample_data_type(cls) -> Type[ShotData | FileData | TimeSeriesFileData]:
+        # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
+        pass
+
+    @abstractmethod
+    def get_sample(
+        self, shot_id: int, sample_data: ShotData | FileData | TimeSeriesFileData
+    ) -> Data:
         pass
 
 
@@ -37,6 +52,14 @@ class LoaderRegistry:
             if not issubclass(loader_class, DataLoader):
                 raise ValueError(
                     f"Loader '{name}' does not inherit from DataLoader base class."
+                )
+            if (sample_data_type := loader_class.sample_data_type()) not in (
+                ShotData,
+                FileData,
+                TimeSeriesFileData,
+            ):
+                raise ValueError(
+                    f"Loader '{name}' must expect a supported data type as an input, but got '{sample_data_type}'."
                 )
             cls._registry[name] = loader_class
             return loader_class
@@ -54,35 +77,72 @@ class LoaderRegistry:
     def names(cls):
         return list(cls._registry.keys())
 
+    @classmethod
+    def get_data_schema(cls, name: str):
+        loader_class: DataLoader | None = cls._registry.get(name)
+        if not loader_class:
+            raise ValueError(f"No DataLoader class called '{name}' found in registry!")
+        return loader_class.sample_data_type().model_json_schema()
+
 
 @LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
-    def get_sample(self, sample: Sample) -> ImageData:
-        assert isinstance(sample.data, FileData)
-        item: FileData = sample.data
-        if not pathlib.Path(item.file_name).exists():
+    def __init__(self, params: DataParamTypes):
+        super().__init__(params)
+
+    @classmethod
+    def sample_data_type(self) -> Type[FileData]:
+        return FileData
+
+    @pydantic.validate_call
+    def get_sample(self, shot_id: int, sample_data: FileData) -> ImageData:
+        # Find directory of images
+        dir_path = pathlib.Path(sample_data.file_name)
+        if not dir_path.exists() or not dir_path.is_dir():
             raise FileNotFoundError(
-                f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
+                f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
             )
-        im = Image.open(item.file_name)
-        arr = np.asarray(im)
-        return ImageData(data=arr.tolist())
+        # Open image which represents frame selected
+        if self.params.name != "image":  # TODO do we want this?
+            file_path = next(dir_path.iterdir())
+        else:
+            file_path = dir_path.joinpath(
+                f"{self.params.frame}.{sample_data.type.value}"
+            )
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
+            )
+        im = Image.open(file_path)
+        buffer = io.BytesIO()
+        im.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        return ImageData(
+            frame=file_path.name.split(".")[0],
+            values=base64.b64encode(buffer.getvalue()).decode(),
+        )
 
 
 @LoaderRegistry.register("parquet")
 class ParquetDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of Parquet files"""
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, TimeSeriesFileData)
-        item: TimeSeriesFileData = sample.data
-        if not pathlib.Path(item.file_name).exists():
+    @classmethod
+    def sample_data_type(self) -> Type[TimeSeriesFileData]:
+        return TimeSeriesFileData
+
+    @pydantic.validate_call
+    def get_sample(
+        self, shot_id: int, sample_data: TimeSeriesFileData
+    ) -> MultiVariateTimeSeriesData:
+        if not pathlib.Path(sample_data.file_name).exists():
             raise FileNotFoundError(
-                f"Could not find file at '{item.file_name}', relative to {pathlib.Path().cwd()}"
+                f"Could not find file at '{sample_data.file_name}', relative to {pathlib.Path().cwd()}"
             )
-        df = pd.read_parquet(item.file_name, columns=item.column_names)
+        df = pd.read_parquet(sample_data.file_name, columns=sample_data.signal_names)
         df = df.fillna(0)
         data = df.to_dict("list")
         time = df.index.values
@@ -97,19 +157,25 @@ class ParquetDataLoader(DataLoader):
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
-    def __init__(self):
+    def __init__(self, params):
         import pyuda
 
         self.client = pyuda.Client()
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, ShotData)
-        item: ShotData = sample.data
+        super().__init__(params)
 
+    @classmethod
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
+
+    @pydantic.validate_call
+    def get_sample(
+        self, shot_id: int, sample_data: ShotData
+    ) -> MultiVariateTimeSeriesData:
         results = {}
-        for name in item.signal_names:
+        for name in sample_data.signal_names:
             try:
-                signal = self.client.get(name, sample.shot_id)
+                signal = self.client.get(name, shot_id)
                 data = signal.data
                 time = signal.time.data
                 item = TimeSeriesData(time=time, values=data)

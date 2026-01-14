@@ -27,6 +27,7 @@ import {
   Sample,
   SamplesSummary,
   FileData,
+  TimeSeriesFileData,
   ShotData,
   ProjectUpdate,
 } from "@/types";
@@ -38,11 +39,7 @@ const Tasks = [
   { key: "ELM", value: "ELM" },
   { key: "disruption", value: "Disruption" },
   { key: "MHD", value: "MHD" },
-];
-
-const DataLoaders = [
-  { key: "file", value: "Local File" },
-  { key: "uda", value: "UDA" },
+  { key: "UFO", value: "UFO" },
 ];
 
 const QueryStrategies = [
@@ -50,15 +47,20 @@ const QueryStrategies = [
   { key: "random", value: "Random" },
 ];
 
-const FileTypes = [{ key: "parquet", value: "Parquet" }];
+const FileTypes = [
+  { key: "parquet", value: "Parquet" },
+  { key: "png", value: "PNG" },
+  { key: "jpg", value: "JPEG" },
+];
 
 const DataLoaderOptionsSchema = z.object({
   name: z.string(),
-  signal_names: z.array(z.string()),
+  data_type: z.string(),
 });
-type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
+export type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
 
 const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
+  signal_names: z.array(z.string()),
   shot_min: z.number(),
   shot_max: z.number(),
 }).refine(
@@ -80,6 +82,103 @@ const FileDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   protocol: z.string().optional(),
 });
 type FileDataLoaderOptions = z.infer<typeof FileDataLoaderOptionsSchema>;
+
+const TimeSeriesFileDataLoaderOptionsSchema =
+  FileDataLoaderOptionsSchema.extend({
+    signal_names: z.array(z.string()),
+  });
+type TimeSeriesFileDataLoaderOptions = z.infer<
+  typeof TimeSeriesFileDataLoaderOptionsSchema
+>;
+
+export function useFileLoaderState(
+  initialPath: string,
+  initialType: string,
+  fileTypes: { key: string; value: string }[],
+) {
+  const [filePath, setFilePath] = useState<string>(initialPath);
+  const [fileType, setFileType] = useState<string>(
+    initialType || fileTypes[0]?.key,
+  );
+  const [fileNames, setFileNames] = useState<string[]>([]);
+  useEffect(() => {
+    async function fetchFileList() {
+      if (filePath) {
+        try {
+          const response = await fetch(
+            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
+          );
+          if (response.ok) {
+            const fileList = await response.json();
+            setFileNames(fileList);
+          } else {
+            ToastQueue.negative(`Error fetching files from ${filePath}`, {
+              timeout: 3000,
+            });
+          }
+        } catch (error) {
+          ToastQueue.negative(`Error fetching files: ${error}`, {
+            timeout: 3000,
+          });
+        }
+      }
+    }
+    fetchFileList();
+  }, [filePath, fileType]);
+
+  return {
+    filePath,
+    setFilePath,
+    fileType,
+    setFileType,
+    fileNames,
+  };
+}
+
+type FileLoaderFieldsProps = {
+  fileTypes: { key: string; value: string }[];
+  fileType: string;
+  setFileType: (type: string) => void;
+  filePath: string;
+  setFilePath: (path: string) => void;
+  fileNames: string[];
+};
+
+export function FileDataLoaderFields({
+  fileTypes,
+  fileType,
+  setFileType,
+  filePath,
+  setFilePath,
+  fileNames,
+}: FileLoaderFieldsProps) {
+  return (
+    <Flex direction="column" gap="size-200">
+      <ComboBox
+        label="File Type"
+        items={fileTypes}
+        selectedKey={fileType}
+        onSelectionChange={(key) => setFileType(key ? String(key) : "")}
+        isRequired
+      >
+        {(item: Record<string, string>) => (
+          <Item key={item.key}>{item.value}</Item>
+        )}
+      </ComboBox>
+      <Flex direction="row" gap="size-200" alignItems="end">
+        <TextField
+          label="File Path"
+          value={filePath}
+          onChange={setFilePath}
+          isRequired
+        ></TextField>
+        <Text>
+          {fileNames.length} {fileType} files found.
+        </Text>
+      </Flex>
+    </Flex>
+  );
+}
 
 const SignalNamesUI = ({
   displayName,
@@ -155,9 +254,13 @@ const SignalNamesUI = ({
 };
 
 const UDADataLoaderOptionsUI = ({
+  dataLoader,
+  dataType,
   dataLoaderOptions,
   setDataLoaderOptions,
 }: {
+  dataLoader: string;
+  dataType: string;
   dataLoaderOptions: UDADataLoaderOptions;
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
@@ -173,7 +276,8 @@ const UDADataLoaderOptionsUI = ({
 
   useEffect(() => {
     const options = UDADataLoaderOptionsSchema.safeParse({
-      name: "uda",
+      name: dataLoader,
+      data_type: dataType,
       signal_names: signalNames,
       shot_min: shotMin,
       shot_max: shotMax,
@@ -182,7 +286,14 @@ const UDADataLoaderOptionsUI = ({
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [shotMin, shotMax, signalNames, setDataLoaderOptions]);
+  }, [
+    dataLoader,
+    dataType,
+    shotMin,
+    shotMax,
+    signalNames,
+    setDataLoaderOptions,
+  ]);
 
   return (
     <View
@@ -239,7 +350,7 @@ const UDADataLoaderOptionsUI = ({
           />
         </Flex>
         <SignalNamesUI
-          displayName={"UDA Signal Names"}
+          displayName={"Signal Names"}
           signalNames={signalNames}
           setSignalNames={setSignalNames}
         />
@@ -249,27 +360,27 @@ const UDADataLoaderOptionsUI = ({
 };
 
 const FileDataLoaderOptionsUI = ({
+  dataLoader,
+  dataType,
   dataLoaderOptions,
   setDataLoaderOptions,
 }: {
+  dataLoader: string;
+  dataType: string;
   dataLoaderOptions: FileDataLoaderOptions;
-  setDataLoaderOptions: (options: DataLoaderOptions) => void;
+  setDataLoaderOptions: (options: FileDataLoaderOptions) => void;
 }) => {
-  const [filePath, setFilePath] = useState<string>(
-    dataLoaderOptions?.dir_name || "",
-  );
-  const [fileType, setFileType] = useState<string>(
-    dataLoaderOptions?.protocol || FileTypes[0].key,
-  );
-  const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
-  );
-  const [fileNames, setFileNames] = useState<string[]>([]);
+  const { filePath, setFilePath, fileType, setFileType, fileNames } =
+    useFileLoaderState(
+      dataLoaderOptions?.dir_name || "",
+      dataLoaderOptions?.protocol || FileTypes[0].key,
+      FileTypes,
+    );
 
   useEffect(() => {
     const options = FileDataLoaderOptionsSchema.safeParse({
-      name: "file",
-      signal_names: signalNames,
+      name: dataLoader,
+      data_type: dataType,
       file_type: fileType,
       file_names: fileNames,
     });
@@ -277,32 +388,7 @@ const FileDataLoaderOptionsUI = ({
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [signalNames, fileNames, fileType, setDataLoaderOptions]);
-
-  useEffect(() => {
-    async function fetchFileList() {
-      if (filePath) {
-        try {
-          const response = await fetch(
-            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
-          );
-          if (response.ok) {
-            const fileList = await response.json();
-            setFileNames(fileList);
-          } else {
-            ToastQueue.negative(`Error fetching files from ${filePath}`, {
-              timeout: 3000,
-            });
-          }
-        } catch (error) {
-          ToastQueue.negative(`Error fetching files: ${error}`, {
-            timeout: 3000,
-          });
-        }
-      }
-    }
-    fetchFileList();
-  }, [filePath, fileType]);
+  }, [dataLoader, dataType, fileNames, fileType, setDataLoaderOptions]);
 
   return (
     <View
@@ -311,37 +397,153 @@ const FileDataLoaderOptionsUI = ({
       borderRadius="medium"
       padding="size-250"
     >
-      <Flex direction="column" gap="size-200">
-        <ComboBox
-          label="File Type"
-          items={FileTypes}
-          selectedKey={fileType}
-          onSelectionChange={(key) => setFileType(key ? String(key) : "")}
-          isRequired
-        >
-          {(item: Record<string, string>) => (
-            <Item key={item.key}>{item.value}</Item>
-          )}
-        </ComboBox>
-        <Flex direction="row" gap="size-200" alignItems="end">
-          <TextField
-            label="File Path"
-            value={filePath}
-            onChange={setFilePath}
-            isRequired
-          ></TextField>
-          <Text>
-            {fileNames.length} {fileType} files found.
-          </Text>
-        </Flex>
-        <SignalNamesUI
-          displayName={"File Columns"}
-          signalNames={signalNames}
-          setSignalNames={setSignalNames}
-        />
-      </Flex>
+      <FileDataLoaderFields
+        fileTypes={FileTypes}
+        fileType={fileType}
+        setFileType={setFileType}
+        filePath={filePath}
+        setFilePath={setFilePath}
+        fileNames={fileNames}
+      />
     </View>
   );
+};
+
+const TimeSeriesFileDataLoaderOptionsUI = ({
+  dataLoader,
+  dataType,
+  dataLoaderOptions,
+  setDataLoaderOptions,
+}: {
+  dataLoader: string;
+  dataType: string;
+  dataLoaderOptions: TimeSeriesFileDataLoaderOptions;
+  setDataLoaderOptions: (options: TimeSeriesFileDataLoaderOptions) => void;
+}) => {
+  const { filePath, setFilePath, fileType, setFileType, fileNames } =
+    useFileLoaderState(
+      dataLoaderOptions?.dir_name || "",
+      dataLoaderOptions?.protocol || FileTypes[0].key,
+      FileTypes,
+    );
+
+  const [signalNames, setSignalNames] = useState<string[]>(
+    dataLoaderOptions?.signal_names || [],
+  );
+
+  useEffect(() => {
+    const options = TimeSeriesFileDataLoaderOptionsSchema.safeParse({
+      name: dataLoader,
+      data_type: dataType,
+      signal_names: signalNames,
+      file_type: fileType,
+      file_names: fileNames,
+    });
+
+    if (options.success) {
+      setDataLoaderOptions(options.data);
+    }
+  }, [
+    dataLoader,
+    dataType,
+    signalNames,
+    fileNames,
+    fileType,
+    setDataLoaderOptions,
+  ]);
+
+  return (
+    <View
+      borderWidth="thin"
+      borderColor="dark"
+      borderRadius="medium"
+      padding="size-250"
+    >
+      <FileDataLoaderFields
+        fileTypes={FileTypes}
+        fileType={fileType}
+        setFileType={setFileType}
+        filePath={filePath}
+        setFilePath={setFilePath}
+        fileNames={fileNames}
+      />
+      <SignalNamesUI
+        displayName={"File Columns"}
+        signalNames={signalNames}
+        setSignalNames={setSignalNames}
+      />
+    </View>
+  );
+};
+
+export const SelectDataLoaderUI = (
+  dataLoader: string | null,
+  dataLoaderOptions: DataLoaderOptions | null,
+  setDataLoaderOptions: (options: DataLoaderOptions) => void,
+) => {
+  const [dataType, setDataType] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dataLoader) {
+      return;
+    }
+    async function fetchDataType() {
+      try {
+        const response = await fetch(
+          `${BACKEND_API_URL}/meta/dataloader/${dataLoader}`,
+        );
+        if (response.ok) {
+          const dataSchema = await response.json();
+          setDataType(dataSchema["title"]);
+        } else {
+          ToastQueue.negative(
+            `Error fetching available Data Loaders from server.`,
+            {
+              timeout: 3000,
+            },
+          );
+        }
+      } catch (error) {
+        ToastQueue.negative(`Error fetching data loaders: ${error}`, {
+          timeout: 3000,
+        });
+      }
+    }
+    fetchDataType();
+  }, [dataLoader]);
+
+  let ui = null;
+  if (dataType === "ShotData") {
+    const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
+    ui = (
+      <UDADataLoaderOptionsUI
+        dataLoader={dataLoader || ""}
+        dataType={dataType}
+        dataLoaderOptions={udaOptions}
+        setDataLoaderOptions={setDataLoaderOptions}
+      />
+    );
+  } else if (dataType === "FileData") {
+    const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
+    ui = (
+      <FileDataLoaderOptionsUI
+        dataLoader={dataLoader || ""}
+        dataType={dataType}
+        dataLoaderOptions={fileOptions}
+        setDataLoaderOptions={setDataLoaderOptions}
+      />
+    );
+  } else if (dataType === "TimeSeriesFileData") {
+    const fileOptions = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
+    ui = (
+      <TimeSeriesFileDataLoaderOptionsUI
+        dataLoader={dataLoader || ""}
+        dataType={dataType}
+        dataLoaderOptions={fileOptions}
+        setDataLoaderOptions={setDataLoaderOptions}
+      />
+    );
+  }
+  return ui;
 };
 
 const DataLoaderForm = ({
@@ -352,32 +554,43 @@ const DataLoaderForm = ({
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
   const name = dataLoaderOptions?.name ? dataLoaderOptions.name : null;
+  const [dataLoaders, setDataLoaders] = useState<
+    { key: string; name: string }[]
+  >([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
-
+  useEffect(() => {
+    async function fetchDataLoaders() {
+      try {
+        const response = await fetch(`${BACKEND_API_URL}/meta/dataloader`);
+        if (response.ok) {
+          const dataLoadersList = await response.json();
+          setDataLoaders(
+            dataLoadersList.map((item: string) => ({ key: item, value: item })),
+          );
+        } else {
+          ToastQueue.negative(
+            `Error fetching available Data Loaders from server.`,
+            {
+              timeout: 3000,
+            },
+          );
+        }
+      } catch (error) {
+        ToastQueue.negative(`Error fetching data loaders: ${error}`, {
+          timeout: 3000,
+        });
+      }
+    }
+    fetchDataLoaders();
+  }, []);
   let ui = null;
-  if (selectedKey === "uda") {
-    const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
-    ui = (
-      <UDADataLoaderOptionsUI
-        dataLoaderOptions={udaOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  } else if (selectedKey === "file") {
-    const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
-    ui = (
-      <FileDataLoaderOptionsUI
-        dataLoaderOptions={fileOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  }
+  ui = SelectDataLoaderUI(selectedKey, dataLoaderOptions, setDataLoaderOptions);
 
   return (
     <>
       <ComboBox
         label="Data Loader"
-        items={DataLoaders}
+        items={dataLoaders}
         isRequired
         onSelectionChange={(key) => setSelectedKey(key ? String(key) : null)}
         selectedKey={selectedKey}
@@ -459,11 +672,15 @@ const createProject = async (project: Project): Promise<string> => {
   return projectId;
 };
 
-const buildSamples = (dataLoaderOptions: DataLoaderOptions): Sample[] => {
-  if (dataLoaderOptions.name === "uda") {
+export const buildSamples = (
+  dataLoaderOptions: DataLoaderOptions,
+): Sample[] => {
+  if (dataLoaderOptions.data_type === "ShotData") {
     return createUDASamples(dataLoaderOptions);
-  } else if (dataLoaderOptions.name === "file") {
+  } else if (dataLoaderOptions.data_type === "FileData") {
     return createFileSamples(dataLoaderOptions);
+  } else if (dataLoaderOptions.data_type === "TimeSeriesFileData") {
+    return createTimeSeriesFileSamples(dataLoaderOptions);
   } else {
     throw new Error(`Unknown data loader ${dataLoaderOptions.name}`);
   }
@@ -489,10 +706,7 @@ const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
   return samples;
 };
 
-const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
-  const options = dataLoaderOptions as FileDataLoaderOptions;
-  const fileNames = options.file_names;
-
+const parseFileNames = (fileNames: string[]) => {
   if (!fileNames || fileNames.length === 0) {
     throw new Error("Directory must contain at least one file.");
   }
@@ -513,11 +727,18 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
     }
   }
 
+  return shots;
+};
+
+const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
+  const options = dataLoaderOptions as FileDataLoaderOptions;
+  const fileNames = options.file_names;
+  const shots = parseFileNames(fileNames);
+
   const dataInfo = {
     file_name: fileNames[0],
     type: options.file_type,
     protocol: options.protocol || "file",
-    column_names: options.signal_names,
   } as FileData;
 
   const samples: Sample[] = shots.map((shot_id: number) => ({
@@ -529,7 +750,28 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
   return samples;
 };
 
-const createSamples = async (projectId: string, samples: Sample[]) => {
+const createTimeSeriesFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
+  const options = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
+  const fileNames = options.file_names;
+  const shots = parseFileNames(fileNames);
+
+  const dataInfo = {
+    file_name: fileNames[0],
+    type: options.file_type,
+    protocol: options.protocol || "file",
+    column_names: options.signal_names,
+  } as TimeSeriesFileData;
+
+  const samples: Sample[] = shots.map((shot_id: number) => ({
+    shot_id: shot_id,
+    timestamp: new Date().toISOString(),
+    data: dataInfo,
+  }));
+
+  return samples;
+};
+
+export const createSamples = async (projectId: string, samples: Sample[]) => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${projectId}/samples`,
     {
@@ -570,14 +812,9 @@ const buildProject = (
     throw new Error("Task cannot be empty");
   }
 
-  let dataLoaderType = dataLoaderOptions.name;
-  if (dataLoaderOptions.name === "file") {
-    const options = dataLoaderOptions as FileDataLoaderOptions;
-    dataLoaderType = options.protocol ?? "parquet";
-  }
   const project: Project = {
     name: projectName,
-    data_loader: dataLoaderType,
+    data_loader: dataLoaderOptions.name,
     task: task,
     query_strategy: queryStrategy,
     timestamp: new Date().toISOString(),
@@ -654,37 +891,37 @@ export const ProjectConfigEditor = ({
     if (onModify) onModify();
   };
 
-  const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {
-    const dataLoaderName = samplesSummary?.data?.protocol;
+  // const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {
+  //   const dataLoaderName = samplesSummary?.data?.protocol;
 
-    if (dataLoaderName === "uda") {
-      // UDA data loader
-      const dataInfo = samplesSummary.data as ShotData;
-      setDataLoaderOptions({
-        name: dataLoaderName,
-        signal_names: dataInfo.signal_names || [],
-        shot_min: samplesSummary.shot_min || null,
-        shot_max: samplesSummary.shot_max || null,
-      } as UDADataLoaderOptions);
-    } else if (dataLoaderName === "file") {
-      // File data loader
-      const dataInfo = samplesSummary.data as FileData;
-      setDataLoaderOptions({
-        name: dataLoaderName,
-        signal_names: dataInfo.column_names || [],
-        file_type: dataLoaderName,
-        file_names: [],
-        file_name: dataInfo.file_name || [],
-      } as FileDataLoaderOptions);
-    } else {
-      // Unknown data loader
-      setDataLoaderOptions(null);
-    }
-  };
+  //   if (dataLoaderName === "uda") {
+  //     // UDA data loader
+  //     const dataInfo = samplesSummary.data as ShotData;
+  //     setDataLoaderOptions({
+  //       name: dataLoaderName,
+  //       signal_names: dataInfo.signal_names || [],
+  //       shot_min: samplesSummary.shot_min || null,
+  //       shot_max: samplesSummary.shot_max || null,
+  //     } as UDADataLoaderOptions);
+  //   } else if (dataLoaderName === "file") {
+  //     // File data loader
+  //     const dataInfo = samplesSummary.data as FileData;
+  //     setDataLoaderOptions({
+  //       name: dataLoaderName,
+  //       signal_names: dataInfo.column_names || [],
+  //       file_type: dataLoaderName,
+  //       file_names: [],
+  //       file_name: dataInfo.file_name || [],
+  //     } as FileDataLoaderOptions);
+  //   } else {
+  //     // Unknown data loader
+  //     setDataLoaderOptions(null);
+  //   }
+  // };
 
   useEffect(() => {
     if (project && samplesSummary !== null) {
-      updateDataLoaderOptions(samplesSummary);
+      //updateDataLoaderOptions(samplesSummary);
       setProjectName(project.name);
       setQueryStrategy(project.query_strategy);
       setTaskSelection(project.task);

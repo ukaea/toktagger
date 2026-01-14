@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Request, HTTPException, Path, Query
+from fastapi import APIRouter, Request, Path, Query
 from typing import Literal
 from toktagger.api.crud import utils
+from toktagger.api.schemas.samples import SampleUpdate
 from toktagger.api.schemas.annotations import (
     AnnotationTypes,
     AnnotationOutTypes,
+    AnnotationBatchItem,
 )
 
 router = APIRouter(
@@ -113,6 +115,47 @@ async def delete_all_annotations(
     await utils.delete_annotations(db_client=db_client, project_id=project_id)
 
 
+@router.put(
+    "/annotations",
+    responses={
+        200: {
+            "description": "Successfully updated annotations for a batch of samples."
+        },
+        404: {"description": "Project or Sample not found with that ID."},
+    },
+)
+async def batch_update_annotations(
+    request: Request,
+    annotations_batch: list[AnnotationBatchItem],
+    project_id: str = Path(
+        description="The ID of the project to update annotations for."
+    ),
+):
+    """
+    Update the list of annotations for a batch of samples for a specified project. Will overwrite existing annotations.
+    --------------------------------------------------------------------------------------------------------------------
+    """
+    db_client = request.app.state.db_client
+
+    # Check project and sample exist
+    await utils.get_project(db_client=db_client, project_id=project_id)
+
+    for annotation_batch_item in annotations_batch:
+        await utils.get_sample(
+            db_client=db_client,
+            project_id=project_id,
+            sample_id=annotation_batch_item.sample_id,
+        )
+
+        # Delete previous annotations, if they exist, and add new ones
+        await utils.update_annotations(
+            db_client,
+            project_id,
+            annotation_batch_item.sample_id,
+            annotation_batch_item.annotations,
+        )
+
+
 @router.get(
     "/samples/{sample_id}/annotations",
     response_model=list[AnnotationOutTypes],
@@ -145,6 +188,10 @@ async def get_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
+    created_by: str = Query(
+        None,
+        description="Whether to only return annotations created by a specific model or by a human.",
+    ),
 ) -> list[AnnotationOutTypes]:
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
@@ -162,6 +209,7 @@ async def get_annotations(
         project_id=project_id,
         sample_id=sample_id,
         validated=validated,
+        created_by=created_by,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
@@ -205,24 +253,20 @@ async def update_annotations(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
 
-    # Delete previous annotations, if they exist
-    try:
-        await utils.delete_annotations(
-            db_client=db_client, project_id=project_id, sample_id=sample_id
-        )
-    except HTTPException:
-        pass
-
-    if len(annotations) == 0:
-        # Nothing to do!
-        return
-
-    return await utils.add_annotations(
-        db_client=db_client,
-        project_id=project_id,
-        sample_id=sample_id,
-        annotations=annotations,
+    # Delete previous annotations, if they exist, and add new ones
+    result = await utils.update_annotations(
+        db_client, project_id, sample_id, annotations
     )
+
+    # Update sample to show that annotations are validated
+    if any(annotation.validated for annotation in annotations):
+        await utils.update_sample(
+            db_client=db_client,
+            sample_id=sample_id,
+            updates=SampleUpdate(validated_annotations=True),
+        )
+
+    return result
 
 
 @router.delete(

@@ -8,7 +8,7 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -16,6 +16,7 @@ type JumpDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
+  dataParams: DataParams;
   setAnnotations: (
     annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
   ) => void;
@@ -25,6 +26,7 @@ export function JumpDetectionTool({
   project_id,
   sample_id,
   data,
+  dataParams,
   setAnnotations,
 }: JumpDetectionType) {
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
@@ -60,11 +62,14 @@ export function JumpDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            threshold: threshold,
-            min_distance: minDistance,
-            smoothing: smoothingValue,
-            num_points: numPoints,
+            annotator_params: {
+              signal_name: signalName,
+              threshold: threshold,
+              min_distance: minDistance,
+              smoothing: smoothingValue,
+              num_points: numPoints,
+            },
+            data_params: dataParams,
           }),
         },
       );
@@ -89,6 +94,7 @@ export function JumpDetectionTool({
     numPoints,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

@@ -5,6 +5,7 @@ import xarray as xr
 import fsspec
 from joblib import Parallel, delayed
 
+
 def get_remote_store(path: str, endpoint_url: str):
     fs = fsspec.filesystem(
         **dict(
@@ -15,6 +16,7 @@ def get_remote_store(path: str, endpoint_url: str):
         )
     )
     return fs.get_mapper(path)
+
 
 def process_shot(shot_id: int):
     store = get_remote_store(
@@ -81,7 +83,7 @@ def main():
     df = df.sort_index(ascending=False)
     shots = df.index.values
 
-    Path('data/elms').mkdir(exist_ok=True, parents=True)
+    Path("data/elms").mkdir(exist_ok=True, parents=True)
 
     tasks = [delayed(safe_process_shot)(shot) for shot in shots]
     pool = Parallel(n_jobs=16, return_as="generator")

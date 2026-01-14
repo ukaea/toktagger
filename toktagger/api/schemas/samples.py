@@ -1,8 +1,8 @@
 from typing import Annotated, List, Optional, Union
 from enum import Enum
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, computed_field
 from toktagger.api.schemas import ConfiguredModel
-from toktagger.api.schemas.annotations import AnnotationIn
+from toktagger.api.schemas.annotations import AnnotationTypes
 
 
 class FileType(str, Enum):
@@ -30,12 +30,7 @@ class FileData(BaseModel):
 
 
 class TimeSeriesFileData(FileData):
-    column_names: Optional[list[str]] = None
-
-
-class ImageFileData(FileData):
-    frame: int
-    time: float
+    signal_names: Optional[list[str]] = None
 
 
 class ShotData(BaseModel):
@@ -43,7 +38,7 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_items=1)]
 
 
-DataTypes = Union[TimeSeriesFileData, FileData, ShotData, ImageFileData]
+DataTypes = Union[TimeSeriesFileData, FileData, ShotData]
 
 
 class SampleBase(ConfiguredModel):
@@ -52,12 +47,32 @@ class SampleBase(ConfiguredModel):
 
 
 class SampleIn(SampleBase):
-    annotations: Optional[List[AnnotationIn]] = None
+    annotations: Optional[List[AnnotationTypes]] = None
+
+    @computed_field
+    @property
+    def validated_annotations(self) -> bool:
+        if not self.annotations:
+            return False
+
+        return any(
+            [annotation.validated for annotation in self.annotations]
+        )  # TODO any or all?
 
 
 class Sample(SampleBase):
+    validated_annotations: bool
     id: str = Field(..., alias="_id")
     project_id: str
+
+
+class SampleUpdate(ConfiguredModel):
+    validated_annotations: Optional[bool] = None
+
+
+class SampleUpdateBatchItem(ConfiguredModel):
+    id: str = Field(..., alias="_id")
+    updates: SampleUpdate
 
 
 class SampleSummary(BaseModel):
