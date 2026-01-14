@@ -52,7 +52,7 @@ export function ClassPanel({
 /** Profile type used by InstancePanel.
  *  NOTE: This is a UI-level type describing per-instance tracking profiles.
  */
-export type Profile = {
+type Profile = {
   key: string;
   class_id: number;
   class_name: string;
