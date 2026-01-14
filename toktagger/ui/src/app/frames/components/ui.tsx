@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {useMemo, useState } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
 import { useAnnotator } from "@annotorious/react";
 import { LABEL_MAP, extractClassLabel, rectToDims } from "./lib";
@@ -93,10 +93,6 @@ export function InstancePanel({
   );
   const [trackId, setTrackId] = useState<string>("");
 
-  useEffect(() => {
-    if (open) setTrackId(`auto-${Math.random().toString(36).slice(2, 7)}`);
-  }, [open]);
-
   return (
     <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
       {/* Header label for the panel */}
@@ -108,7 +104,13 @@ export function InstancePanel({
       {showCreator && (
         <div className="mb-3">
           <button
-            onClick={() => setOpen((o) => !o)}
+            onClick={() => {
+              setOpen((prev) => {
+                const next = !prev;
+                if (next) setTrackId(`auto-${Math.random().toString(36).slice(2, 7)}`);
+                return next;
+              });
+            }}
             className="w-full rounded-lg border shadow-sm px-2.5 py-1.5 text-left bg-black text-white border-gray-600 hover:bg-gray-800 flex items-center justify-between"
             title="Create a new class/track profile"
           >
