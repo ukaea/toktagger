@@ -4,54 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
 import { useAnnotator } from "@annotorious/react";
 import { LABEL_MAP, extractClassLabel, rectToDims } from "./lib";
-import {
-  ActionGroup,
-  Item,
-  SearchField,
-  Flex,
-  Text,
-  Picker,
-} from "@adobe/react-spectrum";
-
-/** ------------------------------------------------------------------
- *  Toolbar — simple frame navigation controls (Prev/Next/Jump)
- *  ------------------------------------------------------------------ */
-export function Toolbar({
-  index,
-  onPrev,
-  onNext,
-  onJump,
-}: {
-  index: number;
-  onPrev: () => void | Promise<void>;
-  onNext: () => void | Promise<void>;
-  onJump: (frame: number) => void | Promise<void>;
-}) {
-  const onJumpSubmit = (value: string) => {
-    const n = Number(value);
-    if (Number.isFinite(n)) onJump(n);
-  };
-
-  return (
-    <Flex gap="size-200" alignItems="center" marginBottom="size-200" wrap>
-      <ActionGroup
-        isQuiet
-        onAction={(key) => (key === "prev" ? onPrev() : onNext())}
-      >
-        <Item key="prev">Prev</Item>
-        <Item key="next">Next</Item>
-      </ActionGroup>
-
-      <Text>Frame {index}</Text>
-
-      <SearchField
-        aria-label="Jump to Frame"
-        placeholder="Jump to…"
-        onSubmit={onJumpSubmit}
-      />
-    </Flex>
-  );
-}
+import { Item, Text, Picker } from "@adobe/react-spectrum";
 
 /** ------------------------------------------------------------------
  *  ClassPanel — dropdown for detection/tracking class selection
