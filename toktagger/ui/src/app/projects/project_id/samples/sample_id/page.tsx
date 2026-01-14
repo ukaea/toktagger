@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Provider,
   defaultTheme,
@@ -239,53 +239,6 @@ export default function SamplePage() {
   // ------------------------------
   const ufoInitRef = useRef(false);
 
-  const isUfo = project?.task === "UFO";
-
-  const currentFrame = useMemo(() => {
-    if (!isUfo) return 0;
-
-    // Preferred: trust backend-returned ImageData.frame
-    if (data) {
-      const parsed = ImageDataSchema.safeParse(data);
-      if (parsed.success) return parsed.data.frame;
-    }
-
-    // Fallback: best-effort read from dataParams if it happens to carry a numeric frame
-    const maybe = dataParams as Partial<{ frame?: unknown }>;
-    return typeof maybe.frame === "number" && Number.isFinite(maybe.frame)
-      ? maybe.frame
-      : 0;
-  }, [isUfo, data, dataParams]);
-
-  const goToFrame = useCallback(
-    (n: number) => {
-      // Intentionally do NOT clamp to backend bounds (we don’t receive them today),
-      // but we do prevent obviously invalid negatives.
-      if (!Number.isFinite(n)) return;
-      const target = Math.max(0, Math.trunc(n));
-      setDataParams(() => ({ name: "image", frame: target }) as DataParams);
-    },
-    [setDataParams],
-  );
-
-  const onPrev = useCallback(() => {
-    if (!isUfo) return;
-    goToFrame(currentFrame - 1);
-  }, [isUfo, goToFrame, currentFrame]);
-
-  const onNext = useCallback(() => {
-    if (!isUfo) return;
-    goToFrame(currentFrame + 1);
-  }, [isUfo, goToFrame, currentFrame]);
-
-  const onJump = useCallback(
-    (n: number) => {
-      if (!isUfo) return;
-      goToFrame(n);
-    },
-    [isUfo, goToFrame],
-  );
-
   // ------------------------------
   // Sample/project refresh
   // ------------------------------
@@ -395,9 +348,6 @@ export default function SamplePage() {
               dataParams={dataParams}
               setDataParams={setDataParams}
               plotProps={plotProps}
-              onPrev={onPrev}
-              onNext={onNext}
-              onJump={onJump}
             />
           </div>
         </div>

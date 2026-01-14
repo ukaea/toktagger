@@ -1413,13 +1413,39 @@ export const UFOView = ({
   annotations,
   setAnnotations: _setAnnotations,
   dataParams: _dataParams,
-  setDataParams: _setDataParams,
+  setDataParams,
   projectId,
   sampleId,
-  onPrev,
-  onNext,
-  onJump,
 }: UFOViewInfo) => {
+  const currentFrame = useMemo(() => {
+    const frame = data.frame;
+    return typeof frame === "number" && Number.isFinite(frame) ? frame : 0;
+  }, [data.frame]);
+
+  const goToFrame = useCallback(
+    (n: number) => {
+      if (!Number.isFinite(n)) return;
+      const target = Math.max(0, Math.trunc(n));
+      setDataParams(() => ({ name: "image", frame: target }) as DataParams);
+    },
+    [setDataParams],
+  );
+
+  const onPrev = useCallback(() => {
+    goToFrame(currentFrame - 1);
+  }, [goToFrame, currentFrame]);
+
+  const onNext = useCallback(() => {
+    goToFrame(currentFrame + 1);
+  }, [goToFrame, currentFrame]);
+
+  const onJump = useCallback(
+    (n: number) => {
+      goToFrame(n);
+    },
+    [goToFrame],
+  );
+
   return (
     <div className="w-full">
       <FrameView
