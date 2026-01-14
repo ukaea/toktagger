@@ -329,14 +329,10 @@ export function ClassInfoPopup(props: {
 
   const dims = rectToDims(annotation);
 
-  const handleDelete = async () => {
-    await anno?.removeAnnotation?.(annotation.id);
-    // Two RAFs to ensure Annotorious state has settled before we notify
-    await new Promise<void>((r) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => r())),
-    );
-    onDeleted?.(effectiveLabel || {});
-  };
+const handleDelete = async () => {
+  await anno?.removeAnnotation?.(annotation.id);
+  onDeleted?.(effectiveLabel || {});
+};
 
   return (
     <div className="rounded-lg shadow-md bg-white/95 backdrop-blur px-3 py-2 text-sm leading-tight border border-gray-200">
