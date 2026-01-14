@@ -91,7 +91,9 @@ export function InstancePanel({
   const [className, setClassName] = useState<string>(
     LABEL_MAP.categories[0].name,
   );
-  const [trackId, setTrackId] = useState<string>("");
+
+  const makeAutoTrackId = () => `auto-${Math.random().toString(36).slice(2, 7)}`;
+  const [trackId, setTrackId] = useState<string>(() => makeAutoTrackId());
 
   return (
     <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
@@ -107,7 +109,7 @@ export function InstancePanel({
             onClick={() => {
               setOpen((prev) => {
                 const next = !prev;
-                if (next) setTrackId(`auto-${Math.random().toString(36).slice(2, 7)}`);
+                if (next) setTrackId(makeAutoTrackId());
                 return next;
               });
             }}
