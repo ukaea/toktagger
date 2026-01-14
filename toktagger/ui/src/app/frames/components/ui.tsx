@@ -1,6 +1,6 @@
 "use client";
 
-import React, {useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
 import { useAnnotator } from "@annotorious/react";
 import { LABEL_MAP, extractClassLabel, rectToDims } from "./lib";
@@ -92,7 +92,8 @@ export function InstancePanel({
     LABEL_MAP.categories[0].name,
   );
 
-  const makeAutoTrackId = () => `auto-${Math.random().toString(36).slice(2, 7)}`;
+  const makeAutoTrackId = () =>
+    `auto-${Math.random().toString(36).slice(2, 7)}`;
   const [trackId, setTrackId] = useState<string>(() => makeAutoTrackId());
 
   return (
@@ -329,10 +330,10 @@ export function ClassInfoPopup(props: {
 
   const dims = rectToDims(annotation);
 
-const handleDelete = async () => {
-  await anno?.removeAnnotation?.(annotation.id);
-  onDeleted?.(effectiveLabel || {});
-};
+  const handleDelete = async () => {
+    await anno?.removeAnnotation?.(annotation.id);
+    onDeleted?.(effectiveLabel || {});
+  };
 
   return (
     <div className="rounded-lg shadow-md bg-white/95 backdrop-blur px-3 py-2 text-sm leading-tight border border-gray-200">

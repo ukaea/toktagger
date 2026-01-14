@@ -256,9 +256,12 @@ function UfoShotSearch({
     }
 
     if (!project_id || !sample_id) {
-      ToastQueue.negative("Cannot jump to shot: missing project or sample id.", {
-        timeout: 5000,
-      });
+      ToastQueue.negative(
+        "Cannot jump to shot: missing project or sample id.",
+        {
+          timeout: 5000,
+        },
+      );
       return;
     }
 
@@ -708,7 +711,9 @@ export default function ToolBar({
 
     const onState = (e: Event) => {
       const detail = (e as CustomEvent<unknown>).detail;
-      const d = (detail && typeof detail === "object" ? detail : {}) as UfoStateDetail;
+      const d = (
+        detail && typeof detail === "object" ? detail : {}
+      ) as UfoStateDetail;
 
       if (Array.isArray(d.profiles)) {
         const next: InstanceProfile[] = d.profiles.map((p) => ({
@@ -902,9 +907,12 @@ export default function ToolBar({
   const handleUfoNextSample = async () => {
     // Guard against incomplete project/sample objects.
     if (!project_id || !sample_id) {
-      ToastQueue.negative("Cannot load next sample: missing project or sample id.", {
-        timeout: 5000,
-      });
+      ToastQueue.negative(
+        "Cannot load next sample: missing project or sample id.",
+        {
+          timeout: 5000,
+        },
+      );
       return;
     }
 
@@ -961,10 +969,10 @@ export default function ToolBar({
               <div className="mb-2">
                 <Flex gap="size-100" alignItems="center" wrap>
                   <Button
-                      variant="secondary"
-                      style="outline" 
-                      isDisabled
-                      UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                    variant="secondary"
+                    style="outline"
+                    isDisabled
+                    UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                   >
                     Rectangle
                   </Button>
