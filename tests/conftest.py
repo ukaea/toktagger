@@ -40,6 +40,7 @@ def ray_session():
 @pytest_asyncio.fixture(scope="function")
 async def db_client(mongo_container):
     db_client = MongoDBClient(mongo_container, "annotate_db")
+
     yield db_client
 
     await db_client.delete_filtered_documents("projects")

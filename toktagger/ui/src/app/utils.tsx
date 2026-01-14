@@ -33,6 +33,10 @@ export const convertDisplayAnnotationToAnnotation = (
     const timeRegion: TimeRegion = {
       created_by: zone.created_by,
       type: "time_region",
+      project_id: null,
+      sample_id: null,
+      validated: false,
+      uncertainty: 1,
       time_min: zone.x0,
       time_max: zone.x1,
       label: zone.category.name,
@@ -41,6 +45,10 @@ export const convertDisplayAnnotationToAnnotation = (
   } else if (VSpanSchema.safeParse(annotation).success) {
     const vspan = VSpanSchema.parse(annotation);
     const timePoint: TimePoint = {
+      project_id: null,
+      sample_id: null,
+      validated: false,
+      uncertainty: 1,
       created_by: vspan.created_by,
       type: "time_point",
       time: vspan.x,
@@ -60,6 +68,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
+        selected: false,
         created_by: timeRegion.created_by,
         x0: timeRegion.time_min,
         x1: timeRegion.time_max,
@@ -69,6 +78,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else if (TimePointSchema.safeParse(item).success) {
       const timePoint = TimePointSchema.parse(item);
       const vspan: VSpan = {
+        selected: false,
         created_by: timePoint.created_by,
         x: timePoint.time,
         category: { name: timePoint.label, color: colors[timePoint.label] },
@@ -89,6 +99,10 @@ export const createAnnotationToDisplayAnnotationFunc = (
       };
       return polygon;
     } else {
+      console.log(
+        "annotation",
+        TimeRegionSchema.safeParse(item).error?.message,
+      );
       throw new Error("Unsupported annotation type");
     }
   };
@@ -112,4 +126,24 @@ export function updateAnnotations<T>(
     newAnnotations = newAnnotations.concat(otherAnnotations);
     return newAnnotations;
   });
+}
+
+// Utility function to find the maximum value in an array
+// Handles very large arrays efficiently
+export function arrayMax(arr: number[]): number {
+  let traceMax = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] > traceMax) traceMax = arr[i];
+  }
+  return traceMax;
+}
+
+// Utility function to find the minimum value in an array
+// Handles very large arrays efficiently
+export function arrayMin(arr: number[]): number {
+  let traceMin = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] < traceMin) traceMin = arr[i];
+  }
+  return traceMin;
 }

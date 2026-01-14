@@ -1,19 +1,31 @@
 "use client";
 import { Annotation } from "@/types";
 import {
+  Flex,
   ActionButton,
   ButtonGroup,
   ToastQueue,
   Text,
   View,
+  Checkbox,
+  Tooltip,
+  TooltipTrigger,
+  SearchField,
 } from "@adobe/react-spectrum";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import StepForward from "@spectrum-icons/workflow/StepForward";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import SaveFloppy from "@spectrum-icons/workflow/SaveFloppy";
 import Delete from "@spectrum-icons/workflow/Delete";
-import { BACKEND_API_URL, saveSampleAnnotations } from "@/app/core";
+import {
+  BACKEND_API_URL,
+  getShotSample,
+  saveSampleAnnotations,
+} from "@/app/core";
 import { useNavigate } from "react-router-dom";
+import { useSample } from "@/app/contexts/SampleContext";
+
+const TOAST_TIMEOUT = 5000;
 
 async function getNextSample(project_id: string, current_sample_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next?current_sample_id=${current_sample_id}`;
@@ -42,24 +54,37 @@ type ButtonInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
+  validateOnNavigate?: boolean;
 };
 
-function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function NextButton({
+  project_id,
+  sample_id,
+  annotations,
+  validateOnNavigate,
+}: ButtonInfo) {
   const navigate = useNavigate();
 
   const moveNextShot = useCallback(async () => {
-    await saveSampleAnnotations(project_id, sample_id, annotations);
+    await saveSampleAnnotations(
+      project_id,
+      sample_id,
+      annotations,
+      validateOnNavigate,
+    );
     const sample = await getNextSample(project_id, sample_id);
     if (!sample) {
-      ToastQueue.negative("No more samples available!", { timeout: 3000 });
+      ToastQueue.negative("No more samples available!", {
+        timeout: TOAST_TIMEOUT,
+      });
       return;
     }
     const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
     navigate(NEXT_SAMPLE_URL);
-  }, [project_id, sample_id, annotations, navigate]);
+  }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
 
   useEffect(() => {
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       // Check for Shift + Right Arrow
       if (e.shiftKey && e.key === "ArrowRight") {
         e.preventDefault();
@@ -80,22 +105,35 @@ function NextButton({ project_id, sample_id, annotations }: ButtonInfo) {
   );
 }
 
-function PreviousButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function PreviousButton({
+  project_id,
+  sample_id,
+  annotations,
+  validateOnNavigate,
+}: ButtonInfo) {
   const navigate = useNavigate();
 
   const movePreviousShot = useCallback(async () => {
-    await saveSampleAnnotations(project_id, sample_id, annotations);
+    await saveSampleAnnotations(
+      project_id,
+      sample_id,
+      annotations,
+      validateOnNavigate,
+    );
+
     const sample = await getPreviousSample(project_id, sample_id);
     if (!sample) {
-      ToastQueue.negative("No earlier samples available!", { timeout: 3000 });
+      ToastQueue.negative("No earlier samples available!", {
+        timeout: TOAST_TIMEOUT,
+      });
       return;
     }
     const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
     navigate(NEXT_SAMPLE_URL);
-  }, [project_id, sample_id, annotations, navigate]);
+  }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
 
   useEffect(() => {
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       // Check for Shift + Left Arrow
       if (e.shiftKey && e.key === "ArrowLeft") {
         e.preventDefault();
@@ -116,16 +154,23 @@ function PreviousButton({ project_id, sample_id, annotations }: ButtonInfo) {
   );
 }
 
-function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
+function SaveButton({
+  project_id,
+  sample_id,
+  annotations,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  validateOnNavigate,
+}: ButtonInfo) {
   const handleClick = async () => {
     try {
-      await saveSampleAnnotations(project_id, sample_id, annotations);
+      await saveSampleAnnotations(project_id, sample_id, annotations, true);
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
-        timeout: 5000,
+        timeout: TOAST_TIMEOUT,
       });
     } catch (err) {
-      ToastQueue.negative(`Failed to save annotations: ${err.message}`, {
-        timeout: 5000,
+      const message = err instanceof Error ? err.message : String(err);
+      ToastQueue.negative(`Failed to save annotations: ${message}`, {
+        timeout: TOAST_TIMEOUT,
       });
     }
   };
@@ -143,10 +188,12 @@ function SaveButton({ project_id, sample_id, annotations }: ButtonInfo) {
 function ClearButton({
   setAnnotations,
 }: {
-  setAnnotations: (annotations: Annotation[]) => void;
+  setAnnotations: (
+    updater: (annotations: Annotation[]) => Annotation[],
+  ) => void;
 }) {
   const handleClick = () => {
-    setAnnotations([]);
+    setAnnotations(() => []);
   };
 
   return (
@@ -159,36 +206,107 @@ function ClearButton({
   );
 }
 
-type NavigationBarInfo = {
+type SaveInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
-  setAnnotations: (annotations: Annotation[]) => void;
+  validateOnNavigate?: boolean;
 };
-export function NavigationBar({
+
+export function ShotSearch({
   project_id,
   sample_id,
   annotations,
-  setAnnotations,
-}: NavigationBarInfo) {
+  validateOnNavigate,
+}: SaveInfo) {
+  const navigate = useNavigate();
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  const onSearchSubmit = async (newValue: string) => {
+    if (newValue == "") {
+      setErrorMessage("");
+    } else if (/^[0-9]*$/.test(newValue)) {
+      setErrorMessage("");
+      const shot_id = newValue;
+      try {
+        const sample = await getShotSample(project_id, shot_id);
+        if (sample !== null) {
+          await saveSampleAnnotations(
+            project_id,
+            sample_id,
+            annotations,
+            validateOnNavigate,
+          );
+          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+          navigate(NEXT_SAMPLE_URL);
+        } else {
+          setErrorMessage("Shot not found!");
+        }
+      } catch (err) {
+        console.error("Failed to fetch data:", err);
+      }
+    } else {
+      setErrorMessage("Please enter a number.");
+    }
+  };
+
   return (
-    <ButtonGroup>
-      <SaveButton
+    <SearchField
+      label="Jump to Shot"
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    ></SearchField>
+  );
+}
+
+type NavigationBarInfo = {
+  project_id: string;
+  sample_id: string;
+};
+export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
+  const { annotations, setAnnotations } = useSample();
+  const [validateOnNavigate, setValidateOnNavigate] = useState(true);
+  return (
+    <Flex alignItems="center" direction="column" gap="size-100">
+      <ButtonGroup>
+        <SaveButton
+          project_id={project_id}
+          sample_id={sample_id}
+          annotations={annotations}
+        />
+        <PreviousButton
+          project_id={project_id}
+          sample_id={sample_id}
+          annotations={annotations}
+          validateOnNavigate={validateOnNavigate}
+        />
+        <NextButton
+          project_id={project_id}
+          sample_id={sample_id}
+          annotations={annotations}
+          validateOnNavigate={validateOnNavigate}
+        />
+        <ClearButton setAnnotations={setAnnotations} />
+      </ButtonGroup>
+      <TooltipTrigger delay={1000} placement="bottom">
+        <Checkbox
+          isSelected={validateOnNavigate}
+          onChange={setValidateOnNavigate}
+        >
+          Validate on Navigate
+        </Checkbox>
+        <Tooltip>
+          When enabled, annotations will be marked as validated when navigating
+          to another sample.
+        </Tooltip>
+      </TooltipTrigger>
+      <ShotSearch
         project_id={project_id}
         sample_id={sample_id}
         annotations={annotations}
+        validateOnNavigate={validateOnNavigate}
       />
-      <PreviousButton
-        project_id={project_id}
-        sample_id={sample_id}
-        annotations={annotations}
-      />
-      <NextButton
-        project_id={project_id}
-        sample_id={sample_id}
-        annotations={annotations}
-      />
-      <ClearButton setAnnotations={setAnnotations} />
-    </ButtonGroup>
+    </Flex>
   );
 }

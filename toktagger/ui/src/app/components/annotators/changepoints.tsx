@@ -8,9 +8,10 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 enum ChangePointMethod {
   PELT = "pelt",
@@ -21,19 +22,15 @@ type ChangePointDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  dataParams: DataParams;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function ChangePointDetectionTool({
   project_id,
   sample_id,
   data,
-  dataParams,
-  setAnnotations,
 }: ChangePointDetectionType) {
+  const { dataParams, setAnnotations } = useSample();
+
   const methodOptions = [
     { id: 0, name: ChangePointMethod.PELT },
     { id: 1, name: ChangePointMethod.HMM },

@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -10,30 +9,20 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
-  SearchField,
   ComboBox,
   Item,
   Key,
-  Switch,
-  NumberField,
-  ActionButton,
-  Slider,
 } from "@adobe/react-spectrum";
 import {
-  Annotation,
-  CompositeDataSchema,
-  Data,
-  DataParams,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
-  Project,
-  Sample,
   SpectrogramData,
   SpectrogramDataSchema,
   SpectrogramViewParamsSchema,
+  TaskType,
   ViewParams,
 } from "@/types";
-import { BACKEND_API_URL, getAnnotationsForSample } from "@/app/core";
+import { getAnnotationsForSample } from "@/app/core";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
@@ -41,86 +30,11 @@ import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
-import { useNavigate } from "react-router-dom";
 import { ExportTool } from "./export";
-import { ImportTool } from "./import";
+import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
-
-async function saveAnnotations(
-  project_id: string,
-  sample_id: string,
-  annotations: Annotation[]
-) {
-  // user has validated the annotations, so set created_by to "manual"
-  const updatedAnnotations = annotations.map((annotation: Annotation) => {
-    annotation.created_by = "manual";
-    annotation.validated = true;
-    return annotation;
-  });
-
-  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
-  const response = await fetch(ANNOTATIONS_URL, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(updatedAnnotations),
-  });
-  return response;
-}
-
-async function getShotSample(project_id: string, shot_id: string) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
-  const sampleResult = await fetch(NEXT_URL);
-  const sampleArray = await sampleResult.json();
-  let sample = null;
-  if (sampleArray.length > 0) {
-    sample = sampleArray[0];
-  }
-  return sample;
-}
-
-type SaveInfo = {
-  project_id: string;
-  sample_id: string;
-  annotations: Annotation[];
-};
-export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
-  const navigate = useNavigate();
-  const [errorMessage, setErrorMessage] = useState<string>("");
-
-  const onSearchSubmit = async (newValue: string) => {
-    if (newValue == "") {
-      setErrorMessage("");
-    } else if (/^[0-9]*$/.test(newValue)) {
-      setErrorMessage("");
-      const shot_id = newValue;
-      try {
-        const sample = await getShotSample(project_id, shot_id);
-        if (sample !== null) {
-          await saveAnnotations(project_id, sample_id, annotations);
-          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-          navigate(NEXT_SAMPLE_URL);
-        } else {
-          setErrorMessage("Shot not found!");
-        }
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
-      }
-    } else {
-      setErrorMessage("Please enter a number.");
-    }
-  };
-
-  return (
-    <SearchField
-      label="Jump to Shot"
-      onSubmit={onSearchSubmit}
-      validationState={errorMessage ? "invalid" : undefined}
-      errorMessage={errorMessage}
-    ></SearchField>
-  );
-}
+import { useSample } from "@/app/contexts/SampleContext";
+import SpectrogramThresholdTool from "../annotators/thresholding";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -211,292 +125,48 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
   );
 }
 
-type RangeStepperInfo = {
-  label: string;
-  value: number;
-  minValue?: number;
-  maxValue?: number;
-  stepSize?: { small: number; large: number };
-  setValue?: (value: number) => void;
-};
-
-function RangeStepper({
-  label,
-  value,
-  minValue,
-  maxValue,
-  stepSize = { small: 1, large: 5 },
-  setValue,
-}: RangeStepperInfo) {
-  const [internalValue, setInternalValue] = useState(value);
-
-  useEffect(() => {
-    setInternalValue(internalValue);
-    setValue?.(internalValue);
-  }, [internalValue, setValue]);
-
-  const incrementValue = (increment: number) => {
-    setInternalValue((prevValue: number) => {
-      const newValue = prevValue + increment;
-      if (newValue < (minValue || 0)) return minValue || 0;
-      if (newValue > (maxValue || 99)) return maxValue || 99;
-      return newValue;
-    });
-  };
-
-  return (
-    <Flex
-      direction="column"
-      gap="size-100"
-      margin={"size-200"}
-      alignItems={"center"}
-    >
-      <Flex direction="row" width={"100%"}>
-        <NumberField
-          label={label}
-          value={internalValue}
-          onChange={setInternalValue}
-          minValue={minValue || 0}
-          maxValue={maxValue || 99}
-          hideStepper={true}
-          width={"100%"}
-        />
-      </Flex>
-      <Flex direction="row" gap="size-100">
-        <ActionButton
-          onPress={() => {
-            incrementValue(stepSize.large * -1);
-          }}
-        >
-          -5
-        </ActionButton>
-        <ActionButton
-          onPress={() => {
-            incrementValue(stepSize.small * -1);
-          }}
-        >
-          -1
-        </ActionButton>
-        <ActionButton
-          onPress={() => {
-            incrementValue(stepSize.small);
-          }}
-        >
-          +1
-        </ActionButton>
-        <ActionButton
-          onPress={() => {
-            incrementValue(stepSize.large);
-          }}
-        >
-          +5
-        </ActionButton>
-      </Flex>
-    </Flex>
-  );
-}
-
-type SpectrogramThresholdToolInfo = {
-  project_id: string;
-  sample_id: string;
-  signal_name: string;
-  dataParams: DataParams;
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
-  setAnnotations: (annotations: Annotation[]) => void;
-};
-
-function SpectrogramThresholdTool({
-  project_id,
-  sample_id,
-  signal_name,
-  dataParams,
-  plotProps,
-  setPlotProps,
-  setAnnotations,
-}: SpectrogramThresholdToolInfo) {
-  const [active, setActive] = useState(false);
-  const [thresholdPercentile, setThresholdPercentile] = useState(95);
-  const [smoothingSigma, setSmoothingSigma] = useState(0.1);
-  const [minAnnotationSize, setMinAnnotationSize] = useState(0);
-  const [lineFilterWidth, setLineFilterWidth] = useState(0);
-  const [minFrequency, setMinFrequency] = useState(5);
-  const [filterSize, setFilterSize] = useState(0.1);
-
-  const onThresholdChange = (value: boolean) => {
-    setActive(value);
-    setPlotProps({ ...plotProps, thresholdActive: value });
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!active) {
-        setAnnotations([]);
-        return;
-      }
-
-      const response = await fetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            signal_name: signal_name,
-            annotator_params: {
-              percentile: thresholdPercentile,
-              freq_min: minFrequency,
-              sigma: smoothingSigma,
-              min_size: minAnnotationSize,
-              line_filter_width: lineFilterWidth,
-              ridge_filter_size: filterSize,
-            },
-            data_params: dataParams,
-          }),
-        }
-      );
-
-      const payload = await response.json();
-      setAnnotations(payload);
-    };
-
-    fetchData();
-  }, [
-    project_id,
-    sample_id,
-    active,
-    signal_name,
-    thresholdPercentile,
-    minFrequency,
-    smoothingSigma,
-    minAnnotationSize,
-    lineFilterWidth,
-    filterSize,
-    dataParams,
+export default function ToolBar() {
+  const {
+    project,
+    sample,
+    data,
+    annotations,
     setAnnotations,
-  ]);
+    viewParams,
+    setViewParams,
+    plotProps,
+    setPlotProps,
+  } = useSample();
 
-  return (
-    <>
-      <Switch isSelected={active} onChange={onThresholdChange}>
-        Segmentation View
-      </Switch>
-      {active && (
-        <>
-          <RangeStepper
-            label={"Threshold"}
-            value={thresholdPercentile}
-            setValue={setThresholdPercentile}
-          />
-          <RangeStepper
-            label={"Min Frequency (kHz)"}
-            value={minFrequency || 5}
-            minValue={0}
-            stepSize={{ small: 1, large: 5 }}
-            setValue={setMinFrequency}
-          />
-          <Slider
-            label="Min Annotation Size"
-            minValue={0}
-            maxValue={500}
-            step={1}
-            defaultValue={minAnnotationSize}
-            onChangeEnd={setMinAnnotationSize}
-          />
-          <Slider
-            label="Vertical Filter Width"
-            minValue={0}
-            maxValue={50}
-            step={1}
-            defaultValue={lineFilterWidth}
-            onChangeEnd={setLineFilterWidth}
-          />
-          <Slider
-            label="Smoothing"
-            minValue={0.0}
-            maxValue={10.0}
-            step={0.001}
-            formatOptions={{ style: "decimal", maximumFractionDigits: 3 }}
-            defaultValue={smoothingSigma}
-            onChangeEnd={setSmoothingSigma}
-          />
-          <Slider
-            label="Ridge Filter Size"
-            minValue={0.001}
-            maxValue={1}
-            step={0.001}
-            defaultValue={filterSize}
-            onChangeEnd={setFilterSize}
-          />
-        </>
-      )}
-    </>
-  );
-}
+  if (!project || !sample) {
+    console.warn("Project or sample not found in ToolBar");
+    return null;
+  }
 
-type ToolBarInfo = {
-  project: Project;
-  sample: Sample;
-  data: Data;
-  annotations: Annotation[];
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
-  ) => void;
-  viewParams: ViewParams;
-  setViewParams: (viewParams: ViewParams) => void;
-  dataParams: DataParams;
-  setDataParams: (dataParams: DataParams) => void;
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
-};
-export default function ToolBar({
-  project,
-  sample,
-  data,
-  annotations,
-  setAnnotations,
-  viewParams,
-  setViewParams,
-  dataParams,
-  plotProps,
-  setPlotProps,
-}: ToolBarInfo) {
   const project_id = project._id;
   const sample_id = sample._id;
+
+  if (!project_id || !sample_id) {
+    console.warn("Invalid project_id or sample_id in ToolBar");
+    return null;
+  }
+
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  tools.push({
-    name: "Model Prediction",
-    component: (
-      <ModelPredictTool
-        project={project}
-        sample_id={sample_id}
-        setAnnotations={setAnnotations}
-      ></ModelPredictTool>
-    ),
-  });
-
-  if (project.task == "ELM") {
+  if (data && project.task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
     if (!result.success) {
-      console.warn("ELM data is not available");
+      console.warn("Time series data is not available");
       return;
     }
 
     const tsData = result.data;
 
-    const labels = ["No ELMs", "Type I", "Type II", "Type III"];
+    const labels = ["Valid Shot", "Invalid Shot"];
     tools.push({
       name: "Shot Labels",
-      component: (
-        <ShotLabels
-          labels={labels}
-          annotations={annotations}
-          setAnnotations={setAnnotations}
-        ></ShotLabels>
-      ),
+      component: <ShotLabels labels={labels}></ShotLabels>,
     });
 
     tools.push({
@@ -506,8 +176,6 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          dataParams={dataParams}
-          setAnnotations={setAnnotations}
         ></PeakDetectionTool>
       ),
     });
@@ -519,8 +187,6 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          dataParams={dataParams}
-          setAnnotations={setAnnotations}
         ></OutlierDetectionTool>
       ),
     });
@@ -532,8 +198,6 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          dataParams={dataParams}
-          setAnnotations={setAnnotations}
         ></ChangePointDetectionTool>
       ),
     });
@@ -545,21 +209,21 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           data={tsData}
-          dataParams={dataParams}
-          setAnnotations={setAnnotations}
         ></JumpDetectionTool>
       ),
     });
-  } else if (project.task == "MHD") {
-    const resultComposite = CompositeDataSchema.safeParse(data);
-    if (!resultComposite.success) {
-      console.warn("MHD data is not available");
-      return;
-    }
 
-    const resultSpec = SpectrogramDataSchema.safeParse(
-      resultComposite.data.values["mirnov"]
-    );
+    tools.push({
+      name: "Model Prediction",
+      component: (
+        <ModelPredictTool
+          project_id={project_id}
+          sample_id={sample_id}
+        ></ModelPredictTool>
+      ),
+    });
+  } else if (data && project.task == TaskType.Spectrogram) {
+    const resultSpec = SpectrogramDataSchema.safeParse(data);
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");
       return;
@@ -592,10 +256,8 @@ export default function ToolBar({
           project_id={project_id}
           sample_id={sample_id}
           signal_name={"mirnov"}
-          dataParams={dataParams}
           plotProps={plotProps}
           setPlotProps={setPlotProps}
-          setAnnotations={setAnnotations}
         />
       ),
     });
@@ -603,7 +265,7 @@ export default function ToolBar({
 
   const refreshAnnotations = async () => {
     const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
-    setAnnotations(dbAnnotations);
+    setAnnotations(() => dbAnnotations);
   };
 
   return (
@@ -625,17 +287,7 @@ export default function ToolBar({
             <Header height="size-300" marginBottom="size-100">
               <span style={{ fontSize: "1.2rem" }}>Controls</span>
             </Header>
-            <NavigationBar
-              project_id={project_id}
-              sample_id={sample_id}
-              annotations={annotations}
-              setAnnotations={setAnnotations}
-            />
-            <ShotSearch
-              project_id={project_id}
-              sample_id={sample_id}
-              annotations={annotations}
-            />
+            <NavigationBar project_id={project_id} sample_id={sample_id} />
             <Accordion allowsMultipleExpanded={true} width="100%">
               <Disclosure>
                 <DisclosureTitle>
@@ -654,7 +306,7 @@ export default function ToolBar({
                   <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
                 </DisclosureTitle>
                 <DisclosurePanel>
-                  <ImportTool
+                  <ImportButton
                     project_id={project_id}
                     refreshAnnotations={refreshAnnotations}
                   />
@@ -662,21 +314,25 @@ export default function ToolBar({
               </Disclosure>
             </Accordion>
           </Flex>
-          <Flex justifyContent="center" alignItems="center">
-            <Header height="size-300" marginBottom="size-100">
-              <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
-            </Header>
-          </Flex>
-          <Accordion allowsMultipleExpanded={true} width="100%">
-            {tools.map((item, i) => (
-              <Disclosure key={i}>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                </DisclosureTitle>
-                <DisclosurePanel>{item.component}</DisclosurePanel>
-              </Disclosure>
-            ))}
-          </Accordion>
+          {tools.length > 0 && (
+            <>
+              <Flex justifyContent="center" alignItems="center">
+                <Header height="size-300" marginBottom="size-100">
+                  <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+                </Header>
+              </Flex>
+              <Accordion allowsMultipleExpanded={true} width="100%">
+                {tools.map((item, i) => (
+                  <Disclosure key={i}>
+                    <DisclosureTitle>
+                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                    </DisclosureTitle>
+                    <DisclosurePanel>{item.component}</DisclosurePanel>
+                  </Disclosure>
+                ))}
+              </Accordion>
+            </>
+          )}
         </Flex>
       </View>
     </Provider>

@@ -32,9 +32,9 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> tuple[torch.tensor, int]:
-        data: TimeSeriesData = self.data_loader.get_sample(
-            self.samples[idx].shot_id, self.samples[idx].data
-        ).values["ip"]
+        data: TimeSeriesData = self.data_loader.get_sample(self.samples[idx]).values[
+            "ip"
+        ]
         # Scale data to be between 0 and 1...
         plasma_current = torch.tensor(data.values, dtype=torch.float32)
         self.current_scaling.append(plasma_current.max())
@@ -48,7 +48,7 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         return plasma_current, disruption_time / data.time[-1]
 
 
-@ModelRegistry.register("disruption_cnn", ["disruption"])
+@ModelRegistry.register("disruption_cnn", ["time-series"])
 class DisruptionCNN(Model):
     def define_model(self):
         return nn.Sequential(

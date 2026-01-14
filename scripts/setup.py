@@ -4,12 +4,21 @@ from typing import Optional
 import requests
 
 
-def create_project(name: str, task: str, data_loader: str, query_strategy: str) -> str:
+def create_project(
+    name: str,
+    task: str,
+    data_loader: str,
+    query_strategy: str,
+    min_time_step: float = 0.0001,
+) -> str:
     project = {
         "name": name,
         "task": task,
         "query_strategy": query_strategy,
         "data_loader": data_loader,
+        "time_min": -0.1,
+        "time_max": 0.8,
+        "min_time_step": min_time_step,
     }
 
     response = requests.post(
@@ -27,7 +36,7 @@ def create_uda_samples(project_id: str, shot_ids: list[int]):
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["ip", "ANE_DENSITY"],
+                "signal_names": ["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"],
                 "protocol": "uda",
             },
         }
@@ -82,10 +91,14 @@ def main():
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
 
-    project_id = create_project("UDA Disruption Project", "disruption", "uda", "random")
+    project_id = create_project(
+        "UDA Disruption Project", "time-series", "uda", "sequential"
+    )
     create_uda_samples(project_id, shot_ids)
 
-    project_id = create_project("Local ELM Project", "ELM", "parquet", "random")
+    project_id = create_project(
+        "Local ELM Project", "time-series", "parquet", "sequential"
+    )
     create_local_samples(
         project_id, shot_ids, base_path=base_path / "summary", file_type="parquet"
     )
@@ -93,7 +106,9 @@ def main():
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
-    project_id = create_project("Local MHD Project", "MHD", "parquet", "random")
+    project_id = create_project(
+        "Local MHD Project", "spectrogram", "parquet", "random", 0.000001
+    )
     create_local_samples(
         project_id,
         shot_ids,

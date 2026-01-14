@@ -1,6 +1,7 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { arrayMax, arrayMin } from "@/app/utils";
 import Plotly, {
   Config,
   Layout,
@@ -27,6 +28,7 @@ interface PlotConfiguration {
 type TimeSeriesPlotProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
+  rescaleOnZoom?: boolean;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -54,14 +56,18 @@ export const TimeSeries = ({
           "resetScale2d",
         ],
       ],
-      dragmode: false,
+      dragmode: "pan",
       displaylogo: false,
       displayModeBar: true,
-      scrollZoom: false,
+      scrollZoom: true,
     },
   },
+  rescaleOnZoom = true,
   children,
 }: TimeSeriesPlotProps) => {
+  const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
+    null
+  );
   const [updateTools, setUpdateTools] = useState(0);
   const [plotReady, setPlotReady] = useState(false);
   const isDraggingRef = useRef(false);
@@ -79,12 +85,6 @@ export const TimeSeries = ({
   const triggerToolUpdate = () => {
     setUpdateTools((current) => (current + 1) % 100);
   };
-
-  if (!disableToolingInteraction) {
-    config = { ...config, scrollZoom: false, dragmode: "pan" };
-  } else {
-    config = { ...config, scrollZoom: true, dragmode: "pan" };
-  }
   // Main plotly rendering
   useEffect(() => {
     const overplots: string[] = [];
@@ -120,6 +120,7 @@ export const TimeSeries = ({
         }
       });
 
+      // Use setTimeout to ensure DOM has fully updated before signaling ready
       setPlotReady(true);
     };
 
@@ -174,8 +175,8 @@ export const TimeSeries = ({
         }
 
         if (yValues.length > 0) {
-          const yMin = Math.min(...yValues);
-          const yMax = Math.max(...yValues);
+          const yMin = arrayMin(yValues);
+          const yMax = arrayMax(yValues);
           const offset = 0.1 * (yMax - yMin); // 10 % offset
 
           configUpdate = {
@@ -194,19 +195,19 @@ export const TimeSeries = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-      // triggers re-render of overlay tools when axes change
-      triggerToolUpdate();
-
-      // This makes use of the first graph displayed but this should be fine
-      if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
-        // for zoom and pan events
-        rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
-      } else if ("xaxis.range" in eventData) {
-        // for range slider events
-        rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
-      } else {
-        rescale(); // for initial load & autoscale
+      if (rescaleOnZoom) {
+        // This makes use of the first graph displayed but this should be fine
+        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+          // for zoom and pan events
+          rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
+        } else if ("xaxis.range" in eventData) {
+          // for range slider events
+          rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
+        } else {
+          rescale(); // for initial load & autoscale
+        }
       }
+      triggerToolUpdate();
     };
 
     const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
@@ -222,15 +223,14 @@ export const TimeSeries = ({
       plot.removeAllListeners("plotly_doubleclick");
       plot.removeAllListeners("plotly_selected");
       plot.removeAllListeners("plotly_deselect");
-
       plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
       plot.on("plotly_doubleclick", rescale);
 
       // attach listener for selection events
-      plot.on("plotly_selected", function (eventData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      plot.on("plotly_selected", function (eventData: any) {
         if (eventData && eventData.range) {
           setSelectedXRange(eventData.range.x);
-          relayout(plot, { selections: [] }); // clear selection
         }
       });
       plot.on("plotly_deselect", function () {
@@ -241,14 +241,40 @@ export const TimeSeries = ({
 
     initGraph();
 
+    if (!disableToolingInteraction) {
+      plot.style.pointerEvents = "auto";
+    } else {
+      plot.style.pointerEvents = "none";
+    }
+
     return () => {
-      // // cleanup on unmount / Fast-Refresh
+      // cleanup on unmount / Fast-Refresh
       overplots.forEach((overplot) => {
         plot?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
       });
       setPlotReady(false); // reset ready state
     };
-  }, [plotId, config, data, layout, plotReady, allowRelayout]);
+  }, [
+    plotId,
+    config,
+    data,
+    layout,
+    plotReady,
+    allowRelayout,
+    disableToolingInteraction,
+    rescaleOnZoom,
+  ]);
+
+  useEffect(() => {
+    const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+    if (!plot) {
+      return;
+    }
+    if (allowRelayout.current) {
+      relayout(plot, { selections: [] }); // clear selection
+      setSelectedXRange(null);
+    }
+  }, [config, plotId]);
 
   // Handles context menu creation
   useEffect(() => {
@@ -412,7 +438,7 @@ export const TimeSeries = ({
       });
       document.removeEventListener("keyup", cancelToolCreation);
     };
-  }, [plotId, plotReady, toolingCallbacks]);
+  }, [plotId, plotReady, toolingCallbacks, updateTools]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">

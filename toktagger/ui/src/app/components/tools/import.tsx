@@ -8,7 +8,7 @@ import {
 } from "@adobe/react-spectrum";
 import Import from "@spectrum-icons/workflow/Import";
 
-export function ImportTool({
+export function ImportButton({
   project_id,
   refreshAnnotations,
 }: {

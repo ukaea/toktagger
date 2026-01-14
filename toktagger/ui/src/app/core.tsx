@@ -109,6 +109,17 @@ export const deleteProject = async (project_id: string) => {
   }
 };
 
+export async function getShotSample(project_id: string, shot_id: string) {
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
+  const sampleResult = await fetch(NEXT_URL);
+  const sampleArray = await sampleResult.json();
+  let sample = null;
+  if (sampleArray.length > 0) {
+    sample = sampleArray[0];
+  }
+  return sample;
+}
+
 export async function getAnnotationsForSample(
   project_id: string,
   sample_id: string
@@ -137,15 +148,23 @@ export async function getAnnotations(
 export async function saveSampleAnnotations(
   project_id: string,
   sample_id: string,
-  annotations: Annotation[]
+  annotations: Annotation[],
+  validateOnSave: boolean = true
 ) {
+  // user has validated the annotations, so set created_by to "manual"
+  const updatedAnnotations = annotations.map((annotation: Annotation) => {
+    annotation.created_by = "manual";
+    annotation.validated = validateOnSave ? true : annotation.validated;
+    return annotation;
+  });
+
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(annotations),
+    body: JSON.stringify(updatedAnnotations),
   });
   if (!response.ok) {
     throw new Error(`Failed to save annotations: ${response.statusText}`);

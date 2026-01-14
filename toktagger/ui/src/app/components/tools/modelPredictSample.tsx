@@ -8,22 +8,17 @@ import {
   ProgressCircle,
   Switch,
 } from "@adobe/react-spectrum";
-import { Project, Annotations, Annotation } from "@/types";
+import { Annotations, Annotation } from "@/types";
 import { startSamplePredictions, getSamplePredictions } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type ModelPredictInfo = {
-  project: Project;
+  project_id: string;
   sample_id: string;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
-export function ModelPredictTool({
-  project,
-  sample_id,
-  setAnnotations,
-}: ModelPredictInfo) {
+export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
+  const { project, setAnnotations } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -36,7 +31,7 @@ export function ModelPredictTool({
         return;
       }
       const response = await startSamplePredictions(
-        project._id,
+        project_id,
         sample_id,
         selectedModel,
       );
@@ -51,7 +46,7 @@ export function ModelPredictTool({
       }
     };
     scheduleTask();
-  }, [project._id, sample_id, selectedModel, isEnabled]);
+  }, [project_id, sample_id, selectedModel, isEnabled]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,8 +63,13 @@ export function ModelPredictTool({
       let pollCounter = 0;
       // Poll for result from GET predictions endpoint
       const interval = setInterval(async () => {
+        if (selectedModel == null) {
+          clearInterval(interval);
+          setIsLoading(false);
+          return;
+        }
         const response = await getSamplePredictions(
-          project._id,
+          project_id,
           sample_id,
           selectedModel,
           taskId,
@@ -104,14 +104,11 @@ export function ModelPredictTool({
       }, 1000);
     };
     fetchData();
-  }, [
-    project._id,
-    sample_id,
-    selectedModel,
-    taskId,
-    setAnnotations,
-    isEnabled,
-  ]);
+  }, [project_id, sample_id, selectedModel, taskId, setAnnotations, isEnabled]);
+
+  if (!project) {
+    return;
+  }
 
   return (
     <Provider theme={defaultTheme}>

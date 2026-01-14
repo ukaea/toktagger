@@ -12,7 +12,12 @@ import { useContextMenuProvider } from "../providers/annotation-provider";
  * @param plotId Used to identify the plot that the tooling should be rendered on
  * @param plotReady Signal from main plot that tooling can be drawn
  */
-export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
+export const VSpans = ({
+  plotId,
+  plotReady,
+  forceUpdate,
+  selectedXRange,
+}: ToolingProps) => {
   const dragOffset = useRef(0);
 
   // Hook to trigger the context provider to render context menu
@@ -59,8 +64,11 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
       )[0];
 
       if (!overplot) {
-        console.error("Could not locate D3 overplot to generate zones");
-        handleVSpanUpdate();
+        // Silently skip if overplot not found yet - it will be available on next render
+        console.warn("Could not find overplot for vspan rendering");
+        setTimeout(() => {
+          handleVSpanUpdate();
+        }, 100);
         return;
       }
 
@@ -116,6 +124,20 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
 
       // Create a line and a transparent drag handle for each VSpan
       for (const vspan of vspans) {
+        let opacity = 0.5;
+
+        // change opacity if the zone is selected
+        if (
+          selectedXRange &&
+          vspan.x > selectedXRange[0] &&
+          vspan.x < selectedXRange[1]
+        ) {
+          vspan.selected = true;
+          opacity = 0.8;
+        } else {
+          vspan.selected = false;
+        }
+
         const x = xaxis.d2p(vspan.x);
         const pointerEvent = disableToolingInteraction ? "none" : "all";
         graphGroup
@@ -125,6 +147,7 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
           .attr("x2", x)
           .attr("y1", upperLimit)
           .attr("y2", upperLimit + height)
+          .attr("opacity", opacity)
           .attr("stroke", vspan.category.color)
           .attr("stroke-width", 6)
           .attr("style", `pointer-events: ${pointerEvent}`)
@@ -155,6 +178,7 @@ export const VSpans = ({ plotId, plotReady, forceUpdate }: ToolingProps) => {
     triggerUpdate,
     forceUpdate,
     disableToolingInteraction,
+    selectedXRange,
   ]);
 
   return <div />;

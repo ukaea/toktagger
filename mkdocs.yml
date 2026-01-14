@@ -5,6 +5,7 @@ theme:
     scheme: default
 markdown_extensions: 
 - admonition
+- attr_list
 - pymdownx.details
 - pymdownx.highlight
 - pymdownx.inlinehilite
@@ -14,6 +15,7 @@ markdown_extensions:
     generic: true
 nav:
   - Home: index.md
+  - Time Series Labelling: time_series.md
   - Annotators: annotators.md
   - Developer Documentation: 
     - Getting Started: dev/developer-setup.md

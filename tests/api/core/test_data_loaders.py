@@ -1,5 +1,6 @@
 import toktagger.api.core.data_loaders as data_loaders
 import pytest
+from toktagger.api.schemas.projects import Task
 from typing import Type
 from toktagger.api.schemas.samples import (
     Sample,
@@ -37,7 +38,7 @@ def test_image_file_loader_jpg():
     data_loader = data_loaders.ImageDataLoader(
         params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample.shot_id, sample.data)
+    image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -63,7 +64,7 @@ def test_image_file_loader_png():
     data_loader = data_loaders.ImageDataLoader(
         params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample.shot_id, sample.data)
+    image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -88,7 +89,7 @@ def test_parquet_file_loader():
         validated_annotations=False,
     )
     data_loader = data_loaders.ParquetDataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample.shot_id, sample.data)
+    data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -121,7 +122,7 @@ def test_uda_loader(uda_env_vars):
         validated_annotations=False,
     )
     data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample.shot_id, sample.data)
+    data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -152,7 +153,7 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
         validated_annotations=False,
     )
     data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample.shot_id, sample.data)
+    data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present, but filled with Nones
@@ -164,7 +165,7 @@ async def test_custom_data_loader(api_client):
     # Check that you cannot create a project with 'test' data loader
     in_project = {
         "name": "test_project",
-        "task": "UFO",
+        "task": Task.VIDEO,
         "query_strategy": "random",
         "data_loader": "test",  # <--- invalid
     }
@@ -179,7 +180,8 @@ async def test_custom_data_loader(api_client):
         def sample_data_type(self) -> Type[ShotData]:
             return ShotData
 
-        def get_sample(self, shot_id: int, sample_data: ShotData):
+        def get_sample(self, sample: Sample, **kwargs):
+            shot_id = sample.shot_id
             # Return some data, use something from sample to check it is passed in correctly
             return MultiVariateTimeSeriesData(
                 values={

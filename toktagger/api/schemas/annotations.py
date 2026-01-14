@@ -1,26 +1,27 @@
 from typing import Literal, Optional, Union
+
+from pydantic import Field, TypeAdapter, field_validator, model_validator
+
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotators import AnnotatorTypes
-from pydantic import Field, TypeAdapter, model_validator, field_validator
 
 
 class AnnotationIn(ConfiguredModel):
-    @model_validator(mode="before")
-    def set_uncertainty(cls, values):
-        if not isinstance(values, dict):
-            values = values.model_dump(mode="python")
-
-        if values.get("validated"):
-            values["uncertainty"] = 0
-        elif not values.get("validated") and values.get("uncertainty") is None:
-            values["uncertainty"] = 1
-
-        return values
-
-    validated: bool = False
-    uncertainty: Optional[float] = None
     label: str
     created_by: str
+    validated: bool = False
+    uncertainty: Optional[float] = None
+    sample_id: Optional[str] = None
+    project_id: Optional[str] = None
+
+    @model_validator(mode="before")
+    def set_uncertainty(cls, values):
+        if isinstance(values, dict):
+            if "validated" in values and values["validated"]:
+                values["uncertainty"] = 0
+            elif values.get("uncertainty") is None:
+                values["uncertainty"] = 1
+        return values
 
     @field_validator("created_by")
     def check_created_by(cls, value):
@@ -37,9 +38,6 @@ class AnnotationIn(ConfiguredModel):
 
 class Annotation(AnnotationIn):
     id: str = Field(..., alias="_id")
-    created_by: AnnotatorTypes
-    project_id: Optional[str] = None
-    sample_id: Optional[str] = None
 
 
 class ClassLabel(AnnotationIn):
@@ -72,28 +70,36 @@ class VideoBoundingBox(BoundingBox):
 
 
 class SpectrogramMask(AnnotationIn):
+    type: Literal["spectrogram_mask"] = "spectrogram_mask"
     values: list[list[float]]
 
 
 class PolygonAnnotation(AnnotationIn):
+    type: Literal["polygon"] = "polygon"
     segmentation: list[list[float]]
     area: float
     bbox: list[float]  # [x, y, width, height]
 
 
-class TimePointOut(TimePoint, Annotation):
+class AnnotationOut(AnnotationIn):
+    id: Optional[str] = Field(None, alias="_id")
+    project_id: Optional[str] = None
+    sample_id: Optional[str] = None
+
+
+class TimePointOut(TimePoint, AnnotationOut):
     pass
 
 
-class TimeRegionOut(TimeRegion, Annotation):
+class TimeRegionOut(TimeRegion, AnnotationOut):
     pass
 
 
-class BoundingBoxOut(BoundingBox, Annotation):
+class BoundingBoxOut(BoundingBox, AnnotationOut):
     pass
 
 
-class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
+class VideoBoundingBoxOut(VideoBoundingBox, AnnotationOut):
     pass
 
 
@@ -118,6 +124,7 @@ AnnotationTypes = Union[
     SpectrogramMask,
     PolygonAnnotation,
 ]
+
 AnnotationOutTypes = Union[
     TimePointOut,
     TimeRegionOut,
@@ -127,11 +134,8 @@ AnnotationOutTypes = Union[
     PolygonAnnotationOut,
 ]
 
-
-class AnnotationBatchItem(ConfiguredModel):
-    sample_id: str
-    annotations: list[AnnotationTypes]
-
+AnnotationBatchInputTypes = AnnotationOutTypes
 
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)
+AnnotationBatchInputTypeAdapter = TypeAdapter(AnnotationBatchInputTypes)

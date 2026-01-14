@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import {
   Provider,
   defaultTheme,
@@ -13,23 +13,18 @@ import {
 } from "@adobe/react-spectrum";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type PeakDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  dataParams: DataParams;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[])
-  ) => void;
 };
 export function PeakDetectionTool({
   project_id,
   sample_id,
-  data,
-  dataParams,
-  setAnnotations,
 }: PeakDetectionType) {
+  const { setAnnotations, dataParams, data } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [prominence, setProminance] = useState<number>(5);
   const [distance, setDistance] = useState<number>(1);
