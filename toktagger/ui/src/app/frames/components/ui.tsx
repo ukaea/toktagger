@@ -25,6 +25,7 @@ export function ClassPanel({
       </Text>
       <Picker
         aria-label="Class"
+        items={LABEL_MAP.categories}
         selectedKey={selectedClassName}
         onSelectionChange={(key) =>
           setSelectedClassName((key as string) || null)
@@ -32,9 +33,7 @@ export function ClassPanel({
         placeholder="— Select class —"
         width="100%"
       >
-        {LABEL_MAP.categories.map((c) => (
-          <Item key={c.name}>{c.name}</Item>
-        ))}
+        {(item) => <Item key={item.name}>{item.name}</Item>}
       </Picker>
       <Text UNSAFE_className="text-xs mt-2 block text-white/80">
         Drawing is enabled after you pick a class.
