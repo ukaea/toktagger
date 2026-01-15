@@ -25,9 +25,9 @@ import {
   W3CImageFormat,
   buildSourceKey,
   clearW3CForSample,
-  isUfoWorkingDirty,
+  isVideoWorkingDirty,
   sampleFramePrefix,
-  setUfoWorkingDirty,
+  setVideoWorkingDirty,
 } from "./adapters";
 import {
   loadClassRegistry,
@@ -266,7 +266,7 @@ export function FrameView({
 
     if (navType === "reload") {
       clearW3CForSample(projectId, sampleId);
-      setUfoWorkingDirty(projectId, sampleId, false);
+      setVideoWorkingDirty(projectId, sampleId, false);
     }
   }, [projectId, sampleId]);
 
@@ -357,7 +357,7 @@ export function FrameView({
       if (typeof window === "undefined") return;
 
       // If user has an in-progress local session, do NOT overwrite it.
-      if (isUfoWorkingDirty(projectId, sampleId)) return;
+      if (isVideoWorkingDirty(projectId, sampleId)) return;
 
       // Clear any leftover per-frame cache to avoid conflicts
       clearW3CForSample(projectId, sampleId);
@@ -456,7 +456,7 @@ export function FrameView({
     try {
       const list = await bridge.persistWorkingNow(frameKey);
       await adapter.write(list);
-      setUfoWorkingDirty(projectId, sampleId, true);
+      setVideoWorkingDirty(projectId, sampleId, true);
       setPopupList(list as ImageAnnotation[]);
       bridge.markSaved();
       return list;
@@ -1385,8 +1385,7 @@ export function FrameView({
   );
 }
 
-// Branch1 uses Annotation[] (no Annotations alias)
-type UFOViewInfo = {
+type VideoViewInfo = {
   data: ImageData;
   annotations: Annotation[];
   setAnnotations: (
@@ -1404,11 +1403,11 @@ type UFOViewInfo = {
 };
 
 /**
- * UFOView:
+ * VideoView:
  * Thin wrapper around FrameView. Keeps the same props surface as backup.
  * (dataParams are unused here but preserved for compatibility.)
  */
-export const UFOView = ({
+export const VideoView = ({
   data,
   annotations,
   setAnnotations: _setAnnotations,
@@ -1416,7 +1415,7 @@ export const UFOView = ({
   setDataParams,
   projectId,
   sampleId,
-}: UFOViewInfo) => {
+}: VideoViewInfo) => {
   const currentFrame = useMemo(() => {
     const frame = data.frame;
     return typeof frame === "number" && Number.isFinite(frame) ? frame : 0;

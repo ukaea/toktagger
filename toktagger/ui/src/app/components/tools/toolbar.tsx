@@ -61,10 +61,10 @@ import {
   scanInstanceCountsChunked,
 } from "@/app/frames/components/lib";
 import {
-  ClassPanel as UFOClassPanel,
-  InstancePanel as UFOInstancePanel,
+  ClassPanel as VideoClassPanel,
+  InstancePanel as VideoInstancePanel,
 } from "@/app/frames/components/ui";
-import { setUfoWorkingDirty } from "@/app/frames/components/adapters";
+import { setVideoWorkingDirty } from "@/app/frames/components/adapters";
 
 // ------------------------------
 // Save helpers
@@ -95,7 +95,7 @@ async function saveAnnotationsValidated(
 }
 
 // UFO behavior: backend expects already-formed payload (COCO video bboxes), no validated tagging here.
-async function saveUfoAnnotations(
+async function saveVideoAnnotations(
   project_id: string,
   sample_id: string,
   annotations: Annotation[],
@@ -222,19 +222,19 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   );
 }
 
-type UfoShotSearchProps = {
+type VideoShotSearchProps = {
   project_id?: string;
   sample_id?: string;
   navigate: NavigateFunction;
-  collectUfoPayloadForBackend: () => Promise<Annotation[]>;
+  collectVideoPayloadForBackend: () => Promise<Annotation[]>;
 };
 
-function UfoShotSearch({
+function VideoShotSearch({
   project_id,
   sample_id,
   navigate,
-  collectUfoPayloadForBackend,
-}: UfoShotSearchProps) {
+  collectVideoPayloadForBackend,
+}: VideoShotSearchProps) {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [shotQuery, setShotQuery] = useState<string>("");
 
@@ -263,10 +263,10 @@ function UfoShotSearch({
     try {
       const nextSample = await getShotSample(project_id, newValue);
       if (nextSample !== null) {
-        const payload = await collectUfoPayloadForBackend();
-        await saveUfoAnnotations(project_id, sample_id, payload);
+        const payload = await collectVideoPayloadForBackend();
+        await saveVideoAnnotations(project_id, sample_id, payload);
 
-        setUfoWorkingDirty(project_id, sample_id, false);
+        setVideoWorkingDirty(project_id, sample_id, false);
 
         const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
         navigate(NEXT_SAMPLE_URL);
@@ -491,7 +491,7 @@ function SpectrogramThresholdTool({
  * Toolbar-side instance profiles used by FrameView via window.ufoInstanceProfiles.
  * FrameView expects: { id, class_name, class_id, track_id }.
  */
-type InstanceProfile = {
+type VideoInstanceProfile = {
   id: string; // `${class_name}:${track_id}`
   class_name: string;
   class_id: number;
@@ -499,7 +499,7 @@ type InstanceProfile = {
 };
 declare global {
   interface Window {
-    ufoInstanceProfiles?: InstanceProfile[];
+    ufoInstanceProfiles?: VideoInstanceProfile[];
     ufoSelectedProfileId?: string | null;
     ufoSelectedClassName?: string | null;
     ufoSelectedTrackId?: string | null;
@@ -516,7 +516,7 @@ declare global {
  * Stable key used by the shared UFOInstancePanel and FrameView events.
  * Shape: "<class_name lowercase>:<canonical track_id>"
  */
-const instanceKey = (inst: InstanceProfile) =>
+const instanceKey = (inst: VideoInstanceProfile) =>
   `${inst.class_name.toLowerCase()}:${inst.track_id}`;
 
 // ------------------------------
@@ -539,11 +539,11 @@ type ToolBarInfo = {
 };
 
 export default function ToolBar(props: ToolBarInfo) {
-  const isUfo = props.project.task === "UFO";
-  return isUfo ? <UfoToolbar {...props} /> : <NonUfoToolbar {...props} />;
+  const isVideo = props.project.task === "UFO";
+  return isVideo ? <VideoToolbar {...props} /> : <StandardToolbar {...props} />;
 }
 
-function NonUfoToolbar({
+function StandardToolbar({
   project,
   sample,
   data,
@@ -760,14 +760,14 @@ function NonUfoToolbar({
   );
 }
 
-type UfoWireProfile = {
+type VideoWireProfile = {
   class_name: string;
   class_id: number;
   track_id: string;
 };
 
-type UfoStateDetail = {
-  profiles?: UfoWireProfile[];
+type VideoStateDetail = {
+  profiles?: VideoWireProfile[];
   selectedKey?: string;
   selectedClassName?: string | null;
   lastClassName?: string;
@@ -775,7 +775,7 @@ type UfoStateDetail = {
   profileCounts?: Record<string, number>;
 };
 
-function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
+function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
   const navigate = useNavigate();
 
   const project_id = project._id;
@@ -786,9 +786,9 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
     null,
   );
 
-  const [instanceProfiles, setInstanceProfiles] = useState<InstanceProfile[]>(
-    [],
-  );
+  const [instanceProfiles, setInstanceProfiles] = useState<
+    VideoInstanceProfile[]
+  >([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
     null,
   );
@@ -805,10 +805,10 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
       const detail = (e as CustomEvent<unknown>).detail;
       const d = (
         detail && typeof detail === "object" ? detail : {}
-      ) as UfoStateDetail;
+      ) as VideoStateDetail;
 
       if (Array.isArray(d.profiles)) {
-        const next: InstanceProfile[] = d.profiles.map((p) => ({
+        const next: VideoInstanceProfile[] = d.profiles.map((p) => ({
           id: `${p.class_name}:${p.track_id}`,
           class_name: p.class_name,
           class_id: p.class_id,
@@ -926,11 +926,11 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
     window.dispatchEvent(new CustomEvent("ufo:deleteAllInstances"));
   };
 
-  const ufoClearCurrent = async () => {
+  const videoClearCurrent = async () => {
     await window.ufoClearCurrent?.();
   };
 
-  const collectUfoPayloadForBackend = async (): Promise<Annotation[]> => {
+  const collectVideoPayloadForBackend = async (): Promise<Annotation[]> => {
     if (typeof window === "undefined") return annotations;
 
     const collect = window.ufoCollectForSave;
@@ -947,7 +947,7 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
     return videoBBoxes as Annotation[];
   };
 
-  const handleUfoSave = async () => {
+  const handleVideoSave = async () => {
     if (!project_id || !sample_id) {
       ToastQueue.negative("Cannot save: missing project or sample id.", {
         timeout: 5000,
@@ -956,14 +956,14 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
     }
 
     try {
-      const payload = await collectUfoPayloadForBackend();
+      const payload = await collectVideoPayloadForBackend();
 
-      const response = await saveUfoAnnotations(project_id, sample_id, payload);
+      const response = await saveVideoAnnotations(project_id, sample_id, payload);
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
 
-      setUfoWorkingDirty(project_id, sample_id, false);
+      setVideoWorkingDirty(project_id, sample_id, false);
 
       ToastQueue.positive(`Saved ${payload.length} annotations!`, {
         timeout: 5000,
@@ -977,7 +977,7 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
     }
   };
 
-  const handleUfoNextSample = async () => {
+  const handleVideoNextSample = async () => {
     if (!project_id || !sample_id) {
       ToastQueue.negative(
         "Cannot load next sample: missing project or sample id.",
@@ -987,10 +987,10 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
     }
 
     try {
-      const payload = await collectUfoPayloadForBackend();
-      await saveUfoAnnotations(project_id, sample_id, payload);
+      const payload = await collectVideoPayloadForBackend();
+      await saveVideoAnnotations(project_id, sample_id, payload);
 
-      setUfoWorkingDirty(project_id, sample_id, false);
+      setVideoWorkingDirty(project_id, sample_id, false);
 
       const next = await getNextSample(project_id);
       const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${next._id}`;
@@ -1011,21 +1011,21 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
       <div className="h-screen text-center w-72 shrink-0 overflow-y-auto">
         <div className="pl-4 pr-4 pt-4">
           <ButtonGroup>
-            <Button variant="primary" onPress={handleUfoSave}>
+            <Button variant="primary" onPress={handleVideoSave}>
               Save
             </Button>
-            <Button variant="primary" onPress={handleUfoNextSample}>
+            <Button variant="primary" onPress={handleVideoNextSample}>
               Next
             </Button>
           </ButtonGroup>
         </div>
 
         <div className="pl-4 pr-4 pb-4 pt-2">
-          <UfoShotSearch
+          <VideoShotSearch
             project_id={project_id}
             sample_id={sample_id}
             navigate={navigate}
-            collectUfoPayloadForBackend={collectUfoPayloadForBackend}
+            collectVideoPayloadForBackend={collectVideoPayloadForBackend}
           />
         </div>
 
@@ -1059,7 +1059,7 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
                   UNSAFE_className="!px-2.5 !py-1.5 text-xs"
                   onPress={async () => {
                     try {
-                      await ufoClearCurrent();
+                      await videoClearCurrent();
                     } catch {
                       ToastQueue.negative("Failed to clear current frame.", {
                         timeout: 5000,
@@ -1075,7 +1075,7 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
             <hr className="m-4 h-px opacity-30 border-gray-200" />
           </div>
 
-          <UFOClassPanel
+          <VideoClassPanel
             items={LABEL_MAP.categories}
             selectedClassName={selectedClassName}
             setSelectedClassName={(name) => {
@@ -1092,7 +1092,7 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
             }}
           />
 
-          <UFOInstancePanel
+          <VideoInstancePanel
             profiles={instanceProfiles.map((inst) => ({
               key: instanceKey(inst),
               class_id: inst.class_id,
@@ -1149,7 +1149,7 @@ function UfoToolbar({ project, sample, annotations }: ToolBarInfo) {
 
               const id = `${cls}:${canonicalTrackId}`;
 
-              const nextInstances: InstanceProfile[] = [
+              const nextInstances: VideoInstanceProfile[] = [
                 ...instanceProfiles,
                 { id, class_name: cls, class_id, track_id: canonicalTrackId },
               ];

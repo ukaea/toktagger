@@ -23,7 +23,7 @@ import {
   DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { UFOView } from "@/app/frames/components/frames";
+import { VideoView } from "@/app/frames/components/frames";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -146,7 +146,7 @@ const SampleView = ({
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) throw new Error("Invalid data for UFO view");
     return (
-      <UFOView
+      <VideoView
         data={result.data}
         annotations={annotations}
         setAnnotations={setAnnotations}
@@ -229,7 +229,7 @@ export default function SamplePage() {
   });
 
   // UFO backend-driven first frame (frame=null) init guard
-  const ufoInitRef = useRef(false);
+  const videoInitRef = useRef(false);
 
   // ------------------------------
   // Sample/project refresh
@@ -237,15 +237,15 @@ export default function SamplePage() {
   useEffect(() => {
     if (!hasIds) return;
 
-    ufoInitRef.current = false;
+    videoInitRef.current = false;
 
     const refreshSample = async () => {
       const proj = await getProject(project_id as string);
       setProject(proj);
 
       // UFO: keep backend-driven initial frame behavior
-      if (proj.task === "UFO" && !ufoInitRef.current) {
-        ufoInitRef.current = true;
+      if (proj.task === "UFO" && !videoInitRef.current) {
+        videoInitRef.current = true;
         setDataParams({ name: "image", frame: null } as DataParams);
       }
 

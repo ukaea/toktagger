@@ -63,31 +63,31 @@ export function buildSourceKey({
 }
 
 export const W3C_KEY_PREFIX = "anno::w3c::";
-const WORKING_PREFIX = "ufo::working::";
+const VIDEO_WORKING_PREFIX = "ufo::working::";
 
 export function sampleFramePrefix(projectId: string, sampleId: string) {
   return `${W3C_KEY_PREFIX}app://p/${projectId}/s/${sampleId}/f/`;
 }
 
-export function workingKey(projectId: string, sampleId: string) {
-  return `${WORKING_PREFIX}${projectId}::${sampleId}`;
+export function videoWorkingKey(projectId: string, sampleId: string) {
+  return `${VIDEO_WORKING_PREFIX}${projectId}::${sampleId}`;
 }
 
-export function isUfoWorkingDirty(
+export function isVideoWorkingDirty(
   projectId: string,
   sampleId: string,
 ): boolean {
   if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(workingKey(projectId, sampleId)) === "1";
+  return window.localStorage.getItem(videoWorkingKey(projectId, sampleId)) === "1";
 }
 
-export function setUfoWorkingDirty(
+export function setVideoWorkingDirty(
   projectId: string,
   sampleId: string,
   dirty: boolean,
 ) {
   if (typeof window === "undefined") return;
-  const key = workingKey(projectId, sampleId);
+  const key = videoWorkingKey(projectId, sampleId);
   if (dirty) window.localStorage.setItem(key, "1");
   else window.localStorage.removeItem(key);
 }
