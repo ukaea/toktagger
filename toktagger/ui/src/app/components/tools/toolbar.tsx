@@ -983,7 +983,11 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
       const payload = await collectVideoPayloadForBackend();
 
       // Video save writes the pre-formed COCO video bbox payload to the backend.
-      const response = await saveVideoAnnotations(project_id,sample_id,payload);
+      const response = await saveVideoAnnotations(
+        project_id,
+        sample_id,
+        payload,
+      );
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }

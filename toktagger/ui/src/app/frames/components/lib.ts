@@ -13,10 +13,10 @@ import { buildSourceKey } from "./adapters";
  */
 
 // ------------------------------
-// LocalStorage keys 
+// LocalStorage keys
 // ------------------------------
 
-// Persisted toolbar "profiles" 
+// Persisted toolbar "profiles"
 export const PROFILES_KEY = "ufo::profiles";
 
 // Persisted class registry (name -> id mapping) shared with toolbar
