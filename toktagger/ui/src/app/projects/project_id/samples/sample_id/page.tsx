@@ -143,6 +143,9 @@ const SampleView = ({
   }
 
   if (project.task === "UFO") {
+    // Video/frame annotation task (backend name is still "UFO"):
+    // - data is an image frame (base64 PNG + frame index)
+    // - annotations are the backend COCO "video bbox" format, which VideoView can seed into localStorage
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) throw new Error("Invalid data for UFO view");
     return (
@@ -228,7 +231,9 @@ export default function SamplePage() {
     colorMap: "Cividis",
   });
 
-  // UFO backend-driven first frame (frame=null) init guard
+  // Video init guard:
+  // For video/frame projects, we want the backend to choose the initial frame on first load
+  // (by requesting frame=null once), and only once per sample refresh.
   const videoInitRef = useRef(false);
 
   // ------------------------------
@@ -243,7 +248,7 @@ export default function SamplePage() {
       const proj = await getProject(project_id as string);
       setProject(proj);
 
-      // UFO: keep backend-driven initial frame behavior
+      // Video (task "UFO"): keep backend-driven initial frame behavior (frame=null) on first load only.
       if (proj.task === "UFO" && !videoInitRef.current) {
         videoInitRef.current = true;
         setDataParams({ name: "image", frame: null } as DataParams);

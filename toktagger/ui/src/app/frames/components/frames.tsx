@@ -42,6 +42,13 @@ import {
 } from "./lib";
 import { Toast, ClassInfoPopup, ConfirmModal } from "./ui";
 
+/**
+ * InstanceProfile
+ * UI-level "instance row" for the toolbar:
+ * - class_name/class_id describe the category
+ * - track_id is the per-object identity across frames
+ * - id is a stable composite key (class_name + track_id)
+ */
 type InstanceProfile = {
   id: string;
   class_name: string;
@@ -49,16 +56,29 @@ type InstanceProfile = {
   track_id: string;
 };
 
+/**
+ * SelectedProfile
+ * "Currently armed instance" from the toolbar. When present, new rectangles
+ * get stamped with this exact (class_id/class_name/track_id).
+ */
 type SelectedProfile = {
   class_id?: number;
   class_name?: string;
   track_id?: string;
 } | null;
 
+/**
+ * BulkDeleteRequestDetail
+ * Payload sent by the toolbar via a CustomEvent("ufo:requestBulkDelete").
+ */
 type BulkDeleteRequestDetail = {
   profile?: { class_name?: string; track_id?: string };
 };
 
+/**
+ * Minimal runtime check used when we read annotations from localStorage.
+ * (We only require an id string; other fields are trusted by downstream code.)
+ */
 function isImageAnnotation(v: unknown): v is ImageAnnotation {
   return (
     !!v &&
@@ -68,23 +88,36 @@ function isImageAnnotation(v: unknown): v is ImageAnnotation {
   );
 }
 
+/** Cheap deep clone for localStorage payloads / forward propagation. */
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * window.* "contract" between:
+ * - the left toolbar (global UI)
+ * - the per-frame annotator view (this file)
+ *
+ * This is intentionally simple/imperative so the toolbar can be decoupled from
+ * Annotorious internals (AnnoBridge exposes the "real" annotator hooks).
+ */
 declare global {
   interface Window {
+    // Called by toolbar whenever selection changes (forces FrameView to re-read window.*)
     ufoNotifySelectionChanged?: () => void;
 
+    // Toolbar-owned state: list of known instances and which one is selected
     ufoInstanceProfiles?: InstanceProfile[];
     ufoSelectedProfileId?: string | null;
-    ufoSelectedClassName?: string | null;
+    ufoSelectedClassName?: string | null; // armed class even if no instance
     ufoSelectedTrackId?: string | null;
-    ufoSelectionSource?: "auto" | "explicit" | null;
+    ufoSelectionSource?: "auto" | "explicit" | null; // used to preserve explicit selection across navigation
 
+    // Exposed by FrameView/AnnoBridge so toolbar can show "unsaved" state
     ufoHasUnsavedChanges?: () => boolean;
     ufoMarkSaved?: () => void;
 
+    // Exposed by FrameView so toolbar can collect all frames for backend save
     ufoCollectForSave?: () => Promise<unknown>;
     ufoClearCurrent?: () => Promise<void>;
     ufoClearAllFrames?: () => Promise<void>;
@@ -98,6 +131,7 @@ declare global {
 export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
+  // Validate user input (non-empty integer >= 0), then forward to the parent.
   const onSearchSubmit = (newValue: string) => {
     if (newValue === "") {
       setErrorMessage("");
@@ -134,6 +168,10 @@ export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
  * - Coordinates Prev/Next/Jump navigation with upstream callbacks.
  * - Integrates with the UFO toolbar via window.* helpers and "ufo:*" events.
  * - Supports bulk delete / clear flows across all frames in a sample.
+ *
+ * IMPORTANT:
+ * - The "source of truth" during an annotation session is localStorage (per frame).
+ * - Backend annotations are used only for the initial seeding step.
  */
 export function FrameView({
   data,
@@ -152,13 +190,24 @@ export function FrameView({
   onNext?: () => void;
   onJump?: (n: number) => void;
 }) {
+  /**
+   * AnnoBridge is our imperative adapter around Annotorious.
+   * We store its handle in a ref so we can call:
+   * - hydrateOverlay / clearOverlaySilently
+   * - persistWorkingNow
+   * - hasUnsaved / markSaved
+   */
   const bridgeRef = useRef<BridgeHandle | null>(null);
 
-  // Increment this whenever the toolbar changes the selected instance
-  // so drawingEnabled can react to the latest window.* selection.
+  /**
+   * Increment this whenever the toolbar changes the selected instance
+   * so drawingEnabled can react to the latest window.* selection.
+   *
+   * (We don't store selection in React state; window.* is the shared "bus".)
+   */
   const [, setSelectionTick] = useState(0);
 
-  // Local toast for notifications (quick-add, delete, etc.)
+  // Local toast for small UX feedback (quick-add, delete, bulk operations).
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string>("");
 
@@ -169,6 +218,11 @@ export function FrameView({
     setTimeout(() => setToastOpen(false), 2000);
   }, []);
 
+  /**
+   * Hook toolbar -> FrameView re-render:
+   * Toolbar calls window.ufoNotifySelectionChanged(), which bumps selectionTick.
+   * That forces drawingEnabled and other window reads to update.
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -181,8 +235,11 @@ export function FrameView({
     };
   }, []);
 
-  // Profiles / classes are owned by the left toolbar (global UFO toolbar).
-  // We just read the current selection from window so AnnoBridge can use it.
+  /**
+   * Read the currently selected instance profile from window state.
+   * - SelectedProfileId points into window.ufoInstanceProfiles.
+   * - Returning null means "no instance selected".
+   */
   const getSelectedProfile = useCallback((): SelectedProfile => {
     if (typeof window === "undefined") return null;
 
@@ -194,24 +251,43 @@ export function FrameView({
     return found ?? null;
   }, []);
 
+  /**
+   * Read the currently armed class name from window.
+   * This supports "drawing enabled" even when the instance list is empty.
+   */
   const getSelectedClassName = useCallback((): string | null => {
     if (typeof window === "undefined") return null;
     return window.ufoSelectedClassName ?? null;
   }, []);
 
-  // Tracking mode: enable track IDs for UFO
+  /**
+   * Tracking mode: for UFO we always write track IDs so instances persist
+   * across frames. (This determines how normalizeWithMode behaves in AnnoBridge.)
+   */
   const includeTrackIds = true;
 
-  // Use the persisted class registry (shared with the toolbar via localStorage)
+  /**
+   * classRegistry is a persisted mapping shared with toolbar (localStorage).
+   * Used when we need to infer numeric class_id from a selected class name.
+   */
   const classRegistry: ClassRegistry = useMemo(() => loadClassRegistry(), []);
 
-  // Enable drawing if user has selected a class (armed), even if no instance exists yet.
+  /**
+   * User can draw only when they have a class "armed":
+   * - either they selected an existing instance (profile)
+   * - or they picked a class name to create the first instance
+   */
   const drawingEnabled = !!getSelectedProfile() || !!getSelectedClassName();
 
   const frameNumber = data.frame;
   const frameLabel = Number.isFinite(frameNumber) ? frameNumber : "?";
 
-  // Stable per-frame identity -> adapter for localStorage
+  /**
+   * frameKey is the canonical W3C "target.source" for this frame:
+   *   app://p/<projectId>/s/<sampleId>/f/<frameNumber>
+   *
+   * It is also used as the localStorage key prefix (via W3CImageFormat adapter).
+   */
   const frameKey = useMemo(
     () =>
       buildSourceKey({
@@ -222,20 +298,25 @@ export function FrameView({
     [projectId, sampleId, frameNumber],
   );
 
+  /**
+   * adapter abstracts localStorage IO for the current frame.
+   * - read(): returns ImageAnnotation[] for this frame
+   * - write(list): persists ImageAnnotation[] for this frame
+   */
   const adapter = useMemo(() => W3CImageFormat(frameKey), [frameKey]);
 
-  // List of annotations for this frame used by ClassInfoPopup
+  // List of annotations for this frame used by ClassInfoPopup (popup needs full list).
   const [popupList, setPopupList] = useState<ImageAnnotation[]>([]);
 
   // Tracks whether an instance has become empty across all frames,
-  // so we can prompt to delete the instance profile.
+  // so we can prompt to delete the instance profile (instance list hygiene).
   const [emptyInstanceModalOpen, setEmptyInstanceModalOpen] = useState(false);
   const [emptyInstanceProfile, setEmptyInstanceProfile] = useState<{
     class_name?: string;
     track_id?: string;
   } | null>(null);
 
-  // Per-instance bulk delete modal state
+  // Per-instance bulk delete modal state (delete one track across all frames).
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteModalProfile, setDeleteModalProfile] = useState<{
     class_name?: string;
@@ -246,7 +327,7 @@ export function FrameView({
     frames: number;
   } | null>(null);
 
-  // Global delete-all modal and preview state
+  // Global delete-all modal and preview state (wipe the sample's local annotations).
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [deleteAllPreview, setDeleteAllPreview] = useState<{
     totalAnnotations: number;
@@ -254,7 +335,13 @@ export function FrameView({
     totalFrames: number;
   } | null>(null);
 
-  // Refresh behavior safety: on browser reload, clear local cache + marker.
+  /**
+   * Refresh behavior safety:
+   * If the user hard-reloads the browser tab, we clear local cached frames and
+   * reset the "dirty" flag so we seed from backend again.
+   *
+   * (This avoids confusion where stale localStorage dominates after a reload.)
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -270,6 +357,11 @@ export function FrameView({
     }
   }, [projectId, sampleId]);
 
+  /**
+   * Bootstrap the toolbar "instance list" from whatever is currently in localStorage.
+   * This scans all stored frames for the sample, extracts (class_name, track_id),
+   * and rebuilds window.ufoInstanceProfiles + emits a "ufo:state" event for toolbar.
+   */
   const bootstrapInstancesFromStorage = useCallback(async () => {
     if (typeof window === "undefined") return;
 
@@ -278,6 +370,7 @@ export function FrameView({
 
     const all: ImageAnnotation[] = [];
 
+    // Collect all annotations across frames (only within this sample prefix).
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
       if (!key || !key.startsWith(prefix)) continue;
@@ -293,11 +386,11 @@ export function FrameView({
           }
         }
       } catch {
-        // ignore
+        // ignore malformed entries
       }
     }
 
-    // Derive unique profiles from annotations
+    // Derive unique instance profiles from extracted labels.
     const map = new Map<string, InstanceProfile>();
     for (const ann of all) {
       const lbl = extractClassLabel(ann);
@@ -322,12 +415,14 @@ export function FrameView({
     // Update window + notify toolbar
     window.ufoInstanceProfiles = profiles;
 
+    // Toolbar expects a simple name->id map for class id lookups.
     const classRegistryWire: Record<string, number> = {};
     for (const def of Object.values(classRegistry)) {
       const n = Number(def.id);
       classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
     }
 
+    // ufo:state is the toolbar's "single source" event to refresh its UI.
     window.dispatchEvent(
       new CustomEvent("ufo:state", {
         detail: {
@@ -346,10 +441,23 @@ export function FrameView({
     );
   }, [projectId, sampleId, classRegistry]);
 
+  // Build instance list from localStorage on mount (and when ids change).
   useEffect(() => {
     void bootstrapInstancesFromStorage();
   }, [bootstrapInstancesFromStorage]);
 
+  /**
+   * Seed localStorage from backend annotations if needed.
+   *
+   * Rules:
+   * - If localStorage is marked "dirty" (user has started editing), do nothing.
+   * - Otherwise:
+   *   1) clear per-frame cache
+   *   2) convert backend VideoBoundingBox[] -> W3C ImageAnnotation[] by frame
+   *   3) write each frame to localStorage
+   *   4) hydrate the current frame overlay immediately
+   *   5) rebuild instance list from seeded storage
+   */
   useEffect(() => {
     let cancelled = false;
 
@@ -369,7 +477,7 @@ export function FrameView({
         annotations: dbAnnotations as unknown[],
       });
 
-      // Write to localStorage per frame so your existing system works
+      // Write to localStorage per frame so the per-frame adapter can load it
       for (const [frame, list] of byFrame.entries()) {
         const key = buildSourceKey({ projectId, sampleId, frame });
         const a = W3CImageFormat(key);
@@ -383,6 +491,7 @@ export function FrameView({
       if (listForCurrent.length > 0) {
         setPopupList(listForCurrent);
 
+        // Annotorious may not be ready yet; retry until it is.
         const attemptHydrate = async () => {
           if (cancelled) return;
           const ready = bridgeRef.current?.isAnnotatorReady?.() ?? false;
@@ -414,7 +523,10 @@ export function FrameView({
     bootstrapInstancesFromStorage,
   ]);
 
-  // Hydrate overlay from localStorage when the annotator is ready.
+  /**
+   * Hydrate overlay from localStorage when the annotator is ready.
+   * This runs on frameKey change, so navigation loads the correct frame overlay.
+   */
   useEffect(() => {
     let cancelled = false;
 
@@ -422,8 +534,10 @@ export function FrameView({
       const stored = await adapter.read();
       if (cancelled || !stored || stored.length === 0) return;
 
+      // Keep popup list aligned with the overlay that will be shown.
       setPopupList(stored as ImageAnnotation[]);
 
+      // Annotorious may not be ready; retry until it is.
       const attemptHydrate = async () => {
         if (cancelled) return;
         const ready = bridgeRef.current?.isAnnotatorReady?.() ?? false;
@@ -448,7 +562,15 @@ export function FrameView({
     };
   }, [adapter, frameKey]);
 
-  // Persist current frame immediately and mark saved.
+  /**
+   * Save current frame immediately and mark saved.
+   *
+   * This:
+   * - asks AnnoBridge to persist the in-memory overlay into a list
+   * - writes that list to localStorage for this frame
+   * - marks the sample as "dirty" (so backend seeding won't override)
+   * - updates popupList so the popup sees the same data
+   */
   const saveCurrentFrame = useCallback(async (): Promise<ImageAnnotation[]> => {
     const bridge = bridgeRef.current;
     if (!bridge) return [];
@@ -466,7 +588,13 @@ export function FrameView({
     }
   }, [adapter, frameKey, projectId, sampleId]);
 
-  // Forward propagation: seed the next frame if empty.
+  /**
+   * Forward propagation:
+   * When moving NEXT, if the next frame has no stored annotations yet,
+   * seed it with the current frame's annotations (source updated to next frameKey).
+   *
+   * This creates "tracking-like" behavior where annotations can be nudged frame-to-frame.
+   */
   const propagateForwardIfEmpty = useCallback(
     async (currentList: ImageAnnotation[], nextFrameNumber: number) => {
       if (!currentList || currentList.length === 0) return;
@@ -494,7 +622,11 @@ export function FrameView({
     [projectId, sampleId],
   );
 
-  // Background auto-save loop.
+  /**
+   * Background auto-save loop:
+   * Every second, if AnnoBridge reports "unsaved", persist the current frame to storage.
+   * (This keeps localStorage in sync without needing explicit Save clicks.)
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -507,7 +639,10 @@ export function FrameView({
     return () => window.clearInterval(interval);
   }, [saveCurrentFrame]);
 
-  // Expose dirty helpers on window for toolbar buttons.
+  /**
+   * Expose dirty helpers on window for toolbar buttons/indicators.
+   * Toolbar calls these to show "unsaved changes" and to clear the unsaved marker.
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -524,7 +659,12 @@ export function FrameView({
     };
   }, []);
 
-  // Expose ufoCollectForSave on window.
+  /**
+   * Expose ufoCollectForSave on window:
+   * Toolbar uses this to gather all annotations across all frames for backend save.
+   *
+   * We always save the current frame first to avoid losing in-memory changes.
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -536,6 +676,7 @@ export function FrameView({
 
       const all: ImageAnnotation[] = [];
 
+      // Gather every frame payload for this sample, flattening into one list.
       for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i);
         if (!key || !key.startsWith(prefix)) continue;
@@ -565,7 +706,10 @@ export function FrameView({
     };
   }, [projectId, sampleId, saveCurrentFrame]);
 
-  // Expose ufoClearCurrent on window.
+  /**
+   * Expose ufoClearCurrent on window:
+   * Toolbar uses this to clear just the currently displayed frame.
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -582,7 +726,11 @@ export function FrameView({
     };
   }, [adapter]);
 
-  // Expose ufoClearAllFrames on window.
+  /**
+   * Expose ufoClearAllFrames on window:
+   * Toolbar uses this to wipe all localStorage frames for the current sample.
+   * (This does not touch the backend; it clears the working set.)
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -607,6 +755,14 @@ export function FrameView({
     };
   }, [projectId, sampleId]);
 
+  /**
+   * When navigating frames we may want to clear the instance selection.
+   *
+   * Behavior:
+   * - If user explicitly selected an instance ("explicit"), keep it across frames.
+   * - If selection was auto-created ("auto"), clear instance selection on nav but
+   *   keep the class armed (so the user can keep drawing).
+   */
   const clearInstanceSelectionUnlessExplicit = useCallback(() => {
     if (typeof window === "undefined") return;
 
@@ -650,7 +806,10 @@ export function FrameView({
     );
   }, [classRegistry]);
 
-  // Navigation handlers: always save current frame before calling upstream.
+  /**
+   * Navigation handlers: always save current frame before calling upstream.
+   * This ensures the in-memory overlay is persisted before changing the frame.
+   */
   const handlePrev = useCallback(async () => {
     if (!onPrev) return;
     await saveCurrentFrame();
@@ -661,6 +820,7 @@ export function FrameView({
   const handleNext = useCallback(async () => {
     if (!onNext) return;
 
+    // Save this frame, then forward-propagate if the next frame has no data yet.
     const currentList = await saveCurrentFrame();
     await propagateForwardIfEmpty(currentList, frameNumber + 1);
 
@@ -686,6 +846,7 @@ export function FrameView({
 
   /**
    * Count annotations for a given (class_name, track_id) across ALL frames.
+   * Used for bulk delete preview + deciding if an instance is now empty.
    */
   const countAnnotationsForProfile = useCallback(
     async (info: { class_name?: string; track_id?: string }) => {
@@ -740,6 +901,7 @@ export function FrameView({
     [projectId, sampleId],
   );
 
+  // Convenience wrapper when we only care about total count.
   const countAnnotationsForInstance = useCallback(
     async (info: { class_name?: string; track_id?: string }) => {
       const { total } = await countAnnotationsForProfile(info);
@@ -750,6 +912,7 @@ export function FrameView({
 
   /**
    * Delete annotations for a profile across ALL frames.
+   * This edits localStorage directly (frame-by-frame) and does not touch backend.
    */
   const deleteAnnotationsForProfile = useCallback(
     async (info: { class_name?: string; track_id?: string }) => {
@@ -813,6 +976,7 @@ export function FrameView({
           filtered.push(ann);
         }
 
+        // If a frame changed, rewrite its localStorage entry (or remove if empty).
         if (changed) {
           framesTouched += 1;
           if (filtered.length > 0)
@@ -826,7 +990,13 @@ export function FrameView({
     [projectId, sampleId],
   );
 
-  // Auto quick-add (duplicate instance) -> create new profile & notify toolbar.
+  /**
+   * Auto quick-add:
+   * When the popup "quick add" is used, we create a NEW instance profile for the
+   * same class_name with a new unique track_id, select it, and notify toolbar.
+   *
+   * This is how users create multiple instances of the same class.
+   */
   const onAutoQuickAdd = useCallback(
     async ({ class_name }: { class_name: string }) => {
       if (typeof window === "undefined") return null;
@@ -836,12 +1006,14 @@ export function FrameView({
 
       const existingProfiles = window.ufoInstanceProfiles ?? [];
 
+      // Use the canonical label casing from LABEL_MAP where possible.
       const labelDef =
         LABEL_MAP.categories.find((c) => c.name.toLowerCase() === cnameKey) ||
         null;
 
       const prettyClassName = labelDef?.name ?? class_name;
 
+      // Generate a readable unique id that doesn't collide for this class.
       const existingTrackIds = existingProfiles
         .filter(
           (p) =>
@@ -854,6 +1026,7 @@ export function FrameView({
       const readable = uniqueReadableId(existingTrackIds);
       const track_id = canonicalizeTrackId(readable);
 
+      // Determine numeric class_id from local registry, then fixed fallback.
       const reg = classRegistry;
       const regEntry = reg[cnameKey] || reg[prettyClassName] || undefined;
 
@@ -880,6 +1053,7 @@ export function FrameView({
         { id, class_name: prettyClassName, class_id, track_id },
       ];
 
+      // Update window selection + mark as "auto" (so it can be cleared on navigation).
       window.ufoInstanceProfiles = nextProfiles;
       window.ufoSelectedProfileId = id;
       window.ufoSelectedClassName = prettyClassName;
@@ -893,6 +1067,7 @@ export function FrameView({
         track_id: p.track_id,
       }));
 
+      // Toolbar uses selectedKey = "<classLower>:<trackId>".
       const selectedKey = `${prettyClassName.toLowerCase()}:${track_id}`;
 
       const classRegistryWire: Record<string, number> = {};
@@ -901,6 +1076,7 @@ export function FrameView({
         classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
       }
 
+      // Broadcast the updated instance list + selection to the toolbar.
       window.dispatchEvent(
         new CustomEvent("ufo:state", {
           detail: {
@@ -914,6 +1090,7 @@ export function FrameView({
         }),
       );
 
+      // Persist last class so user can continue drawing quickly after reload.
       saveLastClassName(prettyClassName);
       showToast(`New ${prettyClassName} instance: #${track_id}`);
 
@@ -922,6 +1099,13 @@ export function FrameView({
     [classRegistry, showToast],
   );
 
+  /**
+   * Called after a single annotation delete from the popup.
+   * We:
+   * - save frame (localStorage)
+   * - show toast
+   * - if the instance now has 0 annotations globally, prompt to delete its profile.
+   */
   const handleAnnotationDeleted = useCallback(
     async (label: { class_name?: string; track_id?: string }) => {
       await saveCurrentFrame();
@@ -946,6 +1130,10 @@ export function FrameView({
     [saveCurrentFrame, countAnnotationsForInstance, showToast],
   );
 
+  /**
+   * Confirm deletion of an instance profile that has no remaining annotations.
+   * This only edits the toolbar instance list (window.ufoInstanceProfiles).
+   */
   const confirmDeleteEmptyInstance = useCallback(() => {
     if (typeof window === "undefined" || !emptyInstanceProfile) {
       setEmptyInstanceModalOpen(false);
@@ -958,12 +1146,14 @@ export function FrameView({
 
     const existingProfiles = window.ufoInstanceProfiles ?? [];
 
+    // Remove the matching instance row.
     const remaining = existingProfiles.filter((p) => {
       const pClass = (p.class_name || "").toLowerCase();
       const pTrack = canonicalizeTrackId(p.track_id || "");
       return !(pClass === classNameKey && pTrack === trackKey);
     });
 
+    // If the removed profile was selected, choose a new selection (last item) or clear.
     let selectedProfileId: string | null = window.ufoSelectedProfileId ?? null;
 
     if (selectedProfileId) {
@@ -1004,6 +1194,7 @@ export function FrameView({
       track_id: p.track_id,
     }));
 
+    // Compute toolbar selectedKey from remaining selection (if any).
     let selectedKey: string | null = null;
     if (selectedProfileId && remaining.length > 0) {
       const matched = remaining.find((p) => p.id === selectedProfileId);
@@ -1020,6 +1211,7 @@ export function FrameView({
       classRegistryWire[def.name] = Number.isFinite(n) ? n : 1;
     }
 
+    // Notify toolbar of updated instance list and selection.
     window.dispatchEvent(
       new CustomEvent("ufo:state", {
         detail: {
@@ -1042,6 +1234,10 @@ export function FrameView({
     setEmptyInstanceProfile(null);
   }, []);
 
+  /**
+   * Trigger the "bulk delete instance across frames" modal.
+   * This is typically requested by toolbar via the ufo:requestBulkDelete event.
+   */
   const onRequestBulkDelete = useCallback(
     async (profile: { class_name?: string; track_id?: string }) => {
       if (!profile.class_name || !profile.track_id) return;
@@ -1057,6 +1253,12 @@ export function FrameView({
     [countAnnotationsForProfile],
   );
 
+  /**
+   * Execute bulk delete:
+   * - delete matching annotations from all frame localStorage keys
+   * - refresh current overlay from adapter
+   * - if instance is now empty globally, prompt to delete instance profile
+   */
   const confirmBulkDelete = useCallback(async () => {
     if (!deleteModalProfile) {
       setDeleteModalOpen(false);
@@ -1067,6 +1269,7 @@ export function FrameView({
     const { totalDeleted } =
       await deleteAnnotationsForProfile(deleteModalProfile);
 
+    // Refresh current frame overlay so user sees the delete immediately.
     try {
       const updated = await adapter.read();
       await bridgeRef.current?.clearOverlaySilently?.();
@@ -1111,6 +1314,10 @@ export function FrameView({
     setDeleteModalProfile(null);
   }, []);
 
+  /**
+   * Open the global "delete all instances & annotations" modal.
+   * We compute a small preview (counts) for user confirmation.
+   */
   const openDeleteAllInstances = useCallback(async () => {
     if (typeof window === "undefined") return;
 
@@ -1153,6 +1360,13 @@ export function FrameView({
     setDeleteAllModalOpen(true);
   }, [projectId, sampleId]);
 
+  /**
+   * Confirm global delete:
+   * - remove all frame keys for this sample from localStorage
+   * - clear current overlay
+   * - reset window selection/instance list
+   * - notify toolbar via ufo:state
+   */
   const confirmDeleteAllInstances = useCallback(async () => {
     if (typeof window === "undefined") {
       setDeleteAllModalOpen(false);
@@ -1200,6 +1414,7 @@ export function FrameView({
       }),
     );
 
+    // Clear last class so UI doesn't auto-arm on next load after wipe.
     saveLastClassName("");
 
     setDeleteAllModalOpen(false);
@@ -1213,7 +1428,10 @@ export function FrameView({
     setDeleteAllPreview(null);
   }, []);
 
-  // Toolbar event wiring: bulk delete + delete-all.
+  /**
+   * Toolbar event wiring: bulk delete.
+   * Toolbar dispatches CustomEvent("ufo:requestBulkDelete", { detail: { profile } })
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -1230,6 +1448,10 @@ export function FrameView({
     };
   }, [onRequestBulkDelete]);
 
+  /**
+   * Toolbar event wiring: delete all instances.
+   * Toolbar dispatches Event("ufo:deleteAllInstances")
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -1247,6 +1469,7 @@ export function FrameView({
     <div className="flex flex-col items-center gap-4 w-full">
       <div className="w-full flex justify-center">
         <div className="inline-flex flex-col items-center gap-4 max-w-5xl">
+          {/* Top controls: jump-to-frame + prev/next */}
           <div className="flex flex-col items-center gap-2">
             {onJump && (
               <div className="w-60 text-center">
@@ -1280,11 +1503,14 @@ export function FrameView({
             </div>
           </div>
 
+          {/* Annotorious canvas: image + overlay + popup + bridge wiring */}
           <div className="overflow-visible">
             <Annotorious>
+              {/* drawingEnabled gates rectangle creation until a class/instance is armed */}
               <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
+                  // Backend returns base64 PNG bytes for the current frame.
                   src={`data:image/png;base64,${data.values}`}
                   alt={`Frame ${frameLabel}`}
                   className="block mx-auto max-w-full h-auto object-contain max-h-[calc(100dvh-220px)] sm:max-h-[calc(100dvh-210px)]"
@@ -1296,6 +1522,7 @@ export function FrameView({
                 />
               </ImageAnnotator>
 
+              {/* Popup for selecting/inspecting class + instance; also supports delete */}
               <ImageAnnotationPopup
                 popup={(props) => (
                   <ClassInfoPopup
@@ -1307,6 +1534,7 @@ export function FrameView({
                 )}
               />
 
+              {/* Bridge wires Annotorious events -> normalization + local storage persistence */}
               <AnnoBridge
                 ref={bridgeRef}
                 getSelectedProfile={getSelectedProfile}
@@ -1320,6 +1548,7 @@ export function FrameView({
         </div>
       </div>
 
+      {/* Per-instance bulk delete confirmation modal */}
       <ConfirmModal
         open={deleteModalOpen}
         title="Delete instance annotations?"
@@ -1342,6 +1571,7 @@ export function FrameView({
         onCancel={cancelBulkDelete}
       />
 
+      {/* Global delete-all confirmation modal */}
       <ConfirmModal
         open={deleteAllModalOpen}
         title="Delete ALL instances & annotations?"
@@ -1370,6 +1600,7 @@ export function FrameView({
         onCancel={cancelDeleteAllInstances}
       />
 
+      {/* Prompt to delete an instance profile when it becomes empty */}
       <ConfirmModal
         open={emptyInstanceModalOpen}
         title="Delete empty instance?"
@@ -1406,6 +1637,10 @@ type VideoViewInfo = {
  * VideoView:
  * Thin wrapper around FrameView. Keeps the same props surface as backup.
  * (dataParams are unused here but preserved for compatibility.)
+ *
+ * Responsibility:
+ * - Translate "frame navigation" into setDataParams({ name:"image", frame:n })
+ *   so the upstream page can request a new frame from the backend.
  */
 export const VideoView = ({
   data,
@@ -1416,11 +1651,16 @@ export const VideoView = ({
   projectId,
   sampleId,
 }: VideoViewInfo) => {
+  // Normalize current frame index from backend data (fallback to 0).
   const currentFrame = useMemo(() => {
     const frame = data.frame;
     return typeof frame === "number" && Number.isFinite(frame) ? frame : 0;
   }, [data.frame]);
 
+  /**
+   * Single navigation primitive:
+   * Update dataParams to request a specific frame from the backend.
+   */
   const goToFrame = useCallback(
     (n: number) => {
       if (!Number.isFinite(n)) return;

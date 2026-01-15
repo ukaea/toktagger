@@ -4,23 +4,34 @@ import type { ImageAnnotation, AnnotationBody } from "@annotorious/react";
 import { buildSourceKey } from "./adapters";
 
 /**
- * Shared helpers for:
- * - Profiles & class registry (toolbar state)
- * - Cross-frame / per-instance usage counts
- * - Track ID utilities
- * - W3C ↔ COCO / backend format conversions
+ * Shared helpers for the video/frame annotation tooling:
+ * - LocalStorage keys shared between toolbar + FrameView/AnnoBridge
+ * - Track-id / instance-id helpers
+ * - Chunked scanners (counts across frames)
+ * - W3C (Annotorious) ↔ COCO frame structure ↔ backend VideoBoundingBox conversion
+ *
  */
 
-// lib.ts – Profiles, Classes, Cross-frame counts
+// ------------------------------
+// LocalStorage keys 
+// ------------------------------
 
+// Persisted toolbar "profiles" 
 export const PROFILES_KEY = "ufo::profiles";
+
+// Persisted class registry (name -> id mapping) shared with toolbar
 export const CLASS_REG_KEY = "ufo::class-registry";
+
+// Last class selected in the toolbar (used to re-arm selection on reload)
 export const LAST_CLASS_KEY = "ufo::last-class-name";
 
+// Per-class numeric seed used to allocate stable instance IDs across frames
 export const INSTANCE_SEED_PREFIX = "anno::instance-seed::";
 
+// We only touch localStorage in the browser runtime.
 const isBrowser = typeof window !== "undefined";
 
+/** Safely acquire localStorage without throwing in restricted contexts. */
 function getStorage(): Storage | null {
   if (!isBrowser) return null;
   try {
@@ -36,6 +47,7 @@ function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;
 }
 
+/** Normalize "maybe array" values into arrays for uniform iteration. */
 function asArray<T>(v: T | T[] | null | undefined): T[] {
   return Array.isArray(v) ? v : v != null ? [v] : [];
 }
@@ -48,8 +60,13 @@ function getNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-// ---------- Fixed label map for UFO categories ----------
+// ------------------------------
+// Fixed label map used by the video tool
+// ------------------------------
 
+/**
+ * Fixed label list used by the video annotation UI.
+ */
 export const LABEL_MAP = {
   version: "v1.0",
   categories: [
@@ -62,11 +79,14 @@ export const LABEL_MAP = {
   ],
 } as const;
 
+/** Lowercased name -> numeric id lookup for quick fallback. */
 export const FIXED_CLASS_REG: Record<string, number> = Object.fromEntries(
   LABEL_MAP.categories.map((c) => [c.name.toLowerCase(), c.id]),
 );
 
-// ---------- Types ----------
+// ------------------------------
+// Types used by toolbar + frame view
+// ------------------------------
 
 export type ProfileId = string;
 
@@ -77,6 +97,10 @@ export type Profile = {
 
 export type ProfileMap = Record<ProfileId, Profile>;
 
+/**
+ * Class registry entry (stored in localStorage):
+ * key is usually lowercased class name -> { id, name }.
+ */
 export type ClassDef = {
   id: string;
   name: string;
@@ -88,10 +112,19 @@ export type ClassRegistry = Record<string, ClassDef>;
 
 export type ClassCounts = Record<string, number>;
 
-// Per-instance usage counts, keyed as
-// `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
+/**
+ * Per-instance usage counts, keyed as:
+ *   `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
+ *
+ * This is the key the toolbar uses to render per-instance badge counts.
+ */
 export type InstanceCounts = Record<string, number>;
 
+/**
+ * Our structured "class" payload stored inside W3C annotation bodies.
+ * We encode this payload as JSON (string) for Annotorious bodies, but accept
+ * legacy "object payload" too for back-compat.
+ */
 type ClassValuePayload = {
   type: "class";
   id: number;
@@ -99,8 +132,11 @@ type ClassValuePayload = {
   track_id?: string;
 };
 
-// ---------- JSON helpers ----------
+// ------------------------------
+// JSON encode/decode helpers for body.value
+// ------------------------------
 
+/** Safe JSON.parse that returns null instead of throwing. */
 function safeParseJSON<T>(raw: string | null): T | null {
   if (!raw) return null;
   try {
@@ -110,10 +146,17 @@ function safeParseJSON<T>(raw: string | null): T | null {
   }
 }
 
+/** Encode our structured class payload as a JSON string. */
 function encodeClassValue(v: ClassValuePayload): string {
   return JSON.stringify(v);
 }
 
+/**
+ * Decode structured class payload.
+ * - New format: JSON string (preferred)
+ * - Legacy format: object stored directly
+ * - Otherwise: null (caller may treat the value as a plain label string)
+ */
 function decodeClassValue(v: unknown): ClassValuePayload | null {
   // Back-compat: older annotations may have stored the object directly
   if (isRecord(v) && v.type === "class") {
@@ -142,21 +185,27 @@ function decodeClassValue(v: unknown): ClassValuePayload | null {
   return null;
 }
 
-// ---------- Profiles ----------
+// ------------------------------
+// Profiles
+// ------------------------------
 
+/** Read the stored profile map (or {} if none). */
 export function loadProfiles(): ProfileMap {
   const storage = getStorage();
   if (!storage) return {};
   return safeParseJSON<ProfileMap>(storage.getItem(PROFILES_KEY)) ?? {};
 }
 
+/** Persist profile map to localStorage. */
 export function saveProfiles(profiles: ProfileMap): void {
   const storage = getStorage();
   if (!storage) return;
   storage.setItem(PROFILES_KEY, JSON.stringify(profiles));
 }
 
-// Ensure at least one default profile exists
+/**
+ * Ensure we always have at least one profile so UI code can assume a "default".
+ */
 export function ensureDefaultProfile(profiles: ProfileMap): {
   profiles: ProfileMap;
   defaultId: ProfileId;
@@ -177,28 +226,36 @@ export function ensureDefaultProfile(profiles: ProfileMap): {
   return { profiles: next, defaultId };
 }
 
-// ---------- Class Registry ----------
+// ------------------------------
+// Class Registry (toolbar ↔ frame view shared state)
+// ------------------------------
 
+/** Read class registry from localStorage (or {} if none). */
 export function loadClassRegistry(): ClassRegistry {
   const storage = getStorage();
   if (!storage) return {};
   return safeParseJSON<ClassRegistry>(storage.getItem(CLASS_REG_KEY)) ?? {};
 }
 
+/** Persist class registry to localStorage. */
 export function saveClassRegistry(registry: ClassRegistry): void {
   const storage = getStorage();
   if (!storage) return;
   storage.setItem(CLASS_REG_KEY, JSON.stringify(registry));
 }
 
-// ---------- Last class ----------
+// ------------------------------
+// Last class selection (re-arm on reload)
+// ------------------------------
 
+/** Load last class selected in toolbar. */
 export function loadLastClassName(): string | null {
   const storage = getStorage();
   if (!storage) return null;
   return storage.getItem(LAST_CLASS_KEY);
 }
 
+/** Save last class selected (or clear when null/empty). */
 export function saveLastClassName(name: string | null): void {
   const storage = getStorage();
   if (!storage) return;
@@ -209,8 +266,14 @@ export function saveLastClassName(name: string | null): void {
   }
 }
 
-// ---------- Annotation helpers ----------
+// ------------------------------
+// W3C annotation shape helpers
+// ------------------------------
 
+/**
+ * Extract W3C target.source from a W3C annotation-like object.
+ * We use target.source to infer the frame number (app://.../f/<n>).
+ */
 function getTargetSource(a: unknown): string | null {
   if (!isRecord(a)) return null;
 
@@ -221,11 +284,19 @@ function getTargetSource(a: unknown): string | null {
   return getString((target as UnknownRecord).source);
 }
 
+/**
+ * Create an AnnotationBody id.
+ * Not cryptographically unique; enough for local diffs / UI usage.
+ */
 function makeBodyId(aid: string): string {
   // deterministic-ish, avoids randomness, good for diffs
   return `b-${aid}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Create a tagging body containing our JSON-encoded class payload.
+ * This is the preferred representation in Annotorious `bodies`.
+ */
 function makeClassBody(
   annotationId: string,
   payload: ClassValuePayload,
@@ -238,7 +309,14 @@ function makeClassBody(
   };
 }
 
-// Try to pull a human-readable class label from a W3C-style annotation.
+// ------------------------------
+// Label extraction
+// ------------------------------
+
+/**
+ * Try to pull a human-readable class label from a W3C-style annotation.
+ * Used by "cross-frame counts" utilities that don't care about track_id.
+ */
 export function extractClassLabelFromAnnotation(
   annotation: unknown,
 ): string | null {
@@ -302,13 +380,19 @@ export function extractClassLabelFromAnnotation(
   return null;
 }
 
-// ---------- Cross-frame counts (chunked scanning) ----------
+// ------------------------------
+// Cross-frame counts (chunked scanning)
+// ------------------------------
 
 /**
- * Scan all localStorage keys in small chunks and compute class usage counts,
- * calling onUpdate(counts) after each chunk.
+ * Scan all localStorage keys in small chunks and compute class usage counts.
  *
- * Returns a cancel function to stop the scan early.
+ * Why chunked?
+ * - localStorage can contain many frames; scanning everything synchronously
+ *   would block the main thread and freeze the UI.
+ *
+ * Returns:
+ * - a cancel function to stop the scan early.
  */
 export function scanCrossFrameCountsChunked(options: {
   onUpdate: (counts: ClassCounts) => void;
@@ -341,6 +425,7 @@ export function scanCrossFrameCountsChunked(options: {
         continue;
       }
 
+      // Our per-frame stores are JSON arrays of ImageAnnotation
       if (!Array.isArray(parsed)) continue;
 
       for (const ann of parsed) {
@@ -372,8 +457,8 @@ export function scanCrossFrameCountsChunked(options: {
  *
  * key: `${class_name.toLowerCase()}:${canonicalizeTrackId(track_id)}`
  *
- * Filters localStorage keys by an optional keyPrefix and updates
- * counts incrementally via onUpdate(counts).
+ * This is the scanner used by the toolbar to show "how many annotations exist"
+ * for each instance across all frames in a sample.
  */
 export function scanInstanceCountsChunked(options: {
   keyPrefix?: string; // e.g. "anno::w3c::app://p/<proj>/s/<sample>/"
@@ -411,6 +496,7 @@ export function scanInstanceCountsChunked(options: {
       if (!Array.isArray(parsed)) continue;
 
       for (const ann of parsed) {
+        // extractClassLabel gives { class_name, class_id, track_id } when present
         const label = extractClassLabel(ann);
         if (!label?.class_name || !label.track_id) continue;
 
@@ -436,13 +522,20 @@ export function scanInstanceCountsChunked(options: {
   };
 }
 
+// ------------------------------
+// Class + track extraction (used for export/save)
+// ------------------------------
+
 /**
- * Class + track extractor for COCO export.
+ * Extract class_id/class_name/track_id from an annotation.
  *
- * Looks in annotation.body / annotation.bodies for:
- *   { purpose: "tagging" | "classifying",
- *     value: { type: "class", id, name, track_id?, instance? } }
- * and falls back to a plain string value as { class_name }.
+ * This is the "source of truth" used by:
+ * - export conversion (W3C -> COCO frames)
+ * - per-instance counts
+ *
+ * It supports:
+ * - Annotorious `bodies` (preferred)
+ * - custom legacy `body` field used by older storage
  */
 export function extractClassLabel(
   a: unknown,
@@ -485,7 +578,15 @@ export function extractClassLabel(
   return null;
 }
 
-/** -------------------- Track id helpers -------------------- */
+// ------------------------------
+// Track id helpers (instance identity across frames)
+// ------------------------------
+
+/**
+ * Track ids are the per-instance identity:
+ * - the same object across multiple frames should share the same track_id
+ * - toolbar selection/instances are keyed using class_name + track_id
+ */
 
 const ADJECTIVES = [
   "bright",
@@ -553,6 +654,7 @@ const NOUNS = [
   "cluster",
 ];
 
+/** Create a human-readable id like "silent comet-3" (pre-canonicalization). */
 function randomReadableId(): string {
   const adjective = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
   const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
@@ -566,6 +668,8 @@ function randomReadableId(): string {
  * - collapse whitespace to "-"
  * - replace non [a-zA-Z0-9._-] with "-"
  * - lowercase
+ *
+ * This ensures stable matching regardless of how the user typed the id.
  */
 export function canonicalizeTrackId(input: string): string {
   return input
@@ -575,6 +679,10 @@ export function canonicalizeTrackId(input: string): string {
     .toLowerCase();
 }
 
+/**
+ * Generate an incrementing numeric track id string ("1", "2", "3", ...)
+ * per class name, persisted in localStorage.
+ */
 export function nextNumericTrackId(
   className: string,
   existingTrackIds: string[],
@@ -619,10 +727,18 @@ export function uniqueReadableId(existingTrackIds: string[]): string {
   return candidate;
 }
 
+// ------------------------------
+// Writing class + track into W3C bodies
+// ------------------------------
+
 /**
  * Ensure an annotation carries the selected class + track_id in its W3C bodies.
- * Updates any existing tagging/classifying body (string or encoded payload) to the latest values.
- * If none exists, appends a new tagging body. Also mirrors the same update into the legacy body field for back-compat storage.
+ *
+ * We update:
+ * - a.bodies (Annotorious standard field)
+ * - a.body (legacy/custom storage field used by older codepaths)
+ *
+ * This function is used in tracking mode (instances across frames).
  */
 export function writeClassAndTrack(
   a: ImageAnnotation,
@@ -694,6 +810,7 @@ export function writeClassAndTrack(
   const bodiesOut = [...pb.mapped];
   const bodyOut = [...p.mapped];
 
+  // If neither bodies nor legacy body had tagging info, append a new one.
   if (!pb.found && !p.found) {
     const cb = classBody();
     bodiesOut.push(cb);
@@ -711,6 +828,7 @@ export function writeClassAndTrack(
 
 /**
  * Write / update a W3C class body without track_id (detection mode).
+ * This is for "class only" annotations where instances are not tracked.
  */
 export function writeClassOnly(
   a: ImageAnnotation,
@@ -827,25 +945,24 @@ export function writeClassOnly(
   return { ...base, body: bodyOut } as unknown as ImageAnnotation;
 }
 
+// ------------------------------
+// Mode-aware normalization (tracking vs detection)
+// ------------------------------
+
 /**
- * Mode-aware normalization.
+ * normalizeWithMode applies the "selection state" to a raw list of annotations.
  *
- * TRACKING MODE (includeTrackIds = true)
+ * It exists because Annotorious can produce annotations without our metadata
+ * after edits (or for newly created rectangles), so we "stamp" or "restore"
+ * class/track info depending on the mode.
  *
- * - For existing rectangles (id in knownById):
- *   If they lost class/track info due to editing, restore from the previous label.
+ * Tracking mode (includeTrackIds=true):
+ * - If an existing annotation lost metadata: restore from the previous version.
+ * - If a new annotation exists and an instance is selected: stamp class+track.
  *
- * - For new rectangles (id not in knownById):
- *   If there is a selected profile, stamp its { class_id, class_name, track_id }
- *   using writeClassAndTrack.
- *
- * DETECTION MODE (includeTrackIds = false)
- *
- * - If an annotation ID already exists in knownById, we copy its previous
- *   class label forward (class_id + class_name) via writeClassOnly.
- * - Else, if getSelectedClassName() returns a class name, we look up its
- *   numeric ID from the classRegistry (if present) or FIXED_CLASS_REG,
- *   and stamp that onto the annotation via writeClassOnly.
+ * Detection mode (includeTrackIds=false):
+ * - If annotation existed before: restore class label from previous version.
+ * - Else, if a class is armed: stamp class only using registry/fallback id.
  */
 type SelectedProfile = {
   class_id?: number;
@@ -868,6 +985,7 @@ export function normalizeWithMode(
       const seen = knownById[a.id];
       let next = a;
 
+      // Existing annotation: repair missing metadata using previous label.
       if (seen) {
         const prev = extractClassLabel(seen) ?? {};
         const hasNow = extractClassLabel(next) ?? {};
@@ -895,6 +1013,7 @@ export function normalizeWithMode(
         continue;
       }
 
+      // New annotation: stamp selected instance (if one is armed).
       const selected = getSelectedProfile?.();
 
       if (
@@ -917,12 +1036,14 @@ export function normalizeWithMode(
     return out;
   }
 
+  // Detection mode (no track ids): stamp / restore class only.
   const out: ImageAnnotation[] = [];
 
   for (const a of rawList) {
     const seen = knownById[a.id];
     let next = a;
 
+    // Existing annotation: restore previous class label.
     if (seen) {
       const prev = extractClassLabel(seen);
       if (prev?.class_name && typeof prev.class_id === "number") {
@@ -935,6 +1056,7 @@ export function normalizeWithMode(
       continue;
     }
 
+    // New annotation: stamp armed class name -> numeric id lookup.
     const selected = getSelectedClassName();
     if (selected) {
       const keyLower = selected.toLowerCase();
@@ -964,8 +1086,14 @@ export function normalizeWithMode(
   return out;
 }
 
-/** ---------- COCO types + converters ---------- */
+// ------------------------------
+// COCO types + converters (W3C <-> COCO frames)
+// ------------------------------
 
+/**
+ * Minimal COCO-ish bbox representation produced by rectToCoco.
+ * (We add class/track fields when exporting.)
+ */
 export type CocoBBox = {
   x_min: number;
   y_min: number;
@@ -1022,6 +1150,13 @@ function isBounds(v: unknown): v is Bounds {
   );
 }
 
+/**
+ * Convert W3C rectangle selector -> COCO bbox.
+ *
+ * Supports:
+ * - selector.value = "xywh=(pixel|percent):x,y,w,h"
+ * - selector.type === "RECTANGLE" with geometry.{x,y,w,h} or geometry.bounds
+ */
 export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
   if (!isRecord(a)) return null;
 
@@ -1041,6 +1176,7 @@ export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
       let w = parseFloat(match[4]);
       let h = parseFloat(match[5]);
 
+      // Percent-based coords require a known natural image size.
       if (unit === "percent") {
         if (!naturalSize) return null;
         x = (x / 100) * naturalSize.w;
@@ -1075,6 +1211,7 @@ export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
       };
     }
 
+    // Some Annotorious adapters store rectangle bounds instead of x/y/w/h.
     const bounds = geometry ? geometry.bounds : null;
     if (isBounds(bounds)) {
       return {
@@ -1089,6 +1226,10 @@ export function rectToCoco(a: unknown, naturalSize?: SelSize): CocoBBox | null {
   return null;
 }
 
+/**
+ * Convert W3C polygon selector -> COCO polygon.
+ * (Not currently used by the rectangle-only tooling, but supported for export.)
+ */
 export function polyToCoco(a: unknown): CocoPolygon | null {
   if (!isRecord(a)) return null;
 
@@ -1139,6 +1280,7 @@ export function polyToCoco(a: unknown): CocoPolygon | null {
     }
   }
 
+  // Fallback: some polygon encodings store SVG-like strings
   const selValue = getString(selector.value);
   if (selValue && /<polygon/i.test(selValue)) {
     const match = selValue.match(/points\s*=\s*["']([^"']+)["']/i);
@@ -1178,7 +1320,9 @@ export function numericFromTrackId(track_id?: string): number | null {
 }
 
 /**
- * Add track/class info to the exported label.
+ * Add class/track fields onto exported bbox/polygon labels.
+ * - includeTracks=true: include track_id plus numeric convenience fields
+ * - includeTracks=false: export class only
  */
 export function augmentLabelForExport(a: unknown, includeTracks: boolean) {
   const label = extractClassLabel(a) ?? {};
@@ -1195,6 +1339,17 @@ export function augmentLabelForExport(a: unknown, includeTracks: boolean) {
   };
 }
 
+/**
+ * Convert W3C annotations (all frames) -> COCO frame grouping.
+ *
+ * Output format:
+ *  [
+ *    { frame: 0, bboxes: [...], polygons: [...] },
+ *    { frame: 1, ... },
+ *  ]
+ *
+ * This is used as an intermediate step before converting to backend payload.
+ */
 export function w3cToCocoFrames(
   list: ImageAnnotation[],
   includeTracks = true,
@@ -1226,8 +1381,14 @@ export function w3cToCocoFrames(
   return Object.values(byFrame).sort((a, b) => a.frame - b.frame);
 }
 
-/** ---------- Rectangles-only adapter to backend VideoBoundingBox format ---------- */
+// ------------------------------
+// Backend payload conversion (COCO frames -> VideoBoundingBox[])
+// ------------------------------
 
+/**
+ * Backend "video_bounding_box" format used by the annotation API.
+ * This is what we save after collecting all frames from localStorage.
+ */
 export type VideoBoundingBox = {
   type: "video_bounding_box";
   created_by: string; // ideally a union of allowed values
@@ -1242,6 +1403,14 @@ export type VideoBoundingBox = {
   track_id: string;
 };
 
+/**
+ * Convert COCO frame groups -> backend VideoBoundingBox[].
+ *
+ * Notes:
+ * - Rectangles only (polygons ignored)
+ * - Requires a track_id per bbox (instances)
+ * - Drops invalid/degenerate boxes (width/height <= 0)
+ */
 export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
   const out: VideoBoundingBox[] = [];
   if (!Array.isArray(coco)) return out;
@@ -1270,6 +1439,7 @@ export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
         typeof b.class_name === "string" ? b.class_name : undefined;
       const class_id = typeof b.class_id === "number" ? b.class_id : undefined;
 
+      // Backend expects a single `label` string; we prefer class_name.
       const labelValue =
         class_name ??
         (typeof class_id === "number" ? String(class_id) : "unknown");
@@ -1296,7 +1466,14 @@ export function cocoFramesToVideoBBoxes(coco: unknown): VideoBoundingBox[] {
   return out;
 }
 
-// If your backend Annotation[] is a union, we guard it.
+// ------------------------------
+// Backend -> W3C seeding (used on initial load)
+// ------------------------------
+
+/**
+ * Guard for backend annotations union types:
+ * We only seed W3C from "video_bounding_box" entries.
+ */
 function isVideoBoundingBox(a: unknown): a is VideoBoundingBox {
   if (!a || typeof a !== "object") return false;
 
@@ -1314,6 +1491,12 @@ function isVideoBoundingBox(a: unknown): a is VideoBoundingBox {
   );
 }
 
+/**
+ * Infer class_id from backend label string.
+ * - if label matches FIXED_CLASS_REG name -> use that id
+ * - else if label is numeric -> parse it
+ * - else fallback to 1
+ */
 function inferClassId(label: string): number {
   const key = label.toLowerCase().trim();
   const fixed = FIXED_CLASS_REG[key];
@@ -1324,6 +1507,13 @@ function inferClassId(label: string): number {
 
   return 1;
 }
+
+/**
+ * Convert backend annotations -> W3C ImageAnnotation[], grouped by frame number.
+ *
+ * This is used by FrameView to "seed" localStorage on first open:
+ * backend COCO-like data -> local W3C overlay format per frame.
+ */
 export function videoBBoxesToW3CByFrame(opts: {
   projectId: string;
   sampleId: string;
@@ -1350,9 +1540,11 @@ export function videoBBoxesToW3CByFrame(opts: {
     const class_id = inferClassId(class_name);
     const track_id = canonicalizeTrackId(raw.track_id);
 
+    // W3C target.source ties the annotation to a specific project/sample/frame.
     const source = buildSourceKey({ projectId, sampleId, frame });
 
-    // Deterministic-ish id so edits/deletes behave predictably after reload
+    // Deterministic-ish id so edits/deletes behave predictably after reload.
+    // Includes frame + track + geometry so the same backend box tends to map to the same id.
     const id = `db-${frame}-${track_id}-${x}-${y}-${w}-${h}-${i++}`;
 
     const anno = {
@@ -1370,6 +1562,9 @@ export function videoBBoxesToW3CByFrame(opts: {
           },
         },
       },
+      // Store class+track in both:
+      // - bodies: Annotorious preferred
+      // - body: legacy/custom field kept for back-compat with older reads
       bodies: [
         {
           purpose: "tagging",

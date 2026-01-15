@@ -94,7 +94,8 @@ async function saveAnnotationsValidated(
   return response;
 }
 
-// UFO behavior: backend expects already-formed payload (COCO video bboxes), no validated tagging here.
+// Video annotation behavior: backend expects already-formed payload (COCO video bboxes), no validated tagging here.
+// This is the "raw" save used by the frame/video annotation tooling.
 async function saveVideoAnnotations(
   project_id: string,
   sample_id: string,
@@ -226,9 +227,11 @@ type VideoShotSearchProps = {
   project_id?: string;
   sample_id?: string;
   navigate: NavigateFunction;
+  // Collect all per-frame W3C annotations from localStorage and convert to backend payload.
   collectVideoPayloadForBackend: () => Promise<Annotation[]>;
 };
 
+// Video-only shot jump: saves the current local frame session to backend (COCO bboxes) before navigating.
 function VideoShotSearch({
   project_id,
   sample_id,
@@ -263,9 +266,11 @@ function VideoShotSearch({
     try {
       const nextSample = await getShotSample(project_id, newValue);
       if (nextSample !== null) {
+        // Persist video/frame annotation state before leaving this sample.
         const payload = await collectVideoPayloadForBackend();
         await saveVideoAnnotations(project_id, sample_id, payload);
 
+        // Clear the "local session has diverged from backend" marker after a successful save.
         setVideoWorkingDirty(project_id, sample_id, false);
 
         const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
@@ -490,6 +495,8 @@ function SpectrogramThresholdTool({
 /**
  * Toolbar-side instance profiles used by FrameView via window.ufoInstanceProfiles.
  * FrameView expects: { id, class_name, class_id, track_id }.
+ *
+ * NOTE: We still use window.ufo* keys/events for compatibility with the FrameView implementation.
  */
 type VideoInstanceProfile = {
   id: string; // `${class_name}:${track_id}`
@@ -499,6 +506,7 @@ type VideoInstanceProfile = {
 };
 declare global {
   interface Window {
+    // Shared state/events between the left VideoToolbar and the FrameView/AnnoBridge code.
     ufoInstanceProfiles?: VideoInstanceProfile[];
     ufoSelectedProfileId?: string | null;
     ufoSelectedClassName?: string | null;
@@ -506,6 +514,7 @@ declare global {
     ufoSelectionSource?: "auto" | "explicit" | null;
     ufoNotifySelectionChanged?: () => void;
 
+    // FrameView exposes these helpers so the toolbar can trigger save/clear actions.
     ufoCollectForSave?: () => Promise<unknown>;
     ufoClearCurrent?: () => Promise<void>;
     ufoClearAllFrames?: () => Promise<void>;
@@ -513,7 +522,7 @@ declare global {
 }
 
 /**
- * Stable key used by the shared UFOInstancePanel and FrameView events.
+ * Stable key used by the shared VideoInstancePanel and FrameView events.
  * Shape: "<class_name lowercase>:<canonical track_id>"
  */
 const instanceKey = (inst: VideoInstanceProfile) =>
@@ -539,6 +548,7 @@ type ToolBarInfo = {
 };
 
 export default function ToolBar(props: ToolBarInfo) {
+  // Task "UFO" is our current backend name for video/frame annotation projects.
   const isVideo = props.project.task === "UFO";
   return isVideo ? <VideoToolbar {...props} /> : <StandardToolbar {...props} />;
 }
@@ -766,6 +776,7 @@ type VideoWireProfile = {
   track_id: string;
 };
 
+// Event payload from FrameView -> toolbar: synchronizes profiles, selection, and count badges.
 type VideoStateDetail = {
   profiles?: VideoWireProfile[];
   selectedKey?: string;
@@ -775,6 +786,8 @@ type VideoStateDetail = {
   profileCounts?: Record<string, number>;
 };
 
+// VideoToolbar: left-side panel used only for video/frame annotation projects (project.task === "UFO").
+// Owns the instance list and selection; FrameView reads selection from window.ufo*.
 function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
   const navigate = useNavigate();
 
@@ -816,6 +829,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
         }));
         setInstanceProfiles(next);
 
+        // selectedKey comes in as "<class>:<track>" (lowercased) so we map it to the internal id.
         if ("selectedKey" in d) {
           if (typeof d.selectedKey === "string") {
             const inst = next.find((p) => instanceKey(p) === d.selectedKey);
@@ -829,10 +843,12 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
       setSelectedClassName(d.selectedClassName ?? null);
 
       if ("lastClassName" in d && d.lastClassName) {
+        // Persist last-selected class so new sessions can default to it.
         saveLastClassName(d.lastClassName);
       }
 
       if (d.classRegistry) {
+        // Normalize registry keys to lowercase for consistent lookup across UI and storage.
         const reg: ClassRegistry = {};
         Object.entries(d.classRegistry).forEach(([name, idVal]) => {
           reg[name.toLowerCase()] = { id: String(idVal), name };
@@ -840,6 +856,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
         setClassRegistry(reg);
       }
 
+      // Badge counts per instance (computed by a localStorage scan in FrameView/lib).
       if (d.profileCounts) {
         setInstanceCounts(d.profileCounts);
       }
@@ -864,6 +881,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Video annotation annotations are stored under anno::w3c::app://p/<p>/s/<s>/...
     const keyPrefix = "anno::w3c::" + `app://p/${project_id}/s/${sample_id}/`;
 
     let stopScan: (() => void) | null = null;
@@ -892,6 +910,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // FrameView reads the "current selection" from these window.ufo* values.
     window.ufoInstanceProfiles = instanceProfiles;
     window.ufoSelectedProfileId = selectedInstanceId ?? null;
     window.ufoSelectedClassName = selectedClassName ?? null;
@@ -900,9 +919,11 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
       instanceProfiles.find((p) => p.id === selectedInstanceId) || null;
     window.ufoSelectedTrackId = sel?.track_id ?? null;
 
+    // Notify FrameView to re-check selection and enable/disable drawing.
     window.ufoNotifySelectionChanged?.();
   }, [instanceProfiles, selectedInstanceId, selectedClassName]);
 
+  // Ask FrameView to delete one instance (across all frames) via a window event.
   const onRequestBulkDelete = (profile: {
     class_name?: string;
     track_id?: string;
@@ -921,15 +942,18 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
     );
   };
 
+  // Ask FrameView to wipe ALL instances/annotations for this sample via a window event.
   const onRequestDeleteAllInstances = () => {
     if (typeof window === "undefined") return;
     window.dispatchEvent(new CustomEvent("ufo:deleteAllInstances"));
   };
 
+  // Clear only the currently visible frame overlay (FrameView owns the implementation).
   const videoClearCurrent = async () => {
     await window.ufoClearCurrent?.();
   };
 
+  // Gather all localStorage W3C annotations, convert to COCO frames, then to backend "video bboxes".
   const collectVideoPayloadForBackend = async (): Promise<Annotation[]> => {
     if (typeof window === "undefined") return annotations;
 
@@ -958,11 +982,13 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
     try {
       const payload = await collectVideoPayloadForBackend();
 
-      const response = await saveVideoAnnotations(project_id, sample_id, payload);
+      // Video save writes the pre-formed COCO video bbox payload to the backend.
+      const response = await saveVideoAnnotations(project_id,sample_id,payload);
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
 
+      // Mark local video session as "in sync" with backend after successful save.
       setVideoWorkingDirty(project_id, sample_id, false);
 
       ToastQueue.positive(`Saved ${payload.length} annotations!`, {
@@ -987,6 +1013,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
     }
 
     try {
+      // Save current video annotation payload before moving to next sample.
       const payload = await collectVideoPayloadForBackend();
       await saveVideoAnnotations(project_id, sample_id, payload);
 
@@ -1081,9 +1108,11 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
             setSelectedClassName={(name) => {
               if (!name) return;
 
+              // "Arm" the class for drawing (FrameView enables drawing when a class is selected).
               setSelectedClassName(name);
               saveLastClassName(name);
 
+              // Reset instance selection when switching class.
               setSelectedInstanceId(null);
 
               if (typeof window !== "undefined") {
@@ -1104,6 +1133,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
               const inst = instanceProfiles.find((p) => instanceKey(p) === key);
               if (!inst) return;
 
+              // Explicit instance selection (persists across frame navigation).
               setSelectedInstanceId(inst.id);
               setSelectedClassName(inst.class_name);
               saveLastClassName(inst.class_name);
@@ -1117,6 +1147,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
               }
             }}
             onCreateProfile={(className: string, trackId: string) => {
+              // Instance profiles define the (class + track_id) that annotations will attach to.
               const cls = className;
 
               const keyLower = cls.toLowerCase();
@@ -1160,6 +1191,7 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
               saveLastClassName(cls);
 
               if (typeof window !== "undefined") {
+                // Keep FrameView selection state in sync.
                 window.ufoInstanceProfiles = nextInstances;
                 window.ufoSelectedProfileId = id;
                 window.ufoSelectedClassName = cls;

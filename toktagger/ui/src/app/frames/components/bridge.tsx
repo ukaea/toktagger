@@ -26,11 +26,20 @@ import type { ClassRegistry } from "./lib";
 /**
  * Imperative bridge between Annotorious and the rest of the UFO frame view.
  *
+ * Why this exists:
+ * - Annotorious is event-driven and stores overlay state internally.
+ * - Our app wants a predictable flow: normalize labels, stamp frame keys,
+ *   track "dirty" edits, and expose imperative operations to the parent view.
+ *
  * Responsibilities:
- * - Keep annotations rectangle-only and normalized (class/track stamping).
- * - Track dirty state for background auto-save.
- * - Expose a small API for reading, hydrating, and clearing the overlay.
- * - Optionally auto-create instance profiles when duplicate (class,track) is drawn.
+ * - Enforce rectangle-only annotations (filters out polygons/unknown shapes).
+ * - Normalize on every change (ensure class/track stamping stays stable).
+ * - Keep a "last known by id" cache so editing doesn't drop class/track bodies.
+ * - Provide an imperative API:
+ *   - persistWorkingNow (read + normalize)
+ *   - hydrateOverlay (programmatic set)
+ *   - clearOverlaySilently (programmatic clear)
+ * - Optionally auto-create / auto-select new instance profiles (quick-add flows).
  */
 export type BridgeHandle = {
   /** Read current overlay, stamp to currentKey, normalize, and return the list (no storage writes). */
@@ -51,15 +60,38 @@ export type BridgeHandle = {
 };
 
 type BridgeProps = {
+  /**
+   * Selection getters come from the FrameView which reads window.* (toolbar state).
+   * This keeps the bridge decoupled from how selection is stored.
+   */
   getSelectedProfile: () => SelectedProfile;
   getSelectedClassName: () => string | null;
+
+  /**
+   * includeTrackIds toggles "tracking mode":
+   * - true: write { class_id, class_name, track_id } into annotation bodies
+   * - false: only write { class_id, class_name } (detection mode)
+   */
   includeTrackIds: boolean;
+
+  /**
+   * classRegistry provides optional class_id lookup (name->id).
+   * It's passed into normalizeWithMode for stamping new annotations.
+   */
   classRegistry: ClassRegistry;
+
+  /**
+   * Optional hook used by FrameView to create/select a new instance profile.
+   * This bridge uses it in two places:
+   * - if user draws the first box with only a class selected (no instance yet)
+   * - if user duplicates an existing (class,track) in the same frame (collision)
+   */
   onAutoQuickAdd?: (hint: { class_name: string }) => Promise<{
     class_id: number;
     class_name: string;
     track_id: string;
   } | null>;
+
   popup?: React.ComponentType<Record<string, unknown>>;
   ref?: React.Ref<BridgeHandle>; // React 19: ref is a normal prop
 };
@@ -70,6 +102,11 @@ type SelectedProfile = {
   track_id?: string;
 } | null;
 
+/**
+ * AnnotatorApi
+ * Runtime shape we rely on from useAnnotator().
+ * Annotorious types aren't always complete, so we treat it as "duck typed".
+ */
 type AnnotatorApi = {
   getAnnotations?: () => unknown;
   setAnnotations?: (anns: ImageAnnotation[], replace?: boolean) => void;
@@ -81,6 +118,10 @@ function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
   return typeof v === "function";
 }
 
+/**
+ * Guard for the minimal Annotorious API surface we need.
+ * Some environments return a function-like object; we accept both object/function.
+ */
 function isAnnotatorApi(a: unknown): a is AnnotatorApi {
   if (!a || (typeof a !== "object" && typeof a !== "function")) return false;
 
@@ -111,6 +152,10 @@ function isAnnotatorApi(a: unknown): a is AnnotatorApi {
   return true;
 }
 
+/**
+ * Runtime ImageAnnotation guard for objects read from Annotorious / localStorage.
+ * We only verify the fields that downstream code assumes exist.
+ */
 function isImageAnnotation(v: unknown): v is ImageAnnotation {
   if (!v || typeof v !== "object") return false;
 
@@ -129,6 +174,10 @@ function isImageAnnotation(v: unknown): v is ImageAnnotation {
   return true;
 }
 
+/**
+ * Annotorious can return either a raw array, or an object with { list }.
+ * Normalize to a strict ImageAnnotation[].
+ */
 function toAnnoList(got: unknown): ImageAnnotation[] {
   if (Array.isArray(got)) return got.filter(isImageAnnotation);
   if (got && typeof got === "object" && "list" in got) {
@@ -138,11 +187,17 @@ function toAnnoList(got: unknown): ImageAnnotation[] {
   return [];
 }
 
+/** JSON-based deep clone is sufficient for annotation payloads. */
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
 // --- Rectangle-only guard (filters out polygons or unknown shapes) ---
+/**
+ * We only support rectangles in the UFO tool right now.
+ * Annotorious may still produce other selector types depending on config/plugins;
+ * this filter ensures everything downstream is rectangle-like.
+ */
 function isRectangleAnno(a: ImageAnnotation): boolean {
   const sel = a.target?.selector;
   if (!sel || typeof sel !== "object") return false;
@@ -164,23 +219,55 @@ export const AnnoBridge = Object.assign(
       onAutoQuickAdd,
     } = props;
 
+    /**
+     * Annotorious annotator instance (imperative API).
+     * Note: may be null during first render before Annotorious mounts.
+     */
     const anno = useAnnotator();
 
-    // Prevent event-driven writes while we are applying programmatic overlay changes.
+    /**
+     * When we programmatically set/hydrate/clear annotations, Annotorious fires
+     * create/update/delete events. We suppress those so we don't recurse.
+     */
     const suppressPersistRef = useRef(false);
-    // Last normalized list, indexed by id, used to keep class/track info stable across edits.
+
+    /**
+     * Cache of the last normalized annotations by id.
+     * normalizeWithMode uses this to restore class/track bodies after edits
+     * (e.g. resize can sometimes drop/customize bodies).
+     */
     const lastByIdRef = useRef<Record<string, ImageAnnotation>>({});
-    // Store latest currentKey (frame key) so reads/writes can stamp annotations correctly.
+
+    /**
+     * Current "frame key" (W3C target.source) to stamp onto every annotation.
+     * Parent FrameView updates this via persistWorkingNow/hydrateOverlay calls.
+     */
     const currentKeyRef = useRef<string>("");
 
-    // Tracks whether the user has made edits that haven't been persisted yet.
+    /**
+     * Dirty flag:
+     * - true when user changed overlay and those changes haven't been persisted
+     *   by FrameView's background auto-save loop yet.
+     * - FrameView reads this via BridgeHandle.hasUnsaved().
+     */
     const dirtyRef = useRef(false);
 
-    // Buffered overlay apply (one setAnnotations per animation frame).
+    /**
+     * Buffered overlay apply:
+     * To avoid repeated setAnnotations calls during bursts of events, we buffer
+     * the latest normalized list and apply it once per animation frame.
+     */
     const pendingRef = useRef<ImageAnnotation[] | null>(null);
     const flushingRef = useRef(false);
     const lastAppliedRef = useRef<string>(""); // JSON signature of last applied overlay
 
+    /**
+     * sig() is a lightweight "overlay signature" used to avoid redundant re-applies.
+     * We only include:
+     * - annotation id
+     * - selector payload (geometry)
+     * This keeps comparisons stable and cheap, and ignores body ordering noise.
+     */
     const sig = (anns: readonly ImageAnnotation[]) =>
       JSON.stringify(
         anns.map((a) => ({
@@ -190,14 +277,23 @@ export const AnnoBridge = Object.assign(
         })),
       );
 
-    // Double-RAF to ensure Annotorious has settled before re-enabling event handling
+    /**
+     * doubleRAF:
+     * Annotorious can take a frame or two to settle after setAnnotations.
+     * Double requestAnimationFrame is a simple way to ensure DOM + internal state
+     * are consistent before we re-enable event handling.
+     */
     const doubleRAF = useCallback(async () => {
       await new Promise<void>((r) =>
         requestAnimationFrame(() => requestAnimationFrame(() => r())),
       );
     }, []);
 
-    // Run a function while temporarily suppressing change-driven normalization/persist logic
+    /**
+     * runSilently:
+     * Execute a programmatic overlay operation while suppressing event-driven
+     * normalization/persist logic. Used by hydrateOverlay/clearOverlay/flushOverlay.
+     */
     const runSilently = useCallback(
       async (fn: () => void | Promise<void>) => {
         suppressPersistRef.current = true;
@@ -211,7 +307,11 @@ export const AnnoBridge = Object.assign(
       [doubleRAF],
     );
 
-    // Once-per-frame overlay flush with signature guard to avoid redundant setAnnotations calls
+    /**
+     * flushOverlay:
+     * Apply pendingRef.current via anno.setAnnotations once per animation frame,
+     * and only if the signature differs from what we already applied.
+     */
     const flushOverlay = useCallback(async () => {
       if (flushingRef.current) return;
       flushingRef.current = true;
@@ -234,11 +334,20 @@ export const AnnoBridge = Object.assign(
       flushingRef.current = false;
     }, [anno, runSilently]);
 
-    // Shared writer: normalize, keep lastByIdRef in sync, and return the normalized list (rectangles only)
+    /**
+     * normalizeWrite:
+     * Single place to enforce our invariants for a list:
+     * - rectangle-only filtering
+     * - mode-aware normalization (tracking vs detection)
+     * - update lastByIdRef cache for future edit restorations
+     */
     const normalizeWrite = useCallback(
       (raw: ImageAnnotation[]) => {
         // Rectangle-only: drop anything not a rectangle
         const rects = raw.filter(isRectangleAnno);
+
+        // normalizeWithMode stamps class/track onto new shapes,
+        // and restores missing metadata on edited shapes via lastByIdRef.
         const ensured = normalizeWithMode(
           rects,
           lastByIdRef.current,
@@ -247,9 +356,12 @@ export const AnnoBridge = Object.assign(
           includeTrackIds,
           classRegistry,
         );
+
+        // Refresh our "last known" cache after normalization.
         const byId: Record<string, ImageAnnotation> = {};
         for (const a of ensured) byId[a.id] = a;
         lastByIdRef.current = byId;
+
         return ensured;
       },
       [
@@ -260,7 +372,13 @@ export const AnnoBridge = Object.assign(
       ],
     );
 
-    // Auto-quick-add: ensure a class entry exists in the registry whenever a new annotation is created
+    /**
+     * handleCreate:
+     * Runs on createAnnotation events to ensure the class registry contains the
+     * selected class name, so class_id lookups remain consistent across reloads.
+     *
+     * This is a "best-effort" localStorage update; failures only warn.
+     */
     const handleCreate = useCallback(
       async (w3c: ImageAnnotation) => {
         // Mark overlay as dirty so background auto-save can pick up the latest state
@@ -279,6 +397,8 @@ export const AnnoBridge = Object.assign(
           let registry: ClassRegistry = loadClassRegistry();
 
           const keyLower = selectedClass.toLowerCase();
+
+          // If this class isn't registered yet, add it with a deterministic id.
           if (!registry[keyLower]) {
             const selectedProfile = getSelectedProfile?.() ?? null;
             // Prefer track_id when available (it’s the instance identifier), otherwise fall back to class_id.
@@ -306,11 +426,23 @@ export const AnnoBridge = Object.assign(
       [getSelectedClassName, getSelectedProfile],
     );
 
+    /**
+     * Expose an imperative handle to FrameView (parent):
+     * - persistWorkingNow: read annotator overlay, stamp currentKey, normalize
+     * - clearOverlaySilently: clear without re-triggering change handlers
+     * - hydrateOverlay: set overlay from a provided list (retarget to currentKey)
+     * - hasUnsaved/markSaved: dirty tracking for background auto-save & toolbar UX
+     */
     useImperativeHandle(
       bridgeRef,
       (): BridgeHandle => ({
         isAnnotatorReady: () => !!anno,
 
+        /**
+         * Read-only "persist" (no storage writes):
+         * Used by FrameView to grab the current overlay and write it to localStorage.
+         * Ensures all annotations have target.source=currentKey and are normalized.
+         */
         persistWorkingNow: async (currentKey: string) => {
           if (!anno) return [];
 
@@ -326,6 +458,10 @@ export const AnnoBridge = Object.assign(
           return normalizeWrite(stamped);
         },
 
+        /**
+         * Clear overlay without firing our change handlers.
+         * Note: we set dirty=true so the parent can persist the "cleared" state.
+         */
         clearOverlaySilently: async () => {
           if (!anno) return;
 
@@ -336,6 +472,14 @@ export const AnnoBridge = Object.assign(
           });
         },
 
+        /**
+         * Hydrate overlay with a provided list (e.g. from localStorage or backend seeding).
+         * We:
+         * - filter rectangles
+         * - stamp target.source to currentKey
+         * - seed lastByIdRef so subsequent edits can restore metadata
+         * - setAnnotations silently to avoid event recursion
+         */
         hydrateOverlay: async (list: ImageAnnotation[], currentKey: string) => {
           if (!isAnnotatorApi(anno)) return false;
           const api = anno;
@@ -368,11 +512,27 @@ export const AnnoBridge = Object.assign(
       [anno, doubleRAF, normalizeWrite, runSilently],
     );
 
-    // Subscribe to create/update/delete events -> normalize + optional auto-quick-add (rectangles only)
+    /**
+     * Subscribe to Annotorious events:
+     * - createAnnotation
+     * - updateAnnotation
+     * - deleteAnnotation
+     *
+     * For every change we:
+     * - stamp annotations to currentKeyRef.current
+     * - normalize them (class/track stability)
+     * - optionally run duplicate-instance detection and auto-quick-add
+     * - buffer the normalized list and apply it (once per frame)
+     */
     useEffect(() => {
       if (!anno || !isAnnotatorApi(anno)) return;
       const api = anno;
 
+      /**
+       * onAnyChange:
+       * Runs after any create/update/delete, unless we are in a "silent" operation.
+       * The main job is to normalize the overlay and re-apply it if normalization changed it.
+       */
       const onAnyChange = async () => {
         if (suppressPersistRef.current) return;
 
@@ -381,6 +541,7 @@ export const AnnoBridge = Object.assign(
         const rawFull = toAnnoList(api.getAnnotations?.());
         const key = currentKeyRef.current;
 
+        // Retarget every annotation to the active frame key.
         const raw: ImageAnnotation[] = rawFull
           .filter(isRectangleAnno)
           .map((a) => ({
@@ -398,7 +559,14 @@ export const AnnoBridge = Object.assign(
           classRegistry,
         );
 
-        // Auto quick-add logic; no-op when onAutoQuickAdd is not provided
+        /**
+         * Duplicate-instance guard (tracking mode only):
+         * If the user draws a second annotation with the same (class_name, track_id)
+         * in the same frame, we auto-create a new instance profile and re-stamp
+         * the duplicate annotation with the new track_id.
+         *
+         * Rationale: one instance per frame is a common constraint for this workflow.
+         */
         if (includeTrackIds && normalized.length > 0 && onAutoQuickAdd) {
           const firstAnnotationIdByInstanceKey = new Map<string, string>();
           let duplicateAnnotation: ImageAnnotation | null = null;
@@ -457,6 +625,14 @@ export const AnnoBridge = Object.assign(
         void flushOverlay();
       };
 
+      /**
+       * onCreate:
+       * Special handling for createAnnotation:
+       * - If tracking mode and there is no selected instance yet, auto-create one
+       *   based on the selected class name (first box bootstraps the instance).
+       * - Ensure class registry is updated for the class involved.
+       * - Then run the generic normalization path.
+       */
       const onCreate = (annoMaybe: unknown) => {
         if (!isImageAnnotation(annoMaybe)) return;
         const w3c = annoMaybe;
@@ -498,7 +674,9 @@ export const AnnoBridge = Object.assign(
       handleCreate,
     ]);
 
+    // This bridge renders no UI; it only wires annotator events + exposes imperative APIs.
     return null;
   },
+  // Preserve the popup export pattern used elsewhere (AnnoBridge.Popup)
   { Popup: ImageAnnotationPopup },
 );
