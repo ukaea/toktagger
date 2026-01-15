@@ -39,6 +39,7 @@ import {
 } from "@/types";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
@@ -46,7 +47,6 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
 import type { NavigateFunction } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
-
 import type { ClassRegistry } from "@/app/frames/components/lib";
 import {
   LABEL_MAP,
@@ -66,37 +66,36 @@ import {
 } from "@/app/frames/components/ui";
 import { setUfoWorkingDirty } from "@/app/frames/components/adapters";
 
-type UfoWireProfile = {
-  class_name: string;
-  class_id: number;
-  track_id: string;
-};
+// ------------------------------
+// Save helpers
+// ------------------------------
 
-type UfoStateDetail = {
-  profiles?: UfoWireProfile[];
-  selectedKey?: string;
-  selectedClassName?: string | null;
-  lastClassName?: string;
-  classRegistry?: Record<string, number>;
-  profileCounts?: Record<string, number>;
-};
+async function saveAnnotationsValidated(
+  project_id: string,
+  sample_id: string,
+  annotations: Annotation[],
+) {
+  const ANNOTATIONS_URL = `${process.env.NEXT_PUBLIC_API_URL}/backend-api/projects/${project_id}/samples/${sample_id}/annotations`;
 
-declare global {
-  interface Window {
-    ufoInstanceProfiles?: InstanceProfile[];
-    ufoSelectedProfileId?: string | null;
-    ufoSelectedClassName?: string | null;
-    ufoSelectedTrackId?: string | null;
-    ufoSelectionSource?: "auto" | "explicit" | null;
-    ufoNotifySelectionChanged?: () => void;
+  const validatedAnnotations: Annotation[] = annotations.map(
+    (annotation: Annotation) => ({
+      ...annotation,
+      validated: true,
+    }),
+  );
 
-    ufoCollectForSave?: () => Promise<unknown>;
-    ufoClearCurrent?: () => Promise<void>;
-    ufoClearAllFrames?: () => Promise<void>;
-  }
+  const response = await fetch(ANNOTATIONS_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(validatedAnnotations),
+  });
+  return response;
 }
 
-async function saveAnnotations(
+// UFO behavior: backend expects already-formed payload (COCO video bboxes), no validated tagging here.
+async function saveUfoAnnotations(
   project_id: string,
   sample_id: string,
   annotations: Annotation[],
@@ -104,9 +103,7 @@ async function saveAnnotations(
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(annotations),
   });
   return response;
@@ -141,7 +138,7 @@ function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
 
   const handleClick = async () => {
     try {
-      await saveAnnotations(project_id, sample_id, annotations);
+      await saveAnnotationsValidated(project_id, sample_id, annotations);
       const sample = await getNextSample(project_id);
       const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
       navigate(NEXT_SAMPLE_URL);
@@ -160,7 +157,7 @@ function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
 function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
   const handleClick = async () => {
     try {
-      const response = await saveAnnotations(
+      const response = await saveAnnotationsValidated(
         project_id,
         sample_id,
         annotations,
@@ -201,7 +198,7 @@ export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
       try {
         const sample = await getShotSample(project_id, shot_id);
         if (sample !== null) {
-          await saveAnnotations(project_id, sample_id, annotations);
+          await saveAnnotationsValidated(project_id, sample_id, annotations);
           const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
           navigate(NEXT_SAMPLE_URL);
         } else {
@@ -258,9 +255,7 @@ function UfoShotSearch({
     if (!project_id || !sample_id) {
       ToastQueue.negative(
         "Cannot jump to shot: missing project or sample id.",
-        {
-          timeout: 5000,
-        },
+        { timeout: 5000 },
       );
       return;
     }
@@ -269,7 +264,7 @@ function UfoShotSearch({
       const nextSample = await getShotSample(project_id, newValue);
       if (nextSample !== null) {
         const payload = await collectUfoPayloadForBackend();
-        await saveAnnotations(project_id, sample_id, payload);
+        await saveUfoAnnotations(project_id, sample_id, payload);
 
         setUfoWorkingDirty(project_id, sample_id, false);
 
@@ -434,9 +429,7 @@ function SpectrogramThresholdTool({
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             annotator_params: {
               signal_name: signal_name,
@@ -512,8 +505,9 @@ type InstanceProfile = {
 const instanceKey = (inst: InstanceProfile) =>
   `${inst.class_name.toLowerCase()}:${inst.track_id}`;
 
-/** ---------------------- Main ToolBar ---------------------- */
-
+// ------------------------------
+// Main ToolBar
+// ------------------------------
 type ToolBarInfo = {
   project: Project;
   sample: Sample;
@@ -551,7 +545,18 @@ export default function ToolBar({
 
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  let nonUfoDataOk = true;
+  if (!isUfo) {
+    tools.push({
+      name: "Model Prediction",
+      component: (
+        <ModelPredictTool
+          project={project}
+          sample_id={sample_id}
+          setAnnotations={setAnnotations}
+        />
+      ),
+    });
+  }
 
   if (!isUfo) {
     if (project.task == "ELM") {
@@ -559,126 +564,123 @@ export default function ToolBar({
 
       if (!result.success) {
         console.warn("ELM data is not available");
-        nonUfoDataOk = false;
-      } else {
-        const tsData = result.data;
-
-        const labels = ["No ELMs", "Type I", "Type II", "Type III"];
-        tools.push({
-          name: "Shot Labels",
-          component: (
-            <ShotLabels
-              labels={labels}
-              annotations={annotations}
-              setAnnotations={setAnnotations}
-            />
-          ),
-        });
-
-        tools.push({
-          name: "Peak Detection",
-          component: (
-            <PeakDetectionTool
-              project_id={project_id}
-              sample_id={sample_id}
-              data={tsData}
-              dataParams={dataParams}
-              setAnnotations={setAnnotations}
-            />
-          ),
-        });
-
-        tools.push({
-          name: "Outlier Detection",
-          component: (
-            <OutlierDetectionTool
-              project_id={project_id}
-              sample_id={sample_id}
-              data={tsData}
-              dataParams={dataParams}
-              setAnnotations={setAnnotations}
-            />
-          ),
-        });
-
-        tools.push({
-          name: "Change Point Detection",
-          component: (
-            <ChangePointDetectionTool
-              project_id={project_id}
-              sample_id={sample_id}
-              data={tsData}
-              dataParams={dataParams}
-              setAnnotations={setAnnotations}
-            />
-          ),
-        });
-
-        tools.push({
-          name: "Jump Detection",
-          component: (
-            <JumpDetectionTool
-              project_id={project_id}
-              sample_id={sample_id}
-              data={tsData}
-              dataParams={dataParams}
-              setAnnotations={setAnnotations}
-            />
-          ),
-        });
+        return null;
       }
+
+      const tsData = result.data;
+
+      const labels = ["No ELMs", "Type I", "Type II", "Type III"];
+      tools.push({
+        name: "Shot Labels",
+        component: (
+          <ShotLabels
+            labels={labels}
+            annotations={annotations}
+            setAnnotations={setAnnotations}
+          />
+        ),
+      });
+
+      tools.push({
+        name: "Peak Detection",
+        component: (
+          <PeakDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+            dataParams={dataParams}
+            setAnnotations={setAnnotations}
+          />
+        ),
+      });
+
+      tools.push({
+        name: "Outlier Detection",
+        component: (
+          <OutlierDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+            dataParams={dataParams}
+            setAnnotations={setAnnotations}
+          />
+        ),
+      });
+
+      tools.push({
+        name: "Change Point Detection",
+        component: (
+          <ChangePointDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+            dataParams={dataParams}
+            setAnnotations={setAnnotations}
+          />
+        ),
+      });
+
+      tools.push({
+        name: "Jump Detection",
+        component: (
+          <JumpDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+            dataParams={dataParams}
+            setAnnotations={setAnnotations}
+          />
+        ),
+      });
     } else if (project.task == "MHD") {
       const resultComposite = CompositeDataSchema.safeParse(data);
       if (!resultComposite.success) {
         console.warn("MHD data is not available");
-        nonUfoDataOk = false;
-      } else {
-        const resultSpec = SpectrogramDataSchema.safeParse(
-          resultComposite.data.values["mirnov"],
-        );
-        if (!resultSpec.success) {
-          console.warn("MHD spectrogram data is not available");
-          nonUfoDataOk = false;
-        } else {
-          const mhdData = resultSpec.data;
-          tools.push({
-            name: "Amplitude Range",
-            component: (
-              <AmplitudeSlider
-                data={mhdData}
-                viewParams={viewParams}
-                setViewParams={setViewParams}
-                plotProps={plotProps}
-              />
-            ),
-          });
-
-          tools.push({
-            name: "Color Map",
-            component: (
-              <ColorMapPicker
-                plotProps={plotProps}
-                setPlotProps={setPlotProps}
-              />
-            ),
-          });
-
-          tools.push({
-            name: "Threshold",
-            component: (
-              <SpectrogramThresholdTool
-                project_id={project_id}
-                sample_id={sample_id}
-                signal_name={"mirnov"}
-                dataParams={dataParams}
-                plotProps={plotProps}
-                setPlotProps={setPlotProps}
-                setAnnotations={setAnnotations}
-              />
-            ),
-          });
-        }
+        return null;
       }
+
+      const resultSpec = SpectrogramDataSchema.safeParse(
+        resultComposite.data.values["mirnov"],
+      );
+      if (!resultSpec.success) {
+        console.warn("MHD spectrogram data is not available");
+        return null;
+      }
+
+      const mhdData = resultSpec.data;
+      tools.push({
+        name: "Amplitude Range",
+        component: (
+          <AmplitudeSlider
+            data={mhdData}
+            viewParams={viewParams}
+            setViewParams={setViewParams}
+            plotProps={plotProps}
+          />
+        ),
+      });
+
+      tools.push({
+        name: "Color Map",
+        component: (
+          <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
+        ),
+      });
+
+      tools.push({
+        name: "Threshold",
+        component: (
+          <SpectrogramThresholdTool
+            project_id={project_id}
+            sample_id={sample_id}
+            signal_name={"mirnov"}
+            dataParams={dataParams}
+            plotProps={plotProps}
+            setPlotProps={setPlotProps}
+            setAnnotations={setAnnotations}
+          />
+        ),
+      });
     }
   }
 
@@ -702,9 +704,22 @@ export default function ToolBar({
     {},
   );
 
-  /**
-   * Listen to FrameView state events so toolbar stays in sync (instances, selection, counts, registry).
-   */
+  type UfoWireProfile = {
+    class_name: string;
+    class_id: number;
+    track_id: string;
+  };
+
+  type UfoStateDetail = {
+    profiles?: UfoWireProfile[];
+    selectedKey?: string;
+    selectedClassName?: string | null;
+    lastClassName?: string;
+    classRegistry?: Record<string, number>;
+    profileCounts?: Record<string, number>;
+  };
+
+  // Listen to FrameView state events so toolbar stays in sync.
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
@@ -757,9 +772,7 @@ export default function ToolBar({
     return () => window.removeEventListener("ufo:state", onState);
   }, [isUfo]);
 
-  /**
-   * Initial load of registry + last-used class (shared with FrameView via localStorage).
-   */
+  // Initial load of registry + last-used class.
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
@@ -771,53 +784,50 @@ export default function ToolBar({
     if (last) setSelectedClassName(last);
   }, [isUfo]);
 
-  /**
-   * Per-instance usage scanner (keeps the instance count badges updated).
-   */
+  // Per-instance usage scanner (keeps badge counts updated).
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
 
-    // Prefix for all per-frame W3C annotation entries in localStorage for this project/sample.
-    // scanInstanceCountsChunked uses this to find and count instance usage.
     const keyPrefix = "anno::w3c::" + `app://p/${project_id}/s/${sample_id}/`;
 
-    // Handle returned by scanInstanceCountsChunked to cancel any in-flight chunked scan.
     let stopScan: (() => void) | null = null;
 
-    // Start a fresh scan, cancelling the previous one to avoid overlapping work.
     const startScan = () => {
       if (stopScan) stopScan();
       stopScan = scanInstanceCountsChunked({
         keyPrefix,
-        // Update badge counts in the UI as the scan progresses.
         onUpdate: setInstanceCounts,
       });
     };
 
-    // Run immediately on mount / when project/sample changes.
     startScan();
 
-    // Periodically rescan so badge counts stay in sync with ongoing edits.
     const intervalId = window.setInterval(() => {
       startScan();
     }, 1000);
 
-    // Cleanup: cancel scan and stop periodic refresh.
     return () => {
       if (stopScan) stopScan();
       window.clearInterval(intervalId);
     };
   }, [isUfo, project_id, sample_id]);
 
-  /**
-   * Mirror toolbar selection + profiles into window.* for FrameView/AnnoBridge.
-   */
+  // Mirror toolbar selection + profiles into window.* for FrameView/AnnoBridge.
   useEffect(() => {
     if (!isUfo) return;
     if (typeof window === "undefined") return;
 
-    const w = window;
+    const w = window as unknown as {
+      ufoInstanceProfiles?: InstanceProfile[];
+      ufoSelectedProfileId?: string | null;
+      ufoSelectedClassName?: string | null;
+      ufoSelectedTrackId?: string | null;
+      ufoNotifySelectionChanged?: () => void;
+      ufoCollectForSave?: () => Promise<unknown>;
+      ufoClearCurrent?: () => Promise<void>;
+    };
+
     w.ufoInstanceProfiles = instanceProfiles;
     w.ufoSelectedProfileId = selectedInstanceId ?? null;
     w.ufoSelectedClassName = selectedClassName ?? null;
@@ -853,13 +863,17 @@ export default function ToolBar({
   };
 
   const ufoClearCurrent = async () => {
-    await window.ufoClearCurrent?.();
+    const w = window as unknown as { ufoClearCurrent?: () => Promise<void> };
+    await w.ufoClearCurrent?.();
   };
 
   const collectUfoPayloadForBackend = async (): Promise<Annotation[]> => {
     if (typeof window === "undefined") return annotations;
 
-    const collect = window.ufoCollectForSave;
+    const w = window as unknown as {
+      ufoCollectForSave?: () => Promise<unknown>;
+    };
+    const collect = w.ufoCollectForSave;
     if (typeof collect !== "function") return annotations;
 
     const raw = await collect();
@@ -874,7 +888,6 @@ export default function ToolBar({
   };
 
   const handleUfoSave = async () => {
-    // Guard against incomplete project/sample objects.
     if (!project_id || !sample_id) {
       ToastQueue.negative("Cannot save: missing project or sample id.", {
         timeout: 5000,
@@ -885,7 +898,7 @@ export default function ToolBar({
     try {
       const payload = await collectUfoPayloadForBackend();
 
-      const response = await saveAnnotations(project_id, sample_id, payload);
+      const response = await saveUfoAnnotations(project_id, sample_id, payload);
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
@@ -905,20 +918,17 @@ export default function ToolBar({
   };
 
   const handleUfoNextSample = async () => {
-    // Guard against incomplete project/sample objects.
     if (!project_id || !sample_id) {
       ToastQueue.negative(
         "Cannot load next sample: missing project or sample id.",
-        {
-          timeout: 5000,
-        },
+        { timeout: 5000 },
       );
       return;
     }
 
     try {
       const payload = await collectUfoPayloadForBackend();
-      await saveAnnotations(project_id, sample_id, payload);
+      await saveUfoAnnotations(project_id, sample_id, payload);
 
       setUfoWorkingDirty(project_id, sample_id, false);
 
@@ -935,10 +945,6 @@ export default function ToolBar({
     const inst = instanceProfiles.find((p) => p.id === selectedInstanceId);
     return inst ? instanceKey(inst) : null;
   })();
-
-  if (!isUfo && !nonUfoDataOk) {
-    return null;
-  }
 
   return (
     <Provider theme={defaultTheme} height="100vh">
@@ -1022,7 +1028,7 @@ export default function ToolBar({
                 setSelectedInstanceId(null);
 
                 if (typeof window !== "undefined") {
-                  window.ufoSelectionSource = null;
+                  (window as any).ufoSelectionSource = null;
                 }
               }}
             />
@@ -1046,7 +1052,7 @@ export default function ToolBar({
                 saveLastClassName(inst.class_name);
 
                 if (typeof window !== "undefined") {
-                  const w = window;
+                  const w = window as any;
                   w.ufoSelectedProfileId = inst.id;
                   w.ufoSelectedClassName = inst.class_name;
                   w.ufoSelectedTrackId = inst.track_id;
@@ -1080,9 +1086,7 @@ export default function ToolBar({
                   (typeof labelMapId === "number" ? labelMapId : undefined) ??
                   1;
 
-                const existingTrackIds = instanceProfiles.map(
-                  (p) => p.track_id,
-                );
+                const existingTrackIds = instanceProfiles.map((p) => p.track_id);
                 const canonicalTrackId =
                   canonicalizeTrackId(trackId) ||
                   canonicalizeTrackId(uniqueReadableId(existingTrackIds));
@@ -1100,7 +1104,7 @@ export default function ToolBar({
                 saveLastClassName(cls);
 
                 if (typeof window !== "undefined") {
-                  const w = window;
+                  const w = window as any;
                   w.ufoInstanceProfiles = nextInstances;
                   w.ufoSelectedProfileId = id;
                   w.ufoSelectedClassName = cls;
@@ -1108,12 +1112,8 @@ export default function ToolBar({
                   w.ufoNotifySelectionChanged?.();
                 }
               }}
-              onRequestBulkDelete={(profile) => {
-                onRequestBulkDelete(profile);
-              }}
-              onRequestDeleteAllInstances={() => {
-                onRequestDeleteAllInstances();
-              }}
+              onRequestBulkDelete={onRequestBulkDelete}
+              onRequestDeleteAllInstances={onRequestDeleteAllInstances}
               profileCounts={instanceCounts}
               showCreator={false}
             />
@@ -1138,39 +1138,31 @@ export default function ToolBar({
                 <span style={{ fontSize: "1.2rem" }}>Controls</span>
               </Header>
               <ButtonGroup>
-                {project_id && sample_id ? (
-                  <>
-                    <SaveButton
-                      project_id={project_id}
-                      sample_id={sample_id}
-                      annotations={annotations}
-                    />
-                    <NextButton
-                      project_id={project_id}
-                      sample_id={sample_id}
-                      annotations={annotations}
-                    />
-                  </>
-                ) : null}
-                <Button variant="primary" onPress={clearAnnotations}>
-                  Clear
-                </Button>
-              </ButtonGroup>
-              {project_id && sample_id ? (
-                <ShotSearch
+                <SaveButton
                   project_id={project_id}
                   sample_id={sample_id}
                   annotations={annotations}
                 />
-              ) : null}
+                <NextButton
+                  project_id={project_id}
+                  sample_id={sample_id}
+                  annotations={annotations}
+                />
+                <Button variant="primary" onPress={clearAnnotations}>
+                  Clear
+                </Button>
+              </ButtonGroup>
+              <ShotSearch
+                project_id={project_id}
+                sample_id={sample_id}
+                annotations={annotations}
+              />
             </Flex>
-
             <Flex justifyContent="center" alignItems="center">
               <Header height="size-300" marginBottom="size-100">
                 <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
               </Header>
             </Flex>
-
             <Accordion allowsMultipleExpanded={true} width="100%">
               {tools.map((item, i) => (
                 <Disclosure key={i}>
