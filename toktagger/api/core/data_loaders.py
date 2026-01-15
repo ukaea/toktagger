@@ -147,7 +147,7 @@ class ParquetDataLoader(DataLoader):
             raise FileNotFoundError(
                 f"Could not find file at '{sample_data.file_name}', relative to {pathlib.Path().cwd()}"
             )
-        df = pd.read_parquet(sample_data.file_name, columns=sample_data.column_names)
+        df = pd.read_parquet(sample_data.file_name, columns=sample_data.signal_names)
         df = df.fillna(0)
         data = df.to_dict("list")
         time = df.index.values

@@ -80,6 +80,8 @@ export const DisruptionView = ({
     .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
     .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
 
+  console.log(vspans);
+
   const updateZones = (newZones: Array<Zone>) => {
     updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
   };

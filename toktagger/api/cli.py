@@ -4,6 +4,7 @@ from toktagger.api.main import Server
 import uvicorn
 import time
 import threading
+import os
 
 # Need to point to app as a module level string if we want reload option
 server = Server()
@@ -41,6 +42,7 @@ def main():
     if open_browser:
         threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
 
+    os.environ["API_URL"] = f"http://{args.host}:{args.port}"
     uvicorn.run(
         "toktagger.api.cli:app", host=args.host, port=args.port, reload=args.reload
     )
