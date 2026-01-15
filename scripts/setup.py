@@ -123,7 +123,7 @@ def main():
         signals=["mirnov"],
     )
     # ---- Image / UFO demo project ----
-    project_id = create_project("Frame Project", "UFO", "image")
+    project_id = create_project("Frame Project", "UFO", "image", "random")
     create_image_samples(project_id, [30000], Path("./data/images"))
 
 
