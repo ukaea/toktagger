@@ -1086,7 +1086,9 @@ export default function ToolBar({
                   (typeof labelMapId === "number" ? labelMapId : undefined) ??
                   1;
 
-                const existingTrackIds = instanceProfiles.map((p) => p.track_id);
+                const existingTrackIds = instanceProfiles.map(
+                  (p) => p.track_id,
+                );
                 const canonicalTrackId =
                   canonicalizeTrackId(trackId) ||
                   canonicalizeTrackId(uniqueReadableId(existingTrackIds));

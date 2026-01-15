@@ -218,9 +218,15 @@ export default function SamplePage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [dataParams, setDataParams] = useState<DataParams>({ name: "identity" });
-  const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
-  const [plotProps, setPlotProps] = useState<PlotProps>({ colorMap: "Cividis" });
+  const [dataParams, setDataParams] = useState<DataParams>({
+    name: "identity",
+  });
+  const [viewParams, setViewParams] = useState<ViewParams>({
+    name: "identity",
+  });
+  const [plotProps, setPlotProps] = useState<PlotProps>({
+    colorMap: "Cividis",
+  });
 
   // UFO backend-driven first frame (frame=null) init guard
   const ufoInitRef = useRef(false);
