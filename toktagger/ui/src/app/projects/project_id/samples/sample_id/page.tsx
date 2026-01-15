@@ -27,6 +27,8 @@ import { UFOView } from "@/app/frames/components/frames";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import { z } from "zod";
@@ -118,9 +120,7 @@ const SampleView = ({
 }: SampleViewInfo) => {
   if (project.task === "disruption") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for disruption view");
-    }
+    if (!result.success) throw new Error("Invalid data for disruption view");
     return (
       <DisruptionView
         data={result.data}
@@ -132,9 +132,7 @@ const SampleView = ({
 
   if (project.task === "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for ELM view");
-    }
+    if (!result.success) throw new Error("Invalid data for ELM view");
     return (
       <ELMView
         data={result.data}
@@ -146,9 +144,7 @@ const SampleView = ({
 
   if (project.task === "UFO") {
     const result = ImageDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for UFO view");
-    }
+    if (!result.success) throw new Error("Invalid data for UFO view");
     return (
       <UFOView
         data={result.data}
@@ -167,14 +163,12 @@ const SampleView = ({
 
   if (project.task === "MHD") {
     const result = CompositeDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for MHD view");
-    }
+    if (!result.success) throw new Error("Invalid data for MHD view");
+
     const mirnov = (result.data.values as UnknownRecord)["mirnov"];
     const mhdData = SpectrogramDataSchema.safeParse(mirnov);
-    if (!mhdData.success) {
-      throw new Error("Invalid data for MHD view");
-    }
+    if (!mhdData.success) throw new Error("Invalid data for MHD view");
+
     return (
       <SpectrogramView
         data={mhdData.data}
@@ -224,19 +218,11 @@ export default function SamplePage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [dataParams, setDataParams] = useState<DataParams>({
-    name: "identity",
-  });
-  const [viewParams, setViewParams] = useState<ViewParams>({
-    name: "identity",
-  });
-  const [plotProps, setPlotProps] = useState<PlotProps>({
-    colorMap: "Cividis",
-  });
+  const [dataParams, setDataParams] = useState<DataParams>({ name: "identity" });
+  const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
+  const [plotProps, setPlotProps] = useState<PlotProps>({ colorMap: "Cividis" });
 
-  // ------------------------------
-  // UFO frame navigation driver
-  // ------------------------------
+  // UFO backend-driven first frame (frame=null) init guard
   const ufoInitRef = useRef(false);
 
   // ------------------------------
@@ -251,7 +237,7 @@ export default function SamplePage() {
       const proj = await getProject(project_id as string);
       setProject(proj);
 
-      // KEEP OLD BEHAVIOR: let backend pick the initial frame
+      // UFO: keep backend-driven initial frame behavior
       if (proj.task === "UFO" && !ufoInitRef.current) {
         ufoInitRef.current = true;
         setDataParams({ name: "image", frame: null } as DataParams);
@@ -291,9 +277,7 @@ export default function SamplePage() {
         `${BACKEND_API_URL}/projects/${project._id}/samples/${sample._id}/data`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ params: dp, view: nextViewParams }),
         },
       );
@@ -322,6 +306,10 @@ export default function SamplePage() {
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample} />
+
+        <ModelTrainModal project={project} />
+        <ModelPredictModal project={project} />
+
         <div className="flex">
           <ToolBar
             project={project}
