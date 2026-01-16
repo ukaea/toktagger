@@ -5,6 +5,8 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { arrayMax, arrayMin } from "@/app/utils";
 import {
   Annotation,
+  BoundingBox,
+  BoundingBoxSchema,
   Polygon,
   PolygonAnnotation,
   PolygonAnnotationSchema,
@@ -208,9 +210,22 @@ export const TimeSeries = ({
       if ("shapes" in eventData) {
         // shapes have been modified - update annotations
         const shapes = eventData.shapes as Plotly.Shape[];
-        const polygons: PolygonAnnotation[] = [];
+        const newAnnotations: Annotation[] = [];
+
         shapes.forEach((shape) => {
-          if (
+          if (shape.type === "rect") {
+            const boundingBox: BoundingBox = BoundingBoxSchema.parse({
+              x0: shape.x0 as number,
+              y0: shape.y0 as number,
+              x1: shape.x1 as number,
+              y1: shape.y1 as number,
+              label: "Unknown",
+              created_by: "manual",
+              type: "bounding_box",
+            });
+
+            newAnnotations.push(boundingBox);
+          } else if (
             shape.type === "path" &&
             shape.path // ensure path exists
           ) {
@@ -247,7 +262,7 @@ export const TimeSeries = ({
                     type: "polygon",
                   });
                 console.log("Extracted polygon:", polygon);
-                polygons.push(polygon);
+                newAnnotations.push(polygon);
               }
             }
           }
@@ -256,9 +271,11 @@ export const TimeSeries = ({
         // Update annotations with new polygons
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) => annotation.type !== "polygon"
+            (annotation: Annotation) =>
+              annotation.type !== "polygon" &&
+              annotation.type !== "bounding_box"
           );
-          return otherAnnotations.concat(polygons);
+          return otherAnnotations.concat(newAnnotations);
         });
       }
 

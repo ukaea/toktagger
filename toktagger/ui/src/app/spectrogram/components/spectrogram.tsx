@@ -15,6 +15,8 @@ import {
   Polygon,
   PolygonSchema,
   SpectrogramMask,
+  BoundingBoxSchema,
+  BoundingBox,
 } from "@/types";
 import { applyGlobalStyle } from "@/app/utils";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
@@ -92,6 +94,10 @@ export const SpectrogramView = () => {
       .filter((x: DisplayAnnotation) => PolygonSchema.safeParse(x).success)
       .map((x: DisplayAnnotation) => PolygonSchema.parse(x));
 
+    const boundingBoxes: BoundingBox[] = displayAnnotations
+      .filter((x: DisplayAnnotation) => BoundingBoxSchema.safeParse(x).success)
+      .map((x: DisplayAnnotation) => BoundingBoxSchema.parse(x));
+
     const paths = polygons.map((polygon) => {
       let path = `M ${polygon.x[0]},${polygon.y[0]}`;
       for (let i = 1; i < polygon.x.length; i++) {
@@ -111,6 +117,22 @@ export const SpectrogramView = () => {
       editable: true,
       layer: "above",
     }));
+
+    boundingBoxes.forEach((bbox) => {
+      shapes.push({
+        type: "rect",
+        xref: "x",
+        yref: "y2",
+        x0: bbox.x0,
+        y0: bbox.y0,
+        x1: bbox.x1,
+        y1: bbox.y1,
+        line: { color: "rgba(255, 0, 0, 0.9)", width: 5 },
+        fillcolor: "rgba( 255, 0, 0, 0.1)",
+        editable: true,
+        layer: "above",
+      });
+    });
 
     // Extract mask from annotations
     const maskAnnotations = annotations.filter(

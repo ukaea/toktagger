@@ -14,6 +14,7 @@ import {
   SpectrogramMask,
   PolygonAnnotationSchema,
   Polygon,
+  BoundingBoxSchema,
 } from "@/types";
 
 export const linspace = (start: number, end: number, num: number) => {
@@ -96,6 +97,9 @@ export const createAnnotationToDisplayAnnotationFunc = (
         y: polygonData.segmentation[0].filter((_, index) => index % 2 === 1),
       };
       return polygon;
+    } else if (BoundingBoxSchema.safeParse(item).success) {
+      const bbox = BoundingBoxSchema.parse(item);
+      return bbox;
     } else {
       console.log(
         "annotation",
