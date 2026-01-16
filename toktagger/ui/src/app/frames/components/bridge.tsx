@@ -22,6 +22,7 @@ import {
   FIXED_CLASS_REG,
 } from "./lib";
 import type { ClassRegistry } from "./lib";
+import type { Annotation, Annotator } from "@annotorious/core";
 
 /**
  * Imperative bridge between Annotorious and the rest of the UFO frame view.
@@ -102,55 +103,9 @@ type SelectedProfile = {
   track_id?: string;
 } | null;
 
-/**
- * AnnotatorApi
- * Runtime shape we rely on from useAnnotator().
- * Annotorious types aren't always complete, so we treat it as "duck typed".
- */
-type AnnotatorApi = {
-  getAnnotations?: () => unknown;
-  setAnnotations?: (anns: ImageAnnotation[], replace?: boolean) => void;
-  on?: (event: string, cb: (...args: unknown[]) => void) => void;
-  off?: (event: string, cb: (...args: unknown[]) => void) => void;
-};
-
-function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
-  return typeof v === "function";
-}
-
-/**
- * Guard for the minimal Annotorious API surface we need.
- * Some environments return a function-like object; we accept both object/function.
- */
-function isAnnotatorApi(a: unknown): a is AnnotatorApi {
-  if (!a || (typeof a !== "object" && typeof a !== "function")) return false;
-
-  const rec = a as Record<string, unknown>;
-
-  // If present, these must be functions. If absent, that's fine (optional API surface).
-  if (
-    "getAnnotations" in rec &&
-    rec.getAnnotations != null &&
-    !isFunction(rec.getAnnotations)
-  ) {
-    return false;
-  }
-  if (
-    "setAnnotations" in rec &&
-    rec.setAnnotations != null &&
-    !isFunction(rec.setAnnotations)
-  ) {
-    return false;
-  }
-  if ("on" in rec && rec.on != null && !isFunction(rec.on)) {
-    return false;
-  }
-  if ("off" in rec && rec.off != null && !isFunction(rec.off)) {
-    return false;
-  }
-
-  return true;
-}
+// Annotorious base annotator interface (core), specialized to our external W3C ImageAnnotation shape.
+// We don't use the internal annotation model in this bridge, so we keep it as the core default type.
+type AnnotatorFromHook = Annotator<Annotation, ImageAnnotation>;
 
 /**
  * Runtime ImageAnnotation guard for objects read from Annotorious / localStorage.
@@ -481,8 +436,7 @@ export const AnnoBridge = Object.assign(
          * - setAnnotations silently to avoid event recursion
          */
         hydrateOverlay: async (list: ImageAnnotation[], currentKey: string) => {
-          if (!isAnnotatorApi(anno)) return false;
-          const api = anno;
+          if (!anno) return false;
 
           currentKeyRef.current = currentKey;
 
@@ -497,7 +451,8 @@ export const AnnoBridge = Object.assign(
           lastByIdRef.current = seed;
 
           await runSilently(() => {
-            api.setAnnotations?.(stamped, true);
+            // Annotorious type guarantees setAnnotations exists here.
+            anno.setAnnotations(stamped, true);
           });
 
           return true;
@@ -525,8 +480,8 @@ export const AnnoBridge = Object.assign(
      * - buffer the normalized list and apply it (once per frame)
      */
     useEffect(() => {
-      if (!anno || !isAnnotatorApi(anno)) return;
-      const api = anno;
+      if (!anno) return;
+      const api: AnnotatorFromHook = anno as AnnotatorFromHook;
 
       /**
        * onAnyChange:
@@ -538,7 +493,7 @@ export const AnnoBridge = Object.assign(
 
         dirtyRef.current = true;
 
-        const rawFull = toAnnoList(api.getAnnotations?.());
+        const rawFull = toAnnoList(api.getAnnotations());
         const key = currentKeyRef.current;
 
         // Retarget every annotation to the active frame key.
@@ -654,14 +609,14 @@ export const AnnoBridge = Object.assign(
         })();
       };
 
-      api.on?.("createAnnotation", onCreate);
-      api.on?.("updateAnnotation", onAnyChange);
-      api.on?.("deleteAnnotation", onAnyChange);
+      api.on("createAnnotation", onCreate);
+      api.on("updateAnnotation", onAnyChange);
+      api.on("deleteAnnotation", onAnyChange);
 
       return () => {
-        api.off?.("createAnnotation", onCreate);
-        api.off?.("updateAnnotation", onAnyChange);
-        api.off?.("deleteAnnotation", onAnyChange);
+        api.off("createAnnotation", onCreate);
+        api.off("updateAnnotation", onAnyChange);
+        api.off("deleteAnnotation", onAnyChange);
       };
     }, [
       anno,
