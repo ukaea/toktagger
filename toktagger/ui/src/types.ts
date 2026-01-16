@@ -67,8 +67,9 @@ export type ImageData = z.infer<typeof ImageDataSchema>;
 export const PolygonAnnotationSchema = BaseAnnotationSchema.extend({
   segmentation: z.array(z.array(z.number())),
   area: z.number(),
-  bbox: z.array(z.number()), // [x, y, width, height]
+  bbox: z.array(z.number()),
 });
+
 export type PolygonAnnotation = z.infer<typeof PolygonAnnotationSchema>;
 
 export const DataSchema = z.union([

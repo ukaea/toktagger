@@ -1,7 +1,6 @@
 from typing import Union
 from pydantic import BaseModel
 from enum import Enum
-from toktagger.api.schemas import ConfiguredModel
 
 
 class Data(BaseModel):
@@ -37,7 +36,7 @@ class LoaderType(str, Enum):
     IMAGE = "image"
 
 
-class DataParams(ConfiguredModel):
+class DataParams(BaseModel):
     name: LoaderType = LoaderType.IDENTITY
 
 

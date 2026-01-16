@@ -103,11 +103,11 @@ class VideoBoundingBoxOut(VideoBoundingBox, AnnotationOut):
     pass
 
 
-class SpectrogramMaskOut(SpectrogramMask, Annotation):
+class SpectrogramMaskOut(SpectrogramMask, AnnotationOut):
     pass
 
 
-class PolygonAnnotationOut(PolygonAnnotation, Annotation):
+class PolygonAnnotationOut(PolygonAnnotation, AnnotationOut):
     pass
 
 

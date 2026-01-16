@@ -73,7 +73,7 @@ const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   {
     message: "shot min must be less than or equal to shot max",
     path: ["shot_max"], // attach error to `max`
-  },
+  }
 );
 type UDADataLoaderOptions = z.infer<typeof UDADataLoaderOptionsSchema>;
 
@@ -96,11 +96,11 @@ type TimeSeriesFileDataLoaderOptions = z.infer<
 export function useFileLoaderState(
   initialPath: string,
   initialType: string,
-  fileTypes: { key: string; value: string }[],
+  fileTypes: { key: string; value: string }[]
 ) {
   const [filePath, setFilePath] = useState<string>(initialPath);
   const [fileType, setFileType] = useState<string>(
-    initialType || fileTypes[0]?.key,
+    initialType || fileTypes[0]?.key
   );
   const [fileNames, setFileNames] = useState<string[]>([]);
   useEffect(() => {
@@ -108,7 +108,7 @@ export function useFileLoaderState(
       if (filePath) {
         try {
           const response = await fetch(
-            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
+            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`
           );
           if (response.ok) {
             const fileList = await response.json();
@@ -272,7 +272,7 @@ const UDADataLoaderOptionsUI = ({
   });
 
   const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
+    dataLoaderOptions?.signal_names || []
   );
 
   useEffect(() => {
@@ -328,7 +328,7 @@ const FileDataLoaderOptionsUI = ({
     useFileLoaderState(
       dataLoaderOptions?.dir_name || "",
       dataLoaderOptions?.protocol || FileTypes[0].key,
-      FileTypes,
+      FileTypes
     );
 
   useEffect(() => {
@@ -378,11 +378,11 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
     useFileLoaderState(
       dataLoaderOptions?.dir_name || "",
       dataLoaderOptions?.protocol || FileTypes[0].key,
-      FileTypes,
+      FileTypes
     );
 
   const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
+    dataLoaderOptions?.signal_names || []
   );
 
   useEffect(() => {
@@ -433,7 +433,7 @@ const TimeSeriesFileDataLoaderOptionsUI = ({
 export const SelectDataLoaderUI = (
   dataLoader: string | null,
   dataLoaderOptions: DataLoaderOptions | null,
-  setDataLoaderOptions: (options: DataLoaderOptions) => void,
+  setDataLoaderOptions: (options: DataLoaderOptions) => void
 ) => {
   const [dataType, setDataType] = useState<string | null>(null);
   useEffect(() => {
@@ -443,7 +443,7 @@ export const SelectDataLoaderUI = (
     async function fetchDataType() {
       try {
         const response = await fetch(
-          `${BACKEND_API_URL}/meta/dataloader/${dataLoader}`,
+          `${BACKEND_API_URL}/meta/dataloader/${dataLoader}`
         );
         if (response.ok) {
           const dataSchema = await response.json();
@@ -453,7 +453,7 @@ export const SelectDataLoaderUI = (
             `Error fetching available Data Loaders from server.`,
             {
               timeout: 3000,
-            },
+            }
           );
         }
       } catch (error) {
@@ -519,14 +519,14 @@ const DataLoaderForm = ({
         if (response.ok) {
           const dataLoadersList = await response.json();
           setDataLoaders(
-            dataLoadersList.map((item: string) => ({ key: item, value: item })),
+            dataLoadersList.map((item: string) => ({ key: item, value: item }))
           );
         } else {
           ToastQueue.negative(
             `Error fetching available Data Loaders from server.`,
             {
               timeout: 3000,
-            },
+            }
           );
         }
       } catch (error) {
@@ -589,7 +589,7 @@ const TaskLoaderForm = ({
 
 const editProject = async (
   projectId: string,
-  project: ProjectUpdate,
+  project: ProjectUpdate
 ): Promise<string> => {
   const response = await fetch(`${BACKEND_API_URL}/projects/${projectId}`, {
     method: "PUT",
@@ -608,7 +608,6 @@ const editProject = async (
 };
 
 const createProject = async (project: Project): Promise<string> => {
-  console.log("Creating project:", project);
   const response = await fetch(`${BACKEND_API_URL}/projects`, {
     method: "POST",
     headers: {
@@ -627,7 +626,7 @@ const createProject = async (project: Project): Promise<string> => {
 };
 
 export const buildSamples = (
-  dataLoaderOptions: DataLoaderOptions,
+  dataLoaderOptions: DataLoaderOptions
 ): Sample[] => {
   if (dataLoaderOptions.data_type === "ShotData") {
     return createUDASamples(dataLoaderOptions);
@@ -645,7 +644,7 @@ const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
 
   const shots = Array.from(
     { length: shot_max - shot_min + 1 },
-    (_, i) => i + shot_min,
+    (_, i) => i + shot_min
   );
   const shotData = {
     signal_names: dataLoaderOptions.signal_names,
@@ -734,7 +733,7 @@ export const createSamples = async (projectId: string, samples: Sample[]) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(samples),
-    },
+    }
   );
 
   if (!response.ok) {
@@ -754,7 +753,7 @@ const buildProject = (
   task: string,
   queryStrategy: string,
   timeRange: NumericalRangeType,
-  minTimeStep: number,
+  minTimeStep: number
 ): Project => {
   if (projectName === "") {
     throw new Error("Project name cannot be empty");
@@ -798,16 +797,16 @@ export const ProjectConfigEditor = ({
     max: project?.time_max || null,
   });
   const [minTimeStep, setMinTimeStep] = useState<number>(
-    project?.min_time_step || 0.0001,
+    project?.min_time_step || 0.0001
   );
   const [queryStrategy, setQueryStrategy] = useState<string>(
-    project?.query_strategy || QueryStrategies[0].key,
+    project?.query_strategy || QueryStrategies[0].key
   );
   const [taskSelection, setTaskSelection] = useState<string>(Tasks[0].key);
   const [dataLoaderOptions, setDataLoaderOptions] =
     useState<DataLoaderOptions | null>(null);
   const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(
-    null,
+    null
   );
 
   useEffect(() => {
@@ -852,7 +851,7 @@ export const ProjectConfigEditor = ({
       taskSelection || "",
       queryStrategy,
       timeRange,
-      minTimeStep,
+      minTimeStep
     );
 
     const samples = buildSamples(dataLoaderOptions);

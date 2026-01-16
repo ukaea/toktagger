@@ -167,6 +167,7 @@ export async function saveSampleAnnotations(
     body: JSON.stringify(updatedAnnotations),
   });
   if (!response.ok) {
+    console.error("Failed to save annotations:", await response.json());
     throw new Error(`Failed to save annotations: ${response.statusText}`);
   }
 }

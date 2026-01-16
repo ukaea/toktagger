@@ -64,7 +64,6 @@ export const createAnnotationToDisplayAnnotationFunc = (
   colors: Record<string, string>
 ) => {
   const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
-    console.log(item);
     if (TimeRegionSchema.safeParse(item).success) {
       const timeRegion = TimeRegionSchema.parse(item);
       const zone: Zone = {
@@ -83,7 +82,6 @@ export const createAnnotationToDisplayAnnotationFunc = (
         x: timePoint.time,
         category: { name: timePoint.label, color: colors[timePoint.label] },
       };
-      console.log(colors);
       return vspan;
     } else if (SpectrogramMaskSchema.safeParse(item).success) {
       const mask = SpectrogramMaskSchema.parse(item);
@@ -101,7 +99,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else {
       console.log(
         "annotation",
-        TimeRegionSchema.safeParse(item).error?.message,
+        TimeRegionSchema.safeParse(item).error?.message
       );
       throw new Error("Unsupported annotation type");
     }
@@ -147,3 +145,38 @@ export function arrayMin(arr: number[]): number {
   }
   return traceMin;
 }
+
+export const applyGlobalStyle = (layout: Partial<Plotly.Layout>) => {
+  // Handle dark mode styling
+  // We should probably move all the styling to this central component
+  const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (isDarkMode) {
+    layout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+    layout.xaxis!.linecolor = "rgb(255, 255, 255)";
+    layout.xaxis!.zerolinecolor = "rgb(255, 255, 255)";
+    layout.xaxis!.tickcolor = "rgb(255, 255, 255)";
+    layout.xaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+    layout.yaxis!.title!.font = { color: "rgb(255, 255, 255)" };
+    layout.yaxis!.linecolor = "rgb(255, 255, 255)";
+    layout.yaxis!.zerolinecolor = "rgb(255, 255, 255)";
+    layout.yaxis!.tickcolor = "rgb(255, 255, 255)";
+    layout.yaxis!.tickfont = { color: "rgb(255, 255, 255)" };
+
+    layout.yaxis2!.title!.font = { color: "rgb(255, 255, 255)" };
+    layout.yaxis2!.linecolor = "rgb(255, 255, 255)";
+    layout.yaxis2!.zerolinecolor = "rgb(255, 255, 255)";
+    layout.yaxis2!.tickcolor = "rgb(255, 255, 255)";
+    layout.yaxis2!.tickfont = { color: "rgb(255, 255, 255)" };
+
+    if (layout.coloraxis && layout.coloraxis.colorbar) {
+      layout.coloraxis!.colorbar!.tickcolor = "rgb(255, 255, 255)";
+      layout.coloraxis!.colorbar!.tickfont = { color: "rgb(255, 255, 255)" };
+      layout.coloraxis!.colorbar!.outlinecolor = "rgb(255, 255, 255)";
+    }
+
+    layout.paper_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of area around the plot
+    layout.plot_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of the plot area
+  }
+  return layout;
+};

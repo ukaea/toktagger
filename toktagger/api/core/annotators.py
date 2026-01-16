@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from scipy.signal import find_peaks, peak_widths, stft
 from scipy.ndimage import uniform_filter1d, gaussian_filter, uniform_filter
 from scipy.interpolate import interp1d
-from skimage import measure, morphology, filters
+from skimage import measure, morphology
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
@@ -20,7 +20,7 @@ from toktagger.api.schemas.annotators import (
 from shapely.geometry import Polygon, MultiPolygon
 
 from toktagger.api.schemas.data import TimeSeriesData
-from toktagger.api.schemas.annotations import SpectrogramMask, TimeRegion
+from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.annotations import (
     PolygonAnnotation,
 )
@@ -658,7 +658,7 @@ class SpectrogramThresholdAnnotator:
     def __init__(self, params: SpectrogramThresholdParams):
         self.params = params
 
-    def predict(self, data: MultiVariateTimeSeriesData) -> SpectrogramMask:
+    def predict(self, data: MultiVariateTimeSeriesData) -> list[PolygonAnnotation]:
         mirnov = data.values[self.params.signal_name]
         frequency, time, amp = compute_stft(mirnov)
         amp = np.nan_to_num(amp, 1e-6).clip(1e-6)
@@ -667,7 +667,6 @@ class SpectrogramThresholdAnnotator:
         if self.params.line_filter_width > 0:
             amp = amp - uniform_filter(amp, size=(self.params.line_filter_width, 1))
         amp = gaussian_filter(amp, sigma=self.params.sigma)
-        amp = filters.meijering(amp, sigmas=(self.params.ridge_filter_size,))
 
         mask = np.where(amp > np.percentile(amp, self.params.percentile), 1, 0)
         mask[frequency < self.params.freq_min] = 0
@@ -700,7 +699,13 @@ class SpectrogramThresholdAnnotator:
                 polygons.append(poly)
 
         polygons = [shapely_to_coco_style_annotation(polygon) for polygon in polygons]
-        annotations = [PolygonAnnotation(**poly, label="modes") for poly in polygons]
+
+        annotations = [
+            PolygonAnnotation(
+                **poly, label="Unknown", created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD
+            )
+            for poly in polygons
+        ]
         return annotations
 
 

@@ -1,9 +1,30 @@
 import { useSample } from "@/app/contexts/SampleContext";
 import { BACKEND_API_URL } from "@/app/core";
 import { Annotation, PlotProps } from "@/types";
-import { ActionButton, Flex, NumberField, Switch } from "@adobe/react-spectrum";
+import {
+  ActionButton,
+  Flex,
+  NumberField,
+  RangeSlider,
+  Switch,
+} from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
 import { AnnotatorTypes } from "./types";
+import { z } from "zod";
+
+const SpectrogramThresholdParamsSchema = z.object({
+  signal_name: z.string(),
+  percentile: z.number(),
+  freq_max: z.number().default(50),
+  freq_min: z.number().default(3),
+  sigma: z.number().default(2),
+  min_size: z.number().int().default(150),
+  line_filter_width: z.number().int().default(0),
+});
+
+type SpectrogramThresholdParams = z.infer<
+  typeof SpectrogramThresholdParamsSchema
+>;
 
 type SpectrogramThresholdToolInfo = {
   project_id: string;
@@ -20,14 +41,164 @@ export default function SpectrogramThresholdTool({
   plotProps,
   setPlotProps,
 }: SpectrogramThresholdToolInfo) {
-  const { setAnnotations } = useSample();
-  const [active, setActive] = useState(false);
-  const [value, setValue] = useState(95);
+  const { setAnnotations, dataParams } = useSample();
+  const [isEnabled, setIsEnabled] = useState(false);
+
+  const params: SpectrogramThresholdParams =
+    SpectrogramThresholdParamsSchema.parse({
+      signal_name: signal_name,
+      percentile: 95,
+    });
+
+  // Tooling properties
+  const [frequencyRange, setFrequencyRange] = useState<{
+    start: number;
+    end: number;
+  }>({
+    start: params.freq_min,
+    end: params.freq_max,
+  });
+  const [percentile, setPercentile] = useState(params.percentile);
+  const [sigma, setSigma] = useState<number>(params.sigma);
+  const [minSize, setMinSize] = useState<number>(params.min_size);
+  const [lineFilterWidth, setLineFilterWidth] = useState(
+    params.line_filter_width
+  );
 
   const onThresholdChange = (value: boolean) => {
-    setActive(value);
+    setIsEnabled(value);
     setPlotProps({ ...plotProps, thresholdActive: value });
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
+          );
+          return otherAnnotations;
+        });
+        return;
+      }
+
+      if (isEnabled) {
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) => annotation.type !== "polygon"
+          );
+          return otherAnnotations;
+        });
+      }
+
+      const response = await fetch(
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            annotator_params: {
+              signal_name: signal_name,
+              percentile: percentile,
+              freq_min: frequencyRange.start,
+              freq_max: frequencyRange.end,
+              sigma: isNaN(sigma) ? 0 : sigma,
+              min_size: isNaN(minSize) ? 0 : minSize,
+              line_filter_width: lineFilterWidth,
+            },
+            data_params: dataParams,
+          }),
+        }
+      );
+
+      const payload: Annotation[] = await response.json();
+      setAnnotations((previousAnnotations: Annotation[]) => {
+        const otherAnnotations = previousAnnotations.filter(
+          (annotation: Annotation) =>
+            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
+        );
+        return otherAnnotations.concat(payload);
+      });
+    };
+
+    fetchData();
+  }, [
+    project_id,
+    sample_id,
+    isEnabled,
+    percentile,
+    signal_name,
+    setAnnotations,
+    dataParams,
+    frequencyRange,
+    lineFilterWidth,
+    minSize,
+    sigma,
+  ]);
+
+  return (
+    <>
+      <Switch isSelected={isEnabled} onChange={onThresholdChange}>
+        Thresholding
+      </Switch>
+      {isEnabled && (
+        <>
+          <NumberStepper
+            label="Percentile"
+            defaultValue={percentile}
+            onChange={(value: number) => {
+              setPercentile(value);
+            }}
+          />
+          <RangeSlider
+            label="Frequency Range (Hz)"
+            value={frequencyRange}
+            minValue={0}
+            maxValue={100}
+            step={1}
+            onChange={setFrequencyRange}
+          />
+          <NumberField
+            label="Sigma"
+            value={sigma}
+            minValue={0}
+            onChange={setSigma}
+            step={0.001}
+          />
+          <NumberField
+            label="Min Size"
+            value={minSize}
+            minValue={0}
+            onChange={setMinSize}
+            formatOptions={{ maximumFractionDigits: 0 }}
+          />
+          <NumberField
+            label="Vertical Line Filter Width"
+            value={lineFilterWidth}
+            minValue={0}
+            onChange={setLineFilterWidth}
+            formatOptions={{ maximumFractionDigits: 0 }}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+function NumberStepper({
+  label,
+  defaultValue,
+  onChange,
+}: {
+  label: string;
+  defaultValue: number;
+  onChange: (value: number) => void;
+}) {
+  const [value, setValue] = useState(defaultValue);
 
   const incrementValue = (increment: number) => {
     setValue((prevValue) => {
@@ -39,98 +210,54 @@ export default function SpectrogramThresholdTool({
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!active) {
-        // Remove previous annotations from this annotator
-        setAnnotations((previousAnnotations: Annotation[]) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
-          );
-          return otherAnnotations;
-        });
-        return;
-      }
-
-      const response = await fetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            signal_name: signal_name,
-            percentile: value,
-          }),
-        },
-      );
-
-      const payload: Annotation[] = await response.json();
-      setAnnotations((previousAnnotations: Annotation[]) => {
-        const otherAnnotations = previousAnnotations.filter(
-          (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
-        );
-        return otherAnnotations.concat(payload);
-      });
-    };
-
-    fetchData();
-  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
+    onChange(value);
+  }, [value, onChange]);
 
   return (
-    <>
-      <Switch isSelected={active} onChange={onThresholdChange}>
-        Thresholding
-      </Switch>
-      {active && (
-        <Flex
-          direction="column"
-          gap="size-100"
-          margin={"size-200"}
-          alignItems={"center"}
+    <Flex
+      direction="column"
+      gap="size-100"
+      margin={"size-200"}
+      alignItems={"center"}
+    >
+      <NumberField
+        label={label}
+        value={value}
+        onChange={setValue}
+        minValue={0}
+        maxValue={99}
+        hideStepper={true}
+      />
+      <Flex direction="row" gap="size-100">
+        <ActionButton
+          onPress={() => {
+            incrementValue(-5);
+          }}
         >
-          <NumberField
-            label="Percentile"
-            value={value}
-            onChange={setValue}
-            minValue={0}
-            maxValue={99}
-            hideStepper={true}
-          />
-          <Flex direction="row" gap="size-100">
-            <ActionButton
-              onPress={() => {
-                incrementValue(-5);
-              }}
-            >
-              -5
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(-1);
-              }}
-            >
-              -1
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(1);
-              }}
-            >
-              +1
-            </ActionButton>
-            <ActionButton
-              onPress={() => {
-                incrementValue(5);
-              }}
-            >
-              +5
-            </ActionButton>
-          </Flex>
-        </Flex>
-      )}
-    </>
+          -5
+        </ActionButton>
+        <ActionButton
+          onPress={() => {
+            incrementValue(-1);
+          }}
+        >
+          -1
+        </ActionButton>
+        <ActionButton
+          onPress={() => {
+            incrementValue(1);
+          }}
+        >
+          +1
+        </ActionButton>
+        <ActionButton
+          onPress={() => {
+            incrementValue(5);
+          }}
+        >
+          +5
+        </ActionButton>
+      </Flex>
+    </Flex>
   );
 }

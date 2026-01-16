@@ -74,7 +74,7 @@ export const ZoneProvider = ({
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category,
+    targetCategory: Category
   ) => {
     zones.current = zones.current.map((zone) => {
       if (zone === props.zone || zone.selected) {
@@ -220,7 +220,6 @@ export const ZoneProvider = ({
   // Delete selected zones on Delete/Backspace keypress
   document.addEventListener("keydown", (e) => {
     if (e.key === "Delete" || e.key == "Backspace") {
-      e.preventDefault(); // Prevent default delete behavior
       const selectedZones = zones.current.filter((zone) => zone.selected);
       for (const zone of selectedZones) {
         handleZoneDelete(zone);

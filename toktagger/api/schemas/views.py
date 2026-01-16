@@ -1,6 +1,6 @@
 from enum import Enum
-from typing import Optional, Union
-from toktagger.api.schemas import ConfiguredModel
+from typing import Literal, Optional, Union
+from pydantic import BaseModel
 
 
 class ViewType(str, Enum):
@@ -8,11 +8,12 @@ class ViewType(str, Enum):
     SPECTROGRAM = "spectrogram"
 
 
-class ViewParams(ConfiguredModel):
-    name: ViewType = ViewType.IDENTITY
+class ViewParams(BaseModel):
+    name: Literal[ViewType.IDENTITY] = ViewType.IDENTITY
 
 
 class SpectrogramViewParams(ViewParams):
+    name: Literal[ViewType.SPECTROGRAM] = ViewType.SPECTROGRAM
     nperseg: Optional[int] = 256
     time_min: Optional[float] = None
     time_max: Optional[float] = None

@@ -16,6 +16,7 @@ import {
   PolygonSchema,
   SpectrogramMask,
 } from "@/types";
+import { applyGlobalStyle } from "@/app/utils";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
@@ -29,7 +30,7 @@ import {
 } from "@/app/utils";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useEffect, useState } from "react";
-import { Flex, View } from "@adobe/react-spectrum";
+import { Flex } from "@adobe/react-spectrum";
 
 const vspanCategories: Category[] = [
   { name: "Mode Locked", color: "rgb(255, 0, 0)" },
@@ -65,6 +66,7 @@ export const SpectrogramView = () => {
   const [zones, setZones] = useState<Zone[]>([]);
   const [vspans, setVSpans] = useState<VSpan[]>([]);
   const [mask, setMask] = useState<SpectrogramMask | null>(null);
+  const [shapes, setShapes] = useState<Partial<Plotly.Shape>[]>([]);
 
   const viewData: SpectrogramData | null = data as SpectrogramData | null;
 
@@ -78,22 +80,13 @@ export const SpectrogramView = () => {
       .filter((x: Annotation) => x.type !== "class_label")
       .map(convertAnnotationToDisplayAnnotation);
 
-    const newZones: Zone[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
-
     const zones: Zone[] = displayAnnotations
       .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
       .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+
     const vspans: VSpan[] = displayAnnotations
       .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
       .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
-
-    // const mask: SpectrogramMask = displayAnnotations
-    //   .filter(
-    //     (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success
-    //   )
-    //   .map((x: DisplayAnnotation) => SpectrogramMaskSchema.parse(x))[0];
 
     const polygons: Polygon[] = displayAnnotations
       .filter((x: DisplayAnnotation) => PolygonSchema.safeParse(x).success)
@@ -104,6 +97,7 @@ export const SpectrogramView = () => {
       for (let i = 1; i < polygon.x.length; i++) {
         path += ` L ${polygon.x[i]},${polygon.y[i]}`;
       }
+      path += " Z"; // close path
       return path;
     });
 
@@ -112,8 +106,10 @@ export const SpectrogramView = () => {
       path: path,
       xref: "x",
       yref: "y2",
-      line: { color: "rgba(255, 0, 0, 0.9)", width: 2 },
+      line: { color: "rgba(255, 0, 0, 0.9)", width: 5 },
       fillcolor: "rgba(255, 0, 0, 0.1)",
+      editable: true,
+      layer: "above",
     }));
 
     // Extract mask from annotations
@@ -125,9 +121,10 @@ export const SpectrogramView = () => {
         ? SpectrogramMaskSchema.parse(maskAnnotations[0])
         : null;
 
-    setZones(newZones);
-    setVSpans(newVSpans);
+    setZones(zones);
+    setVSpans(vspans);
     setMask(newMask);
+    setShapes(shapes);
   }, [annotations, viewData]);
 
   const updateVSpans = (newVSpans: Array<VSpan>) => {
@@ -280,7 +277,15 @@ export const SpectrogramView = () => {
 
   let plotLayout: Partial<Plotly.Layout> = {
     shapes: shapes,
-    height: 600,
+    newshape: {
+      fillcolor: "rgba(255, 0, 0, 0.3)", // fill color
+      line: {
+        color: "red", // line color
+        width: 5,
+      },
+    },
+    width: window.innerWidth * 0.84,
+    height: window.innerHeight * 0.9,
     xaxis: {
       title: {
         text: "",
@@ -347,47 +352,24 @@ export const SpectrogramView = () => {
   };
 
   const plotConfig: Partial<Plotly.Config> = {
+    modeBarButtons: [
+      [
+        "drawrect",
+        "drawclosedpath",
+        "eraseshape",
+        "zoom2d",
+        "select2d",
+        "pan2d",
+        "autoScale2d",
+        "resetScale2d",
+        "toImage",
+      ],
+    ],
+    dragmode: false,
     displaylogo: false,
     displayModeBar: true,
     scrollZoom: false,
-    modeBarButtonsToRemove: ["pan2d"],
-  };
-
-  const applyGlobalStyle = (layout: Partial<Plotly.Layout>) => {
-    // Handle dark mode styling
-    // We should probably move all the styling to this central component
-    const isDarkMode = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
-    if (isDarkMode) {
-      layout.xaxis!.title!.font = { color: "rgb(255, 255, 255)" };
-      layout.xaxis!.linecolor = "rgb(255, 255, 255)";
-      layout.xaxis!.zerolinecolor = "rgb(255, 255, 255)";
-      layout.xaxis!.tickcolor = "rgb(255, 255, 255)";
-      layout.xaxis!.tickfont = { color: "rgb(255, 255, 255)" };
-
-      layout.yaxis!.title!.font = { color: "rgb(255, 255, 255)" };
-      layout.yaxis!.linecolor = "rgb(255, 255, 255)";
-      layout.yaxis!.zerolinecolor = "rgb(255, 255, 255)";
-      layout.yaxis!.tickcolor = "rgb(255, 255, 255)";
-      layout.yaxis!.tickfont = { color: "rgb(255, 255, 255)" };
-
-      layout.yaxis2!.title!.font = { color: "rgb(255, 255, 255)" };
-      layout.yaxis2!.linecolor = "rgb(255, 255, 255)";
-      layout.yaxis2!.zerolinecolor = "rgb(255, 255, 255)";
-      layout.yaxis2!.tickcolor = "rgb(255, 255, 255)";
-      layout.yaxis2!.tickfont = { color: "rgb(255, 255, 255)" };
-
-      if (layout.coloraxis && layout.coloraxis.colorbar) {
-        layout.coloraxis!.colorbar!.tickcolor = "rgb(255, 255, 255)";
-        layout.coloraxis!.colorbar!.tickfont = { color: "rgb(255, 255, 255)" };
-        layout.coloraxis!.colorbar!.outlinecolor = "rgb(255, 255, 255)";
-      }
-
-      layout.paper_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of area around the plot
-      layout.plot_bgcolor = "rgba(0, 0, 0, 0)"; // Transparent background of the plot area
-    }
-    return layout;
+    responsive: true,
   };
 
   plotLayout = applyGlobalStyle(plotLayout);
@@ -397,35 +379,33 @@ export const SpectrogramView = () => {
   }
 
   return (
-    <View width="100%">
-      <Flex justifyContent="center" alignItems="center">
-        <ContextMenuProvider menuId="spectrogram-menu">
+    <Flex justifyContent="center" alignItems="center">
+      <ContextMenuProvider menuId="spectrogram-menu">
+        <ZoneProvider
+          categories={zoneCategories}
+          initialData={zones}
+          onModifyZone={updateZones}
+        >
           <VSpanProvider
             categories={vspanCategories}
             initialData={vspans}
             onModifyVSpan={updateVSpans}
           >
-            <ZoneProvider
-              categories={zoneCategories}
-              initialData={zones}
-              onModifyZone={updateZones}
+            <TimeSeries
+              plotId="SpectrogramView"
+              plotConfig={{
+                data: plotData,
+                config: plotConfig,
+                layout: plotLayout,
+              }}
+              rescaleOnZoom={false}
             >
-              <TimeSeries
-                plotId="SpectrogramView"
-                plotConfig={{
-                  data: plotData,
-                  config: plotConfig,
-                  layout: plotLayout,
-                }}
-                rescaleOnZoom={false}
-              >
-                <Zones onUpdate={updateZones} />
-                <VSpans onUpdate={updateVSpans} />
-              </TimeSeries>
-            </ZoneProvider>
+              <Zones onUpdate={updateZones} />
+              <VSpans onUpdate={updateVSpans} />
+            </TimeSeries>
           </VSpanProvider>
-        </ContextMenuProvider>
-      </Flex>
-    </View>
+        </ZoneProvider>
+      </ContextMenuProvider>
+    </Flex>
   );
 };

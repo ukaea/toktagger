@@ -28,7 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { VSpans } from "@/app/components/tools/vspans";
 import { useSample } from "@/app/contexts/SampleContext";
-import { Flex, View } from "@adobe/react-spectrum";
+import { Flex } from "@adobe/react-spectrum";
 
 const zoneCategories: Category[] = [
   { name: "ELM", color: "#FF5733" },
@@ -109,12 +109,12 @@ export const TimeSeriesView = () => {
           y: value.values,
           mode: "lines",
         };
-      },
+      }
     );
 
     const yAxesNames = Array.from(
       { length: numRows },
-      (_, i) => `y${i === 0 ? "" : i + 1}`,
+      (_, i) => `y${i === 0 ? "" : i + 1}`
     ).reverse();
 
     // Dynamically generate y-axis titles based on plotData names
@@ -155,7 +155,7 @@ export const TimeSeriesView = () => {
         acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true };
         return acc;
       },
-      {} as Record<string, unknown>,
+      {} as Record<string, unknown>
     );
 
     return {
@@ -189,30 +189,31 @@ export const TimeSeriesView = () => {
   }
 
   return (
-    <View width="100%">
-      <Flex justifyContent="center" alignItems="center">
-        <ContextMenuProvider menuId="time-series-menu">
-          <ZoneProvider
-            categories={zoneCategories}
-            initialData={zones}
-            onModifyZone={updateZones}
+    <Flex justifyContent="center" alignItems="center">
+      <ContextMenuProvider menuId="time-series-menu">
+        <ZoneProvider
+          categories={zoneCategories}
+          initialData={zones}
+          onModifyZone={updateZones}
+        >
+          <VSpanProvider
+            categories={vspanCategories}
+            initialData={vspans}
+            onModifyVSpan={updateVSpans}
           >
-            <VSpanProvider
-              categories={vspanCategories}
-              initialData={vspans}
-              onModifyVSpan={updateVSpans}
+            <TimeSeries
+              plotId="TimesSeriesView"
+              plotConfig={{
+                data: plotData,
+                layout: plotLayout,
+              }}
             >
-              <TimeSeries
-                plotId="TimesSeriesView"
-                plotConfig={{ data: plotData, layout: plotLayout }}
-              >
-                <Zones onUpdate={updateZones} />
-                <VSpans onUpdate={updateVSpans} />
-              </TimeSeries>
-            </VSpanProvider>
-          </ZoneProvider>
-        </ContextMenuProvider>
-      </Flex>
-    </View>
+              <Zones onUpdate={updateZones} />
+              <VSpans onUpdate={updateVSpans} />
+            </TimeSeries>
+          </VSpanProvider>
+        </ZoneProvider>
+      </ContextMenuProvider>
+    </Flex>
   );
 };

@@ -1,7 +1,15 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { useSample } from "@/app/contexts/SampleContext";
 import { arrayMax, arrayMin } from "@/app/utils";
+import {
+  Annotation,
+  Polygon,
+  PolygonAnnotation,
+  PolygonAnnotationSchema,
+  PolygonSchema,
+} from "@/types";
 import Plotly, {
   Config,
   Layout,
@@ -60,11 +68,13 @@ export const TimeSeries = ({
       displaylogo: false,
       displayModeBar: true,
       scrollZoom: true,
+      responsive: true,
     },
   },
   rescaleOnZoom = true,
   children,
 }: TimeSeriesPlotProps) => {
+  const { setAnnotations } = useSample();
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
     null
   );
@@ -195,6 +205,63 @@ export const TimeSeries = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
+      if ("shapes" in eventData) {
+        // shapes have been modified - update annotations
+        const shapes = eventData.shapes as Plotly.Shape[];
+        const polygons: PolygonAnnotation[] = [];
+        shapes.forEach((shape) => {
+          if (
+            shape.type === "path" &&
+            shape.path // ensure path exists
+          ) {
+            // extract points from path string
+            const pathCommands = shape.path.match(/[ML][^MLZ]+/g); // match 'M x y' or 'L x y'
+            if (pathCommands) {
+              const xPoints: number[] = [];
+              const yPoints: number[] = [];
+              pathCommands.forEach((command) => {
+                const coords = command
+                  .slice(1)
+                  .trim()
+                  .split(",")
+                  .map((coord) => parseFloat(coord));
+                if (coords.length === 2) {
+                  xPoints.push(coords[0]);
+                  yPoints.push(coords[1]);
+                }
+              });
+
+              if (xPoints.length > 0 && yPoints.length > 0) {
+                const polygon: PolygonAnnotation =
+                  PolygonAnnotationSchema.parse({
+                    segmentation: [xPoints.flatMap((x, i) => [x, yPoints[i]])],
+                    area: 0, // area can be computed server-side if needed
+                    bbox: [
+                      Math.min(...xPoints),
+                      Math.min(...yPoints),
+                      Math.max(...xPoints) - Math.min(...xPoints),
+                      Math.max(...yPoints) - Math.min(...yPoints),
+                    ],
+                    label: "Unknown",
+                    created_by: "manual",
+                    type: "polygon",
+                  });
+                console.log("Extracted polygon:", polygon);
+                polygons.push(polygon);
+              }
+            }
+          }
+        });
+
+        // Update annotations with new polygons
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) => annotation.type !== "polygon"
+          );
+          return otherAnnotations.concat(polygons);
+        });
+      }
+
       if (rescaleOnZoom) {
         // This makes use of the first graph displayed but this should be fine
         if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
@@ -231,6 +298,13 @@ export const TimeSeries = ({
       plot.on("plotly_selected", function (eventData: any) {
         if (eventData && eventData.range) {
           setSelectedXRange(eventData.range.x);
+        }
+
+        if (eventData && eventData.lassoPoints) {
+          const polygon: Polygon = PolygonSchema.parse({
+            x: eventData.lassoPoints.x,
+            y: eventData.lassoPoints.y,
+          });
         }
       });
       plot.on("plotly_deselect", function () {
@@ -441,7 +515,7 @@ export const TimeSeries = ({
   }, [plotId, plotReady, toolingCallbacks, updateTools]);
 
   return (
-    <div className="w-full px-6 py-3 space-y-3 flex-col">
+    <div className="px-6 py-3 space-y-3 flex-col">
       {/* Div where plot is inserted */}
       <div id={plotId} className="" />
       <>

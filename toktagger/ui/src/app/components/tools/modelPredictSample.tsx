@@ -33,7 +33,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       const response = await startSamplePredictions(
         project_id,
         sample_id,
-        selectedModel,
+        selectedModel
       );
       const payload = await response.json();
 
@@ -54,7 +54,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         // Remove previous annotations from this model
         setAnnotations((previousAnnotations: Annotations) => {
           const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) => annotation.created_by !== selectedModel,
+            (annotation: Annotation) => annotation.created_by !== selectedModel
           );
           return otherAnnotations;
         });
@@ -72,14 +72,13 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           project_id,
           sample_id,
           selectedModel,
-          taskId,
+          taskId
         );
         const payload = await response.json();
 
         if (response.status === 202) {
           // Predictions queued but not done yet, so continue to poll
           pollCounter += 1;
-          console.log("Poll counter", pollCounter);
           if (pollCounter > 20) {
             setErrorMessage("Failed to retrieve predictions result.");
             clearInterval(interval);
@@ -89,7 +88,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           setAnnotations((previousAnnotations: Annotations) => {
             const otherAnnotations = previousAnnotations.filter(
               (annotation: Annotation) =>
-                annotation.created_by !== selectedModel,
+                annotation.created_by !== selectedModel
             );
             return otherAnnotations.concat(payload);
           });
