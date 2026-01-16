@@ -154,7 +154,7 @@ function deepClone<T>(value: T): T {
  * Annotorious may still produce other selector types depending on config/plugins;
  * this filter ensures everything downstream is rectangle-like.
  */
-function isRectangleAnno(a: ImageAnnotation): boolean {
+function isRectangleAnno(a: ImageAnnotation): a is ImageAnnotation {
   return a.target.selector.type === ShapeType.RECTANGLE;
 }
 
@@ -476,7 +476,7 @@ export const AnnoBridge = Object.assign(
      */
     useEffect(() => {
       if (!anno) return;
-      const api: AnnotatorFromHook = anno as AnnotatorFromHook;
+      const api = anno as AnnotatorFromHook;
 
       /**
        * onAnyChange:
@@ -488,7 +488,7 @@ export const AnnoBridge = Object.assign(
 
         dirtyRef.current = true;
 
-        const rawFull = toAnnoList(api.getAnnotations());
+        const rawFull = api.getAnnotations();
         const key = currentKeyRef.current;
 
         // Retarget every annotation to the active frame key.
@@ -604,14 +604,14 @@ export const AnnoBridge = Object.assign(
         })();
       };
 
-      api.on("createAnnotation", onCreate);
-      api.on("updateAnnotation", onAnyChange);
-      api.on("deleteAnnotation", onAnyChange);
+      anno.on("createAnnotation", onCreate);
+      anno.on("updateAnnotation", onAnyChange);
+      anno.on("deleteAnnotation", onAnyChange);
 
       return () => {
-        api.off("createAnnotation", onCreate);
-        api.off("updateAnnotation", onAnyChange);
-        api.off("deleteAnnotation", onAnyChange);
+        anno.off("createAnnotation", onCreate);
+        anno.off("updateAnnotation", onAnyChange);
+        anno.off("deleteAnnotation", onAnyChange);
       };
     }, [
       anno,
