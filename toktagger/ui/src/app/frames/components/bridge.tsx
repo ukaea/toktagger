@@ -10,6 +10,7 @@ import {
   useAnnotator,
   type ImageAnnotation,
   ImageAnnotationPopup,
+  ShapeType,
 } from "@annotorious/react";
 import {
   normalizeWithMode,
@@ -154,13 +155,7 @@ function deepClone<T>(value: T): T {
  * this filter ensures everything downstream is rectangle-like.
  */
 function isRectangleAnno(a: ImageAnnotation): boolean {
-  const sel = a.target?.selector;
-  if (!sel || typeof sel !== "object") return false;
-
-  const s = sel as { type?: unknown; value?: unknown };
-  if (s.type === "RECTANGLE") return true;
-
-  return typeof s.value === "string" && /xywh=(pixel|percent):/i.test(s.value);
+  return a.target.selector.type === ShapeType.RECTANGLE;
 }
 
 export const AnnoBridge = Object.assign(
