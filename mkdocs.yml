@@ -16,6 +16,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Time Series Labelling: time_series.md
+  - Spectrogram Labelling: spectrogram.md
   - Annotators: annotators.md
   - Developer Documentation: 
     - Getting Started: dev/developer-setup.md
