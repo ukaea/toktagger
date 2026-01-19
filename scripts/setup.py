@@ -114,7 +114,7 @@ def main():
         shot_ids,
         base_path=base_path / "mhd",
         file_type="parquet",
-        signals=["mirnov"],
+        signals=["mirnov", "saddle_0"],
     )
 
 

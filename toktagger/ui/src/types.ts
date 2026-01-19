@@ -7,8 +7,7 @@ export const BaseAnnotationSchema = z.object({
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(null),
   created_by: z.string().default("manual"),
-  time_min: z.number().nullable().default(null),
-  time_max: z.number().nullable().default(null),
+  signal_name: z.string().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -182,7 +181,7 @@ export const FileDataSchema = z.object({
 export type FileData = z.infer<typeof FileDataSchema>;
 
 export const TimeSeriesFileDataSchema = FileDataSchema.extend({
-  column_names: z.array(z.string()),
+  signal_names: z.array(z.string()),
 });
 export type TimeSeriesFileData = z.infer<typeof TimeSeriesFileDataSchema>;
 
@@ -238,6 +237,8 @@ export const ViewParamsSchema = z.object({
 export type ViewParams = z.infer<typeof ViewParamsSchema>;
 
 export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
+  name: z.literal("spectrogram"),
+  signal_name: z.string(),
   nperseg: z.number().optional(),
   time_min: z.number().optional(),
   time_max: z.number().optional(),

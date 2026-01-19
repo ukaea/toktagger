@@ -12,11 +12,12 @@ import base64
 import pydantic
 from typing import Type
 from toktagger.api.schemas.data import (
-    Data,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
     ImageData,
     DataParamTypes,
+    DataResponseType,
+    ImageParams,
 )
 from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 
@@ -46,9 +47,9 @@ class DataLoader(ABC):
     @abstractmethod
     def get_sample(
         self,
-        sample: ShotData | FileData | TimeSeriesFileData,
+        sample: Sample,
         **kwargs,
-    ) -> Data:
+    ) -> DataResponseType:
         pass
 
 
@@ -99,6 +100,11 @@ class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
     def __init__(self, params: DataParamTypes):
+        if not isinstance(params, ImageParams):
+            raise TypeError(
+                f"Expected params of type 'ImageParams' but got '{type(params)}'"
+            )
+
         super().__init__(params)
 
     @classmethod
@@ -107,12 +113,12 @@ class ImageDataLoader(DataLoader):
 
     @pydantic.validate_call
     def get_sample(self, sample: Sample, **kwargs) -> ImageData:
-        sample_data: FileData = sample.data
-
-        if not isinstance(sample_data, FileData):
+        if not isinstance(sample.data, FileData):
             raise TypeError(
-                f"Expected sample data of type 'FileData' but got '{type(sample_data)}'"
+                f"Expected sample data of type 'FileData' but got '{type(sample.data)}'"
             )
+
+        sample_data: FileData = sample.data
 
         # Find directory of images
         dir_path = pathlib.Path(sample_data.file_name)
@@ -159,13 +165,12 @@ class ParquetDataLoader(DataLoader):
         min_time_step: Optional[float] = None,
         **kwargs,
     ) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, TimeSeriesFileData)
-        sample_data: TimeSeriesFileData = sample.data
-
-        if not isinstance(sample_data, TimeSeriesFileData):
+        if not isinstance(sample.data, TimeSeriesFileData):
             raise TypeError(
-                f"Expected sample data of type 'TimeSeriesFileData' but got '{type(sample_data)}'"
+                f"Expected sample data of type 'TimeSeriesFileData' but got '{type(sample.data)}'"
             )
+
+        sample_data: TimeSeriesFileData = sample.data
 
         if not pathlib.Path(sample_data.file_name).exists():
             raise FileNotFoundError(
@@ -218,12 +223,12 @@ class UDADataLoader(DataLoader):
         min_time_step: Optional[float] = None,
         **kwargs,
     ) -> MultiVariateTimeSeriesData:
-        sample_data: ShotData = sample.data
-
-        if not isinstance(sample_data, ShotData):
+        if not isinstance(sample.data, ShotData):
             raise TypeError(
-                f"Expected sample data of type 'ShotData' but got '{type(sample_data)}'"
+                f"Expected sample data of type 'ShotData' but got '{type(sample.data)}'"
             )
+
+        sample_data: ShotData = sample.data
 
         results = {}
         for name in sample_data.signal_names:

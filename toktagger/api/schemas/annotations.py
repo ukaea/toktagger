@@ -13,6 +13,7 @@ class AnnotationIn(ConfiguredModel):
     uncertainty: Optional[float] = None
     sample_id: Optional[str] = None
     project_id: Optional[str] = None
+    signal_name: Optional[str] = None
 
     @model_validator(mode="before")
     def set_uncertainty(cls, values):

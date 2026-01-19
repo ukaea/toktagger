@@ -2,7 +2,6 @@ import numpy as np
 import xarray as xr
 from toktagger.api.core.annotators import compute_stft
 from toktagger.api.schemas.data import (
-    CompositeData,
     MultiVariateTimeSeriesData,
     SpectrogramData,
     Data,
@@ -21,17 +20,32 @@ class IdentityView:
 
 class SpectrogramView:
     def __init__(self, params: SpectrogramViewParams):
+        if not isinstance(params, SpectrogramViewParams):
+            raise RuntimeError(
+                f"Invalid params type for SpectrogramView: {type(params)}"
+            )
+
         self.params = params
 
-    def __call__(self, data: Data) -> Data:
-        if isinstance(data, MultiVariateTimeSeriesData):
-            response = {}
-            for key, value in data.values.items():
-                response[key] = self.convert_timeseries_to_spectrogram(value)
-        else:
+    def __call__(
+        self, data: MultiVariateTimeSeriesData | SpectrogramData
+    ) -> SpectrogramData:
+        if isinstance(data, SpectrogramData):
+            return data
+
+        if not isinstance(data, MultiVariateTimeSeriesData):
             raise RuntimeError(f"Unsupported data type: {type(data)}")
 
-        return CompositeData(values=response)
+        if self.params.signal_name not in data.values:
+            raise RuntimeError("Signal name not found in data")
+
+        ts_data = data.values[self.params.signal_name]
+        if ts_data is None:
+            raise RuntimeError(
+                f"Time series for {self.params.signal_name} does not exist."
+            )
+
+        return self.convert_timeseries_to_spectrogram(ts_data)
 
     def convert_timeseries_to_spectrogram(
         self, data: TimeSeriesData

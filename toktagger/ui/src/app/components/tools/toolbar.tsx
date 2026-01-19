@@ -35,6 +35,7 @@ import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
+import { SignalSelector } from "./signalSelector";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -228,6 +229,11 @@ export default function ToolBar() {
       console.warn("MHD spectrogram data is not available");
       return;
     }
+
+    tools.push({
+      name: "Signal Selection",
+      component: <SignalSelector />,
+    });
 
     const mhdData = resultSpec.data;
     tools.push({

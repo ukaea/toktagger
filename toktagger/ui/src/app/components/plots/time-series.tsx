@@ -11,6 +11,7 @@ import {
   PolygonAnnotation,
   PolygonAnnotationSchema,
   PolygonSchema,
+  SpectrogramViewParams,
 } from "@/types";
 import Plotly, {
   Config,
@@ -76,7 +77,7 @@ export const TimeSeries = ({
   rescaleOnZoom = true,
   children,
 }: TimeSeriesPlotProps) => {
-  const { setAnnotations } = useSample();
+  const { viewParams, setAnnotations } = useSample();
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
     null
   );
@@ -211,6 +212,8 @@ export const TimeSeries = ({
         // shapes have been modified - update annotations
         const shapes = eventData.shapes as Plotly.Shape[];
         const newAnnotations: Annotation[] = [];
+        const signalName =
+          (viewParams as SpectrogramViewParams).signal_name || null;
 
         shapes.forEach((shape) => {
           if (shape.type === "rect") {
@@ -222,6 +225,7 @@ export const TimeSeries = ({
               label: "Unknown",
               created_by: "manual",
               type: "bounding_box",
+              signal_name: signalName,
             });
 
             newAnnotations.push(boundingBox);
@@ -257,6 +261,7 @@ export const TimeSeries = ({
                       Math.max(...xPoints) - Math.min(...xPoints),
                       Math.max(...yPoints) - Math.min(...yPoints),
                     ],
+                    signal_name: signalName,
                     label: "Unknown",
                     created_by: "manual",
                     type: "polygon",
@@ -354,6 +359,7 @@ export const TimeSeries = ({
     allowRelayout,
     disableToolingInteraction,
     rescaleOnZoom,
+    setAnnotations,
   ]);
 
   useEffect(() => {

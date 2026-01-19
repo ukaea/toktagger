@@ -702,7 +702,10 @@ class SpectrogramThresholdAnnotator:
 
         annotations = [
             PolygonAnnotation(
-                **poly, label="Unknown", created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD
+                **poly,
+                label="Unknown",
+                created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD,
+                signal_name=self.params.signal_name,
             )
             for poly in polygons
         ]

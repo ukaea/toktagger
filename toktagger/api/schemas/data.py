@@ -16,10 +16,6 @@ class MultiVariateTimeSeriesData(Data):
     values: dict[str, TimeSeriesData | None]
 
 
-class CompositeData(Data):
-    values: dict[str, "DataResponseType"]
-
-
 class SpectrogramData(Data):
     time: list[float]
     frequency: list[float]
@@ -48,7 +44,6 @@ DataResponseType = Union[
     Data,
     ImageData,
     MultiVariateTimeSeriesData,
-    CompositeData,
     SpectrogramData,
 ]
 

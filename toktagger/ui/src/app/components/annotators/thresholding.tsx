@@ -71,28 +71,11 @@ export default function SpectrogramThresholdTool({
   };
 
   useEffect(() => {
+    if (!isEnabled) {
+      return;
+    }
+
     const fetchData = async () => {
-      if (!isEnabled) {
-        // Remove previous annotations from this annotator
-        setAnnotations((previousAnnotations: Annotation[]) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
-          );
-          return otherAnnotations;
-        });
-        return;
-      }
-
-      if (isEnabled) {
-        setAnnotations((previousAnnotations: Annotation[]) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) => annotation.type !== "polygon"
-          );
-          return otherAnnotations;
-        });
-      }
-
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
         {
@@ -119,6 +102,7 @@ export default function SpectrogramThresholdTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
+            annotation.signal_name !== signal_name &&
             annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
         );
         return otherAnnotations.concat(payload);

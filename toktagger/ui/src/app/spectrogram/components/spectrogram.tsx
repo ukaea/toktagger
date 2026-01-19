@@ -17,6 +17,7 @@ import {
   SpectrogramMask,
   BoundingBoxSchema,
   BoundingBox,
+  SpectrogramViewParams,
 } from "@/types";
 import { applyGlobalStyle } from "@/app/utils";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
@@ -63,7 +64,8 @@ const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
 const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
 
 export const SpectrogramView = () => {
-  const { data, annotations, setAnnotations, plotProps } = useSample();
+  const { data, annotations, setAnnotations, plotProps, viewParams } =
+    useSample();
 
   const [zones, setZones] = useState<Zone[]>([]);
   const [vspans, setVSpans] = useState<VSpan[]>([]);
@@ -71,6 +73,7 @@ export const SpectrogramView = () => {
   const [shapes, setShapes] = useState<Partial<Plotly.Shape>[]>([]);
 
   const viewData: SpectrogramData | null = data as SpectrogramData | null;
+  const signalName = (viewParams as SpectrogramViewParams).signal_name || null;
 
   useEffect(() => {
     if (!annotations || !viewData) return;
@@ -80,6 +83,7 @@ export const SpectrogramView = () => {
 
     const displayAnnotations: DisplayAnnotation[] = annotations
       .filter((x: Annotation) => x.type !== "class_label")
+      .filter((x: Annotation) => x.signal_name === signalName)
       .map(convertAnnotationToDisplayAnnotation);
 
     const zones: Zone[] = displayAnnotations

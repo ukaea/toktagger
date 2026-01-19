@@ -14,6 +14,7 @@ class ViewParams(BaseModel):
 
 class SpectrogramViewParams(ViewParams):
     name: Literal[ViewType.SPECTROGRAM] = ViewType.SPECTROGRAM
+    signal_name: str
     nperseg: Optional[int] = 256
     time_min: Optional[float] = None
     time_max: Optional[float] = None

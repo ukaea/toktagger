@@ -1,4 +1,4 @@
-import { ZodSchema } from "zod/v4";
+import z, { ZodSchema } from "zod/v4";
 import {
   DisplayAnnotation,
   Annotation,
@@ -15,6 +15,9 @@ import {
   PolygonAnnotationSchema,
   Polygon,
   BoundingBoxSchema,
+  Sample,
+  TimeSeriesFileDataSchema,
+  ShotDataSchema,
 } from "@/types";
 
 export const linspace = (start: number, end: number, num: number) => {
@@ -184,3 +187,14 @@ export const applyGlobalStyle = (layout: Partial<Plotly.Layout>) => {
   }
   return layout;
 };
+
+export function getSignalNames(sample: Sample) {
+  const sampleDataType = z.union([TimeSeriesFileDataSchema, ShotDataSchema]);
+
+  if (!sampleDataType.safeParse(sample.data).success) {
+    return [];
+  }
+
+  const signal_names = sampleDataType.parse(sample.data).signal_names;
+  return signal_names;
+}

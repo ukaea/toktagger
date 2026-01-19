@@ -17,13 +17,12 @@ import {
   MultiVariateTimeSeriesData,
   SpectrogramData,
   MultiVariateTimeSeriesDataSchema,
-  CompositeDataSchema,
   SpectrogramDataSchema,
   TaskType,
   DataParams,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
-
+import { getSignalNames } from "../utils";
 interface SampleContextType {
   project: Project | null;
   sample: Sample | null;
@@ -35,7 +34,7 @@ interface SampleContextType {
   isLoading: boolean;
   error: string | null;
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
@@ -58,7 +57,7 @@ async function getData<T>(url: string): Promise<T> {
 
 async function getSample(projectId: string, sampleId: string): Promise<Sample> {
   return await getData<Sample>(
-    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}`,
+    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}`
   );
 }
 
@@ -68,16 +67,16 @@ async function getProject(projectId: string): Promise<Project> {
 
 async function getAnnotations(
   projectId: string,
-  sampleId: string,
+  sampleId: string
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/annotations`,
+    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/annotations`
   );
 }
 
 async function parseData(
   data: Data,
-  task: TaskType,
+  task: TaskType
 ): Promise<MultiVariateTimeSeriesData | SpectrogramData | undefined> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -86,20 +85,13 @@ async function parseData(
     }
     return result.data;
   } else if (task == TaskType.Spectrogram) {
-    const result = CompositeDataSchema.safeParse(data);
+    const result = SpectrogramDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for spectrogram view");
     }
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"],
-    );
-    if (!mhdData.success) {
-      throw new Error("Invalid data for spectrogram view");
-    }
-    return mhdData.data;
+    return result.data;
   }
 }
-
 export function SampleProvider({
   projectId,
   sampleId,
@@ -143,12 +135,20 @@ export function SampleProvider({
         setSample(sampleData);
         setAnnotations(dbAnnotations);
 
+        const signalNames = getSignalNames(sampleData);
+
         let params = viewParams;
         if (projectData.task === TaskType.Spectrogram) {
+          if (signalNames.length === 0) {
+            throw new Error("No signal names available for spectrogram view");
+          }
+
+          const signal_name =
+            (params as SpectrogramViewParams).signal_name || signalNames[0];
           params = {
             ...params,
             name: "spectrogram",
-            nperseg: 256,
+            signal_name: signal_name,
           } as SpectrogramViewParams;
         }
 
@@ -160,7 +160,7 @@ export function SampleProvider({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({ params: dataParams, view: params }),
-          },
+          }
         );
 
         if (!response.ok) {
