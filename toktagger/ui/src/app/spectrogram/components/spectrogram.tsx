@@ -23,7 +23,7 @@ import { applyGlobalStyle } from "@/app/utils";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
-import { TimeSeries } from "@/app/components/plots/time-series";
+import { TimeSeries } from "@/app/components/plots/plotly";
 import { Zones } from "@/app/components/tools/zones";
 import { VSpans } from "@/app/components/tools/vspans";
 import * as d3 from "d3";

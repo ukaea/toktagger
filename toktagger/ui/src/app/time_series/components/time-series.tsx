@@ -14,7 +14,7 @@ import {
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { TimeSeries } from "@/app/components/plots/time-series";
+import { TimeSeries } from "@/app/components/plots/plotly";
 import { Zones } from "@/app/components/tools/zones";
 import "react-contexify/ReactContexify.css";
 
