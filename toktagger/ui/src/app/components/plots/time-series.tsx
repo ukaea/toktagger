@@ -266,7 +266,6 @@ export const TimeSeries = ({
                     created_by: "manual",
                     type: "polygon",
                   });
-                console.log("Extracted polygon:", polygon);
                 newAnnotations.push(polygon);
               }
             }
@@ -360,6 +359,7 @@ export const TimeSeries = ({
     disableToolingInteraction,
     rescaleOnZoom,
     setAnnotations,
+    viewParams,
   ]);
 
   useEffect(() => {

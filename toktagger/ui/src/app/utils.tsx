@@ -18,6 +18,8 @@ import {
   Sample,
   TimeSeriesFileDataSchema,
   ShotDataSchema,
+  ViewParams,
+  SpectrogramViewParams,
 } from "@/types";
 
 export const linspace = (start: number, end: number, num: number) => {
@@ -30,11 +32,15 @@ export const linspace = (start: number, end: number, num: number) => {
 };
 
 export const convertDisplayAnnotationToAnnotation = (
-  annotation: DisplayAnnotation
+  annotation: DisplayAnnotation,
+  viewParams: ViewParams
 ): Annotation => {
+  const signalName = (viewParams as SpectrogramViewParams)?.signal_name || null;
+
   if (ZoneSchema.safeParse(annotation).success) {
     const zone = ZoneSchema.parse(annotation);
     const timeRegion: TimeRegion = {
+      signal_name: signalName,
       created_by: zone.created_by,
       type: "time_region",
       project_id: null,
@@ -49,8 +55,7 @@ export const convertDisplayAnnotationToAnnotation = (
   } else if (VSpanSchema.safeParse(annotation).success) {
     const vspan = VSpanSchema.parse(annotation);
     const timePoint: TimePoint = {
-      project_id: null,
-      sample_id: null,
+      signal_name: signalName,
       validated: false,
       uncertainty: 1,
       created_by: vspan.created_by,
@@ -104,7 +109,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
       const bbox = BoundingBoxSchema.parse(item);
       return bbox;
     } else {
-      console.log(
+      console.error(
         "annotation",
         TimeRegionSchema.safeParse(item).error?.message
       );
@@ -119,15 +124,18 @@ export function updateAnnotations<T>(
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void,
   newDisplayAnnotations: DisplayAnnotation[],
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
+  viewParams: ViewParams
 ): void {
   setAnnotations((prevAnnotations: Annotation[]) => {
     const otherAnnotations: Annotation[] = prevAnnotations.filter(
       (item: Annotation) => !schema.safeParse(item).success
     );
     let newAnnotations: Annotation[] = newDisplayAnnotations.map(
-      convertDisplayAnnotationToAnnotation
+      (displayAnnotation) =>
+        convertDisplayAnnotationToAnnotation(displayAnnotation, viewParams)
     );
+
     newAnnotations = newAnnotations.concat(otherAnnotations);
     return newAnnotations;
   });

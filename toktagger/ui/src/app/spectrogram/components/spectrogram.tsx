@@ -32,7 +32,7 @@ import {
   updateAnnotations,
 } from "@/app/utils";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Flex } from "@adobe/react-spectrum";
 
 const vspanCategories: Category[] = [
@@ -151,15 +151,21 @@ export const SpectrogramView = () => {
     setVSpans(vspans);
     setMask(newMask);
     setShapes(shapes);
-  }, [annotations, viewData]);
+  }, [annotations, viewData, signalName]);
 
-  const updateVSpans = (newVSpans: Array<VSpan>) => {
-    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
-  };
+  const updateVSpans = useCallback(
+    (newVSpans: Array<VSpan>) => {
+      updateAnnotations(setAnnotations, newVSpans, TimePointSchema, viewParams);
+    },
+    [setAnnotations, viewParams]
+  );
 
-  const updateZones = (newZones: Array<Zone>) => {
-    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-  };
+  const updateZones = useCallback(
+    (newZones: Array<Zone>) => {
+      updateAnnotations(setAnnotations, newZones, TimeRegionSchema, viewParams);
+    },
+    [setAnnotations, viewParams]
+  );
 
   if (!viewData) {
     return null;

@@ -1,10 +1,11 @@
 "use client";
 
-import { Zone, Category, ToolingTypes } from "@/types";
+import { Zone, Category, ToolingTypes, SpectrogramViewParams } from "@/types";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 import "react-contexify/ReactContexify.css";
 import { useContextMenuProvider } from "./annotation-provider";
+import { useSample } from "@/app/contexts/SampleContext";
 
 interface ZoneContextInfo {
   zones: Zone[];
