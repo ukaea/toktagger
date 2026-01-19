@@ -1,6 +1,6 @@
 import { useSample } from "@/app/contexts/SampleContext";
 import { BACKEND_API_URL } from "@/app/core";
-import { Annotation, PlotProps } from "@/types";
+import { Annotation, PlotProps, SpectrogramDataSchema } from "@/types";
 import { NumberField, RangeSlider, Switch } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
 import { AnnotatorTypes } from "./types";
@@ -36,7 +36,7 @@ export default function SpectrogramThresholdTool({
   plotProps,
   setPlotProps,
 }: SpectrogramThresholdToolInfo) {
-  const { setAnnotations, dataParams } = useSample();
+  const { setAnnotations, dataParams, data } = useSample();
   const [isEnabled, setIsEnabled] = useState(false);
 
   const params: SpectrogramThresholdParams =
@@ -53,6 +53,15 @@ export default function SpectrogramThresholdTool({
     start: params.freq_min,
     end: params.freq_max,
   });
+
+  const [defaultFrequencyRange, setDefaultFrequencyRange] = useState<{
+    start: number;
+    end: number;
+  }>({
+    start: params.freq_min,
+    end: params.freq_max,
+  });
+
   const [percentile, setPercentile] = useState(params.percentile);
   const [sigma, setSigma] = useState<number>(params.sigma);
   const [minSize, setMinSize] = useState<number>(params.min_size);
@@ -119,6 +128,24 @@ export default function SpectrogramThresholdTool({
     sigma,
   ]);
 
+  useEffect(() => {
+    if (!isEnabled) return;
+    if (!data || !SpectrogramDataSchema.safeParse(data).success) return;
+
+    const specData = SpectrogramDataSchema.parse(data);
+
+    const freqencyMinValue = specData.frequency[0];
+    const frequencyMaxValue = specData.frequency[specData.frequency.length - 1];
+    setDefaultFrequencyRange({
+      start: freqencyMinValue,
+      end: frequencyMaxValue,
+    });
+    setFrequencyRange({
+      start: freqencyMinValue,
+      end: frequencyMaxValue,
+    });
+  }, [data, isEnabled]);
+
   return (
     <>
       <Switch isSelected={isEnabled} onChange={onThresholdChange}>
@@ -136,10 +163,10 @@ export default function SpectrogramThresholdTool({
           <RangeSlider
             label="Frequency Range (Hz)"
             value={frequencyRange}
-            minValue={0}
-            maxValue={100}
+            minValue={defaultFrequencyRange.start}
+            maxValue={defaultFrequencyRange.end}
             step={1}
-            onChange={setFrequencyRange}
+            onChangeEnd={setFrequencyRange}
           />
           <NumberField
             label="Sigma"

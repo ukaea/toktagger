@@ -73,7 +73,7 @@ export const SpectrogramView = () => {
   const [shapes, setShapes] = useState<Partial<Plotly.Shape>[]>([]);
 
   const viewData: SpectrogramData | null = data as SpectrogramData | null;
-  const signalName = (viewParams as SpectrogramViewParams).signal_name || null;
+  const signalName = (viewParams as SpectrogramViewParams)?.signal_name || null;
 
   useEffect(() => {
     if (!annotations || !viewData) return;
@@ -111,7 +111,7 @@ export const SpectrogramView = () => {
       return path;
     });
 
-    const shapes = paths.map((path) => ({
+    const newShapes = paths.map((path) => ({
       type: "path",
       path: path,
       xref: "x",
@@ -123,7 +123,7 @@ export const SpectrogramView = () => {
     }));
 
     boundingBoxes.forEach((bbox) => {
-      shapes.push({
+      newShapes.push({
         type: "rect",
         xref: "x",
         yref: "y2",
@@ -150,7 +150,7 @@ export const SpectrogramView = () => {
     setZones(zones);
     setVSpans(vspans);
     setMask(newMask);
-    setShapes(shapes);
+    setShapes(newShapes);
   }, [annotations, viewData, signalName]);
 
   const updateVSpans = useCallback(
