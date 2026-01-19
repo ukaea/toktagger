@@ -1,13 +1,14 @@
 import { useSample } from "@/app/contexts/SampleContext";
 import { getSignalNames } from "@/app/utils";
 import { SpectrogramViewParams } from "@/types";
-import { ComboBox, Flex, Item } from "@adobe/react-spectrum";
+import { ComboBox, Flex, Item, NumberField } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
 
-export function SignalSelector() {
+export function SpectrogramViewParamsWidget() {
   const { sample, setViewParams } = useSample();
   const [selectedSignal, setSelectedSignal] = useState<string | null>(null);
   const [signalNames, setSignalNames] = useState<string[]>([]);
+  const [fftValue, setFftValue] = useState<number>(256);
 
   useEffect(() => {
     const signalNames = sample ? getSignalNames(sample) : [];
@@ -24,12 +25,13 @@ export function SignalSelector() {
       return {
         ...prevParams,
         signal_name: selectedSignal,
+        nfft: fftValue,
       } as SpectrogramViewParams;
     });
-  }, [selectedSignal, setViewParams]);
+  }, [selectedSignal, fftValue, setViewParams]);
 
   return (
-    <Flex>
+    <Flex direction="column" alignItems="start" gap="size-200">
       <ComboBox
         label="Select Signal"
         selectedKey={selectedSignal}
@@ -39,6 +41,14 @@ export function SignalSelector() {
           <Item key={signal}>{signal}</Item>
         ))}
       </ComboBox>
+      <NumberField
+        label="FFT Size"
+        value={fftValue}
+        minValue={256}
+        maxValue={8192}
+        step={256}
+        onChange={setFftValue}
+      />
     </Flex>
   );
 }

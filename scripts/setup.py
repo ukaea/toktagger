@@ -29,14 +29,16 @@ def create_project(
     return project_id
 
 
-def create_uda_samples(project_id: str, shot_ids: list[int]):
+def create_uda_samples(
+    project_id: str, shot_ids: list[int], signals: Optional[list[str]] = None
+):
     samples = []
     for shot_id in shot_ids:
         sample = {
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"],
+                "signal_names": signals,
                 "protocol": "uda",
             },
         }
@@ -94,7 +96,9 @@ def main():
     project_id = create_project(
         "UDA Disruption Project", "time-series", "uda", "sequential"
     )
-    create_uda_samples(project_id, shot_ids)
+    create_uda_samples(
+        project_id, shot_ids, signals=["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"]
+    )
 
     project_id = create_project(
         "Local ELM Project", "time-series", "parquet", "sequential"
@@ -115,6 +119,18 @@ def main():
         base_path=base_path / "mhd",
         file_type="parquet",
         signals=["mirnov", "saddle_0"],
+    )
+
+    project_id = create_project(
+        "UDA MHD Project", "spectrogram", "uda", "sequential", min_time_step=1e-6
+    )
+    shot_ids = [
+        52583,
+    ]
+    create_uda_samples(
+        project_id,
+        shot_ids,
+        signals=["/XMB/SANX13-01/CH13", "/XMB/SANX13-01/CH14", "/XMB/SANX13-01/CH15"],
     )
 
 

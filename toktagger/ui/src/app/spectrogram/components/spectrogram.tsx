@@ -19,7 +19,7 @@ import {
   BoundingBox,
   SpectrogramViewParams,
 } from "@/types";
-import { applyGlobalStyle } from "@/app/utils";
+import { applyGlobalStyle, arrayMax, arrayMin } from "@/app/utils";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
@@ -191,14 +191,14 @@ export const SpectrogramView = () => {
     amplitude = viewData.amplitude;
   }
 
-  const ampMin = Math.max(smallPrecisionFactor, Math.min(...amplitude.flat()));
-  const ampMax = Math.max(...amplitude.flat());
+  const ampMin = Math.max(smallPrecisionFactor, arrayMin(amplitude.flat()));
+  const ampMax = Math.max(smallPrecisionFactor, arrayMax(amplitude.flat()));
 
   const logAmplitude_og = amplitude_og.map((row: Array<number>) =>
     row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
   );
-  const logAmpMin = Math.min(...logAmplitude_og.flat());
-  const logAmpMax = Math.max(...logAmplitude_og.flat());
+  const logAmpMin = arrayMin(logAmplitude_og.flat());
+  const logAmpMax = arrayMax(logAmplitude_og.flat());
 
   const generateLogTicks = (min: number, max: number) => {
     const minPower = Math.floor(Math.log10(min));

@@ -18,6 +18,7 @@ import {
   PlotProps,
   SpectrogramData,
   SpectrogramDataSchema,
+  SpectrogramViewParams,
   SpectrogramViewParamsSchema,
   TaskType,
   ViewParams,
@@ -35,21 +36,16 @@ import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
-import { SignalSelector } from "./signalSelector";
+import { SpectrogramViewParamsWidget } from "./spectrogramViewParamsWidget";
 
-type AmplitudeSliderInfo = {
-  data: SpectrogramData;
-  viewParams: ViewParams;
-  setViewParams: (viewParams: ViewParams) => void;
-  plotProps: PlotProps;
-};
+function AmplitudeSlider() {
+  const { data, viewParams, setViewParams, plotProps } = useSample();
 
-function AmplitudeSlider({
-  data,
-  viewParams,
-  setViewParams,
-  plotProps,
-}: AmplitudeSliderInfo) {
+  if (!data || !("amplitude" in data)) {
+    console.warn("Amplitude data not found for AmplitudeSlider");
+    return null;
+  }
+
   const onAmplitudeRangeChange = async ({
     start,
     end,
@@ -92,12 +88,8 @@ function AmplitudeSlider({
   return ampRangeTool;
 }
 
-type ColorMapPickerInfo = {
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
-};
-
-function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
+function ColorMapPicker() {
+  const { plotProps, setPlotProps } = useSample();
   const options = [
     { id: 1, name: "Viridis" },
     { id: 2, name: "Plasma" },
@@ -127,17 +119,7 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
 }
 
 export default function ToolBar() {
-  const {
-    project,
-    sample,
-    data,
-    annotations,
-    setAnnotations,
-    viewParams,
-    setViewParams,
-    plotProps,
-    setPlotProps,
-  } = useSample();
+  const { project, sample, data, annotations, setAnnotations } = useSample();
 
   if (!project || !sample) {
     console.warn("Project or sample not found in ToolBar");
@@ -225,34 +207,25 @@ export default function ToolBar() {
     });
   } else if (data && project.task == TaskType.Spectrogram) {
     const resultSpec = SpectrogramDataSchema.safeParse(data);
+
     if (!resultSpec.success) {
       console.warn("MHD spectrogram data is not available");
       return;
     }
 
     tools.push({
-      name: "Signal Selection",
-      component: <SignalSelector />,
+      name: "View Parameters",
+      component: <SpectrogramViewParamsWidget />,
     });
 
-    const mhdData = resultSpec.data;
     tools.push({
       name: "Amplitude Range",
-      component: (
-        <AmplitudeSlider
-          data={mhdData}
-          viewParams={viewParams}
-          setViewParams={setViewParams}
-          plotProps={plotProps}
-        />
-      ),
+      component: <AmplitudeSlider />,
     });
 
     tools.push({
       name: "Color Map",
-      component: (
-        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
-      ),
+      component: <ColorMapPicker />,
     });
 
     tools.push({
@@ -261,9 +234,6 @@ export default function ToolBar() {
         <SpectrogramThresholdTool
           project_id={project_id}
           sample_id={sample_id}
-          signal_name={"mirnov"}
-          plotProps={plotProps}
-          setPlotProps={setPlotProps}
         />
       ),
     });

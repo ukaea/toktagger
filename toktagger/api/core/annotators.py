@@ -223,7 +223,9 @@ def smooth_binary_mask(mask: np.ndarray, radius: int = 3) -> np.ndarray:
     return closed.astype(np.uint8)
 
 
-def compute_stft(data: TimeSeriesData) -> np.ndarray:
+def compute_stft(
+    data: TimeSeriesData, nfft: int = 256, nperseg: int = 256, noverlap: int = 128
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     time = np.array(data.time)
     values = np.array(data.values)
 
@@ -232,8 +234,9 @@ def compute_stft(data: TimeSeriesData) -> np.ndarray:
     freq, ts, Zxx = stft(
         values,
         fs=int(sample_rate),
-        nperseg=256,
-        noverlap=128,
+        nfft=nfft,
+        nperseg=nperseg,
+        noverlap=noverlap,
     )
     freq /= 1000
     ts += time[0]

@@ -1,11 +1,16 @@
 import { useSample } from "@/app/contexts/SampleContext";
 import { BACKEND_API_URL } from "@/app/core";
-import { Annotation, PlotProps, SpectrogramDataSchema } from "@/types";
-import { NumberField, RangeSlider, Switch } from "@adobe/react-spectrum";
+import {
+  Annotation,
+  SpectrogramDataSchema,
+  SpectrogramViewParams,
+} from "@/types";
+import { Flex, NumberField, RangeSlider, Switch } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
 import { AnnotatorTypes } from "./types";
 import { z } from "zod";
 import NumberStepper from "../ui/number_stepper";
+import { getSignalNames } from "@/app/utils";
 
 const SpectrogramThresholdParamsSchema = z.object({
   signal_name: z.string(),
@@ -24,24 +29,30 @@ type SpectrogramThresholdParams = z.infer<
 type SpectrogramThresholdToolInfo = {
   project_id: string;
   sample_id: string;
-  signal_name: string;
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
 };
 
 export default function SpectrogramThresholdTool({
   project_id,
   sample_id,
-  signal_name,
-  plotProps,
-  setPlotProps,
 }: SpectrogramThresholdToolInfo) {
-  const { setAnnotations, dataParams, data } = useSample();
+  const {
+    sample,
+    setAnnotations,
+    dataParams,
+    data,
+    viewParams,
+    plotProps,
+    setPlotProps,
+  } = useSample();
+
+  const signalNames = getSignalNames(sample);
+  const signalName =
+    (viewParams as SpectrogramViewParams)?.signal_name || signalNames[0];
   const [isEnabled, setIsEnabled] = useState(false);
 
   const params: SpectrogramThresholdParams =
     SpectrogramThresholdParamsSchema.parse({
-      signal_name: signal_name,
+      signal_name: signalName,
       percentile: 95,
     });
 
@@ -89,7 +100,7 @@ export default function SpectrogramThresholdTool({
           },
           body: JSON.stringify({
             annotator_params: {
-              signal_name: signal_name,
+              signal_name: signalName,
               percentile: percentile,
               freq_min: frequencyRange.start,
               freq_max: frequencyRange.end,
@@ -106,7 +117,7 @@ export default function SpectrogramThresholdTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.signal_name !== signal_name &&
+            annotation.signal_name !== signalName &&
             annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
         );
         return otherAnnotations.concat(payload);
@@ -119,7 +130,7 @@ export default function SpectrogramThresholdTool({
     sample_id,
     isEnabled,
     percentile,
-    signal_name,
+    signalName,
     setAnnotations,
     dataParams,
     frequencyRange,
@@ -147,7 +158,7 @@ export default function SpectrogramThresholdTool({
   }, [data, isEnabled]);
 
   return (
-    <>
+    <Flex direction="column" gap="size-200" justifyContent="start">
       <Switch isSelected={isEnabled} onChange={onThresholdChange}>
         Thresholding
       </Switch>
@@ -191,6 +202,6 @@ export default function SpectrogramThresholdTool({
           />
         </>
       )}
-    </>
+    </Flex>
   );
 }
