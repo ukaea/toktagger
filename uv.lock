@@ -3637,7 +3637,7 @@ requires-dist = [
     { name = "s3fs" },
     { name = "scikit-learn" },
     { name = "scipy" },
-    { name = "torch", specifier = ">=2.8.0" },
+    { name = "torch" },
     { name = "uda" },
     { name = "uvicorn" },
     { name = "xarray" },
