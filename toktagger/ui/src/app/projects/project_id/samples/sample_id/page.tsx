@@ -23,7 +23,7 @@ import {
   DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { VideoView } from "@/app/frames/components/frames";
+import { VideoViewV2 } from "@/app/frames/components/v2/VideoViewV2";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -143,26 +143,24 @@ const SampleView = ({
   }
 
   if (project.task === "UFO") {
-    // Video/frame annotation task (backend name is still "UFO"):
-    // - data is an image frame (base64 PNG + frame index)
-    // - annotations are the backend COCO "video bbox" format, which VideoView can seed into localStorage
-    const result = ImageDataSchema.safeParse(data);
-    if (!result.success) throw new Error("Invalid data for UFO view");
-    return (
-      <VideoView
-        data={result.data}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-        dataParams={dataParams}
-        setDataParams={setDataParams}
-        projectId={projectId}
-        sampleId={sampleId}
-        onPrev={onPrev}
-        onNext={onNext}
-        onJump={onJump}
-      />
-    );
-  }
+  const result = ImageDataSchema.safeParse(data);
+  if (!result.success) throw new Error("Invalid data for UFO view");
+
+  return (
+    <VideoViewV2
+      data={result.data}
+      annotations={annotations}
+      projectId={projectId}
+      sampleId={sampleId}
+      dataParams={dataParams}
+      setDataParams={setDataParams}
+      onPrev={onPrev}
+      onNext={onNext}
+      onJump={onJump}
+    />
+  );
+}
+
 
   if (project.task === "MHD") {
     const result = CompositeDataSchema.safeParse(data);
