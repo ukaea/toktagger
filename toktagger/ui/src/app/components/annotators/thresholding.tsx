@@ -1,16 +1,11 @@
 import { useSample } from "@/app/contexts/SampleContext";
 import { BACKEND_API_URL } from "@/app/core";
 import { Annotation, PlotProps } from "@/types";
-import {
-  ActionButton,
-  Flex,
-  NumberField,
-  RangeSlider,
-  Switch,
-} from "@adobe/react-spectrum";
+import { NumberField, RangeSlider, Switch } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
 import { AnnotatorTypes } from "./types";
 import { z } from "zod";
+import NumberStepper from "../ui/number_stepper";
 
 const SpectrogramThresholdParamsSchema = z.object({
   signal_name: z.string(),
@@ -170,78 +165,5 @@ export default function SpectrogramThresholdTool({
         </>
       )}
     </>
-  );
-}
-
-function NumberStepper({
-  label,
-  defaultValue,
-  onChange,
-}: {
-  label: string;
-  defaultValue: number;
-  onChange: (value: number) => void;
-}) {
-  const [value, setValue] = useState(defaultValue);
-
-  const incrementValue = (increment: number) => {
-    setValue((prevValue) => {
-      const newValue = prevValue + increment;
-      if (newValue < 0) return 0;
-      if (newValue > 99) return 99;
-      return newValue;
-    });
-  };
-
-  useEffect(() => {
-    onChange(value);
-  }, [value, onChange]);
-
-  return (
-    <Flex
-      direction="column"
-      gap="size-100"
-      margin={"size-200"}
-      alignItems={"center"}
-    >
-      <NumberField
-        label={label}
-        value={value}
-        onChange={setValue}
-        minValue={0}
-        maxValue={99}
-        hideStepper={true}
-      />
-      <Flex direction="row" gap="size-100">
-        <ActionButton
-          onPress={() => {
-            incrementValue(-5);
-          }}
-        >
-          -5
-        </ActionButton>
-        <ActionButton
-          onPress={() => {
-            incrementValue(-1);
-          }}
-        >
-          -1
-        </ActionButton>
-        <ActionButton
-          onPress={() => {
-            incrementValue(1);
-          }}
-        >
-          +1
-        </ActionButton>
-        <ActionButton
-          onPress={() => {
-            incrementValue(5);
-          }}
-        >
-          +5
-        </ActionButton>
-      </Flex>
-    </Flex>
   );
 }
