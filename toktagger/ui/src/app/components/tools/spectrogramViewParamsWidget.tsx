@@ -1,5 +1,5 @@
 import { useSample } from "@/app/contexts/SampleContext";
-import { getSignalNames } from "@/app/utils";
+import { getSignalNames, shallowEqual } from "@/app/utils";
 import { SpectrogramViewParams } from "@/types";
 import { ComboBox, Flex, Item, NumberField } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
@@ -21,12 +21,17 @@ export function SpectrogramViewParamsWidget() {
 
   useEffect(() => {
     if (!selectedSignal) return;
+
     setViewParams((prevParams: SpectrogramViewParams) => {
-      return {
+      const nextParams = {
         ...prevParams,
         signal_name: selectedSignal,
         nfft: fftValue,
       } as SpectrogramViewParams;
+
+      // Only update if params have actually changed.
+      // Requesting a full data refresh is expensive.
+      return shallowEqual(prevParams, nextParams) ? prevParams : nextParams;
     });
   }, [selectedSignal, fftValue, setViewParams]);
 

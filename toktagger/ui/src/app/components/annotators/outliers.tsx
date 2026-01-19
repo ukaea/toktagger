@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -8,7 +8,7 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation } from "@/types";
+import { Annotation, MultiVariateTimeSeriesDataSchema } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -29,15 +29,21 @@ export function OutlierDetectionTool({
     { id: 1, name: "isoforest" },
   ];
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
+
+  const dataValues = useMemo(
+    () => MultiVariateTimeSeriesDataSchema.safeParse(data).data?.values || {},
+    [data]
+  );
+
   const [signalName, setSignalName] = useState<string | null>(null);
-  const signalOptions = Object.keys(data?.values).map((value, index) => ({
+  const signalOptions = Object.keys(dataValues).map((value, index) => ({
     id: index,
     name: value,
   }));
   const [threshold, setThreshold] = useState<number>(3);
   const [contamination, setContamination] = useState<number>(0);
   const [method, setMethod] = useState<string>("mad");
-  const validSignalName = signalName && signalName in data?.values;
+  const validSignalName = signalName && signalName in dataValues;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,7 +51,7 @@ export function OutlierDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION,
+              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
           );
           return otherAnnotations;
         });
@@ -68,14 +74,14 @@ export function OutlierDetectionTool({
             },
             data_params: dataParams,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION,
+            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
         );
         return otherAnnotations.concat(payload);
       });

@@ -196,13 +196,28 @@ export const applyGlobalStyle = (layout: Partial<Plotly.Layout>) => {
   return layout;
 };
 
-export function getSignalNames(sample: Sample) {
+export function getSignalNames(sample: Sample | null): string[] {
   const sampleDataType = z.union([TimeSeriesFileDataSchema, ShotDataSchema]);
 
-  if (!sampleDataType.safeParse(sample.data).success) {
+  if (!sample || !sampleDataType.safeParse(sample.data).success) {
     return [];
   }
 
   const signal_names = sampleDataType.parse(sample.data).signal_names;
   return signal_names;
+}
+
+export function shallowEqual(a: object, b: object) {
+  if (a === b) return true;
+
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (a[key] !== b[key]) return false;
+  }
+
+  return true;
 }

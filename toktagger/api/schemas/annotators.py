@@ -60,6 +60,8 @@ class SpectrogramThresholdParams(AnnotatorParams):
     sigma: float = 0.1
     min_size: int = 150
     line_filter_width: int = 3
+    nfft: int = 256
+    nperseg: int = 256
 
 
 AnnotatorParamTypes = Union[

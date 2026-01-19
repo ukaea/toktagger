@@ -665,7 +665,6 @@ class SpectrogramThresholdAnnotator:
         mirnov = data.values[self.params.signal_name]
         frequency, time, amp = compute_stft(mirnov)
         amp = np.nan_to_num(amp, 1e-6).clip(1e-6)
-        # amp = np.log10(amp)
 
         if self.params.line_filter_width > 0:
             amp = amp - uniform_filter(amp, size=(self.params.line_filter_width, 1))

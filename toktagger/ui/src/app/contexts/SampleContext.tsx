@@ -29,7 +29,7 @@ interface SampleContextType {
   data: Data | null;
   annotations: Annotation[];
   dataParams: DataParams;
-  viewParams: ViewParams;
+  viewParams: ViewParams | SpectrogramViewParams | null;
   plotProps: PlotProps;
   isLoading: boolean;
   error: string | null;
@@ -37,7 +37,7 @@ interface SampleContextType {
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
   ) => void;
   setDataParams: (params: DataParams) => void;
-  setViewParams: (params: ViewParams) => void;
+  setViewParams: (params: ViewParams | SpectrogramViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
 }
 
@@ -74,6 +74,46 @@ async function getAnnotations(
   );
 }
 
+async function getSampleData(
+  project: Project,
+  sample: Sample,
+  dataParams: DataParams,
+  viewParams: ViewParams | null,
+  setError: (error: string | null) => void,
+  setIsLoading: (isLoading: boolean) => void
+): Promise<MultiVariateTimeSeriesData | SpectrogramData | null> {
+  if (!viewParams) return null;
+
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project._id}/samples/${sample._id}/data`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ params: dataParams, view: viewParams }),
+    }
+  );
+
+  if (!response.ok) {
+    const body = await response.json();
+    setError(`${body.detail}`);
+    setIsLoading(false);
+    return null;
+  }
+
+  const fetchedData: Data = await response.json();
+  console.log("Fetched data:", fetchedData);
+
+  const viewData = await parseData(fetchedData, project.task);
+  if (!viewData) {
+    setError("Data could not read the data for the selected view");
+    return null;
+  }
+
+  return viewData;
+}
+
 async function parseData(
   data: Data,
   task: TaskType
@@ -102,9 +142,9 @@ export function SampleProvider({
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
-  const [viewParams, setViewParams] = useState<ViewParams>({
-    name: "identity",
-  });
+  const [viewParams, setViewParams] = useState<
+    ViewParams | SpectrogramViewParams | null
+  >();
 
   const [dataParams, setDataParams] = useState<DataParams>({
     name: "identity",
@@ -135,51 +175,54 @@ export function SampleProvider({
         setSample(sampleData);
         setAnnotations(dbAnnotations);
 
-        const signalNames = getSignalNames(sampleData);
-
-        let params = viewParams;
-        if (projectData.task === TaskType.Spectrogram) {
-          if (signalNames.length === 0) {
-            throw new Error("No signal names available for spectrogram view");
+        setViewParams((prevViewParams) => {
+          if (prevViewParams) {
+            return prevViewParams;
           }
 
-          const signal_name =
-            (params as SpectrogramViewParams).signal_name || signalNames[0];
-          params = {
-            ...params,
-            name: "spectrogram",
-            signal_name: signal_name,
-          } as SpectrogramViewParams;
-        }
-
-        const response = await fetch(
-          `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/data`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ params: dataParams, view: params }),
+          // Set default viewParams based on project task
+          if (projectData.task === TaskType.TimeSeries) {
+            return {
+              name: "identity",
+            };
+          } else if (projectData.task === TaskType.Spectrogram) {
+            return {
+              name: "spectrogram",
+              signal_name: getSignalNames(sampleData)[0],
+              nfft: 256,
+              nperseg: 256,
+              noverlap: 128,
+            } as SpectrogramViewParams;
           }
+          return null;
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+      }
+    };
+
+    refreshData();
+  }, [projectId, sampleId, dataParams]);
+
+  useEffect(() => {
+    const fetchDataAsync = async () => {
+      if (!project || !sample || !viewParams) return;
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const fetchedData = await getSampleData(
+          project,
+          sample,
+          dataParams,
+          viewParams,
+          setError,
+          setIsLoading
         );
 
-        if (!response.ok) {
-          const body = await response.json();
-          setError(`${body.detail}`);
-          setData(null);
-          setIsLoading(false);
-          return;
-        }
-
-        const fetchedData: Data = await response.json();
-
-        const viewData = await parseData(fetchedData, projectData.task);
-        if (!viewData) {
-          setError("Data could not read the data for the selected view");
-          return;
-        }
-
-        setData(viewData);
+        setData(fetchedData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -187,8 +230,8 @@ export function SampleProvider({
       }
     };
 
-    refreshData();
-  }, [projectId, sampleId, dataParams, viewParams, plotProps]);
+    fetchDataAsync();
+  }, [project, sample, dataParams, viewParams]);
 
   const value: SampleContextType = {
     project,

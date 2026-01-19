@@ -239,7 +239,6 @@ export type ViewParams = z.infer<typeof ViewParamsSchema>;
 export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
   name: z.literal("spectrogram"),
   signal_name: z.string(),
-  nperseg: z.number().optional(),
   time_min: z.number().optional(),
   time_max: z.number().optional(),
   frequency_min: z.number().optional(),
@@ -247,6 +246,8 @@ export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
   amplitude_min: z.number().optional(),
   amplitude_max: z.number().optional(),
   threshold_value: z.number().optional(),
+  nfft: z.number().optional().default(256),
+  nperseg: z.number().optional().default(256),
 });
 export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
 

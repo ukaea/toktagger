@@ -1,3 +1,5 @@
+import pyuda
+from anyio.functools import lru_cache
 import os
 import pathlib
 from abc import ABC, abstractmethod
@@ -205,12 +207,6 @@ class ParquetDataLoader(DataLoader):
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
-    def __init__(self, params):
-        super().__init__(params)
-        import pyuda
-
-        self.client = pyuda.Client()
-
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
@@ -233,10 +229,7 @@ class UDADataLoader(DataLoader):
         results = {}
         for name in sample_data.signal_names:
             try:
-                signal = self.client.get(name, sample.shot_id)
-                data = signal.data
-                time = signal.time.data
-
+                time, data = _get_signal(name, sample.shot_id)
                 if time_min is not None:
                     mask = time >= time_min
                     time = time[mask]
@@ -267,3 +260,13 @@ class UDADataLoader(DataLoader):
             )
 
         return MultiVariateTimeSeriesData(values=results)
+
+
+@lru_cache(maxsize=128)
+def _get_signal(name: str, shot_id: int) -> tuple[np.ndarray, np.ndarray]:
+    """Optimized function to get signal data from UDA with caching."""
+    client = pyuda.Client()
+    signal = client.get(name, shot_id)
+    data = signal.data
+    time = signal.time.data
+    return time, data

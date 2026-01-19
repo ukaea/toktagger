@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -8,7 +8,7 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, MultiVariateTimeSeriesDataSchema } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -16,18 +16,23 @@ import { useSample } from "@/app/contexts/SampleContext";
 type JumpDetectionType = {
   project_id: string;
   sample_id: string;
-  data: MultiVariateTimeSeriesData;
 };
 
 export function JumpDetectionTool({
   project_id,
   sample_id,
-  data,
 }: JumpDetectionType) {
-  const { dataParams, setAnnotations } = useSample();
+  const { data, dataParams, setAnnotations } = useSample();
+
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [signalName, setSignalName] = useState<string | null>(null);
-  const signalOptions = Object.keys(data.values).map((value, index) => ({
+
+  const dataValues = useMemo(
+    () => MultiVariateTimeSeriesDataSchema.safeParse(data).data?.values || {},
+    [data]
+  );
+
+  const signalOptions = Object.keys(dataValues).map((value, index) => ({
     id: index,
     name: value,
   }));
@@ -35,7 +40,7 @@ export function JumpDetectionTool({
   const [minDistance, setMinDistance] = useState<number>(5);
   const [smoothingValue, setSmoothingValue] = useState<number>(2);
   const [numPoints, setNumPoints] = useState<number>(2000);
-  const validSignalName = signalName && signalName in data.values;
+  const validSignalName = signalName && signalName in dataValues;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,7 +48,7 @@ export function JumpDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
           );
           return otherAnnotations;
         });
@@ -67,14 +72,14 @@ export function JumpDetectionTool({
             },
             data_params: dataParams,
           }),
-        },
+        }
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION
         );
         return otherAnnotations.concat(payload);
       });

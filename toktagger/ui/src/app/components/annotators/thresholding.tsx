@@ -4,6 +4,7 @@ import {
   Annotation,
   SpectrogramDataSchema,
   SpectrogramViewParams,
+  SpectrogramViewParamsSchema,
 } from "@/types";
 import { Flex, NumberField, RangeSlider, Switch } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
@@ -20,6 +21,8 @@ const SpectrogramThresholdParamsSchema = z.object({
   sigma: z.number().default(2),
   min_size: z.number().int().default(150),
   line_filter_width: z.number().int().default(0),
+  nfft: z.number().int().default(256),
+  nperseg: z.number().int().default(256),
 });
 
 type SpectrogramThresholdParams = z.infer<
@@ -91,6 +94,12 @@ export default function SpectrogramThresholdTool({
     }
 
     const fetchData = async () => {
+      if (!signalName) return;
+
+      const viewParamsParsed = SpectrogramViewParamsSchema.parse(viewParams);
+      const nfft = viewParamsParsed.nfft;
+      const nperseg = viewParamsParsed.nperseg;
+
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
         {
@@ -107,6 +116,8 @@ export default function SpectrogramThresholdTool({
               sigma: isNaN(sigma) ? 0 : sigma,
               min_size: isNaN(minSize) ? 0 : minSize,
               line_filter_width: lineFilterWidth,
+              nfft: nfft,
+              nperseg: nperseg,
             },
             data_params: dataParams,
           }),
@@ -137,6 +148,7 @@ export default function SpectrogramThresholdTool({
     lineFilterWidth,
     minSize,
     sigma,
+    viewParams,
   ]);
 
   useEffect(() => {

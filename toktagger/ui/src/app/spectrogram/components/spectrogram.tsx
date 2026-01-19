@@ -64,7 +64,7 @@ const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
 const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
 
 export const SpectrogramView = () => {
-  const { data, annotations, setAnnotations, plotProps, viewParams } =
+  const { data, annotations, plotProps, viewParams, setAnnotations } =
     useSample();
 
   const [zones, setZones] = useState<Zone[]>([]);
@@ -73,6 +73,7 @@ export const SpectrogramView = () => {
   const [shapes, setShapes] = useState<Partial<Plotly.Shape>[]>([]);
 
   const viewData: SpectrogramData | null = data as SpectrogramData | null;
+
   const signalName = (viewParams as SpectrogramViewParams)?.signal_name || null;
 
   useEffect(() => {
@@ -151,10 +152,11 @@ export const SpectrogramView = () => {
     setVSpans(vspans);
     setMask(newMask);
     setShapes(newShapes);
-  }, [annotations, viewData, signalName]);
+  }, [annotations, viewData, signalName, viewParams]);
 
   const updateVSpans = useCallback(
     (newVSpans: Array<VSpan>) => {
+      if (!viewParams) return;
       updateAnnotations(setAnnotations, newVSpans, TimePointSchema, viewParams);
     },
     [setAnnotations, viewParams]
@@ -162,6 +164,7 @@ export const SpectrogramView = () => {
 
   const updateZones = useCallback(
     (newZones: Array<Zone>) => {
+      if (!viewParams) return;
       updateAnnotations(setAnnotations, newZones, TimeRegionSchema, viewParams);
     },
     [setAnnotations, viewParams]

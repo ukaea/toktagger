@@ -15,13 +15,8 @@ import {
 } from "@adobe/react-spectrum";
 import {
   MultiVariateTimeSeriesDataSchema,
-  PlotProps,
-  SpectrogramData,
-  SpectrogramDataSchema,
-  SpectrogramViewParams,
   SpectrogramViewParamsSchema,
   TaskType,
-  ViewParams,
 } from "@/types";
 import { getAnnotationsForSample } from "@/app/core";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
@@ -119,7 +114,7 @@ function ColorMapPicker() {
 }
 
 export default function ToolBar() {
-  const { project, sample, data, annotations, setAnnotations } = useSample();
+  const { project, sample, annotations, setAnnotations } = useSample();
 
   if (!project || !sample) {
     console.warn("Project or sample not found in ToolBar");
@@ -136,16 +131,7 @@ export default function ToolBar() {
 
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  if (data && project.task == TaskType.TimeSeries) {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-
-    if (!result.success) {
-      console.warn("Time series data is not available");
-      return;
-    }
-
-    const tsData = result.data;
-
+  if (project.task == TaskType.TimeSeries) {
     const labels = ["Valid Shot", "Invalid Shot"];
     tools.push({
       name: "Shot Labels",
@@ -158,7 +144,6 @@ export default function ToolBar() {
         <PeakDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></PeakDetectionTool>
       ),
     });
@@ -169,7 +154,6 @@ export default function ToolBar() {
         <OutlierDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></OutlierDetectionTool>
       ),
     });
@@ -180,7 +164,6 @@ export default function ToolBar() {
         <ChangePointDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></ChangePointDetectionTool>
       ),
     });
@@ -191,7 +174,6 @@ export default function ToolBar() {
         <JumpDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></JumpDetectionTool>
       ),
     });
@@ -205,23 +187,16 @@ export default function ToolBar() {
         ></ModelPredictTool>
       ),
     });
-  } else if (data && project.task == TaskType.Spectrogram) {
-    const resultSpec = SpectrogramDataSchema.safeParse(data);
-
-    if (!resultSpec.success) {
-      console.warn("MHD spectrogram data is not available");
-      return;
-    }
-
+  } else if (project.task == TaskType.Spectrogram) {
     tools.push({
       name: "View Parameters",
       component: <SpectrogramViewParamsWidget />,
     });
 
-    tools.push({
-      name: "Amplitude Range",
-      component: <AmplitudeSlider />,
-    });
+    // tools.push({
+    //   name: "Amplitude Range",
+    //   component: <AmplitudeSlider />,
+    // });
 
     tools.push({
       name: "Color Map",
