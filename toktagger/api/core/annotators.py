@@ -229,7 +229,7 @@ def compute_stft(
     time = np.array(data.time)
     values = np.array(data.values)
 
-    sample_rate = 1 / (time[1] - time[0])
+    sample_rate = 1 / np.abs(np.median(np.diff(time)))
 
     freq, ts, Zxx = stft(
         values,
@@ -662,8 +662,14 @@ class SpectrogramThresholdAnnotator:
         self.params = params
 
     def predict(self, data: MultiVariateTimeSeriesData) -> list[PolygonAnnotation]:
-        mirnov = data.values[self.params.signal_name]
-        frequency, time, amp = compute_stft(mirnov)
+        signal = data.values[self.params.signal_name]
+
+        if not isinstance(signal, TimeSeriesData):
+            raise ValueError(
+                "SpectrogramThresholdAnnotator only supports univariate time series data."
+            )
+
+        frequency, time, amp = compute_stft(signal)
         amp = np.nan_to_num(amp, 1e-6).clip(1e-6)
 
         if self.params.line_filter_width > 0:

@@ -255,10 +255,10 @@ export const SpectrogramView = () => {
 
   const fftData: Partial<Plotly.PlotData> = {
     type: "heatmap",
-    x: data.time,
-    y: data.frequency,
+    x: viewData.time,
+    y: viewData.frequency,
     z: logAmplitude_og,
-    customdata: data.amplitude,
+    customdata: viewData.amplitude,
     hovertemplate:
       "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
     // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
@@ -273,7 +273,7 @@ export const SpectrogramView = () => {
     const numCols = arr[0].length;
     const sums = new Array(numCols).fill(0);
 
-    for (let row of arr) {
+    for (const row of arr) {
       for (let j = 0; j < numCols; j++) {
         sums[j] += row[j];
       }
@@ -285,7 +285,7 @@ export const SpectrogramView = () => {
 
   const timeIntegratedPlot: Partial<Plotly.PlotData> = {
     mode: "lines",
-    x: data.time,
+    x: viewData.time,
     y: timeIntegratedData,
   };
 
