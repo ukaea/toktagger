@@ -29,7 +29,7 @@ import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { VSpans } from "@/app/components/tools/vspans";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
-import { title } from "process";
+import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 
 const zoneCategories: Category[] = [
   { name: "ELM", color: "#FF5733" },
@@ -218,13 +218,16 @@ export const TimeSeriesView = () => {
               initialData={vspans}
               onModifyVSpan={updateVSpans}
             >
-              <TimeSeries
-                plotId="TimesSeriesView"
-                plotConfig={{ data: plotData, layout: plotLayout }}
-              >
-                <Zones onUpdate={updateZones} />
-                <VSpans onUpdate={updateVSpans} />
-              </TimeSeries>
+              <Flex direction="column" gap="size-200">
+                <TimeSeries
+                  plotId="TimesSeriesView"
+                  plotConfig={{ data: plotData, layout: plotLayout }}
+                >
+                  <Zones onUpdate={updateZones} />
+                  <VSpans onUpdate={updateVSpans} />
+                </TimeSeries>
+                <AnnotationsTable />
+              </Flex>
             </VSpanProvider>
           </ZoneProvider>
         </ContextMenuProvider>
