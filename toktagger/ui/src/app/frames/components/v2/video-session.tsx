@@ -186,30 +186,40 @@ export function VideoSessionProvider(props: {
     (dbAnnotations: Annotation[]) => {
       if (dirty) return;
       if (byFrame.size > 0) return;
+      if (!dbAnnotations || dbAnnotations.length === 0) return;
 
       const byF = new Map<number, ImageAnnotation[]>();
 
-      for (const a of dbAnnotations ?? []) {
+      for (const a of dbAnnotations) {
         const anyA = a as any;
         if (!anyA || anyA.type !== "video_bounding_box") continue;
-
         const frameNum = Number(anyA.frame);
         if (!Number.isFinite(frameNum)) continue;
 
         const vb: VideoBoundingBox = {
           type: "video_bounding_box",
           frame: frameNum,
+
+          // track_id can arrive under different names depending on backend/history
           track_id: String(anyA.track_id ?? anyA.trackId ?? ""),
+
+          // label/class name
           label: String(anyA.label ?? anyA.class_name ?? anyA.className ?? "UFO"),
-          class_id: Number(anyA.class_id ?? classIdForName(String(anyA.label ?? "UFO"))),
+          class_id: Number(
+            anyA.class_id ?? classIdForName(String(anyA.label ?? "UFO")),
+          ),
+
+          // box geometry
           x_min: Number(anyA.x_min ?? anyA.x ?? 0),
           y_min: Number(anyA.y_min ?? anyA.y ?? 0),
           width: Number(anyA.width ?? anyA.w ?? 0),
           height: Number(anyA.height ?? anyA.h ?? 0),
+
           created_by: String(anyA.created_by ?? "db"),
           timestamp: typeof anyA.timestamp === "string" ? anyA.timestamp : undefined,
         };
 
+        // build vb + convert...
         const key = buildSourceKey({ projectId, sampleId, frame: frameNum });
         const anno = videoBBoxToAnno(vb, key);
 
@@ -218,14 +228,15 @@ export function VideoSessionProvider(props: {
         byF.set(frameNum, cur);
       }
 
+      if (byF.size === 0) return;
+
       setByFrame(byF);
-      // still not dirty: db seed is baseline
       setDirty(false);
     },
     [byFrame.size, dirty, projectId, sampleId]
   );
 
-  const value: VideoSessionCtx = {
+  const value = useMemo<VideoSessionCtx>(() => ({
     projectId,
     sampleId,
     frame,
@@ -248,11 +259,33 @@ export function VideoSessionProvider(props: {
     collectAllNative,
     collectAllVideoBBoxes,
     seedFromDbIfEmpty,
-  };
+  }), [
+    projectId,
+    sampleId,
+    frame,
+    setFrame,
+    frameKey,
+    byFrame,
+    dirty,
+    markSaved,
+    selection,
+    setSelection,
+    instances,
+    getFrameList,
+    seedFrame,
+    setFrameList,
+    clearCurrentFrame,
+    clearAllFrames,
+    createNewInstanceForClass,
+    deleteSelectedInstanceAcrossFrames,
+    forwardPropToNextIfEmpty,
+    collectAllNative,
+    collectAllVideoBBoxes,
+    seedFromDbIfEmpty,
+  ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
-
 /**
  * Helper used by the host:
  * given a raw overlay list, normalize + stamp + write into session for current frame.

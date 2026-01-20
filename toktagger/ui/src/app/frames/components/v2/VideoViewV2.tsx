@@ -7,7 +7,10 @@ import { BACKEND_API_URL } from "@/app/core";
 
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 
-import { VideoSessionProvider, useVideoSession } from "@/app/frames/components/v2/video-session";
+import {
+  VideoSessionProvider,
+  useVideoSession,
+} from "@/app/frames/components/v2/video-session";
 import { FrameAnnotatorHostV2 } from "./FrameAnnotatorHostV2";
 
 /**
@@ -88,37 +91,42 @@ function VideoChromeV2(props: {
   onSaveBackend: (payload: Annotation[]) => Promise<void>;
   goToFrame: (n: number) => void;
 
-  frameLabel: number;
-
   onPrev?: () => void;
   onNext?: () => void;
   onJump?: (n: number) => void;
 }) {
   const session = useVideoSession();
+  const { seedFromDbIfEmpty } = session;
 
   // One-shot seed from backend annotations (no-op if session already has data)
   useEffect(() => {
-    session.seedFromDbIfEmpty(props.dbAnnotations);
-  }, [session, props.dbAnnotations]);
+    if (props.dbAnnotations.length === 0) return;
+    seedFromDbIfEmpty(props.dbAnnotations);
+  }, [props.dbAnnotations, seedFromDbIfEmpty]);
 
   const handlePrev = () => {
+    const prev = Math.max(0, session.frame - 1);
+    session.setFrame(prev);
     props.onPrev?.();
-    props.goToFrame(props.frameLabel - 1);
+    props.goToFrame(prev);
   };
 
   const handleNext = () => {
-    const next = props.frameLabel + 1;
+    const next = session.frame + 1;
 
-    // ✅ Forward propagate current -> next if next is empty
+    // Forward propagate current -> next if next is empty
     session.forwardPropToNextIfEmpty(next);
 
+    session.setFrame(next);
     props.onNext?.();
     props.goToFrame(next);
   };
 
   const handleJump = (n: number) => {
-    props.onJump?.(n);
-    props.goToFrame(n);
+    const target = Math.max(0, Math.trunc(n));
+    session.setFrame(target);
+    props.onJump?.(target);
+    props.goToFrame(target);
   };
 
   return (
@@ -136,7 +144,7 @@ function VideoChromeV2(props: {
               Prev
             </Button>
             <Button variant="primary" isDisabled>
-              Frame {props.frameLabel}
+              Frame {session.frame}
             </Button>
             <Button variant="primary" onPress={handleNext}>
               Next
@@ -165,16 +173,10 @@ export function VideoViewV2Inner(props: VideoViewV2Props) {
   }
 
   const imageBase64 = parsed.data.values;
-  const frameFromBackend = Number(parsed.data.frame);
-
-  if (!Number.isFinite(frameFromBackend)) {
-    throw new Error("UFO ImageData.frame is not a finite number");
-  }
-
-  const frameLabel = frameFromBackend;
 
   /**
    * Single navigation primitive: request frame n from backend
+   * (session.setFrame is handled by the caller: VideoChromeV2)
    */
   const goToFrame = (n: number) => {
     if (!Number.isFinite(n)) return;
@@ -205,7 +207,6 @@ export function VideoViewV2Inner(props: VideoViewV2Props) {
           dbAnnotations={props.annotations}
           onSaveBackend={onSaveBackend}
           goToFrame={goToFrame}
-          frameLabel={frameLabel}
           onPrev={props.onPrev}
           onNext={props.onNext}
           onJump={props.onJump}
@@ -225,7 +226,7 @@ export function VideoViewV2(props: VideoViewV2Props) {
     throw new Error("Invalid data for UFO view (expected ImageData)");
   }
 
-  const frameFromBackend = Number(parsed.data.frame);
+  const frameFromBackend = Number((parsed.data as any).frame);
   if (!Number.isFinite(frameFromBackend)) {
     throw new Error("UFO ImageData.frame is not a finite number");
   }

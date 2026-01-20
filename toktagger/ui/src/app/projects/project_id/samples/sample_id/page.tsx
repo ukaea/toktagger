@@ -244,11 +244,19 @@ export default function SamplePage() {
   //  Hooks must not be conditional. This is fine now.
   const [videoFrame, setVideoFrame] = useState<number>(0);
 
-  // Keep videoFrame synced once backend frame becomes available
   useLayoutEffect(() => {
     if (!isUfo) return;
+
+    // If we requested a specific frame, only accept backend response for that same frame.
+    const requested =
+      (dataParams as any)?.name === "image" ? (dataParams as any)?.frame : null;
+
+    if (typeof requested === "number" && Number.isFinite(requested)) {
+      if (frameFromBackend !== requested) return;
+    }
+
     setVideoFrame(frameFromBackend);
-  }, [isUfo, frameFromBackend]);
+  }, [isUfo, frameFromBackend, dataParams]);
 
   // ------------------------------
   // Sample/project refresh

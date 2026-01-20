@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Provider,
   defaultTheme,
@@ -9,6 +9,8 @@ import {
   Button,
   Flex,
   SearchField,
+  DialogContainer,
+  AlertDialog,
 } from "@adobe/react-spectrum";
 import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
@@ -49,6 +51,56 @@ function instanceKey(args: { class_name: string; track_id: string }) {
   const cls = (args.class_name || "").toLowerCase();
   const tid = canonicalizeTrackId(args.track_id || "");
   return `${cls}:${tid}`;
+}
+
+/**
+ * Try to parse a numeric suffix/pure number from trackId for sorting.
+ * Examples:
+ *  - "1" -> 1
+ *  - "ufo-2" -> 2
+ *  - "track_10" -> 10
+ *  - "abc" -> null
+ */
+function parseTrackIdNumber(trackId: string): number | null {
+  const s = (trackId || "").trim();
+  if (!s) return null;
+
+  // pure integer
+  if (/^\d+$/.test(s)) return Number(s);
+
+  // last numeric run
+  const m = s.match(/(\d+)(?!.*\d)/);
+  if (!m) return null;
+
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function compareProfiles(
+  a: { class_name: string; track_id: string },
+  b: { class_name: string; track_id: string },
+) {
+  const ac = (a.class_name || "").toLowerCase();
+  const bc = (b.class_name || "").toLowerCase();
+  if (ac < bc) return -1;
+  if (ac > bc) return 1;
+
+  const an = parseTrackIdNumber(a.track_id);
+  const bn = parseTrackIdNumber(b.track_id);
+
+  // both numeric => numeric sort
+  if (an != null && bn != null) return an - bn;
+
+  // numeric first (optional; feels nicer)
+  if (an != null && bn == null) return -1;
+  if (an == null && bn != null) return 1;
+
+  // fallback stable lexicographic
+  const at = canonicalizeTrackId(a.track_id);
+  const bt = canonicalizeTrackId(b.track_id);
+  if (at < bt) return -1;
+  if (at > bt) return 1;
+  return 0;
 }
 
 function VideoShotSearchV2(props: {
@@ -123,6 +175,8 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
   const project_id = session.projectId;
   const sample_id = session.sampleId;
 
+  const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
+
   // Default class selection from last saved preference (optional, but matches old UX)
   useEffect(() => {
     const last = loadLastClassName();
@@ -132,13 +186,33 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // UX helper: do we have enough selection to draw?
+  const canDraw = Boolean(session.selection.className && session.selection.trackId);
+
+  // Optional: "smart" helper for later auto-create flows (currently used only by hint button)
+  const ensureInstanceSelected = useCallback(() => {
+    const cls = session.selection.className;
+    if (!cls) return null;
+
+    if (session.selection.trackId) return session.selection.trackId;
+
+    const { trackId } = session.createNewInstanceForClass(cls);
+    session.setSelection({ className: cls, trackId, source: "auto" });
+    saveLastClassName(cls);
+    return trackId;
+  }, [session]);
+
   const profiles = useMemo(() => {
-    return session.instances.map((inst) => ({
+    // Build + sort (class then numeric track_id)
+    const arr = session.instances.map((inst) => ({
       key: instanceKey({ class_name: inst.className, track_id: inst.trackId }),
       class_id: inst.classId,
       class_name: inst.className,
       track_id: canonicalizeTrackId(inst.trackId),
     }));
+
+    arr.sort((a, b) => compareProfiles(a, b));
+    return arr;
   }, [session.instances]);
 
   const profileCounts = useMemo(() => {
@@ -160,7 +234,7 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
 
   const saveNow = async () => {
     try {
-      const payload = session.collectAllVideoBBoxes() as unknown as Annotation[];
+      const payload = session.collectAllVideoBBoxes() as Annotation[];
       const res = await saveVideoAnnotations(project_id, sample_id, payload);
       if (!res.ok) throw new Error(`Failed to save annotations: ${res.statusText}`);
 
@@ -231,9 +305,18 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
     session.deleteSelectedInstanceAcrossFrames();
   };
 
+  // Safer: confirm before nuking session.
   const onRequestDeleteAllInstances = () => {
-    session.clearAllFrames();
+    setConfirmClearAllOpen(true);
   };
+
+  const confirmClearAll = () => {
+    setConfirmClearAllOpen(false);
+    session.clearAllFrames();
+    ToastQueue.positive("Cleared all frames in this session.", { timeout: 3000 });
+  };
+
+  const cancelClearAll = () => setConfirmClearAllOpen(false);
 
   return (
     <Provider theme={defaultTheme} height="100vh">
@@ -251,6 +334,37 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
           <div className="mt-2 text-xs opacity-70">
             {session.dirty ? "● unsaved" : "saved"} — frame {session.frame}
           </div>
+
+          {/* Inline guidance: reduce “why can’t I draw?” confusion */}
+          {!canDraw && (
+            <div className="mt-2 text-[12px] opacity-80 leading-snug">
+              <div className="opacity-90">
+                To draw: select a <b>class</b> and an <b>instance</b>.
+              </div>
+              {session.selection.className && !session.selection.trackId && (
+                <div className="mt-1 flex items-center justify-center gap-2">
+                  <span className="opacity-80">No instance selected.</span>
+                  <Button
+                    variant="secondary"
+                    style="outline"
+                    UNSAFE_className="!px-2 !py-1 text-[11px]"
+                    onPress={onNewInstance}
+                  >
+                    New instance
+                  </Button>
+                  {/* Optional: even smoother action */}
+                  <Button
+                    variant="secondary"
+                    style="outline"
+                    UNSAFE_className="!px-2 !py-1 text-[11px]"
+                    onPress={() => ensureInstanceSelected()}
+                  >
+                    Auto-pick
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="pl-4 pr-4 pb-4 pt-2">
@@ -324,6 +438,23 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
             showCreator={false}
           />
         </div>
+
+        {/* Confirm dialog: Clear All */}
+        <DialogContainer onDismiss={cancelClearAll}>
+          {confirmClearAllOpen && (
+            <AlertDialog
+              title="Clear all frames?"
+              variant="destructive"
+              primaryActionLabel="Clear all"
+              cancelLabel="Cancel"
+              onPrimaryAction={confirmClearAll}
+              onCancel={cancelClearAll}
+            >
+              This will remove all annotations across all frames in the current session.
+              You can’t undo this.
+            </AlertDialog>
+          )}
+        </DialogContainer>
       </div>
     </Provider>
   );

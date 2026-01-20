@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Annotorious,
   ImageAnnotator,
@@ -9,7 +9,10 @@ import {
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
 
-import { useVideoSession, commitOverlayToSession } from "@/app/frames/components/v2/video-session";
+import {
+  useVideoSession,
+  commitOverlayToSession,
+} from "@/app/frames/components/v2/video-session";
 import { getLabelTrack } from "./anno-utils";
 
 type AnnotatorApi = {
@@ -73,9 +76,10 @@ function sameOverlay(a: ImageAnnotation[], b: ImageAnnotation[]): boolean {
   return true;
 }
 
-
 async function doubleRAF() {
-  await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+  await new Promise<void>((r) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => r())),
+  );
 }
 
 export function FrameAnnotatorHostV2(props: { imageBase64: string }) {
@@ -94,7 +98,30 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const suppressRef = useRef(false);
 
   // Overlay for current frame comes from session.byFrame
-  const overlayForFrame = useMemo(() => session.getFrameList(session.frame), [session, session.frame]);
+  const overlayForFrame = useMemo(
+    () => session.getFrameList(session.frame),
+    [session, session.frame],
+  );
+
+  // NEW: Auto-create a track on first draw if class is selected but trackId is missing.
+  const ensureTrackSelected = useCallback((): string | null => {
+    const cls = session.selection.className;
+    if (!cls) return null;
+
+    // If already armed, keep it.
+    if (session.selection.trackId) return session.selection.trackId;
+
+    // Auto-create instance for this class
+    const created = session.createNewInstanceForClass(cls);
+    const trackId = created?.trackId;
+
+    if (trackId) {
+      session.setSelection({ className: cls, trackId, source: "auto" });
+      return trackId;
+    }
+
+    return null;
+  }, [session]);
 
   // Hydrate overlay whenever frame changes OR session overlay changes for this frame
   useEffect(() => {
@@ -113,60 +140,73 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   }, [api, overlayForFrame]);
 
   // Any change -> normalize -> store in session (marks dirty)
- useEffect(() => {
-  if (!api?.on || !api?.off || !api?.getAnnotations) return;
+  useEffect(() => {
+    if (!api?.on || !api?.off || !api?.getAnnotations) return;
 
-  const onAnyChange = () => {
-    if (suppressRef.current) return;
+    const onAnyChange = () => {
+      if (suppressRef.current) return;
 
-    const raw = toAnnoList(api.getAnnotations());
-    const fallbackClass = session.selection.className ?? "UFO";
-    const fallbackTrack = session.selection.trackId ?? "1";
+      const raw = toAnnoList(api.getAnnotations());
 
-    const normalized = commitOverlayToSession({
-      raw,
-      frameKey: session.frameKey,
-      fallback: { className: fallbackClass, trackId: fallbackTrack },
-    });
+      // If class is missing, we can't label. Keep behavior predictable.
+      const cls = session.selection.className;
+      if (!cls) return;
 
-    // Only re-apply to Annotorious if normalization actually changed something
-    if (!sameOverlay(raw, normalized)) {
-      suppressRef.current = true;
-      api.setAnnotations?.(normalized, true);
-      void doubleRAF().then(() => {
-        suppressRef.current = false;
+      // Ensure we have a trackId at the moment we persist anything.
+      const trackId = ensureTrackSelected() ?? session.selection.trackId;
+      if (!trackId) return;
+
+      const normalized = commitOverlayToSession({
+        raw,
+        frameKey: session.frameKey,
+        fallback: { className: cls, trackId },
       });
-    }
 
-    // Only update React/session state if session doesn’t already match
-    const prev = session.getFrameList(session.frame);
-    if (!sameOverlay(prev, normalized)) {
-      session.setFrameList(session.frame, normalized);
-    }
-  };
+      // Only re-apply to Annotorious if normalization actually changed something
+      if (!sameOverlay(raw, normalized)) {
+        suppressRef.current = true;
+        api.setAnnotations?.(normalized, true);
+        void doubleRAF().then(() => {
+          suppressRef.current = false;
+        });
+      }
 
-  const onSelectionChanged = (selected: unknown) => {
-    if (suppressRef.current) return;
-    if (Array.isArray(selected) && selected.length === 0) onAnyChange();
-  };
+      // Only update React/session state if session doesn’t already match
+      const prev = session.getFrameList(session.frame);
+      if (!sameOverlay(prev, normalized)) {
+        session.setFrameList(session.frame, normalized);
+      }
+    };
 
-  api.on("createAnnotation", onAnyChange);
-  api.on("updateAnnotation", onAnyChange);
-  api.on("deleteAnnotation", onAnyChange);
-  api.on("selectionChanged", onSelectionChanged);
+    const onSelectionChanged = (selected: unknown) => {
+      if (suppressRef.current) return;
+      if (Array.isArray(selected) && selected.length === 0) onAnyChange();
+    };
 
-  return () => {
-    api.off?.("createAnnotation", onAnyChange);
-    api.off?.("updateAnnotation", onAnyChange);
-    api.off?.("deleteAnnotation", onAnyChange);
-    api.off?.("selectionChanged", onSelectionChanged);
-  };
-}, [api, session]);
+    // IMPORTANT: for createAnnotation, force track creation first,
+    // then run the normal pipeline.
+    const onCreate = () => {
+      if (suppressRef.current) return;
+      ensureTrackSelected();
+      onAnyChange();
+    };
 
-  const drawingEnabled = !!session.selection.className && !!session.selection.trackId;
+    api.on("createAnnotation", onCreate);
+    api.on("updateAnnotation", onAnyChange);
+    api.on("deleteAnnotation", onAnyChange);
+    api.on("selectionChanged", onSelectionChanged);
 
-  // If user has class but no track, still allow creating a track via toolbar.
-  // We keep drawing disabled until both are set (v2 invariant).
+    return () => {
+      api.off?.("createAnnotation", onCreate);
+      api.off?.("updateAnnotation", onAnyChange);
+      api.off?.("deleteAnnotation", onAnyChange);
+      api.off?.("selectionChanged", onSelectionChanged);
+    };
+  }, [api, session, ensureTrackSelected]);
+
+  // UX: allow drawing as soon as class is selected. We'll auto-create a track on first draw.
+  const drawingEnabled = !!session.selection.className;
+
   const label = session.frame;
 
   return (
@@ -182,11 +222,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         />
       </ImageAnnotator>
 
-      {/* Tiny debug helper (delete if you hate it) */}
-      <div className="mt-2 text-xs opacity-70">
-        Armed: {session.selection.className ?? "—"} / {session.selection.trackId ?? "—"}{" "}
-        | Overlay anns: {overlayForFrame.length}
-      </div>
     </div>
   );
 }
