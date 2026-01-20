@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Request, HTTPException, Query, Path
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.crud import utils
-from toktagger.api.schemas.samples import SampleIn, Sample, SampleSummary
+from toktagger.api.schemas.samples import (
+    SampleIn,
+    Sample,
+    SampleSummary,
+    SampleUpdateBatchItem,
+)
 from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas import convert_to_objectid
 from typing import Literal
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
@@ -46,7 +54,13 @@ async def get_samples(
     """
     db_client = request.app.state.db_client
     samples = await utils.get_samples(
-        db_client, project_id, shot_id, sort_by, sort_direction, start, count
+        db_client=db_client,
+        project_id=project_id,
+        shot_id=shot_id,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        start=start,
+        count=count,
     )
     return samples
 
@@ -101,7 +115,6 @@ async def add_samples(
     annotation_ids = []
     for _ann_list, _id in zip(all_annotations, all_ids):
         if _ann_list is not None:
-            _ann_list = [(items, _id) for items in _ann_list]
             _ids = [_id for item in _ann_list]
             annotations.extend(_ann_list)
             annotation_ids.extend(_ids)
@@ -157,6 +170,35 @@ async def add_samples(
     return ids
 
 
+@router.put(
+    "",
+    responses={
+        200: {"description": "Samples have been updated successfully."},
+        404: {"description": "Project or Sample(s) not found with that ID."},
+    },
+)
+async def update_samples(
+    request: Request,
+    sample_batch: list[SampleUpdateBatchItem],
+    project_id: str = Path(
+        description="The project ID to associate these samples with."
+    ),
+):
+    """
+    Update a list of samples (provided with their IDs) for this project.
+    ---------------------------------------------------------------------
+    """
+    db_client = request.app.state.db_client
+    await utils.get_project(db_client, project_id)
+
+    for sample_batch_item in sample_batch:
+        await utils.update_sample(
+            db_client=db_client,
+            sample_id=sample_batch_item.id,
+            updates=sample_batch_item.updates,
+        )
+
+
 @router.get(
     "/next",
     response_model=Sample,
@@ -184,8 +226,16 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
-    annotations = await utils.get_annotations(db_client, project_id, validated=False)
+
+    # Only consider samples that have not been human annotated
+    samples = await utils.get_samples(
+        db_client, project_id, validated=False, sort_by="shot_id"
+    )
+    annotations = await utils.get_annotations(
+        db_client, project_id, validated=False, sort_by="uncertainty"
+    )
+    logger.debug(f"found {len(samples)} non validated samples")
+    logger.debug(f"found {len(annotations)} non validated annotations")
 
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
 

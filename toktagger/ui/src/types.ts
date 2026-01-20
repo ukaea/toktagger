@@ -31,6 +31,7 @@ export const AnnotationSchema = z.union([
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
 export const AnnotationsSchema = z.array(AnnotationSchema);
+export type Annotations = z.infer<typeof AnnotationsSchema>;
 
 export const TimeSeriesDataSchema = z.object({
   time: z.array(z.number()),
@@ -110,7 +111,8 @@ export const ProjectSchema = z.object({
   task: z.string(),
   query_strategy: z.string(),
   data_loader: z.string(),
-  timestamp: z.string().optional(),
+  timestamp: z.string(),
+  model_types: z.array(z.string()),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -151,6 +153,18 @@ export const SampleSchema = z.object({
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
+export const ModelSchema = z.object({
+  _id: z.string(),
+  timestamp: z.string(),
+  project_id: z.string(),
+  type: z.string(),
+  training_status: z.string(),
+  progress: z.number(),
+  accuracy: z.number(),
+  task_id: z.string(),
+});
+
+export type Model = z.infer<typeof ModelSchema>;
 export const DataParamsSchema = z.object({
   name: z.string(),
 });

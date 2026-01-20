@@ -1,4 +1,5 @@
 import pytest
+from bson.objectid import ObjectId
 
 
 @pytest.mark.asyncio
@@ -238,6 +239,30 @@ async def test_create_sample_invalid(api_client, setup_db, db_client):
     # Check it has not been added to database
     samples = await db_client.get_all_documents("samples")
     assert len(samples) == 4
+
+
+@pytest.mark.asyncio
+async def test_batch_update_samples(api_client, setup_db, db_client):
+    update_samples_batch = [
+        {"id": setup_db["sample_id_1"], "updates": {"validated_annotations": True}},
+        {"id": setup_db["sample_id_2"], "updates": {"validated_annotations": True}},
+    ]
+
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/samples", json=update_samples_batch
+    )
+    assert response.status_code == 200
+
+    # Check they have been updated
+    sample_1 = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_1"])
+    )
+    assert sample_1["validated_annotations"] is True
+
+    sample_2 = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_2"])
+    )
+    assert sample_2["validated_annotations"] is True
 
 
 @pytest.mark.asyncio

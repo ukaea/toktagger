@@ -27,7 +27,13 @@ def test_image_file_loader_jpeg():
         type="jpeg",
         protocol="file",
     )
-    sample = Sample(shot_id=10000, data=img_file, _id="test", project_id="test")
+    sample = Sample(
+        shot_id=10000,
+        data=img_file,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
     data_loader = data_loaders.ImageDataLoader(
         params=ImageParams(name="image", frame=1)
     )
@@ -47,7 +53,13 @@ def test_image_file_loader_png():
         type="png",
         protocol="file",
     )
-    sample = Sample(shot_id=10000, data=img_file, _id="test", project_id="test")
+    sample = Sample(
+        shot_id=10000,
+        data=img_file,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
     data_loader = data_loaders.ImageDataLoader(
         params=ImageParams(name="image", frame=1)
     )
@@ -68,7 +80,13 @@ def test_parquet_file_loader():
         protocol="file",
         column_names=["Ip", "dalpha"],
     )
-    sample = Sample(shot_id=10000, data=parquet_file, _id="test", project_id="test")
+    sample = Sample(
+        shot_id=10000,
+        data=parquet_file,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
     data_loader = data_loaders.ParquetDataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(data, MultiVariateTimeSeriesData)
@@ -95,7 +113,13 @@ def test_uda_loader(uda_test):
         pytest.skip("Could not contact UDA server")
 
     uda_shot = ShotData(protocol="uda", signal_names=["ip", "ANE_DENSITY"])
-    sample = Sample(shot_id=14892, data=uda_shot, _id="test", project_id="test")
+    sample = Sample(
+        shot_id=14892,
+        data=uda_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
     data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(data, MultiVariateTimeSeriesData)
@@ -120,7 +144,13 @@ def test_uda_loader_data_doesnt_exist(uda_test):
         pytest.skip("Could not contact UDA server")
 
     uda_shot = ShotData(protocol="uda", signal_names=["doesnt_exist"])
-    sample = Sample(shot_id=10000, data=uda_shot, _id="test", project_id="test")
+    sample = Sample(
+        shot_id=10000,
+        data=uda_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
     data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample.shot_id, sample.data)
     assert isinstance(data, MultiVariateTimeSeriesData)

@@ -37,6 +37,7 @@ import {
 } from "@/types";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
+import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
@@ -427,6 +428,17 @@ export default function ToolBar({
   const project_id = project._id;
   const sample_id = sample._id;
   const tools: { name: string; component: React.ReactNode }[] = [];
+
+  tools.push({
+    name: "Model Prediction",
+    component: (
+      <ModelPredictTool
+        project={project}
+        sample_id={sample_id}
+        setAnnotations={setAnnotations}
+      ></ModelPredictTool>
+    ),
+  });
 
   if (project.task == "ELM") {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
