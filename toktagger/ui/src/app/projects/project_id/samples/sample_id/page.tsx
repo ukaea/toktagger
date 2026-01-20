@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from "react";
 import {
   Provider,
   defaultTheme,
@@ -23,7 +23,7 @@ import {
   DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { VideoViewV2 } from "@/app/frames/components/v2/VideoViewV2";
+import { VideoViewV2Inner } from "@/app/frames/components/v2/VideoViewV2";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -32,6 +32,8 @@ import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import { z } from "zod";
+import { VideoSessionProvider } from "@/app/frames/components/v2/video-session";
+import { ImageDataSchema as ImageDataSchemaForFrameParse } from "@/types";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -143,24 +145,23 @@ const SampleView = ({
   }
 
   if (project.task === "UFO") {
-  const result = ImageDataSchema.safeParse(data);
-  if (!result.success) throw new Error("Invalid data for UFO view");
+    const result = ImageDataSchema.safeParse(data);
+    if (!result.success) throw new Error("Invalid data for UFO view");
 
-  return (
-    <VideoViewV2
-      data={result.data}
-      annotations={annotations}
-      projectId={projectId}
-      sampleId={sampleId}
-      dataParams={dataParams}
-      setDataParams={setDataParams}
-      onPrev={onPrev}
-      onNext={onNext}
-      onJump={onJump}
-    />
-  );
-}
-
+    return (
+      <VideoViewV2Inner
+        data={result.data}
+        annotations={annotations}
+        projectId={projectId}
+        sampleId={sampleId}
+        dataParams={dataParams}
+        setDataParams={setDataParams}
+        onPrev={onPrev}
+        onNext={onNext}
+        onJump={onJump}
+      />
+    );
+  }
 
   if (project.task === "MHD") {
     const result = CompositeDataSchema.safeParse(data);
@@ -219,20 +220,35 @@ export default function SamplePage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [dataParams, setDataParams] = useState<DataParams>({
-    name: "identity",
-  });
-  const [viewParams, setViewParams] = useState<ViewParams>({
-    name: "identity",
-  });
-  const [plotProps, setPlotProps] = useState<PlotProps>({
-    colorMap: "Cividis",
-  });
+  const [dataParams, setDataParams] = useState<DataParams>({ name: "identity" });
+  const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
+  const [plotProps, setPlotProps] = useState<PlotProps>({ colorMap: "Cividis" });
 
-  // Video init guard:
-  // For video/frame projects, we want the backend to choose the initial frame on first load
-  // (by requesting frame=null once), and only once per sample refresh.
   const videoInitRef = useRef(false);
+
+  //  Derive isUfo without assuming project/data exists
+  const isUfo = project?.task === "UFO";
+
+  // Safe parse: only attempt when we actually have data and UFO
+  const parsedImage = useMemo(() => {
+    if (!isUfo || !data) return null;
+    return ImageDataSchemaForFrameParse.safeParse(data);
+  }, [isUfo, data]);
+
+  const frameFromBackend = useMemo(() => {
+    if (!isUfo || !parsedImage?.success) return 0;
+    const n = Number(parsedImage.data.frame);
+    return Number.isFinite(n) ? n : 0;
+  }, [isUfo, parsedImage]);
+
+  //  Hooks must not be conditional. This is fine now.
+  const [videoFrame, setVideoFrame] = useState<number>(0);
+
+  // Keep videoFrame synced once backend frame becomes available
+  useLayoutEffect(() => {
+    if (!isUfo) return;
+    setVideoFrame(frameFromBackend);
+  }, [isUfo, frameFromBackend]);
 
   // ------------------------------
   // Sample/project refresh
@@ -246,7 +262,6 @@ export default function SamplePage() {
       const proj = await getProject(project_id as string);
       setProject(proj);
 
-      // Video (task "UFO"): keep backend-driven initial frame behavior (frame=null) on first load only.
       if (proj.task === "UFO" && !videoInitRef.current) {
         videoInitRef.current = true;
         setDataParams({ name: "image", frame: null } as DataParams);
@@ -255,10 +270,7 @@ export default function SamplePage() {
       const samp = await getSample(project_id as string, sample_id as string);
       setSample(samp);
 
-      const dbAnnotations = await getAnnotations(
-        project_id as string,
-        sample_id as string,
-      );
+      const dbAnnotations = await getAnnotations(project_id as string, sample_id as string);
       setAnnotations(dbAnnotations);
     };
 
@@ -273,13 +285,8 @@ export default function SamplePage() {
       if (!project || !sample) return;
 
       let nextViewParams: ViewParams = vp;
-
       if (project.task === "MHD") {
-        nextViewParams = {
-          ...vp,
-          name: "spectrogram",
-          nperseg: 256,
-        } as SpectrogramViewParams;
+        nextViewParams = { ...vp, name: "spectrogram", nperseg: 256 } as SpectrogramViewParams;
       }
 
       const response = await fetch(
@@ -288,7 +295,7 @@ export default function SamplePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ params: dp, view: nextViewParams }),
-        },
+        }
       );
 
       const payload = (await response.json()) as unknown;
@@ -306,9 +313,20 @@ export default function SamplePage() {
     void refreshData(dataParams, viewParams);
   }, [project, sample, dataParams, viewParams]);
 
+  // Now it’s safe to conditionally return UI,
+  // because all hooks were already called above.
   if (!data || !project || !sample || !hasIds) {
-    return null;
+    // optional: don't render blank while loading
+    return (
+      <Provider theme={defaultTheme}>
+        <ToastContainer placement="top" />
+        <div className="p-4 text-sm opacity-70">Loading sample…</div>
+      </Provider>
+    );
   }
+
+  const projectIdResolved = project._id ?? (project_id as string);
+  const sampleIdResolved = sample._id ?? (sample_id as string);
 
   return (
     <div>
@@ -320,33 +338,75 @@ export default function SamplePage() {
         <ModelPredictModal project={project} />
 
         <div className="flex">
-          <ToolBar
-            project={project}
-            sample={sample}
-            data={data}
-            annotations={annotations}
-            setAnnotations={setAnnotations}
-            viewParams={viewParams}
-            setViewParams={setViewParams}
-            dataParams={dataParams}
-            setDataParams={setDataParams}
-            plotProps={plotProps}
-            setPlotProps={setPlotProps}
-          />
-          <div className="flex-1 justify-center">
-            <SampleView
-              project={project}
-              sample={sample}
-              projectId={project._id ?? (project_id as string)}
-              sampleId={sample._id ?? (sample_id as string)}
-              data={data}
-              annotations={annotations}
-              setAnnotations={setAnnotations}
-              dataParams={dataParams}
-              setDataParams={setDataParams}
-              plotProps={plotProps}
-            />
-          </div>
+          {isUfo ? (
+            <VideoSessionProvider
+              key={`${projectIdResolved}:${sampleIdResolved}`}
+              projectId={projectIdResolved}
+              sampleId={sampleIdResolved}
+              frame={videoFrame}
+              setFrame={setVideoFrame}
+            >
+              <ToolBar
+                project={project}
+                sample={sample}
+                data={data}
+                annotations={annotations}
+                setAnnotations={setAnnotations}
+                viewParams={viewParams}
+                setViewParams={setViewParams}
+                dataParams={dataParams}
+                setDataParams={setDataParams}
+                plotProps={plotProps}
+                setPlotProps={setPlotProps}
+              />
+
+              <div className="flex-1 justify-center">
+                <SampleView
+                  project={project}
+                  sample={sample}
+                  projectId={projectIdResolved}
+                  sampleId={sampleIdResolved}
+                  data={data}
+                  annotations={annotations}
+                  setAnnotations={setAnnotations}
+                  dataParams={dataParams}
+                  setDataParams={setDataParams}
+                  plotProps={plotProps}
+                />
+              </div>
+            </VideoSessionProvider>
+          ) : (
+            <>
+              <ToolBar
+                project={project}
+                sample={sample}
+                data={data}
+                annotations={annotations}
+                setAnnotations={setAnnotations}
+                viewParams={viewParams}
+                setViewParams={setViewParams}
+                dataParams={dataParams}
+                setDataParams={setDataParams}
+                plotProps={plotProps}
+                setPlotProps={setPlotProps}
+              />
+
+              <div className="flex-1 justify-center">
+                <SampleView
+                  project={project}
+                  sample={sample}
+                  projectId={projectIdResolved}
+                  sampleId={sampleIdResolved}
+                  data={data}
+                  annotations={annotations}
+                  setAnnotations={setAnnotations}
+                  dataParams={dataParams}
+                  setDataParams={setDataParams}
+                  plotProps={plotProps}
+                />
+              </div>
+            </>
+          )}
         </div>
       </Provider>
     </div>

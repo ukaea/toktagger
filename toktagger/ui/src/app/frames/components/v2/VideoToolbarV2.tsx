@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useVideoSession } from "./video-session";
+import { useVideoSession } from "@/app/frames/components/v2/video-session";
 import { V2_LABELS, makeTrackKey } from "./types";
 
 export function VideoToolbarV2(props: {

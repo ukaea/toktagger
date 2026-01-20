@@ -9,7 +9,7 @@ import {
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
 
-import { useVideoSession, commitOverlayToSession } from "./video-session";
+import { useVideoSession, commitOverlayToSession } from "@/app/frames/components/v2/video-session";
 import { getLabelTrack } from "./anno-utils";
 
 type AnnotatorApi = {
@@ -42,6 +42,38 @@ function toAnnoList(got: unknown): ImageAnnotation[] {
   return [];
 }
 
+function annoSig(a: ImageAnnotation): string {
+  const sel = (a as any)?.target?.selector;
+  const g = sel?.geometry ?? {};
+  const source = (a as any)?.target?.source ?? "";
+  const { className, trackId } = getLabelTrack(a);
+
+  return [
+    a.id ?? "",
+    sel?.type ?? "",
+    source,
+    g.x ?? "",
+    g.y ?? "",
+    g.w ?? "",
+    g.h ?? "",
+    className ?? "",
+    trackId ?? "",
+  ].join("|");
+}
+
+function sameOverlay(a: ImageAnnotation[], b: ImageAnnotation[]): boolean {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+
+  // order can differ; compare by signatures
+  const as = a.map(annoSig).sort();
+  const bs = b.map(annoSig).sort();
+  for (let i = 0; i < as.length; i++) if (as[i] !== bs[i]) return false;
+  return true;
+}
+
+
 async function doubleRAF() {
   await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 }
@@ -68,58 +100,68 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   useEffect(() => {
     if (!api?.setAnnotations) return;
 
+    // If Annotorious already has the same overlay, don't re-hydrate.
+    const cur = api.getAnnotations ? toAnnoList(api.getAnnotations()) : [];
+    if (sameOverlay(cur, overlayForFrame ?? [])) return;
+
     suppressRef.current = true;
     api.setAnnotations(overlayForFrame ?? [], true);
+
     void doubleRAF().then(() => {
       suppressRef.current = false;
     });
   }, [api, overlayForFrame]);
 
   // Any change -> normalize -> store in session (marks dirty)
-  useEffect(() => {
-    if (!api?.on || !api?.off || !api?.getAnnotations) return;
+ useEffect(() => {
+  if (!api?.on || !api?.off || !api?.getAnnotations) return;
 
-    const onAnyChange = () => {
-      if (suppressRef.current) return;
+  const onAnyChange = () => {
+    if (suppressRef.current) return;
 
-      const raw = toAnnoList(api.getAnnotations());
-      const fallbackClass = session.selection.className ?? "UFO";
-      const fallbackTrack = session.selection.trackId ?? "1";
+    const raw = toAnnoList(api.getAnnotations());
+    const fallbackClass = session.selection.className ?? "UFO";
+    const fallbackTrack = session.selection.trackId ?? "1";
 
-      const normalized = commitOverlayToSession({
-        raw,
-        frameKey: session.frameKey,
-        fallback: { className: fallbackClass, trackId: fallbackTrack },
-      });
+    const normalized = commitOverlayToSession({
+      raw,
+      frameKey: session.frameKey,
+      fallback: { className: fallbackClass, trackId: fallbackTrack },
+    });
 
-      // If normalization changed bodies/source etc, re-apply silently so popup/edit is consistent
+    // Only re-apply to Annotorious if normalization actually changed something
+    if (!sameOverlay(raw, normalized)) {
       suppressRef.current = true;
       api.setAnnotations?.(normalized, true);
       void doubleRAF().then(() => {
         suppressRef.current = false;
       });
+    }
 
+    // Only update React/session state if session doesn’t already match
+    const prev = session.getFrameList(session.frame);
+    if (!sameOverlay(prev, normalized)) {
       session.setFrameList(session.frame, normalized);
-    };
+    }
+  };
 
-    // Create/update/delete are enough; selectionChanged([]) is a decent “commit boundary”
-    const onSelectionChanged = (selected: unknown) => {
-      if (suppressRef.current) return;
-      if (Array.isArray(selected) && selected.length === 0) onAnyChange();
-    };
+  const onSelectionChanged = (selected: unknown) => {
+    if (suppressRef.current) return;
+    if (Array.isArray(selected) && selected.length === 0) onAnyChange();
+  };
 
-    api.on("createAnnotation", onAnyChange);
-    api.on("updateAnnotation", onAnyChange);
-    api.on("deleteAnnotation", onAnyChange);
-    api.on("selectionChanged", onSelectionChanged);
+  api.on("createAnnotation", onAnyChange);
+  api.on("updateAnnotation", onAnyChange);
+  api.on("deleteAnnotation", onAnyChange);
+  api.on("selectionChanged", onSelectionChanged);
 
-    return () => {
-      api.off?.("createAnnotation", onAnyChange);
-      api.off?.("updateAnnotation", onAnyChange);
-      api.off?.("deleteAnnotation", onAnyChange);
-      api.off?.("selectionChanged", onSelectionChanged);
-    };
-  }, [api, session]);
+  return () => {
+    api.off?.("createAnnotation", onAnyChange);
+    api.off?.("updateAnnotation", onAnyChange);
+    api.off?.("deleteAnnotation", onAnyChange);
+    api.off?.("selectionChanged", onSelectionChanged);
+  };
+}, [api, session]);
 
   const drawingEnabled = !!session.selection.className && !!session.selection.trackId;
 

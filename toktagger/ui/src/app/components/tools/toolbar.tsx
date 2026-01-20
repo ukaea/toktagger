@@ -65,6 +65,7 @@ import {
   InstancePanel as VideoInstancePanel,
 } from "@/app/frames/components/ui";
 import { setVideoWorkingDirty } from "@/app/frames/components/adapters";
+import { VideoToolbarV2Sidebar } from "@/app/frames/components/v2/VideoToolbarV2Sidebar";
 
 // ------------------------------
 // Save helpers
@@ -547,10 +548,17 @@ type ToolBarInfo = {
   setPlotProps: (props: PlotProps) => void;
 };
 
+const USE_UFO_V2 = true;
+
 export default function ToolBar(props: ToolBarInfo) {
-  // Task "UFO" is our current backend name for video/frame annotation projects.
   const isVideo = props.project.task === "UFO";
-  return isVideo ? <VideoToolbar {...props} /> : <StandardToolbar {...props} />;
+  if (!isVideo) return <StandardToolbar {...props} />;
+
+  return USE_UFO_V2 ? (
+    <VideoToolbarV2Sidebar project={props.project} sample={props.sample} />
+  ) : (
+    <VideoToolbar {...props} />
+  );
 }
 
 function StandardToolbar({

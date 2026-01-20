@@ -7,9 +7,8 @@ import { BACKEND_API_URL } from "@/app/core";
 
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 
-import { VideoSessionProvider, useVideoSession } from "./video-session";
+import { VideoSessionProvider, useVideoSession } from "@/app/frames/components/v2/video-session";
 import { FrameAnnotatorHostV2 } from "./FrameAnnotatorHostV2";
-import { VideoToolbarV2 } from "./VideoToolbarV2";
 
 /**
  * Backend save helper (same endpoint used by your existing VideoToolbar).
@@ -61,7 +60,7 @@ export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
   );
 }
 
-type VideoViewV2Props = {
+export type VideoViewV2Props = {
   data: unknown; // ImageData
   annotations: Annotation[];
   projectId: string;
@@ -79,6 +78,9 @@ type VideoViewV2Props = {
  * VideoChromeV2
  * This lives INSIDE <VideoSessionProvider>, so it can call useVideoSession()
  * and do forward propagation on Next.
+ *
+ * NOTE: We deliberately removed the inline VideoToolbarV2 from here,
+ * because the v2 left sidebar will own class/instance selection + save + sample nav.
  */
 function VideoChromeV2(props: {
   imageBase64: string;
@@ -145,19 +147,18 @@ function VideoChromeV2(props: {
 
       {/* Main v2 UI */}
       <div className="w-full flex flex-col gap-3">
-        <VideoToolbarV2
-          onJump={handleJump}
-          onSave={async (payload) => {
-            await props.onSaveBackend(payload as Annotation[]);
-          }}
-        />
         <FrameAnnotatorHostV2 imageBase64={props.imageBase64} />
       </div>
     </div>
   );
 }
 
-export function VideoViewV2(props: VideoViewV2Props) {
+/**
+ * Providerless inner view:
+ * Use this when the page/layout already wraps VideoSessionProvider
+ * (so the left sidebar can also access useVideoSession()).
+ */
+export function VideoViewV2Inner(props: VideoViewV2Props) {
   const parsed = ImageDataSchema.safeParse(props.data);
   if (!parsed.success) {
     throw new Error("Invalid data for UFO view (expected ImageData)");
@@ -171,16 +172,6 @@ export function VideoViewV2(props: VideoViewV2Props) {
   }
 
   const frameLabel = frameFromBackend;
-
-  // v2 frame is the REAL backend-returned frame (even when request used frame=null)
-  const [frame, setFrame] = useState<number>(frameFromBackend);
-
-  // Keep session frame synced to backend frame whenever new data arrives
-  // useLayoutEffect reduces a tiny mismatch window during fast nav.
-  useLayoutEffect(() => {
-    if (frame !== frameFromBackend) setFrame(frameFromBackend);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frameFromBackend]);
 
   /**
    * Single navigation primitive: request frame n from backend
@@ -209,24 +200,51 @@ export function VideoViewV2(props: VideoViewV2Props) {
   return (
     <div className="flex-1 flex justify-center">
       <div className="w-full max-w-5xl px-4 py-3">
-        <VideoSessionProvider
-          projectId={props.projectId}
-          sampleId={props.sampleId}
-          frame={frame}
-          setFrame={setFrame}
-        >
-          <VideoChromeV2
-            imageBase64={imageBase64}
-            dbAnnotations={props.annotations}
-            onSaveBackend={onSaveBackend}
-            goToFrame={goToFrame}
-            frameLabel={frameLabel}
-            onPrev={props.onPrev}
-            onNext={props.onNext}
-            onJump={props.onJump}
-          />
-        </VideoSessionProvider>
+        <VideoChromeV2
+          imageBase64={imageBase64}
+          dbAnnotations={props.annotations}
+          onSaveBackend={onSaveBackend}
+          goToFrame={goToFrame}
+          frameLabel={frameLabel}
+          onPrev={props.onPrev}
+          onNext={props.onNext}
+          onJump={props.onJump}
+        />
       </div>
     </div>
+  );
+}
+
+/**
+ * Backwards-compatible wrapper (still works standalone).
+ * We will NOT use this in SamplePage UFO-v2 mode, because it would create a second provider.
+ */
+export function VideoViewV2(props: VideoViewV2Props) {
+  const parsed = ImageDataSchema.safeParse(props.data);
+  if (!parsed.success) {
+    throw new Error("Invalid data for UFO view (expected ImageData)");
+  }
+
+  const frameFromBackend = Number(parsed.data.frame);
+  if (!Number.isFinite(frameFromBackend)) {
+    throw new Error("UFO ImageData.frame is not a finite number");
+  }
+
+  const [frame, setFrame] = useState<number>(frameFromBackend);
+
+  useLayoutEffect(() => {
+    if (frame !== frameFromBackend) setFrame(frameFromBackend);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameFromBackend]);
+
+  return (
+    <VideoSessionProvider
+      projectId={props.projectId}
+      sampleId={props.sampleId}
+      frame={frame}
+      setFrame={setFrame}
+    >
+      <VideoViewV2Inner {...props} />
+    </VideoSessionProvider>
   );
 }
