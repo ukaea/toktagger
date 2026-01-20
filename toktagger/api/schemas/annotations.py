@@ -11,8 +11,6 @@ class AnnotationIn(ConfiguredModel):
     created_by: str
     validated: bool = False
     uncertainty: Optional[float] = None
-    sample_id: Optional[str] = None
-    project_id: Optional[str] = None
 
     @model_validator(mode="before")
     def set_uncertainty(cls, values):

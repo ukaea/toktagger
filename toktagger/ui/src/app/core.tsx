@@ -149,12 +149,12 @@ export async function saveSampleAnnotations(
   project_id: string,
   sample_id: string,
   annotations: Annotation[],
-  validateOnSave: boolean = true,
+  validateOnNavigate: boolean = true,
 ) {
   // user has validated the annotations, so set created_by to "manual"
   const updatedAnnotations = annotations.map((annotation: Annotation) => {
     annotation.created_by = "manual";
-    annotation.validated = validateOnSave ? true : annotation.validated;
+    annotation.validated = validateOnNavigate ? true : annotation.validated;
     return annotation;
   });
 

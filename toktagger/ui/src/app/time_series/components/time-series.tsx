@@ -40,6 +40,9 @@ const zoneCategories: Category[] = [
   { name: "IRE", color: "#FFC733" },
   { name: "Locked Mode", color: "#8DFF33" },
   { name: "VDE", color: "#FF3380" },
+  { name: "Flat Top", color: "#33A8FF" },
+  { name: "Ramp Up", color: "#FF8D33" },
+  { name: "Ramp Down", color: "#3380FF" },
   { name: "Unknown", color: "#B0B0B0" },
 ];
 

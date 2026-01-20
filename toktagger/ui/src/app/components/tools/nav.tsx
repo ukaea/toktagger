@@ -32,6 +32,10 @@ async function getNextSample(project_id: string, current_sample_id: string) {
   const sampleResult = await fetch(NEXT_URL);
   if (sampleResult.status === 204) {
     return null; // No next sample available
+  } else if (!sampleResult.ok) {
+    throw new Error(
+      `Failed to fetch next sample: ${sampleResult.status} ${sampleResult.statusText}`,
+    );
   }
   const sample = await sampleResult.json();
   return sample;
@@ -45,6 +49,10 @@ async function getPreviousSample(
   const sampleResult = await fetch(PREVIOUS_URL);
   if (sampleResult.status === 204) {
     return null; // No previous sample available
+  } else if (!sampleResult.ok) {
+    throw new Error(
+      `Failed to fetch previous sample: ${sampleResult.status} ${sampleResult.statusText}`,
+    );
   }
   const sample = await sampleResult.json();
   return sample;
@@ -72,15 +80,22 @@ function NextButton({
       annotations,
       validateOnNavigate,
     );
-    const sample = await getNextSample(project_id, sample_id);
-    if (!sample) {
-      ToastQueue.negative("No more samples available!", {
+    try {
+      const sample = await getNextSample(project_id, sample_id);
+      if (!sample) {
+        ToastQueue.negative("No more samples available!", {
+          timeout: TOAST_TIMEOUT,
+        });
+        return;
+      }
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      ToastQueue.negative(`Failed to fetch next sample: ${message}`, {
         timeout: TOAST_TIMEOUT,
       });
-      return;
     }
-    const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-    navigate(NEXT_SAMPLE_URL);
   }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
 
   useEffect(() => {
@@ -98,7 +113,7 @@ function NextButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={moveNextShot}>
+      <ActionButton aria-label="Next Sample" onPress={moveNextShot}>
         <StepForward />
       </ActionButton>
     </View>
@@ -121,15 +136,22 @@ function PreviousButton({
       validateOnNavigate,
     );
 
-    const sample = await getPreviousSample(project_id, sample_id);
-    if (!sample) {
-      ToastQueue.negative("No earlier samples available!", {
+    try {
+      const sample = await getPreviousSample(project_id, sample_id);
+      if (!sample) {
+        ToastQueue.negative("No earlier samples available!", {
+          timeout: TOAST_TIMEOUT,
+        });
+        return;
+      }
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      ToastQueue.negative(`Failed to fetch previous sample: ${message}`, {
         timeout: TOAST_TIMEOUT,
       });
-      return;
     }
-    const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-    navigate(NEXT_SAMPLE_URL);
   }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
 
   useEffect(() => {
@@ -147,7 +169,7 @@ function PreviousButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={movePreviousShot}>
+      <ActionButton aria-label="Previous Sample" onPress={movePreviousShot}>
         <StepBackward />
       </ActionButton>
     </View>
@@ -177,7 +199,7 @@ function SaveButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={handleClick}>
+      <ActionButton aria-label="Save" onPress={handleClick}>
         <SaveFloppy />
         <Text>Save</Text>
       </ActionButton>
@@ -198,7 +220,7 @@ function ClearButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={handleClick}>
+      <ActionButton aria-label="Clear" onPress={handleClick}>
         <Delete />
         <Text>Clear</Text>
       </ActionButton>

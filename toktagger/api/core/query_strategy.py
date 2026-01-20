@@ -23,6 +23,19 @@ class QueryStrategy(ABC):
         self.samples = samples
         self.annotations = annotations if annotations is not None else []
 
+    def _get_matching_sample(self, current_sample_id: str) -> int:
+        index = next(
+            (
+                i
+                for i, sample in enumerate(self.samples)
+                if sample.id == current_sample_id
+            ),
+            None,
+        )
+        if index is None:
+            raise RuntimeError("Current sample ID not found in the list of samples.")
+        return index
+
     def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
         """Get the next sample based on the current sample ID"""
 
@@ -50,19 +63,6 @@ class QueryStrategy(ABC):
         previous_index = previous_index % len(self.samples)
 
         return self.samples[previous_index]
-
-    def _get_matching_sample(self, current_sample_id: Optional[str]) -> int:
-        index = next(
-            (
-                i
-                for i, sample in enumerate(self.samples)
-                if sample.id == current_sample_id
-            ),
-            None,
-        )
-        if index is None:
-            raise RuntimeError("Current sample ID not found in the list of samples.")
-        return index
 
 
 class SequentialQueryStrategy(QueryStrategy):
@@ -141,10 +141,15 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
     If no annotations exist, falls back to random sampling.
     """
 
-    def __init__(self, samples, annotations, seed: int = 42):
+    def __init__(
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+        seed: int = 42,
+    ):
         super().__init__(samples, annotations)
 
-        if len(self.annotations) != 0:
+        if self.annotations is not None and len(self.annotations) != 0:
             self.annotations = sorted(
                 self.annotations, key=lambda ann: ann.uncertainty, reverse=True
             )
@@ -154,7 +159,6 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
                 key=lambda sample: sample_ids.index(sample.id)
                 if sample.id in sample_ids
                 else -1,
-                reverse=True,
             )
 
 
