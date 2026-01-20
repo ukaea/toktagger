@@ -7,10 +7,8 @@ import {
   Annotation,
   BoundingBox,
   BoundingBoxSchema,
-  Polygon,
   PolygonAnnotation,
   PolygonAnnotationSchema,
-  PolygonSchema,
   SpectrogramViewParams,
 } from "@/types";
 import Plotly, {
@@ -319,13 +317,6 @@ export const TimeSeries = ({
       plot.on("plotly_selected", function (eventData: any) {
         if (eventData && eventData.range) {
           setSelectedXRange(eventData.range.x);
-        }
-
-        if (eventData && eventData.lassoPoints) {
-          const polygon: Polygon = PolygonSchema.parse({
-            x: eventData.lassoPoints.x,
-            y: eventData.lassoPoints.y,
-          });
         }
       });
       plot.on("plotly_deselect", function () {
