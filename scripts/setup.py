@@ -9,6 +9,8 @@ def create_project(
     task: str,
     data_loader: str,
     query_strategy: str,
+    time_min: float = -0.1,
+    time_max: float = 0.8,
     min_time_step: float = 0.0001,
 ) -> str:
     project = {
@@ -16,8 +18,8 @@ def create_project(
         "task": task,
         "query_strategy": query_strategy,
         "data_loader": data_loader,
-        "time_min": -0.1,
-        "time_max": 0.8,
+        "time_min": time_min,
+        "time_max": time_max,
         "min_time_step": min_time_step,
     }
 
@@ -107,7 +109,7 @@ def main():
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
     project_id = create_project(
-        "Local MHD Project", "spectrogram", "parquet", "random", 0.000001
+        "Local MHD Project", "spectrogram", "parquet", "random", min_time_step=0.000001
     )
     create_local_samples(
         project_id,
