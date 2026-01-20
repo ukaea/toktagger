@@ -153,11 +153,12 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
         validated_annotations=False,
     )
     data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
-    assert isinstance(data, MultiVariateTimeSeriesData)
 
-    # Check both columns requested are present, but filled with Nones
-    assert data.values["doesnt_exist"] is None
+    try:
+        data_loader.get_sample(sample)
+        pytest.fail("Expected DataLoaderError not raised")
+    except data_loaders.DataLoaderError:
+        pass
 
 
 @pytest.mark.asyncio

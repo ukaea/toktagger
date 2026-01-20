@@ -9,8 +9,8 @@ import {
 } from "@adobe/react-spectrum";
 import { useState } from "react";
 import Export from "@spectrum-icons/workflow/Export";
-import { Annotation, Project, Sample } from "@/types";
-import { saveJSONToFile, exportAnnotations } from "@/app/core";
+import { Project, Sample } from "@/types";
+import { exportAnnotations } from "@/app/core";
 
 export function ExportButton({ project }: { project: Project }) {
   return (
@@ -23,13 +23,8 @@ export function ExportButton({ project }: { project: Project }) {
 type ExportToolInfo = {
   project: Project;
   sample: Sample;
-  current_annotations: Annotation[];
 };
-export function ExportTool({
-  project,
-  sample,
-  current_annotations,
-}: ExportToolInfo) {
+export function ExportTool({ project, sample }: ExportToolInfo) {
   const exportItems = ["All", "Current Sample"].map((item) => ({
     id: item,
     name: item,
@@ -40,10 +35,7 @@ export function ExportTool({
     if (exportOption === "All") {
       exportAnnotations(project);
     } else {
-      saveJSONToFile(
-        current_annotations,
-        `${project.name}_${sample.shot_id}_annotations.json`,
-      );
+      exportAnnotations(project, sample);
     }
   };
 

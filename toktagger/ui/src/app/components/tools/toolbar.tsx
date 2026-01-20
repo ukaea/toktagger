@@ -130,7 +130,6 @@ export default function ToolBar() {
     project,
     sample,
     data,
-    annotations,
     setAnnotations,
     viewParams,
     setViewParams,
@@ -294,11 +293,7 @@ export default function ToolBar() {
                   <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
                 </DisclosureTitle>
                 <DisclosurePanel>
-                  <ExportTool
-                    project={project}
-                    sample={sample}
-                    current_annotations={annotations}
-                  />
+                  <ExportTool project={project} sample={sample} />
                 </DisclosurePanel>
               </Disclosure>
               <Disclosure>

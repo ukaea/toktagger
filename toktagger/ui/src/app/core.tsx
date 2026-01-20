@@ -218,10 +218,19 @@ export function saveJSONToFile(data: object, filename: string) {
   URL.revokeObjectURL(url); // Clean up
 }
 
-export const exportAnnotations = async (project: Project) => {
-  getAnnotations(project._id).then((annotations: Annotation[]) => {
-    saveJSONToFile(annotations, `${project.name}_annotations.json`);
-  });
+export const exportAnnotations = async (project: Project, sample?: Sample) => {
+  if (sample) {
+    // Export annotations for the current sample only
+    const annotations = await getAnnotationsForSample(project._id, sample._id);
+    saveJSONToFile(
+      annotations,
+      `${project.name}_${sample.shot_id}_annotations.json`,
+    );
+  } else {
+    // Export annotations for all samples in the project
+    const annotations = await getAnnotations(project._id);
+    saveJSONToFile(annotations, `${project.name}_all_annotations.json`);
+  }
 };
 
 export const startTraining = async (
