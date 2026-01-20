@@ -24,7 +24,13 @@ def check_base_page(page):
     expect(page.get_by_role("columnheader", name="Date Created")).to_be_visible()
 
     # Expect Create button visible
-    expect(page.get_by_role("button", name="Create")).to_be_visible()
+    expect(page.get_by_role("button", name="Create", exact=True)).to_be_visible()
+
+    # Expect Model Train/Predict buttons visible
+    expect(
+        page.get_by_role("button", name="Create Predictions from ML Model")
+    ).to_be_visible()
+    expect(page.get_by_role("button", name="Train ML Model")).to_be_visible()
 
     # Expect searchbar visible
     expect(page.get_by_role("searchbox", name="Search By Shot ID")).to_be_visible()
@@ -255,7 +261,7 @@ def test_create_samples_shot_data(server_setup, page: Page):
     check_base_page(page)
 
     # Press create button
-    page.get_by_role("button", name="Create").click()
+    page.get_by_role("button", name="Create", exact=True).click()
 
     # Check modal has opened
     modal = page.get_by_role("dialog")
@@ -310,7 +316,7 @@ def test_create_samples_file_data(server_setup, page: Page):
     check_base_page(page)
 
     # Press create button
-    page.get_by_role("button", name="Create").click()
+    page.get_by_role("button", name="Create", exact=True).click()
 
     # Check modal has opened
     modal = page.get_by_role("dialog")
@@ -356,7 +362,7 @@ def test_create_samples_file_data(server_setup, page: Page):
         response = requests.get(f"http://localhost:8002/projects/{project_id}/samples")
         samples = response.json()
         assert len(samples) == 2
-        assert all(sample["data"]["column_names"][0] == "ip" for sample in samples)
+        assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
         assert sorted(sample["shot_id"] for sample in samples) == [10000, 10001]
 
 
@@ -372,7 +378,7 @@ def test_create_samples_image_data(server_setup, page: Page, file_type: str):
     check_base_page(page)
 
     # Press create button
-    page.get_by_role("button", name="Create").click()
+    page.get_by_role("button", name="Create", exact=True).click()
 
     # Check modal has opened
     modal = page.get_by_role("dialog")
