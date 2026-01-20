@@ -29,6 +29,7 @@ import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { VSpans } from "@/app/components/tools/vspans";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
+import { title } from "process";
 
 const zoneCategories: Category[] = [
   { name: "ELM", color: "#FF5733" },
@@ -155,7 +156,19 @@ export const TimeSeriesView = () => {
     const yAxesLayout = yAxisDomains.reduce(
       (acc, domain, idx) => {
         const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
-        acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true };
+        acc[`yaxis${axisNum}`] = {
+          domain,
+          autorange: true,
+          fixedrange: true,
+          title: {
+            text: plotData[numRows - idx - 1].name || "",
+            font: {
+              family: "Courier New, monospace",
+              size: 12,
+              color: "#7f7f7f",
+            },
+          },
+        };
         return acc;
       },
       {} as Record<string, unknown>,
