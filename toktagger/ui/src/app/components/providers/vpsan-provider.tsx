@@ -15,6 +15,7 @@ interface VSpanContextInfo {
   vspans: VSpan[];
   handleVSpanUpdate: () => void;
   handleVSpanDragFinish: () => void;
+  handleVSpanDelete: (input: VSpan) => void;
   addVSpan: (x: number, category: Category) => void;
   activateTooling: () => void;
   triggerUpdate: number;
@@ -199,17 +200,6 @@ export const VSpanProvider = ({
     );
   });
 
-  // Delete selected zones on Delete/Backspace keypress
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Delete" || e.key == "Backspace") {
-      e.preventDefault(); // Prevent default delete behavior
-      const selectedZones = spans.current.filter((span) => span.selected);
-      for (const span of selectedZones) {
-        handleVSpanDelete(span);
-      }
-    }
-  });
-
   // The context provider is responsible for rendering the context menu relating to VSpans
   return (
     <VSpanContext.Provider
@@ -217,6 +207,7 @@ export const VSpanProvider = ({
         vspans: spans.current,
         handleVSpanUpdate,
         handleVSpanDragFinish,
+        handleVSpanDelete,
         addVSpan,
         activateTooling,
         triggerUpdate,

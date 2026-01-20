@@ -10,6 +10,7 @@ interface ZoneContextInfo {
   zones: Zone[];
   handleZoneUpdate: () => void;
   handleZoneDragFinish: () => void;
+  handleZoneDelete: (input: Zone) => void;
   addZone: (x0: number, x1: number, category: Category) => void;
   activateTooling: () => void;
   triggerUpdate: number;
@@ -215,19 +216,6 @@ export const ZoneProvider = ({
     );
   });
 
-  // Handle keyboard events
-
-  // Delete selected zones on Delete/Backspace keypress
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Delete" || e.key == "Backspace") {
-      e.preventDefault(); // Prevent default delete behavior
-      const selectedZones = zones.current.filter((zone) => zone.selected);
-      for (const zone of selectedZones) {
-        handleZoneDelete(zone);
-      }
-    }
-  });
-
   // The context provider is responsible for rendering the context menu relating to zones
   return (
     <ZoneContext.Provider
@@ -235,6 +223,7 @@ export const ZoneProvider = ({
         zones: zones.current,
         handleZoneUpdate,
         handleZoneDragFinish,
+        handleZoneDelete,
         addZone,
         activateTooling,
         triggerUpdate,

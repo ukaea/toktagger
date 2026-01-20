@@ -2,6 +2,7 @@
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { arrayMax, arrayMin } from "@/app/utils";
+import { VSpan, Zone } from "@/types";
 import Plotly, {
   Config,
   Layout,
@@ -11,6 +12,8 @@ import Plotly, {
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
+import { useVSpanContext } from "../providers/vpsan-provider";
+import { useZoneContext } from "../providers/zone-provider";
 
 type InjectedProps = {
   plotId: string;
@@ -65,6 +68,8 @@ export const TimeSeries = ({
   rescaleOnZoom = true,
   children,
 }: TimeSeriesPlotProps) => {
+  const { vspans, handleVSpanDelete } = useVSpanContext();
+  const { zones, handleZoneDelete } = useZoneContext();
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
     null,
   );
@@ -419,6 +424,23 @@ export const TimeSeries = ({
       }
     };
 
+    // Delete selected spans on Delete/Backspace keypress
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Delete" || e.key == "Backspace") {
+        e.preventDefault(); // Prevent default delete behavior
+
+        const selectedSpans = vspans.filter((span: VSpan) => span.selected);
+        for (const span of selectedSpans) {
+          handleVSpanDelete(span);
+        }
+
+        const selectedZones = zones.filter((zone: Zone) => zone.selected);
+        for (const zone of selectedZones) {
+          handleZoneDelete(zone);
+        }
+      }
+    });
+
     dragElements.forEach((dragElement) => {
       dragElement.addEventListener("contextmenu", contextHandler); // add context-menu listener
       dragElement.addEventListener("mousedown", startToolCreation);
@@ -438,7 +460,16 @@ export const TimeSeries = ({
       });
       document.removeEventListener("keyup", cancelToolCreation);
     };
-  }, [plotId, plotReady, toolingCallbacks, updateTools]);
+  }, [
+    plotId,
+    plotReady,
+    toolingCallbacks,
+    updateTools,
+    vspans,
+    zones,
+    handleVSpanDelete,
+    handleZoneDelete,
+  ]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">
