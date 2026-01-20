@@ -608,7 +608,6 @@ const editProject = async (
 };
 
 const createProject = async (project: Project): Promise<string> => {
-  console.log("Creating project:", project);
   const response = await fetch(`${BACKEND_API_URL}/projects`, {
     method: "POST",
     headers: {

@@ -20,6 +20,7 @@ class QueryStrategy(ABC):
         samples: list[Sample],
         annotations: Optional[list[Annotation]] = None,
     ):
+        samples = sorted(samples, key=lambda s: s.shot_id)
         self.samples = samples
         self.annotations = annotations if annotations is not None else []
 
@@ -71,15 +72,6 @@ class SequentialQueryStrategy(QueryStrategy):
     Chooses the next sample from the ordered list of samples
     """
 
-    def __init__(
-        self,
-        samples: list[Sample],
-        annotations: Optional[list[Annotation]] = None,
-    ):
-        samples = sorted(samples, key=lambda s: s.shot_id)
-        self.samples = samples
-        self.annotations = annotations if annotations is not None else []
-
 
 class RandomQueryStrategy(QueryStrategy):
     """Random query strategy
@@ -93,10 +85,7 @@ class RandomQueryStrategy(QueryStrategy):
         annotations: Optional[list[Annotation]] = None,
         seed: int = 42,
     ):
-        # need to sort to ensure return order from database is consistent
-        samples = sorted(samples, key=lambda s: s.shot_id)
-        self.samples = samples
-        self.annotations = annotations if annotations is not None else []
+        super().__init__(samples, annotations)
         # simply shuffle the samples at the start
         # seed is used to ensure consistent shuffling between calls
         self._random_shuffle_samples(seed)
@@ -119,7 +108,7 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
         annotations: Optional[list[Annotation]] = None,
         seed: int = 42,
     ):
-        super().__init__(samples, annotations)
+        super().__init__(samples, annotations, seed)
 
         if self.annotations is not None and len(self.annotations) != 0:
             self.annotations = sorted(

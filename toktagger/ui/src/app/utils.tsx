@@ -80,7 +80,6 @@ export const createAnnotationToDisplayAnnotationFunc = (
         x: timePoint.time,
         category: { name: timePoint.label, color: colors[timePoint.label] },
       };
-      console.log(colors);
       return vspan;
     } else if (SpectrogramMaskSchema.safeParse(item).success) {
       const schema = SpectrogramMaskSchema.parse(item);
@@ -89,7 +88,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
       };
       return spectrogramMask;
     } else {
-      console.log(
+      console.error(
         "annotation",
         TimeRegionSchema.safeParse(item).error?.message,
       );

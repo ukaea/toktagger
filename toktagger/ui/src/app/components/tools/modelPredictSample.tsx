@@ -79,7 +79,6 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         if (response.status === 202) {
           // Predictions queued but not done yet, so continue to poll
           pollCounter += 1;
-          console.log("Poll counter", pollCounter);
           if (pollCounter > 20) {
             setErrorMessage("Failed to retrieve predictions result.");
             clearInterval(interval);
