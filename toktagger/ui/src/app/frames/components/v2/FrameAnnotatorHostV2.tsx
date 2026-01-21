@@ -103,7 +103,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     [session, session.frame],
   );
 
-  // NEW: Auto-create a track on first draw if class is selected but trackId is missing.
+  // Auto-create a track on first draw if class is selected but trackId is missing.
+  // This relies on createNewInstanceForClass being the single source of truth.
   const ensureTrackSelected = useCallback((): string | null => {
     const cls = session.selection.className;
     if (!cls) return null;
@@ -111,16 +112,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     // If already armed, keep it.
     if (session.selection.trackId) return session.selection.trackId;
 
-    // Auto-create instance for this class
-    const created = session.createNewInstanceForClass(cls);
-    const trackId = created?.trackId;
-
-    if (trackId) {
-      session.setSelection({ className: cls, trackId, source: "auto" });
-      return trackId;
-    }
-
-    return null;
+    const { trackId } = session.createNewInstanceForClass(cls);
+    return trackId || null;
   }, [session]);
 
   // Hydrate overlay whenever frame changes OR session overlay changes for this frame
@@ -221,7 +214,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           draggable={false}
         />
       </ImageAnnotator>
-
     </div>
   );
 }

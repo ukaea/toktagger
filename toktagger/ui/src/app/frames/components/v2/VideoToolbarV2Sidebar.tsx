@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -16,7 +16,11 @@ import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import type { Annotation, Project, Sample } from "@/types";
 
-import { LABEL_MAP, loadLastClassName, saveLastClassName } from "@/app/frames/components/lib";
+import {
+  LABEL_MAP,
+  loadLastClassName,
+  saveLastClassName,
+} from "@/app/frames/components/lib";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
@@ -25,7 +29,11 @@ import {
 import { useVideoSession } from "@/app/frames/components/v2/video-session";
 import { canonicalizeTrackId } from "./video-utils";
 
-async function saveVideoAnnotations(project_id: string, sample_id: string, payload: Annotation[]) {
+async function saveVideoAnnotations(
+  project_id: string,
+  sample_id: string,
+  payload: Annotation[],
+) {
   const url = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   return await fetch(url, {
     method: "PUT",
@@ -44,7 +52,9 @@ async function getShotSample(project_id: string, shot_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
   const sampleResult = await fetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
-  return Array.isArray(sampleArray) && sampleArray.length > 0 ? sampleArray[0] : null;
+  return Array.isArray(sampleArray) && sampleArray.length > 0
+    ? sampleArray[0]
+    : null;
 }
 
 function instanceKey(args: { class_name: string; track_id: string }) {
@@ -186,21 +196,8 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // UX helper: do we have enough selection to draw?
-  const canDraw = Boolean(session.selection.className && session.selection.trackId);
-
-  // Optional: "smart" helper for later auto-create flows (currently used only by hint button)
-  const ensureInstanceSelected = useCallback(() => {
-    const cls = session.selection.className;
-    if (!cls) return null;
-
-    if (session.selection.trackId) return session.selection.trackId;
-
-    const { trackId } = session.createNewInstanceForClass(cls);
-    session.setSelection({ className: cls, trackId, source: "auto" });
-    saveLastClassName(cls);
-    return trackId;
-  }, [session]);
+  // With auto-create-on-draw, class is enough to start drawing.
+  const hasClass = Boolean(session.selection.className);
 
   const profiles = useMemo(() => {
     // Build + sort (class then numeric track_id)
@@ -335,34 +332,10 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
             {session.dirty ? "● unsaved" : "saved"} — frame {session.frame}
           </div>
 
-          {/* Inline guidance: reduce “why can’t I draw?” confusion */}
-          {!canDraw && (
+          {/* Inline guidance: updated for auto-create-on-draw */}
+          {!hasClass && (
             <div className="mt-2 text-[12px] opacity-80 leading-snug">
-              <div className="opacity-90">
-                To draw: select a <b>class</b> and an <b>instance</b>.
-              </div>
-              {session.selection.className && !session.selection.trackId && (
-                <div className="mt-1 flex items-center justify-center gap-2">
-                  <span className="opacity-80">No instance selected.</span>
-                  <Button
-                    variant="secondary"
-                    style="outline"
-                    UNSAFE_className="!px-2 !py-1 text-[11px]"
-                    onPress={onNewInstance}
-                  >
-                    New instance
-                  </Button>
-                  {/* Optional: even smoother action */}
-                  <Button
-                    variant="secondary"
-                    style="outline"
-                    UNSAFE_className="!px-2 !py-1 text-[11px]"
-                    onPress={() => ensureInstanceSelected()}
-                  >
-                    Auto-pick
-                  </Button>
-                </div>
-              )}
+              Select a <b>class</b> to start drawing.
             </div>
           )}
         </div>

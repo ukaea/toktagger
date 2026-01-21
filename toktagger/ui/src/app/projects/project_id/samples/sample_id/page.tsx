@@ -368,7 +368,7 @@ export default function SamplePage() {
                 setPlotProps={setPlotProps}
               />
 
-              <div className="flex-1 justify-center">
+              <div className="flex-1 flex justify-center">
                 <SampleView
                   project={project}
                   sample={sample}
@@ -399,7 +399,7 @@ export default function SamplePage() {
                 setPlotProps={setPlotProps}
               />
 
-              <div className="flex-1 justify-center">
+              <div className="flex-1 flex justify-center">
                 <SampleView
                   project={project}
                   sample={sample}
