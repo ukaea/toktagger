@@ -115,11 +115,13 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
                 self.annotations, key=lambda ann: ann.uncertainty, reverse=True
             )
             sample_ids = [annotation.sample_id for annotation in self.annotations]
+            sample_ids = np.unique(sample_ids).tolist()
             self.samples = sorted(
                 self.samples,
                 key=lambda sample: sample_ids.index(sample.id)
                 if sample.id in sample_ids
                 else -1,
+                reverse=True,
             )
 
 

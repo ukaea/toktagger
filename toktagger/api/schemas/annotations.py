@@ -10,7 +10,7 @@ class AnnotationIn(ConfiguredModel):
     label: str
     created_by: str
     validated: bool = False
-    uncertainty: Optional[float] = None
+    uncertainty: Optional[float] = 1
 
     @model_validator(mode="before")
     def set_uncertainty(cls, values):

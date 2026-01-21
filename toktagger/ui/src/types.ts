@@ -5,7 +5,7 @@ export const BaseAnnotationSchema = z.object({
   sample_id: z.string().nullable().default(null),
   timestamp: z.string().nullable().default(null),
   validated: z.boolean().nullable().default(null),
-  uncertainty: z.number().nullable().default(null),
+  uncertainty: z.number().nullable().default(1),
   created_by: z.string().default("manual"),
   time_min: z.number().nullable().default(null),
   time_max: z.number().nullable().default(null),
