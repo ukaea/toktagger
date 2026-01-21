@@ -10,7 +10,6 @@ class FileType(str, Enum):
     PARQUET = "parquet"
     PNG = "png"
     JPG = "jpg"
-    CUSTOM = "custom"
 
 
 class FileProtocol(str, Enum):

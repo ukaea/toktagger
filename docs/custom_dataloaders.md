@@ -66,7 +66,7 @@ The `@LoaderRegistry.register("my_custom_loader")` decorator automatically regis
 If you have added your own data loaders, you must make sure they have been loaded before the server is run. You can run the server from within a Python script by initializing the `Server` class, and running `server.run()`. For example, your script for adding a data loader and running the server may look like this:
 
 ```python
-from viz_annotation import DataLoader, LoaderRegistry, Server
+from toktagger.api.core import DataLoader, LoaderRegistry, Server
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.data import TimeSeriesData
 
@@ -183,8 +183,11 @@ class SpectrogramData(Data):
 Here's a complete example of a custom loader for CSV time series files.
 
 This examples assumes the CSV file has the following format:
+
 - First column: time values
 - Remaining columns: signal values with column headers
+
+And the file should be called `{shot_id}.csv`.
 
 For example:
 
@@ -259,6 +262,21 @@ class CSVTimeSeriesLoader(DataLoader):
         
         return MultiVariateTimeSeriesData(values=results)
 ```
+
+### Running the Example
+
+ - Copy the CSV above into a file named eg 1.csv
+ - Copy the code above into a file called loader.py
+ - Make a file to run the server called eg run.py, which does:
+
+    ```python
+    from loader import CSVTimeSeriesLoader
+    from toktagger.api.main import Server
+
+    server = Server()
+    server.run()
+    ```
+ - Run python run.py
 
 ## Example: Database Loader
 
