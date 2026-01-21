@@ -23,7 +23,7 @@ import { applyGlobalStyle, arrayMax, arrayMin } from "@/app/utils";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
-import { TimeSeries } from "@/app/components/plots/plotly";
+import { PlotlyWidget } from "@/app/components/plots/plotly";
 import { Zones } from "@/app/components/tools/zones";
 import { VSpans } from "@/app/components/tools/vspans";
 import * as d3 from "d3";
@@ -50,7 +50,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {}
+  {},
 );
 
 const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
@@ -58,7 +58,7 @@ const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
     acc[curr.name] = curr.color;
     return acc;
   },
-  {}
+  {},
 );
 
 const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
@@ -141,7 +141,7 @@ export const SpectrogramView = () => {
 
     // Extract mask from annotations
     const maskAnnotations = annotations.filter(
-      (x: Annotation) => SpectrogramMaskSchema.safeParse(x).success
+      (x: Annotation) => SpectrogramMaskSchema.safeParse(x).success,
     );
     const newMask =
       maskAnnotations.length > 0
@@ -159,7 +159,7 @@ export const SpectrogramView = () => {
       if (!viewParams) return;
       updateAnnotations(setAnnotations, newVSpans, TimePointSchema, viewParams);
     },
-    [setAnnotations, viewParams]
+    [setAnnotations, viewParams],
   );
 
   const updateZones = useCallback(
@@ -167,7 +167,7 @@ export const SpectrogramView = () => {
       if (!viewParams) return;
       updateAnnotations(setAnnotations, newZones, TimeRegionSchema, viewParams);
     },
-    [setAnnotations, viewParams]
+    [setAnnotations, viewParams],
   );
 
   if (!viewData) {
@@ -188,7 +188,7 @@ export const SpectrogramView = () => {
           maskValue = 1; // Default to 1 if mask value is undefined
         }
         return value * maskValue;
-      })
+      }),
     );
   } else {
     amplitude = viewData.amplitude;
@@ -198,7 +198,7 @@ export const SpectrogramView = () => {
   const ampMax = Math.max(smallPrecisionFactor, arrayMax(amplitude.flat()));
 
   const logAmplitude_og = amplitude_og.map((row: Array<number>) =>
-    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor)))
+    row.map((x) => Math.log10(Math.max(x, smallPrecisionFactor))),
   );
   const logAmpMin = arrayMin(logAmplitude_og.flat());
   const logAmpMax = arrayMax(logAmplitude_og.flat());
@@ -426,7 +426,7 @@ export const SpectrogramView = () => {
             initialData={vspans}
             onModifyVSpan={updateVSpans}
           >
-            <TimeSeries
+            <PlotlyWidget
               plotId="SpectrogramView"
               plotConfig={{
                 data: plotData,
@@ -437,7 +437,7 @@ export const SpectrogramView = () => {
             >
               <Zones onUpdate={updateZones} />
               <VSpans onUpdate={updateVSpans} />
-            </TimeSeries>
+            </PlotlyWidget>
           </VSpanProvider>
         </ZoneProvider>
       </ContextMenuProvider>

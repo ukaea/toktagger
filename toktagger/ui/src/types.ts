@@ -262,6 +262,8 @@ export type ToolingProps = {
 export enum ToolingTypes {
   ZONE,
   VSPAN,
+  BOUNDING_BOX,
+  POLYGON,
 }
 
 export type ToolingCallbacks = {

@@ -1,5 +1,5 @@
 import pyuda
-from anyio.functools import lru_cache
+from functools import lru_cache
 import os
 import pathlib
 from abc import ABC, abstractmethod

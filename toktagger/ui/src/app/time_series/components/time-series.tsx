@@ -14,7 +14,7 @@ import {
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { TimeSeries } from "@/app/components/plots/plotly";
+import { PlotlyWidget } from "@/app/components/plots/plotly";
 import { Zones } from "@/app/components/tools/zones";
 import "react-contexify/ReactContexify.css";
 
@@ -109,12 +109,12 @@ export const TimeSeriesView = () => {
           y: value.values,
           mode: "lines",
         };
-      }
+      },
     );
 
     const yAxesNames = Array.from(
       { length: numRows },
-      (_, i) => `y${i === 0 ? "" : i + 1}`
+      (_, i) => `y${i === 0 ? "" : i + 1}`,
     ).reverse();
 
     // Dynamically generate y-axis titles based on plotData names
@@ -155,7 +155,7 @@ export const TimeSeriesView = () => {
         acc[`yaxis${axisNum}`] = { domain, autorange: true, fixedrange: true };
         return acc;
       },
-      {} as Record<string, unknown>
+      {} as Record<string, unknown>,
     );
 
     return {
@@ -201,7 +201,7 @@ export const TimeSeriesView = () => {
             initialData={vspans}
             onModifyVSpan={updateVSpans}
           >
-            <TimeSeries
+            <PlotlyWidget
               plotId="TimesSeriesView"
               plotConfig={{
                 data: plotData,
@@ -210,7 +210,7 @@ export const TimeSeriesView = () => {
             >
               <Zones onUpdate={updateZones} />
               <VSpans onUpdate={updateVSpans} />
-            </TimeSeries>
+            </PlotlyWidget>
           </VSpanProvider>
         </ZoneProvider>
       </ContextMenuProvider>

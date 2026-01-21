@@ -20,6 +20,7 @@ import Plotly, {
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
+import { Item, Submenu, ItemParams } from "react-contexify";
 
 type InjectedProps = {
   plotId: string;
@@ -34,7 +35,7 @@ interface PlotConfiguration {
   config?: Partial<Config>;
 }
 
-type TimeSeriesPlotProps = {
+type PlotlyWidgetProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
   rescaleOnZoom?: boolean;
@@ -49,7 +50,7 @@ type TimeSeriesPlotProps = {
  * @param data Disruption time series data
  * @param plotId Set plot id externally in case multiple plots are used
  */
-export const TimeSeries = ({
+export const PlotlyWidget = ({
   plotId: externalId,
   plotConfig: {
     data,
@@ -74,10 +75,10 @@ export const TimeSeries = ({
   },
   rescaleOnZoom = true,
   children,
-}: TimeSeriesPlotProps) => {
+}: PlotlyWidgetProps) => {
   const { viewParams, setAnnotations } = useSample();
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
-    null
+    null,
   );
   const [updateTools, setUpdateTools] = useState(0);
   const [plotReady, setPlotReady] = useState(false);
@@ -88,8 +89,14 @@ export const TimeSeries = ({
     show: showContextMenu,
     toolingCallbacks,
     disableToolingInteraction,
+    registerMenuItem,
   } = useContextMenuProvider();
   const showContextMenuRef = useRef(showContextMenu);
+
+  // Keep the ref in sync with the latest show function
+  useEffect(() => {
+    showContextMenuRef.current = showContextMenu;
+  }, [showContextMenu]);
 
   const allowRelayout = useRef(true);
 
@@ -104,7 +111,7 @@ export const TimeSeries = ({
       // Get all subplot elements and extract the subplot name (xy for example) from the class list
       const subplots = plot.querySelectorAll(".subplot");
       const subplotNames = [...subplots].map((el) =>
-        [...el.classList].find((cls) => cls !== "subplot")
+        [...el.classList].find((cls) => cls !== "subplot"),
       );
 
       // For each subplot identified generate a D3 overplot with the subplot name appended so that tooling can reference it
@@ -122,7 +129,7 @@ export const TimeSeries = ({
           // ensure only one custom overlay group is present
           const svg = document.createElementNS(
             "http://www.w3.org/2000/svg",
-            "g"
+            "g",
           );
           svg.setAttribute("class", `${plotId}-overplot-${coordinateSystem}`);
           svg.setAttribute("fill", "none");
@@ -275,7 +282,7 @@ export const TimeSeries = ({
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
               annotation.type !== "polygon" &&
-              annotation.type !== "bounding_box"
+              annotation.type !== "bounding_box",
           );
           return otherAnnotations.concat(newAnnotations);
         });
@@ -447,17 +454,43 @@ export const TimeSeries = ({
       const xRange = xMax - xMin; // total span on x axis
       const yRange = yMax - yMin; // total span on y axis
 
+      const shapes = plot.layout.shapes;
+      let shapeIndex: number | undefined = undefined;
+
+      for (let i = 0; i < shapes?.length; i++) {
+        const shape = shapes[i];
+        if (shape.type === "rect") {
+          // Handle both coordinate orders by using min/max
+          const rectXMin = Math.min(shape.x0, shape.x1);
+          const rectXMax = Math.max(shape.x0, shape.x1);
+          const rectYMin = Math.min(shape.y0, shape.y1);
+          const rectYMax = Math.max(shape.y0, shape.y1);
+
+          if (
+            x >= rectXMin &&
+            x <= rectXMax &&
+            y >= rectYMin &&
+            y <= rectYMax
+          ) {
+            shapeIndex = i;
+            break; // found the clicked bounding box
+          }
+        }
+      }
+
+      const menuProps = {
+        x,
+        y, // generic data-space click position
+        xRange,
+        yRange, // current axis spans
+        xLimits: [xMin, xMax],
+        yLimits: [yMin, yMax], // explicit axis limits
+        shapeIndex, // will be undefined if no bbox was clicked
+      };
+
       showContextMenuRef.current({
         event,
-        props: {
-          // new generic props
-          x,
-          y, // generic data-space click position
-          xRange,
-          yRange, // current axis spans
-          xLimits: [xMin, xMax],
-          yLimits: [yMin, yMax], // explicit axis limits
-        },
+        props: menuProps,
       });
     }
 
@@ -526,7 +559,116 @@ export const TimeSeries = ({
       });
       document.removeEventListener("keyup", cancelToolCreation);
     };
-  }, [plotId, plotReady, toolingCallbacks, updateTools]);
+  }, [
+    plotId,
+    plotReady,
+    toolingCallbacks,
+    updateTools,
+    setAnnotations,
+    rescaleOnZoom,
+    viewParams,
+  ]);
+
+  useEffect(() => {
+    const handleBoundingBoxClick = (params: ItemParams) => {
+      console.log("Menu item clicked:", params);
+      console.log("Shape index:", params.shapeIndex);
+
+      const shapeIndex = params.shapeIndex;
+      if (shapeIndex === undefined) {
+        return;
+      }
+
+      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+      if (!plot) {
+        return;
+      }
+
+      const shapes = plot.layout.shapes as Plotly.Shape[] | undefined;
+      if (!shapes || shapeIndex < 0 || shapeIndex >= shapes.length) {
+        return;
+      }
+
+      const shape = shapes[shapeIndex];
+      if (shape.type !== "rect") {
+        return;
+      }
+
+      // Update the shape's label based on the menu item clicked
+      let newLabel = "Unknown";
+      if (params.id === "llm") {
+        newLabel = "LLM";
+      } else if (params.id === "ntm") {
+        newLabel = "NTM";
+      }
+
+      // Update the shape in the plot layout
+      const updatedShapes = [...shapes];
+      updatedShapes[shapeIndex] = {
+        type: "rect",
+        x0: shape.x0,
+        y0: shape.y0,
+        x1: shape.x1,
+        y1: shape.y1,
+        meta: { label: newLabel },
+        fillcolor: "rgba(0, 255, 0, 0.5)",
+        line: {
+          color: "rgba(0, 255, 0, 1)",
+          width: 5,
+        },
+        editable: shape.editable,
+        xref: shape.xref,
+        yref: shape.yref,
+      };
+
+      console.log("Current shape:", shape);
+      console.log("Updated shape:", updatedShapes[shapeIndex]);
+
+      // Use react instead of relayout for a more forceful update
+      const newLayout = { ...plot.layout, shapes: updatedShapes };
+      Plotly.react(plot, plot.data, newLayout, plot.config);
+      console.log(plot.layout.shapes);
+    };
+
+    const menuElement = (
+      <Submenu
+        id="bbox-submenu"
+        key="bbox-submenu"
+        label="Set type"
+        hidden={({ props }) => props?.shapeIndex === undefined}
+      >
+        <Item
+          id="llm"
+          key="llm"
+          onClick={({ props }) => {
+            handleBoundingBoxClick(props);
+          }}
+        >
+          LLM
+        </Item>
+        <Item
+          id="ntm"
+          key="ntm"
+          onClick={({ props }) => {
+            handleBoundingBoxClick(props);
+          }}
+        >
+          NTM
+        </Item>
+        <Item
+          id="unknown"
+          key="unknown"
+          onClick={({ props }) => {
+            handleBoundingBoxClick(props);
+          }}
+        >
+          Unknown
+        </Item>
+      </Submenu>
+    );
+
+    registerMenuItem("bbox", menuElement);
+  }, [registerMenuItem, plotId]);
 
   return (
     <div className="px-6 py-3 space-y-3 flex-col">
