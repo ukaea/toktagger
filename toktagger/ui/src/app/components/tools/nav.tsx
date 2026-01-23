@@ -62,14 +62,14 @@ type ButtonInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
-  validateOnNavigate?: boolean;
+  saveOnNavigate?: boolean;
 };
 
 function NextButton({
   project_id,
   sample_id,
   annotations,
-  validateOnNavigate,
+  saveOnNavigate,
 }: ButtonInfo) {
   const navigate = useNavigate();
 
@@ -78,7 +78,7 @@ function NextButton({
       project_id,
       sample_id,
       annotations,
-      validateOnNavigate,
+      saveOnNavigate,
     );
     try {
       const sample = await getNextSample(project_id, sample_id);
@@ -96,7 +96,7 @@ function NextButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
+  }, [project_id, sample_id, annotations, navigate, saveOnNavigate]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -124,7 +124,7 @@ function PreviousButton({
   project_id,
   sample_id,
   annotations,
-  validateOnNavigate,
+  saveOnNavigate,
 }: ButtonInfo) {
   const navigate = useNavigate();
 
@@ -133,7 +133,7 @@ function PreviousButton({
       project_id,
       sample_id,
       annotations,
-      validateOnNavigate,
+      saveOnNavigate,
     );
 
     try {
@@ -152,7 +152,7 @@ function PreviousButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
+  }, [project_id, sample_id, annotations, navigate, saveOnNavigate]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -180,8 +180,7 @@ function SaveButton({
   project_id,
   sample_id,
   annotations,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  validateOnNavigate,
+  saveOnNavigate: _saveOnNavigate,
 }: ButtonInfo) {
   const handleClick = async () => {
     try {
@@ -232,14 +231,14 @@ type SaveInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
-  validateOnNavigate?: boolean;
+  saveOnNavigate?: boolean;
 };
 
 export function ShotSearch({
   project_id,
   sample_id,
   annotations,
-  validateOnNavigate,
+  saveOnNavigate,
 }: SaveInfo) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -257,7 +256,7 @@ export function ShotSearch({
             project_id,
             sample_id,
             annotations,
-            validateOnNavigate,
+            saveOnNavigate,
           );
           const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
           navigate(NEXT_SAMPLE_URL);
@@ -288,7 +287,7 @@ type NavigationBarInfo = {
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
   const { annotations, setAnnotations } = useSample();
-  const [validateOnNavigate, setValidateOnNavigate] = useState(true);
+  const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
     <Flex alignItems="center" direction="column" gap="size-100">
       <ButtonGroup>
@@ -301,33 +300,30 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          validateOnNavigate={validateOnNavigate}
+          saveOnNavigate={SaveOnNavigate}
         />
         <NextButton
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          validateOnNavigate={validateOnNavigate}
+          saveOnNavigate={SaveOnNavigate}
         />
         <ClearButton setAnnotations={setAnnotations} />
       </ButtonGroup>
       <TooltipTrigger delay={1000} placement="bottom">
-        <Checkbox
-          isSelected={validateOnNavigate}
-          onChange={setValidateOnNavigate}
-        >
-          Validate on Navigate
+        <Checkbox isSelected={SaveOnNavigate} onChange={setSaveOnNavigate}>
+          Save on Navigate
         </Checkbox>
         <Tooltip>
-          When enabled, annotations will be marked as validated when navigating
-          to another sample.
+          When enabled, annotations will be saved when navigating to another
+          sample.
         </Tooltip>
       </TooltipTrigger>
       <ShotSearch
         project_id={project_id}
         sample_id={sample_id}
         annotations={annotations}
-        validateOnNavigate={validateOnNavigate}
+        saveOnNavigate={SaveOnNavigate}
       />
     </Flex>
   );

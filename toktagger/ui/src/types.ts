@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 export const BaseAnnotationSchema = z.object({
   project_id: z.string().nullable().default(null),
   sample_id: z.string().nullable().default(null),
+  shot_id: z.number().nullable().default(null),
   timestamp: z.string().nullable().default(null),
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),

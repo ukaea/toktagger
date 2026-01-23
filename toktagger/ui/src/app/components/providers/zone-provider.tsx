@@ -47,7 +47,6 @@ export const ZoneProvider = ({
 }) => {
   const zones = useRef<Zone[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
-
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
   // It is necessary for the context to trigger child refreshes

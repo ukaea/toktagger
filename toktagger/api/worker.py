@@ -5,7 +5,7 @@ import typing
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from toktagger.api.schemas.annotations import (
-    AnnotationBatchInputTypeAdapter,
+    AnnotationBatchTypeAdapter,
     AnnotationOutTypes,
 )
 from pydantic import ValidationError
@@ -137,8 +137,10 @@ def get_predictions(
             annotation = annotation.model_dump(mode="python")
             annotation["sample_id"] = sample.id
             annotation["project_id"] = project.id
+            annotation["shot_id"] = sample.shot_id
+            annotation["created_by"] = model.type
             try:
-                annotation = AnnotationBatchInputTypeAdapter.validate_python(annotation)
+                annotation = AnnotationBatchTypeAdapter.validate_python(annotation)
             except ValidationError as e:
                 logger.error(f"Failed to validate annotation: {e}")
             annotations_batch.append(annotation)

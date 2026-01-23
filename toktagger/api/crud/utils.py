@@ -6,10 +6,9 @@ from pydantic import TypeAdapter
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
 from toktagger.api.schemas.annotations import (
-    AnnotationIn,
     AnnotationOutTypes,
-    AnnotationTypes,
     AnnotationOutTypeAdapter,
+    AnnotationBatchTypes,
 )
 from toktagger.api.schemas.projects import Project, ProjectUpdate
 from toktagger.api.schemas.samples import FileData, Sample, SampleUpdate, SampleSummary
@@ -339,11 +338,15 @@ async def get_annotations(
         start=start,
         limit=count if count is not None else 0,
     )
+
     return [AnnotationOutTypeAdapter.validate_python(a) for a in annotations]
 
 
 async def add_annotations(
-    db_client, project_id: str, sample_id: str, annotations: list[AnnotationTypes]
+    db_client: MongoDBClient,
+    project_id: str,
+    sample_id: str,
+    annotations: list[AnnotationBatchTypes],
 ) -> list[str]:
     db_ids = {
         "project_id": convert_to_objectid(project_id, "projects"),
@@ -357,8 +360,8 @@ async def add_annotations(
 async def delete_annotations(
     db_client: MongoDBClient,
     project_id: str,
-    sample_id: str = None,
-    annotation_id: str = None,
+    sample_id: Optional[str] = None,
+    annotation_id: Optional[str] = None,
 ) -> None:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
@@ -386,7 +389,7 @@ async def update_annotations(
     db_client: MongoDBClient,
     project_id: str,
     sample_id: str,
-    annotations: list[AnnotationIn],
+    annotations: list[AnnotationBatchTypes],
 ) -> list[str]:
     # Delete previous annotations, if they exist
     try:
@@ -398,7 +401,7 @@ async def update_annotations(
 
     if len(annotations) == 0:
         # Nothing to add!
-        return
+        return []
 
     return await add_annotations(
         db_client=db_client,
@@ -436,7 +439,7 @@ async def get_sample_summary(
 async def import_annotations(
     db_client: MongoDBClient,
     project_id: str,
-    annotations: list[AnnotationTypes],
+    annotations: list[AnnotationBatchTypes],
 ) -> None:
     ids = {
         "project_id": convert_to_objectid(project_id, "projects"),
@@ -450,16 +453,34 @@ async def import_annotations(
 
     sample_groups = defaultdict(list)
     for annotation in annotations:
-        sample_groups[annotation.sample_id].append(annotation)
+        sample_groups[annotation.shot_id].append(annotation)
 
-    for sample_id, sample_annotations in sample_groups.items():
-        sample_obj_id = convert_to_objectid(sample_id, "samples")
+    shot_ids = list(sample_groups.keys())
+    samples = await db_client.get_filtered_documents(
+        collection="samples",
+        filters={"project_id": ids["project_id"], "shot_id": {"$in": shot_ids}},
+        sort_by="shot_id",
+        sort_direction="ascending",
+    )
 
-        if not await db_client.get_document_by_id("samples", sample_obj_id):
+    sample_shot_ids = [sample["shot_id"] for sample in samples]
+    for shot_id in shot_ids:
+        if shot_id not in sample_shot_ids:
             raise HTTPException(
                 status_code=404,
-                detail=f"Sample not found with ID {sample_id} belonging to specified Project.",
+                detail=f"Sample not found with shot ID {shot_id}.",
             )
+
+    for sample in samples:
+        sample_id = str(sample["_id"])
+        shot_id = sample["shot_id"]
+        sample_obj_id = convert_to_objectid(sample_id, "samples")
+        sample_annotations = sample_groups[shot_id]
+
+        # Set shot_id for each annotation
+        for annotation in sample_annotations:
+            annotation.sample_id = sample_obj_id
+            annotation.shot_id = shot_id
 
         ids["sample_id"] = sample_obj_id
         await db_client.insert_many(

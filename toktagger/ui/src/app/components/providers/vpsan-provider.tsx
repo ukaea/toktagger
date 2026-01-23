@@ -52,7 +52,6 @@ export const VSpanProvider = ({
 }) => {
   const spans = useRef<VSpan[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
-
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
   // It is necessary for the context to trigger child refreshes
@@ -70,7 +69,7 @@ export const VSpanProvider = ({
     onModifyVSpan?.(spans.current);
   };
 
-  const handleVSpanDelete = (input: unknown) => {
+  const handleVSpanDelete = (input: VSpan) => {
     spans.current = spans.current.filter((span) => span !== input);
     spans.current = spans.current.filter((span) => !span.selected);
     triggerVSpanUpdate();

@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 import ray
 import itertools
 from toktagger.api.crud import utils
-from toktagger.api.schemas.annotations import AnnotationBatchInputTypes
+from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.worker import train_model, get_predictions
 
@@ -422,7 +422,7 @@ async def get_sample_predictions(
     ),
     model_type: str = Path(description="The type of model to get predictions from."),
     task_id: str = Path(description="The prediction task to get results from."),
-) -> list[AnnotationBatchInputTypes]:
+) -> list[AnnotationBatchTypes]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 

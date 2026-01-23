@@ -2,9 +2,9 @@ import pytest
 import pytest_asyncio
 import random
 import pathlib
-from toktagger.api.schemas.projects import ProjectIn, Task
+from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.schemas.annotations import TimePoint
+from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.models import ModelUpdate
 from tests.db_definitions import MODEL_1, MODEL_2
 from unittest.mock import patch
@@ -56,7 +56,7 @@ async def setup_model_db(db_client):
     project = ProjectIn(
         name="Test",
         task=Task.TIME_SERIES,
-        query_strategy="random",
+        query_strategy=QueryStrategyType.RANDOM,
         data_loader="parquet",
     )
     project_id = await db_client.insert("projects", project)
@@ -64,7 +64,8 @@ async def setup_model_db(db_client):
     for i in range(20):
         # Generate sample data
         disruption_time = random.randint(80, 120)
-        annotation = TimePoint(
+        annotation = TimePointBatch(
+            shot_id=i,
             validated=True,
             label="Disruption",
             time=disruption_time,
@@ -264,7 +265,6 @@ async def test_model_get_sample_prediction_wrong_sample(
     get_response = await api_client.get(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_disruption_cnn/predict/{task_id}"
     )
-    print(get_response.json())
 
     # Check it returns 404 with appropriate message
     assert get_response.status_code == 404

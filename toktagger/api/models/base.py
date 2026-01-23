@@ -1,5 +1,5 @@
 from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas.annotations import Annotation, AnnotationIn
+from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.projects import Project, Task
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
@@ -118,7 +118,7 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def predict(self, samples: list[Sample]) -> list[list[AnnotationIn]]:
+    def predict(self, samples: list[Sample]) -> list[list[AnnotationBase]]:
         # pass in list of samples and list of annotations (could be size 1)
         # returns list / array / tensor of predictions and uncertainties
         pass

@@ -47,6 +47,7 @@ const Tasks = Object.values(TaskType).map((task) => ({
 const QueryStrategies = [
   { key: "sequential", value: "Sequential" },
   { key: "random", value: "Random" },
+  { key: "uncertainty", value: "Uncertainty Sampling" },
 ];
 
 const FileTypes = [

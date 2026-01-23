@@ -39,7 +39,7 @@ export function ImportButton({
         onSelect={handleFileChange}
         acceptedFileTypes={["application/json"]}
       >
-        <Flex justifyContent="center" alignItems="center">
+        <Flex justifyContent="center" alignItems="end">
           <Button variant="primary">
             <Import />
             <Text>Import Annotations</Text>

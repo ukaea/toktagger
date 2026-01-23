@@ -149,14 +149,19 @@ export async function saveSampleAnnotations(
   project_id: string,
   sample_id: string,
   annotations: Annotation[],
-  validateOnNavigate: boolean = true,
+  saveOnNavigate: boolean = true,
 ) {
+  if (!saveOnNavigate) {
+    return;
+  }
   // user has validated the annotations, so set created_by to "manual"
   const updatedAnnotations = annotations.map((annotation: Annotation) => {
     annotation.created_by = "manual";
-    annotation.validated = validateOnNavigate ? true : annotation.validated;
+    annotation.validated = true;
     return annotation;
   });
+
+  console.log("Saving annotations:", updatedAnnotations);
 
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {

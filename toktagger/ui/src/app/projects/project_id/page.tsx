@@ -199,6 +199,12 @@ export default function ProjectView() {
             >
               <Flex gap="size-100" alignItems="center" justifyContent="start">
                 <AddSamplesEditor project={project} onModify={refreshSamples} />
+              </Flex>
+              <Flex gap="size-100" alignItems="center" justifyContent="end">
+                <Flex gap="size-100" alignItems="center" marginTop="size-200">
+                  <ImportButton project_id={project_id} />
+                  <ExportButton project={project} />
+                </Flex>
                 <SearchField
                   label="Search By Shot ID"
                   // SearchField should be able to do validation when provided a 'pattern' inside a Form element
@@ -207,10 +213,6 @@ export default function ProjectView() {
                   validationState={errorMessage ? "invalid" : undefined}
                   errorMessage={errorMessage}
                 />
-              </Flex>
-              <Flex gap="size-100">
-                <ImportButton project_id={project_id} />
-                <ExportButton project={project} />
               </Flex>
             </Flex>
             <SamplesTable
