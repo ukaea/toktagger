@@ -180,26 +180,9 @@ class SpectrogramData(Data):
 
 ## Complete Example: CSV Time Series Loader
 
-Here's a complete example of a custom loader for CSV time series files.
+Here's a complete example of a custom loader for CSV time series files:
 
-This examples assumes the CSV file has the following format:
-
-- First column: time values
-- Remaining columns: signal values with column headers
-
-And the file should be called `{shot_id}.csv`.
-
-For example:
-
-```csv
-time,signal1,signal2
-0.0,1.0,2.0
-0.1,1.5,2.5
-0.2,2.0,3.0
-```
-
-
-```python
+```python title="loader.py"
 import pandas as pd
 import pathlib
 from typing import Type
@@ -263,20 +246,44 @@ class CSVTimeSeriesLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 ```
 
+This examples assumes the CSV file has the following format:
+
+- First column: time values
+- Remaining columns: signal values with column headers
+
+The file should be called `{shot_id}.csv`.
+
+For example:
+
+```csv title="1.csv"
+time,signal1,signal2
+0.0,1.0,2.0
+0.1,1.5,2.5
+0.2,2.0,3.0
+```
+
+
 ### Running the Example
+To run the example above and create a custom CSV dataloader:
 
- - Copy the CSV above into a file named eg 1.csv
- - Copy the code above into a file called loader.py
- - Make a file to run the server called eg run.py, which does:
+- Copy the code above into a file called `loader.py`
+- Make a file to run the server called `run.py`, which does:
 
-    ```python
-    from loader import CSVTimeSeriesLoader
-    from toktagger.api.main import Server
+```python title="run.py"
+from loader import CSVTimeSeriesLoader
+from toktagger.api.main import Server
 
-    server = Server()
-    server.run()
-    ```
- - Run python run.py
+server = Server()
+server.run()
+```
+
+- Create a directory which will contain your data called `data`, and then copy the CSV above into a file named `1.csv` within the new directory
+- Run `python run.py`
+- Open the UI in your browser at `localhost:8002/ui/projects`
+- Click the `Create` button on the UI, and click the `Data Loader` dropdown. You should see your new data loader listed there, called `csv_timeseries`.
+- After selecting the custom data loader, set the file path as `data` - the UI should tell you that a file has been found within that directory. Fill in the other information, including project name and task as shown below, and press `Create`:
+- You should now be able to open the sample which we have created, corresponding to our CSV file. You should see two time series plots containing the data from our CSV file:
+
 
 ## Example: Database Loader
 

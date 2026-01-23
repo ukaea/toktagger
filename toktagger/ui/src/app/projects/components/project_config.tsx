@@ -47,8 +47,12 @@ const QueryStrategies = [
   { key: "random", value: "Random" },
 ];
 
-const FileTypes = [{ key: "parquet", value: "Parquet" }];
-
+const FileTypes = [
+  { key: "parquet", value: "Parquet" },
+  { key: "csv", value: "CSV" },
+  { key: "png", value: "PNG" },
+  { key: "jpg", value: "JPEG" },
+];
 const DataLoaderOptionsSchema = z.object({
   name: z.string(),
   data_type: z.string(),

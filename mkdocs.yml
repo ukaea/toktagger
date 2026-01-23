@@ -3,6 +3,8 @@ theme:
   name: material
   palette:
     scheme: default
+  features:
+    - content.code.copy
 markdown_extensions: 
 - admonition
 - pymdownx.details
