@@ -116,7 +116,6 @@ Models can be registered for one or more of the following tasks:
 If you have added your own models, you must make sure they have been loaded before the server is run. You can run the server from within a Python script by initializing the `Server` class, and running `server.run()`:
 
 ```python
-from toktagger.api.models.base import Model, ModelRegistry
 from toktagger.api.main import Server
 
 # Import your custom model module so it gets registered
@@ -157,7 +156,7 @@ from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas.data import DataParams
 
 # Initialize data loader
-data_loader = LoaderRegistry.get(self.project.data_loader)(DataParams())
+data_loader = LoaderRegistry.get(self.project.data_loader)(DataParams(...))
 
 # Get data for a sample
 data = data_loader.get_sample(sample.shot_id, sample.data)
