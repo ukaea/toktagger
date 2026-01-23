@@ -244,12 +244,6 @@ export const TimeSeries = ({
       });
     };
 
-    // if (!disableToolingInteraction) {
-    //   config = { ...config, scrollZoom: false };
-    // } else {
-    //   config = { ...config, scrollZoom: true };
-    // }
-
     initGraph();
 
     if (!disableToolingInteraction) {

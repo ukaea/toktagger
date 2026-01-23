@@ -302,7 +302,8 @@ export default function ToolBar() {
                 </DisclosureTitle>
                 <DisclosurePanel>
                   <ImportButton
-                    project_id={project_id}
+                    project={project}
+                    sample={sample}
                     refreshAnnotations={refreshAnnotations}
                   />
                 </DisclosurePanel>

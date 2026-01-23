@@ -202,7 +202,7 @@ export default function ProjectView() {
               </Flex>
               <Flex gap="size-100" alignItems="center" justifyContent="end">
                 <Flex gap="size-100" alignItems="center" marginTop="size-200">
-                  <ImportButton project_id={project_id} />
+                  <ImportButton project={project} />
                   <ExportButton project={project} />
                 </Flex>
                 <SearchField

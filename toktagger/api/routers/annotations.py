@@ -215,7 +215,6 @@ async def update_annotations(
     # Set shot_id for each annotation
     for annotation in annotations:
         annotation.shot_id = sample.shot_id
-        print(annotation.shot_id)
 
     # Delete previous annotations, if they exist, and add new ones
     result = await utils.update_annotations(

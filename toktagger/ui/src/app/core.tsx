@@ -161,8 +161,6 @@ export async function saveSampleAnnotations(
     return annotation;
   });
 
-  console.log("Saving annotations:", updatedAnnotations);
-
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
@@ -195,18 +193,31 @@ export async function saveAnnotations(
 
 export function importJSONFile(
   project_id: string,
+  shot_id: number | null,
   file: File,
   callback?: () => void,
+  errorCallback?: () => void,
 ): void {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
       const parsed = JSON.parse(e.target?.result as string);
       const annotations = parsed as Annotation[];
+
+      // If shot_id is provided, set it for all annotations that don't have it
+      if (shot_id !== null) {
+        annotations.map((annotation: Annotation) => {
+          if (!annotation.shot_id) {
+            annotation.shot_id = shot_id;
+          }
+          return annotation;
+        });
+      }
+
       await saveAnnotations(project_id, annotations);
       callback?.();
     } catch {
-      throw new Error(`Failed to parse JSON from file: ${file.name}`);
+      errorCallback?.();
     }
   };
   reader.readAsText(file);
