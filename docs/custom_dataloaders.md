@@ -282,7 +282,12 @@ server.run()
 - Open the UI in your browser at `localhost:8002/ui/projects`
 - Click the `Create` button on the UI, and click the `Data Loader` dropdown. You should see your new data loader listed there, called `csv_timeseries`.
 - After selecting the custom data loader, set the file path as `data` - the UI should tell you that a file has been found within that directory. Fill in the other information, including project name and task as shown below, and press `Create`:
+
+![image](assets/dataloaders/create_project_ui.png)
+
 - You should now be able to open the sample which we have created, corresponding to our CSV file. You should see two time series plots containing the data from our CSV file:
+
+![image](assets/dataloaders/csv_dataloader_sample.png)
 
 
 ## Example: Database Loader
