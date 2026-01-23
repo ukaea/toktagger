@@ -39,7 +39,7 @@ def create_local_samples(
                 "file_name": str(base_path / f"{shot_id}.parquet"),
                 "type": "parquet",
                 "protocol": "file",
-                "column_names": columns,
+                "signal_names": columns,
             },
         }
         samples.append(sample)

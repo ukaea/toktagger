@@ -165,7 +165,7 @@ async def get_next_sample(api_client, setup_db):
     assert returned_sample.get("protocol") == "file"
     assert returned_sample.get("type") == "csv"
     assert returned_sample.get("file_name") == "test.csv"
-    assert returned_sample.get("column_names") == ["Ip"]
+    assert returned_sample.get("signal_names") == ["Ip"]
 
     # Then also check ID and timestamp are returned - should have been added automatically
     assert returned_sample.get("_id") == setup_db["sample_id_2"]

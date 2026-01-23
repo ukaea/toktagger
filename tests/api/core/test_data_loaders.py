@@ -78,7 +78,7 @@ def test_parquet_file_loader():
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("10000.parquet")),
         type="parquet",
         protocol="file",
-        column_names=["Ip", "dalpha"],
+        signal_names=["Ip", "dalpha"],
     )
     sample = Sample(
         shot_id=10000,

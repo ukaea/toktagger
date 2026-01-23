@@ -655,7 +655,6 @@ const editProject = async (
 };
 
 const createProject = async (project: Project): Promise<string> => {
-  console.log("Creating project:", project);
   const response = await fetch(`${BACKEND_API_URL}/projects`, {
     method: "POST",
     headers: {
@@ -774,17 +773,15 @@ const createTimeSeriesFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
   const fileNames = options.file_names;
   const shots = parseFileNames(fileNames);
 
-  const dataInfo = {
-    file_name: fileNames[0],
-    type: options.file_type,
-    protocol: options.protocol || "file",
-    column_names: options.signal_names,
-  } as TimeSeriesFileData;
-
-  const samples: Sample[] = shots.map((shot_id: number) => ({
+  const samples: Sample[] = shots.map((shot_id: number, i: number) => ({
     shot_id: shot_id,
     timestamp: new Date().toISOString(),
-    data: dataInfo,
+    data: {
+      file_name: fileNames[i],
+      type: options.file_type,
+      protocol: options.protocol || "file",
+      signal_names: options.signal_names,
+    } as TimeSeriesFileData,
   }));
 
   return samples;

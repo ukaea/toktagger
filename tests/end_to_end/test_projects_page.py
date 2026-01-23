@@ -485,5 +485,5 @@ def test_create_project_file_data(server_setup, page: Page):
         )
         samples = response.json()
         assert len(samples) == 2
-        assert all(sample["data"]["column_names"][0] == "ip" for sample in samples)
+        assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
         assert sorted(sample["shot_id"] for sample in samples) == [10000, 10001]
