@@ -7,7 +7,7 @@ import { BACKEND_API_URL } from "@/app/core";
 
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 
-import { useVideoSession } from "@/app/frames/components/video-session";
+import { useVideoSession } from "@/app/video/components/video-session";
 import { FrameAnnotatorHostV2 } from "./FrameAnnotatorHostV2";
 
 /**

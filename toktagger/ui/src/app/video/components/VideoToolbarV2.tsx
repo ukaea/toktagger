@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useVideoSession } from "@/app/frames/components/video-session";
+import { useVideoSession } from "@/app/video/components/video-session";
 import { V2_LABELS, makeTrackKey } from "./types";
 
 /**

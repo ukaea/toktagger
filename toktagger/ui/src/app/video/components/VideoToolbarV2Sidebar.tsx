@@ -16,14 +16,14 @@ import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import type { Annotation, Project, Sample } from "@/types";
 
-import { useVideoSession } from "@/app/frames/components/video-session";
-import { canonicalizeTrackId } from "@/app/frames/components/video-utils";
+import { useVideoSession } from "@/app/video/components/video-session";
+import { canonicalizeTrackId } from "@/app/video/components/video-utils";
 import { V2_LABELS } from "./types";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
   ConfirmModal,
-} from "@/app/frames/components/ui_elements";
+} from "@/app/video/components/ui_elements";
 
 /**
  * Persist the last selected class so the annotator can immediately draw

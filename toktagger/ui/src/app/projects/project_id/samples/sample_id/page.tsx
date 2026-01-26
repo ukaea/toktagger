@@ -23,7 +23,7 @@ import {
   DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { VideoViewV2Inner } from "@/app/frames/components/VideoViewV2";
+import { VideoViewV2Inner } from "@/app/video/components/VideoViewV2";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -32,7 +32,7 @@ import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import { z } from "zod";
-import { VideoSessionProvider } from "@/app/frames/components/video-session";
+import { VideoSessionProvider } from "@/app/video/components/video-session";
 import { ImageDataSchema as ImageDataSchemaForFrameParse } from "@/types";
 
 type UnknownRecord = Record<string, unknown>;

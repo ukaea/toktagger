@@ -12,7 +12,7 @@ import "@annotorious/react/annotorious-react.css";
 import {
   useVideoSession,
   commitOverlayToSession,
-} from "@/app/frames/components/video-session";
+} from "@/app/video/components/video-session";
 import { getLabelTrack, readRectGeometry, stampLabelAndTrack } from "./anno-utils";
 import {
   canonicalizeTrackId,
