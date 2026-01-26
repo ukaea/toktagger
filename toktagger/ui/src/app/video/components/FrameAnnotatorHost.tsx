@@ -1,3 +1,4 @@
+// toktagger/ui/src/app/video/components/FrameAnnotatorHost.tsx
 "use client";
 
 import React, {
@@ -281,6 +282,55 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     left: number;
     top: number;
   } | null>(null);
+
+  // --- Responsive upscale measurement state ---
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [containerW, setContainerW] = useState<number>(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Seed once immediately (important: avoids "0 width" if RO fires late)
+    const seed = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w) setContainerW(w);
+    };
+    seed();
+
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (!cr) return;
+      setContainerW(cr.width);
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const displayWidth = useMemo(() => {
+    if (!containerW) return undefined;
+
+    // Tune these three values as needed
+    const TARGET = 900; // "comfortable" tagging width
+    const MAX = 1100; // don't exceed this even on huge screens
+    const MAX_SCALE = 3; // don't upscale more than 3× natural
+
+    const maxAvailable = Math.min(containerW, MAX);
+
+    // Before image loads, just take the available width nicely
+    if (!natural?.w) return maxAvailable;
+
+    const maxScaled = natural.w * MAX_SCALE;
+
+    // Upscale small images towards TARGET, but:
+    // - never exceed container/max
+    // - never exceed MAX_SCALE × natural
+    // - never go below natural unless container is smaller (then fit)
+    const desired = Math.max(natural.w, Math.min(TARGET, maxAvailable));
+    return Math.min(maxAvailable, maxScaled, desired);
+  }, [containerW, natural]);
 
   const clearPopup = useCallback(() => {
     setSelectedId(null);
@@ -572,7 +622,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   };
 
   return (
-    <div className="w-full flex justify-center">
+    // This keeps your previous centering approach:
+    // - outer flex justify-center centers the inline-block content
+    // - inner inline-block shrink-wraps to the image width we set
+    <div ref={containerRef} className="w-full flex justify-center">
       <div className="relative inline-block max-w-full">
         <ImageAnnotator
           tool="rectangle"
@@ -584,14 +637,20 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             ref={imgRef}
             src={`data:image/png;base64,${imageBase64}`}
             alt={`Frame ${label}`}
-            className="block mx-auto max-w-full h-auto object-contain max-h-[calc(100dvh-220px)] sm:max-h-[calc(100dvh-210px)]"
-            style={{
-              imageRendering: "pixelated",
-              maxHeight: "calc(100dvh - 240px)",
-            }}
             draggable={false}
             onLoad={() => {
+              const img = imgRef.current;
+              if (img) setNatural({ w: img.naturalWidth, h: img.naturalHeight });
               if (selectedId) void refreshPopupForId(selectedId);
+            }}
+            className="block mx-auto h-auto object-contain select-none"
+            // Key change: explicitly set width on the IMG so Annotorious can't shrink-wrap it away.
+            style={{
+              imageRendering: "pixelated",
+              width: displayWidth ? `${displayWidth}px` : undefined,
+              maxWidth: "100%",
+              height: "auto",
+              maxHeight: "calc(100dvh - 240px)",
             }}
           />
         </ImageAnnotator>
