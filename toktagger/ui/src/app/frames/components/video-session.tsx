@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
 
-import type { Annotation } from "@/types"; // v1 already uses this; we only use it for seeding filter
+import type { Annotation } from "@/types"; // used only for one-shot seeding from backend payload
 import type { ByFrameMap, FrameIndex, InstanceProfile, Selection, VideoBoundingBox } from "./types";
 import { buildSourceKey, classIdForName } from "./types";
 import {
@@ -17,6 +17,11 @@ import {
 } from "./video-utils";
 import { annoToVideoBBox, getLabelTrack, normalizeOverlay, videoBBoxToAnno } from "./anno-utils";
 
+/**
+ * Session state for the frame-by-frame annotation workflow.
+ * Owns the in-memory per-frame overlays, selection (class/instance), and helpers for
+ * forward propagation and converting overlays to/from backend shapes.
+ */
 type VideoSessionCtx = {
   projectId: string;
   sampleId: string;
@@ -24,30 +29,40 @@ type VideoSessionCtx = {
   frame: FrameIndex;
   setFrame: (n: FrameIndex) => void;
 
+  /** Stable source key for the current frame (used as target.source on annotations). */
   frameKey: string;
 
+  /** Per-frame overlay storage (native Annotorious annotation objects). */
   byFrame: ByFrameMap;
 
+  /** True if in-memory session has changes that haven't been saved to backend. */
   dirty: boolean;
   markSaved: () => void;
 
+  /** Current "armed" selection for drawing and instance operations. */
   selection: Selection;
   setSelection: (next: Selection) => void;
 
+  /** Derived instance summary across all frames (used by sidebar UI). */
   instances: InstanceProfile[];
 
   // frame ops
   getFrameList: (frame: FrameIndex) => ImageAnnotation[];
-  seedFrame: (frame: FrameIndex, list: ImageAnnotation[]) => void; // does not set dirty
-  setFrameList: (frame: FrameIndex, list: ImageAnnotation[]) => void; // sets dirty
+  /** Set overlay for a frame without marking dirty (used for seeding). */
+  seedFrame: (frame: FrameIndex, list: ImageAnnotation[]) => void;
+  /** Set overlay for a frame and mark dirty (used for edits). */
+  setFrameList: (frame: FrameIndex, list: ImageAnnotation[]) => void;
   clearCurrentFrame: () => void;
   clearAllFrames: () => void;
 
   // instance ops
+  /** Allocate/select the next track id for a class (used by "new instance" flows). */
   createNewInstanceForClass: (className: string) => { className: string; trackId: string };
+  /** Delete the currently selected instance across all frames. */
   deleteSelectedInstanceAcrossFrames: () => void;
 
   // forward propagation
+  /** Seed next frame with current overlay if the next frame has no annotations. */
   forwardPropToNextIfEmpty: (nextFrame: FrameIndex) => void;
 
   // conversion helpers for backend save
@@ -66,6 +81,10 @@ export function useVideoSession(): VideoSessionCtx {
   return v;
 }
 
+/**
+ * Provides shared session state for the video annotation UI.
+ * The page owns the current frame number; this provider owns the overlays and selection.
+ */
 export function VideoSessionProvider(props: {
   projectId: string;
   sampleId: string;
@@ -84,8 +103,12 @@ export function VideoSessionProvider(props: {
     source: null,
   });
 
-  const frameKey = useMemo(() => buildSourceKey({ projectId, sampleId, frame }), [projectId, sampleId, frame]);
+  const frameKey = useMemo(
+    () => buildSourceKey({ projectId, sampleId, frame }),
+    [projectId, sampleId, frame]
+  );
 
+  // Instances are derived from byFrame so UI can render a stable sidebar list.
   const instances = useMemo(() => deriveInstances(byFrame, getLabelTrack), [byFrame]);
 
   const getFrameList = useCallback(
@@ -95,7 +118,7 @@ export function VideoSessionProvider(props: {
 
   const seedFrame = useCallback((f: FrameIndex, list: ImageAnnotation[]) => {
     setByFrame((prev) => mapSetFrame(prev, f, list));
-    // does NOT set dirty
+    // Seeding should not mark the session dirty.
   }, []);
 
   const setFrameList = useCallback((f: FrameIndex, list: ImageAnnotation[]) => {
@@ -133,38 +156,49 @@ export function VideoSessionProvider(props: {
 
   const deleteSelectedInstanceAcrossFrames = useCallback(() => {
     if (!selection.className || !selection.trackId) return;
+
     setByFrame((prev) =>
-      deleteTrackAcrossFrames(prev, { className: selection.className, trackId: selection.trackId }, getLabelTrack)
+      deleteTrackAcrossFrames(
+        prev,
+        { className: selection.className, trackId: selection.trackId },
+        getLabelTrack
+      )
     );
     setDirty(true);
   }, [selection.className, selection.trackId]);
 
+  /**
+   * Copies current frame annotations into `nextFrame` if it's empty.
+   * Any copied annotations get their target.source updated to match the destination frame.
+   */
   const forwardPropToNextIfEmpty = useCallback(
     (nextFrame: FrameIndex) => {
-        setByFrame((prev) => {
+      setByFrame((prev) => {
         const next = forwardPropagateIfEmpty(prev, frame, nextFrame, (a, nf) => {
-            const nextKey = buildSourceKey({ projectId, sampleId, frame: nf });
-            return {
+          const nextKey = buildSourceKey({ projectId, sampleId, frame: nf });
+          return {
             ...a,
             target: { ...(a.target as any), source: nextKey } as any,
-            };
+          };
         });
 
-        // Only mark dirty if we actually changed something (seeded next frame).
+        // Only mark dirty if we actually seeded the next frame.
         if (next !== prev) setDirty(true);
 
         return next;
-        });
+      });
     },
     [frame, projectId, sampleId]
-    );
+  );
 
+  /** Flatten all per-frame overlays into a single list (useful for debugging/export). */
   const collectAllNative = useCallback(() => {
     const out: ImageAnnotation[] = [];
     for (const list of byFrame.values()) out.push(...(list ?? []));
     return out;
   }, [byFrame]);
 
+  /** Convert the session overlays into backend video bounding boxes. */
   const collectAllVideoBBoxes = useCallback(() => {
     const out: VideoBoundingBox[] = [];
     for (const [f, list] of byFrame.entries()) {
@@ -177,10 +211,11 @@ export function VideoSessionProvider(props: {
   }, [byFrame]);
 
   /**
-   * One-shot seeding helper:
-   * - only runs if byFrame is empty AND not dirty
-   * - filters dbAnnotations for video_bounding_box entries
-   * - groups by frame, converts to native ImageAnnotation[] and stores in byFrame
+   * Seed session overlays from backend annotations if the user hasn't edited anything yet.
+   * This is intentionally conservative:
+   * - no-op if session is dirty
+   * - no-op if we already have in-memory overlays
+   * - only consumes `video_bounding_box` entries
    */
   const seedFromDbIfEmpty = useCallback(
     (dbAnnotations: Annotation[]) => {
@@ -193,23 +228,21 @@ export function VideoSessionProvider(props: {
       for (const a of dbAnnotations) {
         const anyA = a as any;
         if (!anyA || anyA.type !== "video_bounding_box") continue;
+
         const frameNum = Number(anyA.frame);
         if (!Number.isFinite(frameNum)) continue;
 
+        // Normalize backend payload into our minimal VideoBoundingBox shape.
         const vb: VideoBoundingBox = {
           type: "video_bounding_box",
           frame: frameNum,
 
-          // track_id can arrive under different names depending on backend/history
+          // Track id and label can arrive under different names depending on history.
           track_id: String(anyA.track_id ?? anyA.trackId ?? ""),
-
-          // label/class name
           label: String(anyA.label ?? anyA.class_name ?? anyA.className ?? "UFO"),
-          class_id: Number(
-            anyA.class_id ?? classIdForName(String(anyA.label ?? "UFO")),
-          ),
+          class_id: Number(anyA.class_id ?? classIdForName(String(anyA.label ?? "UFO"))),
 
-          // box geometry
+          // Geometry
           x_min: Number(anyA.x_min ?? anyA.x ?? 0),
           y_min: Number(anyA.y_min ?? anyA.y ?? 0),
           width: Number(anyA.width ?? anyA.w ?? 0),
@@ -219,7 +252,6 @@ export function VideoSessionProvider(props: {
           timestamp: typeof anyA.timestamp === "string" ? anyA.timestamp : undefined,
         };
 
-        // build vb + convert...
         const key = buildSourceKey({ projectId, sampleId, frame: frameNum });
         const anno = videoBBoxToAnno(vb, key);
 
@@ -236,64 +268,79 @@ export function VideoSessionProvider(props: {
     [byFrame.size, dirty, projectId, sampleId]
   );
 
-  const value = useMemo<VideoSessionCtx>(() => ({
-    projectId,
-    sampleId,
-    frame,
-    setFrame,
-    frameKey,
-    byFrame,
-    dirty,
-    markSaved,
-    selection,
-    setSelection,
-    instances,
-    getFrameList,
-    seedFrame,
-    setFrameList,
-    clearCurrentFrame,
-    clearAllFrames,
-    createNewInstanceForClass,
-    deleteSelectedInstanceAcrossFrames,
-    forwardPropToNextIfEmpty,
-    collectAllNative,
-    collectAllVideoBBoxes,
-    seedFromDbIfEmpty,
-  }), [
-    projectId,
-    sampleId,
-    frame,
-    setFrame,
-    frameKey,
-    byFrame,
-    dirty,
-    markSaved,
-    selection,
-    setSelection,
-    instances,
-    getFrameList,
-    seedFrame,
-    setFrameList,
-    clearCurrentFrame,
-    clearAllFrames,
-    createNewInstanceForClass,
-    deleteSelectedInstanceAcrossFrames,
-    forwardPropToNextIfEmpty,
-    collectAllNative,
-    collectAllVideoBBoxes,
-    seedFromDbIfEmpty,
-  ]);
+  const value = useMemo<VideoSessionCtx>(
+    () => ({
+      projectId,
+      sampleId,
+      frame,
+      setFrame,
+      frameKey,
+      byFrame,
+      dirty,
+      markSaved,
+      selection,
+      setSelection,
+      instances,
+      getFrameList,
+      seedFrame,
+      setFrameList,
+      clearCurrentFrame,
+      clearAllFrames,
+      createNewInstanceForClass,
+      deleteSelectedInstanceAcrossFrames,
+      forwardPropToNextIfEmpty,
+      collectAllNative,
+      collectAllVideoBBoxes,
+      seedFromDbIfEmpty,
+    }),
+    [
+      projectId,
+      sampleId,
+      frame,
+      setFrame,
+      frameKey,
+      byFrame,
+      dirty,
+      markSaved,
+      selection,
+      setSelection,
+      instances,
+      getFrameList,
+      seedFrame,
+      setFrameList,
+      clearCurrentFrame,
+      clearAllFrames,
+      createNewInstanceForClass,
+      deleteSelectedInstanceAcrossFrames,
+      forwardPropToNextIfEmpty,
+      collectAllNative,
+      collectAllVideoBBoxes,
+      seedFromDbIfEmpty,
+    ]
+  );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
+
 /**
- * Helper used by the host:
- * given a raw overlay list, normalize + stamp + write into session for current frame.
+ * Normalizes a raw overlay list into our session invariants:
+ * - rectangles only
+ * - stamps the frame source key
+ * - ensures class/track bodies exist (allocating track ids when needed)
+ * - optional per-instance de-duplication within the frame
+ *
+ * The caller is responsible for writing the returned list into session state.
  */
 export function commitOverlayToSession(args: {
   raw: ImageAnnotation[];
   frameKey: string;
-  fallback: { className: string; trackId: string };
+  fallback: { className: string | null; trackId: string | null };
+  allocTrackId?: (className: string) => string;
+  enforceBothBodies?: boolean;
+  dedupeByInstance?: boolean;
 }): ImageAnnotation[] {
-  return normalizeOverlay(args.raw, args.frameKey, args.fallback);
+  return normalizeOverlay(args.raw, args.frameKey, args.fallback, args.allocTrackId, {
+    enforceBothBodies: args.enforceBothBodies ?? true,
+    dedupeByInstance: args.dedupeByInstance ?? true,
+  });
 }
