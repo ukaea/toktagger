@@ -10,6 +10,8 @@ from toktagger.api.crud.mongita_client import AsyncMongitaClient
 DATABASE_NAME = "event_db"
 COLLECTION_NAME = "shots"
 
+T = typing.TypeVar("T", bound=pydantic.BaseModel)
+
 
 class MongoDBClient:
     def __init__(self, url: str, db_name: str):
@@ -27,7 +29,7 @@ class MongoDBClient:
     async def insert(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        model: pydantic.BaseModel,
+        model: T,
         ids: dict[str, ObjectId] | None = None,
     ):
         ids = ids or {}
@@ -39,7 +41,7 @@ class MongoDBClient:
     async def insert_many(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        models: list[pydantic.BaseModel],
+        models: list[T],
         ids: typing.Union[dict, list[dict]] | None = None,
     ):
         ids = ids or {}
@@ -60,7 +62,7 @@ class MongoDBClient:
     async def update(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        model: pydantic.BaseModel,
+        model: T,
         object_id: ObjectId,
     ):
         # Retrieve existing entry:

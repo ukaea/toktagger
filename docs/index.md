@@ -1,6 +1,11 @@
-# Welcome to TokTagger
+#
 
-An interactive annotation platform for Tokamak diagnostic data.
+<figure markdown="span">
+    ![TokTagger Logo](assets/logo_small.png){align=center}
+  <figcaption>An open source, interactive annotation platform for Tokamak diagnostic data.</figcaption>
+</figure>
+
+
 
 ## Quick Start
 
@@ -24,4 +29,3 @@ This will start a local instance of the application running at `http://localhost
  - [License](https://github.com/ukaea/toktagger/blob/main/LICENSE.md)
  - [Bug/Issue Tracker](https://github.com/ukaea/toktagger/issues)
  - [Contributing](https://github.com/ukaea/toktagger/blob/main/CONTRIBUTING.md)
-

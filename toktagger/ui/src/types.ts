@@ -1,13 +1,19 @@
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
+  project_id: z.string().nullable().default(null),
+  sample_id: z.string().nullable().default(null),
+  shot_id: z.number().nullable().default(null),
+  timestamp: z.string().nullable().default(null),
+  validated: z.boolean().nullable().default(null),
+  uncertainty: z.number().nullable().default(1),
   created_by: z.string().default("manual"),
-  timestamp: z.string().optional(),
-  validated: z.boolean().optional(),
-  uncertainty: z.number().optional(),
+  time_min: z.number().nullable().default(null),
+  time_max: z.number().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
+
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 export const ClassLabelSchema = BaseAnnotationSchema;
 export type ClassLabel = z.infer<typeof ClassLabelSchema>;
@@ -78,17 +84,21 @@ export const CategorySchema = z.object({
 });
 export type Category = z.infer<typeof CategorySchema>;
 
-export const ZoneSchema = z.object({
+export const BaseDisplayAnnotationSchema = z.object({
   created_by: z.string().default("manual"),
+  selected: z.boolean().default(false),
   category: CategorySchema,
+});
+
+export type BaseDisplayAnnotation = z.infer<typeof BaseDisplayAnnotationSchema>;
+
+export const ZoneSchema = BaseDisplayAnnotationSchema.extend({
   x0: z.number(),
   x1: z.number(),
 });
 export type Zone = z.infer<typeof ZoneSchema>;
 
-export const VSpanSchema = z.object({
-  created_by: z.string().default("manual"),
-  category: CategorySchema,
+export const VSpanSchema = BaseDisplayAnnotationSchema.extend({
   x: z.number(),
 });
 export type VSpan = z.infer<typeof VSpanSchema>;
@@ -105,21 +115,39 @@ export const DisplayAnnotationSchema = z.union([
 ]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
+export enum TaskType {
+  TimeSeries = "time-series",
+  Spectrogram = "spectrogram",
+  Video = "video",
+}
+
+export const TaskSchema = z.enum([
+  TaskType.TimeSeries,
+  TaskType.Spectrogram,
+  TaskType.Video,
+]);
+
 export const ProjectSchema = z.object({
-  _id: z.string().optional(),
+  _id: z.string().nullable(),
   name: z.string(),
-  task: z.string(),
+  task: TaskSchema,
   query_strategy: z.string(),
   data_loader: z.string(),
-  timestamp: z.string(),
+  timestamp: z.string().optional(),
+  time_min: z.number().nullable().optional(),
+  time_max: z.number().nullable().optional(),
+  min_time_step: z.number().nullable().optional(),
   model_types: z.array(z.string()),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
 export const ProjectUpdateSchema = z.object({
   name: z.string().optional(),
-  task: z.string().optional(),
+  task: TaskSchema.optional(),
   query_strategy: z.string().optional(),
+  time_min: z.number().nullable().optional(),
+  time_max: z.number().nullable().optional(),
+  min_time_step: z.number().nullable().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 
@@ -202,7 +230,8 @@ export type ToolingProps = {
   plotId?: string;
   plotReady?: boolean;
   forceUpdate?: number;
-  onZoneUpdate?: CallableFunction;
+  onUpdate?: CallableFunction;
+  selectedXRange?: [number, number];
 };
 
 export enum ToolingTypes {

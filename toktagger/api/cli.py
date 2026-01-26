@@ -46,3 +46,7 @@ def main():
     uvicorn.run(
         "toktagger.api.cli:app", host=args.host, port=args.port, reload=args.reload
     )
+
+
+if __name__ == "__main__":
+    main()

@@ -2,9 +2,9 @@ import pytest
 import pytest_asyncio
 import random
 import pathlib
-from toktagger.api.schemas.projects import ProjectIn
+from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.schemas.annotations import TimePoint
+from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.models import ModelUpdate
 from tests.db_definitions import MODEL_1, MODEL_2
 from unittest.mock import patch
@@ -55,8 +55,8 @@ async def setup_model_db(db_client):
     # Create sample data for training / predicting a Disruption model
     project = ProjectIn(
         name="Test",
-        task="disruption",
-        query_strategy="random",
+        task=Task.TIME_SERIES,
+        query_strategy=QueryStrategyType.RANDOM,
         data_loader="parquet",
     )
     project_id = await db_client.insert("projects", project)
@@ -64,7 +64,8 @@ async def setup_model_db(db_client):
     for i in range(20):
         # Generate sample data
         disruption_time = random.randint(80, 120)
-        annotation = TimePoint(
+        annotation = TimePointBatch(
+            shot_id=i,
             validated=True,
             label="Disruption",
             time=disruption_time,

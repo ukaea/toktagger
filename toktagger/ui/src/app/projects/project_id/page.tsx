@@ -24,6 +24,8 @@ import type { Project, Sample } from "@/types";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
+import { ImportButton } from "@/app/components/tools/import";
+import { ExportButton } from "@/app/components/tools/export";
 
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
@@ -109,6 +111,25 @@ export default function ProjectView() {
 
   const [project, setProject] = useState<Project | null>(null);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!hasId) {
+        return;
+      }
+      const samples = await getSamples(
+        sortDescriptor,
+        project_id,
+        currentPage,
+        samplesPerPage,
+        shotId,
+      );
+      setSamples(samples);
+      const project = await getProject(project_id);
+      setProject(project);
+    };
+    fetchData();
+  }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
+
   const refreshSamples = useCallback(async () => {
     if (!hasId) {
       return;
@@ -124,6 +145,7 @@ export default function ProjectView() {
     const project = await getProject(project_id);
     setProject(project);
   }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
+
   useEffect(() => {
     refreshSamples();
   }, [
@@ -175,15 +197,23 @@ export default function ProjectView() {
               alignItems="center"
               justifyContent="space-between"
             >
-              <AddSamplesEditor project={project} onModify={refreshSamples} />
-              <SearchField
-                label="Search By Shot ID"
-                // SearchField should be able to do validation when provided a 'pattern' inside a Form element
-                // But I could not for the life of me get that to work, so will do it manually...
-                onSubmit={onSearchSubmit}
-                validationState={errorMessage ? "invalid" : undefined}
-                errorMessage={errorMessage}
-              />
+              <Flex gap="size-100" alignItems="center" justifyContent="start">
+                <AddSamplesEditor project={project} onModify={refreshSamples} />
+              </Flex>
+              <Flex gap="size-100" alignItems="center" justifyContent="end">
+                <Flex gap="size-100" alignItems="center" marginTop="size-200">
+                  <ImportButton project={project} />
+                  <ExportButton project={project} />
+                </Flex>
+                <SearchField
+                  label="Search By Shot ID"
+                  // SearchField should be able to do validation when provided a 'pattern' inside a Form element
+                  // But I could not for the life of me get that to work, so will do it manually...
+                  onSubmit={onSearchSubmit}
+                  validationState={errorMessage ? "invalid" : undefined}
+                  errorMessage={errorMessage}
+                />
+              </Flex>
             </Flex>
             <SamplesTable
               project_id={project_id}
