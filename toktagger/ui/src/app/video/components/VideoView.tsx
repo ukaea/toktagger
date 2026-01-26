@@ -179,14 +179,11 @@ export function VideoViewInner(props: VideoViewProps) {
     if (!Number.isFinite(n)) return;
     const target = Math.max(0, Math.trunc(n));
 
-    props.setDataParams(
-      (prev) =>
-        ({
-          ...(prev as any),
-          name: "image",
-          frame: target,
-        }) as DataParams,
-    );
+    props.setDataParams((prev) => ({
+      ...(prev as Record<string, unknown>),
+      name: "image",
+      frame: target,
+    }) as DataParams);
   };
 
   const onSaveBackend = async (payload: Annotation[]) => {
