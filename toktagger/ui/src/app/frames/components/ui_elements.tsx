@@ -1,0 +1,301 @@
+"use client";
+
+import React, { useState } from "react";
+import { Item, Text, Picker } from "@adobe/react-spectrum";
+
+/**
+ * Minimal class category shape consumed by the class picker.
+ * Kept intentionally small so this file stays UI-only and decoupled from session/types.
+ */
+export type ClassCategoryItem = {
+  name: string;
+};
+
+/**
+ * Class selector used to "arm" drawing with a label.
+ * When no class is selected, the annotator should disable drawing.
+ */
+export function ClassPanel({
+  items,
+  selectedClassName,
+  setSelectedClassName,
+}: {
+  items: Iterable<ClassCategoryItem>;
+  selectedClassName: string | null;
+  setSelectedClassName: (v: string | null) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-700 bg-black shadow-sm p-3 w-48 mx-auto">
+      <Text UNSAFE_className="text-sm font-medium mb-2 block text-white">
+        Class
+      </Text>
+
+      <Picker
+        aria-label="Class"
+        items={items}
+        selectedKey={selectedClassName}
+        onSelectionChange={(key) => setSelectedClassName((key as string) || null)}
+        placeholder="— Select class —"
+        width="100%"
+      >
+        {(item) => <Item key={item.name}>{item.name}</Item>}
+      </Picker>
+
+      <Text UNSAFE_className="text-xs mt-2 block text-white/80">
+        Drawing is enabled after you pick a class.
+      </Text>
+    </div>
+  );
+}
+
+/** Minimal shape used to render/select a tracked instance in the sidebar list. */
+export type Profile = {
+  key: string;
+  class_id: number;
+  class_name: string;
+  track_id: string;
+};
+
+/**
+ * Instance list + optional "profile creator" UI.
+ * - Selecting an instance calls `onSelect`.
+ * - Right-clicking an instance calls `onRequestBulkDelete`.
+ * - The creator UI is gated by `showCreator` and `classItems`.
+ */
+export function InstancePanel({
+  profiles,
+  selectedKey,
+  onSelect,
+  onCreateProfile,
+  onRequestBulkDelete,
+  onRequestDeleteAllInstances,
+  profileCounts,
+  showCreator = true,
+  // Only used when showCreator=true
+  classItems,
+}: {
+  profiles: Profile[];
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+  onCreateProfile: (className: string, trackId: string) => void;
+  onRequestBulkDelete: (profile: Profile) => void;
+  onRequestDeleteAllInstances: () => void;
+  profileCounts?: Record<string, number>;
+  showCreator?: boolean;
+  classItems?: { name: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Creator UI state (only meaningful when showCreator=true)
+  const defaultClass = classItems?.[0]?.name ?? "";
+  const [className, setClassName] = useState<string>(defaultClass);
+
+  const makeAutoTrackId = () => `auto-${Math.random().toString(36).slice(2, 7)}`;
+  const [trackId, setTrackId] = useState<string>(() => makeAutoTrackId());
+
+  const creatorEnabled = Boolean(classItems && classItems.length > 0);
+
+  return (
+    <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
+      <div className="text-gray-200 text-sm font-medium mb-2">
+        {showCreator ? "Class + Track" : "Instances"}
+      </div>
+
+      {showCreator && (
+        <div className="mb-3">
+          <button
+            onClick={() => {
+              setOpen((prev) => {
+                const next = !prev;
+                if (next) setTrackId(makeAutoTrackId());
+                return next;
+              });
+            }}
+            className="w-full rounded-lg border shadow-sm px-2.5 py-1.5 text-left bg-black text-white border-gray-600 hover:bg-gray-800 flex items-center justify-between"
+            title="Create a new class/track profile"
+            disabled={!creatorEnabled}
+          >
+            <span className="font-medium text-sm">Add Profile</span>
+            <span className="text-lg leading-none">+</span>
+          </button>
+
+          {!creatorEnabled && (
+            <div className="text-[11px] text-white/60 mt-1">
+              Creator disabled (no class items provided).
+            </div>
+          )}
+        </div>
+      )}
+
+      <button
+        onClick={onRequestDeleteAllInstances}
+        disabled={profiles.length === 0}
+        className={`mb-2 w-full rounded-lg px-2.5 py-1.5 text-left border shadow-sm ${
+          profiles.length
+            ? "bg-black text-red-400 border-red-400 hover:text-red-300 hover:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-400/40"
+            : "bg-black/40 text-white/40 border-gray-700 cursor-not-allowed"
+        }`}
+        title="Delete all instances and their annotations across all frames"
+      >
+        <span className="text-sm">Delete All Instances</span>
+      </button>
+
+      {showCreator && open && (
+        <div className="mt-2 rounded-lg border shadow-sm bg-black text-white border-gray-700 p-2 space-y-2">
+          <div>
+            <label className="text-xs text-gray-300">Class Label</label>
+            <select
+              value={className}
+              onChange={(e) => setClassName(e.target.value)}
+              className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none bg-gray-900 text-white border-gray-700"
+            >
+              {(classItems ?? []).map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-300">Track ID</label>
+            <input
+              type="text"
+              value={trackId}
+              readOnly
+              className="mt-1 w-full border rounded px-2 py-1 text-sm bg-gray-900 text-white border-gray-700 cursor-not-allowed select-all"
+              title="Auto-generated; not editable"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const name = (className || "").trim();
+                const trk = (trackId || "").trim();
+                if (!name || !trk) return;
+                onCreateProfile(name, trk);
+                setOpen(false);
+              }}
+              className="flex-1 rounded-md bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 text-xs"
+              disabled={!creatorEnabled}
+            >
+              Create
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded-md border border-gray-700 text-white bg-black hover:bg-gray-800 px-2.5 py-1.5 text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg border bg-black/60 border-gray-700 shadow-sm max-h-[45vh] overflow-y-auto mt-2">
+        {profiles.length === 0 && (
+          <div className="p-3 text-sm text-gray-200">
+            {showCreator
+              ? "No profiles yet. Click “Add Profile”."
+              : "No instances yet. Pick a class above, then draw to create one."}
+          </div>
+        )}
+
+        {profiles.map((p) => {
+          const count = profileCounts?.[p.key] ?? 0;
+
+          return (
+            <button
+              key={p.key}
+              onClick={() => onSelect(p.key)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onRequestBulkDelete(p);
+              }}
+              className={`w-full text-left px-2 py-1.5 border-b last:border-b-0 transition leading-snug ${
+                selectedKey === p.key
+                  ? "bg-gray-900 border-gray-600 ring-1 ring-orange-400/60"
+                  : "bg-black hover:bg-gray-900 border-gray-800"
+              } text-white`}
+              title={`Select: ${p.class_name} (${p.track_id}). Right-click to bulk delete this instance.`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-white">
+                    #{p.track_id}
+                  </div>
+                  <div className="text-[11px] text-gray-300 mt-0">
+                    Class: {p.class_name} (id {p.class_id})
+                  </div>
+                </div>
+
+                <span
+                  className="ml-2 shrink-0 inline-block text-[10px] px-1.5 py-0.5 rounded-full border border-gray-700 bg-gray-900 text-gray-200"
+                  title="Total annotations for this instance across all frames"
+                >
+                  {count}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Simple confirmation modal used by destructive actions (bulk deletes, etc.).
+ * Kept dependency-free to avoid quirks across UI libraries.
+ */
+export function ConfirmModal({
+  open,
+  title,
+  message,
+  details,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  details?: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-xl border">
+        <div className="px-4 py-3 border-b">
+          <h2 className="text-base font-semibold">{title}</h2>
+        </div>
+
+        <div className="px-4 py-3 space-y-2">
+          <p className="text-sm text-gray-800">{message}</p>
+          {details && <div className="text-xs text-gray-600">{details}</div>}
+        </div>
+
+        <div className="px-4 py-3 border-t flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 rounded-md border text-sm"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
