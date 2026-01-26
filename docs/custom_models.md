@@ -28,7 +28,7 @@ import typing
 Create a class that inherits from `Model` and implement the required methods:
 
 ```python
-@ModelRegistry.register("my_custom_model", ["classification"])
+@ModelRegistry.register("my_custom_model", ["time-series"])
 class MyCustomModel(Model):
     """Custom model for my specific task"""
     
@@ -100,16 +100,15 @@ class MyCustomModel(Model):
 
 ### Step 3: Register the Model
 
-The `@ModelRegistry.register("my_custom_model", ["classification"])` decorator automatically registers your model with TokTagger. The first argument is the model name identifier, and the second is a list of tasks the model supports.
+The `@ModelRegistry.register("my_custom_model", ["time-series"])` decorator automatically registers your model with TokTagger. The first argument is the model name identifier, and the second is a list of tasks the model supports.
 
 ### Supported Tasks
 
 Models can be registered for one or more of the following tasks:
 
-- `"classification"` - Multi-class classification
-- `"disruption"` - Disruption time prediction
-- `"segmentation"` - Temporal segmentation
-- Custom task types can be added
+- `"time-series"` - Time series annotation
+- `"spectrogram"` - Spectrogram annotation
+- `"video"` - Video frame annotation
 
 ### Step 4: Run Server with Custom Model
 
@@ -208,7 +207,7 @@ from toktagger.api.schemas.data import TimeSeriesData, DataParams
 from toktagger.api.core.data_loaders import LoaderRegistry
 
 
-@ModelRegistry.register("random_forest_classifier", ["classification"])
+@ModelRegistry.register("random_forest_classifier", ["time-series"])
 class RandomForestModel(Model):
     """Random Forest classifier for time series classification"""
     
