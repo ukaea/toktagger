@@ -1,4 +1,6 @@
+// toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 "use client";
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -17,7 +19,9 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import React from "react";
+
+import { VideoViewInner } from "@/app/video/components/VideoView";
+import { VideoSessionProvider } from "@/app/video/components/video-session";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -46,57 +50,91 @@ const SampleDataBreadCrumbs = ({
 
 const SampleView = () => {
   const { project, isLoading, error } = useSample();
+  if (!project) return null;
+  if (isLoading) return <LoadingView />;
+  if (error) return <ErrorView message={error} />;
 
-  if (!project) {
-    return null;
-  }
-
-  if (isLoading) {
-    return <LoadingView />;
-  }
-
-  if (error) {
-    return <ErrorView message={error} />;
-  }
-
-  if (project.task == TaskType.TimeSeries) {
-    return <TimeSeriesView />;
-  } else if (project.task == TaskType.Spectrogram) {
-    return <SpectrogramView />;
-  }
+  if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
+  if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
+  return null;
 };
 
-function SamplePageContent() {
-  const { project, sample, isLoading } = useSample();
+function SamplePageContent(props: { projectId: string; sampleId: string }) {
+  const {
+    project,
+    sample,
+    data,
+    annotations,
+    dataParams,
+    setDataParams,
+    isLoading,
+    error,
+  } = useSample();
 
-  if (!project && !isLoading) {
-    return <ErrorView message="Project not found." />;
-  }
+  if (isLoading) return <LoadingView />;
+  if (error) return <ErrorView message={error} />;
+  if (!project) return <ErrorView message="Project not found." />;
+  if (!sample) return <ErrorView message="Sample not found." />;
+  if (!data) return null;
 
-  if (!sample && !isLoading) {
-    return <ErrorView message="Sample not found." />;
-  }
+  const isVideo = project.task === TaskType.Video;
 
-  if (!project || !sample) {
-    return null;
-  }
+  // For video we assume backend returns { frame: number, values: base64, ... }
+  const frameFromBackend = useMemo(() => {
+    if (!isVideo) return 0;
+    return (data as unknown as { frame?: number }).frame ?? 0;
+  }, [isVideo, data]);
 
-  const projectIdResolved = project._id ?? (project_id as string);
-  const sampleIdResolved = sample._id ?? (sample_id as string);
+  // IMPORTANT: don't force-load frame 0; session frame should follow backend response.
+  const [videoFrame, setVideoFrame] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (!isVideo) return;
+
+    // Don’t advance session frame unless backend actually returned the requested frame.
+    const dp = dataParams as unknown as { name?: string; frame?: number | null };
+
+    if (dp.name === "image" && dp.frame != null) {
+      if (frameFromBackend !== dp.frame) return;
+    }
+
+    setVideoFrame(frameFromBackend);
+  }, [isVideo, frameFromBackend, dataParams]);
 
   return (
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
-        <SampleDataBreadCrumbs
-          project={project}
-          sample={sample}
-        ></SampleDataBreadCrumbs>
-        <ModelTrainModal project={project}></ModelTrainModal>
-        <ModelPredictModal project={project}></ModelPredictModal>
+        <SampleDataBreadCrumbs project={project} sample={sample} />
+        <ModelTrainModal project={project} />
+        <ModelPredictModal project={project} />
         <Flex>
-          <ToolBar />
-          <SampleView />
+          {isVideo ? (
+            <VideoSessionProvider
+              key={`${props.projectId}:${props.sampleId}`}
+              projectId={props.projectId}
+              sampleId={props.sampleId}
+              frame={videoFrame ?? frameFromBackend}
+              setFrame={(n) => setVideoFrame(n)}
+            >
+              <ToolBar />
+              <div className="flex-1 flex justify-center">
+                <VideoViewInner
+                  data={data}
+                  annotations={annotations ?? []}
+                  projectId={props.projectId}
+                  sampleId={props.sampleId}
+                  dataParams={dataParams}
+                  setDataParams={setDataParams as any}
+                />
+              </div>
+            </VideoSessionProvider>
+          ) : (
+            <>
+              <ToolBar />
+              <SampleView />
+            </>
+          )}
         </Flex>
       </Provider>
     </div>
@@ -106,13 +144,11 @@ function SamplePageContent() {
 export default function SamplePage() {
   const { project_id, sample_id } = useParams();
 
-  if (!project_id || !sample_id) {
-    return null;
-  }
+  if (!project_id || !sample_id) return null;
 
   return (
     <SampleProvider projectId={project_id} sampleId={sample_id}>
-      <SamplePageContent />
+      <SamplePageContent projectId={project_id} sampleId={sample_id} />
     </SampleProvider>
   );
 }

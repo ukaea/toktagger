@@ -19,6 +19,8 @@ import {
   MultiVariateTimeSeriesDataSchema,
   CompositeDataSchema,
   SpectrogramDataSchema,
+  ImageData,
+  ImageDataSchema,
   TaskType,
   DataParams,
 } from "@/types";
@@ -78,7 +80,7 @@ async function getAnnotations(
 async function parseData(
   data: Data,
   task: TaskType,
-): Promise<MultiVariateTimeSeriesData | SpectrogramData | undefined> {
+): Promise<MultiVariateTimeSeriesData | SpectrogramData | ImageData | undefined> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {
@@ -90,14 +92,24 @@ async function parseData(
     if (!result.success) {
       throw new Error("Invalid data for spectrogram view");
     }
+
     const mhdData = SpectrogramDataSchema.safeParse(
       result.data.values["mirnov"],
     );
     if (!mhdData.success) {
       throw new Error("Invalid data for spectrogram view");
     }
+
     return mhdData.data;
+  } else if (task == TaskType.Video) {
+    const result = ImageDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for video view");
+    }
+    return result.data;
   }
+
+  return undefined;
 }
 
 export function SampleProvider({
@@ -152,6 +164,26 @@ export function SampleProvider({
           } as SpectrogramViewParams;
         }
 
+        // ------------------------------------------------------------
+        // video projects must request image data parameters.
+        // Backend ImageDataLoader requires params.name === "image".
+        // frame: null means "backend picks first frame automatically".
+        // ------------------------------------------------------------
+        let effectiveDataParams: DataParams = dataParams;
+
+        if (projectData.task === TaskType.Video) {
+          const prev = dataParams as unknown as {
+            name?: string;
+            frame?: number | null;
+          };
+
+          effectiveDataParams = {
+            ...(dataParams as Record<string, unknown>),
+            name: "image",
+            frame: prev.frame ?? null,
+          } as DataParams;
+        }
+
         const response = await fetch(
           `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/data`,
           {
@@ -159,7 +191,7 @@ export function SampleProvider({
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ params: dataParams, view: params }),
+            body: JSON.stringify({ params: effectiveDataParams, view: params }),
           },
         );
 

@@ -220,7 +220,7 @@ export const DataParamsSchema = z.object({
 });
 export type DataParams = z.infer<typeof DataParamsSchema>;
 export const ImageDataParamsSchema = DataParamsSchema.extend({
-  frame: z.number(),
+  frame: z.number().nullable(), // the backend passes frame can be null?
 });
 export type ImageDataParams = z.infer<typeof ImageDataParamsSchema>;
 export const SamplesSummarySchema = z.object({
