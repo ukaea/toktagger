@@ -640,7 +640,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             draggable={false}
             onLoad={() => {
               const img = imgRef.current;
-              if (img) setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+              if (img)
+                setNatural({ w: img.naturalWidth, h: img.naturalHeight });
               if (selectedId) void refreshPopupForId(selectedId);
             }}
             className="block mx-auto h-auto object-contain select-none"
