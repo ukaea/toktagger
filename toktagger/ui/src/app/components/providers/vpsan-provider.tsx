@@ -146,7 +146,7 @@ export const VSpanProvider = ({
     });
 
     /* Decide what to register in the main context-menu:
-            - When there is exactly one V-Span category (e.g. “Disruption”) show a single top-level Item “Add Disruption”.
+            - When there is exactly one V-Span category (e.g. “Disruption”) show a single top-level Item “Add Time Point”.
             - When there are multiple categories keep the existing “Add VSpan” submenu containing one Item per type.
             - This prevents an unnecessary extra click in the single-category case.
         */

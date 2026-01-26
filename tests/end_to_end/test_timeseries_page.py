@@ -10,10 +10,10 @@ import time
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 
 
-@pytest.mark.parametrize("zone_type", ["RampUp", "FlatTop", "RampDown"])
-def test_disruption_add_zone(zone_type, server_setup, page: Page):
+@pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
+def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -30,14 +30,26 @@ def test_disruption_add_zone(zone_type, server_setup, page: Page):
     # Right click on it, check menu renders
     page.get_by_label("time-series").click(button="right")
 
-    expect(page.get_by_role("menuitem", name="Add zone")).to_be_visible()
-    expect(page.get_by_role("menuitem", name="Add Disruption")).to_be_visible()
+    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
+    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
 
-    # Choose add zone, check options load
-    page.get_by_role("menuitem", name="Add zone").click()
-    expect(page.get_by_role("menuitem", name="RampUp", exact=True)).to_be_visible()
-    expect(page.get_by_role("menuitem", name="FlatTop", exact=True)).to_be_visible()
-    expect(page.get_by_role("menuitem", name="RampDown", exact=True)).to_be_visible()
+    # Choose Add Time Region, check options load
+    page.get_by_role("menuitem", name="Add Time Region").click()
+    for item in (
+        "ELM",
+        "L-mode",
+        "H-mode",
+        "Thermal Quench",
+        "Current Quench",
+        "Sawtooth",
+        "IRE",
+        "Locked Mode",
+        "VDE",
+        "Flat Top",
+        "Ramp Up",
+        "Ramp Down",
+    ):
+        expect(page.get_by_role("menuitem", name=item, exact=True)).to_be_visible()
 
     # Choose each type, check a new zone is added
     page.get_by_role("menuitem", name=zone_type, exact=True).click()
@@ -56,12 +68,12 @@ def test_disruption_add_zone(zone_type, server_setup, page: Page):
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
 
 
-@pytest.mark.parametrize("zone_type", ["RampUp", "FlatTop", "RampDown"])
+@pytest.mark.parametrize("zone_type", ["Ramp Up", "FlatTop", "Ramp Down"])
 @pytest.mark.parametrize("handle", ["leftHandle", "rightHandle"])
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
-def test_disruption_drag_zone(zone_type, handle, drag_to, server_setup, page: Page):
+def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -77,7 +89,7 @@ def test_disruption_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
 
     # Add a new zone
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add zone").click()
+    page.get_by_role("menuitem", name="Add Time Region").click()
 
     # Choose each type, check a new zone is added
     page.get_by_role("menuitem", name=zone_type, exact=True).click()
@@ -125,9 +137,12 @@ def test_disruption_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
             assert updated_left_position == initial_left_position
 
 
-def test_disruption_add_vspan(server_setup, page: Page):
+@pytest.mark.parametrize(
+    "zone_type", ["Disruption", "Thermal Quench", "Curreent Quench", "Control Loss"]
+)
+def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -144,17 +159,20 @@ def test_disruption_add_vspan(server_setup, page: Page):
     # Right click on it, check menu renders
     page.get_by_label("time-series").click(button="right")
 
-    expect(page.get_by_role("menuitem", name="Add zone")).to_be_visible()
-    expect(page.get_by_role("menuitem", name="Add Disruption")).to_be_visible()
+    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
+    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
 
-    # Choose add disruption
-    page.get_by_role("menuitem", name="Add Disruption").click()
+    # Choose Add Time Point
+    page.get_by_role("menuitem", name="Add Time Point").click()
+    for item in ("Disruption", "Thermal Quench", "Current Quench", "Control Loss"):
+        expect(page.get_by_role("menuitem", name=item, exact=True)).to_be_visible()
 
-    # Check disruption Vspan has been added
+    # Click each type, check a new Vspan has been added
+    page.get_by_role("menuitem", name=zone_type, exact=True).click()
     expect(page.get_by_label("vspan").first).to_be_visible()
 
     # Check added to list
-    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+    expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
 
     # Check you can right click to delete it
     page.get_by_label("vspan").first.click(button="right")
@@ -163,13 +181,16 @@ def test_disruption_add_vspan(server_setup, page: Page):
 
     # Check it no longer exists
     expect(page.get_by_label("vspan").first).to_be_hidden()
-    expect(page.get_by_role("rowheader", name="Disruption")).to_be_hidden()
+    expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
 
 
+@pytest.mark.parametrize(
+    "zone_type", ["Disruption", "Thermal Quench", "Curreent Quench", "Control Loss"]
+)
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
-def test_disruption_drag_vspan(drag_to, server_setup, page: Page):
+def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -185,12 +206,14 @@ def test_disruption_drag_vspan(drag_to, server_setup, page: Page):
 
     # Add a new vspan
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Disruption").click()
+    page.get_by_role("menuitem", name="Add Time Point").click()
 
+    # Click each type, check a new Vspan has been added
+    page.get_by_role("menuitem", name=zone_type, exact=True).click()
     expect(page.get_by_label("vspan").first).to_be_visible()
 
     # Check added to list, record initial positions
-    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+    expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
     initial_position = float(
         page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
     )
@@ -212,9 +235,9 @@ def test_disruption_drag_vspan(drag_to, server_setup, page: Page):
         assert updated_position > initial_position
 
 
-def test_disruption_save_annotations(server_setup, page: Page):
+def test_timeseries_save_annotations(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -230,7 +253,8 @@ def test_disruption_save_annotations(server_setup, page: Page):
 
     # Add a new vspan
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Disruption").click()
+    page.get_by_role("menuitem", name="Add Time Point").click()
+    page.get_by_role("menuitem", name="Disruption", exact=True).click()
 
     expect(page.get_by_label("vspan").first).to_be_visible()
 
@@ -244,7 +268,7 @@ def test_disruption_save_annotations(server_setup, page: Page):
 
     # Add a zone
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add zone").click()
+    page.get_by_role("menuitem", name="Add Time Region").click()
     page.get_by_role("menuitem", name="FlatTop", exact=True).click()
     expect(page.get_by_label("zone").first).to_be_visible()
 
@@ -291,9 +315,9 @@ def test_disruption_save_annotations(server_setup, page: Page):
     assert flattop_annotation["type"] == "time_region"
 
 
-def test_disruption_load_annotations(server_setup, page: Page):
+def test_timeseries_load_annotations(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -303,13 +327,13 @@ def test_disruption_load_annotations(server_setup, page: Page):
 
     # Create annotations of each type
     rampup = TimeRegion(
-        label="RampUp", created_by="peak_detection", time_min=10, time_max=20
+        label="Ramp Up", created_by="peak_detection", time_min=10, time_max=20
     )
     flattop = TimeRegion(
-        label="FlatTop", created_by="peak_detection", time_min=20, time_max=70
+        label="Flat Top", created_by="peak_detection", time_min=20, time_max=70
     )
     rampdown = TimeRegion(
-        label="RampDown", created_by="peak_detection", time_min=70, time_max=90
+        label="Ramp Down", created_by="peak_detection", time_min=70, time_max=90
     )
     disruption = TimePoint(label="Disruption", created_by="peak_detection", time=91)
     # Add annotations
@@ -336,27 +360,27 @@ def test_disruption_load_annotations(server_setup, page: Page):
     assert float(row.get_by_role("cell").nth(0).inner_text()) == disruption.time
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="RampUp")
+        has=page.get_by_role("rowheader", name="Ramp Up")
     )
     assert float(row.get_by_role("cell").nth(0).inner_text()) == rampup.time_min
     assert float(row.get_by_role("cell").nth(1).inner_text()) == rampup.time_max
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="FlatTop")
+        has=page.get_by_role("rowheader", name="Flat Top")
     )
     assert float(row.get_by_role("cell").nth(0).inner_text()) == flattop.time_min
     assert float(row.get_by_role("cell").nth(1).inner_text()) == flattop.time_max
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="RampDown")
+        has=page.get_by_role("rowheader", name="Ramp Down")
     )
     assert float(row.get_by_role("cell").nth(0).inner_text()) == rampdown.time_min
     assert float(row.get_by_role("cell").nth(1).inner_text()) == rampdown.time_max
 
 
-def test_disruption_update_annotations(server_setup, page: Page):
+def test_timeseries_update_annotations(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -366,10 +390,10 @@ def test_disruption_update_annotations(server_setup, page: Page):
 
     # Create annotations of each type
     rampup = TimeRegion(
-        label="RampUp", created_by="peak_detection", time_min=10, time_max=20
+        label="Ramp Up", created_by="peak_detection", time_min=10, time_max=20
     )
     flattop = TimeRegion(
-        label="FlatTop", created_by="peak_detection", time_min=20, time_max=70
+        label="Flat Top", created_by="peak_detection", time_min=20, time_max=70
     )
     disruption = TimePoint(label="Disruption", created_by="peak_detection", time=71)
     # Add annotations
@@ -382,7 +406,7 @@ def test_disruption_update_annotations(server_setup, page: Page):
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
 
-    # One vspan and 3 zones visible
+    # One vspan and 2 zones visible
     expect(page.get_by_label("vspan").first).to_be_visible()
     assert page.get_by_label("zone", exact=True).count() == 2
 
