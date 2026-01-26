@@ -47,7 +47,7 @@ import { useNavigate } from "react-router-dom";
 import type { NavigateFunction } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
-import { VideoToolbarV2Sidebar } from "@/app/video/components/VideoToolbarV2Sidebar";
+import { VideoSidebar } from "@/app/video/components/VideoSidebar";
 
 // ------------------------------
 // Save helpers
@@ -403,7 +403,7 @@ export default function ToolBar(props: ToolBarInfo) {
   const isVideo = props.project.task === "UFO";
   if (!isVideo) return <StandardToolbar {...props} />;
 
-  return <VideoToolbarV2Sidebar project={props.project} sample={props.sample} />;
+  return <VideoSidebar project={props.project} sample={props.sample} />;
 }
 
 function StandardToolbar({

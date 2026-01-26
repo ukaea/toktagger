@@ -19,7 +19,7 @@ import {
   existingTrackIdsForClass,
   uniqueReadableTrackId,
 } from "./video-utils";
-import { AnnotationPopupV2 } from "./AnnotationPopupV2";
+import { AnnotationPopup } from "./AnnotationPopup";
 
 /**
  * Narrow API surface we rely on from Annotorious.
@@ -219,7 +219,7 @@ function clampOverlayToImage(
 /**
  * Top-level host that provides the Annotorious context and renders the annotator.
  */
-export function FrameAnnotatorHostV2(props: { imageBase64: string }) {
+export function FrameAnnotatorHost(props: { imageBase64: string }) {
   return (
     <Annotorious>
       <Inner imageBase64={props.imageBase64} />
@@ -547,7 +547,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         </ImageAnnotator>
 
         {selectedId && selectedMeta && popupPos && (
-          <AnnotationPopupV2
+          <AnnotationPopup
             left={popupPos.left}
             top={popupPos.top}
             className={selectedMeta.className}

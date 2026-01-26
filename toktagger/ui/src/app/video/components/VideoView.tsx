@@ -8,7 +8,7 @@ import { BACKEND_API_URL } from "@/app/core";
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
-import { FrameAnnotatorHostV2 } from "./FrameAnnotatorHostV2";
+import { FrameAnnotatorHost } from "./FrameAnnotatorHost";
 
 /**
  * Persist the current session annotations to the backend for this sample.
@@ -62,7 +62,7 @@ export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
   );
 }
 
-export type VideoViewV2Props = {
+export type VideoViewProps = {
   data: unknown; // ImageData
   annotations: Annotation[];
   projectId: string;
@@ -152,7 +152,7 @@ function VideoChromeV2(props: {
 
       {/* Frame annotator canvas (image + Annotorious overlay). */}
       <div className="w-full flex flex-col items-center gap-3">
-        <FrameAnnotatorHostV2 imageBase64={props.imageBase64} />
+        <FrameAnnotatorHost imageBase64={props.imageBase64} />
       </div>
     </div>
   );
@@ -162,7 +162,7 @@ function VideoChromeV2(props: {
  * Render the image view and wire "go to frame" to the host page via dataParams.
  * This component assumes it is already inside a VideoSessionProvider.
  */
-export function VideoViewV2Inner(props: VideoViewV2Props) {
+export function VideoViewInner(props: VideoViewProps) {
   const parsed = ImageDataSchema.safeParse(props.data);
   if (!parsed.success) {
     throw new Error("Invalid data for UFO view (expected ImageData)");

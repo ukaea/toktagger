@@ -13,7 +13,7 @@ import { V2_LABELS, makeTrackKey } from "./types";
  *
  * The toolbar is a thin UI wrapper over `useVideoSession()` state and helpers.
  */
-export function VideoToolbarV2(props: {
+export function VideoToolbar(props: {
   onSave?: (payload: unknown) => Promise<void> | void;
   onJump?: (n: number) => void;
 }) {

@@ -8,7 +8,7 @@ import React from "react";
  * Positioning is computed by the host (in image pixel space -> client space) and
  * passed in as absolute coordinates so this component stays purely presentational.
  */
-export function AnnotationPopupV2(props: {
+export function AnnotationPopup(props: {
   left: number;
   top: number;
   className: string | null;

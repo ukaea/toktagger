@@ -195,7 +195,7 @@ function VideoShotSearchV2(props: {
  * - Instance selection (filters / targets an existing track)
  * - Destructive actions with confirmation
  */
-export function VideoToolbarV2Sidebar(_props: { project: Project; sample: Sample }) {
+export function VideoSidebar(_props: { project: Project; sample: Sample }) {
   const navigate = useNavigate();
   const session = useVideoSession();
 

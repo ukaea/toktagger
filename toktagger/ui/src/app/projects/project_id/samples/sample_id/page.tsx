@@ -23,7 +23,7 @@ import {
   DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { VideoViewV2Inner } from "@/app/video/components/VideoViewV2";
+import { VideoViewInner } from "@/app/video/components/VideoView";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -149,7 +149,7 @@ const SampleView = ({
     if (!result.success) throw new Error("Invalid data for UFO view");
 
     return (
-      <VideoViewV2Inner
+      <VideoViewInner
         data={result.data}
         annotations={annotations}
         projectId={projectId}
