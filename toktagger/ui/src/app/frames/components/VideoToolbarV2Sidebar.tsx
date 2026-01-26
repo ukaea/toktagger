@@ -16,19 +16,45 @@ import { useNavigate } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import type { Annotation, Project, Sample } from "@/types";
 
-import {
-  LABEL_MAP,
-  loadLastClassName,
-  saveLastClassName,
-} from "@/app/frames/components/lib";
+import { useVideoSession } from "@/app/frames/components/video-session";
+import { canonicalizeTrackId } from "@/app/frames/components/video-utils";
+import { V2_LABELS } from "./types";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
-} from "@/app/frames/components/ui";
+  ConfirmModal,
+} from "@/app/frames/components/ui_elements";
 
-import { useVideoSession } from "@/app/frames/components/v2/video-session";
-import { canonicalizeTrackId } from "./video-utils";
+/**
+ * Persist the last selected class so the annotator can immediately draw
+ * when moving between samples (same project).
+ */
+const LAST_CLASS_KEY = "ufo::lastClassName";
 
+function loadLastClassName(): string | null {
+  try {
+    const v = globalThis.localStorage?.getItem(LAST_CLASS_KEY);
+    const s = (v ?? "").trim();
+    return s ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastClassName(name: string) {
+  try {
+    const s = (name ?? "").trim();
+    if (!s) return;
+    globalThis.localStorage?.setItem(LAST_CLASS_KEY, s);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Backend helpers for saving annotations and navigating between samples.
+ * These mirror existing endpoints used elsewhere in the app.
+ */
 async function saveVideoAnnotations(
   project_id: string,
   sample_id: string,
@@ -52,36 +78,25 @@ async function getShotSample(project_id: string, shot_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
   const sampleResult = await fetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
-  return Array.isArray(sampleArray) && sampleArray.length > 0
-    ? sampleArray[0]
-    : null;
+  return Array.isArray(sampleArray) && sampleArray.length > 0 ? sampleArray[0] : null;
 }
 
+/**
+ * Sidebar instance rows are keyed by (class, track_id). We keep a stable string key
+ * for selection, sorting, and count lookups.
+ */
 function instanceKey(args: { class_name: string; track_id: string }) {
   const cls = (args.class_name || "").toLowerCase();
   const tid = canonicalizeTrackId(args.track_id || "");
   return `${cls}:${tid}`;
 }
 
-/**
- * Try to parse a numeric suffix/pure number from trackId for sorting.
- * Examples:
- *  - "1" -> 1
- *  - "ufo-2" -> 2
- *  - "track_10" -> 10
- *  - "abc" -> null
- */
 function parseTrackIdNumber(trackId: string): number | null {
   const s = (trackId || "").trim();
   if (!s) return null;
-
-  // pure integer
   if (/^\d+$/.test(s)) return Number(s);
-
-  // last numeric run
   const m = s.match(/(\d+)(?!.*\d)/);
   if (!m) return null;
-
   const n = Number(m[1]);
   return Number.isFinite(n) ? n : null;
 }
@@ -90,6 +105,7 @@ function compareProfiles(
   a: { class_name: string; track_id: string },
   b: { class_name: string; track_id: string },
 ) {
+  // Sort by class then by track id (numeric if possible, otherwise lexicographic).
   const ac = (a.class_name || "").toLowerCase();
   const bc = (b.class_name || "").toLowerCase();
   if (ac < bc) return -1;
@@ -98,14 +114,10 @@ function compareProfiles(
   const an = parseTrackIdNumber(a.track_id);
   const bn = parseTrackIdNumber(b.track_id);
 
-  // both numeric => numeric sort
   if (an != null && bn != null) return an - bn;
-
-  // numeric first (optional; feels nicer)
   if (an != null && bn == null) return -1;
   if (an == null && bn != null) return 1;
 
-  // fallback stable lexicographic
   const at = canonicalizeTrackId(a.track_id);
   const bt = canonicalizeTrackId(b.track_id);
   if (at < bt) return -1;
@@ -113,6 +125,10 @@ function compareProfiles(
   return 0;
 }
 
+/**
+ * Jump-to-shot control. Before navigating, it calls `onBeforeNavigate` so we can
+ * save any unsaved session annotations.
+ */
 function VideoShotSearchV2(props: {
   project_id: string;
   sample_id: string;
@@ -172,13 +188,14 @@ function VideoShotSearchV2(props: {
 }
 
 /**
- * v2 Sidebar for UFO:
- * - Reads/writes session via useVideoSession()
- * - No window.* globals
- * - No localStorage W3C scans
- * - Save/Next/Jump-to-shot all use session.collectAllVideoBBoxes()
+ * Left sidebar controls for the frame annotator:
+ * - Save / Next sample navigation
+ * - Jump-to-shot navigation
+ * - Class selection (enables drawing)
+ * - Instance selection (filters / targets an existing track)
+ * - Destructive actions with confirmation
  */
-export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample }) {
+export function VideoToolbarV2Sidebar(_props: { project: Project; sample: Sample }) {
   const navigate = useNavigate();
   const session = useVideoSession();
 
@@ -187,7 +204,12 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
 
-  // Default class selection from last saved preference (optional, but matches old UX)
+  const [pendingDeleteInstance, setPendingDeleteInstance] = useState<{
+    className: string;
+    trackId: string;
+  } | null>(null);
+
+  // Restore the last selected class to reduce clicks between samples.
   useEffect(() => {
     const last = loadLastClassName();
     if (last && !session.selection.className) {
@@ -196,21 +218,31 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // With auto-create-on-draw, class is enough to start drawing.
   const hasClass = Boolean(session.selection.className);
 
+  const classItems = useMemo(() => {
+    // ClassPanel only needs { name }.
+    return V2_LABELS.map((c) => ({ name: c.name }));
+  }, []);
+
+  const classIdByName = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of V2_LABELS) map.set(c.name, c.id);
+    return map;
+  }, []);
+
+  // Shape the derived session instances into the UI panel format.
   const profiles = useMemo(() => {
-    // Build + sort (class then numeric track_id)
     const arr = session.instances.map((inst) => ({
       key: instanceKey({ class_name: inst.className, track_id: inst.trackId }),
-      class_id: inst.classId,
+      class_id: classIdByName.get(inst.className) ?? inst.classId ?? -1,
       class_name: inst.className,
       track_id: canonicalizeTrackId(inst.trackId),
     }));
 
     arr.sort((a, b) => compareProfiles(a, b));
     return arr;
-  }, [session.instances]);
+  }, [session.instances, classIdByName]);
 
   const profileCounts = useMemo(() => {
     const out: Record<string, number> = {};
@@ -243,6 +275,7 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
     }
   };
 
+  // Save only when needed (used before navigation).
   const maybeSave = async () => {
     if (!session.dirty) return;
     await saveNow();
@@ -265,14 +298,25 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
     }
   };
 
-  const onSelectClassName = (name: string) => {
-    if (!name) return;
+  const onSelectClassName = (name: string | null) => {
+    const cls = (name ?? "").trim();
+    if (!cls) return;
 
-    session.setSelection({ className: name, trackId: null, source: "explicit" });
-    saveLastClassName(name);
+    session.setSelection({ className: cls, trackId: null, source: "explicit" });
+    saveLastClassName(cls);
   };
 
   const onSelectInstance = (key: string) => {
+    if (!key) {
+      // Auto mode: keep the selected class, allocate a new instance per draw.
+      session.setSelection({
+        className: session.selection.className ?? null,
+        trackId: null,
+        source: "explicit",
+      });
+      return;
+    }
+
     const hit = profiles.find((p) => p.key === key);
     if (!hit) return;
 
@@ -285,24 +329,31 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
     saveLastClassName(hit.class_name);
   };
 
-  const onNewInstance = () => {
-    const cls = session.selection.className ?? "UFO";
-    const { trackId } = session.createNewInstanceForClass(cls);
-    session.setSelection({ className: cls, trackId, source: "auto" });
-    saveLastClassName(cls);
-  };
-
-  const onRequestBulkDelete = async (profile: { class_name?: string; track_id?: string }) => {
+  // Right-click on an instance row triggers a confirm flow (no immediate deletion).
+  const onRequestBulkDelete = (profile: { class_name?: string; track_id?: string }) => {
     const cls = (profile.class_name || "").trim();
     const tid = canonicalizeTrackId(profile.track_id || "");
     if (!cls || !tid) return;
 
-    // deleteSelectedInstanceAcrossFrames uses session.selection, so set selection first
-    session.setSelection({ className: cls, trackId: tid, source: "explicit" });
-    session.deleteSelectedInstanceAcrossFrames();
+    setPendingDeleteInstance({ className: cls, trackId: tid });
   };
 
-  // Safer: confirm before nuking session.
+  const cancelDeleteInstance = () => setPendingDeleteInstance(null);
+
+  const confirmDeleteInstance = () => {
+    const pending = pendingDeleteInstance;
+    if (!pending) return;
+
+    session.setSelection({
+      className: pending.className,
+      trackId: pending.trackId,
+      source: "explicit",
+    });
+
+    session.deleteSelectedInstanceAcrossFrames();
+    setPendingDeleteInstance(null);
+  };
+
   const onRequestDeleteAllInstances = () => {
     setConfirmClearAllOpen(true);
   };
@@ -310,7 +361,6 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
   const confirmClearAll = () => {
     setConfirmClearAllOpen(false);
     session.clearAllFrames();
-    ToastQueue.positive("Cleared all frames in this session.", { timeout: 3000 });
   };
 
   const cancelClearAll = () => setConfirmClearAllOpen(false);
@@ -332,7 +382,6 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
             {session.dirty ? "● unsaved" : "saved"} — frame {session.frame}
           </div>
 
-          {/* Inline guidance: updated for auto-create-on-draw */}
           {!hasClass && (
             <div className="mt-2 text-[12px] opacity-80 leading-snug">
               Select a <b>class</b> to start drawing.
@@ -352,12 +401,7 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
           <div className="max-w-[16rem] mx-auto mb-4">
             <div className="mb-2">
               <Flex gap="size-100" alignItems="center" wrap>
-                <Button
-                  variant="secondary"
-                  style="outline"
-                  isDisabled
-                  UNSAFE_className="!px-2.5 !py-1.5 text-xs"
-                >
+                <Button variant="secondary" style="outline" isDisabled UNSAFE_className="!px-2.5 !py-1.5 text-xs">
                   Rectangle
                 </Button>
               </Flex>
@@ -375,16 +419,6 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
                 >
                   Clear Current Frame
                 </Button>
-
-                <Button
-                  variant="primary"
-                  style="outline"
-                  UNSAFE_className="!px-2.5 !py-1.5 text-xs"
-                  onPress={onNewInstance}
-                  isDisabled={!session.selection.className}
-                >
-                  New Instance
-                </Button>
               </Flex>
             </div>
 
@@ -392,7 +426,7 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
           </div>
 
           <VideoClassPanel
-            items={LABEL_MAP.categories}
+            items={classItems}
             selectedClassName={session.selection.className}
             setSelectedClassName={onSelectClassName}
           />
@@ -402,17 +436,17 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
             selectedKey={selectedKey}
             onSelect={onSelectInstance}
             onCreateProfile={() => {
-              // We intentionally don't use the embedded creator in v2 right now
-              // (instances are derived from session.byFrame). Use "New Instance" instead.
+              // Instances are derived from annotations; creation happens via drawing.
             }}
             onRequestBulkDelete={onRequestBulkDelete}
             onRequestDeleteAllInstances={onRequestDeleteAllInstances}
             profileCounts={profileCounts}
             showCreator={false}
+            classItems={classItems}
           />
         </div>
 
-        {/* Confirm dialog: Clear All */}
+        {/* Confirm: clear the entire session overlay */}
         <DialogContainer onDismiss={cancelClearAll}>
           {confirmClearAllOpen && (
             <AlertDialog
@@ -428,6 +462,27 @@ export function VideoToolbarV2Sidebar(props: { project: Project; sample: Sample 
             </AlertDialog>
           )}
         </DialogContainer>
+
+        {/* Confirm: delete one instance across all frames */}
+        <ConfirmModal
+          open={Boolean(pendingDeleteInstance)}
+          title="Delete instance?"
+          message="This deletes all annotations for this instance across all frames. You can’t undo this."
+          details={
+            pendingDeleteInstance ? (
+              <div>
+                Target:{" "}
+                <b>
+                  {pendingDeleteInstance.className} / {pendingDeleteInstance.trackId}
+                </b>
+              </div>
+            ) : null
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={confirmDeleteInstance}
+          onCancel={cancelDeleteInstance}
+        />
       </div>
     </Provider>
   );
