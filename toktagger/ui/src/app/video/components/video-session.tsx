@@ -3,9 +3,10 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
 
-import type { Annotation } from "@/types"; // used only for one-shot seeding from backend payload
+import type { Annotation } from "@/types"; 
+import { VideoBoundingBoxSchema } from "@/types";
 import type { ByFrameMap, FrameIndex, InstanceProfile, Selection, VideoBoundingBox } from "./types";
-import { buildSourceKey, classIdForName } from "./types";
+import { buildSourceKey } from "./types";
 import {
   deleteTrackAcrossFrames,
   deriveInstances,
@@ -16,7 +17,6 @@ import {
   nextTrackIdForClass,
 } from "./video-utils";
 import { annoToVideoBBox, getLabelTrack, normalizeOverlay, videoBBoxToAnno } from "./anno-utils";
-
 /**
  * Session state for the frame-by-frame annotation workflow.
  * Owns the in-memory per-frame overlays, selection (class/instance), and helpers for
@@ -178,7 +178,7 @@ export function VideoSessionProvider(props: {
           const nextKey = buildSourceKey({ projectId, sampleId, frame: nf });
           return {
             ...a,
-            target: { ...(a.target as any), source: nextKey } as any,
+            target: { ...(a.target), source: nextKey},
           };
         });
 
@@ -226,38 +226,16 @@ export function VideoSessionProvider(props: {
       const byF = new Map<number, ImageAnnotation[]>();
 
       for (const a of dbAnnotations) {
-        const anyA = a as any;
-        if (!anyA || anyA.type !== "video_bounding_box") continue;
+        const parsed = VideoBoundingBoxSchema.safeParse(a);
+        if (!parsed.success) continue;
 
-        const frameNum = Number(anyA.frame);
-        if (!Number.isFinite(frameNum)) continue;
-
-        // Normalize backend payload into our minimal VideoBoundingBox shape.
-        const vb: VideoBoundingBox = {
-          type: "video_bounding_box",
-          frame: frameNum,
-
-          // Track id and label can arrive under different names depending on history.
-          track_id: String(anyA.track_id ?? anyA.trackId ?? ""),
-          label: String(anyA.label ?? anyA.class_name ?? anyA.className ?? "UFO"),
-          class_id: Number(anyA.class_id ?? classIdForName(String(anyA.label ?? "UFO"))),
-
-          // Geometry
-          x_min: Number(anyA.x_min ?? anyA.x ?? 0),
-          y_min: Number(anyA.y_min ?? anyA.y ?? 0),
-          width: Number(anyA.width ?? anyA.w ?? 0),
-          height: Number(anyA.height ?? anyA.h ?? 0),
-
-          created_by: String(anyA.created_by ?? "db"),
-          timestamp: typeof anyA.timestamp === "string" ? anyA.timestamp : undefined,
-        };
-
-        const key = buildSourceKey({ projectId, sampleId, frame: frameNum });
+        const vb = parsed.data; 
+        const key = buildSourceKey({ projectId, sampleId, frame: vb.frame });
         const anno = videoBBoxToAnno(vb, key);
 
-        const cur = byF.get(frameNum) ?? [];
+        const cur = byF.get(vb.frame) ?? [];
         cur.push(anno);
-        byF.set(frameNum, cur);
+        byF.set(vb.frame, cur);
       }
 
       if (byF.size === 0) return;
