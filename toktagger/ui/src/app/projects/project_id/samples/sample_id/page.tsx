@@ -23,7 +23,7 @@ import {
   DataParams,
 } from "@/types";
 import { ELMView } from "@/app/elms/components/elms";
-import { VideoViewV2Inner } from "@/app/frames/components/v2/VideoViewV2";
+import { VideoViewV2Inner } from "@/app/frames/components/VideoViewV2";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -32,7 +32,7 @@ import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 import { z } from "zod";
-import { VideoSessionProvider } from "@/app/frames/components/v2/video-session";
+import { VideoSessionProvider } from "@/app/frames/components/video-session";
 import { ImageDataSchema as ImageDataSchemaForFrameParse } from "@/types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -226,28 +226,36 @@ export default function SamplePage() {
 
   const videoInitRef = useRef(false);
 
-  //  Derive isUfo without assuming project/data exists
+  // Whether we're in the frame-based (video) workflow.
   const isUfo = project?.task === "UFO";
 
-  // Safe parse: only attempt when we actually have data and UFO
+  // Only parse image payloads when the current task expects them.
   const parsedImage = useMemo(() => {
     if (!isUfo || !data) return null;
     return ImageDataSchemaForFrameParse.safeParse(data);
   }, [isUfo, data]);
 
+  /**
+   * Frame index reported by the backend in the image payload.
+   * Used as the source of truth for the session frame.
+   */
   const frameFromBackend = useMemo(() => {
     if (!isUfo || !parsedImage?.success) return 0;
     const n = Number(parsedImage.data.frame);
     return Number.isFinite(n) ? n : 0;
   }, [isUfo, parsedImage]);
 
-  //  Hooks must not be conditional. This is fine now.
+  // Session frame (shown in UI, used by annotator session state).
   const [videoFrame, setVideoFrame] = useState<number>(0);
 
   useLayoutEffect(() => {
     if (!isUfo) return;
 
-    // If we requested a specific frame, only accept backend response for that same frame.
+    /**
+     * When navigation requests a specific frame, only update the session frame once
+     * the backend response matches the requested frame. This prevents displaying a
+     * "new" frame number while still showing the previous image on fetch errors.
+     */
     const requested =
       (dataParams as any)?.name === "image" ? (dataParams as any)?.frame : null;
 
@@ -258,9 +266,10 @@ export default function SamplePage() {
     setVideoFrame(frameFromBackend);
   }, [isUfo, frameFromBackend, dataParams]);
 
-  // ------------------------------
-  // Sample/project refresh
-  // ------------------------------
+  /**
+   * Refresh project/sample metadata and annotations when the route changes.
+   * Also resets per-sample session init behavior.
+   */
   useEffect(() => {
     if (!hasIds) return;
 
@@ -270,6 +279,7 @@ export default function SamplePage() {
       const proj = await getProject(project_id as string);
       setProject(proj);
 
+      // Initialize image mode once for UFO projects (drives first data fetch).
       if (proj.task === "UFO" && !videoInitRef.current) {
         videoInitRef.current = true;
         setDataParams({ name: "image", frame: null } as DataParams);
@@ -285,9 +295,10 @@ export default function SamplePage() {
     void refreshSample();
   }, [project_id, sample_id, hasIds]);
 
-  // ------------------------------
-  // Data refresh
-  // ------------------------------
+  /**
+   * Fetch the current data payload whenever params/view change.
+   * Errors are surfaced via toast and we keep the last good `data` in state.
+   */
   useEffect(() => {
     const refreshData = async (dp: DataParams, vp: ViewParams) => {
       if (!project || !sample) return;
@@ -321,10 +332,8 @@ export default function SamplePage() {
     void refreshData(dataParams, viewParams);
   }, [project, sample, dataParams, viewParams]);
 
-  // Now it’s safe to conditionally return UI,
-  // because all hooks were already called above.
+  // All hooks run above; it's safe to early-return UI states here.
   if (!data || !project || !sample || !hasIds) {
-    // optional: don't render blank while loading
     return (
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
@@ -347,6 +356,12 @@ export default function SamplePage() {
 
         <div className="flex">
           {isUfo ? (
+             /**
+             * For frame-based annotation, we provide a single session context that both
+             * the toolbar and the main view consume.
+             *
+             * Keyed by project+sample to ensure a clean session when navigating.
+             */
             <VideoSessionProvider
               key={`${projectIdResolved}:${sampleIdResolved}`}
               projectId={projectIdResolved}
