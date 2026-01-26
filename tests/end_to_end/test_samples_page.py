@@ -7,6 +7,8 @@ import time
 import requests
 import tempfile
 import pytest
+import json
+from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 
 
 def check_base_page(page):
@@ -42,6 +44,10 @@ def check_base_page(page):
 
     # Expect to be on page 1
     expect(page.get_by_text("Page: 1")).to_be_visible()
+
+    # Expect import and export annotation buttons to be visible
+    expect(page.get_by_role("button", name="Import Annotations")).to_be_visible()
+    expect(page.get_by_role("button", name="Export Annotations")).to_be_visible()
 
 
 def test_empty_samples_table(server_setup, page: Page):
@@ -413,3 +419,171 @@ def test_create_samples_image_data(server_setup, page: Page, file_type: str):
 
         # Check sample added to table - currently must add one sample at a time since each one is a directory of images
         expect(page.get_by_role("row").nth(1)).to_contain_text("104000")
+
+
+@pytest.mark.parametrize("shot_id", (True, False))
+def test_samples_page_import_annotations(shot_id: bool, server_setup, page: Page):
+    # Create a project
+    project_id = create_project("Test Project", "time-series", "parquet")
+    # And a sample
+    sample_ids = create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    # Navigate to projects page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Create a Time Point annotation using sample ID in schema
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as file:
+        annotations_1 = [
+            {
+                "label": "Disruption",
+                "created_by": "manual",
+                "time": 71,
+            },
+            {
+                "label": "Flat Top",
+                "created_by": "manual",
+                "time_min": 50,
+                "time_max": 70,
+            },
+        ]
+        annotations_2 = [
+            {
+                "label": "Control Loss",
+                "created_by": "manual",
+                "time": 61,
+            },
+            {
+                "label": "Ramp Up",
+                "created_by": "manual",
+                "time_min": 40,
+                "time_max": 60,
+            },
+        ]
+        if shot_id:
+            for annotation in annotations_1:
+                annotation["shot_id"] = 10000
+            for annotation in annotations_2:
+                annotation["shot_id"] = 10001
+        else:
+            for annotation in annotations_1:
+                annotation["shot_id"] = sample_ids[0]
+            for annotation in annotations_2:
+                annotation["shot_id"] = sample_ids[1]
+
+        json.dump(annotations_1 + annotations_2, file)
+        file.flush()
+
+        # Import annotation
+        with page.expect_file_chooser() as fc_info:
+            page.get_by_role("button", name="Import Annotations").click()
+            file_chooser = fc_info.value
+            file_chooser.set_files(file.name)
+
+        time.sleep(1)
+
+        # Navigate to first sample, check annotations visible
+        page.goto(
+            f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}"
+        )
+
+        assert page.get_by_label("zone", exact=True).count() == 1
+        assert page.get_by_label("vspan", exact=True).count() == 1
+        expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+        expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
+
+        # Navigate to second sample, check annotations visble
+        page.goto(
+            f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[1]}"
+        )
+
+        assert page.get_by_label("zone", exact=True).count() == 1
+        assert page.get_by_label("vspan", exact=True).count() == 1
+        expect(page.get_by_role("rowheader", name="Control Loss")).to_be_visible()
+        expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_visible()
+
+
+def test_samples_page_export_annotations(server_setup, page: Page):
+    # Create project
+    project_id = create_project("Test Project", "time-series", "parquet")
+    # And a sample
+    sample_ids = create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    # Add annotations
+    flat_top = TimeRegion(
+        label="Flat Top", created_by="peak_detection", time_min=50, time_max=70
+    )
+    disruption = TimePoint(label="Disruption", created_by="peak_detection", time=71)
+    response = requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_ids[0]}/annotations",
+        json=[model.model_dump(mode="json") for model in (flat_top, disruption)],
+    )
+    assert response.status_code == 200
+
+    ramp_up = TimeRegion(
+        label="Ramp Up", created_by="peak_detection", time_min=40, time_max=60
+    )
+    control_loss = TimePoint(label="Control Loss", created_by="peak_detection", time=61)
+    response = requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_ids[1]}/annotations",
+        json=[model.model_dump(mode="json") for model in (ramp_up, control_loss)],
+    )
+
+    assert response.status_code == 200
+
+    # Navigate to projects page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Press export annotations
+    with page.expect_download() as download_info:
+        page.get_by_role("button", name="Export Annotations").click()
+
+        download = download_info.value
+        with tempfile.TemporaryDirectory() as tempd:
+            download.save_as(pathlib.Path(tempd).joinpath("annotations.json"))
+
+            with open(pathlib.Path(tempd).joinpath("annotations.json"), "r") as file:
+                annotations = json.load(file)
+
+    # Get flat top annotation
+    exported_flat_top = next(ann for ann in annotations if ann["label"] == "Flat Top")
+    # Check values are correct
+    assert exported_flat_top["time_min"] == 50
+    assert exported_flat_top["time_max"] == 70
+    assert exported_flat_top["shot_id"] == 10000
+    assert exported_flat_top["sample_id"] == sample_ids[0]
+
+    # Get disruption annotation
+    exported_disruption = next(
+        ann for ann in annotations if ann["label"] == "Disruption"
+    )
+    # Check values are correct
+    assert exported_disruption["time"] == 71
+    assert exported_disruption["shot_id"] == 10000
+    assert exported_disruption["sample_id"] == sample_ids[0]
+
+    # Get ramp up annotation
+    exported_ramp_up = next(ann for ann in annotations if ann["label"] == "Ramp Up")
+    # Check values are correct
+    assert exported_ramp_up["time_min"] == 40
+    assert exported_ramp_up["time_max"] == 60
+    assert exported_ramp_up["shot_id"] == 10001
+    assert exported_ramp_up["sample_id"] == sample_ids[1]
+
+    # Get control loss annotation
+    exported_control_loss = next(
+        ann for ann in annotations if ann["label"] == "Control Loss"
+    )
+    # Check values are correct
+    assert exported_control_loss["time"] == 61
+    assert exported_control_loss["shot_id"] == 10001
+    assert exported_control_loss["sample_id"] == sample_ids[1]
