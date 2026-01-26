@@ -18,6 +18,23 @@ import { classIdForName } from "./types";
  * These helpers keep the shape consistent and make conversion to/from backend boxes trivial.
  */
 
+type UnknownRecord = Record<string, unknown>;
+
+function isImageAnnotationLike(v: unknown): v is ImageAnnotation {
+  if (!v || typeof v !== "object") return false;
+
+  const rec = v as UnknownRecord;
+  const target = rec["target"];
+  if (!target || typeof target !== "object") return false;
+
+  const selector = (target as UnknownRecord)["selector"];
+  if (!selector || typeof selector !== "object") return false;
+
+  // Shape.type is a string enum at runtime, so just require a string here.
+  const type = (selector as UnknownRecord)["type"];
+  return typeof type === "string";
+}
+
 export function getBodyValue(a: ImageAnnotation, purpose: string): string | null {
   const v = a?.bodies?.find((b) => b?.purpose === purpose)?.value;
   return typeof v === "string" ? v : null;
@@ -62,22 +79,25 @@ export function getLabelTrack(a: ImageAnnotation): { className: string | null; t
 
 /** True if the annotation target is a rectangle selector. */
 export function isRectangleAnno(a: ImageAnnotation): boolean {
-  const sel = (a as any)?.target?.selector;
-  if (!sel || typeof sel !== "object") return false;
-  if ((sel as any).type === ShapeType.RECTANGLE) return true;
-  // Some environments emit string literals for the selector type.
-  if ((sel as any).type === "RECTANGLE") return true;
-  return false;
+  // ShapeType.RECTANGLE is already the string literal "RECTANGLE",
+  // so we don't need a separate check for the string form.
+  return a.target.selector.type === ShapeType.RECTANGLE;
 }
 
 /** Read rectangle geometry (returns null if missing/invalid). */
-export function readRectGeometry(a: ImageAnnotation): { x: number; y: number; w: number; h: number } | null {
-  const sel = (a as any)?.target?.selector;
-  const g = sel?.geometry;
-  const x = g?.x;
-  const y = g?.y;
-  const w = g?.w;
-  const h = g?.h;
+export function readRectGeometry(
+  a: ImageAnnotation
+): { x: number; y: number; w: number; h: number } | null {
+  const g = a.target.selector.geometry as unknown;
+
+  if (!g || typeof g !== "object") return null;
+  const rec = g as UnknownRecord;
+
+  const x = rec["x"];
+  const y = rec["y"];
+  const w = rec["w"];
+  const h = rec["h"];
+
   if (![x, y, w, h].every((v) => typeof v === "number" && Number.isFinite(v))) return null;
   if (w <= 0 || h <= 0) return null;
   return { x, y, w, h };
@@ -108,16 +128,17 @@ export function normalizeOverlay(
   const enforceBothBodies = opts?.enforceBothBodies ?? true;
   const dedupeByInstance = opts?.dedupeByInstance ?? true;
 
-  const src: ImageAnnotation[] = Array.isArray(list) ? (list as ImageAnnotation[]) : [];
+  const src: ImageAnnotation[] = Array.isArray(list)
+    ? list.filter(isImageAnnotationLike)
+    : [];
   const out: ImageAnnotation[] = [];
 
   for (const a of src) {
-    if (!a || typeof a !== "object") continue;
     if (!isRectangleAnno(a)) continue;
 
     const withSource: ImageAnnotation = {
-      ...(a as ImageAnnotation),
-      target: { ...(a.target as any), source: frameKey } as any,
+      ...a,
+      target: { ...a.target, source: frameKey },
     };
 
     const got = getLabelTrack(withSource);
@@ -185,24 +206,32 @@ export function videoBBoxToAnno(b: VideoBoundingBox, frameKey: string): ImageAnn
   const w = Number(b.width);
   const h = Number(b.height);
 
-  const id = (globalThis.crypto?.randomUUID?.() ?? `anno-${Math.random().toString(36).slice(2)}`) as string;
+  const id =
+    globalThis.crypto?.randomUUID?.() ??
+    `anno-${Math.random().toString(36).slice(2)}`;
+
+  // Annotorious Geometry type only guarantees `bounds`, but rectangle geometry
+  // includes x/y/w/h at runtime. We keep those fields without using `any`.
+  const geometry = {
+    x,
+    y,
+    w,
+    h,
+    bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h },
+  } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
+
+  const selector = {
+    type: ShapeType.RECTANGLE,
+    geometry,
+  } as unknown as ImageAnnotation["target"]["selector"];
 
   const anno: ImageAnnotation = {
     id,
     bodies: [],
     target: {
       source: frameKey,
-      selector: {
-        type: ShapeType.RECTANGLE,
-        geometry: {
-          x,
-          y,
-          w,
-          h,
-          bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h },
-        },
-      },
-    } as any,
+      selector,
+    },
   };
 
   return stampLabelAndTrack(anno, b.label, String(b.track_id));
