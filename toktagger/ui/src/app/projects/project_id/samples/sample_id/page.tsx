@@ -88,7 +88,10 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
     if (!isVideo) return;
     if (!data) return;
 
-    const dp = dataParams as unknown as { name?: string; frame?: number | null };
+    const dp = dataParams as unknown as {
+      name?: string;
+      frame?: number | null;
+    };
 
     if (dp.name === "image" && dp.frame != null) {
       if (frameFromBackend !== dp.frame) return;
@@ -101,11 +104,19 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
   if (error) return <ErrorView message={error} />;
 
   if (!project) {
-    return isLoading ? <LoadingView /> : <ErrorView message="Project not found." />;
+    return isLoading ? (
+      <LoadingView />
+    ) : (
+      <ErrorView message="Project not found." />
+    );
   }
 
   if (!sample) {
-    return isLoading ? <LoadingView /> : <ErrorView message="Sample not found." />;
+    return isLoading ? (
+      <LoadingView />
+    ) : (
+      <ErrorView message="Sample not found." />
+    );
   }
 
   // Only hard-block on loading for non-video.
@@ -139,7 +150,7 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
                   projectId={props.projectId}
                   sampleId={props.sampleId}
                   dataParams={dataParams}
-                  setDataParams={setDataParams as any}
+                  setDataParams={setDataParams}
                 />
               </div>
             </VideoSessionProvider>

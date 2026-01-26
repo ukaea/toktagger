@@ -80,7 +80,9 @@ async function getAnnotations(
 async function parseData(
   data: Data,
   task: TaskType,
-): Promise<MultiVariateTimeSeriesData | SpectrogramData | ImageData | undefined> {
+): Promise<
+  MultiVariateTimeSeriesData | SpectrogramData | ImageData | undefined
+> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {

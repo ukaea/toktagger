@@ -141,11 +141,20 @@ export default function ToolBar() {
 
   if (project.task === TaskType.Video) {
     const refreshAnnotations = async () => {
-    const dbAnnotations = await getAnnotationsForSample(project._id, sample._id);
-    setAnnotations(() => dbAnnotations);
-  };
-  
-  return <VideoSidebar project={project} sample={sample} onSaved={refreshAnnotations} />;
+      const dbAnnotations = await getAnnotationsForSample(
+        project._id,
+        sample._id,
+      );
+      setAnnotations(() => dbAnnotations);
+    };
+
+    return (
+      <VideoSidebar
+        project={project}
+        sample={sample}
+        onSaved={refreshAnnotations}
+      />
+    );
   }
 
   const project_id = project._id;

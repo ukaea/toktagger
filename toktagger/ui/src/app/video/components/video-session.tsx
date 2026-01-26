@@ -21,6 +21,7 @@ import type {
 import { buildSourceKey } from "./types";
 import {
   deleteTrackAcrossFrames,
+  canonicalizeTrackId,
   deriveInstances,
   forwardPropagateIfEmpty,
   mapClearAll,
@@ -34,6 +35,7 @@ import {
   normalizeOverlay,
   videoBBoxToAnno,
 } from "./anno-utils";
+
 /**
  * Session state for the frame-by-frame annotation workflow.
  * Owns the in-memory per-frame overlays, selection (class/instance), and helpers for
@@ -78,6 +80,13 @@ type VideoSessionCtx = {
     className: string;
     trackId: string;
   };
+
+  /**
+   * Delete a specific instance across all frames (does NOT rely on selection state).
+   * This avoids "needs two clicks" bugs when callers first set selection then delete.
+   */
+  deleteInstanceAcrossFrames: (className: string, trackId: string) => void;
+
   /** Delete the currently selected instance across all frames. */
   deleteSelectedInstanceAcrossFrames: () => void;
 
@@ -180,18 +189,47 @@ export function VideoSessionProvider(props: {
     [byFrame],
   );
 
+  /**
+   * Delete a specific (className, trackId) across all frames.
+   * IMPORTANT: does not depend on selection being updated first.
+   */
+  const deleteInstanceAcrossFrames = useCallback(
+    (className: string, trackId: string) => {
+      const cls = (className || "").trim();
+      const tid = canonicalizeTrackId(trackId || "");
+      if (!cls || !tid) return;
+
+      setByFrame((prev) =>
+        deleteTrackAcrossFrames(
+          prev,
+          { className: cls, trackId: tid },
+          getLabelTrack,
+        ),
+      );
+
+      // If the deleted instance is currently selected, clear selection.trackId
+      setSelectionState((prev) => {
+        const prevCls = (prev.className || "").trim();
+        const prevTid = canonicalizeTrackId(prev.trackId || "");
+        if (prevCls === cls && prevTid === tid) {
+          return { ...prev, trackId: null };
+        }
+        return prev;
+      });
+
+      setDirty(true);
+    },
+    [],
+  );
+
+  /**
+   * Backwards-compatible helper: delete the currently selected instance.
+   * Now implemented via deleteInstanceAcrossFrames to avoid stale selection issues.
+   */
   const deleteSelectedInstanceAcrossFrames = useCallback(() => {
     if (!selection.className || !selection.trackId) return;
-
-    setByFrame((prev) =>
-      deleteTrackAcrossFrames(
-        prev,
-        { className: selection.className, trackId: selection.trackId },
-        getLabelTrack,
-      ),
-    );
-    setDirty(true);
-  }, [selection.className, selection.trackId]);
+    deleteInstanceAcrossFrames(selection.className, selection.trackId);
+  }, [deleteInstanceAcrossFrames, selection.className, selection.trackId]);
 
   /**
    * Copies current frame annotations into `nextFrame` if it's empty.
@@ -296,6 +334,7 @@ export function VideoSessionProvider(props: {
       clearCurrentFrame,
       clearAllFrames,
       createNewInstanceForClass,
+      deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
       collectAllNative,
@@ -320,6 +359,7 @@ export function VideoSessionProvider(props: {
       clearCurrentFrame,
       clearAllFrames,
       createNewInstanceForClass,
+      deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
       collectAllNative,

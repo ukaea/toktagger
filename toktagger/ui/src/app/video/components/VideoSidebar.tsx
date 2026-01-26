@@ -197,7 +197,11 @@ function VideoShotSearchV2(props: {
  * - Instance selection (filters / targets an existing track)
  * - Destructive actions with confirmation
  */
-export function VideoSidebar(_props: { project: Project; sample: Sample; onSaved?: () => Promise<void> | void; }) {
+export function VideoSidebar(_props: {
+  project: Project;
+  sample: Sample;
+  onSaved?: () => Promise<void> | void;
+}) {
   const navigate = useNavigate();
   const session = useVideoSession();
 
@@ -362,13 +366,8 @@ export function VideoSidebar(_props: { project: Project; sample: Sample; onSaved
     const pending = pendingDeleteInstance;
     if (!pending) return;
 
-    session.setSelection({
-      className: pending.className,
-      trackId: pending.trackId,
-      source: "explicit",
-    });
+    session.deleteInstanceAcrossFrames(pending.className, pending.trackId);
 
-    session.deleteSelectedInstanceAcrossFrames();
     setPendingDeleteInstance(null);
   };
 
