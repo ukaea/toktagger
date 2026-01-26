@@ -60,7 +60,7 @@ def check_create_modal(page):
 
     # Fill in common info
     modal.get_by_role("button", name="Task").click()
-    page.get_by_role("option", name="disruption").click()
+    page.get_by_role("option", name="time-series").click()
     modal.get_by_role("radio", name="Random").click()
     modal.get_by_role("textbox", name="Project Name").fill("Test Project")
 
@@ -85,7 +85,7 @@ def test_empty_projects_table(server_setup, page: Page):
 
 def test_single_project(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "disruption", "uda")
+    project_id = create_project("Test Project", "time-series", "uda")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -103,7 +103,7 @@ def test_single_project(server_setup, page: Page):
 
     # Check project information is shown
     expect(page.get_by_text("Test Project")).to_be_visible()
-    expect(page.get_by_text("disruption")).to_be_visible()
+    expect(page.get_by_text("time-series")).to_be_visible()
     expect(page.get_by_text("uda")).to_be_visible()
     expect(page.get_by_text(re.compile(f"^{datetime.now().date()}*"))).to_be_visible()
 
@@ -122,7 +122,7 @@ def test_single_project(server_setup, page: Page):
 def test_projects_page_navigation(server_setup, page: Page):
     # Create 6 projects
     for i in range(1, 7):
-        create_project(f"Test Project {i}", "disruption", "uda")
+        create_project(f"Test Project {i}", "time-series", "uda")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -204,9 +204,9 @@ def test_projects_sorting(server_setup, page: Page):
         expect(page.get_by_role("row").nth(2)).to_contain_text(expected_first)
 
     # Create some projects
-    create_project("A Project", "ELM", "uda")
+    create_project("A Project", "time-series", "uda")
     time.sleep(0.1)
-    create_project("B Project", "MHD", "parquet")
+    create_project("B Project", "spectrogram", "parquet")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -217,8 +217,8 @@ def test_projects_sorting(server_setup, page: Page):
     # Sort by Name: A should be first, then B
     sort(page, "Name", "A Project", "B Project")
 
-    # Sort by Task, A should be first (ELM), then B (MHD)
-    sort(page, "Task", "A Project", "B Project")
+    # Sort by Task, b should be first (spectrogram), then A (time-series)
+    sort(page, "Task", "B Project", "A Project")
 
     # Sort by Timestamp, A should be first (oldest - so lowest timestamp), then B (newest - highest timestamp)
     sort(page, "Date Created", "A Project", "B Project")
@@ -229,12 +229,12 @@ def test_projects_sorting(server_setup, page: Page):
 
 def test_projects_search(server_setup, page: Page):
     # Create some projects with different names
-    create_project("Project A", "ELM", "uda")
-    create_project("Project B", "ELM", "uda")
-    create_project("project C", "ELM", "uda")
-    create_project("Test Project", "ELM", "uda")
-    create_project("Projection", "ELM", "uda")
-    create_project("New UDA ELMs", "ELM", "uda")
+    create_project("Project A", "time-series", "uda")
+    create_project("Project B", "time-series", "uda")
+    create_project("project C", "time-series", "uda")
+    create_project("Test Project", "time-series", "uda")
+    create_project("Projection", "time-series", "uda")
+    create_project("New UDA ELMs", "time-series", "uda")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -294,8 +294,8 @@ def test_projects_search(server_setup, page: Page):
 
 def test_delete_project(server_setup, page: Page):
     # Create some projects
-    create_project("Project A", "ELM", "uda")
-    create_project("Project B", "disruption", "parquet")
+    create_project("Project A", "time-series", "uda")
+    create_project("Project B", "time-series", "parquet")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -319,7 +319,7 @@ def test_delete_project(server_setup, page: Page):
 
 def test_edit_project(server_setup, page: Page):
     # Create some projects
-    create_project("Test Project", "ELM", "uda")
+    create_project("Test Project", "time-series", "uda")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -363,7 +363,7 @@ def test_edit_project(server_setup, page: Page):
     project = response.json()[0]
     assert project["name"] == "Updated Project"
     assert project["query_strategy"] == "sequential"
-    assert project["task"] == "ELM"
+    assert project["task"] == "time-series"
     assert project["data_loader"] == "uda"
 
 
@@ -414,7 +414,7 @@ def test_create_project_shot_data(server_setup, page: Page):
     project = response.json()[0]
     assert project["name"] == "Test Project"
     assert project["query_strategy"] == "random"
-    assert project["task"] == "disruption"
+    assert project["task"] == "time-series"
     assert project["data_loader"] == "uda"
 
     # Check 6 samples added (12380 to 12385 inclusive)
@@ -476,7 +476,7 @@ def test_create_project_file_data(server_setup, page: Page):
         project = response.json()[0]
         assert project["name"] == "Test Project"
         assert project["query_strategy"] == "random"
-        assert project["task"] == "disruption"
+        assert project["task"] == "time-series"
         assert project["data_loader"] == "parquet"
 
         # Check 2 samples added (10000 and 10001)
