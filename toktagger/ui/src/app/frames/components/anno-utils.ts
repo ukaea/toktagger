@@ -9,11 +9,13 @@ import type { VideoBoundingBox } from "./types";
 import { classIdForName } from "./types";
 
 /**
- * Bodies convention (v2):
- * - purpose="tagging"      => class name (string)
- * - purpose="identifying"  => track id (string)
+ * Annotorious annotation helpers.
  *
- * We keep it DEAD simple (no JSON payloads) because v2 is a refactor/sandbox branch.
+ * We store two string bodies on each annotation:
+ * - purpose="tagging"     -> class label
+ * - purpose="identifying" -> track id
+ *
+ * These helpers keep the shape consistent and make conversion to/from backend boxes trivial.
  */
 
 export function getBodyValue(a: ImageAnnotation, purpose: string): string | null {
@@ -21,6 +23,7 @@ export function getBodyValue(a: ImageAnnotation, purpose: string): string | null
   return typeof v === "string" ? v : null;
 }
 
+/** Insert or replace a body by purpose (returns a new array). */
 export function upsertBody(
   bodies: AnnotationBody[] | undefined,
   purpose: string,
@@ -36,12 +39,20 @@ export function upsertBody(
   return list;
 }
 
+/** Ensure the annotation has a class label body. */
+export function stampLabel(a: ImageAnnotation, className: string): ImageAnnotation {
+  const bodies = upsertBody(a.bodies, "tagging", className);
+  return { ...a, bodies };
+}
+
+/** Ensure the annotation has both class label + track id bodies. */
 export function stampLabelAndTrack(a: ImageAnnotation, className: string, trackId: string): ImageAnnotation {
   const bodies = upsertBody(a.bodies, "tagging", className);
   const bodies2 = upsertBody(bodies, "identifying", trackId);
   return { ...a, bodies: bodies2 };
 }
 
+/** Read the class label + track id bodies. */
 export function getLabelTrack(a: ImageAnnotation): { className: string | null; trackId: string | null } {
   return {
     className: getBodyValue(a, "tagging"),
@@ -49,16 +60,17 @@ export function getLabelTrack(a: ImageAnnotation): { className: string | null; t
   };
 }
 
+/** True if the annotation target is a rectangle selector. */
 export function isRectangleAnno(a: ImageAnnotation): boolean {
   const sel = (a as any)?.target?.selector;
   if (!sel || typeof sel !== "object") return false;
-  // Native model: selector.type === ShapeType.RECTANGLE
   if ((sel as any).type === ShapeType.RECTANGLE) return true;
-  // Some environments have string literal type
+  // Some environments emit string literals for the selector type.
   if ((sel as any).type === "RECTANGLE") return true;
   return false;
 }
 
+/** Read rectangle geometry (returns null if missing/invalid). */
 export function readRectGeometry(a: ImageAnnotation): { x: number; y: number; w: number; h: number } | null {
   const sel = (a as any)?.target?.selector;
   const g = sel?.geometry;
@@ -72,20 +84,34 @@ export function readRectGeometry(a: ImageAnnotation): { x: number; y: number; w:
 }
 
 /**
- * Normalize overlay:
- * - rectangle-only
- * - stamp target.source to frameKey
- * - ensure bodies have class+track (fallbacks if missing)
- * - preserve existing bodies if present
+ * Normalize an overlay list into a backend-safe shape:
+ * - keep rectangles only
+ * - stamp target.source with frameKey
+ * - ensure class label exists (uses fallback if missing)
+ * - ensure track id exists (uses fallback or allocator)
+ * - optionally dedupe to one annotation per (class, trackId) in this frame
+ *
+ * `list` is `unknown` because Annotorious event payloads are not always arrays.
  */
 export function normalizeOverlay(
-  list: ImageAnnotation[],
+  list: unknown,
   frameKey: string,
-  fallback: { className: string; trackId: string }
+  fallback: { className: string | null; trackId: string | null },
+  allocTrackId?: (className: string) => string,
+  opts?: {
+    /** If true, drop any annotation that can't end up with BOTH bodies. Default: true */
+    enforceBothBodies?: boolean;
+    /** If true, keep at most 1 anno per (class, trackId) in this frame. Default: true */
+    dedupeByInstance?: boolean;
+  }
 ): ImageAnnotation[] {
+  const enforceBothBodies = opts?.enforceBothBodies ?? true;
+  const dedupeByInstance = opts?.dedupeByInstance ?? true;
+
+  const src: ImageAnnotation[] = Array.isArray(list) ? (list as ImageAnnotation[]) : [];
   const out: ImageAnnotation[] = [];
 
-  for (const a of list ?? []) {
+  for (const a of src) {
     if (!a || typeof a !== "object") continue;
     if (!isRectangleAnno(a)) continue;
 
@@ -95,16 +121,41 @@ export function normalizeOverlay(
     };
 
     const got = getLabelTrack(withSource);
-    const className = got.className ?? fallback.className;
-    const trackId = got.trackId ?? fallback.trackId;
+    const className = (got.className ?? fallback.className)?.trim() || null;
+    if (!className) continue;
+
+    let trackId = (got.trackId ?? fallback.trackId)?.trim() || null;
+    if (!trackId && allocTrackId) {
+      trackId = allocTrackId(className);
+    }
+
+    if (!trackId) {
+      if (enforceBothBodies) continue;
+      out.push(stampLabel(withSource, className));
+      continue;
+    }
 
     out.push(stampLabelAndTrack(withSource, className, trackId));
   }
 
-  return out;
+  if (!dedupeByInstance) return out;
+
+  // Enforce: one box per (class, trackId) per frame (keep last seen).
+  const byKey = new Map<string, ImageAnnotation>();
+  const order: string[] = [];
+
+  for (const a of out) {
+    const { className, trackId } = getLabelTrack(a);
+    if (!className || !trackId) continue;
+    const k = `${className}::${trackId}`;
+    if (!byKey.has(k)) order.push(k);
+    byKey.set(k, a);
+  }
+
+  return order.map((k) => byKey.get(k)!).filter(Boolean);
 }
 
-/** Convert a normalized ImageAnnotation -> backend VideoBoundingBox */
+/** Convert a normalized ImageAnnotation -> backend VideoBoundingBox. */
 export function annoToVideoBBox(a: ImageAnnotation, frame: number): VideoBoundingBox | null {
   if (!isRectangleAnno(a)) return null;
   const g = readRectGeometry(a);
@@ -127,7 +178,7 @@ export function annoToVideoBBox(a: ImageAnnotation, frame: number): VideoBoundin
   };
 }
 
-/** Convert backend VideoBoundingBox -> native ImageAnnotation (rectangle geometry) */
+/** Convert backend VideoBoundingBox -> Annotorious rectangle annotation. */
 export function videoBBoxToAnno(b: VideoBoundingBox, frameKey: string): ImageAnnotation {
   const x = Number(b.x_min);
   const y = Number(b.y_min);
