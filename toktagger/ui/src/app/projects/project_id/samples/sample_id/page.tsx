@@ -256,8 +256,8 @@ export default function SamplePage() {
      * the backend response matches the requested frame. This prevents displaying a
      * "new" frame number while still showing the previous image on fetch errors.
      */
-    const requested =
-      (dataParams as any)?.name === "image" ? (dataParams as any)?.frame : null;
+    const dp = dataParams as UnknownRecord;
+    const requested = dp["name"] === "image" ? dp["frame"] : null;
 
     if (typeof requested === "number" && Number.isFinite(requested)) {
       if (frameFromBackend !== requested) return;
