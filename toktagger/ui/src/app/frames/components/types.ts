@@ -2,23 +2,33 @@
 
 import type { ImageAnnotation } from "@annotorious/react";
 
-/** Frame index (0-based) */
+/** Frame number within a video (0-based). */
 export type FrameIndex = number;
 
-/** Composite key for an "instance" track */
+/**
+ * Stable identifier for a tracked instance in the UI/session.
+ * Format: "<className>::<trackId>"
+ */
 export type TrackKey = `${string}::${string}`;
 
-/** Selection source: explicit (user chose) vs auto (system created) */
+/** How the current selection was produced (user picked it vs. auto-assigned). */
 export type SelectionSource = "explicit" | "auto" | null;
 
-/** Currently armed selection for drawing */
+/**
+ * The "armed" selection used when creating new annotations.
+ * - className: required to enable drawing
+ * - trackId: optional; when null, a new id can be allocated automatically
+ */
 export type Selection = {
   className: string | null;
   trackId: string | null;
   source: SelectionSource;
 };
 
-/** UI-level instance row */
+/**
+ * UI summary for one tracked instance across frames.
+ * `frames` is unique + sorted; `count` is total boxes across all frames.
+ */
 export type InstanceProfile = {
   key: TrackKey;
   className: string;
@@ -28,10 +38,13 @@ export type InstanceProfile = {
   count: number; // total boxes across frames
 };
 
-/** Map of per-frame overlay annotations (native Annotorious model) */
+/** In-memory annotation storage keyed by frame, using the native Annotorious model. */
 export type ByFrameMap = Map<FrameIndex, ImageAnnotation[]>;
 
-/** Minimal backend video bbox shape we can emit */
+/**
+ * Minimal backend payload for a video bounding box annotation.
+ * This matches what we emit back to the server.
+ */
 export type VideoBoundingBox = {
   type: "video_bounding_box";
   frame: number;
@@ -46,7 +59,10 @@ export type VideoBoundingBox = {
   class_id?: number;
 };
 
-/** Fixed label list for v2 (keep in sync with v1 LABEL_MAP if you want) */
+/**
+ * Supported label set for this UI.
+ * These ids are used when exporting to backend formats that expect a numeric class id.
+ */
 export const V2_LABELS: { id: number; name: string }[] = [
   { id: 1, name: "UFO" },
   { id: 2, name: "Minor UFO" },
@@ -56,24 +72,28 @@ export const V2_LABELS: { id: number; name: string }[] = [
   { id: 6, name: "Other Anomaly" },
 ];
 
+/** Resolve a human label name to a numeric class id (defaults to 1). */
 export function classIdForName(className: string): number {
   const key = (className || "").trim().toLowerCase();
   const hit = V2_LABELS.find((c) => c.name.toLowerCase() === key);
   return hit?.id ?? 1;
 }
 
+/** Build a TrackKey from a class + track id. */
 export function makeTrackKey(className: string, trackId: string): TrackKey {
   return `${className}::${trackId}`;
 }
 
+/** Parse a TrackKey back into its components. */
 export function parseTrackKey(key: TrackKey): { className: string; trackId: string } {
   const idx = key.lastIndexOf("::");
   return { className: key.slice(0, idx), trackId: key.slice(idx + 2) };
 }
 
 /**
- * Keep the same "source key" format as v1 so you can re-use any downstream logic.
- * (We do NOT use this for storage in v2 — only as target.source for debugging/export.)
+ * Construct a stable source identifier for the current frame.
+ * Used for `target.source` so downstream exports/debugging can associate an annotation
+ * with a specific project/sample/frame.
  */
 export function buildSourceKey(args: {
   projectId: string;
