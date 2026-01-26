@@ -15,6 +15,7 @@ interface VSpanContextInfo {
   vspans: VSpan[];
   handleVSpanUpdate: () => void;
   handleVSpanDragFinish: () => void;
+  handleVSpanDelete: (input: VSpan) => void;
   addVSpan: (x: number, category: Category) => void;
   activateTooling: () => void;
   triggerUpdate: number;
@@ -51,7 +52,6 @@ export const VSpanProvider = ({
 }) => {
   const spans = useRef<VSpan[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
-
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
   // It is necessary for the context to trigger child refreshes
@@ -69,8 +69,9 @@ export const VSpanProvider = ({
     onModifyVSpan?.(spans.current);
   };
 
-  const handleDelete = (input: unknown) => {
+  const handleVSpanDelete = (input: VSpan) => {
     spans.current = spans.current.filter((span) => span !== input);
+    spans.current = spans.current.filter((span) => !span.selected);
     triggerVSpanUpdate();
     onModifyVSpan?.(spans.current);
   };
@@ -90,10 +91,13 @@ export const VSpanProvider = ({
 
   const addVSpan = (x: number, category: Category) => {
     spans.current.push({
+      created_by: "manual",
+      selected: false,
       category,
       x,
     });
     triggerVSpanUpdate();
+    onModifyVSpan?.(spans.current);
   };
 
   const activateTooling = () => {
@@ -108,8 +112,8 @@ export const VSpanProvider = ({
       },
       end: (x, _y) => {
         spans.current[spans.current.length - 1].x = x;
-        handleVSpanDragFinish();
         triggerVSpanUpdate();
+        handleVSpanDragFinish();
       },
     });
   };
@@ -118,6 +122,8 @@ export const VSpanProvider = ({
   useEffect(() => {
     const add = (x: number, category: Category) => {
       spans.current.push({
+        created_by: "manual",
+        selected: false,
         category,
         x,
       });
@@ -158,7 +164,7 @@ export const VSpanProvider = ({
         </Item>
       ) : (
         // multiple-category branch
-        <Submenu key="vspan-submenu" label="Add VSpan">
+        <Submenu key="vspan-submenu" label="Add Time Point">
           {addVSpanItems}
         </Submenu>
       );
@@ -200,6 +206,7 @@ export const VSpanProvider = ({
         vspans: spans.current,
         handleVSpanUpdate,
         handleVSpanDragFinish,
+        handleVSpanDelete,
         addVSpan,
         activateTooling,
         triggerUpdate,
@@ -210,7 +217,7 @@ export const VSpanProvider = ({
         <Item
           id="delete"
           onClick={({ props }: ItemParams) => {
-            handleDelete(props.vspan);
+            handleVSpanDelete(props.vspan);
           }}
         >
           Delete

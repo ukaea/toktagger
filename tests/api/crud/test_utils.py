@@ -80,17 +80,17 @@ async def test_get_samples(db_client, setup_db):
     # Check three samples returned
     assert len(samples) == 2
     # Check returned in correct order - reverse order of created
-    assert [sample.shot_id for sample in samples] == [3, 1]
+    assert [sample.shot_id for sample in samples] == [2, 1]
 
 
 @pytest.mark.asyncio
 async def test_get_samples_by_shot_id(db_client, setup_db):
     samples = await utils.get_samples(
-        db_client, project_id=setup_db["project_id_1"], shot_id=3
+        db_client, project_id=setup_db["project_id_1"], shot_id=1
     )
     # Should do an exact search for this shot_id
     assert len(samples) == 1
-    assert samples[0].shot_id == 3
+    assert samples[0].shot_id == 1
 
 
 @pytest.mark.asyncio
@@ -123,7 +123,7 @@ async def test_get_sample_summary(db_client, setup_db):
     )
     assert summary.total == 2
     assert summary.shot_min == 1
-    assert summary.shot_max == 3
+    assert summary.shot_max == 2
     assert summary.data is not None
 
 
@@ -286,6 +286,69 @@ async def test_delete_specific_annotation(db_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_import_annotations_success(db_client, setup_db):
+    # Create new annotations with sample_id references
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+        ANNOTATION_2.model_copy(update={"sample_id": setup_db["sample_id_2"]}),
+    ]
+
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=new_annotations,
+    )
+
+    # Verify annotations were added
+    all_annotations = await db_client.get_filtered_documents("annotations")
+    assert len(all_annotations) == 7  # 5 existing + 2 new
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_empty_list(db_client, setup_db):
+    # Should handle empty list gracefully
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=[],
+    )
+
+    # Verify no changes
+    all_annotations = await db_client.get_filtered_documents("annotations")
+    assert len(all_annotations) == 5
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_project_not_found(db_client, setup_db):
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+    ]
+
+    with pytest.raises(HTTPException, match="Project not found with that ID"):
+        await utils.import_annotations(
+            db_client,
+            project_id=str(ObjectId()),
+            annotations=new_annotations,
+        )
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_sample_not_found(db_client, setup_db):
+    # Use invalid sample_id
+    shot_id = 10
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"shot_id": shot_id}),
+    ]
+
+    with pytest.raises(HTTPException, match=f"Sample not found with shot ID {shot_id}"):
+        await utils.import_annotations(
+            db_client,
+            project_id=setup_db["project_id_1"],
+            annotations=new_annotations,
+        )
+
+
+@pytest.mark.asyncio
 async def test_get_models(db_client, setup_db):
     models = await utils.get_models(db_client, project_id=setup_db["project_id_1"])
     # Check three models returned
@@ -341,6 +404,37 @@ async def test_get_model_doesnt_exist(db_client, setup_db):
             model_type="mock_disruption_cnn",
             version=4,
         )
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_multiple_samples(db_client, setup_db):
+    # Import annotations for multiple samples
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"shot_id": 1}),
+        ANNOTATION_2.model_copy(update={"shot_id": 1}),
+        ANNOTATION_1.model_copy(update={"shot_id": 2}),
+    ]
+
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=new_annotations,
+    )
+
+    # Verify annotations were added correctly
+    sample1_annotations = await utils.get_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
+    )
+    sample2_annotations = await utils.get_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_2"],
+    )
+
+    assert len(sample1_annotations) == 5  # 3 existing + 2 new
+    assert len(sample2_annotations) == 2  # 1 existing + 1 new
 
 
 @pytest.mark.asyncio

@@ -234,7 +234,7 @@ class PeakDetectionAnnotator(DataAnnotator):
             peak_time = time[idx]
             if peak_time >= tmin and peak_time <= tmax:
                 region = TimeRegion(
-                    label="Peak",
+                    label="Unknown",
                     time_min=max(float(peak_time - width), np.min(time)),
                     time_max=min(float(peak_time + width), np.max(time)),
                     created_by=AnnotatorTypes.PEAK_DETECTION,
@@ -308,7 +308,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=time[imin],
                 time_max=time[imax],
-                label="Outlier",
+                label="Unknown",
                 created_by=AnnotatorTypes.OUTLIER_DETECTION,
             )
             for imin, imax in bounds
@@ -333,7 +333,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=time[imin],
                 time_max=time[imax],
-                label="Outlier",
+                label="Unknown",
                 created_by=AnnotatorTypes.OUTLIER_DETECTION,
             )
             for imin, imax in bounds
@@ -418,7 +418,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=time[imin],
                 time_max=time[imax],
-                label="Change Point",
+                label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
             )
             for imin, imax in zip(result, result[1:])
@@ -456,7 +456,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
             TimeRegion(
                 time_min=tmin,
                 time_max=tmax,
-                label="Change Point",
+                label="Unknown",
                 created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
             )
             for (tmin, tmax) in bounds
@@ -540,7 +540,7 @@ class JumpDetectionAnnotator(DataAnnotator):
                 TimeRegion(
                     time_min=tmin,
                     time_max=tmax,
-                    label="Jump",
+                    label="Unknown",
                     created_by=AnnotatorTypes.JUMP_DETECTION,
                 )
             )
@@ -549,6 +549,28 @@ class JumpDetectionAnnotator(DataAnnotator):
 
 
 class SpectrogramThresholdAnnotator:
+    """
+    SpectrogramThresholdAnnotator for generating a spectrogram mask based on thresholding.
+    This annotator computes the Short-Time Fourier Transform (STFT) of a specified signal
+    from multivariate time series data, applies a percentile-based threshold to the
+    spectrogram values, and generates a binary mask indicating regions exceeding the threshold.
+
+    Parameters
+    ----------
+    params : SpectrogramThresholdParams
+        Configuration parameters for spectrogram thresholding, including signal name and percentile.
+
+    Methods
+    -------
+    predict(data: MultiVariateTimeSeriesData) -> SpectrogramMask
+        Computes the spectrogram mask based on the specified thresholding parameters.
+
+    Examples
+    --------
+    >>> annotator = SpectrogramThresholdAnnotator(params)
+    >>> mask = annotator.predict(data)
+    """
+
     def __init__(self, params: SpectrogramThresholdParams):
         self.params = params
 
@@ -575,18 +597,12 @@ ANNOTATORS = {
 # Currently only allowing these annotators to task mapping
 # Might want user to be able to specify a choice when making the project down the line?
 ANNOTATORS_PER_TASK = {
-    Task.ELM: [
+    Task.TIME_SERIES: [
         AnnotatorTypes.PEAK_DETECTION,
         AnnotatorTypes.OUTLIER_DETECTION,
         AnnotatorTypes.CHANGE_POINT_DETECTION,
         AnnotatorTypes.JUMP_DETECTION,
     ],
-    Task.DISRUPTION: [
-        AnnotatorTypes.PEAK_DETECTION,
-        AnnotatorTypes.OUTLIER_DETECTION,
-        AnnotatorTypes.CHANGE_POINT_DETECTION,
-        AnnotatorTypes.JUMP_DETECTION,
-    ],
-    Task.MHD: [AnnotatorTypes.SPECTROGRAM_THRESHOLD],
-    Task.UFO: [],
+    Task.SPECTROGRAM: [AnnotatorTypes.SPECTROGRAM_THRESHOLD],
+    Task.VIDEO: [],
 }

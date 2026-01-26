@@ -1,18 +1,23 @@
 from pydantic import Field, field_validator, computed_field
 from typing import Optional, List
 from enum import Enum
-from toktagger.api.schemas import ConfiguredModel
+
+
 from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.schemas import ConfiguredModel
 
 
 class Task(str, Enum):
-    ELM = "ELM"
-    DISRUPTION = "disruption"
-    MHD = "MHD"
-    UFO = "UFO"
+    """The type of labelling task for a project."""
+
+    TIME_SERIES = "time-series"
+    SPECTROGRAM = "spectrogram"
+    VIDEO = "video"
 
 
 class QueryStrategyType(str, Enum):
+    """The strategy to use when selecting the next sample to annotate."""
+
     RANDOM = "random"
     SEQUENTIAL = "sequential"
     UNCERTAINTY = "uncertainty"
@@ -25,9 +30,25 @@ class ProjectIn(ConfiguredModel):
         ...,
         description="The strategy to use when selecting the next sample to annotate.",
     )
+
     data_loader: str = Field(
         ...,
         description="The type of data which will need to be loaded for this project.",
+    )
+
+    time_min: Optional[float] = Field(
+        None,
+        description="The minimum time (in seconds) for samples in this project.",
+    )
+
+    time_max: Optional[float] = Field(
+        None,
+        description="The maximum time (in seconds) for samples in this project.",
+    )
+
+    min_time_step: Optional[float] = Field(
+        None,
+        description="The minimum time step (in seconds) between samples in this project.",
     )
 
     @computed_field
@@ -55,3 +76,6 @@ class ProjectUpdate(ConfiguredModel):
     name: Optional[str] = None
     task: Optional[Task] = None
     query_strategy: Optional[QueryStrategyType] = None
+    time_min: Optional[float] = None
+    time_max: Optional[float] = None
+    min_time_step: Optional[float] = None

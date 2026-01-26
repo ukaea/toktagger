@@ -1,6 +1,8 @@
 # TokTagger
 
-An interactive annotation platform for Tokamak diagnostic data.
+![TokTagger Logo](docs/assets/logo_small.png)
+
+An open source, interactive annotation platform for Tokamak diagnostic data.
 
 [![Workflow: CI](https://github.com/ukaea/toktagger/actions/workflows/ci.yml/badge.svg)](https://github.com/ukaea/toktagger/actions/workflows/ci.yml)
 [![Workflow: Dependabot](https://img.shields.io/badge/Dependabot-enabled-34d058?logo=github)](https://github.com/ukaea/toktagger/actions/workflows/dependabot/dependabot-updates)
@@ -32,13 +34,13 @@ Below is a high level overview of the project structure:
 ```
 .
 ├── data                # Sample experimental data
-├── active_learning     # Experiments in active learning
-├── notebooks           # Notebooks for exploring data
-├── toktagger            # Implementations of different apis/toktagger
+├── docs                # Documentation files
+├── scripts             # Useful development scripts
+├── tests               # Unit tests 
+├── toktagger           # Implementations of different apis/toktagger
 │   ├── api             # API: backend for pulling data, annotations, running models.
 │   └── ui              # UI: the react front end of the application
 ├── README.md           # This README doc
-└── docker-compose.yml  # Master docker compose for running the application
 ```
 
 ## Development Setup
