@@ -47,7 +47,7 @@ import { useNavigate } from "react-router-dom";
 import type { NavigateFunction } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
-import { VideoToolbarV2Sidebar } from "@/app/frames/components/v2/VideoToolbarV2Sidebar";
+import { VideoToolbarV2Sidebar } from "@/app/frames/components/VideoToolbarV2Sidebar";
 
 // ------------------------------
 // Save helpers
