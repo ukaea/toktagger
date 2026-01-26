@@ -69,7 +69,9 @@ export type VideoViewProps = {
   sampleId: string;
 
   dataParams: DataParams;
-  setDataParams: (updater: (prev: DataParams) => DataParams | DataParams) => void;
+  setDataParams: (
+    updater: (prev: DataParams) => DataParams | DataParams,
+  ) => void;
 
   onPrev?: () => void;
   onNext?: () => void;
@@ -179,15 +181,22 @@ export function VideoViewInner(props: VideoViewProps) {
     if (!Number.isFinite(n)) return;
     const target = Math.max(0, Math.trunc(n));
 
-    props.setDataParams((prev) => ({
-      ...(prev as Record<string, unknown>),
-      name: "image",
-      frame: target,
-    }) as DataParams);
+    props.setDataParams(
+      (prev) =>
+        ({
+          ...(prev as Record<string, unknown>),
+          name: "image",
+          frame: target,
+        }) as DataParams,
+    );
   };
 
   const onSaveBackend = async (payload: Annotation[]) => {
-    const res = await saveVideoAnnotations(props.projectId, props.sampleId, payload);
+    const res = await saveVideoAnnotations(
+      props.projectId,
+      props.sampleId,
+      payload,
+    );
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
       throw new Error(

@@ -220,9 +220,15 @@ export default function SamplePage() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [dataParams, setDataParams] = useState<DataParams>({ name: "identity" });
-  const [viewParams, setViewParams] = useState<ViewParams>({ name: "identity" });
-  const [plotProps, setPlotProps] = useState<PlotProps>({ colorMap: "Cividis" });
+  const [dataParams, setDataParams] = useState<DataParams>({
+    name: "identity",
+  });
+  const [viewParams, setViewParams] = useState<ViewParams>({
+    name: "identity",
+  });
+  const [plotProps, setPlotProps] = useState<PlotProps>({
+    colorMap: "Cividis",
+  });
 
   const videoInitRef = useRef(false);
 
@@ -288,7 +294,10 @@ export default function SamplePage() {
       const samp = await getSample(project_id as string, sample_id as string);
       setSample(samp);
 
-      const dbAnnotations = await getAnnotations(project_id as string, sample_id as string);
+      const dbAnnotations = await getAnnotations(
+        project_id as string,
+        sample_id as string,
+      );
       setAnnotations(dbAnnotations);
     };
 
@@ -305,7 +314,11 @@ export default function SamplePage() {
 
       let nextViewParams: ViewParams = vp;
       if (project.task === "MHD") {
-        nextViewParams = { ...vp, name: "spectrogram", nperseg: 256 } as SpectrogramViewParams;
+        nextViewParams = {
+          ...vp,
+          name: "spectrogram",
+          nperseg: 256,
+        } as SpectrogramViewParams;
       }
 
       const response = await fetch(
@@ -314,7 +327,7 @@ export default function SamplePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ params: dp, view: nextViewParams }),
-        }
+        },
       );
 
       const payload = (await response.json()) as unknown;
@@ -356,7 +369,7 @@ export default function SamplePage() {
 
         <div className="flex">
           {isUfo ? (
-             /**
+            /**
              * For frame-based annotation, we provide a single session context that both
              * the toolbar and the main view consume.
              *

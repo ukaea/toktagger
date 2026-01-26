@@ -78,7 +78,9 @@ async function getShotSample(project_id: string, shot_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
   const sampleResult = await fetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
-  return Array.isArray(sampleArray) && sampleArray.length > 0 ? sampleArray[0] : null;
+  return Array.isArray(sampleArray) && sampleArray.length > 0
+    ? sampleArray[0]
+    : null;
 }
 
 /**
@@ -247,7 +249,10 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
   const profileCounts = useMemo(() => {
     const out: Record<string, number> = {};
     for (const inst of session.instances) {
-      const k = instanceKey({ class_name: inst.className, track_id: inst.trackId });
+      const k = instanceKey({
+        class_name: inst.className,
+        track_id: inst.trackId,
+      });
       out[k] = inst.count;
     }
     return out;
@@ -265,12 +270,16 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
     try {
       const payload = session.collectAllVideoBBoxes() as Annotation[];
       const res = await saveVideoAnnotations(project_id, sample_id, payload);
-      if (!res.ok) throw new Error(`Failed to save annotations: ${res.statusText}`);
+      if (!res.ok)
+        throw new Error(`Failed to save annotations: ${res.statusText}`);
 
       session.markSaved();
-      ToastQueue.positive(`Saved ${payload.length} annotations!`, { timeout: 5000 });
+      ToastQueue.positive(`Saved ${payload.length} annotations!`, {
+        timeout: 5000,
+      });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save annotations.";
+      const msg =
+        err instanceof Error ? err.message : "Failed to save annotations.";
       ToastQueue.negative(msg, { timeout: 5000 });
     }
   };
@@ -283,7 +292,10 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
 
   const handleNextSample = async () => {
     if (!project_id || !sample_id) {
-      ToastQueue.negative("Cannot load next sample: missing project or sample id.", { timeout: 5000 });
+      ToastQueue.negative(
+        "Cannot load next sample: missing project or sample id.",
+        { timeout: 5000 },
+      );
       return;
     }
 
@@ -330,7 +342,10 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
   };
 
   // Right-click on an instance row triggers a confirm flow (no immediate deletion).
-  const onRequestBulkDelete = (profile: { class_name?: string; track_id?: string }) => {
+  const onRequestBulkDelete = (profile: {
+    class_name?: string;
+    track_id?: string;
+  }) => {
     const cls = (profile.class_name || "").trim();
     const tid = canonicalizeTrackId(profile.track_id || "");
     if (!cls || !tid) return;
@@ -370,7 +385,11 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
       <div className="h-screen text-center w-72 shrink-0 overflow-y-auto">
         <div className="pl-4 pr-4 pt-4">
           <ButtonGroup>
-            <Button variant="primary" onPress={saveNow} isDisabled={!session.dirty}>
+            <Button
+              variant="primary"
+              onPress={saveNow}
+              isDisabled={!session.dirty}
+            >
               Save
             </Button>
             <Button variant="primary" onPress={handleNextSample}>
@@ -401,7 +420,12 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
           <div className="max-w-[16rem] mx-auto mb-4">
             <div className="mb-2">
               <Flex gap="size-100" alignItems="center" wrap>
-                <Button variant="secondary" style="outline" isDisabled UNSAFE_className="!px-2.5 !py-1.5 text-xs">
+                <Button
+                  variant="secondary"
+                  style="outline"
+                  isDisabled
+                  UNSAFE_className="!px-2.5 !py-1.5 text-xs"
+                >
                   Rectangle
                 </Button>
               </Flex>
@@ -410,7 +434,12 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
             <hr className="m-4 h-px opacity-30 border-gray-200" />
 
             <div className="mb-1">
-              <Flex gap="size-100" alignItems="center" justifyContent="center" wrap>
+              <Flex
+                gap="size-100"
+                alignItems="center"
+                justifyContent="center"
+                wrap
+              >
                 <Button
                   variant="primary"
                   style="outline"
@@ -457,8 +486,8 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
               onPrimaryAction={confirmClearAll}
               onCancel={cancelClearAll}
             >
-              This will remove all annotations across all frames in the current session.
-              You can’t undo this.
+              This will remove all annotations across all frames in the current
+              session. You can’t undo this.
             </AlertDialog>
           )}
         </DialogContainer>
@@ -473,7 +502,8 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
               <div>
                 Target:{" "}
                 <b>
-                  {pendingDeleteInstance.className} / {pendingDeleteInstance.trackId}
+                  {pendingDeleteInstance.className} /{" "}
+                  {pendingDeleteInstance.trackId}
                 </b>
               </div>
             ) : null

@@ -34,7 +34,9 @@ export function ClassPanel({
         aria-label="Class"
         items={items}
         selectedKey={selectedClassName}
-        onSelectionChange={(key) => setSelectedClassName((key as string) || null)}
+        onSelectionChange={(key) =>
+          setSelectedClassName((key as string) || null)
+        }
         placeholder="— Select class —"
         width="100%"
       >
@@ -90,7 +92,8 @@ export function InstancePanel({
   const defaultClass = classItems?.[0]?.name ?? "";
   const [className, setClassName] = useState<string>(defaultClass);
 
-  const makeAutoTrackId = () => `auto-${Math.random().toString(36).slice(2, 7)}`;
+  const makeAutoTrackId = () =>
+    `auto-${Math.random().toString(36).slice(2, 7)}`;
   const [trackId, setTrackId] = useState<string>(() => makeAutoTrackId());
 
   const creatorEnabled = Boolean(classItems && classItems.length > 0);

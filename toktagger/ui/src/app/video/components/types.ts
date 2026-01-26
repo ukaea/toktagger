@@ -85,7 +85,10 @@ export function makeTrackKey(className: string, trackId: string): TrackKey {
 }
 
 /** Parse a TrackKey back into its components. */
-export function parseTrackKey(key: TrackKey): { className: string; trackId: string } {
+export function parseTrackKey(key: TrackKey): {
+  className: string;
+  trackId: string;
+} {
   const idx = key.lastIndexOf("::");
   return { className: key.slice(0, idx), trackId: key.slice(idx + 2) };
 }

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  useState,
+} from "react";
 import {
   Annotorious,
   ImageAnnotator,
@@ -13,7 +19,11 @@ import {
   useVideoSession,
   commitOverlayToSession,
 } from "@/app/video/components/video-session";
-import { getLabelTrack, readRectGeometry, stampLabelAndTrack } from "./anno-utils";
+import {
+  getLabelTrack,
+  readRectGeometry,
+  stampLabelAndTrack,
+} from "./anno-utils";
 import {
   canonicalizeTrackId,
   existingTrackIdsForClass,
@@ -45,12 +55,20 @@ function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
 function asAnnotatorApi(a: unknown): AnnotatorApi | null {
   if (!a || (typeof a !== "object" && typeof a !== "function")) return null;
   const r = a as Record<string, unknown>;
-  if ("getAnnotations" in r && r.getAnnotations != null && !isFunction(r.getAnnotations))
+  if (
+    "getAnnotations" in r &&
+    r.getAnnotations != null &&
+    !isFunction(r.getAnnotations)
+  )
     return null;
-  if ("setAnnotations" in r && r.setAnnotations != null && !isFunction(r.setAnnotations))
+  if (
+    "setAnnotations" in r &&
+    r.setAnnotations != null &&
+    !isFunction(r.setAnnotations)
+  )
     return null;
   if ("on" in r && r.on != null && !isFunction(r.on)) return null;
-  if ("off" in r && r.off !=null && !isFunction(r.off)) return null;
+  if ("off" in r && r.off != null && !isFunction(r.off)) return null;
   return a as AnnotatorApi;
 }
 
@@ -152,7 +170,9 @@ function withRectGeometry(
   const geom = a.target.selector.geometry as unknown;
 
   const base =
-    geom && typeof geom === "object" ? (geom as UnknownRecord) : ({} as UnknownRecord);
+    geom && typeof geom === "object"
+      ? (geom as UnknownRecord)
+      : ({} as UnknownRecord);
 
   const nextGeom = {
     ...base,
@@ -257,9 +277,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     trackId: string | null;
     geom: { x: number; y: number; w: number; h: number } | null;
   } | null>(null);
-  const [popupPos, setPopupPos] = useState<{ left: number; top: number } | null>(
-    null,
-  );
+  const [popupPos, setPopupPos] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
 
   const clearPopup = useCallback(() => {
     setSelectedId(null);
@@ -271,7 +292,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     () => session.getFrameList(session.frame),
     [session],
   );
-  
+
   /**
    * Track id allocator for "AUTO" mode (no explicit trackId selected).
    * The allocator memoizes per-class used ids across calls.
@@ -284,7 +305,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
       let used = usedByClass.get(cls);
       if (!used) {
-        const existing = existingTrackIdsForClass(session.byFrame, cls, getLabelTrack);
+        const existing = existingTrackIdsForClass(
+          session.byFrame,
+          cls,
+          getLabelTrack,
+        );
         used = new Set(existing.map((t) => canonicalizeTrackId(t)));
         usedByClass.set(cls, used);
       }
@@ -443,7 +468,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
     const onSelectionChanged = (selected: unknown) => {
       // Keep selection UI responsive even during suppression.
-      const arr = Array.isArray(selected) ? (selected as ImageAnnotation[]) : [];
+      const arr = Array.isArray(selected)
+        ? (selected as ImageAnnotation[])
+        : [];
 
       if (arr.length === 0) {
         clearPopup();
@@ -486,7 +513,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
       // Track ids already used for this class (session + current overlay).
       const used = new Set<string>();
-      for (const tid of existingTrackIdsForClass(session.byFrame, cls, getLabelTrack)) {
+      for (const tid of existingTrackIdsForClass(
+        session.byFrame,
+        cls,
+        getLabelTrack,
+      )) {
         const c = canonicalizeTrackId(tid);
         if (c) used.add(c);
       }
@@ -520,7 +551,14 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       api.off?.("deleteAnnotation", onAnyChange);
       api.off?.("selectionChanged", onSelectionChanged);
     };
-  }, [api, session, onAnyChange, clearPopup, computePopupPos, refreshPopupForId]);
+  }, [
+    api,
+    session,
+    onAnyChange,
+    clearPopup,
+    computePopupPos,
+    refreshPopupForId,
+  ]);
 
   const drawingEnabled = !!session.selection.className;
   const label = session.frame;
@@ -536,14 +574,21 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   return (
     <div className="w-full flex justify-center">
       <div className="relative inline-block max-w-full">
-        <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled} autoSave={true}>
+        <ImageAnnotator
+          tool="rectangle"
+          drawingEnabled={drawingEnabled}
+          autoSave={true}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}
             src={`data:image/png;base64,${imageBase64}`}
             alt={`Frame ${label}`}
             className="block mx-auto max-w-full h-auto object-contain max-h-[calc(100dvh-220px)] sm:max-h-[calc(100dvh-210px)]"
-            style={{ imageRendering: "pixelated", maxHeight: "calc(100dvh - 240px)" }}
+            style={{
+              imageRendering: "pixelated",
+              maxHeight: "calc(100dvh - 240px)",
+            }}
             draggable={false}
             onLoad={() => {
               if (selectedId) void refreshPopupForId(selectedId);

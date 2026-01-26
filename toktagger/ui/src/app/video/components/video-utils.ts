@@ -1,7 +1,12 @@
 "use client";
 
 import type { ImageAnnotation } from "@annotorious/react";
-import type { ByFrameMap, FrameIndex, InstanceProfile, TrackKey } from "./types";
+import type {
+  ByFrameMap,
+  FrameIndex,
+  InstanceProfile,
+  TrackKey,
+} from "./types";
 import { classIdForName, makeTrackKey } from "./types";
 
 /**
@@ -116,7 +121,9 @@ function randomReadableSlug(): string {
  * Generate a readable track id that doesn't collide with an existing set
  * (collisions checked after canonicalization).
  */
-export function uniqueReadableTrackId(existingTrackIds: Iterable<string>): string {
+export function uniqueReadableTrackId(
+  existingTrackIds: Iterable<string>,
+): string {
   const used = new Set<string>();
   for (const t of existingTrackIds) {
     const c = canonicalizeTrackId(String(t ?? ""));
@@ -148,7 +155,10 @@ export function uniqueReadableTrackId(existingTrackIds: Iterable<string>): strin
 export function existingTrackIdsForClass(
   byFrame: ByFrameMap,
   className: string,
-  getLabelTrack: (a: ImageAnnotation) => { className?: string | null; trackId?: string | null }
+  getLabelTrack: (a: ImageAnnotation) => {
+    className?: string | null;
+    trackId?: string | null;
+  },
 ): string[] {
   const cls = (className || "").trim();
   if (!cls) return [];
@@ -171,14 +181,21 @@ export function existingTrackIdsForClass(
 export function nextReadableTrackIdForClass(
   byFrame: ByFrameMap,
   className: string,
-  getLabelTrack: (a: ImageAnnotation) => { className?: string | null; trackId?: string | null }
+  getLabelTrack: (a: ImageAnnotation) => {
+    className?: string | null;
+    trackId?: string | null;
+  },
 ): string {
   const existing = existingTrackIdsForClass(byFrame, className, getLabelTrack);
   return uniqueReadableTrackId(existing);
 }
 
 /** Immutable update: set a frame's overlay list. */
-export function mapSetFrame(prev: ByFrameMap, frame: FrameIndex, list: ImageAnnotation[]): ByFrameMap {
+export function mapSetFrame(
+  prev: ByFrameMap,
+  frame: FrameIndex,
+  list: ImageAnnotation[],
+): ByFrameMap {
   const next = new Map(prev);
   next.set(frame, list);
   return next;
@@ -211,7 +228,10 @@ export function flattenByFrame(byFrame: ByFrameMap): ImageAnnotation[] {
  */
 export function deriveInstances(
   byFrame: ByFrameMap,
-  getLabelTrack: (a: ImageAnnotation) => { className?: string | null; trackId?: string | null }
+  getLabelTrack: (a: ImageAnnotation) => {
+    className?: string | null;
+    trackId?: string | null;
+  },
 ): InstanceProfile[] {
   const map = new Map<TrackKey, InstanceProfile>();
 
@@ -244,7 +264,8 @@ export function deriveInstances(
   // Stable UI ordering: class name then track id.
   out.sort(
     (a, b) =>
-      a.className.localeCompare(b.className) || a.trackId.localeCompare(b.trackId)
+      a.className.localeCompare(b.className) ||
+      a.trackId.localeCompare(b.trackId),
   );
 
   return out;
@@ -256,7 +277,10 @@ export function deriveInstances(
 export function deleteTrackAcrossFrames(
   byFrame: ByFrameMap,
   match: { className: string; trackId: string },
-  getLabelTrack: (a: ImageAnnotation) => { className?: string | null; trackId?: string | null }
+  getLabelTrack: (a: ImageAnnotation) => {
+    className?: string | null;
+    trackId?: string | null;
+  },
 ): ByFrameMap {
   const cls = (match.className || "").trim();
   const tid = ensureTrackId(match.trackId);
@@ -284,7 +308,7 @@ export function forwardPropagateIfEmpty(
   byFrame: ByFrameMap,
   frame: FrameIndex,
   nextFrame: FrameIndex,
-  withRetarget: (a: ImageAnnotation, nextFrame: FrameIndex) => ImageAnnotation
+  withRetarget: (a: ImageAnnotation, nextFrame: FrameIndex) => ImageAnnotation,
 ): ByFrameMap {
   const cur = byFrame.get(frame) ?? [];
   if (cur.length === 0) return byFrame;
@@ -305,7 +329,10 @@ export function forwardPropagateIfEmpty(
 export function nextTrackIdForClass(
   byFrame: ByFrameMap,
   className: string,
-  getLabelTrack: (a: ImageAnnotation) => { className?: string | null; trackId?: string | null }
+  getLabelTrack: (a: ImageAnnotation) => {
+    className?: string | null;
+    trackId?: string | null;
+  },
 ): string {
   const key = (className || "").trim();
   if (!key) return "1";
@@ -323,4 +350,3 @@ export function nextTrackIdForClass(
 
   return String(max + 1);
 }
-

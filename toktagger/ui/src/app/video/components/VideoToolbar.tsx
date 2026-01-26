@@ -31,7 +31,9 @@ export function VideoToolbar(props: {
   // When a class is selected, list all existing instances for that class.
   const instancesForClass = useMemo(() => {
     if (!session.selection.className) return [];
-    return session.instances.filter((i) => i.className === session.selection.className);
+    return session.instances.filter(
+      (i) => i.className === session.selection.className,
+    );
   }, [session.instances, session.selection.className]);
 
   const doSave = async () => {

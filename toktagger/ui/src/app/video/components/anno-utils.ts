@@ -35,7 +35,10 @@ function isImageAnnotationLike(v: unknown): v is ImageAnnotation {
   return typeof type === "string";
 }
 
-export function getBodyValue(a: ImageAnnotation, purpose: string): string | null {
+export function getBodyValue(
+  a: ImageAnnotation,
+  purpose: string,
+): string | null {
   const v = a?.bodies?.find((b) => b?.purpose === purpose)?.value;
   return typeof v === "string" ? v : null;
 }
@@ -44,12 +47,16 @@ export function getBodyValue(a: ImageAnnotation, purpose: string): string | null
 export function upsertBody(
   bodies: AnnotationBody[] | undefined,
   purpose: string,
-  value: string
+  value: string,
 ): AnnotationBody[] {
   const list = Array.isArray(bodies) ? bodies.slice() : [];
   const idx = list.findIndex((b) => b?.purpose === purpose);
   if (idx >= 0) {
-    list[idx] = { ...(list[idx] as AnnotationBody), purpose, value } as AnnotationBody;
+    list[idx] = {
+      ...(list[idx] as AnnotationBody),
+      purpose,
+      value,
+    } as AnnotationBody;
     return list;
   }
   list.push({ purpose, value } as unknown as AnnotationBody);
@@ -57,20 +64,30 @@ export function upsertBody(
 }
 
 /** Ensure the annotation has a class label body. */
-export function stampLabel(a: ImageAnnotation, className: string): ImageAnnotation {
+export function stampLabel(
+  a: ImageAnnotation,
+  className: string,
+): ImageAnnotation {
   const bodies = upsertBody(a.bodies, "tagging", className);
   return { ...a, bodies };
 }
 
 /** Ensure the annotation has both class label + track id bodies. */
-export function stampLabelAndTrack(a: ImageAnnotation, className: string, trackId: string): ImageAnnotation {
+export function stampLabelAndTrack(
+  a: ImageAnnotation,
+  className: string,
+  trackId: string,
+): ImageAnnotation {
   const bodies = upsertBody(a.bodies, "tagging", className);
   const bodies2 = upsertBody(bodies, "identifying", trackId);
   return { ...a, bodies: bodies2 };
 }
 
 /** Read the class label + track id bodies. */
-export function getLabelTrack(a: ImageAnnotation): { className: string | null; trackId: string | null } {
+export function getLabelTrack(a: ImageAnnotation): {
+  className: string | null;
+  trackId: string | null;
+} {
   return {
     className: getBodyValue(a, "tagging"),
     trackId: getBodyValue(a, "identifying"),
@@ -86,7 +103,7 @@ export function isRectangleAnno(a: ImageAnnotation): boolean {
 
 /** Read rectangle geometry (returns null if missing/invalid). */
 export function readRectGeometry(
-  a: ImageAnnotation
+  a: ImageAnnotation,
 ): { x: number; y: number; w: number; h: number } | null {
   const g = a.target.selector.geometry as unknown;
 
@@ -98,7 +115,8 @@ export function readRectGeometry(
   const w = rec["w"];
   const h = rec["h"];
 
-  if (![x, y, w, h].every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+  if (![x, y, w, h].every((v) => typeof v === "number" && Number.isFinite(v)))
+    return null;
   if (w <= 0 || h <= 0) return null;
   return { x, y, w, h };
 }
@@ -123,7 +141,7 @@ export function normalizeOverlay(
     enforceBothBodies?: boolean;
     /** If true, keep at most 1 anno per (class, trackId) in this frame. Default: true */
     dedupeByInstance?: boolean;
-  }
+  },
 ): ImageAnnotation[] {
   const enforceBothBodies = opts?.enforceBothBodies ?? true;
   const dedupeByInstance = opts?.dedupeByInstance ?? true;
@@ -177,7 +195,10 @@ export function normalizeOverlay(
 }
 
 /** Convert a normalized ImageAnnotation -> backend VideoBoundingBox. */
-export function annoToVideoBBox(a: ImageAnnotation, frame: number): VideoBoundingBox | null {
+export function annoToVideoBBox(
+  a: ImageAnnotation,
+  frame: number,
+): VideoBoundingBox | null {
   if (!isRectangleAnno(a)) return null;
   const g = readRectGeometry(a);
   if (!g) return null;
@@ -200,7 +221,10 @@ export function annoToVideoBBox(a: ImageAnnotation, frame: number): VideoBoundin
 }
 
 /** Convert backend VideoBoundingBox -> Annotorious rectangle annotation. */
-export function videoBBoxToAnno(b: VideoBoundingBox, frameKey: string): ImageAnnotation {
+export function videoBBoxToAnno(
+  b: VideoBoundingBox,
+  frameKey: string,
+): ImageAnnotation {
   const x = Number(b.x_min);
   const y = Number(b.y_min);
   const w = Number(b.width);
