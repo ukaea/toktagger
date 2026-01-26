@@ -170,7 +170,8 @@ toktagger/ui/.next/*
 toktagger/ui/node_modules/*
 data/elms
 data/elm-events
+data/test/mock_disruptions
 node_modules
 package-lock.json
 package.json
-data/test/mock_disruptions
+.vscode

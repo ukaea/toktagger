@@ -8,7 +8,6 @@ from toktagger.api.schemas.annotations import AnnotationBatchTypes
 class FileType(str, Enum):
     CSV = "csv"
     PARQUET = "parquet"
-    MP4 = "mp4"
     PNG = "png"
     JPG = "jpg"
 
