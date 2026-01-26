@@ -1,26 +1,27 @@
 from typing import Literal, Optional, Union
+
+from pydantic import Field, TypeAdapter, create_model, field_validator, model_validator
+
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotators import AnnotatorTypes
-from pydantic import Field, TypeAdapter, model_validator, BaseModel, field_validator
 
 
-class AnnotationIn(ConfiguredModel):
-    @model_validator(mode="before")
-    def set_uncertainty(cls, values):
-        if not isinstance(values, dict):
-            values = values.model_dump(mode="python")
+class AnnotationBase(ConfiguredModel):
+    """Base class for annotation inputs, without IDs."""
 
-        if values.get("validated"):
-            values["uncertainty"] = 0
-        elif not values.get("validated") and values.get("uncertainty") is None:
-            values["uncertainty"] = 1
-
-        return values
-
-    validated: bool = False
-    uncertainty: Optional[float] = None
     label: str
     created_by: str
+    validated: bool = False
+    uncertainty: Optional[float] = 1
+
+    @model_validator(mode="before")
+    def set_uncertainty(cls, values):
+        if isinstance(values, dict):
+            if "validated" in values and values["validated"]:
+                values["uncertainty"] = 0
+            elif values.get("uncertainty") is None:
+                values["uncertainty"] = 1
+        return values
 
     @field_validator("created_by")
     def check_created_by(cls, value):
@@ -35,28 +36,26 @@ class AnnotationIn(ConfiguredModel):
         return value
 
 
-class Annotation(AnnotationIn):
+class Annotation(AnnotationBase):
     id: str = Field(..., alias="_id")
-    project_id: Optional[str] = None
-    sample_id: Optional[str] = None
 
 
-class ClassLabel(AnnotationIn):
+class ClassLabel(AnnotationBase):
     type: Literal["class_label"] = "class_label"
 
 
-class TimePoint(AnnotationIn):
+class TimePoint(AnnotationBase):
     type: Literal["time_point"] = "time_point"
     time: float
 
 
-class TimeRegion(AnnotationIn):
+class TimeRegion(AnnotationBase):
     type: Literal["time_region"] = "time_region"
     time_min: float
     time_max: float
 
 
-class BoundingBox(AnnotationIn):
+class BoundingBox(AnnotationBase):
     type: Literal["bounding_box"] = "bounding_box"
     height: int
     width: int
@@ -70,50 +69,80 @@ class VideoBoundingBox(BoundingBox):
     track_id: str
 
 
-class AnnotationOut(BaseModel):
-    id: str = Field(..., alias="_id")
-    created_by: AnnotatorTypes
-    project_id: str
-    sample_id: str
-
-
-class TimePointOut(TimePoint, Annotation):
-    pass
-
-
-class TimeRegionOut(TimeRegion, Annotation):
-    pass
-
-
-class BoundingBoxOut(BoundingBox, Annotation):
-    pass
-
-
-class VideoBoundingBoxOut(VideoBoundingBox, Annotation):
-    pass
-
-
-class ModelAnnotation(AnnotationIn):
-    uncertainty: float
-    created_by: str
-
-
-class SpectrogramMask(AnnotationIn):
+class SpectrogramMask(AnnotationBase):
+    type: Literal["spectrogram_mask"] = "spectrogram_mask"
     values: list[list[float]]
 
 
-AnnotationTypes = Union[
-    AnnotationIn, TimePoint, TimeRegion, BoundingBox, VideoBoundingBox
-]
-AnnotationOutTypes = Union[
-    Annotation, TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut
-]
+class AnnotationBatch(AnnotationBase):
+    """Base class for batch annotation inputs, with or without IDs."""
+
+    id: Optional[str] = Field(None, alias="_id")
+    project_id: Optional[str] = None
+    sample_id: Optional[str] = None
+    shot_id: Optional[int] = None
 
 
-class AnnotationBatchItem(ConfiguredModel):
+class AnnotationOut(AnnotationBatch):
+    """Base class for annotation outputs coming from the database, with IDs."""
+
+    id: str = Field(alias="_id")
+    project_id: str
     sample_id: str
-    annotations: list[AnnotationTypes]
+    shot_id: int
 
 
+def create_out_model(base_class, name_suffix="Out"):
+    """Create an Out variant of an annotation class by combining it with AnnotationOut."""
+    class_name = f"{base_class.__name__}{name_suffix}"
+    return create_model(
+        class_name,
+        __base__=(base_class, AnnotationOut),
+    )
+
+
+def create_batch_model(base_class, name_suffix="Batch"):
+    """Create a Batch variant of an annotation class by combining it with AnnotationBatch."""
+    class_name = f"{base_class.__name__}{name_suffix}"
+    return create_model(
+        class_name,
+        __base__=(base_class, AnnotationBatch),
+    )
+
+
+# Generate Out classes using factory function
+TimePointOut = create_out_model(TimePoint)
+TimeRegionOut = create_out_model(TimeRegion)
+BoundingBoxOut = create_out_model(BoundingBox)
+VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
+SpectrogramMaskOut = create_out_model(SpectrogramMask)
+
+# Generate Batch classes using factory function
+TimePointBatch = create_batch_model(TimePoint)
+TimeRegionBatch = create_batch_model(TimeRegion)
+BoundingBoxBatch = create_batch_model(BoundingBox)
+VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
+SpectrogramMaskBatch = create_batch_model(SpectrogramMask)
+
+
+# Union types for annotations
+AnnotationTypes = Union[
+    TimePoint, TimeRegion, BoundingBox, VideoBoundingBox, SpectrogramMask
+]
+
+AnnotationOutTypes = Union[
+    TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut, SpectrogramMaskOut
+]
+
+AnnotationBatchTypes = Union[
+    TimePointBatch,
+    TimeRegionBatch,
+    BoundingBoxBatch,
+    VideoBoundingBoxBatch,
+    SpectrogramMaskBatch,
+]
+
+# TypeAdapters for annotations
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)
+AnnotationBatchTypeAdapter = TypeAdapter(AnnotationBatchTypes)

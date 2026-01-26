@@ -22,7 +22,7 @@ import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
 import { startTraining } from "@/app/core";
 
-export function ModelTrainModal({ project }: Project) {
+export function ModelTrainModal({ project }: { project: Project }) {
   const [message, setMessage] = useState<string | null>(null);
   const [messageColour, setMessageColour] = useState<string>("primary");
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);

@@ -8,27 +8,23 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type JumpDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  dataParams: DataParams;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function JumpDetectionTool({
   project_id,
   sample_id,
   data,
-  dataParams,
-  setAnnotations,
 }: JumpDetectionType) {
+  const { dataParams, setAnnotations } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [signalName, setSignalName] = useState<string | null>(null);
   const signalOptions = Object.keys(data.values).map((value, index) => ({

@@ -1,5 +1,7 @@
-import random
-from abc import ABC, abstractmethod
+from abc import ABC
+from typing import Optional
+
+import numpy as np
 
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation
@@ -11,29 +13,57 @@ logger = logging.getLogger(__name__)
 
 
 class QueryStrategy(ABC):
-    def __init__(self, samples: list[Sample], annotations: list[Annotation]):
-        # Samples should be listed by timestamp, high to low
-        # Annotations should be listed by uncertaity, high to low
+    """Base class for query strategies"""
+
+    def __init__(
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+    ):
+        samples = sorted(samples, key=lambda s: s.shot_id)
         self.samples = samples
-        self.annotations = annotations
+        self.annotations = annotations if annotations is not None else []
 
-    @abstractmethod
-    def get_next_sample(self) -> Sample:
-        pass
+    def _get_matching_sample(self, current_sample_id: str) -> int:
+        index = next(
+            (
+                i
+                for i, sample in enumerate(self.samples)
+                if sample.id == current_sample_id
+            ),
+            None,
+        )
+        if index is None:
+            raise RuntimeError("Current sample ID not found in the list of samples.")
+        return index
 
+    def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
+        """Get the next sample based on the current sample ID"""
 
-class RandomQueryStrategy(QueryStrategy):
-    """Random query strategy
+        if current_sample_id is None:
+            if len(self.samples) == 0:
+                raise RuntimeError("No samples available!")
+            return self.samples[0]
 
-    Randomly chooses a sample as the next one to show to the user
-    """
+        index = self._get_matching_sample(current_sample_id)
+        next_index = index + 1
+        next_index = next_index % len(self.samples)
 
-    def get_next_sample(self) -> Sample:
-        if len(self.samples) == 0:
-            raise RuntimeError("No more samples to label!")
+        return self.samples[next_index]
 
-        index = random.randint(0, len(self.samples) - 1)
-        return self.samples.pop(index)
+    def get_previous_sample(self, current_sample_id: Optional[str] = None) -> Sample:
+        """Get the previous sample based on the current sample ID"""
+
+        if current_sample_id is None:
+            if len(self.samples) == 0:
+                raise RuntimeError("No samples available!")
+            return self.samples[-1]
+
+        index = self._get_matching_sample(current_sample_id)
+        previous_index = index - 1
+        previous_index = previous_index % len(self.samples)
+
+        return self.samples[previous_index]
 
 
 class SequentialQueryStrategy(QueryStrategy):
@@ -42,40 +72,57 @@ class SequentialQueryStrategy(QueryStrategy):
     Chooses the next sample from the ordered list of samples
     """
 
-    def get_next_sample(self) -> Sample:
-        if len(self.samples) == 0:
-            raise RuntimeError("No more samples to label!")
 
-        return self.samples.pop(0)
+class RandomQueryStrategy(QueryStrategy):
+    """Random query strategy
+
+    Randomly chooses a sample as the next one to show to the user
+    """
+
+    def __init__(
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+        seed: int = 42,
+    ):
+        super().__init__(samples, annotations)
+        # simply shuffle the samples at the start
+        # seed is used to ensure consistent shuffling between calls
+        self._random_shuffle_samples(seed)
+
+    def _random_shuffle_samples(self, seed: int):
+        rng = np.random.default_rng(seed=seed)
+        self.samples = rng.permutation(self.samples)
 
 
-class UncertaintyQueryStrategy(QueryStrategy):
-    def get_next_sample(self) -> Sample:
-        if len(self.samples) == 0:
-            raise RuntimeError("No more samples to label!")
+class UncertaintyQueryStrategy(RandomQueryStrategy):
+    """Uncertainty-based query strategy
 
-        if len(self.annotations) == 0:
-            logger.warning(
-                "No unvalidated annotations available - falling back to random sample selection."
+    Chooses the next sample based on uncertainty scores from existing annotations.
+    If no annotations exist, falls back to random sampling.
+    """
+
+    def __init__(
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+        seed: int = 42,
+    ):
+        super().__init__(samples, annotations, seed)
+
+        if self.annotations is not None and len(self.annotations) != 0:
+            self.annotations = sorted(
+                self.annotations, key=lambda ann: ann.uncertainty, reverse=True
             )
-            index = random.randint(0, len(self.samples) - 1)
-            return self.samples.pop(index)
-        else:
-            sample_id = self.annotations.pop(0).sample_id
-            index = next(
-                (
-                    index
-                    for index, sample in enumerate(self.samples)
-                    if sample.id == sample_id
-                ),
-                None,
+            sample_ids = [annotation.sample_id for annotation in self.annotations]
+            sample_ids = np.unique(sample_ids).tolist()
+            self.samples = sorted(
+                self.samples,
+                key=lambda sample: sample_ids.index(sample.id)
+                if sample.id in sample_ids
+                else -1,
+                reverse=True,
             )
-            if index is None:
-                logger.warning(
-                    "Most uncertain annotation does not link to a sample - falling back to random sample selection."
-                )
-                index = random.randint(0, len(self.samples) - 1)
-            return self.samples.pop(index)
 
 
 QUERY_STRATEGIES = {

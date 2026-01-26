@@ -53,22 +53,27 @@ def create_mock_data(base_path: Path, shot_ids: list):
         df = pd.DataFrame(data={"ip": current}, index=time)
         df.to_parquet(base_path.joinpath(f"{shot_id}.parquet"))
 
-    return data
+    return data, time
 
 
 def main():
     num_samples = 200
     base_path = Path(__file__).parents[1].joinpath("data", "test", "mock_disruptions")
     base_path.mkdir(parents=True, exist_ok=True)
-    data = create_mock_data(base_path, list(range(1, num_samples + 1)))
+    data, time = create_mock_data(base_path, list(range(1, num_samples + 1)))
 
     project_id = create_project(
-        "Mock Disruption Project", "disruption", "parquet", "uncertainty"
+        "Mock Disruption Project",
+        "time-series",
+        "parquet",
+        "uncertainty",
+        time_max=time[-1],
     )
     # Make annotations to add at same time as sample
     annotations = {
         shot_id: [
             {
+                "shot_id": shot_id,
                 "validated": True,
                 "label": "Disruption",
                 "time": item["annotations"]["disruption"],

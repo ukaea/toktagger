@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 import ray
 import itertools
 from toktagger.api.crud import utils
-from toktagger.api.schemas.annotations import AnnotationTypes
+from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.worker import train_model, get_predictions
 
@@ -422,7 +422,7 @@ async def get_sample_predictions(
     ),
     model_type: str = Path(description="The type of model to get predictions from."),
     task_id: str = Path(description="The prediction task to get results from."),
-) -> list[AnnotationTypes]:
+) -> list[AnnotationBatchTypes]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -452,27 +452,34 @@ async def get_sample_predictions(
     elif ready:
         try:
             result = ray.get(task)
-        except Exception:
+        except Exception as e:
             raise HTTPException(
                 detail="Predict task failed - no predictions available",
                 status_code=500,
-            )
+            ) from e
+
         # Check project ID and model type match those expected by user
         if result["project_id"] != project_id:
             raise HTTPException(
                 detail="Project ID for this task does not match!", status_code=422
             )
-        elif result["model_type"] != model_type:
+
+        # Check model type matches
+        if result["model_type"] != model_type:
             raise HTTPException(
                 detail="Model used for this task does not match!", status_code=422
             )
-        elif not (annotations := result["annotations"].get(sample_id)):
+
+        prediction_annotations = result.get("annotations")
+
+        # Check that annotations contain results for this sample ID
+        if not any(ann.sample_id == sample_id for ann in prediction_annotations):
             raise HTTPException(
                 status_code=404,
                 detail="This task does not have results for the specified sample!",
             )
-        else:
-            return annotations
+
+        return prediction_annotations
     else:
         return HTTPException(
             status_code=404, detail="Predict task not found with that ID!"
