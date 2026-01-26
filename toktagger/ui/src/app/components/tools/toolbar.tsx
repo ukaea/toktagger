@@ -44,7 +44,6 @@ import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
 import { JumpDetectionTool } from "../annotators/jump";
 import { useNavigate } from "react-router-dom";
-import type { NavigateFunction } from "react-router-dom";
 import { BACKEND_API_URL } from "@/app/core";
 
 import { VideoSidebar } from "@/app/video/components/VideoSidebar";
