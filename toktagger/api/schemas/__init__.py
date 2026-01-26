@@ -1,6 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 from bson.objectid import ObjectId
-from datetime import datetime
 from bson.errors import InvalidId
 from fastapi import HTTPException
 

@@ -8,41 +8,36 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, DataParams, MultiVariateTimeSeriesData } from "@/types";
+import { Annotation } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type OutlierDetectionType = {
   project_id: string;
   sample_id: string;
-  data: MultiVariateTimeSeriesData;
-  dataParams: DataParams;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function OutlierDetectionTool({
   project_id,
   sample_id,
-  data,
-  dataParams,
-  setAnnotations,
 }: OutlierDetectionType) {
+  const { dataParams, data, setAnnotations } = useSample();
+
   const methodOptions = [
     { id: 0, name: "mad" },
     { id: 1, name: "isoforest" },
   ];
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [signalName, setSignalName] = useState<string | null>(null);
-  const signalOptions = Object.keys(data.values).map((value, index) => ({
+  const signalOptions = Object.keys(data?.values).map((value, index) => ({
     id: index,
     name: value,
   }));
   const [threshold, setThreshold] = useState<number>(3);
   const [contamination, setContamination] = useState<number>(0);
   const [method, setMethod] = useState<string>("mad");
-  const validSignalName = signalName && signalName in data.values;
+  const validSignalName = signalName && signalName in data?.values;
 
   useEffect(() => {
     const fetchData = async () => {

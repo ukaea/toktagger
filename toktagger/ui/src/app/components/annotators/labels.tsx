@@ -2,20 +2,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ListView, Item } from "@adobe/react-spectrum";
 import { Annotation } from "@/types";
 import { Selection } from "@react-types/shared";
+import { useSample } from "@/app/contexts/SampleContext";
 
 export type ShotLabelsType = {
   labels: string[];
-  annotations: Annotation[];
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
-export function ShotLabels({
-  labels = [],
-  annotations,
-  setAnnotations,
-}: ShotLabelsType) {
+export function ShotLabels({ labels = [] }: ShotLabelsType) {
+  const { annotations, setAnnotations } = useSample();
   const items = labels.map((label, index) => ({ id: index, name: label }));
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 

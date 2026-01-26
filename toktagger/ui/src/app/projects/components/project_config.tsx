@@ -30,29 +30,32 @@ import {
   TimeSeriesFileData,
   ShotData,
   ProjectUpdate,
+  TaskType,
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { BACKEND_API_URL, getSamplesSummary } from "@/app/core";
+import NumericalRange, {
+  NumericalRangeType,
+} from "@/app/components/ui/numerical_range";
 
-const Tasks = [
-  { key: "ELM", value: "ELM" },
-  { key: "disruption", value: "Disruption" },
-  { key: "MHD", value: "MHD" },
-  { key: "UFO", value: "UFO" },
-];
+const Tasks = Object.values(TaskType).map((task) => ({
+  key: task,
+  value: task,
+}));
 
 const QueryStrategies = [
   { key: "sequential", value: "Sequential" },
   { key: "random", value: "Random" },
+  { key: "uncertainty", value: "Uncertainty Sampling" },
 ];
 
 const FileTypes = [
   { key: "parquet", value: "Parquet" },
+  { key: "csv", value: "CSV" },
   { key: "png", value: "PNG" },
   { key: "jpeg", value: "JPEG" },
 ];
-
 const DataLoaderOptionsSchema = z.object({
   name: z.string(),
   data_type: z.string(),
@@ -161,9 +164,7 @@ export function FileDataLoaderFields({
         onSelectionChange={(key) => setFileType(key ? String(key) : "")}
         isRequired
       >
-        {(item: Record<string, string>) => (
-          <Item key={item.key}>{item.value}</Item>
-        )}
+        {(item) => <Item>{item.value}</Item>}
       </ComboBox>
       <Flex direction="row" gap="size-200" alignItems="end">
         <TextField
@@ -264,12 +265,11 @@ const UDADataLoaderOptionsUI = ({
   dataLoaderOptions: UDADataLoaderOptions;
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
-  const [shotMin, setShotMin] = useState<number | null>(
-    dataLoaderOptions?.shot_min || null,
-  );
-  const [shotMax, setShotMax] = useState<number | null>(
-    dataLoaderOptions?.shot_max || null,
-  );
+  const [shotRange, setShotRange] = useState<NumericalRangeType>({
+    min: dataLoaderOptions?.shot_min || null,
+    max: dataLoaderOptions?.shot_max || null,
+  });
+
   const [signalNames, setSignalNames] = useState<string[]>(
     dataLoaderOptions?.signal_names || [],
   );
@@ -279,21 +279,14 @@ const UDADataLoaderOptionsUI = ({
       name: dataLoader,
       data_type: dataType,
       signal_names: signalNames,
-      shot_min: shotMin,
-      shot_max: shotMax,
+      shot_min: shotRange.min,
+      shot_max: shotRange.max,
     });
 
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [
-    dataLoader,
-    dataType,
-    shotMin,
-    shotMax,
-    signalNames,
-    setDataLoaderOptions,
-  ]);
+  }, [shotRange, signalNames, setDataLoaderOptions, dataLoader, dataType]);
 
   return (
     <View
@@ -303,52 +296,12 @@ const UDADataLoaderOptionsUI = ({
       padding="size-250"
     >
       <Flex direction="column">
-        <Flex direction="row" gap="size-200" alignItems="center">
-          <NumberField
-            label="Shot Min"
-            isRequired
-            value={shotMin ?? undefined}
-            onChange={setShotMin}
-            validate={(value: number) => {
-              if (Number.isNaN(value)) {
-                return "Shot Min is required";
-              } else if (
-                !Number.isNaN(shotMax) &&
-                shotMax &&
-                value >= shotMax
-              ) {
-                return "Must be less than Shot Max";
-              } else {
-                return true;
-              }
-            }}
-            formatOptions={{
-              maximumFractionDigits: 0,
-            }}
-          />
-          <NumberField
-            label="Shot Max"
-            isRequired
-            value={shotMax ?? undefined}
-            onChange={setShotMax}
-            validate={(value: number) => {
-              if (Number.isNaN(value)) {
-                return "Shot Max is required";
-              } else if (
-                !Number.isNaN(shotMin) &&
-                shotMin &&
-                value <= shotMin
-              ) {
-                return "Must be greater than Shot Min";
-              } else {
-                return true;
-              }
-            }}
-            formatOptions={{
-              maximumFractionDigits: 0,
-            }}
-          />
-        </Flex>
+        <NumericalRange
+          label="Shot"
+          defaultMin={shotRange.min}
+          defaultMax={shotRange.max}
+          onChange={setShotRange}
+        />
         <SignalNamesUI
           displayName={"Signal Names"}
           signalNames={signalNames}
@@ -815,6 +768,8 @@ const buildProject = (
   dataLoaderOptions: DataLoaderOptions,
   task: string,
   queryStrategy: string,
+  timeRange: NumericalRangeType,
+  minTimeStep: number,
 ): Project => {
   if (projectName === "") {
     throw new Error("Project name cannot be empty");
@@ -834,6 +789,9 @@ const buildProject = (
     task: task,
     query_strategy: queryStrategy,
     timestamp: new Date().toISOString(),
+    time_min: timeRange.min,
+    time_max: timeRange.max,
+    min_time_step: minTimeStep,
   };
 
   return project;
@@ -850,6 +808,13 @@ export const ProjectConfigEditor = ({
   const text = editMode ? "Edit" : "Create";
   const icon = editMode ? <Edit /> : <AddCircle />;
   const [projectName, setProjectName] = useState<string>(project?.name || "");
+  const [timeRange, setTimeRange] = useState<NumericalRangeType>({
+    min: project?.time_min || null,
+    max: project?.time_max || null,
+  });
+  const [minTimeStep, setMinTimeStep] = useState<number>(
+    project?.min_time_step || 0.0001,
+  );
   const [queryStrategy, setQueryStrategy] = useState<string>(
     project?.query_strategy || QueryStrategies[0].key,
   );
@@ -886,6 +851,9 @@ export const ProjectConfigEditor = ({
       name: project.name,
       query_strategy: project.query_strategy,
       task: project.task,
+      time_min: timeRange.min,
+      time_max: timeRange.max,
+      min_time_step: minTimeStep,
     };
 
     await editProject(projectId, updatedProject);
@@ -898,6 +866,8 @@ export const ProjectConfigEditor = ({
       dataLoaderOptions,
       taskSelection || "",
       queryStrategy,
+      timeRange,
+      minTimeStep,
     );
 
     const samples = buildSamples(dataLoaderOptions);
@@ -1012,6 +982,32 @@ export const ProjectConfigEditor = ({
                   </Radio>
                 ))}
               </RadioGroup>
+
+              <NumericalRange
+                label="Time"
+                defaultMin={timeRange.min}
+                defaultMax={timeRange.max}
+                onChange={setTimeRange}
+                isRequired={false}
+              />
+              <Flex direction="row" gap="size-200" alignItems="center">
+                <NumberField
+                  label="Min Time Step (s)"
+                  defaultValue={minTimeStep}
+                  onChange={setMinTimeStep}
+                  isRequired={false}
+                  validate={(value: number) => {
+                    if (!Number.isNaN(value) && minTimeStep <= 0) {
+                      return `Min Time Step must be greater than 0`;
+                    } else {
+                      return true;
+                    }
+                  }}
+                  formatOptions={{
+                    maximumFractionDigits: 10,
+                  }}
+                />
+              </Flex>
             </Form>
           </Content>
           <ButtonGroup>

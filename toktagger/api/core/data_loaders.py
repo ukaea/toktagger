@@ -1,8 +1,12 @@
 import os
-import pandas as pd
 import pathlib
 from abc import ABC, abstractmethod
+from typing import Optional
+
+import numpy as np
+import pandas as pd
 from PIL import Image
+
 import io
 import base64
 import pydantic
@@ -14,8 +18,7 @@ from toktagger.api.schemas.data import (
     ImageData,
     DataParamTypes,
 )
-from toktagger.api.schemas.samples import FileData, ShotData, TimeSeriesFileData
-
+from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 
 # Set up UDA environment variables with defaults if not already set. This is required for
 # the pyuda client to work correctly outside of Freia.
@@ -24,6 +27,10 @@ os.environ["UDA_META_PLUGINNAME"] = os.environ.get("UDA_META_PLUGINNAME", "MASTU
 os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
     "UDA_METANEW_PLUGINNAME", "MAST_DB"
 )
+
+
+class DataLoaderError(Exception):
+    """Custom exception for data loader errors."""
 
 
 class DataLoader(ABC):
@@ -38,7 +45,9 @@ class DataLoader(ABC):
 
     @abstractmethod
     def get_sample(
-        self, shot_id: int, sample_data: ShotData | FileData | TimeSeriesFileData
+        self,
+        sample: Sample,
+        **kwargs,
     ) -> Data:
         pass
 
@@ -97,7 +106,14 @@ class ImageDataLoader(DataLoader):
         return FileData
 
     @pydantic.validate_call
-    def get_sample(self, shot_id: int, sample_data: FileData) -> ImageData:
+    def get_sample(self, sample: Sample, **kwargs) -> ImageData:
+        if not isinstance(sample.data, FileData):
+            raise TypeError(
+                f"Expected sample data of type 'FileData' but got '{type(sample.data)}'"
+            )
+
+        sample_data: FileData = sample.data
+
         # Find directory of images
         dir_path = pathlib.Path(sample_data.file_name)
         if not dir_path.exists() or not dir_path.is_dir():
@@ -136,16 +152,42 @@ class ParquetDataLoader(DataLoader):
 
     @pydantic.validate_call
     def get_sample(
-        self, shot_id: int, sample_data: TimeSeriesFileData
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
+        **kwargs,
     ) -> MultiVariateTimeSeriesData:
+        if not isinstance(sample.data, TimeSeriesFileData):
+            raise TypeError(
+                f"Expected sample data of type 'TimeSeriesFileData' but got '{type(sample.data)}'"
+            )
+
+        sample_data: TimeSeriesFileData = sample.data
+
         if not pathlib.Path(sample_data.file_name).exists():
             raise FileNotFoundError(
                 f"Could not find file at '{sample_data.file_name}', relative to {pathlib.Path().cwd()}"
             )
         df = pd.read_parquet(sample_data.file_name, columns=sample_data.signal_names)
         df = df.fillna(0)
-        data = df.to_dict("list")
-        time = df.index.values
+
+        df.index = pd.to_timedelta(df.index, unit="s")
+        mean_diff = df.index.to_series().diff().dropna().mean().total_seconds()
+
+        if min_time_step is not None and mean_diff < min_time_step:
+            df = df.resample(rule=f"{min_time_step}s").interpolate(method="linear")
+
+        if time_min is not None:
+            df = df[df.index >= pd.to_timedelta(time_min, unit="s")]
+
+        if time_max is not None:
+            df = df[df.index <= pd.to_timedelta(time_max, unit="s")]
+
+        data = df.to_dict(orient="list")
+        time = df.index.total_seconds().to_list()
+
         results = {}
         for key, value in data.items():
             results[key] = TimeSeriesData(time=time, values=value)
@@ -158,29 +200,64 @@ class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
     def __init__(self, params):
+        super().__init__(params)
         import pyuda
 
         self.client = pyuda.Client()
-
-        super().__init__(params)
 
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
 
-    @pydantic.validate_call
     def get_sample(
-        self, shot_id: int, sample_data: ShotData
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
+        **kwargs,
     ) -> MultiVariateTimeSeriesData:
+        if not isinstance(sample.data, ShotData):
+            raise TypeError(
+                f"Expected sample data of type 'ShotData' but got '{type(sample.data)}'"
+            )
+
+        sample_data: ShotData = sample.data
+
         results = {}
         for name in sample_data.signal_names:
             try:
-                signal = self.client.get(name, shot_id)
+                signal = self.client.get(name, sample.shot_id)
                 data = signal.data
                 time = signal.time.data
+
+                if time_min is not None:
+                    mask = time >= time_min
+                    time = time[mask]
+                    data = data[mask]
+
+                if time_max is not None:
+                    mask = time <= time_max
+                    time = time[mask]
+                    data = data[mask]
+
+                if (
+                    min_time_step is not None
+                    and len(time) > 1
+                    and np.diff(time).mean() < min_time_step
+                ):
+                    time_base = np.arange(time[0], time[-1], min_time_step)
+                    data = np.interp(time_base, time, data)
+                    time = time_base
+
                 item = TimeSeriesData(time=time, values=data)
                 results[name] = item
             except Exception:
                 results[name] = None
+
+        if all(values is None for values in results.values()):
+            raise DataLoaderError(
+                f"Could not load any signals for shot ID '{sample.shot_id}'. Check UDA connectivity and signal names."
+            )
 
         return MultiVariateTimeSeriesData(values=results)

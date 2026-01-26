@@ -27,7 +27,7 @@ import Alert from "@spectrum-icons/workflow/Alert";
 import { Project, Model } from "@/types";
 import { startPredictions, getModels, stopTraining } from "@/app/core";
 
-export function ModelPredictModal({ project }: Project) {
+export function ModelPredictModal({ project }: { project: Project }) {
   const [models, setModels] = useState<Model[] | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
   const [modalOpen, setModalOpen] = useState<boolean>(false);

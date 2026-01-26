@@ -129,7 +129,6 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
 
   const refreshProjects = useCallback(async () => {
-    console.log("Refreshing projects...");
     const projects = await getProjects(
       sortDescriptor,
       currentPage,

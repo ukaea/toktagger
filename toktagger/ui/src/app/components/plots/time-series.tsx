@@ -1,19 +1,25 @@
 "use client";
 
 import { useContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { arrayMax, arrayMin } from "@/app/utils";
+import { VSpan, Zone } from "@/types";
 import Plotly, {
   Config,
   Layout,
   PlotData,
   relayout,
+  react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
+import { useVSpanContext } from "../providers/vpsan-provider";
+import { useZoneContext } from "../providers/zone-provider";
 
 type InjectedProps = {
   plotId: string;
   plotReady: boolean;
   forceUpdate: number;
+  selectedXRange: [number, number] | null;
 };
 
 interface PlotConfiguration {
@@ -22,9 +28,10 @@ interface PlotConfiguration {
   config?: Partial<Config>;
 }
 
-type DisruptionPlotProps = {
+type TimeSeriesPlotProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
+  rescaleOnZoom?: boolean;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -42,21 +49,40 @@ export const TimeSeries = ({
     data,
     layout,
     config = {
+      modeBarButtons: [
+        [
+          "toImage",
+          "zoom2d",
+          "select2d",
+          "pan2d",
+          "autoScale2d",
+          "resetScale2d",
+        ],
+      ],
+      dragmode: "pan",
       displaylogo: false,
       displayModeBar: true,
-      scrollZoom: false,
+      scrollZoom: true,
     },
   },
+  rescaleOnZoom = true,
   children,
-}: DisruptionPlotProps) => {
+}: TimeSeriesPlotProps) => {
+  const { vspans, handleVSpanDelete } = useVSpanContext();
+  const { zones, handleZoneDelete } = useZoneContext();
+  const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
+    null,
+  );
   const [updateTools, setUpdateTools] = useState(0);
   const [plotReady, setPlotReady] = useState(false);
   const isDraggingRef = useRef(false);
-  const controlHeldRef = useRef(false);
+  const plotId = externalId || "time-series"; // Facilitate an external or default ID
 
-  const plotId = externalId || "disruption"; // Facilitate an external or default ID
-
-  const { show: showContextMenu, toolingCallbacks } = useContextMenuProvider();
+  const {
+    show: showContextMenu,
+    toolingCallbacks,
+    disableToolingInteraction,
+  } = useContextMenuProvider();
   const showContextMenuRef = useRef(showContextMenu);
 
   const allowRelayout = useRef(true);
@@ -64,10 +90,10 @@ export const TimeSeries = ({
   const triggerToolUpdate = () => {
     setUpdateTools((current) => (current + 1) % 100);
   };
-
   // Main plotly rendering
   useEffect(() => {
     const overplots: string[] = [];
+
     const renderZones = (plot: Plotly.PlotlyHTMLElement) => {
       // Get all subplot elements and extract the subplot name (xy for example) from the class list
       const subplots = plot.querySelectorAll(".subplot");
@@ -82,7 +108,7 @@ export const TimeSeries = ({
           ?.querySelector(".overplot")
           ?.querySelector(`.${coordinateSystem}`) as HTMLElement;
         if (!subplot) {
-          console.error("Cannot locate disruption plotly subplot");
+          console.error("Cannot locate plotly subplot");
           return;
         }
 
@@ -99,158 +125,161 @@ export const TimeSeries = ({
         }
       });
 
+      // Use setTimeout to ensure DOM has fully updated before signaling ready
       setPlotReady(true);
-
-      // Sets the y axis range required for the current x range for each subplot
-      const rescale = (x0?: number, x1?: number, manualZoom = false) => {
-        if (!allowRelayout.current) return; // Prevents relayout triggering itself
-        allowRelayout.current = false;
-
-        // If no x range is passed, then the min/max is used
-        if (!x0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          x0 = (plot as any)._fullData[0]._extremes.x.min[0].val as number;
-        }
-        if (!x1) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          x1 = (plot as any)._fullData[0]._extremes.x.max[0].val as number;
-        }
-
-        // Ensure each data set is handled (ensures all subplots are zoomed correctly)
-        data.forEach((dataSet) => {
-          let yAxisID = "";
-
-          if (dataSet.yaxis) {
-            // Find the y axis ID relating to this subplot
-            const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
-            if (locatedID) {
-              yAxisID = locatedID;
-            }
-          }
-
-          const xArray = (dataSet as PlotData).x as number[];
-          const yArray = (dataSet as PlotData).y as number[];
-
-          // Find min and max y data values
-          const yValues: number[] = [];
-          for (let i = 0; i < xArray.length; i++) {
-            const xVal = xArray[i];
-            if (xVal >= x0 && xVal <= x1) {
-              yValues.push(yArray[i]);
-            }
-          }
-
-          if (yValues.length > 0) {
-            const yMin = Math.min(...yValues);
-            const yMax = Math.max(...yValues);
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const previousRange = (plot as any)._fullLayout[`yaxis${yAxisID}`]
-              .range;
-
-            // Only allow relayout if new yRange is smaller than previous one or if this isn't a manual zoom
-            // This allows users to zoom in on bits of the graph accurately without it auto-scaling
-            if (
-              yMax - yMin < previousRange[1] - previousRange[0] ||
-              !manualZoom
-            ) {
-              relayout(plot, {
-                [`yaxis${yAxisID}.range`]: [yMin, yMax],
-              });
-            }
-          }
-        });
-
-        // Debounce the relayout calls
-        setTimeout(() => {
-          allowRelayout.current = true;
-        }, 100);
-      };
-
-      const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-        // triggers re-render of overlay tools when axes change
-        triggerToolUpdate();
-
-        // This makes use of the first graph displayed but this should be fine
-        const x0 = eventData["xaxis.range[0]"];
-        const x1 = eventData["xaxis.range[1]"];
-
-        rescale(x0, x1, true);
-      };
-      plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
-      plot.on("plotly_doubleclick", rescale);
     };
 
-    const root = document.getElementById(plotId);
+    // Sets the y axis range required for the current x range for each subplot
+    const rescale = (x0?: number, x1?: number) => {
+      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+      if (!plot) {
+        return;
+      }
 
-    if (!root) {
-      console.error("Cannot locate disruption element");
+      if (!allowRelayout.current) return; // Prevents relayout triggering itself
+
+      if (data.length === 0) {
+        return;
+      }
+      allowRelayout.current = false;
+
+      // If no x range is passed, then the min/max is used
+      if (!x0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        x0 = (plot as any)._fullData[0]._extremes.x.min[0].val as number;
+      }
+      if (!x1) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        x1 = (plot as any)._fullData[0]._extremes.x.max[0].val as number;
+      }
+
+      let configUpdate = {};
+
+      // Ensure each data set is handled (ensures all subplots are zoomed correctly)
+      data.forEach((dataSet) => {
+        let yAxisID = "";
+
+        if (dataSet.yaxis) {
+          // Find the y axis ID relating to this subplot
+          const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
+          if (locatedID) {
+            yAxisID = locatedID;
+          }
+        }
+
+        const xArray = (dataSet as PlotData).x as number[];
+        const yArray = (dataSet as PlotData).y as number[];
+
+        // Find min and max y data values
+        const yValues: number[] = [];
+        for (let i = 0; i < xArray.length; i++) {
+          const xVal = xArray[i];
+          if (xVal >= x0 && xVal <= x1) {
+            yValues.push(yArray[i]);
+          }
+        }
+
+        if (yValues.length > 0) {
+          const yMin = arrayMin(yValues);
+          const yMax = arrayMax(yValues);
+          const offset = 0.1 * (yMax - yMin); // 10 % offset
+
+          configUpdate = {
+            ...configUpdate,
+            [`yaxis${yAxisID}.range`]: [yMin - offset, yMax + offset],
+          };
+        }
+      });
+
+      relayout(plot, configUpdate);
+
+      // Debounce the relayout calls
+      setTimeout(() => {
+        allowRelayout.current = true;
+      }, 100);
+    };
+
+    const relayoutHandler = (eventData: PlotRelayoutEvent) => {
+      if (rescaleOnZoom) {
+        // This makes use of the first graph displayed but this should be fine
+        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+          // for zoom and pan events
+          rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
+        } else if ("xaxis.range" in eventData) {
+          // for range slider events
+          rescale(eventData["xaxis.range"][0], eventData["xaxis.range"][1]);
+        } else {
+          rescale(); // for initial load & autoscale
+        }
+      }
+      triggerToolUpdate();
+    };
+
+    const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+
+    if (!plot) {
       return;
     }
 
     const initGraph = async () => {
-      const { react } = await import("plotly.js"); // Annoyingly there seems to be an issue with plotly so dynamic import is needed
-      react(root, data, layout, config).then(renderZones);
+      react(plot, data, layout, config).then(renderZones);
+
+      plot.removeAllListeners("plotly_relayout"); // remove any existing listeners
+      plot.removeAllListeners("plotly_doubleclick");
+      plot.removeAllListeners("plotly_selected");
+      plot.removeAllListeners("plotly_deselect");
+      plot.on("plotly_relayout", relayoutHandler); // attach listener so it can be removed
+      plot.on("plotly_doubleclick", rescale);
+
+      // attach listener for selection events
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      plot.on("plotly_selected", function (eventData: any) {
+        if (eventData && eventData.range) {
+          setSelectedXRange(eventData.range.x);
+        }
+      });
+      plot.on("plotly_deselect", function () {
+        setSelectedXRange(null);
+        relayout(plot, { selections: [] }); // clear selection
+      });
     };
+
     initGraph();
+
+    if (!disableToolingInteraction) {
+      plot.style.pointerEvents = "auto";
+    } else {
+      plot.style.pointerEvents = "none";
+    }
+
     return () => {
       // cleanup on unmount / Fast-Refresh
-
       overplots.forEach((overplot) => {
-        root?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
+        plot?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
       });
       setPlotReady(false); // reset ready state
     };
-  }, [plotId, config, data, layout, plotReady, allowRelayout]);
+  }, [
+    plotId,
+    config,
+    data,
+    layout,
+    plotReady,
+    allowRelayout,
+    disableToolingInteraction,
+    rescaleOnZoom,
+  ]);
 
   useEffect(() => {
-    const reload = async () => {
-      const root = document.getElementById(plotId);
-      if (root) {
-        Plotly.react(root, data, layout, config);
-      }
-    };
-    reload();
-  }, [plotId, data, layout, config]);
-
-  // Change drag mode based on tooling interactability
-  useEffect(() => {
-    if (!plotReady) {
-      // Plot may not have loaded yet - this will rerun after loading
-      return;
-    }
-
-    const plot = document.getElementById(plotId);
-
+    const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
     if (!plot) {
-      console.error("Could not locate plot to set drag mode");
       return;
     }
-
-    const disableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Control") {
-        if (!controlHeldRef.current) {
-          controlHeldRef.current = true;
-          relayout(plot, { dragmode: false });
-        }
-      }
-    };
-
-    const enableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Control") {
-        controlHeldRef.current = false;
-        relayout(plot, { dragmode: "pan" });
-      }
-    };
-
-    document.addEventListener("keydown", disableInteraction);
-    document.addEventListener("keyup", enableInteraction);
-
-    return () => {
-      document.removeEventListener("keydown", disableInteraction);
-      document.removeEventListener("keyup", enableInteraction);
-    };
-  }, [plotId, plotReady]);
+    if (allowRelayout.current) {
+      relayout(plot, { selections: [] }); // clear selection
+      setSelectedXRange(null);
+    }
+  }, [config, plotId]);
 
   // Handles context menu creation
   useEffect(() => {
@@ -375,11 +404,7 @@ export const TimeSeries = ({
 
     // This is a backup listener in case the user lifts the control key first - this isn't ideal as a final update won't be sent
     const cancelToolCreation = (event: KeyboardEvent) => {
-      if (
-        event.key === "Control" &&
-        toolingCallbacks &&
-        isDraggingRef.current
-      ) {
+      if (event.key === "Alt" && toolingCallbacks && isDraggingRef.current) {
         isDraggingRef.current = false;
       }
     };
@@ -398,6 +423,23 @@ export const TimeSeries = ({
         toolingCallbacks.move(x, y);
       }
     };
+
+    // Delete selected spans on Delete/Backspace keypress
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Delete" || e.key == "Backspace") {
+        e.preventDefault(); // Prevent default delete behavior
+
+        const selectedSpans = vspans.filter((span: VSpan) => span.selected);
+        for (const span of selectedSpans) {
+          handleVSpanDelete(span);
+        }
+
+        const selectedZones = zones.filter((zone: Zone) => zone.selected);
+        for (const zone of selectedZones) {
+          handleZoneDelete(zone);
+        }
+      }
+    });
 
     dragElements.forEach((dragElement) => {
       dragElement.addEventListener("contextmenu", contextHandler); // add context-menu listener
@@ -418,7 +460,16 @@ export const TimeSeries = ({
       });
       document.removeEventListener("keyup", cancelToolCreation);
     };
-  }, [plotId, plotReady, toolingCallbacks]);
+  }, [
+    plotId,
+    plotReady,
+    toolingCallbacks,
+    updateTools,
+    vspans,
+    zones,
+    handleVSpanDelete,
+    handleZoneDelete,
+  ]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">
@@ -431,6 +482,7 @@ export const TimeSeries = ({
                 plotId,
                 plotReady,
                 forceUpdate: updateTools,
+                selectedXRange: selectedXRange,
               })
             : child;
         })}

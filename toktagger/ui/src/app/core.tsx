@@ -1,6 +1,12 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import type { Project, Sample, SamplesSummary, Model } from "@/types";
+import type {
+  Project,
+  Sample,
+  SamplesSummary,
+  Annotation,
+  Model,
+} from "@/types";
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -100,6 +106,146 @@ export const deleteProject = async (project_id: string) => {
   });
   if (!response.ok && response.status !== 404) {
     throw new Error(`Failed to delete project: ${response.statusText}`);
+  }
+};
+
+export async function getShotSample(project_id: string, shot_id: string) {
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
+  const sampleResult = await fetch(NEXT_URL);
+  const sampleArray = await sampleResult.json();
+  let sample = null;
+  if (sampleArray.length > 0) {
+    sample = sampleArray[0];
+  }
+  return sample;
+}
+
+export async function getAnnotationsForSample(
+  project_id: string,
+  sample_id: string,
+): Promise<Annotation[]> {
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+  const response = await fetch(ANNOTATIONS_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch annotations: ${response.statusText}`);
+  }
+  const annotations = await response.json();
+  return annotations;
+}
+
+export async function getAnnotations(
+  project_id: string,
+): Promise<Annotation[]> {
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
+  const response = await fetch(ANNOTATIONS_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch annotations: ${response.statusText}`);
+  }
+  const annotations = await response.json();
+  return annotations;
+}
+
+export async function saveSampleAnnotations(
+  project_id: string,
+  sample_id: string,
+  annotations: Annotation[],
+  saveOnNavigate: boolean = true,
+) {
+  if (!saveOnNavigate) {
+    return;
+  }
+  // user has validated the annotations, so set created_by to "manual"
+  const updatedAnnotations = annotations.map((annotation: Annotation) => {
+    annotation.created_by = "manual";
+    annotation.validated = true;
+    return annotation;
+  });
+
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+  const response = await fetch(ANNOTATIONS_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updatedAnnotations),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to save annotations: ${response.statusText}`);
+  }
+}
+
+export async function saveAnnotations(
+  project_id: string,
+  annotations: Annotation[],
+) {
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
+  const response = await fetch(ANNOTATIONS_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(annotations),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to save annotations: ${response.statusText}`);
+  }
+}
+
+export function importJSONFile(
+  project_id: string,
+  shot_id: number | null,
+  file: File,
+  callback?: () => void,
+  errorCallback?: () => void,
+): void {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const parsed = JSON.parse(e.target?.result as string);
+      const annotations = parsed as Annotation[];
+
+      // If shot_id is provided, set it for all annotations that don't have it
+      if (shot_id !== null) {
+        annotations.map((annotation: Annotation) => {
+          if (!annotation.shot_id) {
+            annotation.shot_id = shot_id;
+          }
+          return annotation;
+        });
+      }
+
+      await saveAnnotations(project_id, annotations);
+      callback?.();
+    } catch {
+      errorCallback?.();
+    }
+  };
+  reader.readAsText(file);
+}
+
+export function saveJSONToFile(data: object, filename: string) {
+  const jsonStr = JSON.stringify(data, null, 2); // pretty print with 2 spaces
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url); // Clean up
+}
+
+export const exportAnnotations = async (project: Project, sample?: Sample) => {
+  if (sample) {
+    // Export annotations for the current sample only
+    const annotations = await getAnnotationsForSample(project._id, sample._id);
+    saveJSONToFile(
+      annotations,
+      `${project.name}_${sample.shot_id}_annotations.json`,
+    );
+  } else {
+    // Export annotations for all samples in the project
+    const annotations = await getAnnotations(project._id);
+    saveJSONToFile(annotations, `${project.name}_all_annotations.json`);
   }
 };
 
