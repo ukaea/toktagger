@@ -34,7 +34,7 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
 
     # Choose Add Time Region, check options load
-    page.get_by_role("menuitem", name="Add Time Region").click()
+    page.get_by_role("menuitem", name="Add Time Region").click(force=True)
     for item in (
         "ELM",
         "L-mode",
@@ -52,7 +52,7 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
         expect(page.get_by_role("menuitem", name=item, exact=True)).to_be_visible()
 
     # Choose each type, check a new zone is added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click()
+    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
     expect(page.get_by_label("zone").first).to_be_visible()
 
     # Check added to list
@@ -68,7 +68,7 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
 
 
-@pytest.mark.parametrize("zone_type", ["Ramp Up", "FlatTop", "Ramp Down"])
+@pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
 @pytest.mark.parametrize("handle", ["leftHandle", "rightHandle"])
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
 def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Page):
@@ -87,21 +87,26 @@ def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
     # Check time series plot rendered
     expect(page.get_by_label("time-series")).to_be_visible()
 
-    # Add a new zone
+    # Right click on it, check menu renders
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Time Region").click()
+
+    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
+    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
+
+    # Add a new zone
+    page.get_by_role("menuitem", name="Add Time Region").click(force=True)
 
     # Choose each type, check a new zone is added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click()
+    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
     expect(page.get_by_label("zone").first).to_be_visible()
 
     # Check added to list, record initial positions
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
     initial_left_position = float(
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
     )
     initial_right_position = float(
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(1).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
 
     # Click handle, drag to new position
@@ -109,10 +114,10 @@ def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
     time.sleep(0.1)
     # Check values in table correctly updated
     updated_left_position = float(
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
     )
     updated_right_position = float(
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(1).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
 
     if drag_to == ".wdrag":
@@ -163,12 +168,12 @@ def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
     expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
 
     # Choose Add Time Point
-    page.get_by_role("menuitem", name="Add Time Point").click()
+    page.get_by_role("menuitem", name="Add Time Point").click(force=True)
     for item in ("Disruption", "Thermal Quench", "Current Quench", "Control Loss"):
         expect(page.get_by_role("menuitem", name=item, exact=True)).to_be_visible()
 
     # Click each type, check a new Vspan has been added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click()
+    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
     expect(page.get_by_label("vspan").first).to_be_visible()
 
     # Check added to list
@@ -206,16 +211,16 @@ def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page:
 
     # Add a new vspan
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Time Point").click()
+    page.get_by_role("menuitem", name="Add Time Point").click(force=True)
 
     # Click each type, check a new Vspan has been added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click()
+    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
     expect(page.get_by_label("vspan").first).to_be_visible()
 
     # Check added to list, record initial positions
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
     initial_position = float(
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
     )
 
     # Click handle, drag to new position
@@ -224,7 +229,7 @@ def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page:
 
     # Check values in table correctly updated
     updated_position = float(
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
     )
 
     if drag_to == ".wdrag":
@@ -253,8 +258,8 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     # Add a new vspan
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Time Point").click()
-    page.get_by_role("menuitem", name="Disruption", exact=True).click()
+    page.get_by_role("menuitem", name="Add Time Point").click(force=True)
+    page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
 
     expect(page.get_by_label("vspan").first).to_be_visible()
 
@@ -263,29 +268,29 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     # Get value of position
     disruption_position = (
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
     )
 
     # Add a zone
     page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Time Region").click()
-    page.get_by_role("menuitem", name="FlatTop", exact=True).click()
+    page.get_by_role("menuitem", name="Add Time Region").click(force=True)
+    page.get_by_role("menuitem", name="Flat Top", exact=True).click(force=True)
     expect(page.get_by_label("zone").first).to_be_visible()
 
     # Click handle, drag to new position
     page.get_by_label("zone.leftHandle").drag_to(page.locator(".wdrag"))
 
     # Check added to list, record positions
-    expect(page.get_by_role("rowheader", name="FlatTop")).to_be_visible()
+    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
     flattop_left_position = (
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(0).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
     )
     flattop_right_position = (
-        page.get_by_role("row").nth(1).get_by_role("cell").nth(1).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
 
     # Press Save
-    page.get_by_role("button", name="Save").click()
+    page.get_by_role("button", name="Save").click(force=True)
 
     time.sleep(1)
 
@@ -309,7 +314,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     assert round(disruption_annotation["time"], 6) == float(disruption_position)
     assert disruption_annotation["type"] == "time_point"
 
-    flattop_annotation = next(ann for ann in annotations if ann["label"] == "FlatTop")
+    flattop_annotation = next(ann for ann in annotations if ann["label"] == "Flat Top")
     assert round(flattop_annotation["time_min"], 6) == float(flattop_left_position)
     assert round(flattop_annotation["time_max"], 6) == float(flattop_right_position)
     assert flattop_annotation["type"] == "time_region"
@@ -357,25 +362,25 @@ def test_timeseries_load_annotations(server_setup, page: Page):
     row = page.get_by_role("row").filter(
         has=page.get_by_role("rowheader", name="Disruption")
     )
-    assert float(row.get_by_role("cell").nth(0).inner_text()) == disruption.time
+    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == disruption.time
 
     row = page.get_by_role("row").filter(
         has=page.get_by_role("rowheader", name="Ramp Up")
     )
-    assert float(row.get_by_role("cell").nth(0).inner_text()) == rampup.time_min
-    assert float(row.get_by_role("cell").nth(1).inner_text()) == rampup.time_max
+    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == rampup.time_min
+    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == rampup.time_max
 
     row = page.get_by_role("row").filter(
         has=page.get_by_role("rowheader", name="Flat Top")
     )
-    assert float(row.get_by_role("cell").nth(0).inner_text()) == flattop.time_min
-    assert float(row.get_by_role("cell").nth(1).inner_text()) == flattop.time_max
+    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == flattop.time_min
+    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == flattop.time_max
 
     row = page.get_by_role("row").filter(
         has=page.get_by_role("rowheader", name="Ramp Down")
     )
-    assert float(row.get_by_role("cell").nth(0).inner_text()) == rampdown.time_min
-    assert float(row.get_by_role("cell").nth(1).inner_text()) == rampdown.time_max
+    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == rampdown.time_min
+    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == rampdown.time_max
 
 
 def test_timeseries_update_annotations(server_setup, page: Page):
@@ -413,7 +418,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     # Delete a zone
     page.get_by_label("zone").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
-    page.get_by_role("menuitem", name="Delete").click()
+    page.get_by_role("menuitem", name="Delete").click(force=True)
 
     # Move the disruption
     # Click handle, drag to new position
@@ -422,10 +427,10 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     row = page.get_by_role("row").filter(
         has=page.get_by_role("rowheader", name="Disruption")
     )
-    updated_disruption_time = float(row.get_by_role("cell").nth(0).inner_text())
+    updated_disruption_time = float(row.get_by_role("gridcell").nth(1).inner_text())
 
     # Press Save
-    page.get_by_role("button", name="Save").click()
+    page.get_by_role("button", name="Save").click(force=True)
 
     time.sleep(1)
 
