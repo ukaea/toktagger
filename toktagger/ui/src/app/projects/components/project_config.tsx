@@ -49,10 +49,10 @@ const QueryStrategies = [
 
 const FileTypes = [
   { key: "parquet", value: "Parquet" },
+  { key: "csv", value: "CSV" },
   { key: "png", value: "PNG" },
   { key: "jpg", value: "JPEG" },
 ];
-
 const DataLoaderOptionsSchema = z.object({
   name: z.string(),
   data_type: z.string(),
@@ -161,9 +161,7 @@ export function FileDataLoaderFields({
         onSelectionChange={(key) => setFileType(key ? String(key) : "")}
         isRequired
       >
-        {(item: Record<string, string>) => (
-          <Item key={item.key}>{item.value}</Item>
-        )}
+        {(item) => <Item>{item.value}</Item>}
       </ComboBox>
       <Flex direction="row" gap="size-200" alignItems="end">
         <TextField
