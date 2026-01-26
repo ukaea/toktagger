@@ -46,7 +46,7 @@ def check_base_page(page):
 
 def test_empty_samples_table(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -65,7 +65,7 @@ def test_empty_samples_table(server_setup, page: Page):
 
 def test_single_sample(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -101,7 +101,7 @@ def test_single_sample(server_setup, page: Page):
 
 def test_sample_page_navigation(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "disruption", "uda")
+    project_id = create_project("Test Project", "time-series", "uda")
     # And 6 samples
     create_uda_samples(project_id, shot_ids=list(range(10001, 10007)))
 
@@ -185,7 +185,7 @@ def test_samples_sorting(server_setup, page: Page):
         expect(page.get_by_role("row").nth(2)).to_contain_text(expected_first)
 
     # Create a project
-    project_id = create_project("Test Project", "disruption", "uda")
+    project_id = create_project("Test Project", "time-series", "uda")
     # And 2 samples
     create_uda_samples(project_id, shot_ids=[20000])
     time.sleep(0.1)
@@ -206,7 +206,7 @@ def test_samples_sorting(server_setup, page: Page):
 
 def test_samples_search(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "disruption", "uda")
+    project_id = create_project("Test Project", "time-series", "uda")
     # And 6 samples
     create_uda_samples(project_id, shot_ids=list(range(10001, 10007)))
 
@@ -252,7 +252,7 @@ def test_samples_search(server_setup, page: Page):
 
 def test_create_samples_shot_data(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "disruption", "uda")
+    project_id = create_project("Test Project", "time-series", "uda")
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -307,7 +307,7 @@ def test_create_samples_shot_data(server_setup, page: Page):
 
 def test_create_samples_file_data(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "disruption", "parquet")
+    project_id = create_project("Test Project", "time-series", "parquet")
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -369,7 +369,7 @@ def test_create_samples_file_data(server_setup, page: Page):
 @pytest.mark.parametrize("file_type", ["PNG", "JPEG"])
 def test_create_samples_image_data(server_setup, page: Page, file_type: str):
     # Create a project
-    project_id = create_project("Test Project", "UFO", "image")
+    project_id = create_project("Test Project", "video", "image")
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
