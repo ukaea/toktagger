@@ -32,6 +32,8 @@ type AnnotatorApi = {
   off?: (event: string, cb: (...args: unknown[]) => void) => void;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
 function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
   return typeof v === "function";
 }
@@ -58,8 +60,10 @@ function asAnnotatorApi(a: unknown): AnnotatorApi | null {
  */
 function toAnnoList(got: unknown): ImageAnnotation[] {
   if (Array.isArray(got)) return got as ImageAnnotation[];
-  if (got && typeof got === "object" && "list" in (got as any)) {
-    const list = (got as any).list;
+
+  if (got && typeof got === "object") {
+    const rec = got as UnknownRecord;
+    const list = rec["list"];
     if (Array.isArray(list)) return list as ImageAnnotation[];
   }
   return [];
@@ -70,19 +74,19 @@ function toAnnoList(got: unknown): ImageAnnotation[] {
  * Used to avoid feedback loops when we programmatically call `setAnnotations`.
  */
 function annoSig(a: ImageAnnotation): string {
-  const sel = (a as any)?.target?.selector;
-  const g = sel?.geometry ?? {};
-  const source = (a as any)?.target?.source ?? "";
+  const sel = a.target.selector;
+  const source = a.target.source ?? "";
+  const g = readRectGeometry(a);
   const { className, trackId } = getLabelTrack(a);
 
   return [
     a.id ?? "",
     sel?.type ?? "",
     source,
-    g.x ?? "",
-    g.y ?? "",
-    g.w ?? "",
-    g.h ?? "",
+    g?.x ?? "",
+    g?.y ?? "",
+    g?.w ?? "",
+    g?.h ?? "",
     className ?? "",
     trackId ?? "",
   ].join("|");
@@ -145,28 +149,29 @@ function withRectGeometry(
   a: ImageAnnotation,
   g: { x: number; y: number; w: number; h: number },
 ): ImageAnnotation {
-  const target = (a as any)?.target ?? {};
-  const sel = (target as any)?.selector ?? {};
-  const geom = (sel as any)?.geometry ?? {};
+  const geom = a.target.selector.geometry as unknown;
+
+  const base =
+    geom && typeof geom === "object" ? (geom as UnknownRecord) : ({} as UnknownRecord);
 
   const nextGeom = {
-    ...geom,
+    ...base,
     x: g.x,
     y: g.y,
     w: g.w,
     h: g.h,
     bounds: { minX: g.x, minY: g.y, maxX: g.x + g.w, maxY: g.y + g.h },
-  };
+  } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
 
   return {
-    ...(a as ImageAnnotation),
+    ...a,
     target: {
-      ...target,
+      ...a.target,
       selector: {
-        ...sel,
+        ...a.target.selector,
         geometry: nextGeom,
       },
-    } as any,
+    },
   };
 }
 
@@ -264,9 +269,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   const overlayForFrame = useMemo(
     () => session.getFrameList(session.frame),
-    [session, session.frame],
+    [session],
   );
-
+  
   /**
    * Track id allocator for "AUTO" mode (no explicit trackId selected).
    * The allocator memoizes per-class used ids across calls.
