@@ -35,6 +35,7 @@ import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
+import { VideoSidebar } from "@/app/video/components/VideoSidebar";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -136,6 +137,15 @@ export default function ToolBar() {
   if (!project || !sample) {
     console.warn("Project or sample not found in ToolBar");
     return null;
+  }
+
+  if (project.task === TaskType.Video) {
+    const refreshAnnotations = async () => {
+    const dbAnnotations = await getAnnotationsForSample(project._id, sample._id);
+    setAnnotations(() => dbAnnotations);
+  };
+  
+  return <VideoSidebar project={project} sample={sample} onSaved={refreshAnnotations} />;
   }
 
   const project_id = project._id;

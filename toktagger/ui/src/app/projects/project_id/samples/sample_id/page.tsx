@@ -1,6 +1,6 @@
-// toktagger/ui/src/app/projects/project_id/samples/sample_id/page.tsx
 "use client";
-import React, { useLayoutEffect, useMemo, useState } from "react";
+
+import React, { useLayoutEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -71,27 +71,23 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
     error,
   } = useSample();
 
-  if (isLoading) return <LoadingView />;
-  if (error) return <ErrorView message={error} />;
-  if (!project) return <ErrorView message="Project not found." />;
-  if (!sample) return <ErrorView message="Sample not found." />;
-  if (!data) return null;
+  const isVideo = project?.task === TaskType.Video;
 
-  const isVideo = project.task === TaskType.Video;
+  // Hooks must be called unconditionally (no early returns before this).
+  const [videoFrame, setVideoFrame] = useState<number | null>(null);
 
   // For video we assume backend returns { frame: number, values: base64, ... }
-  const frameFromBackend = useMemo(() => {
+  const frameFromBackend = (() => {
     if (!isVideo) return 0;
-    return (data as unknown as { frame?: number }).frame ?? 0;
-  }, [isVideo, data]);
-
-  // IMPORTANT: don't force-load frame 0; session frame should follow backend response.
-  const [videoFrame, setVideoFrame] = useState<number | null>(null);
+    if (!data) return 0;
+    const maybe = data as unknown as { frame?: number };
+    return maybe?.frame ?? 0;
+  })();
 
   useLayoutEffect(() => {
     if (!isVideo) return;
+    if (!data) return;
 
-    // Don’t advance session frame unless backend actually returned the requested frame.
     const dp = dataParams as unknown as { name?: string; frame?: number | null };
 
     if (dp.name === "image" && dp.frame != null) {
@@ -99,7 +95,25 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
     }
 
     setVideoFrame(frameFromBackend);
-  }, [isVideo, frameFromBackend, dataParams]);
+  }, [isVideo, data, frameFromBackend, dataParams]);
+
+  // Early returns AFTER all hooks
+  if (error) return <ErrorView message={error} />;
+
+  if (!project) {
+    return isLoading ? <LoadingView /> : <ErrorView message="Project not found." />;
+  }
+
+  if (!sample) {
+    return isLoading ? <LoadingView /> : <ErrorView message="Sample not found." />;
+  }
+
+  // Only hard-block on loading for non-video.
+  if (!isVideo && isLoading) return <LoadingView />;
+
+  // Keep video UI mounted; for initial load (no data yet) show loading.
+  if (!data && !isVideo) return null;
+  if (!data && isVideo) return <LoadingView />;
 
   return (
     <div>

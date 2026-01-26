@@ -197,7 +197,7 @@ function VideoShotSearchV2(props: {
  * - Instance selection (filters / targets an existing track)
  * - Destructive actions with confirmation
  */
-export function VideoSidebar(_props: { project: Project; sample: Sample }) {
+export function VideoSidebar(_props: { project: Project; sample: Sample; onSaved?: () => Promise<void> | void; }) {
   const navigate = useNavigate();
   const session = useVideoSession();
 
@@ -277,6 +277,9 @@ export function VideoSidebar(_props: { project: Project; sample: Sample }) {
       ToastQueue.positive(`Saved ${payload.length} annotations!`, {
         timeout: 5000,
       });
+
+      // refresh SampleContext annotations after save
+      await _props.onSaved?.();
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Failed to save annotations.";
