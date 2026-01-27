@@ -18,8 +18,6 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-
-// ✅ Video view for this branch (v1-style frames tooling)
 import { VideoView } from "@/app/frames/components/frames";
 
 type SampleDataBreadCrumbsInfo = {
@@ -48,15 +46,21 @@ const SampleDataBreadCrumbs = ({
 };
 
 const SampleView = () => {
-  const { project, isLoading, error } = useSample();
+  const { project, data, isLoading, error } = useSample();
 
-  if (!project) return null;
-  if (isLoading) return <LoadingView />;
   if (error) return <ErrorView message={error} />;
+
+  // Initial load: no project yet
+  if (!project) return isLoading ? <LoadingView /> : null;
+
+  // This prevents FrameView from unmounting, so toolbar/session state is preserved.
+  if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
+
+  // Non-video tasks can keep the old behavior
+  if (isLoading) return <LoadingView />;
 
   if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
   if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
-  if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
 
   return null;
 };
@@ -72,7 +76,10 @@ function VideoViewWrapperFromContext() {
     setDataParams,
   } = useSample();
 
-  if (!project || !sample || !data) return null;
+  if (!project || !sample) return null;
+
+  // During next-frame fetch, we keep the previous frame data mounted.
+  if (!data) return <LoadingView />;
 
   // In video projects, SampleContext.parseData returns ImageData (frame + base64 PNG)
   return (
