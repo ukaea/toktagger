@@ -484,27 +484,27 @@ def test_samples_page_import_annotations(shot_id: bool, server_setup, page: Page
             file_chooser = fc_info.value
             file_chooser.set_files(file.name)
 
-        time.sleep(1)
-
         # Navigate to first sample, check annotations visible
         page.goto(
             f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}"
         )
 
-        assert page.get_by_label("zone", exact=True).count() == 1
-        assert page.get_by_label("vspan", exact=True).count() == 1
         expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
         expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
+
+        expect(page.get_by_label("zone", exact=True)).to_have_count(1)
+        expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
 
         # Navigate to second sample, check annotations visble
         page.goto(
             f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[1]}"
         )
 
-        assert page.get_by_label("zone", exact=True).count() == 1
-        assert page.get_by_label("vspan", exact=True).count() == 1
         expect(page.get_by_role("rowheader", name="Control Loss")).to_be_visible()
         expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_visible()
+
+        expect(page.get_by_label("zone", exact=True)).to_have_count(1)
+        expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
 
 
 def test_samples_page_export_annotations(server_setup, page: Page):

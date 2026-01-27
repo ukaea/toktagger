@@ -356,7 +356,7 @@ def test_timeseries_load_annotations(server_setup, page: Page):
 
     # One vspan and 3 zones visible
     expect(page.get_by_label("vspan").first).to_be_visible()
-    assert page.get_by_label("zone", exact=True).count() == 3
+    expect(page.get_by_label("zone", exact=True)).to_have_count(3)
 
     # Check all four entries have correct info in table
     row = page.get_by_role("row").filter(
@@ -413,7 +413,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     # One vspan and 2 zones visible
     expect(page.get_by_label("vspan").first).to_be_visible()
-    assert page.get_by_label("zone", exact=True).count() == 2
+    expect(page.get_by_label("zone", exact=True)).to_have_count(2)
 
     # Delete a zone
     page.get_by_label("zone").first.click(button="right")
