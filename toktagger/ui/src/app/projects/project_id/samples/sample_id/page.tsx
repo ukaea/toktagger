@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import {
   Provider,
   defaultTheme,
@@ -17,7 +18,9 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import React from "react";
+
+// ✅ Video view for this branch (v1-style frames tooling)
+import { VideoView } from "@/app/frames/components/frames";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -47,24 +50,43 @@ const SampleDataBreadCrumbs = ({
 const SampleView = () => {
   const { project, isLoading, error } = useSample();
 
-  if (!project) {
-    return null;
-  }
+  if (!project) return null;
+  if (isLoading) return <LoadingView />;
+  if (error) return <ErrorView message={error} />;
 
-  if (isLoading) {
-    return <LoadingView />;
-  }
+  if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
+  if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
+  if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
 
-  if (error) {
-    return <ErrorView message={error} />;
-  }
-
-  if (project.task == TaskType.TimeSeries) {
-    return <TimeSeriesView />;
-  } else if (project.task == TaskType.Spectrogram) {
-    return <SpectrogramView />;
-  }
+  return null;
 };
+
+function VideoViewWrapperFromContext() {
+  const {
+    project,
+    sample,
+    data,
+    annotations,
+    setAnnotations,
+    dataParams,
+    setDataParams,
+  } = useSample();
+
+  if (!project || !sample || !data) return null;
+
+  // In video projects, SampleContext.parseData returns ImageData (frame + base64 PNG)
+  return (
+    <VideoView
+      data={data as any}
+      annotations={annotations ?? []}
+      setAnnotations={setAnnotations}
+      dataParams={dataParams}
+      setDataParams={setDataParams as any}
+      projectId={project._id as any}
+      sampleId={sample._id as any}
+    />
+  );
+}
 
 function SamplePageContent() {
   const { project, sample, isLoading } = useSample();
@@ -85,12 +107,9 @@ function SamplePageContent() {
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
-        <SampleDataBreadCrumbs
-          project={project}
-          sample={sample}
-        ></SampleDataBreadCrumbs>
-        <ModelTrainModal project={project}></ModelTrainModal>
-        <ModelPredictModal project={project}></ModelPredictModal>
+        <SampleDataBreadCrumbs project={project} sample={sample} />
+        <ModelTrainModal project={project} />
+        <ModelPredictModal project={project} />
         <Flex>
           <ToolBar />
           <SampleView />
