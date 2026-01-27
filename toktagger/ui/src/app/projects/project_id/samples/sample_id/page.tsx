@@ -46,17 +46,15 @@ const SampleDataBreadCrumbs = ({
 };
 
 const SampleView = () => {
-  const { project, data, isLoading, error } = useSample();
+  const { project, isLoading, error } = useSample();
 
   if (error) return <ErrorView message={error} />;
 
-  // Initial load: no project yet
   if (!project) return isLoading ? <LoadingView /> : null;
 
-  // This prevents FrameView from unmounting, so toolbar/session state is preserved.
+  // Video: keep the video UI mounted while fetching the next frame.
   if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
 
-  // Non-video tasks can keep the old behavior
   if (isLoading) return <LoadingView />;
 
   if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
@@ -78,10 +76,10 @@ function VideoViewWrapperFromContext() {
 
   if (!project || !sample) return null;
 
-  // During next-frame fetch, we keep the previous frame data mounted.
+  // On initial load, block until we have frame data.
+  // During frame-to-frame fetches, SampleContext keeps previous data set, so VideoView stays mounted.
   if (!data) return <LoadingView />;
 
-  // In video projects, SampleContext.parseData returns ImageData (frame + base64 PNG)
   return (
     <VideoView
       data={data as any}

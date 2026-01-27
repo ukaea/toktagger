@@ -100,7 +100,7 @@ async function saveAnnotationsValidated(
   return response;
 }
 
-// Video annotation behavior: backend expects already-formed payload (COCO video bboxes).
+// Video save writes the already-formed payload expected by the frame/video backend (COCO video bboxes).
 async function saveVideoAnnotations(
   project_id: string,
   sample_id: string,
@@ -240,7 +240,7 @@ type VideoShotSearchProps = {
   collectVideoPayloadForBackend: () => Promise<Annotation[]>;
 };
 
-// Video-only shot jump: saves the local frame session to backend (COCO bboxes) before navigating.
+// Video-only shot jump: save current local frame session before navigating to the requested shot.
 function VideoShotSearch({
   project_id,
   sample_id,
@@ -275,7 +275,6 @@ function VideoShotSearch({
     try {
       const nextSample = await getShotSample(project_id, newValue);
       if (nextSample !== null) {
-        // Persist video/frame annotation state before leaving this sample.
         const payload = await collectVideoPayloadForBackend();
         await saveVideoAnnotations(project_id, sample_id, payload);
 
@@ -400,12 +399,8 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
 // Video toolbar types + window contract
 // ------------------------------
 
-/**
- * Toolbar-side instance profiles used by FrameView via window.ufoInstanceProfiles.
- * FrameView expects: { id, class_name, class_id, track_id }.
- *
- * NOTE: We still use window.ufo* keys/events for compatibility with the FrameView implementation.
- */
+// Toolbar-side instance profiles used by FrameView via window.ufoInstanceProfiles.
+// FrameView expects: { id, class_name, class_id, track_id }.
 type VideoInstanceProfile = {
   id: string; // `${class_name}:${track_id}`
   class_name: string;
@@ -430,10 +425,7 @@ declare global {
   }
 }
 
-/**
- * Stable key used by the shared VideoInstancePanel and FrameView events.
- * Shape: "<class_name lowercase>:<canonical track_id>"
- */
+// Stable key shared between the VideoInstancePanel UI and FrameView events.
 const instanceKey = (inst: VideoInstanceProfile) =>
   `${inst.class_name.toLowerCase()}:${inst.track_id}`;
 
@@ -443,7 +435,7 @@ type VideoWireProfile = {
   track_id: string;
 };
 
-// Event payload from FrameView -> toolbar: synchronizes profiles, selection, and count badges.
+// Event payload from FrameView -> toolbar: keeps profiles/selection/badges in sync.
 type VideoStateDetail = {
   profiles?: VideoWireProfile[];
   selectedKey?: string;
@@ -462,7 +454,7 @@ export default function ToolBar() {
     project,
     sample,
     data,
-    annotations, // ✅ ensure we pull annotations from context
+    annotations,
     setAnnotations,
     viewParams,
     setViewParams,
@@ -477,10 +469,15 @@ export default function ToolBar() {
     return null;
   }
 
-  // ✅ NEW: for video projects, render the video toolbar instead of the TS/spec toolbar.
-  // This does NOT change the TS/spec tools at all.
+  // Video projects use the dedicated left-side toolbar which wires into FrameView via window.ufo*.
   if (project.task === TaskType.Video) {
-    return <VideoToolbar project={project} sample={sample} annotations={annotations} />;
+    return (
+      <VideoToolbar
+        project={project}
+        sample={sample}
+        annotations={annotations}
+      />
+    );
   }
 
   const project_id = project._id;
@@ -680,8 +677,8 @@ export default function ToolBar() {
 // VideoToolbar: used only when project.task === TaskType.Video
 // ------------------------------
 
-// VideoToolbar: left-side panel used only for video/frame annotation projects.
-// Owns the instance list and selection; FrameView reads selection from window.ufo*.
+// Left-side toolbar for video/frame annotation.
+// Owns the instance list + selection; FrameView consumes selection from window.ufo*.
 function VideoToolbar({
   project,
   sample,
@@ -696,11 +693,13 @@ function VideoToolbar({
   const project_id = project._id;
   const sample_id = sample._id;
 
+  // Class registry maps a display label to a stable numeric class_id used in exports/saves.
   const [classRegistry, setClassRegistry] = useState<ClassRegistry>({});
   const [selectedClassName, setSelectedClassName] = useState<string | null>(
     null,
   );
 
+  // Instance profiles represent (class + track_id) pairs that annotations attach to.
   const [instanceProfiles, setInstanceProfiles] = useState<
     VideoInstanceProfile[]
   >([]);
@@ -708,11 +707,12 @@ function VideoToolbar({
     null,
   );
 
+  // Badge counts show how many boxes exist for each instance across all frames.
   const [instanceCounts, setInstanceCounts] = useState<Record<string, number>>(
     {},
   );
 
-  // Listen to FrameView state events so toolbar stays in sync.
+  // Subscribe to FrameView state broadcasts (profiles, selection, registry, counts).
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -731,7 +731,7 @@ function VideoToolbar({
         }));
         setInstanceProfiles(next);
 
-        // selectedKey comes in as "<class>:<track>" (lowercased) so we map it to the internal id.
+        // FrameView reports selection as "<class>:<track>" (lowercased); map it back to our internal id.
         if ("selectedKey" in d) {
           if (typeof d.selectedKey === "string") {
             const inst = next.find((p) => instanceKey(p) === d.selectedKey);
@@ -744,13 +744,13 @@ function VideoToolbar({
 
       setSelectedClassName(d.selectedClassName ?? null);
 
+      // Persist last-selected class so new sessions can default to it.
       if ("lastClassName" in d && d.lastClassName) {
-        // Persist last-selected class so new sessions can default to it.
         saveLastClassName(d.lastClassName);
       }
 
+      // Normalize registry keys to lowercase for consistent lookup across UI and storage.
       if (d.classRegistry) {
-        // Normalize registry keys to lowercase for consistent lookup across UI and storage.
         const reg: ClassRegistry = {};
         Object.entries(d.classRegistry).forEach(([name, idVal]) => {
           reg[name.toLowerCase()] = { id: String(idVal), name };
@@ -758,7 +758,7 @@ function VideoToolbar({
         setClassRegistry(reg);
       }
 
-      // Badge counts per instance (computed by a localStorage scan in FrameView/lib).
+      // Counts are computed by a localStorage scan (FrameView/lib) and pushed up as an event payload.
       if (d.profileCounts) {
         setInstanceCounts(d.profileCounts);
       }
@@ -768,7 +768,7 @@ function VideoToolbar({
     return () => window.removeEventListener("ufo:state", onState);
   }, []);
 
-  // Initial load of registry + last-used class.
+  // Initial load of registry + last-used class for convenience on page refresh.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -779,11 +779,10 @@ function VideoToolbar({
     if (last) setSelectedClassName(last);
   }, []);
 
-  // Per-instance usage scanner (keeps badge counts updated).
+  // Periodically scan localStorage to keep per-instance badge counts updated.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Video annotation annotations are stored under anno::w3c::app://p/<p>/s/<s>/...
     const keyPrefix = "anno::w3c::" + `app://p/${project_id}/s/${sample_id}/`;
 
     let stopScan: (() => void) | null = null;
@@ -808,11 +807,10 @@ function VideoToolbar({
     };
   }, [project_id, sample_id]);
 
-  // Mirror toolbar selection + profiles into window.* for FrameView/AnnoBridge.
+  // Mirror toolbar state into window.ufo* so FrameView can read current profiles + selection.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // FrameView reads the "current selection" from these window.ufo* values.
     window.ufoInstanceProfiles = instanceProfiles;
     window.ufoSelectedProfileId = selectedInstanceId ?? null;
     window.ufoSelectedClassName = selectedClassName ?? null;
@@ -821,11 +819,11 @@ function VideoToolbar({
       instanceProfiles.find((p) => p.id === selectedInstanceId) || null;
     window.ufoSelectedTrackId = sel?.track_id ?? null;
 
-    // Notify FrameView to re-check selection and enable/disable drawing.
+    // Ask FrameView to re-check selection and enable/disable drawing accordingly.
     window.ufoNotifySelectionChanged?.();
   }, [instanceProfiles, selectedInstanceId, selectedClassName]);
 
-  // Ask FrameView to delete one instance (across all frames) via a window event.
+  // Request FrameView to delete a single instance (across all frames).
   const onRequestBulkDelete = (profile: {
     class_name?: string;
     track_id?: string;
@@ -844,18 +842,18 @@ function VideoToolbar({
     );
   };
 
-  // Ask FrameView to wipe ALL instances/annotations for this sample via a window event.
+  // Request FrameView to delete all instances/annotations for this sample.
   const onRequestDeleteAllInstances = () => {
     if (typeof window === "undefined") return;
     window.dispatchEvent(new CustomEvent("ufo:deleteAllInstances"));
   };
 
-  // Clear only the currently visible frame overlay (FrameView owns the implementation).
+  // Clear only the current frame overlay (implementation lives in FrameView).
   const videoClearCurrent = async () => {
     await window.ufoClearCurrent?.();
   };
 
-  // Gather all localStorage W3C annotations, convert to COCO frames, then to backend "video bboxes".
+  // Collect W3C per-frame annotations from FrameView, convert to COCO frames, then to backend "video bboxes".
   const collectVideoPayloadForBackend = async (): Promise<Annotation[]> => {
     if (typeof window === "undefined") return annotations;
 
@@ -884,17 +882,12 @@ function VideoToolbar({
     try {
       const payload = await collectVideoPayloadForBackend();
 
-      // Video save writes the pre-formed COCO video bbox payload to the backend.
-      const response = await saveVideoAnnotations(
-        project_id,
-        sample_id,
-        payload,
-      );
+      const response = await saveVideoAnnotations(project_id, sample_id, payload);
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
 
-      // Mark local video session as "in sync" with backend after successful save.
+      // Mark local session as synced after a successful save.
       setVideoWorkingDirty(project_id, sample_id, false);
 
       ToastQueue.positive(`Saved ${payload.length} annotations!`, {
@@ -919,7 +912,7 @@ function VideoToolbar({
     }
 
     try {
-      // Save current video annotation payload before moving to next sample.
+      // Persist current session before navigating away.
       const payload = await collectVideoPayloadForBackend();
       await saveVideoAnnotations(project_id, sample_id, payload);
 
@@ -934,6 +927,7 @@ function VideoToolbar({
     }
   };
 
+  // Convert internal selectedInstanceId into the "<class>:<track>" key used by the InstancePanel.
   const selectedInstanceKey = useMemo(() => {
     const inst = instanceProfiles.find((p) => p.id === selectedInstanceId);
     return inst ? instanceKey(inst) : null;
@@ -1014,11 +1008,11 @@ function VideoToolbar({
             setSelectedClassName={(name) => {
               if (!name) return;
 
-              // "Arm" the class for drawing (FrameView enables drawing when a class is selected).
+              // Selecting a class "arms" drawing in FrameView (annotations will be tagged with this class).
               setSelectedClassName(name);
               saveLastClassName(name);
 
-              // Reset instance selection when switching class.
+              // Switching class drops any active instance selection.
               setSelectedInstanceId(null);
 
               if (typeof window !== "undefined") {
@@ -1039,7 +1033,7 @@ function VideoToolbar({
               const inst = instanceProfiles.find((p) => instanceKey(p) === key);
               if (!inst) return;
 
-              // Explicit instance selection (persists across frame navigation).
+              // Explicit instance selection persists across frame navigation.
               setSelectedInstanceId(inst.id);
               setSelectedClassName(inst.class_name);
               saveLastClassName(inst.class_name);
@@ -1053,7 +1047,7 @@ function VideoToolbar({
               }
             }}
             onCreateProfile={(className: string, trackId: string) => {
-              // Instance profiles define the (class + track_id) that annotations will attach to.
+              // Instance profiles define (class + track_id) targets that annotations attach to.
               const cls = className;
 
               const keyLower = cls.toLowerCase();
@@ -1080,6 +1074,8 @@ function VideoToolbar({
                 1;
 
               const existingTrackIds = instanceProfiles.map((p) => p.track_id);
+
+              // Track ids are canonicalized to keep keys stable across UI, storage, and events.
               const canonicalTrackId =
                 canonicalizeTrackId(trackId) ||
                 canonicalizeTrackId(uniqueReadableId(existingTrackIds));
@@ -1097,7 +1093,7 @@ function VideoToolbar({
               saveLastClassName(cls);
 
               if (typeof window !== "undefined") {
-                // Keep FrameView selection state in sync.
+                // Keep FrameView in sync immediately (so drawing is enabled for the new instance).
                 window.ufoInstanceProfiles = nextInstances;
                 window.ufoSelectedProfileId = id;
                 window.ufoSelectedClassName = cls;
