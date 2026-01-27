@@ -825,7 +825,11 @@ function VideoToolbar({
     try {
       const payload = await collectVideoPayloadForBackend();
 
-      const response = await saveVideoAnnotations(project_id, sample_id, payload);
+      const response = await saveVideoAnnotations(
+        project_id,
+        sample_id,
+        payload,
+      );
       if (!response.ok) {
         throw new Error(`Failed to save annotations: ${response.statusText}`);
       }
