@@ -1,4 +1,5 @@
 "use client";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -12,18 +13,34 @@ import {
   ComboBox,
   Item,
   Key,
+  ButtonGroup,
+  Button,
+  ToastQueue,
+  SearchField,
 } from "@adobe/react-spectrum";
 import type { ImageAnnotation } from "@annotorious/react";
 import {
+  Annotation,
+  CompositeDataSchema,
+  Data,
+  DataParams,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
+  Project,
+  Sample,
   SpectrogramData,
   SpectrogramDataSchema,
   SpectrogramViewParamsSchema,
   TaskType,
   ViewParams,
 } from "@/types";
-import { getAnnotationsForSample } from "@/app/core";
+
+import { useNavigate } from "react-router-dom";
+import type { NavigateFunction } from "react-router-dom";
+
+import { BACKEND_API_URL, getAnnotationsForSample } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
+
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
@@ -34,8 +51,265 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { ExportTool } from "./export";
 import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
-import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
+
+import type { ClassRegistry } from "@/app/frames/components/lib";
+import {
+  LABEL_MAP,
+  w3cToCocoFrames,
+  cocoFramesToVideoBBoxes,
+  loadClassRegistry,
+  loadLastClassName,
+  saveLastClassName,
+  FIXED_CLASS_REG,
+  canonicalizeTrackId,
+  uniqueReadableId,
+  scanInstanceCountsChunked,
+} from "@/app/frames/components/lib";
+import {
+  ClassPanel as VideoClassPanel,
+  InstancePanel as VideoInstancePanel,
+} from "@/app/frames/components/ui";
+import { setVideoWorkingDirty } from "@/app/frames/components/adapters";
+
+// ------------------------------
+// Helpers: backend save + sample navigation
+// ------------------------------
+
+async function saveAnnotationsValidated(
+  project_id: string,
+  sample_id: string,
+  annotations: Annotation[],
+) {
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+
+  const validatedAnnotations: Annotation[] = annotations.map(
+    (annotation: Annotation) => ({
+      ...annotation,
+      validated: true,
+    }),
+  );
+
+  const response = await fetch(ANNOTATIONS_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(validatedAnnotations),
+  });
+  return response;
+}
+
+// Video annotation behavior: backend expects already-formed payload (COCO video bboxes).
+async function saveVideoAnnotations(
+  project_id: string,
+  sample_id: string,
+  annotations: Annotation[],
+) {
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+  const response = await fetch(ANNOTATIONS_URL, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(annotations),
+  });
+  return response;
+}
+
+async function getNextSample(project_id: string) {
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
+  const sampleResult = await fetch(NEXT_URL);
+  const sample = await sampleResult.json();
+  return sample;
+}
+
+async function getShotSample(project_id: string, shot_id: string) {
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
+  const sampleResult = await fetch(NEXT_URL);
+  const sampleArray = await sampleResult.json();
+  let sample = null;
+  if (sampleArray.length > 0) {
+    sample = sampleArray[0];
+  }
+  return sample;
+}
+
+// ------------------------------
+// Standard TS/Spectrogram controls
+// ------------------------------
+
+type SaveInfo = {
+  project_id: string;
+  sample_id: string;
+  annotations: Annotation[];
+};
+
+function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
+  const navigate = useNavigate();
+
+  const handleClick = async () => {
+    try {
+      await saveAnnotationsValidated(project_id, sample_id, annotations);
+      const sample = await getNextSample(project_id);
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    }
+  };
+
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Next
+    </Button>
+  );
+}
+
+function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
+  const handleClick = async () => {
+    try {
+      const response = await saveAnnotationsValidated(
+        project_id,
+        sample_id,
+        annotations,
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to save annotations: ${response.statusText}`);
+      }
+      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
+        timeout: 5000,
+      });
+    } catch (err) {
+      if (err instanceof Error) {
+        ToastQueue.negative(`${err.message}`, {
+          timeout: 5000,
+        });
+      }
+    }
+  };
+
+  return (
+    <Button variant="primary" onPress={handleClick}>
+      Save
+    </Button>
+  );
+}
+
+export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
+  const navigate = useNavigate();
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  const onSearchSubmit = async (newValue: string) => {
+    if (newValue == "") {
+      setErrorMessage("");
+    } else if (/^[0-9]*$/.test(newValue)) {
+      setErrorMessage("");
+      const shot_id = newValue;
+      try {
+        const sample = await getShotSample(project_id, shot_id);
+        if (sample !== null) {
+          await saveAnnotationsValidated(project_id, sample_id, annotations);
+          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+          navigate(NEXT_SAMPLE_URL);
+        } else {
+          setErrorMessage("Shot not found!");
+        }
+      } catch (err) {
+        console.error("Failed to fetch data:", err);
+      }
+    } else {
+      setErrorMessage("Please enter a number.");
+    }
+  };
+
+  return (
+    <SearchField
+      label="Jump to Shot"
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    />
+  );
+}
+
+type VideoShotSearchProps = {
+  project_id?: string;
+  sample_id?: string;
+  navigate: NavigateFunction;
+  // Collect all per-frame W3C annotations from localStorage and convert to backend payload.
+  collectVideoPayloadForBackend: () => Promise<Annotation[]>;
+};
+
+// Video-only shot jump: saves the local frame session to backend (COCO bboxes) before navigating.
+function VideoShotSearch({
+  project_id,
+  sample_id,
+  navigate,
+  collectVideoPayloadForBackend,
+}: VideoShotSearchProps) {
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [shotQuery, setShotQuery] = useState<string>("");
+
+  const onSearchSubmit = async (rawValue: string) => {
+    const newValue = rawValue.trim();
+
+    if (newValue === "") {
+      setErrorMessage("");
+      setShotQuery("");
+      return;
+    }
+
+    if (!/^[0-9]+$/.test(newValue)) {
+      setErrorMessage("Please enter a number.");
+      return;
+    }
+
+    if (!project_id || !sample_id) {
+      ToastQueue.negative(
+        "Cannot jump to shot: missing project or sample id.",
+        { timeout: 5000 },
+      );
+      return;
+    }
+
+    try {
+      const nextSample = await getShotSample(project_id, newValue);
+      if (nextSample !== null) {
+        // Persist video/frame annotation state before leaving this sample.
+        const payload = await collectVideoPayloadForBackend();
+        await saveVideoAnnotations(project_id, sample_id, payload);
+
+        // Clear the "local session has diverged from backend" marker after a successful save.
+        setVideoWorkingDirty(project_id, sample_id, false);
+
+        const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${nextSample._id}`;
+        navigate(NEXT_SAMPLE_URL);
+
+        setShotQuery("");
+        setErrorMessage("");
+      } else {
+        setErrorMessage("Shot not found!");
+      }
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setErrorMessage("Failed to fetch shot.");
+    }
+  };
+
+  return (
+    <SearchField
+      label="Jump to Shot"
+      value={shotQuery}
+      onChange={(v) => {
+        setShotQuery(v);
+        if (errorMessage) setErrorMessage("");
+      }}
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    />
+  );
+}
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -122,14 +396,78 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
   );
 }
 
+// ------------------------------
+// Video toolbar types + window contract
+// ------------------------------
+
+/**
+ * Toolbar-side instance profiles used by FrameView via window.ufoInstanceProfiles.
+ * FrameView expects: { id, class_name, class_id, track_id }.
+ *
+ * NOTE: We still use window.ufo* keys/events for compatibility with the FrameView implementation.
+ */
+type VideoInstanceProfile = {
+  id: string; // `${class_name}:${track_id}`
+  class_name: string;
+  class_id: number;
+  track_id: string; // canonicalized slug
+};
+
+declare global {
+  interface Window {
+    // Shared state/events between the left VideoToolbar and the FrameView/AnnoBridge code.
+    ufoInstanceProfiles?: VideoInstanceProfile[];
+    ufoSelectedProfileId?: string | null;
+    ufoSelectedClassName?: string | null;
+    ufoSelectedTrackId?: string | null;
+    ufoSelectionSource?: "auto" | "explicit" | null;
+    ufoNotifySelectionChanged?: () => void;
+
+    // FrameView exposes these helpers so the toolbar can trigger save/clear actions.
+    ufoCollectForSave?: () => Promise<unknown>;
+    ufoClearCurrent?: () => Promise<void>;
+    ufoClearAllFrames?: () => Promise<void>;
+  }
+}
+
+/**
+ * Stable key used by the shared VideoInstancePanel and FrameView events.
+ * Shape: "<class_name lowercase>:<canonical track_id>"
+ */
+const instanceKey = (inst: VideoInstanceProfile) =>
+  `${inst.class_name.toLowerCase()}:${inst.track_id}`;
+
+type VideoWireProfile = {
+  class_name: string;
+  class_id: number;
+  track_id: string;
+};
+
+// Event payload from FrameView -> toolbar: synchronizes profiles, selection, and count badges.
+type VideoStateDetail = {
+  profiles?: VideoWireProfile[];
+  selectedKey?: string;
+  selectedClassName?: string | null;
+  lastClassName?: string;
+  classRegistry?: Record<string, number>;
+  profileCounts?: Record<string, number>;
+};
+
+// ------------------------------
+// Main ToolBar (Context-driven)
+// ------------------------------
+
 export default function ToolBar() {
   const {
     project,
     sample,
     data,
+    annotations, // ✅ ensure we pull annotations from context
     setAnnotations,
     viewParams,
     setViewParams,
+    dataParams,
+    setDataParams,
     plotProps,
     setPlotProps,
   } = useSample();
@@ -137,6 +475,12 @@ export default function ToolBar() {
   if (!project || !sample) {
     console.warn("Project or sample not found in ToolBar");
     return null;
+  }
+
+  // ✅ NEW: for video projects, render the video toolbar instead of the TS/spec toolbar.
+  // This does NOT change the TS/spec tools at all.
+  if (project.task === TaskType.Video) {
+    return <VideoToolbar project={project} sample={sample} annotations={annotations} />;
   }
 
   const project_id = project._id;
@@ -154,7 +498,7 @@ export default function ToolBar() {
 
     if (!result.success) {
       console.warn("Time series data is not available");
-      return;
+      return null;
     }
 
     const tsData = result.data;
@@ -332,25 +676,21 @@ export default function ToolBar() {
   );
 }
 
-type VideoWireProfile = {
-  class_name: string;
-  class_id: number;
-  track_id: string;
-};
+// ------------------------------
+// VideoToolbar: used only when project.task === TaskType.Video
+// ------------------------------
 
-// Event payload from FrameView -> toolbar: synchronizes profiles, selection, and count badges.
-type VideoStateDetail = {
-  profiles?: VideoWireProfile[];
-  selectedKey?: string;
-  selectedClassName?: string | null;
-  lastClassName?: string;
-  classRegistry?: Record<string, number>;
-  profileCounts?: Record<string, number>;
-};
-
-// VideoToolbar: left-side panel used only for video/frame annotation projects (project.task === "UFO").
+// VideoToolbar: left-side panel used only for video/frame annotation projects.
 // Owns the instance list and selection; FrameView reads selection from window.ufo*.
-function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
+function VideoToolbar({
+  project,
+  sample,
+  annotations,
+}: {
+  project: Project;
+  sample: Sample;
+  annotations: Annotation[];
+}) {
   const navigate = useNavigate();
 
   const project_id = project._id;
@@ -594,10 +934,10 @@ function VideoToolbar({ project, sample, annotations }: ToolBarInfo) {
     }
   };
 
-  const selectedInstanceKey = (() => {
+  const selectedInstanceKey = useMemo(() => {
     const inst = instanceProfiles.find((p) => p.id === selectedInstanceId);
     return inst ? instanceKey(inst) : null;
-  })();
+  }, [instanceProfiles, selectedInstanceId]);
 
   return (
     <Provider theme={defaultTheme} height="100vh">
