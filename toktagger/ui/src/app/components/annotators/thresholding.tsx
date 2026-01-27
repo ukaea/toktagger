@@ -41,14 +41,6 @@ export default function SpectrogramThresholdTool({
   useEffect(() => {
     const fetchData = async () => {
       if (!active) {
-        // Remove previous annotations from this annotator
-        setAnnotations((previousAnnotations: Annotation[]) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
-          );
-          return otherAnnotations;
-        });
         return;
       }
 
@@ -70,7 +62,8 @@ export default function SpectrogramThresholdTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
+            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });

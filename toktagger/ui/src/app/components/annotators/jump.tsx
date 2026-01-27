@@ -40,13 +40,6 @@ export function JumpDetectionTool({
   useEffect(() => {
     const fetchData = async () => {
       if (!validSignalName || !isEnabled) {
-        setAnnotations((previousAnnotations: Annotation[]) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
-          );
-          return otherAnnotations;
-        });
         return;
       }
 
@@ -74,7 +67,8 @@ export function JumpDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });

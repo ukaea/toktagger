@@ -51,13 +51,6 @@ export function ChangePointDetectionTool({
   useEffect(() => {
     const fetchData = async () => {
       if (!validSignalName || !isEnabled) {
-        setAnnotations((previousAnnotations) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
-          );
-          return otherAnnotations;
-        });
         return;
       }
 
@@ -85,7 +78,8 @@ export function ChangePointDetectionTool({
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
+            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });

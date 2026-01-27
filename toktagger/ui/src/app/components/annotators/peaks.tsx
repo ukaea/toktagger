@@ -56,15 +56,6 @@ export function PeakDetectionTool({
   useEffect(() => {
     const fetchData = async () => {
       if (!validSignal || !isEnabled) {
-        // Remove previous annotations from this annotator
-        setAnnotations((previousAnnotations: Annotation[]) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
-          );
-          return otherAnnotations;
-        });
-
         return;
       }
 
@@ -92,7 +83,8 @@ export function PeakDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
+            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });
