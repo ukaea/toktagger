@@ -82,13 +82,13 @@ function VideoViewWrapperFromContext() {
 
   return (
     <VideoView
-      data={data as any}
+      data={data}
       annotations={annotations ?? []}
       setAnnotations={setAnnotations}
       dataParams={dataParams}
-      setDataParams={setDataParams as any}
-      projectId={project._id as any}
-      sampleId={sample._id as any}
+      setDataParams={setDataParams}
+      projectId={project._id}
+      sampleId={sample._id}
     />
   );
 }

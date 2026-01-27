@@ -21,9 +21,6 @@ import {
 import type { ImageAnnotation } from "@annotorious/react";
 import {
   Annotation,
-  CompositeDataSchema,
-  Data,
-  DataParams,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
   Project,
@@ -142,58 +139,6 @@ type SaveInfo = {
   sample_id: string;
   annotations: Annotation[];
 };
-
-function NextButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const navigate = useNavigate();
-
-  const handleClick = async () => {
-    try {
-      await saveAnnotationsValidated(project_id, sample_id, annotations);
-      const sample = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-      navigate(NEXT_SAMPLE_URL);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-    }
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Next
-    </Button>
-  );
-}
-
-function SaveButton({ project_id, sample_id, annotations }: SaveInfo) {
-  const handleClick = async () => {
-    try {
-      const response = await saveAnnotationsValidated(
-        project_id,
-        sample_id,
-        annotations,
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to save annotations: ${response.statusText}`);
-      }
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
-        timeout: 5000,
-      });
-    } catch (err) {
-      if (err instanceof Error) {
-        ToastQueue.negative(`${err.message}`, {
-          timeout: 5000,
-        });
-      }
-    }
-  };
-
-  return (
-    <Button variant="primary" onPress={handleClick}>
-      Save
-    </Button>
-  );
-}
 
 export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
   const navigate = useNavigate();
@@ -458,8 +403,6 @@ export default function ToolBar() {
     setAnnotations,
     viewParams,
     setViewParams,
-    dataParams,
-    setDataParams,
     plotProps,
     setPlotProps,
   } = useSample();
