@@ -20,12 +20,17 @@ export default function SpectrogramThresholdTool({
   plotProps,
   setPlotProps,
 }: SpectrogramThresholdToolInfo) {
-  const { setAnnotations } = useSample();
-  const [active, setActive] = useState(false);
+  const { annotations, setAnnotations } = useSample();
   const [value, setValue] = useState(95);
 
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.SPECTROGRAM_THRESHOLD,
+    );
+  });
+
   const onThresholdChange = (value: boolean) => {
-    setActive(value);
+    setIsEnabled(value);
     setPlotProps({ ...plotProps, thresholdActive: value });
   };
 
@@ -40,7 +45,16 @@ export default function SpectrogramThresholdTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!active) {
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD ||
+              annotation.validated,
+          );
+          return otherAnnotations;
+        });
         return;
       }
 
@@ -70,14 +84,14 @@ export default function SpectrogramThresholdTool({
     };
 
     fetchData();
-  }, [project_id, sample_id, active, value, signal_name, setAnnotations]);
+  }, [project_id, sample_id, isEnabled, value, signal_name, setAnnotations]);
 
   return (
     <>
-      <Switch isSelected={active} onChange={onThresholdChange}>
+      <Switch isSelected={isEnabled} onChange={onThresholdChange}>
         Thresholding
       </Switch>
-      {active && (
+      {isEnabled && (
         <Flex
           direction="column"
           gap="size-100"

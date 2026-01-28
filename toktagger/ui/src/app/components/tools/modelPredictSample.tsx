@@ -18,16 +18,27 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { project, setAnnotations } = useSample();
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const { annotations, project, setAnnotations } = useSample();
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some((ann) => ann.created_by === selectedModel);
+  });
   const [taskId, setTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const scheduleTask = async () => {
-      if (selectedModel == null || !isEnabled) {
+      if (!isEnabled) {
+        // Remove previous annotations from this model
+        setAnnotations((previousAnnotations: Annotations) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== selectedModel || annotation.validated,
+          );
+          return otherAnnotations;
+        });
+      } else if (selectedModel == null) {
         return;
       }
       const response = await startSamplePredictions(
@@ -46,7 +57,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       }
     };
     scheduleTask();
-  }, [project_id, sample_id, selectedModel, isEnabled]);
+  }, [project_id, sample_id, selectedModel, isEnabled, setAnnotations]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,6 +71,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         });
         return;
       }
+
       let pollCounter = 0;
       // Poll for result from GET predictions endpoint
       const interval = setInterval(async () => {

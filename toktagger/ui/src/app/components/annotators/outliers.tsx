@@ -22,13 +22,19 @@ export function OutlierDetectionTool({
   project_id,
   sample_id,
 }: OutlierDetectionType) {
-  const { dataParams, data, setAnnotations } = useSample();
+  const { annotations, dataParams, data, setAnnotations } = useSample();
 
   const methodOptions = [
     { id: 0, name: "mad" },
     { id: 1, name: "isoforest" },
   ];
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.OUTLIER_DETECTION,
+    );
+  });
+
   const [signalName, setSignalName] = useState<string | null>(null);
   const signalOptions = Object.keys(data?.values).map((value, index) => ({
     id: index,
@@ -41,7 +47,18 @@ export function OutlierDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignalName || !isEnabled) {
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION ||
+              annotation.validated,
+          );
+          return otherAnnotations;
+        });
+        return;
+      } else if (!validSignalName) {
         return;
       }
 

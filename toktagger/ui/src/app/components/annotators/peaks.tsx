@@ -24,8 +24,14 @@ export function PeakDetectionTool({
   project_id,
   sample_id,
 }: PeakDetectionType) {
-  const { setAnnotations, dataParams, data } = useSample();
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const { annotations, setAnnotations, dataParams, data } = useSample();
+
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.PEAK_DETECTION,
+    );
+  });
+
   const [prominence, setProminance] = useState<number>(5);
   const [distance, setDistance] = useState<number>(1);
 
@@ -55,7 +61,18 @@ export function PeakDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignal || !isEnabled) {
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION ||
+              annotation.validated,
+          );
+          return otherAnnotations;
+        });
+        return;
+      } else if (!validSignal) {
         return;
       }
 
