@@ -335,6 +335,55 @@ export function FrameView({
     totalFrames: number;
   } | null>(null);
 
+  // --- Responsive upscale measurement state (for small frames like MAST) ---
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [containerW, setContainerW] = useState<number>(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Seed once immediately (avoids 0 width if ResizeObserver fires late)
+    const seed = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w) setContainerW(w);
+    };
+    seed();
+
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (!cr) return;
+      setContainerW(cr.width);
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const displayWidth = useMemo(() => {
+    if (!containerW) return undefined;
+
+    const TARGET = 900;   // "comfortable" tagging width for small frames
+    const MAX_SCALE = 3;  // don't upscale more than 3× natural
+
+    // Before image loads, just fit available width.
+    if (!natural?.w) return containerW;
+
+    // For already-large images: keep previous behavior (fit container, no forced cap).
+    if (natural.w >= TARGET) return Math.min(containerW, natural.w);
+
+    // For small images: upscale toward TARGET but respect container and MAX_SCALE.
+    const fit = Math.min(containerW, natural.w);                 // never exceed container
+    const up = Math.min(containerW, TARGET, natural.w * MAX_SCALE);
+
+    // Pick whichever is larger (i.e., upscale when possible, otherwise fit).
+    return Math.max(fit, up);
+  }, [containerW, natural]);
+
+
   /**
    * Refresh behavior safety:
    * If the user hard-reloads the browser tab, we clear local cached frames and
@@ -1466,8 +1515,8 @@ export function FrameView({
   }, [openDeleteAllInstances]);
 
   return (
-    <div className="flex flex-col items-center gap-4 w-full">
-      <div className="w-full flex justify-center">
+    <div ref={containerRef} className="w-full flex justify-center">
+      <div className="inline-flex flex-col items-center gap-4 max-w-5xl">
         <div className="inline-flex flex-col items-center gap-4 max-w-5xl">
           {/* Top controls: jump-to-frame + prev/next */}
           <div className="flex flex-col items-center gap-2">
@@ -1503,47 +1552,57 @@ export function FrameView({
             </div>
           </div>
 
-          {/* Annotorious canvas: image + overlay + popup + bridge wiring */}
-          <div className="overflow-visible">
-            <Annotorious>
-              {/* drawingEnabled gates rectangle creation until a class/instance is armed */}
-              <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  // Backend returns base64 PNG bytes for the current frame.
-                  src={`data:image/png;base64,${data.values}`}
-                  alt={`Frame ${frameLabel}`}
-                  className="block mx-auto max-w-full h-auto object-contain max-h-[calc(100dvh-220px)] sm:max-h-[calc(100dvh-210px)]"
-                  style={{
-                    imageRendering: "pixelated",
-                    maxHeight: "calc(100dvh - 240px)",
-                  }}
-                  draggable={false}
-                />
-              </ImageAnnotator>
-
-              {/* Popup for selecting/inspecting class + instance; also supports delete */}
-              <ImageAnnotationPopup
-                popup={(props) => (
-                  <ClassInfoPopup
-                    {...props}
-                    list={popupList}
-                    includeTrackIds={true}
-                    onDeleted={handleAnnotationDeleted}
+          <div className="overflow-visible flex justify-center">
+            <div className="relative inline-block max-w-full">
+              <Annotorious>
+                {/* drawingEnabled gates rectangle creation until a class/instance is armed */}
+                <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    ref={imgRef}
+                    // Backend returns base64 PNG bytes for the current frame.
+                    src={`data:image/png;base64,${data.values}`}
+                    alt={`Frame ${frameLabel}`}
+                    draggable={false}
+                    onLoad={() => {
+                      const img = imgRef.current;
+                      if (img) setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+                    }}
+                    className="block mx-auto h-auto object-contain select-none"
+                    // Key change: explicitly set width so small frames upscale
+                    style={{
+                      imageRendering: "pixelated",
+                      width: displayWidth ? `${displayWidth}px` : undefined,
+                      maxWidth: "100%",
+                      height: "auto",
+                      maxHeight: "calc(100dvh - 240px)",
+                    }}
                   />
-                )}
-              />
+                </ImageAnnotator>
 
-              {/* Bridge wires Annotorious events -> normalization + local storage persistence */}
-              <AnnoBridge
-                ref={bridgeRef}
-                getSelectedProfile={getSelectedProfile}
-                getSelectedClassName={getSelectedClassName}
-                includeTrackIds={includeTrackIds}
-                classRegistry={classRegistry}
-                onAutoQuickAdd={onAutoQuickAdd}
-              />
-            </Annotorious>
+                {/* Popup for selecting/inspecting class + instance; also supports delete */}
+                <ImageAnnotationPopup
+                  popup={(props) => (
+                    <ClassInfoPopup
+                      {...props}
+                      list={popupList}
+                      includeTrackIds={true}
+                      onDeleted={handleAnnotationDeleted}
+                    />
+                  )}
+                />
+
+                {/* Bridge wires Annotorious events -> normalization + local storage persistence */}
+                <AnnoBridge
+                  ref={bridgeRef}
+                  getSelectedProfile={getSelectedProfile}
+                  getSelectedClassName={getSelectedClassName}
+                  includeTrackIds={includeTrackIds}
+                  classRegistry={classRegistry}
+                  onAutoQuickAdd={onAutoQuickAdd}
+                />
+              </Annotorious>
+            </div>
           </div>
         </div>
       </div>
