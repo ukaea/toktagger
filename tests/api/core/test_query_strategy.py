@@ -31,8 +31,8 @@ def annotations():
     # Annotations, sorted by uncertainty, descending. Only non-validated.
     annotation_ins = [
         db_definitions.ANNOTATION_5,
-        db_definitions.ANNOTATION_3,
         db_definitions.ANNOTATION_4,
+        db_definitions.ANNOTATION_3,
     ]
     annotations = [
         TimePointOut(
@@ -102,26 +102,6 @@ def test_random_strategy_previous(samples, annotations):
         assert previous_sample == forward_samples[i]
 
 
-def test_uncertainty_strategy_previous(samples, annotations):
-    strategy = query_strategy.UncertaintyQueryStrategy(
-        samples.copy(), annotations.copy()
-    )
-
-    # Should return samples in reverse order: 3, 4, 1, 2
-    previous_sample = strategy.get_previous_sample()
-    assert previous_sample.id == "sample_3"
-    previous_sample = strategy.get_previous_sample("sample_3")
-    assert previous_sample.id == "sample_4"
-    previous_sample = strategy.get_previous_sample("sample_4")
-    assert previous_sample.id == "sample_1"
-    previous_sample = strategy.get_previous_sample("sample_1")
-    assert previous_sample.id == "sample_2"
-
-    # Should cycle back to end
-    previous_sample = strategy.get_previous_sample("sample_2")
-    assert previous_sample.id == "sample_3"
-
-
 def test_random_strategy(samples, annotations):
     random.seed(42)
     strategy_1 = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
@@ -142,18 +122,34 @@ def test_uncertainty_strategy(samples, annotations):
         samples.copy(), annotations.copy()
     )
 
-    # Should return annotations 5, 3, 4 in that order
-    # These correspond to samples number 4, 1, 2
-    # It should then fallback to random selection of remaining samples - 3
     next_sample = strategy.get_next_sample()
+    assert next_sample.id == "sample_4"
+    next_sample = strategy.get_next_sample("sample_4")
     assert next_sample.id == "sample_2"
     next_sample = strategy.get_next_sample("sample_2")
     assert next_sample.id == "sample_1"
     next_sample = strategy.get_next_sample("sample_1")
-    assert next_sample.id == "sample_4"
-    next_sample = strategy.get_next_sample("sample_4")
     assert next_sample.id == "sample_3"
 
     # Should cycle back to start
     next_sample = strategy.get_next_sample("sample_3")
-    assert next_sample.id == "sample_2"
+    assert next_sample.id == "sample_4"
+
+
+def test_uncertainty_strategy_previous(samples, annotations):
+    strategy = query_strategy.UncertaintyQueryStrategy(
+        samples.copy(), annotations.copy()
+    )
+
+    previous_sample = strategy.get_previous_sample()
+    assert previous_sample.id == "sample_3"
+    previous_sample = strategy.get_previous_sample("sample_3")
+    assert previous_sample.id == "sample_1"
+    previous_sample = strategy.get_previous_sample("sample_1")
+    assert previous_sample.id == "sample_2"
+    previous_sample = strategy.get_previous_sample("sample_2")
+    assert previous_sample.id == "sample_4"
+
+    # Should cycle back to end
+    previous_sample = strategy.get_previous_sample("sample_4")
+    assert previous_sample.id == "sample_3"

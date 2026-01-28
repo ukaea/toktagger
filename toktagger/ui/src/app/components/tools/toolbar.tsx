@@ -60,7 +60,7 @@ function AmplitudeSlider() {
 
   let ampValues = data.amplitude.flat();
   ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor))
+    Math.log10(Math.max(x, smallPrecisionFactor)),
   );
 
   const displayAmplitudeValues = (val: number) => {
@@ -75,7 +75,7 @@ function AmplitudeSlider() {
       onChange={onAmplitudeRangeChange}
       getValueLabel={(val) =>
         `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(
-          val.end
+          val.end,
         )}`
       }
     />
@@ -245,11 +245,7 @@ export default function ToolBar() {
                   <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
                 </DisclosureTitle>
                 <DisclosurePanel>
-                  <ExportTool
-                    project={project}
-                    sample={sample}
-                    current_annotations={annotations}
-                  />
+                  <ExportTool project={project} sample={sample} />
                 </DisclosurePanel>
               </Disclosure>
               <Disclosure>
@@ -258,7 +254,8 @@ export default function ToolBar() {
                 </DisclosureTitle>
                 <DisclosurePanel>
                   <ImportButton
-                    project_id={project_id}
+                    project={project}
+                    sample={sample}
                     refreshAnnotations={refreshAnnotations}
                   />
                 </DisclosurePanel>

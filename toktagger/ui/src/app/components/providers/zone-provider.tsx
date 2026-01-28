@@ -10,6 +10,7 @@ interface ZoneContextInfo {
   zones: Zone[];
   handleZoneUpdate: () => void;
   handleZoneDragFinish: () => void;
+  handleZoneDelete: (input: Zone) => void;
   addZone: (x0: number, x1: number, category: Category) => void;
   activateTooling: () => void;
   triggerUpdate: number;
@@ -46,7 +47,6 @@ export const ZoneProvider = ({
 }) => {
   const zones = useRef<Zone[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
-
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
   // It is necessary for the context to trigger child refreshes
@@ -74,7 +74,7 @@ export const ZoneProvider = ({
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category
+    targetCategory: Category,
   ) => {
     zones.current = zones.current.map((zone) => {
       if (zone === props.zone || zone.selected) {
@@ -234,6 +234,7 @@ export const ZoneProvider = ({
         zones: zones.current,
         handleZoneUpdate,
         handleZoneDragFinish,
+        handleZoneDelete,
         addZone,
         activateTooling,
         triggerUpdate,

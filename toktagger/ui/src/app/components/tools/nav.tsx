@@ -32,6 +32,10 @@ async function getNextSample(project_id: string, current_sample_id: string) {
   const sampleResult = await fetch(NEXT_URL);
   if (sampleResult.status === 204) {
     return null; // No next sample available
+  } else if (!sampleResult.ok) {
+    throw new Error(
+      `Failed to fetch next sample: ${sampleResult.status} ${sampleResult.statusText}`,
+    );
   }
   const sample = await sampleResult.json();
   return sample;
@@ -45,6 +49,10 @@ async function getPreviousSample(
   const sampleResult = await fetch(PREVIOUS_URL);
   if (sampleResult.status === 204) {
     return null; // No previous sample available
+  } else if (!sampleResult.ok) {
+    throw new Error(
+      `Failed to fetch previous sample: ${sampleResult.status} ${sampleResult.statusText}`,
+    );
   }
   const sample = await sampleResult.json();
   return sample;
@@ -54,14 +62,14 @@ type ButtonInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
-  validateOnNavigate?: boolean;
+  saveOnNavigate?: boolean;
 };
 
 function NextButton({
   project_id,
   sample_id,
   annotations,
-  validateOnNavigate,
+  saveOnNavigate,
 }: ButtonInfo) {
   const navigate = useNavigate();
 
@@ -70,18 +78,25 @@ function NextButton({
       project_id,
       sample_id,
       annotations,
-      validateOnNavigate,
+      saveOnNavigate,
     );
-    const sample = await getNextSample(project_id, sample_id);
-    if (!sample) {
-      ToastQueue.negative("No more samples available!", {
+    try {
+      const sample = await getNextSample(project_id, sample_id);
+      if (!sample) {
+        ToastQueue.negative("No more samples available!", {
+          timeout: TOAST_TIMEOUT,
+        });
+        return;
+      }
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      ToastQueue.negative(`Failed to fetch next sample: ${message}`, {
         timeout: TOAST_TIMEOUT,
       });
-      return;
     }
-    const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-    navigate(NEXT_SAMPLE_URL);
-  }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
+  }, [project_id, sample_id, annotations, navigate, saveOnNavigate]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -98,7 +113,7 @@ function NextButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={moveNextShot}>
+      <ActionButton aria-label="Next Sample" onPress={moveNextShot}>
         <StepForward />
       </ActionButton>
     </View>
@@ -109,7 +124,7 @@ function PreviousButton({
   project_id,
   sample_id,
   annotations,
-  validateOnNavigate,
+  saveOnNavigate,
 }: ButtonInfo) {
   const navigate = useNavigate();
 
@@ -118,19 +133,26 @@ function PreviousButton({
       project_id,
       sample_id,
       annotations,
-      validateOnNavigate,
+      saveOnNavigate,
     );
 
-    const sample = await getPreviousSample(project_id, sample_id);
-    if (!sample) {
-      ToastQueue.negative("No earlier samples available!", {
+    try {
+      const sample = await getPreviousSample(project_id, sample_id);
+      if (!sample) {
+        ToastQueue.negative("No earlier samples available!", {
+          timeout: TOAST_TIMEOUT,
+        });
+        return;
+      }
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      navigate(NEXT_SAMPLE_URL);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      ToastQueue.negative(`Failed to fetch previous sample: ${message}`, {
         timeout: TOAST_TIMEOUT,
       });
-      return;
     }
-    const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-    navigate(NEXT_SAMPLE_URL);
-  }, [project_id, sample_id, annotations, navigate, validateOnNavigate]);
+  }, [project_id, sample_id, annotations, navigate, saveOnNavigate]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -147,7 +169,7 @@ function PreviousButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={movePreviousShot}>
+      <ActionButton aria-label="Previous Sample" onPress={movePreviousShot}>
         <StepBackward />
       </ActionButton>
     </View>
@@ -158,8 +180,7 @@ function SaveButton({
   project_id,
   sample_id,
   annotations,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  validateOnNavigate,
+  saveOnNavigate: _saveOnNavigate,
 }: ButtonInfo) {
   const handleClick = async () => {
     try {
@@ -177,7 +198,7 @@ function SaveButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={handleClick}>
+      <ActionButton aria-label="Save" onPress={handleClick}>
         <SaveFloppy />
         <Text>Save</Text>
       </ActionButton>
@@ -198,7 +219,7 @@ function ClearButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton onPress={handleClick}>
+      <ActionButton aria-label="Clear" onPress={handleClick}>
         <Delete />
         <Text>Clear</Text>
       </ActionButton>
@@ -210,14 +231,14 @@ type SaveInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
-  validateOnNavigate?: boolean;
+  saveOnNavigate?: boolean;
 };
 
 export function ShotSearch({
   project_id,
   sample_id,
   annotations,
-  validateOnNavigate,
+  saveOnNavigate,
 }: SaveInfo) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -235,7 +256,7 @@ export function ShotSearch({
             project_id,
             sample_id,
             annotations,
-            validateOnNavigate,
+            saveOnNavigate,
           );
           const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
           navigate(NEXT_SAMPLE_URL);
@@ -266,7 +287,7 @@ type NavigationBarInfo = {
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
   const { annotations, setAnnotations } = useSample();
-  const [validateOnNavigate, setValidateOnNavigate] = useState(true);
+  const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
     <Flex alignItems="center" direction="column" gap="size-100">
       <ButtonGroup>
@@ -279,33 +300,30 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          validateOnNavigate={validateOnNavigate}
+          saveOnNavigate={SaveOnNavigate}
         />
         <NextButton
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          validateOnNavigate={validateOnNavigate}
+          saveOnNavigate={SaveOnNavigate}
         />
         <ClearButton setAnnotations={setAnnotations} />
       </ButtonGroup>
       <TooltipTrigger delay={1000} placement="bottom">
-        <Checkbox
-          isSelected={validateOnNavigate}
-          onChange={setValidateOnNavigate}
-        >
-          Validate on Navigate
+        <Checkbox isSelected={SaveOnNavigate} onChange={setSaveOnNavigate}>
+          Save on Navigate
         </Checkbox>
         <Tooltip>
-          When enabled, annotations will be marked as validated when navigating
-          to another sample.
+          When enabled, annotations will be saved when navigating to another
+          sample.
         </Tooltip>
       </TooltipTrigger>
       <ShotSearch
         project_id={project_id}
         sample_id={sample_id}
         annotations={annotations}
-        validateOnNavigate={validateOnNavigate}
+        saveOnNavigate={SaveOnNavigate}
       />
     </Flex>
   );

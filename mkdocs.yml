@@ -3,6 +3,8 @@ theme:
   name: material
   palette:
     scheme: default
+  features:
+    - content.code.copy
 markdown_extensions: 
 - admonition
 - attr_list
@@ -18,9 +20,11 @@ nav:
   - Time Series Labelling: time_series.md
   - Spectrogram Labelling: spectrogram.md
   - Annotators: annotators.md
+  - Advanced:
+    - Custom Data Loaders: custom_dataloaders.md
+    - Custom Models: custom_models.md
   - Developer Documentation: 
     - Getting Started: dev/developer-setup.md
-    - Adding a Custom Data Loader: dev/custom-data-loaders.md
     - Unit Tests: dev/tests.md
     - Building the Docs: dev/building-the-docs.md
     - API Design: dev/API-Design.md

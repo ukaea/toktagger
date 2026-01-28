@@ -1,7 +1,7 @@
 import requests
 from toktagger.api.schemas.samples import SampleUpdateBatchItem
 from toktagger.api.schemas.models import ModelUpdate
-from toktagger.api.schemas.annotations import AnnotationBatchInputTypes
+from toktagger.api.schemas.annotations import AnnotationBatchTypes
 import typing
 import os
 
@@ -10,7 +10,7 @@ def send_updates(
     object_type: str,
     url: str,
     updates: ModelUpdate
-    | list[typing.Union[SampleUpdateBatchItem, AnnotationBatchInputTypes]],
+    | list[typing.Union[SampleUpdateBatchItem, AnnotationBatchTypes]],
 ) -> None:
     """Send a single item or batch of items from worker node to a provided URL.
 
@@ -77,7 +77,7 @@ def send_batch_samples(project_id: str, samples: list[SampleUpdateBatchItem]) ->
 
 
 def send_batch_annotations(
-    project_id: str, annotations: list[AnnotationBatchInputTypes]
+    project_id: str, annotations: list[AnnotationBatchTypes]
 ) -> None:
     """Send a batch of new annotations from worker node to server via API.
 

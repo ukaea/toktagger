@@ -2,13 +2,12 @@ from typing import Annotated, List, Optional, Union
 from enum import Enum
 from pydantic import Field, BaseModel, computed_field
 from toktagger.api.schemas import ConfiguredModel
-from toktagger.api.schemas.annotations import AnnotationTypes
+from toktagger.api.schemas.annotations import AnnotationBatchTypes
 
 
 class FileType(str, Enum):
     CSV = "csv"
     PARQUET = "parquet"
-    MP4 = "mp4"
     PNG = "png"
     JPG = "jpg"
 
@@ -47,7 +46,7 @@ class SampleBase(ConfiguredModel):
 
 
 class SampleIn(SampleBase):
-    annotations: Optional[List[AnnotationTypes]] = None
+    annotations: Optional[List[AnnotationBatchTypes]] = None
 
     @computed_field
     @property

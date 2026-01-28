@@ -15,6 +15,7 @@ interface VSpanContextInfo {
   vspans: VSpan[];
   handleVSpanUpdate: () => void;
   handleVSpanDragFinish: () => void;
+  handleVSpanDelete: (input: VSpan) => void;
   addVSpan: (x: number, category: Category) => void;
   activateTooling: () => void;
   triggerUpdate: number;
@@ -51,7 +52,6 @@ export const VSpanProvider = ({
 }) => {
   const spans = useRef<VSpan[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
-
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
   // It is necessary for the context to trigger child refreshes
@@ -69,7 +69,7 @@ export const VSpanProvider = ({
     onModifyVSpan?.(spans.current);
   };
 
-  const handleVSpanDelete = (input: unknown) => {
+  const handleVSpanDelete = (input: VSpan) => {
     spans.current = spans.current.filter((span) => span !== input);
     spans.current = spans.current.filter((span) => !span.selected);
     triggerVSpanUpdate();
@@ -78,7 +78,7 @@ export const VSpanProvider = ({
 
   const handleTypeSetting = (
     { props }: ItemParams,
-    targetCategory: Category
+    targetCategory: Category,
   ) => {
     spans.current = spans.current.map((span) => {
       if (span === props.vspan) {
@@ -216,6 +216,7 @@ export const VSpanProvider = ({
         vspans: spans.current,
         handleVSpanUpdate,
         handleVSpanDragFinish,
+        handleVSpanDelete,
         addVSpan,
         activateTooling,
         triggerUpdate,

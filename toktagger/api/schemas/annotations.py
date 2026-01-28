@@ -1,19 +1,21 @@
 from typing import Literal, Optional, Union
 
-from pydantic import Field, TypeAdapter, field_validator, model_validator
+from pydantic import Field, TypeAdapter, create_model, field_validator, model_validator
 
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotators import AnnotatorTypes
 
 
-class AnnotationIn(ConfiguredModel):
+class AnnotationBase(ConfiguredModel):
+    """Base class for annotation inputs, without IDs."""
+
     label: str
     created_by: str
     validated: bool = False
-    uncertainty: Optional[float] = None
     sample_id: Optional[str] = None
     project_id: Optional[str] = None
     signal_name: Optional[str] = None
+    uncertainty: Optional[float] = 1
 
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
@@ -37,26 +39,26 @@ class AnnotationIn(ConfiguredModel):
         return value
 
 
-class Annotation(AnnotationIn):
+class Annotation(AnnotationBase):
     id: str = Field(..., alias="_id")
 
 
-class ClassLabel(AnnotationIn):
+class ClassLabel(AnnotationBase):
     type: Literal["class_label"] = "class_label"
 
 
-class TimePoint(AnnotationIn):
+class TimePoint(AnnotationBase):
     type: Literal["time_point"] = "time_point"
     time: float
 
 
-class TimeRegion(AnnotationIn):
+class TimeRegion(AnnotationBase):
     type: Literal["time_region"] = "time_region"
     time_min: float
     time_max: float
 
 
-class BoundingBox(AnnotationIn):
+class BoundingBox(AnnotationBase):
     type: Literal["bounding_box"] = "bounding_box"
     x0: float
     y0: float
@@ -70,53 +72,72 @@ class VideoBoundingBox(BoundingBox):
     track_id: str
 
 
-class SpectrogramMask(AnnotationIn):
-    type: Literal["spectrogram_mask"] = "spectrogram_mask"
-    values: list[list[float]]
-
-
-class PolygonAnnotation(AnnotationIn):
+class PolygonAnnotation(AnnotationBase):
     type: Literal["polygon"] = "polygon"
     segmentation: list[list[float]]
     area: float
     bbox: list[float]  # [x, y, width, height]
 
 
-class AnnotationOut(AnnotationIn):
+class SpectrogramMask(AnnotationBase):
+    type: Literal["spectrogram_mask"] = "spectrogram_mask"
+    values: list[list[float]]
+
+
+class AnnotationBatch(AnnotationBase):
+    """Base class for batch annotation inputs, with or without IDs."""
+
     id: Optional[str] = Field(None, alias="_id")
     project_id: Optional[str] = None
     sample_id: Optional[str] = None
+    shot_id: Optional[int] = None
 
 
-class TimePointOut(TimePoint, AnnotationOut):
-    pass
+class AnnotationOut(AnnotationBatch):
+    """Base class for annotation outputs coming from the database, with IDs."""
+
+    id: str = Field(alias="_id")
+    project_id: str
+    sample_id: str
+    shot_id: int
 
 
-class TimeRegionOut(TimeRegion, AnnotationOut):
-    pass
+def create_out_model(base_class, name_suffix="Out"):
+    """Create an Out variant of an annotation class by combining it with AnnotationOut."""
+    class_name = f"{base_class.__name__}{name_suffix}"
+    return create_model(
+        class_name,
+        __base__=(base_class, AnnotationOut),
+    )
 
 
-class BoundingBoxOut(BoundingBox, AnnotationOut):
-    pass
+def create_batch_model(base_class, name_suffix="Batch"):
+    """Create a Batch variant of an annotation class by combining it with AnnotationBatch."""
+    class_name = f"{base_class.__name__}{name_suffix}"
+    return create_model(
+        class_name,
+        __base__=(base_class, AnnotationBatch),
+    )
 
 
-class VideoBoundingBoxOut(VideoBoundingBox, AnnotationOut):
-    pass
+# Generate Out classes using factory function
+TimePointOut = create_out_model(TimePoint)
+TimeRegionOut = create_out_model(TimeRegion)
+BoundingBoxOut = create_out_model(BoundingBox)
+VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
+SpectrogramMaskOut = create_out_model(SpectrogramMask)
+PolygonAnnotationOut = create_out_model(PolygonAnnotation)
+
+# Generate Batch classes using factory function
+TimePointBatch = create_batch_model(TimePoint)
+TimeRegionBatch = create_batch_model(TimeRegion)
+BoundingBoxBatch = create_batch_model(BoundingBox)
+VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
+SpectrogramMaskBatch = create_batch_model(SpectrogramMask)
+PolygonAnnotationBatch = create_batch_model(PolygonAnnotation)
 
 
-class SpectrogramMaskOut(SpectrogramMask, AnnotationOut):
-    pass
-
-
-class PolygonAnnotationOut(PolygonAnnotation, AnnotationOut):
-    pass
-
-
-class ModelAnnotation(AnnotationIn):
-    uncertainty: float
-    created_by: str
-
-
+# Union types for annotations
 AnnotationTypes = Union[
     TimePoint,
     TimeRegion,
@@ -135,8 +156,15 @@ AnnotationOutTypes = Union[
     PolygonAnnotationOut,
 ]
 
-AnnotationBatchInputTypes = AnnotationOutTypes
+AnnotationBatchTypes = Union[
+    TimePointBatch,
+    TimeRegionBatch,
+    BoundingBoxBatch,
+    VideoBoundingBoxBatch,
+    SpectrogramMaskBatch,
+]
 
+# TypeAdapters for annotations
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)
 AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)
-AnnotationBatchInputTypeAdapter = TypeAdapter(AnnotationBatchInputTypes)
+AnnotationBatchTypeAdapter = TypeAdapter(AnnotationBatchTypes)

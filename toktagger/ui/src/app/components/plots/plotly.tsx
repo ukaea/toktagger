@@ -10,6 +10,8 @@ import {
   PolygonAnnotation,
   PolygonAnnotationSchema,
   SpectrogramViewParams,
+  VSpan,
+  Zone,
 } from "@/types";
 import Plotly, {
   Config,
@@ -21,6 +23,8 @@ import Plotly, {
 } from "plotly.js-dist-min";
 import React, { useEffect, useRef, useState } from "react";
 import { Item, Submenu, ItemParams } from "react-contexify";
+import { useVSpanContext } from "../providers/vpsan-provider";
+import { useZoneContext } from "../providers/zone-provider";
 
 type InjectedProps = {
   plotId: string;
@@ -77,6 +81,8 @@ export const PlotlyWidget = ({
   children,
 }: PlotlyWidgetProps) => {
   const { viewParams, setAnnotations } = useSample();
+  const { vspans, handleVSpanDelete } = useVSpanContext();
+  const { zones, handleZoneDelete } = useZoneContext();
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
     null,
   );
@@ -539,6 +545,23 @@ export const PlotlyWidget = ({
         toolingCallbacks.move(x, y);
       }
     };
+
+    // Delete selected spans on Delete/Backspace keypress
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Delete" || e.key == "Backspace") {
+        e.preventDefault(); // Prevent default delete behavior
+
+        const selectedSpans = vspans.filter((span: VSpan) => span.selected);
+        for (const span of selectedSpans) {
+          handleVSpanDelete(span);
+        }
+
+        const selectedZones = zones.filter((zone: Zone) => zone.selected);
+        for (const zone of selectedZones) {
+          handleZoneDelete(zone);
+        }
+      }
+    });
 
     dragElements.forEach((dragElement) => {
       dragElement.addEventListener("contextmenu", contextHandler); // add context-menu listener

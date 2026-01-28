@@ -20,8 +20,22 @@ class QueryStrategy(ABC):
         samples: list[Sample],
         annotations: Optional[list[Annotation]] = None,
     ):
+        samples = sorted(samples, key=lambda s: s.shot_id)
         self.samples = samples
         self.annotations = annotations if annotations is not None else []
+
+    def _get_matching_sample(self, current_sample_id: str) -> int:
+        index = next(
+            (
+                i
+                for i, sample in enumerate(self.samples)
+                if sample.id == current_sample_id
+            ),
+            None,
+        )
+        if index is None:
+            raise RuntimeError("Current sample ID not found in the list of samples.")
+        return index
 
     def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
         """Get the next sample based on the current sample ID"""
@@ -51,34 +65,12 @@ class QueryStrategy(ABC):
 
         return self.samples[previous_index]
 
-    def _get_matching_sample(self, current_sample_id: Optional[str]) -> int:
-        index = next(
-            (
-                i
-                for i, sample in enumerate(self.samples)
-                if sample.id == current_sample_id
-            ),
-            None,
-        )
-        if index is None:
-            raise RuntimeError("Current sample ID not found in the list of samples.")
-        return index
-
 
 class SequentialQueryStrategy(QueryStrategy):
     """Sequential query strategy
 
     Chooses the next sample from the ordered list of samples
     """
-
-    def __init__(
-        self,
-        samples: list[Sample],
-        annotations: Optional[list[Annotation]] = None,
-    ):
-        samples = sorted(samples, key=lambda s: s.shot_id)
-        self.samples = samples
-        self.annotations = annotations if annotations is not None else []
 
 
 class RandomQueryStrategy(QueryStrategy):
@@ -93,10 +85,7 @@ class RandomQueryStrategy(QueryStrategy):
         annotations: Optional[list[Annotation]] = None,
         seed: int = 42,
     ):
-        # need to sort to ensure return order from database is consistent
-        samples = sorted(samples, key=lambda s: s.shot_id)
-        self.samples = samples
-        self.annotations = annotations if annotations is not None else []
+        super().__init__(samples, annotations)
         # simply shuffle the samples at the start
         # seed is used to ensure consistent shuffling between calls
         self._random_shuffle_samples(seed)
@@ -104,34 +93,6 @@ class RandomQueryStrategy(QueryStrategy):
     def _random_shuffle_samples(self, seed: int):
         rng = np.random.default_rng(seed=seed)
         self.samples = rng.permutation(self.samples)
-
-    def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
-        """Get the next sample based on the current sample ID"""
-
-        if current_sample_id is None:
-            if len(self.samples) == 0:
-                raise RuntimeError("No samples available!")
-            return self.samples[0]
-
-        index = self._get_matching_sample(current_sample_id)
-        next_index = index + 1
-        next_index = next_index % len(self.samples)
-
-        return self.samples[next_index]
-
-    def get_previous_sample(self, current_sample_id: Optional[str] = None) -> Sample:
-        """Get the previous sample based on the current sample ID"""
-
-        if current_sample_id is None:
-            if len(self.samples) == 0:
-                raise RuntimeError("No samples available!")
-            return self.samples[-1]
-
-        index = self._get_matching_sample(current_sample_id)
-        previous_index = index - 1
-        previous_index = previous_index % len(self.samples)
-
-        return self.samples[previous_index]
 
 
 class UncertaintyQueryStrategy(RandomQueryStrategy):
@@ -141,14 +102,20 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
     If no annotations exist, falls back to random sampling.
     """
 
-    def __init__(self, samples, annotations, seed: int = 42):
-        super().__init__(samples, annotations)
+    def __init__(
+        self,
+        samples: list[Sample],
+        annotations: Optional[list[Annotation]] = None,
+        seed: int = 42,
+    ):
+        super().__init__(samples, annotations, seed)
 
-        if len(self.annotations) != 0:
+        if self.annotations is not None and len(self.annotations) != 0:
             self.annotations = sorted(
                 self.annotations, key=lambda ann: ann.uncertainty, reverse=True
             )
             sample_ids = [annotation.sample_id for annotation in self.annotations]
+            sample_ids = np.unique(sample_ids).tolist()
             self.samples = sorted(
                 self.samples,
                 key=lambda sample: sample_ids.index(sample.id)

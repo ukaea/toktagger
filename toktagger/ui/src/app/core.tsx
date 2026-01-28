@@ -20,7 +20,7 @@ export const getURL = async (url: string) => {
 };
 
 export async function getSamplesSummary(
-  project_id: string
+  project_id: string,
 ): Promise<SamplesSummary> {
   const url = `${BACKEND_API_URL}/projects/${project_id}/samples/summary`;
   const response = await fetch(url);
@@ -34,7 +34,7 @@ export const getSamples = async (
   project_id: string,
   page: number,
   samplesPerPage: number,
-  shotId: string
+  shotId: string,
 ): Promise<Sample[]> => {
   const params = new URLSearchParams();
   params.append("sort_by", sortDescriptor.column.toString());
@@ -55,10 +55,10 @@ export const getSamples = async (
 
 export const getSample = async (
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Sample> => {
   const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
   );
   const data = await response.json();
   const sample = data as Sample;
@@ -69,7 +69,7 @@ export const getProjects = async (
   sortDescriptor: SortDescriptor,
   page: number,
   projectsPerPage: number,
-  name: string
+  name: string,
 ): Promise<Project[]> => {
   const params = new URLSearchParams();
   params.append("sort_by", sortDescriptor.column.toString());
@@ -81,7 +81,7 @@ export const getProjects = async (
   }
 
   const response = await fetch(
-    `${BACKEND_API_URL}/projects?${params.toString()}`
+    `${BACKEND_API_URL}/projects?${params.toString()}`,
   );
   const data = await response.json();
   const projects = data as Project[];
@@ -89,7 +89,7 @@ export const getProjects = async (
 };
 
 export const getProject = async (
-  project_id: string
+  project_id: string,
 ): Promise<Project | null> => {
   const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}`);
   const data = await response.json();
@@ -122,7 +122,7 @@ export async function getShotSample(project_id: string, shot_id: string) {
 
 export async function getAnnotationsForSample(
   project_id: string,
-  sample_id: string
+  sample_id: string,
 ): Promise<Annotation[]> {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL);
@@ -134,7 +134,7 @@ export async function getAnnotationsForSample(
 }
 
 export async function getAnnotations(
-  project_id: string
+  project_id: string,
 ): Promise<Annotation[]> {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL);
@@ -149,12 +149,15 @@ export async function saveSampleAnnotations(
   project_id: string,
   sample_id: string,
   annotations: Annotation[],
-  validateOnSave: boolean = true
+  saveOnNavigate: boolean = true,
 ) {
+  if (!saveOnNavigate) {
+    return;
+  }
   // user has validated the annotations, so set created_by to "manual"
   const updatedAnnotations = annotations.map((annotation: Annotation) => {
     annotation.created_by = "manual";
-    annotation.validated = validateOnSave ? true : annotation.validated;
+    annotation.validated = true;
     return annotation;
   });
 
@@ -174,7 +177,7 @@ export async function saveSampleAnnotations(
 
 export async function saveAnnotations(
   project_id: string,
-  annotations: Annotation[]
+  annotations: Annotation[],
 ) {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
   const response = await fetch(ANNOTATIONS_URL, {
@@ -191,18 +194,31 @@ export async function saveAnnotations(
 
 export function importJSONFile(
   project_id: string,
+  shot_id: number | null,
   file: File,
-  callback?: () => void
+  callback?: () => void,
+  errorCallback?: () => void,
 ): void {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
       const parsed = JSON.parse(e.target?.result as string);
       const annotations = parsed as Annotation[];
+
+      // If shot_id is provided, set it for all annotations that don't have it
+      if (shot_id !== null) {
+        annotations.map((annotation: Annotation) => {
+          if (!annotation.shot_id) {
+            annotation.shot_id = shot_id;
+          }
+          return annotation;
+        });
+      }
+
       await saveAnnotations(project_id, annotations);
       callback?.();
     } catch {
-      throw new Error(`Failed to parse JSON from file: ${file.name}`);
+      errorCallback?.();
     }
   };
   reader.readAsText(file);
@@ -219,15 +235,24 @@ export function saveJSONToFile(data: object, filename: string) {
   URL.revokeObjectURL(url); // Clean up
 }
 
-export const exportAnnotations = async (project: Project) => {
-  getAnnotations(project._id).then((annotations: Annotation[]) => {
-    saveJSONToFile(annotations, `${project.name}_annotations.json`);
-  });
+export const exportAnnotations = async (project: Project, sample?: Sample) => {
+  if (sample) {
+    // Export annotations for the current sample only
+    const annotations = await getAnnotationsForSample(project._id, sample._id);
+    saveJSONToFile(
+      annotations,
+      `${project.name}_${sample.shot_id}_annotations.json`,
+    );
+  } else {
+    // Export annotations for all samples in the project
+    const annotations = await getAnnotations(project._id);
+    saveJSONToFile(annotations, `${project.name}_all_annotations.json`);
+  }
 };
 
 export const startTraining = async (
   project_id: string,
-  selected_model: string
+  selected_model: string,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train`,
@@ -236,7 +261,7 @@ export const startTraining = async (
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
   return response;
 };
@@ -244,7 +269,7 @@ export const startTraining = async (
 export const stopTraining = async (
   project_id: string,
   selected_model: string,
-  version: number
+  version: number,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?version=${version}`,
@@ -253,7 +278,7 @@ export const stopTraining = async (
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
   return response;
 };
@@ -262,7 +287,7 @@ export const startPredictions = async (
   project_id: string,
   selected_model: string,
   version: number,
-  num_predictions: number
+  num_predictions: number,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}`,
@@ -271,7 +296,7 @@ export const startPredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
   return response;
 };
@@ -279,7 +304,7 @@ export const startPredictions = async (
 export const startSamplePredictions = async (
   project_id: string,
   sample_id: string,
-  selected_model: string
+  selected_model: string,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
@@ -288,7 +313,7 @@ export const startSamplePredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
   return response;
 };
@@ -297,7 +322,7 @@ export const getSamplePredictions = async (
   project_id: string,
   sample_id: string,
   selected_model: string,
-  task_id: string
+  task_id: string,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict/${task_id}`,
@@ -306,14 +331,14 @@ export const getSamplePredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
   return response;
 };
 
 export const getModels = async (project_id: string): Promise<Model[]> => {
   const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/models`
+    `${BACKEND_API_URL}/projects/${project_id}/models`,
   );
   const data = await response.json();
   const models = data as Model[];

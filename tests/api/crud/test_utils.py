@@ -335,14 +335,12 @@ async def test_import_annotations_project_not_found(db_client, setup_db):
 @pytest.mark.asyncio
 async def test_import_annotations_sample_not_found(db_client, setup_db):
     # Use invalid sample_id
-    invalid_sample_id = str(ObjectId())
+    shot_id = 10
     new_annotations = [
-        ANNOTATION_1.model_copy(update={"sample_id": invalid_sample_id}),
+        ANNOTATION_1.model_copy(update={"shot_id": shot_id}),
     ]
 
-    with pytest.raises(
-        HTTPException, match=f"Sample not found with ID {invalid_sample_id}"
-    ):
+    with pytest.raises(HTTPException, match=f"Sample not found with shot ID {shot_id}"):
         await utils.import_annotations(
             db_client,
             project_id=setup_db["project_id_1"],
@@ -412,9 +410,9 @@ async def test_get_model_doesnt_exist(db_client, setup_db):
 async def test_import_annotations_multiple_samples(db_client, setup_db):
     # Import annotations for multiple samples
     new_annotations = [
-        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
-        ANNOTATION_2.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
-        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_2"]}),
+        ANNOTATION_1.model_copy(update={"shot_id": 1}),
+        ANNOTATION_2.model_copy(update={"shot_id": 1}),
+        ANNOTATION_1.model_copy(update={"shot_id": 2}),
     ]
 
     await utils.import_annotations(

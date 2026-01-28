@@ -1,4 +1,5 @@
 #
+
 <figure markdown="span">
     ![TokTagger Logo](assets/logo_small.png){align=center}
   <figcaption>An open source, interactive annotation platform for Tokamak diagnostic data.</figcaption>

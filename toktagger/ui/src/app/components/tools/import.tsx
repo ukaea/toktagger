@@ -1,4 +1,5 @@
 import { importJSONFile } from "@/app/core";
+import { Project, Sample } from "@/types";
 import {
   Button,
   FileTrigger,
@@ -9,27 +10,38 @@ import {
 import Import from "@spectrum-icons/workflow/Import";
 
 export function ImportButton({
-  project_id,
+  project,
+  sample,
   refreshAnnotations,
 }: {
-  project_id: string;
+  project: Project;
+  sample?: Sample;
   refreshAnnotations?: () => void;
 }) {
+  const project_id = project._id;
+  const shot_id = sample?.shot_id || null;
+
+  if (!project_id) {
+    return null;
+  }
+
   const handleFileChange = (files: FileList | null) => {
     if (files && files.length > 0) {
       const file = files[0];
-      try {
-        importJSONFile(project_id, file, refreshAnnotations);
-        ToastQueue.positive(
-          `Annotations imported successfully from ${file.name}`,
-          { timeout: 5000 },
-        );
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        ToastQueue.negative(`Error importing annotations: ${errorMessage}`, {
-          timeout: 5000,
-        });
-      }
+      importJSONFile(
+        project_id,
+        shot_id,
+        file,
+        () => {
+          ToastQueue.positive(
+            `Annotations imported successfully from ${file.name}`,
+          );
+          refreshAnnotations?.();
+        },
+        () => {
+          ToastQueue.negative(`Error importing annotations from ${file.name}`);
+        },
+      );
     }
   };
 
@@ -39,7 +51,7 @@ export function ImportButton({
         onSelect={handleFileChange}
         acceptedFileTypes={["application/json"]}
       >
-        <Flex justifyContent="center" alignItems="center">
+        <Flex justifyContent="center" alignItems="end">
           <Button variant="primary">
             <Import />
             <Text>Import Annotations</Text>

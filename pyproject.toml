@@ -31,6 +31,7 @@ dependencies = [
   "pytest",
   "mkdocs",
   "mkdocs-material",
+  "torch",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
   "ruptures>=1.1.10",

@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Request, Path, Query
 from typing import Literal
+from fastapi import APIRouter, Request, Path, Query
 from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import SampleUpdate
 from toktagger.api.schemas.annotations import (
-    AnnotationBatchInputTypes,
+    AnnotationBatchTypes,
     AnnotationOutTypes,
 )
 
@@ -78,7 +78,7 @@ async def get_all_annotations(
 )
 async def import_annotations(
     request: Request,
-    annotations: list[AnnotationBatchInputTypes],
+    annotations: list[AnnotationBatchTypes],
     project_id: str = Path(
         description="The ID of the project to update annotations for"
     ),
@@ -187,7 +187,7 @@ async def get_annotations(
 )
 async def update_annotations(
     request: Request,
-    annotations: list[AnnotationBatchInputTypes],
+    annotations: list[AnnotationBatchTypes],
     project_id: str = Path(
         description="The ID of the project to update annotations for."
     ),
@@ -208,9 +208,13 @@ async def update_annotations(
 
     # Check project and sample exist
     await utils.get_project(db_client=db_client, project_id=project_id)
-    await utils.get_sample(
+    sample = await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
+
+    # Set shot_id for each annotation
+    for annotation in annotations:
+        annotation.shot_id = sample.shot_id
 
     # Delete previous annotations, if they exist, and add new ones
     result = await utils.update_annotations(

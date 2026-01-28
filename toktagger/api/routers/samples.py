@@ -230,7 +230,8 @@ async def get_next_sample(
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
     samples = await utils.get_samples(db_client, project_id)
-    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples)
+    annotations = await utils.get_annotations(db_client, project_id)
+    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
 
     try:
         sample = query_strategy.get_next_sample(current_sample_id)
@@ -263,7 +264,7 @@ async def get_previous_sample(
     ),
 ) -> Sample:
     """
-    Get the next sample to annotate for this project, according to query strategy.
+    Get the previous sample to annotate for this project, according to query strategy.
     ------------------------------------------------------------------------------
     """
     # Return the previous sample for human validation for this project
@@ -275,8 +276,8 @@ async def get_previous_sample(
     samples = await utils.get_samples(
         db_client, project_id, sort_by="shot_id", sort_direction="descending"
     )
-    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples)
-
+    annotations = await utils.get_annotations(db_client, project_id)
+    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
     try:
         sample = query_strategy.get_previous_sample(current_sample_id)
     except RuntimeError as e:
