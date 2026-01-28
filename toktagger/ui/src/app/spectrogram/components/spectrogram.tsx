@@ -34,6 +34,8 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { useCallback, useEffect, useState } from "react";
 import { Flex } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
+import { PolygonProvider } from "@/app/components/providers/polygon-provider";
+import { BoundingBoxProvider } from "@/app/components/providers/bounding-box-provider";
 
 const vspanCategories: Category[] = [
   { name: "Mode Locked", color: "rgb(255, 0, 0)" },
@@ -459,23 +461,27 @@ export const SpectrogramView = () => {
             initialData={vspans}
             onModifyVSpan={updateVSpans}
           >
-            <Flex direction="column" gap="size-200">
-              <PlotlyWidget
-                plotId="SpectrogramView"
-                plotConfig={{
-                  data: plotData,
-                  config: plotConfig,
-                  layout: plotLayout,
-                }}
-                rescaleOnZoom={false}
-                boundingBoxCategories={boundingBoxCategories}
-                polygonCategories={polygonCategories}
-              >
-                <Zones onUpdate={updateZones} />
-                <VSpans onUpdate={updateVSpans} />
-              </PlotlyWidget>
-              <AnnotationsTable />
-            </Flex>
+            <PolygonProvider categories={polygonCategories}>
+              <BoundingBoxProvider categories={boundingBoxCategories}>
+                <Flex direction="column" gap="size-200">
+                  <PlotlyWidget
+                    plotId="SpectrogramView"
+                    plotConfig={{
+                      data: plotData,
+                      config: plotConfig,
+                      layout: plotLayout,
+                    }}
+                    rescaleOnZoom={false}
+                    boundingBoxCategories={boundingBoxCategories}
+                    polygonCategories={polygonCategories}
+                  >
+                    <Zones onUpdate={updateZones} />
+                    <VSpans onUpdate={updateVSpans} />
+                  </PlotlyWidget>
+                  <AnnotationsTable />
+                </Flex>
+              </BoundingBoxProvider>
+            </PolygonProvider>
           </VSpanProvider>
         </ZoneProvider>
       </ContextMenuProvider>

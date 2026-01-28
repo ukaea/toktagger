@@ -13,19 +13,23 @@ import {
   Cell,
   Flex,
 } from "@adobe/react-spectrum";
-// import { ToolingControls } from "./toolingControls";
+import { usePolygonContext } from "../providers/polygon-provider";
+import { useBoundingBoxContext } from "../providers/bounding-box-provider";
 
 interface TableEntry {
   id: string;
   category: Category;
   x0: string;
   x1: string;
+  type: string;
   markerClass: string;
 }
 
 export const AnnotationsTable = () => {
   const { zones } = useZoneContext();
   const { vspans } = useVSpanContext();
+  const { polygons } = usePolygonContext();
+  const { boundingBoxes } = useBoundingBoxContext();
 
   const entries = useMemo<TableEntry[]>(() => {
     const entriesBuffer: TableEntry[] = [];
@@ -37,6 +41,7 @@ export const AnnotationsTable = () => {
         x0: zone.x0.toFixed(6),
         x1: zone.x1.toFixed(6),
         markerClass: "w-5 h-5 sm:rounded-lg",
+        type: "Time Region",
       });
     }
 
@@ -47,11 +52,38 @@ export const AnnotationsTable = () => {
         x0: vspan.x.toFixed(6),
         x1: "--",
         markerClass: "w-5 h-1.5 sm:rounded-lg",
+        type: "Time Point",
+      });
+    }
+
+    for (const [index, polygon] of polygons.entries()) {
+      const xValues = polygon.x;
+      const x0 = Math.min(...xValues);
+      const x1 = Math.max(...xValues);
+
+      entriesBuffer.push({
+        id: `polygon-${index}`,
+        category: polygon.category,
+        x0: x0.toFixed(6),
+        x1: x1.toFixed(6),
+        markerClass: "w-5 h-5 sm:rounded-lg",
+        type: "Polygon",
+      });
+    }
+
+    for (const [index, bbox] of boundingBoxes.entries()) {
+      entriesBuffer.push({
+        id: `bounding-box-${index}`,
+        category: bbox.category,
+        x0: bbox.x0.toFixed(6),
+        x1: bbox.x1.toFixed(6),
+        markerClass: "w-5 h-5 sm:rounded-lg",
+        type: "Bounding Box",
       });
     }
 
     return entriesBuffer;
-  }, [zones, vspans]);
+  }, [zones, vspans, polygons, boundingBoxes]);
 
   return (
     <div className="relative w-[70%] overflow-x-auto shadow-md sm:rounded-lg ml-auto mr-auto p-4">
@@ -93,9 +125,7 @@ export const AnnotationsTable = () => {
                   <span>{item.category.name}</span>
                 </div>
               </Cell>
-              <Cell>
-                {item.id.startsWith("zone") ? "Time Region" : "Time Point"}
-              </Cell>
+              <Cell>{item.type}</Cell>
               <Cell>{item.x0}</Cell>
               <Cell>{item.x1}</Cell>
             </Row>
