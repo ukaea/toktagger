@@ -22,7 +22,7 @@ import Plotly, {
   react,
   PlotRelayoutEvent,
 } from "plotly.js-dist-min";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Item, Submenu } from "react-contexify";
 import { useVSpanContext } from "../providers/vpsan-provider";
 import { useZoneContext } from "../providers/zone-provider";
@@ -59,6 +59,62 @@ type PlotlyWidgetProps = {
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
+};
+
+const shapeToAnnotation = (
+  shape: Plotly.Shape,
+  signalName: string | null,
+): Annotation => {
+  if (shape.type === "rect") {
+    const boundingBox: BoundingBoxAnnotation =
+      BoundingBoxAnnotationSchema.parse({
+        x0: shape.x0 as number,
+        y0: shape.y0 as number,
+        x1: shape.x1 as number,
+        y1: shape.y1 as number,
+        signal_name: signalName,
+        label: shape.meta?.label || "Unknown",
+        created_by: "manual",
+        type: "bounding_box",
+      });
+    return boundingBox;
+  } else if (shape.type === "path" && shape.path) {
+    // extract points from path string
+    const pathCommands = shape.path.match(/[ML][^MLZ]+/g); // match 'M x y' or 'L x y'
+    if (pathCommands) {
+      const xPoints: number[] = [];
+      const yPoints: number[] = [];
+      pathCommands.forEach((command) => {
+        const coords = command
+          .slice(1)
+          .trim()
+          .split(",")
+          .map((coord) => parseFloat(coord));
+        if (coords.length === 2) {
+          xPoints.push(coords[0]);
+          yPoints.push(coords[1]);
+        }
+      });
+      if (xPoints.length > 0 && yPoints.length > 0) {
+        const polygon: PolygonAnnotation = PolygonAnnotationSchema.parse({
+          segmentation: [xPoints.flatMap((x, i) => [x, yPoints[i]])],
+          area: 0, // area can be computed server-side if needed
+          bbox: [
+            arrayMin(xPoints),
+            arrayMin(yPoints),
+            arrayMax(xPoints) - arrayMin(xPoints),
+            arrayMax(yPoints) - arrayMin(yPoints),
+          ],
+          signal_name: signalName,
+          label: shape.meta?.label || "Unknown",
+          created_by: "manual",
+          type: "polygon",
+        });
+        return polygon;
+      }
+    }
+  }
+  throw new Error("Unsupported shape type for annotation conversion");
 };
 
 /**
@@ -124,6 +180,28 @@ export const PlotlyWidget = ({
   const triggerToolUpdate = () => {
     setUpdateTools((current) => (current + 1) % 100);
   };
+
+  const updateShapeAnnotations = useCallback(
+    (shapes: Plotly.Shape[]) => {
+      const signalName =
+        (viewParams as SpectrogramViewParams).signal_name || null;
+
+      const newAnnotations: Annotation[] = shapes.map((shape) => {
+        const annotation = shapeToAnnotation(shape, signalName);
+        return annotation;
+      });
+
+      // Update annotations with new polygons/bounding boxes
+      setAnnotations((previousAnnotations: Annotation[]) => {
+        const otherAnnotations = previousAnnotations.filter(
+          (annotation: Annotation) =>
+            annotation.type !== "polygon" && annotation.type !== "bounding_box",
+        );
+        return otherAnnotations.concat(newAnnotations);
+      });
+    },
+    [viewParams, setAnnotations],
+  );
   // Main plotly rendering
   useEffect(() => {
     const overplots: string[] = [];
@@ -235,79 +313,9 @@ export const PlotlyWidget = ({
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
       if ("shapes" in eventData) {
-        // shapes have been modified - update annotations
+        // shapes may have been modified - update annotations
         const shapes = eventData.shapes as Plotly.Shape[];
-        const newAnnotations: Annotation[] = [];
-        const signalName =
-          (viewParams as SpectrogramViewParams).signal_name || null;
-
-        shapes.forEach((shape) => {
-          if (shape.type === "rect") {
-            const boundingBox: BoundingBoxAnnotation =
-              BoundingBoxAnnotationSchema.parse({
-                x0: shape.x0 as number,
-                y0: shape.y0 as number,
-                x1: shape.x1 as number,
-                y1: shape.y1 as number,
-                signal_name: signalName,
-                label: shape.meta?.label || "Unknown",
-                created_by: "manual",
-                type: "bounding_box",
-              });
-
-            newAnnotations.push(boundingBox);
-          } else if (
-            shape.type === "path" &&
-            shape.path // ensure path exists
-          ) {
-            // extract points from path string
-            const pathCommands = shape.path.match(/[ML][^MLZ]+/g); // match 'M x y' or 'L x y'
-            if (pathCommands) {
-              const xPoints: number[] = [];
-              const yPoints: number[] = [];
-              pathCommands.forEach((command) => {
-                const coords = command
-                  .slice(1)
-                  .trim()
-                  .split(",")
-                  .map((coord) => parseFloat(coord));
-                if (coords.length === 2) {
-                  xPoints.push(coords[0]);
-                  yPoints.push(coords[1]);
-                }
-              });
-
-              if (xPoints.length > 0 && yPoints.length > 0) {
-                const polygon: PolygonAnnotation =
-                  PolygonAnnotationSchema.parse({
-                    segmentation: [xPoints.flatMap((x, i) => [x, yPoints[i]])],
-                    area: 0, // area can be computed server-side if needed
-                    bbox: [
-                      arrayMin(xPoints),
-                      arrayMin(yPoints),
-                      arrayMax(xPoints) - arrayMin(xPoints),
-                      arrayMax(yPoints) - arrayMin(yPoints),
-                    ],
-                    signal_name: signalName,
-                    label: shape.meta?.label || "Unknown",
-                    created_by: "manual",
-                    type: "polygon",
-                  });
-                newAnnotations.push(polygon);
-              }
-            }
-          }
-        });
-
-        // Update annotations with new polygons
-        setAnnotations((previousAnnotations: Annotation[]) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.type !== "polygon" &&
-              annotation.type !== "bounding_box",
-          );
-          return otherAnnotations.concat(newAnnotations);
-        });
+        updateShapeAnnotations(shapes);
       }
 
       if (rescaleOnZoom) {
@@ -380,6 +388,7 @@ export const PlotlyWidget = ({
     rescaleOnZoom,
     setAnnotations,
     viewParams,
+    updateShapeAnnotations,
   ]);
 
   useEffect(() => {
@@ -764,6 +773,32 @@ export const PlotlyWidget = ({
 
       const newLayout = { ...plot.layout, shapes: updatedShapes };
       Plotly.react(plot, plot.data, newLayout, plot.config);
+      updateShapeAnnotations(updatedShapes);
+    };
+
+    const handleShapeDelete = (shapeIndex: number) => {
+      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+
+      if (!plot) {
+        return;
+      }
+
+      const shapes = plot.layout.shapes as Plotly.Shape[] | null;
+      if (!shapes) {
+        return;
+      }
+
+      if (shapeIndex < 0 || shapeIndex >= shapes.length) {
+        return;
+      }
+
+      const updatedShapes = shapes.filter(
+        (_shape, index) => index !== shapeIndex,
+      );
+
+      const newLayout = { ...plot.layout, shapes: updatedShapes };
+      Plotly.react(plot, plot.data, newLayout, plot.config);
+      updateShapeAnnotations(updatedShapes);
     };
 
     const menuElement = (
@@ -787,8 +822,33 @@ export const PlotlyWidget = ({
       </Submenu>
     );
 
+    const deleteItem = (
+      <Item
+        id="delete-shape"
+        key="delete-shape"
+        onClick={({ props }) => {
+          const shapeIndex = props?.shapeIndex;
+          if (shapeIndex !== undefined) {
+            handleShapeDelete(shapeIndex);
+          }
+        }}
+        hidden={({ props }) => props?.shapeIndex === undefined}
+      >
+        Delete Shape
+      </Item>
+    );
+
     registerMenuItem("bbox", menuElement);
-  }, [registerMenuItem, plotId, boundingBoxCategories, polygonCategories]);
+    registerMenuItem("delete", deleteItem);
+  }, [
+    registerMenuItem,
+    plotId,
+    boundingBoxCategories,
+    polygonCategories,
+    setAnnotations,
+    viewParams,
+    updateShapeAnnotations,
+  ]);
 
   return (
     <div className="px-6 py-3 space-y-3 flex-col">
