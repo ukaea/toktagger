@@ -1,10 +1,11 @@
 import { useSample } from "@/app/contexts/SampleContext";
 import { createAnnotationToDisplayAnnotationFunc } from "@/app/utils";
 import { Annotation, Category, Polygon, PolygonSchema } from "@/types";
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 interface PolygonContextType {
   polygons: Polygon[];
+  categories: Category[];
 }
 
 const PolygonContext = createContext<PolygonContextType | undefined>(undefined);
@@ -19,14 +20,15 @@ export const PolygonProvider = ({
   children: React.ReactNode;
 }) => {
   const { annotations } = useSample();
-  const polygons = useRef<Polygon[]>(initialData ?? []);
+  const [polygons, setPolygons] = useState<Polygon[]>(initialData ?? []);
 
-  const categoryColors = categories.reduce<Record<string, string>>(
-    (acc, curr) => {
-      acc[curr.name] = curr.color;
-      return acc;
-    },
-    {},
+  const categoryColors = useMemo(
+    () =>
+      categories.reduce<Record<string, string>>((acc, curr) => {
+        acc[curr.name] = curr.color;
+        return acc;
+      }, {}),
+    [categories],
   );
 
   useEffect(() => {
@@ -40,13 +42,14 @@ export const PolygonProvider = ({
       .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
       .map((x) => PolygonSchema.parse(x));
 
-    polygons.current = newPolygons;
+    setPolygons(newPolygons);
   }, [annotations, categoryColors]);
 
   return (
     <PolygonContext.Provider
       value={{
-        polygons: polygons.current,
+        polygons: polygons,
+        categories: categories,
       }}
     >
       {children}

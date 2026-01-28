@@ -1,10 +1,23 @@
 "use client";
 
-import { Zone, Category, ToolingTypes } from "@/types";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { Zone, Category, ToolingTypes, Annotation, ZoneSchema } from "@/types";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 import "react-contexify/ReactContexify.css";
 import { useContextMenuProvider } from "./annotation-provider";
+import { useSample } from "@/app/contexts/SampleContext";
+import {
+  convertDisplayAnnotationToAnnotation,
+  createAnnotationToDisplayAnnotationFunc,
+} from "@/app/utils";
 
 interface ZoneContextInfo {
   zones: Zone[];
@@ -36,18 +49,59 @@ export const ZONE_MENU_ID = "zone-provider";
  */
 export const ZoneProvider = ({
   categories,
-  initialData,
   children,
   onModifyZone,
 }: {
   categories: Category[];
-  initialData?: Zone[];
   children: React.ReactNode;
   onModifyZone?: (newZones: Zone[]) => void;
 }) => {
   const zones = useRef<Zone[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
+
+  const { annotations, viewParams, setAnnotations } = useSample();
+
+  const categoryColors = useMemo(
+    () =>
+      categories.reduce<Record<string, string>>((acc, curr) => {
+        acc[curr.name] = curr.color;
+        return acc;
+      }, {}),
+    [categories],
+  );
+
+  const updateAnnotations = useCallback(() => {
+    if (!viewParams) return;
+    console.log(zones.current);
+
+    const timeRegions = zones.current.map((zone: Zone) =>
+      convertDisplayAnnotationToAnnotation(zone, viewParams),
+    );
+
+    setAnnotations((currentAnnotations: Annotation[]) => {
+      // Remove existing time_region annotations
+      const filteredAnnotations = currentAnnotations.filter(
+        (ann) => ann.type !== "time_region",
+      );
+      // Add updated timeRegions
+      return [...filteredAnnotations, ...timeRegions];
+    });
+  }, [setAnnotations, viewParams]);
+
+  useEffect(() => {
+    if (!annotations) return;
+
+    const convertAnnotationToDisplayAnnotation =
+      createAnnotationToDisplayAnnotationFunc(categoryColors);
+
+    const newZones = annotations
+      .filter((x: Annotation) => x.type === "time_region")
+      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
+      .map((x) => ZoneSchema.parse(x));
+
+    zones.current = newZones;
+  }, [annotations, categoryColors]);
 
   // It is necessary for the context to trigger child refreshes
   const triggerZoneUpdate = () => {
@@ -61,6 +115,7 @@ export const ZoneProvider = ({
 
   const handleZoneDragFinish = () => {
     triggerZoneUpdate();
+    updateAnnotations();
     onModifyZone?.(zones.current);
   };
 
@@ -69,6 +124,7 @@ export const ZoneProvider = ({
     zones.current = zones.current.filter((zone) => zone !== input);
     zones.current = zones.current.filter((zone) => !zone.selected);
     triggerZoneUpdate();
+    updateAnnotations();
     onModifyZone?.(zones.current);
   };
 
@@ -84,6 +140,7 @@ export const ZoneProvider = ({
       return zone;
     });
     triggerZoneUpdate();
+    updateAnnotations();
   };
 
   const addZone = (x0: number, x1: number, category: Category) => {
@@ -95,6 +152,7 @@ export const ZoneProvider = ({
       x1,
     });
     triggerZoneUpdate();
+    updateAnnotations();
     onModifyZone?.(zones.current);
   };
 
@@ -117,6 +175,7 @@ export const ZoneProvider = ({
         }
         triggerZoneUpdate();
         handleZoneDragFinish();
+        updateAnnotations();
       },
     });
   };
@@ -132,6 +191,7 @@ export const ZoneProvider = ({
         x1,
       });
       triggerZoneUpdate();
+      updateAnnotations();
       onModifyZone?.(zones.current);
     };
     /**
@@ -183,22 +243,7 @@ export const ZoneProvider = ({
       );
 
     registerMenuItem("zone", menuElement);
-  }, [categories, onModifyZone, registerMenuItem]);
-
-  // Initialisation of data - this should only run once
-  // Effect: run ONCE per mount to populate from initialData
-  // – overwrites instead of pushing; cleans on unmount
-  useEffect(() => {
-    if (!initialData) return;
-
-    zones.current = [...initialData];
-    triggerZoneUpdate();
-
-    /* remove stale copy when Strict-Mode unmounts the first render */
-    return () => {
-      zones.current = [];
-    };
-  }, [initialData]);
+  }, [categories, onModifyZone, registerMenuItem, updateAnnotations]);
 
   // Provides an array of the categories for the context menu
   const updateTypeItems = categories.map((category, index) => {

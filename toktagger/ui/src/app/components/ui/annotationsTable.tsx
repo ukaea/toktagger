@@ -1,9 +1,6 @@
 "use client";
 
-import { useVSpanContext } from "@/app/components/providers/vpsan-provider";
-import { useZoneContext } from "@/app/components/providers/zone-provider";
-import { Category } from "@/types";
-import { useMemo } from "react";
+import { JSX, useMemo } from "react";
 import {
   TableView,
   TableHeader,
@@ -13,125 +10,151 @@ import {
   Cell,
   Flex,
 } from "@adobe/react-spectrum";
-import { usePolygonContext } from "../providers/polygon-provider";
-import { useBoundingBoxContext } from "../providers/bounding-box-provider";
+import { useSample } from "@/app/contexts/SampleContext";
+import {
+  RectangleHorizontal,
+  RectangleVertical,
+  Pentagon,
+  Square,
+  Tag,
+  HelpCircle,
+} from "lucide-react";
+import {
+  Annotation,
+  BoundingBoxAnnotationSchema,
+  PolygonAnnotationSchema,
+  TimePointSchema,
+  TimeRegionSchema,
+} from "@/types";
 
 interface TableEntry {
   id: string;
-  category: Category;
-  x0: string;
-  x1: string;
   type: string;
-  markerClass: string;
+  label: string;
+  created_by: string;
+  icon: JSX.Element;
+  position: string;
 }
 
+const AnnotationTypeNames: Record<string, string> = {
+  time_point: "Time Point",
+  time_region: "Time Region",
+  polygon: "Polygon",
+  bounding_box: "Bounding Box",
+  class_label: "Class Label",
+};
+
+const getIconForType = (type: string) => {
+  const iconProps = { size: 20, strokeWidth: 2 };
+
+  switch (type) {
+    case "time_region":
+      return <RectangleHorizontal {...iconProps} className="text-blue-500" />;
+    case "time_point":
+      return <RectangleVertical {...iconProps} className="text-green-500" />;
+    case "polygon":
+      return <Pentagon {...iconProps} className="text-red-500" />;
+    case "bounding_box":
+      return <Square {...iconProps} className="text-yellow-500" />;
+    case "class_label":
+      return <Tag {...iconProps} className="text-purple-500" />;
+    default:
+      return <HelpCircle {...iconProps} className="text-gray-500" />;
+  }
+};
+
+const getPositionForAnnotation = (annotation: Annotation) => {
+  switch (annotation.type) {
+    case "time_region":
+      const timeRegion = TimeRegionSchema.parse(annotation);
+      return `Time Min: ${timeRegion.time_min.toFixed(2)}, Time Max: ${timeRegion.time_max.toFixed(2)}`;
+    case "time_point":
+      const timePoint = TimePointSchema.parse(annotation);
+      return `Time: ${timePoint.time.toFixed(2)}`;
+
+    case "bounding_box":
+      const boundingBox = BoundingBoxAnnotationSchema.parse(annotation);
+      return `x0: ${boundingBox.x0.toFixed(2)}, y0: ${boundingBox.y0.toFixed(2)}, x1: ${boundingBox.x1.toFixed(2)}, y1: ${boundingBox.y1.toFixed(2)}`;
+    case "polygon":
+      const polygon = PolygonAnnotationSchema.parse(annotation);
+      const segmentation = polygon.segmentation[0];
+      const xCoords = segmentation.filter((_, index) => index % 2 === 0);
+      const yCoords = segmentation.filter((_, index) => index % 2 === 1);
+      const centerX = xCoords.reduce((sum, x) => sum + x, 0) / xCoords.length;
+      const centerY = yCoords.reduce((sum, y) => sum + y, 0) / yCoords.length;
+      return `Center: (${centerX.toFixed(2)}, ${centerY.toFixed(2)})`;
+
+    default:
+      return "--";
+  }
+};
+
 export const AnnotationsTable = () => {
-  const { zones } = useZoneContext();
-  const { vspans } = useVSpanContext();
-  const { polygons } = usePolygonContext();
-  const { boundingBoxes } = useBoundingBoxContext();
+  const { annotations } = useSample();
 
   const entries = useMemo<TableEntry[]>(() => {
     const entriesBuffer: TableEntry[] = [];
 
-    for (const [index, zone] of zones.entries()) {
+    for (const [index, annotation] of annotations.entries()) {
       entriesBuffer.push({
-        id: `zone-${index}`,
-        category: zone.category,
-        x0: zone.x0.toFixed(6),
-        x1: zone.x1.toFixed(6),
-        markerClass: "w-5 h-5 sm:rounded-lg",
-        type: "Time Region",
-      });
-    }
-
-    for (const [index, vspan] of vspans.entries()) {
-      entriesBuffer.push({
-        id: `vspan-${index}`,
-        category: vspan.category,
-        x0: vspan.x.toFixed(6),
-        x1: "--",
-        markerClass: "w-5 h-1.5 sm:rounded-lg",
-        type: "Time Point",
-      });
-    }
-
-    for (const [index, polygon] of polygons.entries()) {
-      const xValues = polygon.x;
-      const x0 = Math.min(...xValues);
-      const x1 = Math.max(...xValues);
-
-      entriesBuffer.push({
-        id: `polygon-${index}`,
-        category: polygon.category,
-        x0: x0.toFixed(6),
-        x1: x1.toFixed(6),
-        markerClass: "w-5 h-5 sm:rounded-lg",
-        type: "Polygon",
-      });
-    }
-
-    for (const [index, bbox] of boundingBoxes.entries()) {
-      entriesBuffer.push({
-        id: `bounding-box-${index}`,
-        category: bbox.category,
-        x0: bbox.x0.toFixed(6),
-        x1: bbox.x1.toFixed(6),
-        markerClass: "w-5 h-5 sm:rounded-lg",
-        type: "Bounding Box",
+        id: `annotation-${index}`,
+        type: AnnotationTypeNames[annotation.type],
+        label: annotation.label,
+        created_by: annotation.created_by,
+        icon: getIconForType(annotation.type),
+        position: getPositionForAnnotation(annotation),
       });
     }
 
     return entriesBuffer;
-  }, [zones, vspans, polygons, boundingBoxes]);
+  }, [annotations]);
 
   return (
-    <div className="relative w-[70%] overflow-x-auto shadow-md sm:rounded-lg ml-auto mr-auto p-4">
+    <div className="relative w-[70%] shadow-md sm:rounded-lg ml-auto mr-auto p-4">
       {/* <ToolingControls /> */}
       <Flex justifyContent="center" marginBottom="size-200">
         <h1 className="text-xl font-bold">Annotations</h1>
       </Flex>
-      <TableView aria-label="Annotations table" width="100%" height="200px">
-        <TableHeader>
-          <Column key="category" width="40%">
-            Category
-          </Column>
-          <Column key="type" width="20%">
-            Type
-          </Column>
-          <Column key="x0" width="20%">
-            x0
-          </Column>
-          <Column key="x1" width="20%">
-            x1
-          </Column>
-        </TableHeader>
-        <TableBody items={entries}>
-          {(item) => (
-            <Row key={item.id}>
-              <Cell>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    cursor: "pointer",
-                  }}
-                >
+      <div className="overflow-x-auto">
+        <TableView aria-label="Annotations table" width="100%" height="200px">
+          <TableHeader>
+            <Column key="type" minWidth={150}>
+              Type
+            </Column>
+            <Column key="label" minWidth={120}>
+              Label
+            </Column>
+            <Column key="created_by" minWidth={120}>
+              Created By
+            </Column>
+            <Column key="position" minWidth={200}>
+              Position
+            </Column>
+          </TableHeader>
+          <TableBody items={entries}>
+            {(item) => (
+              <Row key={item.id}>
+                <Cell>
                   <div
-                    className={item.markerClass}
-                    style={{ background: item.category.color }}
-                  />
-                  <span>{item.category.name}</span>
-                </div>
-              </Cell>
-              <Cell>{item.type}</Cell>
-              <Cell>{item.x0}</Cell>
-              <Cell>{item.x1}</Cell>
-            </Row>
-          )}
-        </TableBody>
-      </TableView>
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {item.icon}
+                    <span>{item.type}</span>
+                  </div>
+                </Cell>
+                <Cell>{item.label}</Cell>
+                <Cell>{item.created_by}</Cell>
+                <Cell>{item.position}</Cell>
+              </Row>
+            )}
+          </TableBody>
+        </TableView>
+      </div>
     </div>
   );
 };

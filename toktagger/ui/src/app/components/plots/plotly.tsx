@@ -7,7 +7,6 @@ import {
   Annotation,
   BoundingBoxAnnotation,
   BoundingBoxAnnotationSchema,
-  Category,
   PolygonAnnotation,
   PolygonAnnotationSchema,
   SpectrogramViewParams,
@@ -26,6 +25,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Item, Submenu } from "react-contexify";
 import { useVSpanContext } from "../providers/vpsan-provider";
 import { useZoneContext } from "../providers/zone-provider";
+import { useBoundingBoxContext } from "../providers/bounding-box-provider";
+import { usePolygonContext } from "../providers/polygon-provider";
 
 type InjectedProps = {
   plotId: string;
@@ -54,8 +55,6 @@ type PlotlyWidgetProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
   rescaleOnZoom?: boolean;
-  boundingBoxCategories?: Category[];
-  polygonCategories?: Category[];
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -147,13 +146,14 @@ export const PlotlyWidget = ({
     },
   },
   rescaleOnZoom = true,
-  boundingBoxCategories,
-  polygonCategories,
   children,
 }: PlotlyWidgetProps) => {
   const { viewParams, setAnnotations } = useSample();
   const { vspans, handleVSpanDelete } = useVSpanContext();
   const { zones, handleZoneDelete } = useZoneContext();
+  const { categories: polygonCategories } = usePolygonContext();
+  const { categories: boundingBoxCategories } = useBoundingBoxContext();
+
   const [selectedXRange, setSelectedXRange] = useState<[number, number] | null>(
     null,
   );
@@ -162,12 +162,10 @@ export const PlotlyWidget = ({
   const isDraggingRef = useRef(false);
   const plotId = externalId || "time-series"; // Facilitate an external or default ID
 
-  const {
-    show: showContextMenu,
-    toolingCallbacks,
-    disableToolingInteraction,
-    registerMenuItem,
-  } = useContextMenuProvider();
+  const { toolingCallbacks, disableToolingInteraction } =
+    useContextMenuProvider();
+
+  const { show: showContextMenu, registerMenuItem } = useContextMenuProvider();
   const showContextMenuRef = useRef(showContextMenu);
 
   // Keep the ref in sync with the latest show function
@@ -201,6 +199,34 @@ export const PlotlyWidget = ({
       });
     },
     [viewParams, setAnnotations],
+  );
+
+  const handleShapeDelete = useCallback(
+    (shapeIndex: number) => {
+      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+
+      if (!plot) {
+        return;
+      }
+
+      const shapes = plot.layout.shapes as Plotly.Shape[] | null;
+      if (!shapes) {
+        return;
+      }
+
+      if (shapeIndex < 0 || shapeIndex >= shapes.length) {
+        return;
+      }
+
+      const updatedShapes = shapes.filter(
+        (_shape, index) => index !== shapeIndex,
+      );
+
+      const newLayout = { ...plot.layout, shapes: updatedShapes };
+      Plotly.react(plot, plot.data, newLayout, plot.config);
+      updateShapeAnnotations(updatedShapes);
+    },
+    [plotId, updateShapeAnnotations],
   );
   // Main plotly rendering
   useEffect(() => {
@@ -654,11 +680,8 @@ export const PlotlyWidget = ({
     zones,
   ]);
 
-  useEffect(() => {
-    const handleShapeContextMenuClick = (
-      id: string | undefined,
-      params: ShapeContextMenuProps,
-    ) => {
+  const handleShapeContextMenuClick = useCallback(
+    (id: string | undefined, params: ShapeContextMenuProps) => {
       if (!id) {
         return;
       }
@@ -685,126 +708,65 @@ export const PlotlyWidget = ({
 
       const shape = shapes[shapeIndex];
       if (shape.type === "rect") {
-        handleBoundingBoxClick(id, shape, params);
+        const category = boundingBoxCategories?.find((cat) => cat.name === id);
+        if (!category) return;
+
+        const updatedShapes = [...shapes];
+        updatedShapes[shapeIndex] = {
+          ...updatedShapes[shapeIndex],
+          meta: { label: category.name },
+          line: { color: "rgb(150, 150, 150)", width: 5 },
+          fillcolor: category.color
+            ?.replace("rgb(", "rgba(")
+            .replace(")", ", 0.5)"),
+        };
+
+        const newLayout = { ...plot.layout, shapes: updatedShapes };
+        Plotly.react(plot, plot.data, newLayout, plot.config);
+        updateShapeAnnotations(updatedShapes);
       } else if (shape.type === "path") {
-        handlePolygonClick(id, shape, params);
+        const category = polygonCategories?.find((cat) => cat.name === id);
+        if (!category) return;
+
+        const updatedShapes = [...shapes];
+        updatedShapes[shapeIndex] = {
+          ...updatedShapes[shapeIndex],
+          meta: { label: category.name },
+          line: { color: "rgb(150, 150, 150)", width: 5 },
+          fillcolor: category.color
+            ?.replace("rgb(", "rgba(")
+            .replace(")", ", 0.5)"),
+        };
+
+        const newLayout = { ...plot.layout, shapes: updatedShapes };
+        Plotly.react(plot, plot.data, newLayout, plot.config);
+        updateShapeAnnotations(updatedShapes);
       }
-    };
+    },
+    [plotId, boundingBoxCategories, polygonCategories, updateShapeAnnotations],
+  );
 
-    const handlePolygonClick = (
-      id: string,
-      shape: Plotly.Shape,
-      params: ShapeContextMenuProps,
-    ) => {
-      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+  useEffect(() => {
+    const deleteItem = (
+      <Item
+        id="delete-shape"
+        key="delete-shape"
+        onClick={({ props }) => {
+          const shapeIndex = props?.shapeIndex;
+          if (shapeIndex !== undefined) {
+            handleShapeDelete(shapeIndex);
+          }
+        }}
+        hidden={({ props }) => props?.shapeIndex === undefined}
+      >
+        Delete Shape
+      </Item>
+    );
 
-      if (!plot) {
-        return;
-      }
-
-      const shapes = plot.layout.shapes as Plotly.Shape[] | null;
-      if (!shapes) {
-        return;
-      }
-
-      const shapeIndex = params.shapeIndex;
-      if (
-        shapeIndex === undefined ||
-        shapeIndex < 0 ||
-        shapeIndex >= shapes.length
-      ) {
-        return;
-      }
-
-      const category = polygonCategories?.find((cat) => cat.name === id);
-
-      // Update the shape in the plot layout
-      const updatedShapes = [...shapes];
-      updatedShapes[shapeIndex] = {
-        ...updatedShapes[shapeIndex],
-        meta: { label: category?.name },
-        line: { color: "rgb(150, 150, 150)", width: 5 },
-        fillcolor: category?.color
-          ?.replace("rgb(", "rgba(")
-          .replace(")", ", 0.5)"),
-      };
-
-      const newLayout = { ...plot.layout, shapes: updatedShapes };
-      Plotly.react(plot, plot.data, newLayout, plot.config);
-    };
-
-    const handleBoundingBoxClick = (
-      id: string,
-      shape: Plotly.Shape,
-      params: ShapeContextMenuProps,
-    ) => {
-      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
-
-      if (!plot) {
-        return;
-      }
-
-      const shapes = plot.layout.shapes as Plotly.Shape[] | null;
-      if (!shapes) {
-        return;
-      }
-
-      const shapeIndex = params.shapeIndex;
-      if (
-        shapeIndex === undefined ||
-        shapeIndex < 0 ||
-        shapeIndex >= shapes.length
-      ) {
-        return;
-      }
-
-      const category = boundingBoxCategories?.find((cat) => cat.name === id);
-
-      // Update the shape in the plot layout
-      const updatedShapes = [...shapes];
-      updatedShapes[shapeIndex] = {
-        ...updatedShapes[shapeIndex],
-        meta: { label: category?.name },
-        line: { color: "rgb(150, 150, 150)", width: 5 },
-        fillcolor: category?.color
-          ?.replace("rgb(", "rgba(")
-          .replace(")", ", 0.5)"),
-      };
-
-      const newLayout = { ...plot.layout, shapes: updatedShapes };
-      Plotly.react(plot, plot.data, newLayout, plot.config);
-      updateShapeAnnotations(updatedShapes);
-    };
-
-    const handleShapeDelete = (shapeIndex: number) => {
-      const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
-
-      if (!plot) {
-        return;
-      }
-
-      const shapes = plot.layout.shapes as Plotly.Shape[] | null;
-      if (!shapes) {
-        return;
-      }
-
-      if (shapeIndex < 0 || shapeIndex >= shapes.length) {
-        return;
-      }
-
-      const updatedShapes = shapes.filter(
-        (_shape, index) => index !== shapeIndex,
-      );
-
-      const newLayout = { ...plot.layout, shapes: updatedShapes };
-      Plotly.react(plot, plot.data, newLayout, plot.config);
-      updateShapeAnnotations(updatedShapes);
-    };
-
-    const menuElement = (
+    const setTypeSubmenu = (
       <Submenu
-        id="bbox-submenu"
-        key="bbox-submenu"
+        id="set-shape-type"
+        key="set-shape-type"
         label="Set type"
         hidden={({ props }) => props?.shapeIndex === undefined}
       >
@@ -822,33 +784,10 @@ export const PlotlyWidget = ({
       </Submenu>
     );
 
-    const deleteItem = (
-      <Item
-        id="delete-shape"
-        key="delete-shape"
-        onClick={({ props }) => {
-          const shapeIndex = props?.shapeIndex;
-          if (shapeIndex !== undefined) {
-            handleShapeDelete(shapeIndex);
-          }
-        }}
-        hidden={({ props }) => props?.shapeIndex === undefined}
-      >
-        Delete Shape
-      </Item>
-    );
-
-    registerMenuItem("bbox", menuElement);
-    registerMenuItem("delete", deleteItem);
-  }, [
-    registerMenuItem,
-    plotId,
-    boundingBoxCategories,
-    polygonCategories,
-    setAnnotations,
-    viewParams,
-    updateShapeAnnotations,
-  ]);
+    registerMenuItem("shape-delete", deleteItem);
+    registerMenuItem("shape-type", setTypeSubmenu);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleShapeDelete, handleShapeContextMenuClick, boundingBoxCategories]);
 
   return (
     <div className="px-6 py-3 space-y-3 flex-col">
@@ -866,6 +805,39 @@ export const PlotlyWidget = ({
             : child;
         })}
       </>
+      {/* <Menu id={SHAPE_CONTEXT_MENU_ID}>
+        <Item
+          id="delete-shape"
+          key="delete-shape"
+          onClick={({ props }) => {
+            const shapeIndex = props?.shapeIndex;
+            if (shapeIndex !== undefined) {
+              handleShapeDelete(shapeIndex);
+            }
+          }}
+          hidden={({ props }) => props?.shapeIndex === undefined}
+        >
+          Delete Shape
+        </Item>
+        <Submenu
+          id="set-shape"
+          key="set-shape"
+          label="Set type"
+          hidden={({ props }) => props?.shapeIndex === undefined}
+        >
+          {boundingBoxCategories?.map((category) => (
+            <Item
+              id={category.name}
+              key={category.name}
+              onClick={({ id, props }) => {
+                handleShapeContextMenuClick(id, props);
+              }}
+            >
+              {category.name}
+            </Item>
+          ))}
+        </Submenu>
+      </Menu> */}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -46,9 +47,8 @@ export const ContextMenuProvider = ({
   menuId: string;
   children: React.ReactNode;
 }) => {
-  const [menuElements, setMenuElements] = useState<
-    Map<string, React.ReactNode>
-  >(new Map());
+  const menuElementsRef = useRef<Map<string, React.ReactNode>>(new Map());
+  const [, forceUpdate] = useState({});
   const { show } = useContextMenu({ id: menuId });
   const [toolingCallbacksState, setToolingCallbacksState] =
     useState<ToolingCallbacks | null>(null);
@@ -60,12 +60,8 @@ export const ContextMenuProvider = ({
   // Allows tools to register their own menu item in the general context menu
   const registerMenuItem = useCallback(
     (id: string, element: React.ReactNode) => {
-      setMenuElements((prev) => {
-        if (prev.has(id)) return prev;
-        const newMap = new Map(prev);
-        newMap.set(id, element);
-        return newMap;
-      });
+      menuElementsRef.current.set(id, element);
+      forceUpdate({}); // Trigger re-render
     },
     [],
   );
@@ -101,18 +97,21 @@ export const ContextMenuProvider = ({
     setToolingCallbacksState(callbacks);
   };
 
+  const contextValue = useMemo(
+    () => ({
+      setToolingCallbacks,
+      registerMenuItem,
+      show,
+      toolingCallbacks: toolingCallbacksState,
+      disableToolingInteraction,
+    }),
+    [show, toolingCallbacksState, disableToolingInteraction, registerMenuItem],
+  );
+
   return (
-    <ContextMenuContext.Provider
-      value={{
-        setToolingCallbacks,
-        registerMenuItem,
-        show,
-        toolingCallbacks: toolingCallbacksState,
-        disableToolingInteraction,
-      }}
-    >
+    <ContextMenuContext.Provider value={contextValue}>
       {children}
-      <Menu id={menuId}>{[...menuElements.values()]}</Menu>
+      <Menu id={menuId}>{[...menuElementsRef.current.values()]}</Menu>
     </ContextMenuContext.Provider>
   );
 };

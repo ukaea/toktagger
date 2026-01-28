@@ -1,15 +1,28 @@
 "use client";
 
-import { Category, ToolingTypes, VSpan } from "@/types";
+import {
+  Annotation,
+  Category,
+  ToolingTypes,
+  VSpan,
+  VSpanSchema,
+} from "@/types";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 import { useContextMenuProvider } from "./annotation-provider";
+import {
+  convertDisplayAnnotationToAnnotation,
+  createAnnotationToDisplayAnnotationFunc,
+} from "@/app/utils";
+import { useSample } from "@/app/contexts/SampleContext";
 
 interface VSpanContextInfo {
   vspans: VSpan[];
@@ -41,18 +54,59 @@ export const VSPAN_MENU_ID = "vspan-provider";
  */
 export const VSpanProvider = ({
   categories,
-  initialData,
   children,
   onModifyVSpan,
 }: {
   categories: Category[];
-  initialData?: VSpan[];
   children: React.ReactNode;
   onModifyVSpan?: (newVSpans: VSpan[]) => void;
 }) => {
   const spans = useRef<VSpan[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
+
+  const { annotations, viewParams, setAnnotations } = useSample();
+
+  const categoryColors = useMemo(
+    () =>
+      categories.reduce<Record<string, string>>((acc, curr) => {
+        acc[curr.name] = curr.color;
+        return acc;
+      }, {}),
+    [categories],
+  );
+
+  useEffect(() => {
+    if (!annotations) return;
+
+    const convertAnnotationToDisplayAnnotation =
+      createAnnotationToDisplayAnnotationFunc(categoryColors);
+
+    const newVSpans = annotations
+      .filter((x: Annotation) => x.type === "time_point")
+      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
+      .map((x) => VSpanSchema.parse(x));
+
+    spans.current = newVSpans;
+  }, [annotations, categoryColors]);
+
+  const updateAnnotations = useCallback(() => {
+    if (!viewParams) return;
+    console.log(spans.current);
+
+    const timeRegions = spans.current.map((span: VSpan) =>
+      convertDisplayAnnotationToAnnotation(span, viewParams),
+    );
+
+    setAnnotations((currentAnnotations: Annotation[]) => {
+      // Remove existing time_region annotations
+      const filteredAnnotations = currentAnnotations.filter(
+        (ann) => ann.type !== "time_point",
+      );
+      // Add updated timeRegions
+      return [...filteredAnnotations, ...timeRegions];
+    });
+  }, [setAnnotations, viewParams]);
 
   // It is necessary for the context to trigger child refreshes
   const triggerVSpanUpdate = () => {
@@ -66,6 +120,7 @@ export const VSpanProvider = ({
 
   // Provides a method for child components to update on drag finish
   const handleVSpanDragFinish = () => {
+    updateAnnotations();
     onModifyVSpan?.(spans.current);
   };
 
@@ -73,6 +128,7 @@ export const VSpanProvider = ({
     spans.current = spans.current.filter((span) => span !== input);
     spans.current = spans.current.filter((span) => !span.selected);
     triggerVSpanUpdate();
+    updateAnnotations();
     onModifyVSpan?.(spans.current);
   };
 
@@ -97,6 +153,7 @@ export const VSpanProvider = ({
       x,
     });
     triggerVSpanUpdate();
+    updateAnnotations();
     onModifyVSpan?.(spans.current);
   };
 
@@ -113,6 +170,7 @@ export const VSpanProvider = ({
       end: (x, _y) => {
         spans.current[spans.current.length - 1].x = x;
         triggerVSpanUpdate();
+        updateAnnotations();
         handleVSpanDragFinish();
       },
     });
@@ -128,6 +186,7 @@ export const VSpanProvider = ({
         x,
       });
       triggerVSpanUpdate();
+      updateAnnotations();
       onModifyVSpan?.(spans.current);
     };
 
@@ -169,20 +228,7 @@ export const VSpanProvider = ({
         </Submenu>
       );
     registerMenuItem("vspan", menuElement);
-  }, [categories, onModifyVSpan, registerMenuItem]);
-
-  // Initialisation of data - this should only run once
-  useEffect(() => {
-    if (!initialData) return;
-
-    spans.current = [...initialData];
-    triggerVSpanUpdate();
-
-    /* cleanup runs when the first (discarded) mount unmounts */
-    return () => {
-      spans.current = [];
-    };
-  }, [initialData]);
+  }, [categories, onModifyVSpan, registerMenuItem, updateAnnotations]);
 
   // Provides an array of the categories for the context menu
   const updateTypeItems = categories.map((category, index) => {

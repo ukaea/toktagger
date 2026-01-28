@@ -1,104 +1,22 @@
 "use client";
-import {
-  MultiVariateTimeSeriesData,
-  Zone,
-  Category,
-  DisplayAnnotation,
-  ZoneSchema,
-  TimeRegionSchema,
-  Annotation,
-  TimeSeriesData,
-  VSpanSchema,
-  VSpan,
-  TimePointSchema,
-} from "@/types";
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
-import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { MultiVariateTimeSeriesData, TimeSeriesData } from "@/types";
 import { PlotlyWidget } from "@/app/components/plots/plotly";
 import { Zones } from "@/app/components/tools/zones";
 import "react-contexify/ReactContexify.css";
 
-import {
-  arrayMax,
-  arrayMin,
-  createAnnotationToDisplayAnnotationFunc,
-  updateAnnotations,
-} from "@/app/utils";
+import { arrayMax, arrayMin } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
-import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { VSpans } from "@/app/components/tools/vspans";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 
-const zoneCategories: Category[] = [
-  { name: "ELM", color: "#FF5733" },
-  { name: "L-mode", color: "#33FF57" },
-  { name: "H-mode", color: "#3357FF" },
-  { name: "Thermal Quench", color: "#FF33A8" },
-  { name: "Current Quench", color: "#A833FF" },
-  { name: "Sawtooth", color: "#33FFF6" },
-  { name: "IRE", color: "#FFC733" },
-  { name: "Locked Mode", color: "#8DFF33" },
-  { name: "VDE", color: "#FF3380" },
-  { name: "Flat Top", color: "#33A8FF" },
-  { name: "Ramp Up", color: "#FF8D33" },
-  { name: "Ramp Down", color: "#3380FF" },
-  { name: "Unknown", color: "#B0B0B0" },
-];
-
-const vspanCategories: Category[] = [
-  { name: "Disruption", color: "#33FFAA" },
-  { name: "Thermal Quench", color: "#FFAA33" },
-  { name: "Current Quench", color: "#AA33FF" },
-  { name: "Control Loss", color: "#FF3333" },
-];
-
-const categoryColors = zoneCategories
-  .concat(vspanCategories)
-  .reduce<Record<string, string>>((acc, curr) => {
-    acc[curr.name] = curr.color;
-    return acc;
-  }, {});
-
 export const TimeSeriesView = () => {
-  const { data, annotations, setAnnotations } = useSample();
+  const { data } = useSample();
 
   const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [vspans, setVSpans] = useState<VSpan[]>([]);
 
   const viewData = data as MultiVariateTimeSeriesData | null;
-
-  useEffect(() => {
-    if (!annotations || !viewData) return;
-
-    const convertAnnotationToDisplayAnnotation =
-      createAnnotationToDisplayAnnotationFunc(categoryColors);
-
-    const displayAnnotations: DisplayAnnotation[] = annotations
-      .filter((x: Annotation) => x.type !== "class_label")
-      .map(convertAnnotationToDisplayAnnotation);
-
-    const newZones: Zone[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
-
-    const newVSpans: VSpan[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
-
-    setZones(newZones);
-    setVSpans(newVSpans);
-  }, [annotations, viewData]);
-
-  const updateVSpans = (newVSpans: Array<VSpan>) => {
-    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
-  };
-
-  const updateZones = (newZones: Array<Zone>) => {
-    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-  };
 
   useEffect(() => {
     if (!viewData) return;
@@ -206,33 +124,19 @@ export const TimeSeriesView = () => {
 
   return (
     <Flex justifyContent="center" alignItems="center">
-      <ContextMenuProvider menuId="time-series-menu">
-        <ZoneProvider
-          categories={zoneCategories}
-          initialData={zones}
-          onModifyZone={updateZones}
+      <Flex direction="column" gap="size-200">
+        <PlotlyWidget
+          plotId="TimesSeriesView"
+          plotConfig={{
+            data: plotData,
+            layout: plotLayout,
+          }}
         >
-          <VSpanProvider
-            categories={vspanCategories}
-            initialData={vspans}
-            onModifyVSpan={updateVSpans}
-          >
-            <Flex direction="column" gap="size-200">
-              <PlotlyWidget
-                plotId="TimesSeriesView"
-                plotConfig={{
-                  data: plotData,
-                  layout: plotLayout,
-                }}
-              >
-                <Zones onUpdate={updateZones} />
-                <VSpans onUpdate={updateVSpans} />
-              </PlotlyWidget>
-              <AnnotationsTable />
-            </Flex>
-          </VSpanProvider>
-        </ZoneProvider>
-      </ContextMenuProvider>
+          <Zones />
+          <VSpans />
+        </PlotlyWidget>
+        <AnnotationsTable />
+      </Flex>
     </Flex>
   );
 };

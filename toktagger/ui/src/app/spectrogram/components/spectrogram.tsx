@@ -2,131 +2,34 @@
 
 import {
   SpectrogramData,
-  Category,
-  Zone,
-  TimeRegionSchema,
-  TimePointSchema,
-  ZoneSchema,
-  VSpanSchema,
-  VSpan,
   Annotation,
   SpectrogramMaskSchema,
-  Polygon,
-  PolygonSchema,
   SpectrogramMask,
-  BoundingBoxSchema,
-  BoundingBox,
-  SpectrogramViewParams,
 } from "@/types";
 import { applyGlobalStyle, arrayMax, arrayMin } from "@/app/utils";
-import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
-import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { PlotlyWidget } from "@/app/components/plots/plotly";
 import { Zones } from "@/app/components/tools/zones";
 import { VSpans } from "@/app/components/tools/vspans";
 import * as d3 from "d3";
-import {
-  createAnnotationToDisplayAnnotationFunc,
-  updateAnnotations,
-} from "@/app/utils";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Flex } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
-import { PolygonProvider } from "@/app/components/providers/polygon-provider";
-import { BoundingBoxProvider } from "@/app/components/providers/bounding-box-provider";
-
-const vspanCategories: Category[] = [
-  { name: "Mode Locked", color: "rgb(255, 0, 0)" },
-];
-
-const zoneCategories: Category[] = [
-  { name: "NTM", color: "rgb(0, 255, 255)" },
-  { name: "LLM", color: "rgb(200, 100, 100)" },
-  { name: "Sawteeth", color: "rgb(100, 200, 100)" },
-];
-
-const boundingBoxCategories: Category[] = [
-  { name: "Unknown", color: "rgb(150, 150, 150)" },
-  { name: "NTM", color: "rgb(0, 255, 255)" },
-  { name: "LLM", color: "rgb(200, 100, 100)" },
-  { name: "Sawteeth", color: "rgb(100, 200, 100)" },
-];
-
-const polygonCategories: Category[] = boundingBoxCategories;
-
-const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
-  (acc, curr) => {
-    acc[curr.name] = curr.color;
-    return acc;
-  },
-  {},
-);
-
-const vspanCategoryColors = vspanCategories.reduce<Record<string, string>>(
-  (acc, curr) => {
-    acc[curr.name] = curr.color;
-    return acc;
-  },
-  {},
-);
-
-const boundingBoxCategoryColors = boundingBoxCategories.reduce<
-  Record<string, string>
->((acc, curr) => {
-  acc[curr.name] = curr.color;
-  return acc;
-}, {});
-
-const colorMapping = {
-  ...vspanCategoryColors,
-  ...zoneCategoryColors,
-  ...boundingBoxCategoryColors,
-};
+import { useBoundingBoxContext } from "@/app/components/providers/bounding-box-provider";
+import { usePolygonContext } from "@/app/components/providers/polygon-provider";
 
 export const SpectrogramView = () => {
-  const { data, annotations, plotProps, viewParams, setAnnotations } =
-    useSample();
+  const { data, annotations, plotProps } = useSample();
 
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [vspans, setVSpans] = useState<VSpan[]>([]);
-  const [mask, setMask] = useState<SpectrogramMask | null>(null);
+  const { polygons } = usePolygonContext();
+  const { boundingBoxes } = useBoundingBoxContext();
   const [shapes, setShapes] = useState<Partial<Plotly.Shape>[]>([]);
+  const [mask, setMask] = useState<SpectrogramMask | null>(null);
 
   const viewData: SpectrogramData | null = data as SpectrogramData | null;
 
-  const signalName = (viewParams as SpectrogramViewParams)?.signal_name || null;
-
   useEffect(() => {
     if (!annotations || !viewData) return;
-
-    const convertAnnotationToDisplayAnnotation =
-      createAnnotationToDisplayAnnotationFunc(colorMapping);
-
-    const filteredAnnotatons: Annotation[] = annotations
-      .filter((x: Annotation) => x.type !== "class_label")
-      .filter((x: Annotation) => x.signal_name === signalName);
-
-    const zones: Zone[] = filteredAnnotatons
-      .filter((x: Annotation) => x.type === "zone")
-      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
-      .map((x) => ZoneSchema.parse(x));
-
-    const vspans: VSpan[] = filteredAnnotatons
-      .filter((x: Annotation) => x.type === "vspan")
-      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
-      .map((x) => VSpanSchema.parse(x));
-
-    const polygons: Polygon[] = filteredAnnotatons
-      .filter((x: Annotation) => x.type === "polygon")
-      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
-      .map((x) => PolygonSchema.parse(x));
-
-    const boundingBoxes: BoundingBox[] = filteredAnnotatons
-      .filter((x: Annotation) => x.type === "bounding_box")
-      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
-      .map((x) => BoundingBoxSchema.parse(x));
 
     const paths = polygons.map((polygon) => {
       let path = `M ${polygon.x[0]},${polygon.y[0]}`;
@@ -183,27 +86,9 @@ export const SpectrogramView = () => {
         ? SpectrogramMaskSchema.parse(maskAnnotations[0])
         : null;
 
-    setZones(zones);
-    setVSpans(vspans);
     setMask(newMask);
     setShapes(newShapes);
-  }, [annotations, viewData, signalName, viewParams]);
-
-  const updateVSpans = useCallback(
-    (newVSpans: Array<VSpan>) => {
-      if (!viewParams) return;
-      updateAnnotations(setAnnotations, newVSpans, TimePointSchema, viewParams);
-    },
-    [setAnnotations, viewParams],
-  );
-
-  const updateZones = useCallback(
-    (newZones: Array<Zone>) => {
-      if (!viewParams) return;
-      updateAnnotations(setAnnotations, newZones, TimeRegionSchema, viewParams);
-    },
-    [setAnnotations, viewParams],
-  );
+  }, [annotations, viewData, polygons, boundingBoxes]);
 
   if (!viewData) {
     return null;
@@ -450,41 +335,21 @@ export const SpectrogramView = () => {
 
   return (
     <Flex justifyContent="center" alignItems="center">
-      <ContextMenuProvider menuId="spectrogram-menu">
-        <ZoneProvider
-          categories={zoneCategories}
-          initialData={zones}
-          onModifyZone={updateZones}
+      <Flex direction="column" gap="size-200">
+        <PlotlyWidget
+          plotId="SpectrogramView"
+          plotConfig={{
+            data: plotData,
+            config: plotConfig,
+            layout: plotLayout,
+          }}
+          rescaleOnZoom={false}
         >
-          <VSpanProvider
-            categories={vspanCategories}
-            initialData={vspans}
-            onModifyVSpan={updateVSpans}
-          >
-            <PolygonProvider categories={polygonCategories}>
-              <BoundingBoxProvider categories={boundingBoxCategories}>
-                <Flex direction="column" gap="size-200">
-                  <PlotlyWidget
-                    plotId="SpectrogramView"
-                    plotConfig={{
-                      data: plotData,
-                      config: plotConfig,
-                      layout: plotLayout,
-                    }}
-                    rescaleOnZoom={false}
-                    boundingBoxCategories={boundingBoxCategories}
-                    polygonCategories={polygonCategories}
-                  >
-                    <Zones onUpdate={updateZones} />
-                    <VSpans onUpdate={updateVSpans} />
-                  </PlotlyWidget>
-                  <AnnotationsTable />
-                </Flex>
-              </BoundingBoxProvider>
-            </PolygonProvider>
-          </VSpanProvider>
-        </ZoneProvider>
-      </ContextMenuProvider>
+          <Zones />
+          <VSpans />
+        </PlotlyWidget>
+        <AnnotationsTable />
+      </Flex>
     </Flex>
   );
 };

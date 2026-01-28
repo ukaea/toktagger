@@ -7,7 +7,7 @@ import {
   ToastContainer,
   Flex,
 } from "@adobe/react-spectrum";
-import { Project, Sample, TaskType } from "@/types";
+import { Category, Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import ToolBar from "@/app/components/tools/toolbar";
@@ -18,6 +18,11 @@ import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
 import React from "react";
+import { BoundingBoxProvider } from "@/app/components/providers/bounding-box-provider";
+import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
+import { ZoneProvider } from "@/app/components/providers/zone-provider";
+import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
+import { PolygonProvider } from "@/app/components/providers/polygon-provider";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -59,9 +64,75 @@ const SampleView = () => {
   }
 
   if (project.task == TaskType.TimeSeries) {
-    return <TimeSeriesView />;
+    const zoneCategories: Category[] = [
+      { name: "ELM", color: "#FF5733" },
+      { name: "L-mode", color: "#33FF57" },
+      { name: "H-mode", color: "#3357FF" },
+      { name: "Thermal Quench", color: "#FF33A8" },
+      { name: "Current Quench", color: "#A833FF" },
+      { name: "Sawtooth", color: "#33FFF6" },
+      { name: "IRE", color: "#FFC733" },
+      { name: "Locked Mode", color: "#8DFF33" },
+      { name: "VDE", color: "#FF3380" },
+      { name: "Flat Top", color: "#33A8FF" },
+      { name: "Ramp Up", color: "#FF8D33" },
+      { name: "Ramp Down", color: "#3380FF" },
+      { name: "Unknown", color: "#B0B0B0" },
+    ];
+
+    const vspanCategories: Category[] = [
+      { name: "Disruption", color: "#33FFAA" },
+      { name: "Thermal Quench", color: "#FFAA33" },
+      { name: "Current Quench", color: "#AA33FF" },
+      { name: "Control Loss", color: "#FF3333" },
+    ];
+
+    return (
+      <ContextMenuProvider menuId="time-series-menu">
+        <ZoneProvider categories={zoneCategories}>
+          <VSpanProvider categories={vspanCategories}>
+            <PolygonProvider categories={[]}>
+              <BoundingBoxProvider categories={[]}>
+                <TimeSeriesView />
+              </BoundingBoxProvider>
+            </PolygonProvider>
+          </VSpanProvider>
+        </ZoneProvider>
+      </ContextMenuProvider>
+    );
   } else if (project.task == TaskType.Spectrogram) {
-    return <SpectrogramView />;
+    const vspanCategories: Category[] = [
+      { name: "Mode Locked", color: "rgb(255, 0, 0)" },
+    ];
+
+    const zoneCategories: Category[] = [
+      { name: "NTM", color: "rgb(0, 255, 255)" },
+      { name: "LLM", color: "rgb(200, 100, 100)" },
+      { name: "Sawteeth", color: "rgb(100, 200, 100)" },
+    ];
+
+    const boundingBoxCategories: Category[] = [
+      { name: "Unknown", color: "rgb(150, 150, 150)" },
+      { name: "NTM", color: "rgb(0, 255, 255)" },
+      { name: "LLM", color: "rgb(200, 100, 100)" },
+      { name: "Sawteeth", color: "rgb(100, 200, 100)" },
+    ];
+
+    const polygonCategories: Category[] = boundingBoxCategories;
+
+    return (
+      <ContextMenuProvider menuId="spectrogram-menu">
+        <ZoneProvider categories={zoneCategories}>
+          <VSpanProvider categories={vspanCategories}>
+            <BoundingBoxProvider categories={boundingBoxCategories}>
+              <PolygonProvider categories={polygonCategories}>
+                <SpectrogramView />
+              </PolygonProvider>
+            </BoundingBoxProvider>
+          </VSpanProvider>
+        </ZoneProvider>
+      </ContextMenuProvider>
+    );
   }
 };
 
