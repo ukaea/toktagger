@@ -32,7 +32,7 @@ export function OutlierDetectionTool({
 
   const dataValues = useMemo(
     () => MultiVariateTimeSeriesDataSchema.safeParse(data).data?.values || {},
-    [data]
+    [data],
   );
 
   const [signalName, setSignalName] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export function OutlierDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
+              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION,
           );
           return otherAnnotations;
         });
@@ -74,14 +74,14 @@ export function OutlierDetectionTool({
             },
             data_params: dataParams,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION
+            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION,
         );
         return otherAnnotations.concat(payload);
       });

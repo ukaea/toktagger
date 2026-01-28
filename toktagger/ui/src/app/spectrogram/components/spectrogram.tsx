@@ -6,7 +6,6 @@ import {
   Zone,
   TimeRegionSchema,
   TimePointSchema,
-  DisplayAnnotation,
   ZoneSchema,
   VSpanSchema,
   VSpan,
@@ -34,6 +33,7 @@ import {
 import { useSample } from "@/app/contexts/SampleContext";
 import { useCallback, useEffect, useState } from "react";
 import { Flex } from "@adobe/react-spectrum";
+import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 
 const vspanCategories: Category[] = [
   { name: "Mode Locked", color: "rgb(255, 0, 0)" },
@@ -45,6 +45,15 @@ const zoneCategories: Category[] = [
   { name: "Sawteeth", color: "rgb(100, 200, 100)" },
 ];
 
+const boundingBoxCategories: Category[] = [
+  { name: "Unknown", color: "rgb(150, 150, 150)" },
+  { name: "NTM", color: "rgb(0, 255, 255)" },
+  { name: "LLM", color: "rgb(200, 100, 100)" },
+  { name: "Sawteeth", color: "rgb(100, 200, 100)" },
+];
+
+const polygonCategories: Category[] = boundingBoxCategories;
+
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
   (acc, curr) => {
     acc[curr.name] = curr.color;
@@ -53,7 +62,7 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
   {},
 );
 
-const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
+const vspanCategoryColors = vspanCategories.reduce<Record<string, string>>(
   (acc, curr) => {
     acc[curr.name] = curr.color;
     return acc;
@@ -61,7 +70,18 @@ const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
   {},
 );
 
-const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
+const boundingBoxCategoryColors = boundingBoxCategories.reduce<
+  Record<string, string>
+>((acc, curr) => {
+  acc[curr.name] = curr.color;
+  return acc;
+}, {});
+
+const colorMapping = {
+  ...vspanCategoryColors,
+  ...zoneCategoryColors,
+  ...boundingBoxCategoryColors,
+};
 
 export const SpectrogramView = () => {
   const { data, annotations, plotProps, viewParams, setAnnotations } =
@@ -82,26 +102,29 @@ export const SpectrogramView = () => {
     const convertAnnotationToDisplayAnnotation =
       createAnnotationToDisplayAnnotationFunc(colorMapping);
 
-    const displayAnnotations: DisplayAnnotation[] = annotations
+    const filteredAnnotatons: Annotation[] = annotations
       .filter((x: Annotation) => x.type !== "class_label")
-      .filter((x: Annotation) => x.signal_name === signalName)
-      .map(convertAnnotationToDisplayAnnotation);
+      .filter((x: Annotation) => x.signal_name === signalName);
 
-    const zones: Zone[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
+    const zones: Zone[] = filteredAnnotatons
+      .filter((x: Annotation) => x.type === "zone")
+      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
+      .map((x) => ZoneSchema.parse(x));
 
-    const vspans: VSpan[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
+    const vspans: VSpan[] = filteredAnnotatons
+      .filter((x: Annotation) => x.type === "vspan")
+      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
+      .map((x) => VSpanSchema.parse(x));
 
-    const polygons: Polygon[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => PolygonSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => PolygonSchema.parse(x));
+    const polygons: Polygon[] = filteredAnnotatons
+      .filter((x: Annotation) => x.type === "polygon")
+      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
+      .map((x) => PolygonSchema.parse(x));
 
-    const boundingBoxes: BoundingBox[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => BoundingBoxSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => BoundingBoxSchema.parse(x));
+    const boundingBoxes: BoundingBox[] = filteredAnnotatons
+      .filter((x: Annotation) => x.type === "bounding_box")
+      .map((x: Annotation) => convertAnnotationToDisplayAnnotation(x))
+      .map((x) => BoundingBoxSchema.parse(x));
 
     const paths = polygons.map((polygon) => {
       let path = `M ${polygon.x[0]},${polygon.y[0]}`;
@@ -117,23 +140,33 @@ export const SpectrogramView = () => {
       path: path,
       xref: "x",
       yref: "y2",
-      line: { color: "rgba(255, 0, 0, 0.9)", width: 5 },
-      fillcolor: "rgba(255, 0, 0, 0.1)",
+      line: { color: "rgba(150, 150, 150, 1.0)", width: 5 },
+      fillcolor: "rgba(150, 150, 150, 0.5)",
       editable: true,
       layer: "above",
     }));
 
+    polygons.forEach((polygon, index) => {
+      newShapes[index].meta = { label: polygon.category.name };
+      newShapes[index].fillcolor = polygon.category.color
+        .replace("rgb(", "rgba(")
+        .replace(")", ", 0.5)");
+    });
+
     boundingBoxes.forEach((bbox) => {
       newShapes.push({
         type: "rect",
+        meta: { label: bbox.category.name },
         xref: "x",
         yref: "y2",
         x0: bbox.x0,
         y0: bbox.y0,
         x1: bbox.x1,
         y1: bbox.y1,
-        line: { color: "rgba(255, 0, 0, 0.9)", width: 5 },
-        fillcolor: "rgba( 255, 0, 0, 0.1)",
+        line: { color: "rgb(150, 150, 150)", width: 5 },
+        fillcolor: bbox.category.color
+          .replace("rgb(", "rgba(")
+          .replace(")", ", 0.5)"),
         editable: true,
         layer: "above",
       });
@@ -313,9 +346,9 @@ export const SpectrogramView = () => {
   let plotLayout: Partial<Plotly.Layout> = {
     shapes: shapes,
     newshape: {
-      fillcolor: "rgba(255, 0, 0, 0.3)", // fill color
+      fillcolor: "rgba(150, 150, 150, 0.5)", // fill color
       line: {
-        color: "red", // line color
+        color: "rgba(150, 150, 150, 1)", // line color
         width: 5,
       },
     },
@@ -426,18 +459,23 @@ export const SpectrogramView = () => {
             initialData={vspans}
             onModifyVSpan={updateVSpans}
           >
-            <PlotlyWidget
-              plotId="SpectrogramView"
-              plotConfig={{
-                data: plotData,
-                config: plotConfig,
-                layout: plotLayout,
-              }}
-              rescaleOnZoom={false}
-            >
-              <Zones onUpdate={updateZones} />
-              <VSpans onUpdate={updateVSpans} />
-            </PlotlyWidget>
+            <Flex direction="column" gap="size-200">
+              <PlotlyWidget
+                plotId="SpectrogramView"
+                plotConfig={{
+                  data: plotData,
+                  config: plotConfig,
+                  layout: plotLayout,
+                }}
+                rescaleOnZoom={false}
+                boundingBoxCategories={boundingBoxCategories}
+                polygonCategories={polygonCategories}
+              >
+                <Zones onUpdate={updateZones} />
+                <VSpans onUpdate={updateVSpans} />
+              </PlotlyWidget>
+              <AnnotationsTable />
+            </Flex>
           </VSpanProvider>
         </ZoneProvider>
       </ContextMenuProvider>

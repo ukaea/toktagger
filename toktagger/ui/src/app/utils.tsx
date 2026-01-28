@@ -10,16 +10,19 @@ import {
   Zone,
   TimePoint,
   TimeRegion,
-  SpectrogramMaskSchema,
-  SpectrogramMask,
   PolygonAnnotationSchema,
   Polygon,
-  BoundingBoxSchema,
   Sample,
   TimeSeriesFileDataSchema,
   ShotDataSchema,
   ViewParams,
   SpectrogramViewParams,
+  BoundingBoxAnnotationSchema,
+  BoundingBox,
+  BoundingBoxSchema,
+  PolygonSchema,
+  PolygonAnnotation,
+  BoundingBoxAnnotation,
 } from "@/types";
 
 export const linspace = (start: number, end: number, num: number) => {
@@ -33,7 +36,7 @@ export const linspace = (start: number, end: number, num: number) => {
 
 export const convertDisplayAnnotationToAnnotation = (
   annotation: DisplayAnnotation,
-  viewParams: ViewParams
+  viewParams: ViewParams,
 ): Annotation => {
   const signalName = (viewParams as SpectrogramViewParams)?.signal_name || null;
 
@@ -64,13 +67,46 @@ export const convertDisplayAnnotationToAnnotation = (
       label: vspan.category.name,
     };
     return timePoint;
+  } else if (PolygonSchema.safeParse(annotation).success) {
+    const polygon = PolygonSchema.parse(annotation);
+    const polygonAnnotation: PolygonAnnotation = {
+      signal_name: signalName,
+      validated: false,
+      uncertainty: 1,
+      created_by: polygon.created_by,
+      type: "polygon",
+      segmentation: [
+        polygon.x.reduce<number[]>((acc, x, index) => {
+          acc.push(x);
+          acc.push(polygon.y[index]);
+          return acc;
+        }, []),
+      ],
+      label: polygon.category.name,
+    };
+    return polygonAnnotation;
+  } else if (BoundingBoxSchema.safeParse(annotation).success) {
+    const bbox = BoundingBoxSchema.parse(annotation);
+    const bboxAnnotation: BoundingBoxAnnotation = {
+      signal_name: signalName,
+      validated: false,
+      uncertainty: 1,
+      created_by: bbox.created_by,
+      type: "bounding_box",
+      x0: bbox.x0,
+      y0: bbox.y0,
+      x1: bbox.x1,
+      y1: bbox.y1,
+      label: bbox.category.name,
+    };
+    return bboxAnnotation;
   } else {
     throw new Error("Unsupported annotation type");
   }
 };
 
 export const createAnnotationToDisplayAnnotationFunc = (
-  colors: Record<string, string>
+  colors: Record<string, string>,
 ) => {
   const convertAnnotationToDisplayAnnotation = (item: Annotation) => {
     if (TimeRegionSchema.safeParse(item).success) {
@@ -92,26 +128,39 @@ export const createAnnotationToDisplayAnnotationFunc = (
         category: { name: timePoint.label, color: colors[timePoint.label] },
       };
       return vspan;
-    } else if (SpectrogramMaskSchema.safeParse(item).success) {
-      const mask = SpectrogramMaskSchema.parse(item);
-      const spectrogramMask: SpectrogramMask = {
-        values: mask.values,
-      };
-      return spectrogramMask;
     } else if (PolygonAnnotationSchema.safeParse(item).success) {
       const polygonData = PolygonAnnotationSchema.parse(item);
       const polygon: Polygon = {
         x: polygonData.segmentation[0].filter((_, index) => index % 2 === 0),
         y: polygonData.segmentation[0].filter((_, index) => index % 2 === 1),
+        created_by: polygonData.created_by,
+        category: {
+          name: polygonData.label,
+          color: colors[polygonData.label],
+        },
+        selected: false,
       };
       return polygon;
-    } else if (BoundingBoxSchema.safeParse(item).success) {
-      const bbox = BoundingBoxSchema.parse(item);
+    } else if (BoundingBoxAnnotationSchema.safeParse(item).success) {
+      const bboxData = BoundingBoxAnnotationSchema.parse(item);
+      const bbox: BoundingBox = {
+        x0: bboxData.x0,
+        y0: bboxData.y0,
+        x1: bboxData.x1,
+        y1: bboxData.y1,
+        created_by: bboxData.created_by,
+        category: {
+          name: bboxData.label,
+          color: colors[bboxData.label],
+        },
+        selected: false,
+      };
+
       return bbox;
     } else {
       console.error(
         "annotation",
-        TimeRegionSchema.safeParse(item).error?.message
+        TimeRegionSchema.safeParse(item).error?.message,
       );
       throw new Error("Unsupported annotation type");
     }
@@ -121,19 +170,19 @@ export const createAnnotationToDisplayAnnotationFunc = (
 
 export function updateAnnotations<T>(
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void,
   newDisplayAnnotations: DisplayAnnotation[],
   schema: ZodSchema<T>,
-  viewParams: ViewParams
+  viewParams: ViewParams,
 ): void {
   setAnnotations((prevAnnotations: Annotation[]) => {
     const otherAnnotations: Annotation[] = prevAnnotations.filter(
-      (item: Annotation) => !schema.safeParse(item).success
+      (item: Annotation) => !schema.safeParse(item).success,
     );
     let newAnnotations: Annotation[] = newDisplayAnnotations.map(
       (displayAnnotation) =>
-        convertDisplayAnnotationToAnnotation(displayAnnotation, viewParams)
+        convertDisplayAnnotationToAnnotation(displayAnnotation, viewParams),
     );
 
     newAnnotations = newAnnotations.concat(otherAnnotations);

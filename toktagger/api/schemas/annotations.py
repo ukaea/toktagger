@@ -162,6 +162,7 @@ AnnotationBatchTypes = Union[
     BoundingBoxBatch,
     VideoBoundingBoxBatch,
     SpectrogramMaskBatch,
+    PolygonAnnotationBatch,
 ]
 
 # TypeAdapters for annotations

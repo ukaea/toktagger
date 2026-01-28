@@ -80,7 +80,7 @@ export default function SpectrogramThresholdTool({
   const [sigma, setSigma] = useState<number>(params.sigma);
   const [minSize, setMinSize] = useState<number>(params.min_size);
   const [lineFilterWidth, setLineFilterWidth] = useState(
-    params.line_filter_width
+    params.line_filter_width,
   );
 
   const onThresholdChange = (value: boolean) => {
@@ -121,7 +121,7 @@ export default function SpectrogramThresholdTool({
             },
             data_params: dataParams,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
@@ -129,7 +129,7 @@ export default function SpectrogramThresholdTool({
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
             annotation.signal_name !== signalName &&
-            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD
+            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
         );
         return otherAnnotations.concat(payload);
       });

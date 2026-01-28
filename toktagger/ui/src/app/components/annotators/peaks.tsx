@@ -37,7 +37,7 @@ export function PeakDetectionTool({
 
   const dataValues = useMemo(
     () => MultiVariateTimeSeriesDataSchema.safeParse(data).data?.values || {},
-    [data]
+    [data],
   );
 
   const [signalName, setSignalName] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export function PeakDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION
+              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
           );
           return otherAnnotations;
         });
@@ -90,14 +90,14 @@ export function PeakDetectionTool({
             },
             data_params: dataParams,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION
+            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
         );
         return otherAnnotations.concat(payload);
       });

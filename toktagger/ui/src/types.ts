@@ -28,15 +28,6 @@ export const TimePointSchema = BaseAnnotationSchema.extend({
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
 
-export const BoundingBoxSchema = BaseAnnotationSchema.extend({
-  x0: z.number(),
-  y0: z.number(),
-  x1: z.number(),
-  y1: z.number(),
-});
-
-export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
-
 export const AnnotationSchema = z.union([
   TimePointSchema,
   TimeRegionSchema,
@@ -72,6 +63,15 @@ export const ImageDataSchema = z.object({
   values: z.string(), // base64 PNG
 });
 export type ImageData = z.infer<typeof ImageDataSchema>;
+
+export const BoundingBoxAnnotationSchema = BaseAnnotationSchema.extend({
+  x0: z.number(),
+  y0: z.number(),
+  x1: z.number(),
+  y1: z.number(),
+});
+
+export type BoundingBoxAnnotation = z.infer<typeof BoundingBoxAnnotationSchema>;
 
 export const PolygonAnnotationSchema = BaseAnnotationSchema.extend({
   segmentation: z.array(z.array(z.number())),
@@ -119,12 +119,20 @@ export const VSpanSchema = BaseDisplayAnnotationSchema.extend({
 });
 export type VSpan = z.infer<typeof VSpanSchema>;
 
-export const SpectrogramMaskSchema = z.object({
+export const SpectrogramMaskSchema = BaseDisplayAnnotationSchema.extend({
   values: z.array(z.array(z.number())),
 });
 export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
 
-export const PolygonSchema = z.object({
+export const BoundingBoxSchema = BaseDisplayAnnotationSchema.extend({
+  x0: z.number(),
+  y0: z.number(),
+  x1: z.number(),
+  y1: z.number(),
+});
+export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
+
+export const PolygonSchema = BaseDisplayAnnotationSchema.extend({
   x: z.array(z.number()),
   y: z.array(z.number()),
 });

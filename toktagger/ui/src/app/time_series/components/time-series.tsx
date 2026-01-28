@@ -28,7 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { VSpans } from "@/app/components/tools/vspans";
 import { useSample } from "@/app/contexts/SampleContext";
-import { Flex, View } from "@adobe/react-spectrum";
+import { Flex } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 
 const zoneCategories: Category[] = [

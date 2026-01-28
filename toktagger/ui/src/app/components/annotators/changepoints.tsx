@@ -36,7 +36,7 @@ export function ChangePointDetectionTool({
 
   const dataValues = useMemo(
     () => MultiVariateTimeSeriesDataSchema.safeParse(data).data?.values || {},
-    [data]
+    [data],
   );
 
   const signalOptions = Object.keys(dataValues).map((value, index) => ({
@@ -58,7 +58,7 @@ export function ChangePointDetectionTool({
         setAnnotations((previousAnnotations) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
+              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
           );
           return otherAnnotations;
         });
@@ -82,14 +82,14 @@ export function ChangePointDetectionTool({
             },
             data_params: dataParams,
           }),
-        }
+        },
       );
 
       const payload: Annotation[] = await response.json();
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION
+            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
         );
         return otherAnnotations.concat(payload);
       });

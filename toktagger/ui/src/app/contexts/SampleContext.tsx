@@ -34,7 +34,7 @@ interface SampleContextType {
   isLoading: boolean;
   error: string | null;
   setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[]
+    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams | SpectrogramViewParams) => void;
@@ -57,7 +57,7 @@ async function getData<T>(url: string): Promise<T> {
 
 async function getSample(projectId: string, sampleId: string): Promise<Sample> {
   return await getData<Sample>(
-    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}`
+    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}`,
   );
 }
 
@@ -67,10 +67,10 @@ async function getProject(projectId: string): Promise<Project> {
 
 async function getAnnotations(
   projectId: string,
-  sampleId: string
+  sampleId: string,
 ): Promise<Annotation[]> {
   return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/annotations`
+    `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/annotations`,
   );
 }
 
@@ -80,7 +80,7 @@ async function getSampleData(
   dataParams: DataParams,
   viewParams: ViewParams | null,
   setError: (error: string | null) => void,
-  setIsLoading: (isLoading: boolean) => void
+  setIsLoading: (isLoading: boolean) => void,
 ): Promise<MultiVariateTimeSeriesData | SpectrogramData | null> {
   if (!viewParams) return null;
 
@@ -92,7 +92,7 @@ async function getSampleData(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ params: dataParams, view: viewParams }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -103,7 +103,6 @@ async function getSampleData(
   }
 
   const fetchedData: Data = await response.json();
-  console.log("Fetched data:", fetchedData);
 
   const viewData = await parseData(fetchedData, project.task);
   if (!viewData) {
@@ -116,7 +115,7 @@ async function getSampleData(
 
 async function parseData(
   data: Data,
-  task: TaskType
+  task: TaskType,
 ): Promise<MultiVariateTimeSeriesData | SpectrogramData | undefined> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -219,7 +218,7 @@ export function SampleProvider({
           dataParams,
           viewParams,
           setError,
-          setIsLoading
+          setIsLoading,
         );
 
         setData(fetchedData);
