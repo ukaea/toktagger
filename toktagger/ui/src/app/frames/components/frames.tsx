@@ -366,8 +366,8 @@ export function FrameView({
   const displayWidth = useMemo(() => {
     if (!containerW) return undefined;
 
-    const TARGET = 900;   // "comfortable" tagging width for small frames
-    const MAX_SCALE = 3;  // don't upscale more than 3× natural
+    const TARGET = 900; // "comfortable" tagging width for small frames
+    const MAX_SCALE = 3; // don't upscale more than 3× natural
 
     // Before image loads, just fit available width.
     if (!natural?.w) return containerW;
@@ -376,13 +376,12 @@ export function FrameView({
     if (natural.w >= TARGET) return Math.min(containerW, natural.w);
 
     // For small images: upscale toward TARGET but respect container and MAX_SCALE.
-    const fit = Math.min(containerW, natural.w);                 // never exceed container
+    const fit = Math.min(containerW, natural.w); // never exceed container
     const up = Math.min(containerW, TARGET, natural.w * MAX_SCALE);
 
     // Pick whichever is larger (i.e., upscale when possible, otherwise fit).
     return Math.max(fit, up);
   }, [containerW, natural]);
-
 
   /**
    * Refresh behavior safety:
@@ -1556,7 +1555,10 @@ export function FrameView({
             <div className="relative inline-block max-w-full">
               <Annotorious>
                 {/* drawingEnabled gates rectangle creation until a class/instance is armed */}
-                <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled}>
+                <ImageAnnotator
+                  tool="rectangle"
+                  drawingEnabled={drawingEnabled}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={imgRef}
@@ -1566,7 +1568,11 @@ export function FrameView({
                     draggable={false}
                     onLoad={() => {
                       const img = imgRef.current;
-                      if (img) setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+                      if (img)
+                        setNatural({
+                          w: img.naturalWidth,
+                          h: img.naturalHeight,
+                        });
                     }}
                     className="block mx-auto h-auto object-contain select-none"
                     // Key change: explicitly set width so small frames upscale
