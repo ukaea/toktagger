@@ -172,7 +172,7 @@ data/elms
 data/elm-events
 data/test/mock_disruptions
 node_modules
-package-lock.json
-package.json
+/package-lock.json
+/package.json
 .DS_Store
 .vscode
