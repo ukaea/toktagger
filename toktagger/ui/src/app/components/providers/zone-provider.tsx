@@ -260,18 +260,6 @@ export const ZoneProvider = ({
     );
   });
 
-  // Handle keyboard events
-
-  // Delete selected zones on Delete/Backspace keypress
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Delete" || e.key == "Backspace") {
-      const selectedZones = zones.current.filter((zone) => zone.selected);
-      for (const zone of selectedZones) {
-        handleZoneDelete(zone);
-      }
-    }
-  });
-
   // The context provider is responsible for rendering the context menu relating to zones
   return (
     <ZoneContext.Provider

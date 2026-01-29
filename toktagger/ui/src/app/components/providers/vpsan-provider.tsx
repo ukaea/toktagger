@@ -245,16 +245,6 @@ export const VSpanProvider = ({
     );
   });
 
-  // Delete selected zones on Delete/Backspace keypress
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Delete" || e.key == "Backspace") {
-      const selectedZones = spans.current.filter((span) => span.selected);
-      for (const span of selectedZones) {
-        handleVSpanDelete(span);
-      }
-    }
-  });
-
   // The context provider is responsible for rendering the context menu relating to VSpans
   return (
     <VSpanContext.Provider
