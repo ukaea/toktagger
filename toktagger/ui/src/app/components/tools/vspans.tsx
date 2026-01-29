@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useContextMenu } from "react-contexify";
 
 import * as d3 from "d3";
 import { useVSpanContext, VSPAN_MENU_ID } from "../providers/vpsan-provider";
-import { Annotation, ToolingProps, VSpan } from "@/types";
 import { useContextMenuProvider } from "../providers/annotation-provider";
-import { useSample } from "@/app/contexts/SampleContext";
-import { convertDisplayAnnotationToAnnotation } from "@/app/utils";
+import { ToolingProps } from "@/types";
 
 /**
  * Handles the rendering of VSpans onto a specific plot

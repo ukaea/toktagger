@@ -27,8 +27,6 @@ import { useVSpanContext } from "../providers/vpsan-provider";
 import { useZoneContext } from "../providers/zone-provider";
 import { useBoundingBoxContext } from "../providers/bounding-box-provider";
 import { usePolygonContext } from "../providers/polygon-provider";
-import { get } from "http";
-import { update } from "plotly.js";
 
 type InjectedProps = {
   plotId: string;
@@ -756,7 +754,7 @@ export const PlotlyWidget = ({
         const shapes = plot?.layout.shapes as Plotly.Shape[] | null;
         if (!shapes) return;
 
-        const updatedShapes = shapes.filter((_shape, index) => {
+        const updatedShapes = shapes.filter((_shape) => {
           // Keep shape if not selected
           return !(_shape.meta && _shape.meta.selected === true);
         });

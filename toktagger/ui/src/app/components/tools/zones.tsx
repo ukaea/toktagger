@@ -3,10 +3,8 @@ import { useContextMenu } from "react-contexify";
 
 import * as d3 from "d3";
 import { useZoneContext, ZONE_MENU_ID } from "../providers/zone-provider";
-import { Annotation, ToolingProps, Zone } from "@/types";
+import { ToolingProps, Zone } from "@/types";
 import { useContextMenuProvider } from "../providers/annotation-provider";
-import { convertDisplayAnnotationToAnnotation } from "@/app/utils";
-import { set } from "zod/v4";
 
 /**
  * Handles the rendering of zones onto a specific plot
