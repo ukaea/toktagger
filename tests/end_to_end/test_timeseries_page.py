@@ -33,8 +33,11 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
     expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
 
+    visible_menu = page.locator('[data-testid="zone-submenu"]')
+    expect(visible_menu).to_be_visible()
+
     # Choose Add Time Region, check options load
-    page.get_by_role("menuitem", name="Add Time Region").click(force=True)
+    visible_menu.click(force=True)
     for item in (
         "ELM",
         "L-mode",
@@ -49,14 +52,19 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
         "Ramp Up",
         "Ramp Down",
     ):
-        expect(page.get_by_role("menuitem", name=item, exact=True)).to_be_visible()
+        expect(
+            visible_menu.get_by_role("menuitem", name=item, exact=True)
+        ).to_be_visible()
 
     # Choose each type, check a new zone is added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
+    visible_menu.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
     expect(page.get_by_label("zone").first).to_be_visible()
 
     # Check added to list
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
+
+    # Wait for a bit for Zone to fully render
+    page.wait_for_timeout(200)
 
     # Check you can right click to delete it
     page.get_by_label("zone").first.click(button="right")
@@ -64,8 +72,8 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
     # Check it no longer exists
-    expect(page.get_by_label("zone").first).to_be_hidden()
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
+    expect(page.get_by_label("zone").first).to_be_hidden()
 
 
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
@@ -143,7 +151,7 @@ def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
 
 
 @pytest.mark.parametrize(
-    "zone_type", ["Disruption", "Thermal Quench", "Curreent Quench", "Control Loss"]
+    "zone_type", ["Disruption", "Thermal Quench", "Current Quench", "Control Loss"]
 )
 def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
     # Create Project
@@ -168,29 +176,37 @@ def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
     expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
 
     # Choose Add Time Point
-    page.get_by_role("menuitem", name="Add Time Point").click(force=True)
+    page.get_by_role("menuitem", name="Add Time Point").hover(force=True)
+
+    visible_menu = page.locator('[data-testid="vspan-submenu"]')
+    expect(visible_menu).to_be_visible()
+
     for item in ("Disruption", "Thermal Quench", "Current Quench", "Control Loss"):
-        expect(page.get_by_role("menuitem", name=item, exact=True)).to_be_visible()
+        expect(
+            visible_menu.get_by_role("menuitem", name=item, exact=True)
+        ).to_be_visible()
 
     # Click each type, check a new Vspan has been added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
+    visible_menu.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
     expect(page.get_by_label("vspan").first).to_be_visible()
 
     # Check added to list
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
 
+    # Wait for a bit for Vspan to fully render
+    page.wait_for_timeout(200)
+
     # Check you can right click to delete it
-    page.get_by_label("vspan").first.click(button="right")
-    expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
+    page.get_by_label("vspan").first.click(button="right", force=True)
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
-    # Check it no longer exists
-    expect(page.get_by_label("vspan").first).to_be_hidden()
+    # # Check it no longer exists
     expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
+    expect(page.get_by_label("vspan")).to_have_count(0)
 
 
 @pytest.mark.parametrize(
-    "zone_type", ["Disruption", "Thermal Quench", "Curreent Quench", "Control Loss"]
+    "zone_type", ["Disruption", "Thermal Quench", "Current Quench", "Control Loss"]
 )
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
 def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page: Page):

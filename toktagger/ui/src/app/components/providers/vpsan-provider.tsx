@@ -164,7 +164,7 @@ export const VSpanProvider = ({
         </Item>
       ) : (
         // multiple-category branch
-        <Submenu key="vspan-submenu" label="Add Time Point">
+        <Submenu key="vspan-submenu" data-testid="vspan-submenu" label="Add Time Point">
           {addVSpanItems}
         </Submenu>
       );
