@@ -21,7 +21,9 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const { annotations, project, setAnnotations } = useSample();
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
-    return annotations.some((ann) => ann.created_by === selectedModel);
+    return annotations.some(
+      (ann) => project?.model_types.includes(ann.created_by) || false,
+    );
   });
   const [taskId, setTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
