@@ -24,8 +24,14 @@ export function JumpDetectionTool({
   sample_id,
   data,
 }: JumpDetectionType) {
-  const { dataParams, setAnnotations } = useSample();
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const { annotations, dataParams, setAnnotations } = useSample();
+
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.JUMP_DETECTION,
+    );
+  });
+
   const [signalName, setSignalName] = useState<string | null>(null);
   const signalOptions = Object.keys(data.values).map((value, index) => ({
     id: index,
@@ -39,14 +45,18 @@ export function JumpDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignalName || !isEnabled) {
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION ||
+              annotation.validated,
           );
           return otherAnnotations;
         });
+        return;
+      } else if (!validSignalName) {
         return;
       }
 
@@ -74,7 +84,8 @@ export function JumpDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });
