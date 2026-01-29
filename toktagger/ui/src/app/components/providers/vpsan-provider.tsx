@@ -92,7 +92,6 @@ export const VSpanProvider = ({
 
   const updateAnnotations = useCallback(() => {
     if (!viewParams) return;
-    console.log(spans.current);
 
     const timeRegions = spans.current.map((span: VSpan) =>
       convertDisplayAnnotationToAnnotation(span, viewParams),

@@ -73,7 +73,6 @@ export const ZoneProvider = ({
 
   const updateAnnotations = useCallback(() => {
     if (!viewParams) return;
-    console.log(zones.current);
 
     const timeRegions = zones.current.map((zone: Zone) =>
       convertDisplayAnnotationToAnnotation(zone, viewParams),
