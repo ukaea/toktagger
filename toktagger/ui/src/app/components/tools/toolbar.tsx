@@ -10,25 +10,13 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
-  ComboBox,
-  Item,
-  Key,
   ButtonGroup,
   Button,
   ToastQueue,
   SearchField,
 } from "@adobe/react-spectrum";
 import type { ImageAnnotation } from "@annotorious/react";
-import {
-  Annotation,
-  PlotProps,
-  Project,
-  Sample,
-  SpectrogramData,
-  SpectrogramViewParamsSchema,
-  TaskType,
-  ViewParams,
-} from "@/types";
+import { Annotation, Project, Sample, TaskType } from "@/types";
 
 import { useNavigate } from "react-router-dom";
 import type { NavigateFunction } from "react-router-dom";
@@ -66,7 +54,7 @@ import {
   InstancePanel as VideoInstancePanel,
 } from "@/app/frames/components/ui";
 import { setVideoWorkingDirty } from "@/app/frames/components/adapters";
-import { DataRangeSlider } from "./dataRangeSlider";
+import { ColorMapPicker } from "./colorMapPicker";
 
 // ------------------------------
 // Helpers: backend save + sample navigation
@@ -251,92 +239,6 @@ function VideoShotSearch({
       validationState={errorMessage ? "invalid" : undefined}
       errorMessage={errorMessage}
     />
-  );
-}
-
-type AmplitudeSliderInfo = {
-  data: SpectrogramData;
-  viewParams: ViewParams;
-  setViewParams: (viewParams: ViewParams) => void;
-  plotProps: PlotProps;
-};
-
-function AmplitudeSlider({
-  data,
-  viewParams,
-  setViewParams,
-  plotProps,
-}: AmplitudeSliderInfo) {
-  const onAmplitudeRangeChange = async ({
-    start,
-    end,
-  }: {
-    start: number;
-    end: number;
-  }) => {
-    const params = SpectrogramViewParamsSchema.parse(viewParams);
-    params.amplitude_min = Math.pow(10, start);
-    params.amplitude_max = Math.pow(10, end);
-    setViewParams(params);
-  };
-
-  const numDigits = plotProps.numSignificantDigits || 4;
-  const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
-  const largePrecisionFactor = Math.pow(10, numDigits);
-
-  let ampValues = data.amplitude.flat();
-  ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor)),
-  );
-
-  const displayAmplitudeValues = (val: number) => {
-    return `${Math.round(Math.pow(10, val) * largePrecisionFactor) / largePrecisionFactor}`;
-  };
-
-  return (
-    <DataRangeSlider
-      name={"Amplitude Range"}
-      data={ampValues}
-      onChange={onAmplitudeRangeChange}
-      getValueLabel={(val) =>
-        `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(val.end)}`
-      }
-    />
-  );
-}
-
-type ColorMapPickerInfo = {
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
-};
-
-function ColorMapPicker() {
-  const { plotProps, setPlotProps } = useSample();
-  const options = [
-    { id: 1, name: "Viridis" },
-    { id: 2, name: "Plasma" },
-    { id: 3, name: "Inferno" },
-    { id: 4, name: "Magma" },
-    { id: 5, name: "Cividis" },
-  ];
-
-  const onColorMapChange = (key: Key | null) => {
-    if (key) {
-      const selectedColorMap = Number(key.toString());
-      const value = options.find((item) => item.id === selectedColorMap);
-      setPlotProps({ ...plotProps, colorMap: value?.name || "Cividis" });
-    }
-  };
-
-  return (
-    <ComboBox
-      label="Color Map"
-      defaultItems={options}
-      inputValue={plotProps.colorMap || "Cividis"}
-      onSelectionChange={onColorMapChange}
-    >
-      {(item) => <Item key={item.id}>{item.name}</Item>}
-    </ComboBox>
   );
 }
 
