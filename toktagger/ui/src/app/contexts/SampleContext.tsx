@@ -5,7 +5,9 @@ import React, {
   useState,
   useEffect,
   ReactNode,
+  useRef,
 } from "react";
+import { ToastQueue } from "@adobe/react-spectrum";
 import {
   Project,
   Sample,
@@ -19,6 +21,8 @@ import {
   MultiVariateTimeSeriesDataSchema,
   CompositeDataSchema,
   SpectrogramDataSchema,
+  ImageData,
+  ImageDataSchema,
   TaskType,
   DataParams,
 } from "@/types";
@@ -78,7 +82,9 @@ async function getAnnotations(
 async function parseData(
   data: Data,
   task: TaskType,
-): Promise<MultiVariateTimeSeriesData | SpectrogramData | undefined> {
+): Promise<
+  MultiVariateTimeSeriesData | SpectrogramData | ImageData | undefined
+> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {
@@ -90,14 +96,24 @@ async function parseData(
     if (!result.success) {
       throw new Error("Invalid data for spectrogram view");
     }
+
     const mhdData = SpectrogramDataSchema.safeParse(
       result.data.values["mirnov"],
     );
     if (!mhdData.success) {
       throw new Error("Invalid data for spectrogram view");
     }
+
     return mhdData.data;
+  } else if (task == TaskType.Video) {
+    const result = ImageDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for video view");
+    }
+    return result.data;
   }
+
+  return undefined;
 }
 
 export function SampleProvider({
@@ -124,6 +140,39 @@ export function SampleProvider({
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const lastGoodVideoFrameRef = useRef<number | null>(null);
+
+  function extractDetail(payload: unknown): string {
+    if (!payload) return "Unknown error";
+    if (typeof payload === "string") return payload;
+    if (typeof payload === "object") {
+      const d = (payload as { detail?: unknown }).detail;
+      if (typeof d === "string" && d.trim()) return d;
+      if (Array.isArray(d)) {
+        const first = d.find((x) => typeof x === "string" && x.trim());
+        if (typeof first === "string") return first;
+      }
+    }
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return "Unknown error";
+    }
+  }
+
+  function isMissingFrameError(status: number, detail: string): boolean {
+    // Your backend message example: "Could not find image on disk for this frame index"
+    // Treat 404 + that phrasing as "navigation boundary" rather than fatal.
+    if (status === 404) return true;
+    const msg = (detail || "").toLowerCase();
+    return (
+      msg.includes("could not find image") ||
+      msg.includes("file not found") ||
+      msg.includes("no such file") ||
+      msg.includes("frame index")
+    );
+  }
 
   // Consolidated data fetching - fetch everything together
   useEffect(() => {
@@ -152,6 +201,26 @@ export function SampleProvider({
           } as SpectrogramViewParams;
         }
 
+        // ------------------------------------------------------------
+        // video projects must request image data parameters.
+        // Backend ImageDataLoader requires params.name === "image".
+        // frame: null means "backend picks first frame automatically".
+        // ------------------------------------------------------------
+        let effectiveDataParams: DataParams = dataParams;
+
+        if (projectData.task === TaskType.Video) {
+          const prev = dataParams as unknown as {
+            name?: string;
+            frame?: number | null;
+          };
+
+          effectiveDataParams = {
+            ...(dataParams as Record<string, unknown>),
+            name: "image",
+            frame: prev.frame ?? null,
+          } as DataParams;
+        }
+
         const response = await fetch(
           `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/data`,
           {
@@ -159,13 +228,51 @@ export function SampleProvider({
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ params: dataParams, view: params }),
+            body: JSON.stringify({ params: effectiveDataParams, view: params }),
           },
         );
 
         if (!response.ok) {
-          const body = await response.json();
-          setError(`${body.detail}`);
+          let payload: unknown = null;
+          try {
+            payload = await response.json();
+          } catch {
+            // ignore; payload stays null
+          }
+
+          const detail = extractDetail(payload);
+
+          // Video-only: treat missing frame as "boundary" and stay on last good frame.
+          if (projectData.task === TaskType.Video) {
+            const requestedFrame = effectiveDataParams?.frame as
+              | number
+              | null
+              | undefined;
+
+            const lastGood = lastGoodVideoFrameRef.current;
+
+            if (
+              typeof requestedFrame === "number" &&
+              typeof lastGood === "number" &&
+              requestedFrame !== lastGood &&
+              isMissingFrameError(response.status, detail)
+            ) {
+              ToastQueue.negative(`Frame ${requestedFrame} not found.`, {
+                timeout: 2500,
+              });
+
+              // Roll back params; do NOT set error and do NOT clear data.
+              setDataParams((prev) => ({
+                ...prev,
+                name: "image",
+                frame: lastGood,
+              }));
+              setIsLoading(false);
+              return;
+            }
+          }
+
+          setError(detail);
           setData(null);
           setIsLoading(false);
           return;
@@ -180,6 +287,14 @@ export function SampleProvider({
         }
 
         setData(viewData);
+
+        // video: remember last good frame so we can roll back on missing-frame errors
+        if (projectData.task === TaskType.Video) {
+          const frame = (viewData as unknown as { frame?: unknown }).frame;
+          if (typeof frame === "number" && Number.isFinite(frame)) {
+            lastGoodVideoFrameRef.current = frame;
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
