@@ -28,10 +28,30 @@ export const TimePointSchema = BaseAnnotationSchema.extend({
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
 
+export const BoundingBoxAnnotationSchema = BaseAnnotationSchema.extend({
+  x_min: z.number(),
+  y_min: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
+export type BoundingBoxAnnotation = z.infer<typeof BoundingBoxAnnotationSchema>;
+
+export const VideoBoundingBoxAnnotationSchema =
+  BoundingBoxAnnotationSchema.extend({
+    type: z.literal("video_bounding_box"),
+    frame: z.number().int(),
+    track_id: z.string(), // force string
+  });
+
+export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxAnnotationSchema>;
+
 export const AnnotationSchema = z.union([
   TimePointSchema,
   TimeRegionSchema,
   ClassLabelSchema,
+  BoundingBoxAnnotationSchema,
+  VideoBoundingBoxAnnotationSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
@@ -63,15 +83,6 @@ export const ImageDataSchema = z.object({
   values: z.string(), // base64 PNG
 });
 export type ImageData = z.infer<typeof ImageDataSchema>;
-
-export const BoundingBoxAnnotationSchema = BaseAnnotationSchema.extend({
-  x0: z.number(),
-  y0: z.number(),
-  x1: z.number(),
-  y1: z.number(),
-});
-
-export type BoundingBoxAnnotation = z.infer<typeof BoundingBoxAnnotationSchema>;
 
 export const PolygonAnnotationSchema = BaseAnnotationSchema.extend({
   segmentation: z.array(z.array(z.number())),
@@ -125,10 +136,10 @@ export const SpectrogramMaskSchema = BaseDisplayAnnotationSchema.extend({
 export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
 
 export const BoundingBoxSchema = BaseDisplayAnnotationSchema.extend({
-  x0: z.number(),
-  y0: z.number(),
-  x1: z.number(),
-  y1: z.number(),
+  x_min: z.number(),
+  y_min: z.number(),
+  width: z.number(),
+  height: z.number(),
 });
 export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 

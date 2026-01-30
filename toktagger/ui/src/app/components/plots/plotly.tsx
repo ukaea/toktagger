@@ -127,10 +127,10 @@ const shapeToAnnotation = (
   if (shape.type === "rect") {
     const boundingBox: BoundingBoxAnnotation =
       BoundingBoxAnnotationSchema.parse({
-        x0: shape.x0 as number,
-        y0: shape.y0 as number,
-        x1: shape.x1 as number,
-        y1: shape.y1 as number,
+        x_min: shape.x0 as number,
+        y_min: shape.y0 as number,
+        width: (shape.x1 as number) - (shape.x0 as number),
+        height: (shape.y1 as number) - (shape.y0 as number),
         signal_name: signalName,
         label: shape.meta?.label || "Unknown",
         created_by: "manual",

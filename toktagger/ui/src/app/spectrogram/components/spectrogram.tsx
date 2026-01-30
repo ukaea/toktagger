@@ -64,10 +64,10 @@ export const SpectrogramView = () => {
         meta: { label: bbox.category.name },
         xref: "x",
         yref: "y2",
-        x0: bbox.x0,
-        y0: bbox.y0,
-        x1: bbox.x1,
-        y1: bbox.y1,
+        x0: bbox.x_min,
+        y0: bbox.y_min,
+        x1: bbox.x_min + bbox.width,
+        y1: bbox.y_min + bbox.height,
         line: { color: "rgb(150, 150, 150)", width: 5 },
         fillcolor: bbox.category.color
           .replace("rgb(", "rgba(")

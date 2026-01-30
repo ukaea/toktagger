@@ -142,6 +142,7 @@ export const VSpanProvider = ({
       return span;
     });
     triggerVSpanUpdate();
+    onModifyVSpan?.(spans.current);
   };
 
   const addVSpan = (x: number, category: Category) => {

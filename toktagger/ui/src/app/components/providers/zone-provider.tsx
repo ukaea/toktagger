@@ -140,6 +140,7 @@ export const ZoneProvider = ({
     });
     triggerZoneUpdate();
     updateAnnotations();
+    onModifyZone?.(zones.current);
   };
 
   const addZone = (x0: number, x1: number, category: Category) => {

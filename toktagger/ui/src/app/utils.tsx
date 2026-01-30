@@ -144,10 +144,10 @@ export const createAnnotationToDisplayAnnotationFunc = (
     } else if (BoundingBoxAnnotationSchema.safeParse(item).success) {
       const bboxData = BoundingBoxAnnotationSchema.parse(item);
       const bbox: BoundingBox = {
-        x0: bboxData.x0,
-        y0: bboxData.y0,
-        x1: bboxData.x1,
-        y1: bboxData.y1,
+        x_min: bboxData.x_min,
+        y_min: bboxData.y_min,
+        width: bboxData.width,
+        height: bboxData.height,
         created_by: bboxData.created_by,
         category: {
           name: bboxData.label,

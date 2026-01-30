@@ -60,10 +60,10 @@ class TimeRegion(AnnotationBase):
 
 class BoundingBox(AnnotationBase):
     type: Literal["bounding_box"] = "bounding_box"
-    x0: float
-    y0: float
-    x1: float
-    y1: float
+    x_min: float
+    y_min: float
+    width: float
+    height: float
 
 
 class VideoBoundingBox(BoundingBox):

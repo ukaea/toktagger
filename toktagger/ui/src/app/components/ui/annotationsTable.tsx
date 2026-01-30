@@ -74,7 +74,7 @@ const getPositionForAnnotation = (annotation: Annotation) => {
 
     case "bounding_box":
       const boundingBox = BoundingBoxAnnotationSchema.parse(annotation);
-      return `x0: ${boundingBox.x0.toFixed(2)}, y0: ${boundingBox.y0.toFixed(2)}, x1: ${boundingBox.x1.toFixed(2)}, y1: ${boundingBox.y1.toFixed(2)}`;
+      return `x_min: ${boundingBox.x_min.toFixed(2)}, y_min: ${boundingBox.y_min.toFixed(2)}, width: ${boundingBox.width.toFixed(2)}, height: ${boundingBox.height.toFixed(2)}`;
     case "polygon":
       const polygon = PolygonAnnotationSchema.parse(annotation);
       const segmentation = polygon.segmentation[0];

@@ -40,6 +40,7 @@ export default function SpectrogramThresholdTool({
 }: SpectrogramThresholdToolInfo) {
   const {
     sample,
+    annotations,
     setAnnotations,
     dataParams,
     data,
@@ -51,7 +52,6 @@ export default function SpectrogramThresholdTool({
   const signalNames = getSignalNames(sample);
   const signalName =
     (viewParams as SpectrogramViewParams)?.signal_name || signalNames[0];
-  const [isEnabled, setIsEnabled] = useState(false);
 
   const params: SpectrogramThresholdParams =
     SpectrogramThresholdParamsSchema.parse({
@@ -83,6 +83,12 @@ export default function SpectrogramThresholdTool({
     params.line_filter_width,
   );
 
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.SPECTROGRAM_THRESHOLD,
+    );
+  });
+
   const onThresholdChange = (value: boolean) => {
     setIsEnabled(value);
     setPlotProps({ ...plotProps, thresholdActive: value });
@@ -99,6 +105,19 @@ export default function SpectrogramThresholdTool({
       const viewParamsParsed = SpectrogramViewParamsSchema.parse(viewParams);
       const nfft = viewParamsParsed.nfft;
       const nperseg = viewParamsParsed.nperseg;
+
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD ||
+              annotation.validated,
+          );
+          return otherAnnotations;
+        });
+        return;
+      }
 
       const response = await fetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/spectrogram_threshold`,
@@ -129,7 +148,8 @@ export default function SpectrogramThresholdTool({
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
             annotation.signal_name !== signalName &&
-            annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD,
+            (annotation.created_by !== AnnotatorTypes.SPECTROGRAM_THRESHOLD ||
+              annotation.validated),
         );
         return otherAnnotations.concat(payload);
       });
