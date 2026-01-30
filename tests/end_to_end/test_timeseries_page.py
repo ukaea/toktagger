@@ -229,8 +229,11 @@ def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page:
     page.get_by_label("time-series").click(button="right")
     page.get_by_role("menuitem", name="Add Time Point").click(force=True)
 
+    visible_menu = page.locator('[data-testid="vspan-submenu"]')
+    expect(visible_menu).to_be_visible()
+
     # Click each type, check a new Vspan has been added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
+    visible_menu.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
     expect(page.get_by_label("vspan").first).to_be_visible()
 
     # Check added to list, record initial positions

@@ -87,6 +87,7 @@ async def import_annotations(
     Update or add annotations for this project.
     -------------------------------------------
     """
+    print(annotations)
     db_client = request.app.state.db_client
     await utils.import_annotations(db_client, project_id, annotations)
 

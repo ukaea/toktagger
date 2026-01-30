@@ -84,6 +84,7 @@ export const ZoneProvider = ({
       return zone;
     });
     triggerZoneUpdate();
+    onModifyZone?.(zones.current);
   };
 
   const addZone = (x0: number, x1: number, category: Category) => {

@@ -421,8 +421,8 @@ def test_create_samples_image_data(server_setup, page: Page, file_type: str):
         expect(page.get_by_role("row").nth(1)).to_contain_text("104000")
 
 
-@pytest.mark.parametrize("shot_id", (True, False))
-def test_samples_page_import_annotations(shot_id: bool, server_setup, page: Page):
+@pytest.mark.parametrize("sample_id", (True, False))
+def test_samples_page_import_annotations(sample_id: bool, server_setup, page: Page):
     # Create a project
     project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample
@@ -443,12 +443,14 @@ def test_samples_page_import_annotations(shot_id: bool, server_setup, page: Page
                 "label": "Disruption",
                 "created_by": "manual",
                 "time": 71,
+                "shot_id": 10000,
             },
             {
                 "label": "Flat Top",
                 "created_by": "manual",
                 "time_min": 50,
                 "time_max": 70,
+                "shot_id": 10000,
             },
         ]
         annotations_2 = [
@@ -456,24 +458,21 @@ def test_samples_page_import_annotations(shot_id: bool, server_setup, page: Page
                 "label": "Control Loss",
                 "created_by": "manual",
                 "time": 61,
+                "shot_id": 10001,
             },
             {
                 "label": "Ramp Up",
                 "created_by": "manual",
                 "time_min": 40,
                 "time_max": 60,
+                "shot_id": 10001,
             },
         ]
-        if shot_id:
+        if sample_id:
             for annotation in annotations_1:
-                annotation["shot_id"] = 10000
+                annotation["sample_id"] = sample_ids[0]
             for annotation in annotations_2:
-                annotation["shot_id"] = 10001
-        else:
-            for annotation in annotations_1:
-                annotation["shot_id"] = sample_ids[0]
-            for annotation in annotations_2:
-                annotation["shot_id"] = sample_ids[1]
+                annotation["sample_id"] = sample_ids[1]
 
         json.dump(annotations_1 + annotations_2, file)
         file.flush()
