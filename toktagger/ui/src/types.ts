@@ -29,10 +29,32 @@ export const TimePointSchema = BaseAnnotationSchema.extend({
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
 
+// add near other annotation schemas
+
+export const BoundingBoxSchema = BaseAnnotationSchema.extend({
+  type: z.literal("bounding_box"),
+  height: z.number().int(),
+  width: z.number().int(),
+  x_min: z.number().int(),
+  y_min: z.number().int(),
+});
+
+export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
+
+export const VideoBoundingBoxSchema = BoundingBoxSchema.extend({
+  type: z.literal("video_bounding_box"),
+  frame: z.number().int(),
+  track_id: z.string(), // force string
+});
+
+export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;
+
 export const AnnotationSchema = z.union([
   TimePointSchema,
   TimeRegionSchema,
   ClassLabelSchema,
+  BoundingBoxSchema,
+  VideoBoundingBoxSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 

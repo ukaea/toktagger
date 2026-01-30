@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import {
   Provider,
   defaultTheme,
@@ -17,12 +18,13 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import React from "react";
+import { VideoView } from "@/app/frames/components/frames";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
   sample: Sample;
 };
+
 const SampleDataBreadCrumbs = ({
   project,
   sample,
@@ -46,24 +48,50 @@ const SampleDataBreadCrumbs = ({
 const SampleView = () => {
   const { project, isLoading, error } = useSample();
 
-  if (!project) {
-    return null;
-  }
+  if (error) return <ErrorView message={error} />;
 
-  if (isLoading) {
-    return <LoadingView />;
-  }
+  if (!project) return isLoading ? <LoadingView /> : null;
 
-  if (error) {
-    return <ErrorView message={error} />;
-  }
+  // Video: keep the video UI mounted while fetching the next frame.
+  if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
 
-  if (project.task == TaskType.TimeSeries) {
-    return <TimeSeriesView />;
-  } else if (project.task == TaskType.Spectrogram) {
-    return <SpectrogramView />;
-  }
+  if (isLoading) return <LoadingView />;
+
+  if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
+  if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
+
+  return null;
 };
+
+function VideoViewWrapperFromContext() {
+  const {
+    project,
+    sample,
+    data,
+    annotations,
+    setAnnotations,
+    dataParams,
+    setDataParams,
+  } = useSample();
+
+  if (!project || !sample) return null;
+
+  // On initial load, block until we have frame data.
+  // During frame-to-frame fetches, SampleContext keeps previous data set, so VideoView stays mounted.
+  if (!data) return <LoadingView />;
+
+  return (
+    <VideoView
+      data={data}
+      annotations={annotations ?? []}
+      setAnnotations={setAnnotations}
+      dataParams={dataParams}
+      setDataParams={setDataParams}
+      projectId={project._id}
+      sampleId={sample._id}
+    />
+  );
+}
 
 function SamplePageContent() {
   const { project, sample, isLoading } = useSample();
@@ -84,12 +112,9 @@ function SamplePageContent() {
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
-        <SampleDataBreadCrumbs
-          project={project}
-          sample={sample}
-        ></SampleDataBreadCrumbs>
-        <ModelTrainModal project={project}></ModelTrainModal>
-        <ModelPredictModal project={project}></ModelPredictModal>
+        <SampleDataBreadCrumbs project={project} sample={sample} />
+        <ModelTrainModal project={project} />
+        <ModelPredictModal project={project} />
         <Flex>
           <ToolBar />
           <SampleView />

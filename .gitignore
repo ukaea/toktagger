@@ -174,4 +174,3 @@ data/test/mock_disruptions
 node_modules
 package-lock.json
 package.json
-.vscode
