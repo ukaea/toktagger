@@ -210,7 +210,7 @@ export function VideoSessionProvider(props: {
 
   const createNewInstanceForClass = useCallback(
     (className: string) => {
-      const cname = (className || "").trim() || "UFO";
+      const cname = (className || "").trim();
       const nextId = nextTrackIdForClass(byFrame, cname, getLabelTrack);
       const trackId = String(nextId);
 
