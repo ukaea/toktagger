@@ -165,7 +165,7 @@ export function existingTrackIdsForClass(
 
   const out: string[] = [];
   for (const list of byFrame.values()) {
-    for (const a of list ?? []) {
+    for (const a of list) {
       const got = getLabelTrack(a);
       if ((got.className || "").trim() !== cls) continue;
       const tid = canonicalizeTrackId(got.trackId || "");
@@ -218,7 +218,7 @@ export function mapClearAll(prev: ByFrameMap): ByFrameMap {
 /** Flatten all frame overlays into one list. */
 export function flattenByFrame(byFrame: ByFrameMap): ImageAnnotation[] {
   const out: ImageAnnotation[] = [];
-  for (const list of byFrame.values()) out.push(...(list ?? []));
+  for (const list of byFrame.values()) out.push(...(list));
   return out;
 }
 
@@ -236,7 +236,7 @@ export function deriveInstances(
   const map = new Map<TrackKey, InstanceProfile>();
 
   for (const [frame, list] of byFrame.entries()) {
-    for (const a of list ?? []) {
+    for (const a of list) {
       const { className, trackId } = getLabelTrack(a);
       if (!className || !trackId) continue;
 
@@ -288,7 +288,7 @@ export function deleteTrackAcrossFrames(
   const next = new Map<FrameIndex, ImageAnnotation[]>();
 
   for (const [frame, list] of byFrame.entries()) {
-    const filtered = (list ?? []).filter((a) => {
+    const filtered = (list).filter((a) => {
       const got = getLabelTrack(a);
       const c = (got.className || "").trim();
       const t = ensureTrackId(got.trackId || "");
@@ -339,7 +339,7 @@ export function nextTrackIdForClass(
 
   let max = 0;
   for (const list of byFrame.values()) {
-    for (const a of list ?? []) {
+    for (const a of list) {
       const got = getLabelTrack(a);
       if ((got.className || "").trim() !== key) continue;
       const t = ensureTrackId(got.trackId || "");
