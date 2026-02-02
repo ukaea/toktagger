@@ -33,7 +33,6 @@ import {
 import {
   annoToVideoBBox,
   getLabelTrack,
-  normalizeOverlay,
   videoBBoxToAnno,
 } from "./anno-utils";
 
@@ -406,33 +405,4 @@ export function VideoSessionProvider(props: {
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
-
-/**
- * Normalizes a raw overlay list into our session invariants:
- * - rectangles only
- * - stamps the frame source key
- * - ensures class/track bodies exist (allocating track ids when needed)
- * - optional per-instance de-duplication within the frame
- *
- * The caller is responsible for writing the returned list into session state.
- */
-export function commitOverlayToSession(args: {
-  raw: ImageAnnotation[];
-  frameKey: string;
-  fallback: { className: string | null; trackId: string | null };
-  allocTrackId?: (className: string) => string;
-  enforceBothBodies?: boolean;
-  dedupeByInstance?: boolean;
-}): ImageAnnotation[] {
-  return normalizeOverlay(
-    args.raw,
-    args.frameKey,
-    args.fallback,
-    args.allocTrackId,
-    {
-      enforceBothBodies: args.enforceBothBodies ?? true,
-      dedupeByInstance: args.dedupeByInstance ?? true,
-    },
-  );
 }

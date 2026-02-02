@@ -260,3 +260,32 @@ export function videoBBoxToAnno(
 
   return stampLabelAndTrack(anno, b.label, String(b.track_id));
 }
+
+/**
+ * Normalizes a raw overlay list into our session invariants:
+ * - rectangles only
+ * - stamps the frame source key
+ * - ensures class/track bodies exist (allocating track ids when needed)
+ * - optional per-instance de-duplication within the frame
+ *
+ * The caller is responsible for writing the returned list into session state.
+ */
+export function normalizeOverlayForSession(args: {
+  raw: ImageAnnotation[];
+  frameKey: string;
+  fallback: { className: string | null; trackId: string | null };
+  allocTrackId?: (className: string) => string;
+  enforceBothBodies?: boolean;
+  dedupeByInstance?: boolean;
+}): ImageAnnotation[] {
+  return normalizeOverlay(
+    args.raw,
+    args.frameKey,
+    args.fallback,
+    args.allocTrackId,
+    {
+      enforceBothBodies: args.enforceBothBodies ?? true,
+      dedupeByInstance: args.dedupeByInstance ?? true,
+    },
+  );
+}

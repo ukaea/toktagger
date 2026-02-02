@@ -17,7 +17,7 @@ import "@annotorious/react/annotorious-react.css";
 
 import {
   useVideoSession,
-  commitOverlayToSession,
+  normalizeOverlayForSession,
 } from "@/app/video/components/video-session";
 import {
   getLabelTrack,
@@ -459,7 +459,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       const fallbackTrackId = session.selection.trackId ?? null;
       const allocTrackId = fallbackTrackId ? undefined : makeAllocator();
 
-      const normalized = commitOverlayToSession({
+      const normalized = normalizeOverlayForSession({
         raw: clamped,
         frameKey: session.frameKey,
         fallback: { className: cls, trackId: fallbackTrackId },
