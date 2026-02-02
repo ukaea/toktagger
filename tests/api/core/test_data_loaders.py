@@ -7,6 +7,10 @@ from toktagger.api.schemas.samples import (
     FileData,
     TimeSeriesFileData,
     ShotData,
+    FileType,
+    FileProtocol,
+    ShotProtocol,
+    ToksearchShotData,
 )
 from toktagger.api.schemas.data import (
     TimeSeriesData,
@@ -25,8 +29,8 @@ import io
 def test_image_file_loader_jpg():
     img_file = FileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
-        type="jpg",
-        protocol="file",
+        type=FileType.JPG,
+        protocol=FileProtocol.LOCAL,
     )
     sample = Sample(
         shot_id=10000,
@@ -51,8 +55,8 @@ def test_image_file_loader_jpg():
 def test_image_file_loader_png():
     img_file = FileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
-        type="png",
-        protocol="file",
+        type=FileType.PNG,
+        protocol=FileProtocol.LOCAL,
     )
     sample = Sample(
         shot_id=10000,
@@ -77,9 +81,9 @@ def test_image_file_loader_png():
 def test_parquet_file_loader():
     parquet_file = TimeSeriesFileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("test.parquet")),
-        type="tabular",
-        protocol="file",
-        column_names=["Ip", "dalpha"],
+        type=FileType.PARQUET,
+        protocol=FileProtocol.LOCAL,
+        signal_names=["Ip", "dalpha"],
     )
     sample = Sample(
         shot_id=10000,
@@ -113,7 +117,7 @@ def test_uda_loader(uda_env_vars):
     except Exception:
         pytest.skip("Could not contact UDA server")
 
-    uda_shot = ShotData(protocol="uda", signal_names=["ip", "ANE_DENSITY"])
+    uda_shot = ShotData(protocol=ShotProtocol.UDA, signal_names=["ip", "ANE_DENSITY"])
     sample = Sample(
         shot_id=14892,
         data=uda_shot,
@@ -144,7 +148,7 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
     except Exception:
         pytest.skip("Could not contact UDA server")
 
-    uda_shot = ShotData(protocol="uda", signal_names=["doesnt_exist"])
+    uda_shot = ShotData(protocol=ShotProtocol.UDA, signal_names=["doesnt_exist"])
     sample = Sample(
         shot_id=10000,
         data=uda_shot,
@@ -171,8 +175,16 @@ def test_sal_loader():
     except Exception:
         pytest.skip("Could not contact SAL server")
 
-    sal_shot = ShotData(protocol="sal", signal_names=["ppf/signal/jetppf/magn/ipla"])
-    sample = Sample(shot_id=87737, data=sal_shot, _id="test", project_id="test")
+    sal_shot = ShotData(
+        protocol=ShotProtocol.SAL, signal_names=["ppf/signal/jetppf/magn/ipla"]
+    )
+    sample = Sample(
+        shot_id=87737,
+        data=sal_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
     data_loader = data_loaders.SALDataLoader()
     data = data_loader.get_sample(sample)
 
@@ -183,14 +195,20 @@ def test_sal_loader():
 
 def test_toksearch_loader():
     toksearch_shot = data_loaders.ToksearchShotData(
-        protocol="toksearch",
+        protocol=ShotProtocol.TOKSEARCH,
         signal_names=["magnetics/ip"],
         backend_type="zarr",
         base_path="s3://mast/level2/shots/",
         endpoint="https://echo.stfc.ac.uk",
     )
-    sample = Sample(shot_id=30421, data=toksearch_shot, _id="test", project_id="test")
-    data_loader = data_loaders.TokSearchDataLoader()
+    sample = Sample(
+        shot_id=30421,
+        data=toksearch_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data_loader = data_loaders.TokSearchDataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
@@ -267,8 +285,10 @@ async def test_custom_data_loader(api_client):
     "name,data_loader,sample_data_model",
     [
         ("image", data_loaders.ImageDataLoader, FileData),
-        ("parquet", data_loaders.ParquetDataLoader, TimeSeriesFileData),
+        ("tabular", data_loaders.TabularDataLoader, TimeSeriesFileData),
         ("uda", data_loaders.UDADataLoader, ShotData),
+        ("sal", data_loaders.SALDataLoader, ShotData),
+        ("toksearch", data_loaders.TokSearchDataLoader, ToksearchShotData),
     ],
 )
 def test_loader_registry(name, data_loader, sample_data_model):

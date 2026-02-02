@@ -87,6 +87,7 @@ class LoaderRegistry:
                 ShotData,
                 FileData,
                 TimeSeriesFileData,
+                ToksearchShotData,
             ):
                 raise ValueError(
                     f"Loader '{name}' must expect a supported data type as an input, but got '{sample_data_type}'."
@@ -198,17 +199,17 @@ class TabularDataLoader(DataLoader):
         item: TimeSeriesFileData = sample.data
 
         if item.file_name.endswith(".csv"):
-            df = pd.read_csv(item.file_name, usecols=item.column_names)
+            df = pd.read_csv(item.file_name, usecols=item.signal_names)
         elif item.file_name.endswith(".tsv"):
-            df = pd.read_csv(item.file_name, sep="\t", usecols=item.column_names)
+            df = pd.read_csv(item.file_name, sep="\t", usecols=item.signal_names)
         elif item.file_name.endswith(".parquet"):
-            df = pd.read_parquet(item.file_name, columns=item.column_names)
+            df = pd.read_parquet(item.file_name, columns=item.signal_names)
         elif item.file_name.endswith(".json"):
-            df = pd.read_json(item.file_name, columns=item.column_names)
+            df = pd.read_json(item.file_name, columns=item.signal_names)
         elif item.file_name.endswith(".xlsx"):
-            df = pd.read_excel(item.file_name, usecols=item.column_names)
+            df = pd.read_excel(item.file_name, usecols=item.signal_names)
         elif item.file_name.endswith(".feather"):
-            df = pd.read_feather(item.file_name, columns=item.column_names)
+            df = pd.read_feather(item.file_name, columns=item.signal_names)
         else:
             raise ValueError(
                 "Unsupported file format {}".format(Path(item.file_name).suffix)
@@ -311,17 +312,22 @@ class SALDataLoader(DataLoader):
     """DataLoader for retrieving data using the SAL access layer"""
 
     def __init__(self):
+        super().__init__()
         from sal.client import SALClient
 
         host = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
         self.client = SALClient(host)
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        item: ShotData = sample.data
+    @classmethod
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
+
+    def get_sample(self, sample: Sample, **kwargs) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
+        sample_data: ShotData = sample.data
 
         results = {}
-        for name in item.signal_names:
+        for name in sample_data.signal_names:
             full_name = f"/pulse/{sample.shot_id}/{name}"
             signal = self.client.get(full_name)
             data = signal.data
@@ -334,19 +340,20 @@ class SALDataLoader(DataLoader):
 
 @LoaderRegistry.register("toksearch")
 class TokSearchDataLoader(DataLoader):
-    def __init__(self):
-        super().__init__()
+    @classmethod
+    def sample_data_type(self) -> Type[ToksearchShotData]:
+        return ToksearchShotData
 
-    def get_sample(self, sample: Sample) -> MultiVariateTimeSeriesData:
-        item: ToksearchShotData = sample.data
+    def get_sample(self, sample: Sample, **kwargs) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ToksearchShotData), (
             "Sample data must be of type ToksearchShotData"
         )
+        sample_data: ToksearchShotData = sample.data
 
-        endpoint = item.endpoint
-        base_path = item.base_path
+        endpoint = sample_data.endpoint
+        base_path = sample_data.base_path
 
-        if item.backend_type != "zarr":
+        if sample_data.backend_type != "zarr":
             raise ValueError("Only zarr backend is currently supported")
 
         self.fs = s3fs.S3FileSystem(anon=True, endpoint_url=endpoint, asynchronous=True)
@@ -354,7 +361,7 @@ class TokSearchDataLoader(DataLoader):
         from toksearch.signal.zarr import ZarrSignal
 
         results = {}
-        for name in item.signal_names:
+        for name in sample_data.signal_names:
             signal = ZarrSignal(base_path, name, fs=self.fs)
             ds = signal.fetch_as_xarray(sample.shot_id)
             data = ds.data

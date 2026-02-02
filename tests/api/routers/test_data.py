@@ -16,5 +16,5 @@ async def test_get_data(api_client, setup_db):
     assert not data["values"].get("dalpha")
     assert data["values"]["Ip"]["time"] == list(range(100))
     # Load data from parquet, check it matches
-    df = pd.read_parquet(pathlib.Path(__file__).parents[2].joinpath("test.parquet"))
+    df = pd.read_csv(pathlib.Path(__file__).parents[2].joinpath("test.csv"))
     assert data["values"]["Ip"]["values"] == df.Ip.tolist()

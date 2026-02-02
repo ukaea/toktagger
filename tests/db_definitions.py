@@ -8,6 +8,8 @@ from toktagger.api.schemas.samples import (
     ShotData,
     TimeSeriesFileData,
     ShotProtocol,
+    FileType,
+    FileProtocol,
 )
 from toktagger.api.schemas.annotations import (
     TimePoint,
@@ -88,7 +90,10 @@ SAMPLE_2 = SampleIn(
 SAMPLE_3 = SampleIn(
     shot_id=3,
     data=TimeSeriesFileData(
-        file_name="test.csv", type="csv", protocol="s3", signal_names=["Ip"]
+        file_name="test.csv",
+        type=FileType.CSV,
+        protocol=FileProtocol.S3,
+        signal_names=["Ip"],
     ),
     annotations=None,
 )
@@ -96,8 +101,8 @@ SAMPLE_4 = SampleIn(
     shot_id=4,
     data=TimeSeriesFileData(
         file_name=str(pathlib.Path(__file__).parent.joinpath("test.csv").absolute()),
-        type="tabular",
-        protocol="file",
+        type=FileType.CSV,
+        protocol=FileProtocol.LOCAL,
         signal_names=["Ip"],
     ),
     annotations=None,
