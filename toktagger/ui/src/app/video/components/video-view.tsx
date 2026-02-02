@@ -1,12 +1,9 @@
 "use client";
 
 import React, {useState } from "react";
-import type { Annotation, DataParams } from "@/types";
+import type {  DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
-import { BACKEND_API_URL } from "@/app/core";
-
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
-
 import { useVideoSession } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 
