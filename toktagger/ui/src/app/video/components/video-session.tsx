@@ -6,6 +6,7 @@ import React, {
   useContext,
   useMemo,
   useState,
+  useEffect,
   useLayoutEffect,
 } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
@@ -122,6 +123,7 @@ export function VideoSessionProvider(props: {
   sampleId: string;
   data: unknown;
   dataParams: DataParams;
+  dbAnnotations: Annotation[];
   children: React.ReactNode;
 }) {
   const { projectId, sampleId, children } = props;
@@ -350,6 +352,13 @@ export function VideoSessionProvider(props: {
     },
     [byFrame.size, dirty, projectId, sampleId],
   );
+
+  // Seed session state from backend annotations once (no-op if the session already has data).
+  useEffect(() => {
+    if (!props.dbAnnotations || props.dbAnnotations.length === 0) return;
+    seedFromDbIfEmpty(props.dbAnnotations);
+  }, [props.dbAnnotations, seedFromDbIfEmpty]);
+
 
   const value = useMemo<VideoSessionCtx>(
     () => ({

@@ -111,12 +111,12 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
               sampleId={props.sampleId}
               data={data}
               dataParams={dataParams}
+              dbAnnotations={annotations ?? []}
             >
               <ToolBar />
               <div className="flex-1 flex justify-center">
                 <VideoViewInner
                   data={data}
-                  annotations={annotations ?? []}
                   projectId={props.projectId}
                   sampleId={props.sampleId}
                   dataParams={dataParams}

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import type { Annotation, DataParams } from "@/types";
+import React, {useState } from "react";
+import type {DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
 
@@ -64,7 +64,6 @@ export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
 
 export type VideoViewProps = {
   data: unknown; // ImageData
-  annotations: Annotation[];
   projectId: string;
   sampleId: string;
 
@@ -89,7 +88,6 @@ export type VideoViewProps = {
  */
 function VideoFrameAnnotator(props: {
   imageBase64: string;
-  dbAnnotations: Annotation[];
   onSaveBackend: (payload: Annotation[]) => Promise<void>;
   goToFrame: (n: number) => void;
 
@@ -97,14 +95,8 @@ function VideoFrameAnnotator(props: {
   onNext?: () => void;
   onJump?: (n: number) => void;
 }) {
-  const session = useVideoSession();
-  const { seedFromDbIfEmpty } = session;
 
-  // Seed session state from backend annotations once (no-op if the session already has data).
-  useEffect(() => {
-    if (props.dbAnnotations.length === 0) return;
-    seedFromDbIfEmpty(props.dbAnnotations);
-  }, [props.dbAnnotations, seedFromDbIfEmpty]);
+  const session = useVideoSession();
 
   const handlePrev = () => {
     const prev = Math.max(0, session.frame - 1);
@@ -210,7 +202,6 @@ export function VideoViewInner(props: VideoViewProps) {
       <div className="w-full max-w-5xl mx-auto px-4 py-3">
         <VideoFrameAnnotator
           imageBase64={imageBase64}
-          dbAnnotations={props.annotations}
           onSaveBackend={onSaveBackend}
           goToFrame={goToFrame}
           onPrev={props.onPrev}
