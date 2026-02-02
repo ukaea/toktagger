@@ -322,7 +322,11 @@ export function VideoSessionProvider(props: {
 
         const vb = parsed.data;
         const key = buildSourceKey({ projectId, sampleId, frame: vb.frame });
-        const anno = videoBBoxToAnno(vb, key);
+        const vbForAnno: VideoBoundingBox = {
+          ...vb,
+          timestamp: vb.timestamp ?? undefined,
+      };
+      const anno = videoBBoxToAnno(vbForAnno, key);
 
         const cur = byF.get(vb.frame) ?? [];
         cur.push(anno);
