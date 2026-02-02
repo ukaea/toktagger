@@ -1,5 +1,6 @@
 import requests
 import pathlib
+import tests.db_definitions as db_definitions
 
 
 def create_project(
@@ -100,3 +101,22 @@ def create_uda_samples(
 
     assert response.status_code == 200
     return response.json()
+
+
+def create_model_samples(setup_model_samples):
+    response = requests.post(
+        "http://localhost:8002/projects",
+        json=db_definitions.PROJECT_2.model_dump(mode="json"),
+    )
+    assert response.status_code == 200
+
+    project_id = response.json()["_id"]
+
+    response = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples",
+        json=[sample.model_dump(mode="json") for sample in setup_model_samples],
+    )
+    assert response.status_code == 200
+    sample_ids = response.json()
+
+    return project_id, sample_ids

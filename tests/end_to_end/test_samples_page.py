@@ -2,7 +2,12 @@ from playwright.sync_api import Page, expect
 import re
 from datetime import datetime
 import pathlib
-from tests.endpoints import create_project, create_local_samples, create_uda_samples
+from tests.endpoints import (
+    create_project,
+    create_local_samples,
+    create_uda_samples,
+    create_model_samples,
+)
 import time
 import requests
 import tempfile
@@ -586,3 +591,51 @@ def test_samples_page_export_annotations(server_setup, page: Page):
     assert exported_control_loss["time"] == 61
     assert exported_control_loss["shot_id"] == 10001
     assert exported_control_loss["sample_id"] == sample_ids[1]
+
+
+def test_model_train(server_setup, setup_model_samples, page: Page):
+    project_id, sample_ids = create_model_samples(setup_model_samples)
+
+    # Navigate to projects page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Click on model train modal
+    page.get_by_role("button", name="Train ML Model").click()
+
+    # Check modal has opened
+    expect(page.get_by_role("heading", name="Train ML Model")).to_be_visible()
+    expect(page.get_by_role("combobox", name="Select Model Type")).to_be_visible()
+    expect(page.get_by_role("button", name="Close")).to_be_visible()
+    expect(page.get_by_role("button", name="Train", exact=True)).to_be_visible()
+
+    # Click on dropdown box, check 'disruption_cnn' is shown
+    page.get_by_role("button", name="Select Model Type").click()
+    expect(
+        page.get_by_role("option", name="disruption_cnn", exact=True)
+    ).to_be_visible()
+    expect(
+        page.get_by_role("option", name="mock_disruption_cnn", exact=True)
+    ).to_be_visible()
+    page.get_by_role("option", name="mock_disruption_cnn", exact=True).click()
+
+    # Click train, should get accepted message
+    page.get_by_role("button", name="Train", exact=True).click()
+    expect(page.get_by_text("Model training added to job queue!")).to_be_visible()
+
+    # Close modal, check it disappears
+    page.get_by_role("button", name="Close", exact=True).click()
+
+    expect(page.get_by_role("heading", name="Train ML Model")).to_be_hidden()
+    expect(page.get_by_role("combobox", name="Select Model Type")).to_be_hidden()
+    expect(page.get_by_role("button", name="Close")).to_be_hidden()
+    expect(page.get_by_role("button", name="Train", exact=True)).to_be_hidden()
+
+    # Open predict modal, check entry is there
+    page.get_by_role("button", name="Create Predictions from ML Model").click()
+    modal = page.get_by_role("dialog", name="Create Predictions from ML Model")
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_disruption_cnn")
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
