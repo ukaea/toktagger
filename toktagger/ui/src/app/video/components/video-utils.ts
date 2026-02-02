@@ -160,7 +160,7 @@ export function existingTrackIdsForClass(
     trackId?: string | null;
   },
 ): string[] {
-  const cls = (className || "").trim();
+  const cls = className.trim();
   if (!cls) return [];
 
   const out: string[] = [];
@@ -282,7 +282,7 @@ export function deleteTrackAcrossFrames(
     trackId?: string | null;
   },
 ): ByFrameMap {
-  const cls = (match.className || "").trim();
+  const cls = match.className.trim();
   const tid = ensureTrackId(match.trackId);
 
   const next = new Map<FrameIndex, ImageAnnotation[]>();
@@ -334,7 +334,7 @@ export function nextTrackIdForClass(
     trackId?: string | null;
   },
 ): string {
-  const key = (className || "").trim();
+  const key = className.trim();
   if (!key) return "1";
 
   let max = 0;
