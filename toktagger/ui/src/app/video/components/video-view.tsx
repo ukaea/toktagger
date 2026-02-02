@@ -1,7 +1,7 @@
 "use client";
 
 import React, {useState } from "react";
-import type {DataParams } from "@/types";
+import type { Annotation, DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
 
