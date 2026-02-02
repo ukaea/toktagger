@@ -268,18 +268,10 @@ export function VideoSessionProvider(props: {
   const forwardPropToNextIfEmpty = useCallback(
     (nextFrame: FrameIndex) => {
       setByFrame((prev) => {
-        const next = forwardPropagateIfEmpty(
-          prev,
-          frame,
-          nextFrame,
-          (a, nf) => {
-            const nextKey = buildSourceKey({ projectId, sampleId, frame: nf });
-            return {
-              ...a,
-              target: { ...a.target, source: nextKey },
-            };
-          },
-        );
+        const next = forwardPropagateIfEmpty(prev, frame, nextFrame, {
+          projectId,
+          sampleId,
+        });
 
         // Only mark dirty if we actually seeded the next frame.
         if (next !== prev) setDirty(true);

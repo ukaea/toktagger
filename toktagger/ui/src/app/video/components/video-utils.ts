@@ -7,7 +7,7 @@ import type {
   InstanceProfile,
   TrackKey,
 } from "./types";
-import { classIdForName, makeTrackKey } from "./types";
+import { classIdForName, makeTrackKey, buildSourceKey } from "./types";
 
 /**
  * Simple deep clone for annotation payloads.
@@ -308,7 +308,7 @@ export function forwardPropagateIfEmpty(
   byFrame: ByFrameMap,
   frame: FrameIndex,
   nextFrame: FrameIndex,
-  withRetarget: (a: ImageAnnotation, nextFrame: FrameIndex) => ImageAnnotation,
+  ids: { projectId: string; sampleId: string },
 ): ByFrameMap {
   const cur = byFrame.get(frame) ?? [];
   if (cur.length === 0) return byFrame;
@@ -316,11 +316,25 @@ export function forwardPropagateIfEmpty(
   const nxt = byFrame.get(nextFrame) ?? [];
   if (nxt.length > 0) return byFrame;
 
-  const seeded = cur.map((a) => withRetarget(deepClone(a), nextFrame));
+  const nextKey = buildSourceKey({
+    projectId: ids.projectId,
+    sampleId: ids.sampleId,
+    frame: nextFrame,
+  });
+
+  const seeded = cur.map((a) => {
+    const cloned = deepClone(a);
+    return {
+      ...cloned,
+      target: { ...cloned.target, source: nextKey },
+    };
+  });
+
   const next = new Map(byFrame);
   next.set(nextFrame, seeded);
   return next;
 }
+
 
 /**
  * Allocate the next numeric track id for a class by scanning existing instances.
