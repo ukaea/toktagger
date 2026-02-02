@@ -22,7 +22,7 @@ export function deepClone<T>(v: T): T {
  * We keep this intentionally conservative (no heavy validation), just formatting.
  */
 export function canonicalizeTrackId(trackId: string): string {
-  const s = String(trackId ?? "").trim();
+  const s = trackId.trim();
   if (!s) return "";
   return s.replace(/\s+/g, "-").toLowerCase();
 }
@@ -126,7 +126,7 @@ export function uniqueReadableTrackId(
 ): string {
   const used = new Set<string>();
   for (const t of existingTrackIds) {
-    const c = canonicalizeTrackId(String(t ?? ""));
+    const c = canonicalizeTrackId(t);
     if (c) used.add(c);
   }
 
