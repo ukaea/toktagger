@@ -33,7 +33,7 @@ export function canonicalizeTrackId(trackId: string): string {
  */
 export function ensureTrackId(trackId: string): string {
   const c = canonicalizeTrackId(trackId);
-  return c || "1";
+  return c.length > 0 ? c : "1";
 }
 
 /* ------------------------------------------------------------------ */
