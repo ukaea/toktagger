@@ -11,24 +11,6 @@ import { useVideoSession } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 
 /**
- * Persist the current session annotations to the backend for this sample.
- * Payload is expected to already be in the backend annotation format.
- */
-async function saveVideoAnnotations(
-  project_id: string,
-  sample_id: string,
-  annotations: Annotation[],
-) {
-  const url = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(annotations),
-  });
-  return response;
-}
-
-/**
  * Small "jump to frame" input with validation. Delegates the actual navigation
  * to the parent via `onJump`.
  */
@@ -88,7 +70,6 @@ export type VideoViewProps = {
  */
 function VideoFrameAnnotator(props: {
   imageBase64: string;
-  onSaveBackend: (payload: Annotation[]) => Promise<void>;
   goToFrame: (n: number) => void;
 
   onPrev?: () => void;
@@ -183,26 +164,11 @@ export function VideoViewInner(props: VideoViewProps) {
     );
   };
 
-  const onSaveBackend = async (payload: Annotation[]) => {
-    const res = await saveVideoAnnotations(
-      props.projectId,
-      props.sampleId,
-      payload,
-    );
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(
-        `Failed to save video annotations (${res.status}): ${txt || res.statusText}`,
-      );
-    }
-  };
-
   return (
     <div className="w-full flex justify-center">
       <div className="w-full max-w-5xl mx-auto px-4 py-3">
         <VideoFrameAnnotator
           imageBase64={imageBase64}
-          onSaveBackend={onSaveBackend}
           goToFrame={goToFrame}
           onPrev={props.onPrev}
           onNext={props.onNext}
