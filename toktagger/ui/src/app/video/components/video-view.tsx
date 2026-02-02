@@ -79,15 +79,15 @@ export type VideoViewProps = {
 };
 
 /**
- * Chrome and controls around the frame annotator:
- * - Displays the current frame number
- * - Prev/Next navigation and jump-to-frame
+ * Frame annotator UI wrapper:
+ * - Renders the frame navigation (prev/next + jump)
+ * - Shows the current frame index (from session state)
  * - Seeds the session overlay from backend annotations (one-shot)
  *
- * Note: the frame number shown here comes from the session. The outer page is
- * responsible for updating the session frame when the backend image changes.
+ * Note: this component does not fetch frames. The parent drives frame changes by
+ * updating dataParams and passing the new image when the backend responds.
  */
-function VideoChromeV2(props: {
+function VideoFrameAnnotator(props: {
   imageBase64: string;
   dbAnnotations: Annotation[];
   onSaveBackend: (payload: Annotation[]) => Promise<void>;
@@ -208,7 +208,7 @@ export function VideoViewInner(props: VideoViewProps) {
   return (
     <div className="w-full flex justify-center">
       <div className="w-full max-w-5xl mx-auto px-4 py-3">
-        <VideoChromeV2
+        <VideoFrameAnnotator
           imageBase64={imageBase64}
           dbAnnotations={props.annotations}
           onSaveBackend={onSaveBackend}
