@@ -20,7 +20,7 @@ import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
 
-import { VideoViewInner } from "@/app/video/components/VideoView";
+import { VideoViewInner } from "@/app/video/components/video-view";
 import { VideoSessionProvider } from "@/app/video/components/video-session";
 
 type SampleDataBreadCrumbsInfo = {

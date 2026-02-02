@@ -1,4 +1,3 @@
-// toktagger/ui/src/app/video/components/FrameAnnotatorHost.tsx
 "use client";
 
 import React, {
@@ -30,7 +29,7 @@ import {
   existingTrackIdsForClass,
   uniqueReadableTrackId,
 } from "./video-utils";
-import { AnnotationPopup } from "./AnnotationPopup";
+import { AnnotationPopup } from "./annotation-popup";
 
 /**
  * Narrow API surface we rely on from Annotorious.

@@ -8,7 +8,7 @@ import { BACKEND_API_URL } from "@/app/core";
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
-import { FrameAnnotatorHost } from "./FrameAnnotatorHost";
+import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 
 /**
  * Persist the current session annotations to the backend for this sample.

@@ -35,7 +35,7 @@ import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
-import { VideoSidebar } from "@/app/video/components/VideoSidebar";
+import { VideoSidebar } from "@/app/video/components/video-sidebar";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
