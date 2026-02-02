@@ -17,12 +17,12 @@ import "@annotorious/react/annotorious-react.css";
 
 import {
   useVideoSession,
-  normalizeOverlayForSession,
 } from "@/app/video/components/video-session";
 import {
   getLabelTrack,
   readRectGeometry,
   stampLabelAndTrack,
+  normalizeOverlayForSession,
 } from "./anno-utils";
 import {
   canonicalizeTrackId,
