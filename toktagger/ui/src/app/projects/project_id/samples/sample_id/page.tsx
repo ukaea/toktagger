@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useLayoutEffect, useState } from "react";
+import React from "react";
 import {
   Provider,
   defaultTheme,
@@ -19,7 +19,6 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-
 import { VideoViewInner } from "@/app/video/components/video-view";
 import { VideoSessionProvider } from "@/app/video/components/video-session";
 
@@ -73,33 +72,6 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
 
   const isVideo = project?.task === TaskType.Video;
 
-  // Hooks must be called unconditionally (no early returns before this).
-  const [videoFrame, setVideoFrame] = useState<number | null>(null);
-
-  // For video we assume backend returns { frame: number, values: base64, ... }
-  const frameFromBackend = (() => {
-    if (!isVideo) return 0;
-    if (!data) return 0;
-    const maybe = data as unknown as { frame?: number };
-    return maybe?.frame ?? 0;
-  })();
-
-  useLayoutEffect(() => {
-    if (!isVideo) return;
-    if (!data) return;
-
-    const dp = dataParams as unknown as {
-      name?: string;
-      frame?: number | null;
-    };
-
-    if (dp.name === "image" && dp.frame != null) {
-      if (frameFromBackend !== dp.frame) return;
-    }
-
-    setVideoFrame(frameFromBackend);
-  }, [isVideo, data, frameFromBackend, dataParams]);
-
   // Early returns AFTER all hooks
   if (error) return <ErrorView message={error} />;
 
@@ -119,12 +91,10 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
     );
   }
 
-  // Only hard-block on loading for non-video.
-  if (!isVideo && isLoading) return <LoadingView />;
+  // Hard-block on loading for all tasks.
+  if (isLoading && !data) return <LoadingView />;
 
-  // Keep video UI mounted; for initial load (no data yet) show loading.
-  if (!data && !isVideo) return null;
-  if (!data && isVideo) return <LoadingView />;
+  if (!data) return null;
 
   return (
     <div>
@@ -139,8 +109,8 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
               key={`${props.projectId}:${props.sampleId}`}
               projectId={props.projectId}
               sampleId={props.sampleId}
-              frame={videoFrame ?? frameFromBackend}
-              setFrame={(n) => setVideoFrame(n)}
+              data={data}
+              dataParams={dataParams}
             >
               <ToolBar />
               <div className="flex-1 flex justify-center">

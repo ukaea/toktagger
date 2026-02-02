@@ -6,10 +6,11 @@ import React, {
   useContext,
   useMemo,
   useState,
+  useLayoutEffect,
 } from "react";
 import type { ImageAnnotation } from "@annotorious/react";
 
-import type { Annotation } from "@/types";
+import type { Annotation, DataParams } from "@/types";
 import { VideoBoundingBoxSchema } from "@/types";
 import type {
   ByFrameMap,
@@ -115,16 +116,46 @@ export function useVideoSession(): VideoSessionCtx {
 
 /**
  * Provides shared session state for the video annotation UI.
- * The page owns the current frame number; this provider owns the overlays and selection.
+ * This provider owns the current frame number, overlays, and selection.
  */
 export function VideoSessionProvider(props: {
   projectId: string;
   sampleId: string;
-  frame: FrameIndex;
-  setFrame: (n: FrameIndex) => void;
+  data: unknown;
+  dataParams: DataParams;
   children: React.ReactNode;
 }) {
-  const { projectId, sampleId, frame, setFrame, children } = props;
+  const { projectId, sampleId, children } = props;
+
+  const [videoFrame, setVideoFrame] = useState<number | null>(null);
+
+  // For video we assume backend returns { frame: number, values: base64, ... }
+  const frameFromBackend = useMemo(() => {
+    if (!props.data) return 0;
+    const maybe = props.data as unknown as { frame?: number };
+    return maybe?.frame ?? 0;
+  }, [props.data]);
+
+  useLayoutEffect(() => {
+    if (!props.data) return;
+
+    const dp = props.dataParams as unknown as {
+      name?: string;
+      frame?: number | null;
+    };
+
+    if (dp.name === "image" && dp.frame != null) {
+      if (frameFromBackend !== dp.frame) return;
+    }
+
+    setVideoFrame(frameFromBackend);
+  }, [props.data, frameFromBackend, props.dataParams]);
+
+  const frame: FrameIndex = (videoFrame ?? frameFromBackend) as FrameIndex;
+
+  const setFrame = useCallback((n: FrameIndex) => {
+    setVideoFrame(n);
+  }, []);
 
   const [byFrame, setByFrame] = useState<ByFrameMap>(() => new Map());
   const [dirty, setDirty] = useState(false);
