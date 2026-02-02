@@ -316,21 +316,32 @@ export function VideoSessionProvider(props: {
 
       const byF = new Map<number, ImageAnnotation[]>();
 
+      let invalid = 0;
+
       for (const a of dbAnnotations) {
         const parsed = VideoBoundingBoxSchema.safeParse(a);
-        if (!parsed.success) continue;
+        if (!parsed.success) {
+          invalid += 1;
+          continue;
+        }
 
         const vb = parsed.data;
         const key = buildSourceKey({ projectId, sampleId, frame: vb.frame });
         const vbForAnno: VideoBoundingBox = {
           ...vb,
           timestamp: vb.timestamp ?? undefined,
-      };
-      const anno = videoBBoxToAnno(vbForAnno, key);
+        };
+        const anno = videoBBoxToAnno(vbForAnno, key);
 
         const cur = byF.get(vb.frame) ?? [];
         cur.push(anno);
         byF.set(vb.frame, cur);
+      }
+
+      if (invalid > 0) {
+        console.warn(
+          `[video] seedFromDbIfEmpty: skipped ${invalid} invalid annotation(s) from backend (failed VideoBoundingBoxSchema).`,
+        );
       }
 
       if (byF.size === 0) return;
