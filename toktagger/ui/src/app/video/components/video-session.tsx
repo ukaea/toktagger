@@ -211,8 +211,7 @@ export function VideoSessionProvider(props: {
   const createNewInstanceForClass = useCallback(
     (className: string) => {
       const cname = (className || "").trim();
-      const nextId = nextTrackIdForClass(byFrame, cname, getLabelTrack);
-      const trackId = String(nextId);
+      const trackId = nextTrackIdForClass(byFrame, cname, getLabelTrack);
 
       setSelectionState({ className: cname, trackId, source: "auto" });
       return { className: cname, trackId };
