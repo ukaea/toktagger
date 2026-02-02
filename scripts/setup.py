@@ -132,6 +132,22 @@ def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
     r.raise_for_status()
 
 
+def create_uda_camera_samples(project_id: str, shot_ids: list[int]):
+    samples = []
+    for shot_id in shot_ids:
+        sample = {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "signal_names": ["rbb"],
+                "protocol": "uda_camera",
+            },
+        }
+        samples.append(sample)
+
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument(
@@ -158,7 +174,7 @@ def main():
         "Local ELM Project", "time-series", "tabular", "sequential"
     )
     create_local_samples(
-        project_id, shot_ids, base_path=base_path / "summary", file_type="tabular"
+        project_id, shot_ids, base_path=base_path / "summary", file_type="parquet"
     )
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
@@ -171,7 +187,7 @@ def main():
         project_id,
         shot_ids,
         base_path=base_path / "mhd",
-        file_type="tabular",
+        file_type="parquet",
         signals=["mirnov"],
     )
     # ---- Image / UFO demo project ----
@@ -180,17 +196,26 @@ def main():
 
     # JET data
     project_id = create_project(
-        "SAL Disruption Project", "disruption", "sal", query_strategy="sequential"
+        "SAL Disruption Project", "time-series", "sal", query_strategy="sequential"
     )
     shot_ids = [87737]
     create_sal_samples(project_id, shot_ids)
 
     # Toksearch - FAIR MAST
     project_id = create_project(
-        "Toksearch MAST Project", "disruption", "toksearch", query_strategy="sequential"
+        "Toksearch MAST Project",
+        "time-series",
+        "toksearch",
+        query_strategy="sequential",
     )
     shot_ids = [30421]
     create_toksearch_samples(project_id, shot_ids)
+
+    shot_ids = [30421]
+    project_id = create_project(
+        "UDA Camera Frame Project", "video", "uda_camera", "random"
+    )
+    create_uda_camera_samples(project_id, shot_ids)
 
     print("Projects and samples created successfully.")
 

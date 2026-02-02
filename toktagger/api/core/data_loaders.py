@@ -4,6 +4,7 @@ import types
 import os
 import s3fs
 import pandas as pd
+import xarray as xr
 import pathlib
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -243,12 +244,6 @@ class TabularDataLoader(DataLoader):
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
-    def __init__(self, params):
-        super().__init__(params)
-        import pyuda
-
-        self.client = pyuda.Client()
-
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
@@ -271,9 +266,9 @@ class UDADataLoader(DataLoader):
         results = {}
         for name in sample_data.signal_names:
             try:
-                signal = self.client.get(name, sample.shot_id)
-                data = signal.data
-                time = signal.time.data
+                signal = xr.open_dataset(f"uda://{name}:{sample.shot_id}", engine="uda")
+                data = signal["data"].values
+                time = signal["time"].values
 
                 if time_min is not None:
                     mask = time >= time_min
@@ -307,33 +302,111 @@ class UDADataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
-@LoaderRegistry.register("sal")
-class SALDataLoader(DataLoader):
-    """DataLoader for retrieving data using the SAL access layer"""
+@LoaderRegistry.register("uda_camera")
+class UDACameraDataLoader(DataLoader):
+    """DataLoader for retrieving camera image data using the UDA access layer"""
 
-    def __init__(self):
-        super().__init__()
-        from sal.client import SALClient
-
-        host = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
-        self.client = SALClient(host)
+    def __init__(self, params: DataParamTypes):
+        super().__init__(params)
 
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
 
-    def get_sample(self, sample: Sample, **kwargs) -> MultiVariateTimeSeriesData:
+    def get_sample(
+        self,
+        sample: Sample,
+        **kwargs,
+    ) -> ImageData:
+        if not isinstance(sample.data, ShotData):
+            raise TypeError(
+                f"Expected sample data of type 'ShotData' but got '{type(sample.data)}'"
+            )
+
+        sample_data: ShotData = sample.data
+
+        if len(sample_data.signal_names) != 1:
+            raise ValueError("UDA Camera DataLoader expects exactly one signal name.")
+
+        signal_name = sample_data.signal_names[0]
+        try:
+            if self.params.frame is None:
+                self.params.frame = 0  # Default to first frame if not specified
+
+            signal = xr.open_dataset(
+                f"uda://{signal_name}:{sample.shot_id}",
+                engine="uda",
+                frame_number=self.params.frame,
+            )
+
+            image_array = signal["data"].values
+            image_array = np.squeeze(image_array)
+
+            im = Image.fromarray(image_array)
+            buffer = io.BytesIO()
+            im.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            return ImageData(
+                frame=str(self.params.frame),
+                values=base64.b64encode(buffer.getvalue()).decode(),
+            )
+        except Exception as e:
+            raise DataLoaderError(
+                f"Could not load image signal '{signal_name}' for shot ID '{sample.shot_id}': {e}"
+            )
+
+
+@LoaderRegistry.register("sal")
+class SALDataLoader(DataLoader):
+    """DataLoader for retrieving data using the SAL access layer"""
+
+    @classmethod
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
+
+    def get_sample(
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
+        **kwargs,
+    ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
 
         results = {}
         for name in sample_data.signal_names:
-            full_name = f"/pulse/{sample.shot_id}/{name}"
-            signal = self.client.get(full_name)
-            data = signal.data
-            time = signal.dimensions[0].data
-            item = TimeSeriesData(time=time, values=data)
-            results[name] = item
+            full_name = f"pulse/{sample.shot_id}/{name}"
+            try:
+                signal = xr.open_dataset(f"sal://{full_name}", engine="sal")
+                data = signal["data"].values
+                time = signal["time"].values
+
+                if time_min is not None:
+                    mask = time >= time_min
+                    time = time[mask]
+                    data = data[mask]
+
+                if time_max is not None:
+                    mask = time <= time_max
+                    time = time[mask]
+                    data = data[mask]
+
+                if (
+                    min_time_step is not None
+                    and len(time) > 1
+                    and np.diff(time).mean() < min_time_step
+                ):
+                    time_base = np.arange(time[0], time[-1], min_time_step)
+                    data = np.interp(time_base, time, data)
+                    time = time_base
+
+                item = TimeSeriesData(time=time, values=data)
+                results[name] = item
+            except Exception:
+                results[name] = None
 
         return MultiVariateTimeSeriesData(values=results)
 
@@ -344,7 +417,14 @@ class TokSearchDataLoader(DataLoader):
     def sample_data_type(self) -> Type[ToksearchShotData]:
         return ToksearchShotData
 
-    def get_sample(self, sample: Sample, **kwargs) -> MultiVariateTimeSeriesData:
+    def get_sample(
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
+        **kwargs,
+    ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ToksearchShotData), (
             "Sample data must be of type ToksearchShotData"
         )
@@ -362,11 +442,34 @@ class TokSearchDataLoader(DataLoader):
 
         results = {}
         for name in sample_data.signal_names:
-            signal = ZarrSignal(base_path, name, fs=self.fs)
-            ds = signal.fetch_as_xarray(sample.shot_id)
-            data = ds.data
-            time = ds.times.data
-            item = TimeSeriesData(time=time, values=data)
-            results[name] = item
+            try:
+                signal = ZarrSignal(base_path, name, fs=self.fs)
+                ds = signal.fetch_as_xarray(sample.shot_id)
+                data = ds.data
+                time = ds.times.data
+
+                if time_min is not None:
+                    mask = time >= time_min
+                    time = time[mask]
+                    data = data[mask]
+
+                if time_max is not None:
+                    mask = time <= time_max
+                    time = time[mask]
+                    data = data[mask]
+
+                if (
+                    min_time_step is not None
+                    and len(time) > 1
+                    and np.diff(time).mean() < min_time_step
+                ):
+                    time_base = np.arange(time[0], time[-1], min_time_step)
+                    data = np.interp(time_base, time, data)
+                    time = time_base
+
+                item = TimeSeriesData(time=time, values=data)
+                results[name] = item
+            except Exception:
+                results[name] = None
 
         return MultiVariateTimeSeriesData(values=results)

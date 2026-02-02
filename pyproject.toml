@@ -42,6 +42,8 @@ dependencies = [
   "pyspark>=4.0.0",
   "hmmlearn>=0.3.3",
   "ray>=2.51.1",
+  "uda-xarray>=0.2.1",
+  "sal-xarray>=0.2.1",
 ]
 
 [tool.setuptools.packages.find]

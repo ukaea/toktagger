@@ -24,6 +24,7 @@ class FileProtocol(str, Enum):
 
 class ShotProtocol(str, Enum):
     UDA = "uda"
+    UDA_CAMERA = "uda_camera"
     SAL = "sal"
     TOKSEARCH = "toksearch"
 

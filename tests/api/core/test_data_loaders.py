@@ -18,6 +18,7 @@ from toktagger.api.schemas.data import (
     ImageData,
     ImageParams,
     DataParams,
+    LoaderType,
 )
 import pathlib
 import numpy
@@ -138,6 +139,36 @@ def test_uda_loader(uda_env_vars):
     times = numpy.array(data.values.get("ip").time)
     assert numpy.all((ip_values >= -50) & (ip_values <= 1000))
     assert numpy.max(times) < 1.5
+
+
+def test_uda_camera_loader(uda_env_vars):
+    try:
+        import pyuda
+
+        pyuda.Client().get("help::help()")
+    except Exception:
+        pytest.skip("Could not contact UDA server")
+
+    camera_name = "rba"
+    uda_shot = ShotData(protocol=ShotProtocol.UDA, signal_names=[camera_name])
+    sample = Sample(
+        shot_id=30421,
+        data=uda_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data_loader = data_loaders.UDACameraDataLoader(
+        params=ImageParams(name=LoaderType.IMAGE, frame=0)
+    )
+    data = data_loader.get_sample(sample)
+    assert isinstance(data, ImageData)
+    # Check we got back base64 encoded string
+    assert isinstance(data.values, str)
+    # Convert back to numpy array
+    base64_decoded = base64.b64decode(data.values)
+    image = Image.open(io.BytesIO(base64_decoded))
+    assert numpy.array(image).shape == (912, 768)
 
 
 def test_uda_loader_data_doesnt_exist(uda_env_vars):
