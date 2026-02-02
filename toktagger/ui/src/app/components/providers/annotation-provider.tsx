@@ -73,7 +73,7 @@ export const ContextMenuProvider = ({
   // Set up listeners to toggle tooling interaction
   useEffect(() => {
     const disableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Shift" || event.key === "Control") {
+      if (event.key === "Alt") {
         if (!keyHeldRef.current) {
           keyHeldRef.current = true;
           setDisableToolInteraction(true);
@@ -82,7 +82,7 @@ export const ContextMenuProvider = ({
     };
 
     const enableInteraction = (event: KeyboardEvent) => {
-      if (event.key === "Shift" || event.key === "Control") {
+      if (event.key === "Alt") {
         keyHeldRef.current = false;
         setDisableToolInteraction(false);
       }

@@ -1,4 +1,5 @@
 import pytest
+from bson.objectid import ObjectId
 
 
 @pytest.mark.asyncio
@@ -8,7 +9,7 @@ async def test_get_all_samples(api_client, setup_db):
     )
     assert response.status_code == 200
     returned_samples = response.json()
-    assert [sample["shot_id"] for sample in returned_samples] == [1, 3]
+    assert [sample["shot_id"] for sample in returned_samples] == [1, 2]
     assert [sample["_id"] for sample in returned_samples] == [
         setup_db["sample_id_1"],
         setup_db["sample_id_2"],
@@ -25,7 +26,7 @@ async def test_get_all_samples_sortby(api_client, setup_db):
     # Default sort direction is descending, so will return the opposite of this: 2, 3, 1
     assert response.status_code == 200
     returned_samples = response.json()
-    assert [sample["shot_id"] for sample in returned_samples] == [3, 1]
+    assert [sample["shot_id"] for sample in returned_samples] == [2, 1]
     assert [sample["_id"] for sample in returned_samples] == [
         setup_db["sample_id_2"],
         setup_db["sample_id_1"],
@@ -188,7 +189,7 @@ async def test_create_samples(api_client, setup_db, db_client):
                 "protocol": "file",
                 "type": "parquet",
                 "file_name": "test.parquet",
-                "column_names": ["Ip", "dalpha"],
+                "signal_names": ["Ip", "dalpha"],
             },
         },
     ]
@@ -241,6 +242,30 @@ async def test_create_sample_invalid(api_client, setup_db, db_client):
 
 
 @pytest.mark.asyncio
+async def test_batch_update_samples(api_client, setup_db, db_client):
+    update_samples_batch = [
+        {"id": setup_db["sample_id_1"], "updates": {"validated_annotations": True}},
+        {"id": setup_db["sample_id_2"], "updates": {"validated_annotations": True}},
+    ]
+
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/samples", json=update_samples_batch
+    )
+    assert response.status_code == 200
+
+    # Check they have been updated
+    sample_1 = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_1"])
+    )
+    assert sample_1["validated_annotations"] is True
+
+    sample_2 = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_2"])
+    )
+    assert sample_2["validated_annotations"] is True
+
+
+@pytest.mark.asyncio
 async def test_get_samples_summary(api_client, setup_db):
     response = await api_client.get(
         f"/projects/{setup_db['project_id_1']}/samples/summary"
@@ -249,4 +274,4 @@ async def test_get_samples_summary(api_client, setup_db):
     summary = response.json()
     assert summary.get("total") == 2
     assert summary.get("shot_min") == 1
-    assert summary.get("shot_max") == 3
+    assert summary.get("shot_max") == 2

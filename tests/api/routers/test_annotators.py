@@ -3,7 +3,10 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_annotators_invalid_type(api_client, setup_db):
-    params = {"signal_name": "Ip", "prominence": 10, "distance": 5}
+    params = {
+        "annotator_params": {"signal_name": "Ip", "prominence": 10, "distance": 5},
+        "data_params": {"name": "identity"},
+    }
     response = await api_client.post(
         f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_2']}/annotator/wrong_type",
         json=params,
@@ -14,7 +17,10 @@ async def test_annotators_invalid_type(api_client, setup_db):
 
 @pytest.mark.asyncio
 async def test_annotators(api_client, setup_db):
-    params = {"signal_name": "Ip", "prominence": 1, "distance": 1}
+    params = {
+        "annotator_params": {"signal_name": "Ip", "prominence": 1, "distance": 1},
+        "data_params": {"name": "identity"},
+    }
     response = await api_client.post(
         f"/projects/{setup_db['project_id_2']}/samples/{setup_db['sample_id_4']}/annotator/peak_detection",
         json=params,
@@ -23,14 +29,19 @@ async def test_annotators(api_client, setup_db):
     returned_annotations = response.json()
     # Check it found 4 ELMs since we added 4 spikes to the data at 20, 40, 60, 80
     assert len(returned_annotations) == 4
-    assert all(annotation.get("label") == "Peak" for annotation in returned_annotations)
+    assert all(
+        annotation.get("label") == "Unknown" for annotation in returned_annotations
+    )
     assert all(annotation.get("time_min") for annotation in returned_annotations)
     assert all(annotation.get("time_max") for annotation in returned_annotations)
 
 
 @pytest.mark.asyncio
 async def test_annotators_not_supported_for_project(api_client, setup_db):
-    params = {"signal_name": "Ip", "prominence": 10, "distance": 5}
+    params = {
+        "annotator_params": {"signal_name": "Ip", "prominence": 10, "distance": 5},
+        "data_params": {"name": "identity"},
+    }
     response = await api_client.post(
         f"/projects/{setup_db['project_id_3']}/samples/{setup_db['sample_id_3']}/annotator/peak_detection",
         json=params,

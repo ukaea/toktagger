@@ -1,35 +1,30 @@
 "use client";
-import { useState, useEffect } from "react";
+import React from "react";
 import {
   Provider,
   defaultTheme,
   Breadcrumbs,
   Item,
   ToastContainer,
+  Flex,
 } from "@adobe/react-spectrum";
-import {
-  Annotation,
-  CompositeDataSchema,
-  Data,
-  MultiVariateTimeSeriesDataSchema,
-  Project,
-  Sample,
-  SpectrogramDataSchema,
-  SpectrogramViewParams,
-  PlotProps,
-  ViewParams,
-} from "@/types";
-import { ELMView } from "@/app/elms/components/elms";
+import { Project, Sample, TaskType } from "@/types";
+import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
-import { DisruptionView } from "@/app/disruption/components/disruption";
 import ToolBar from "@/app/components/tools/toolbar";
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
-import { BACKEND_API_URL } from "@/app/core";
+import ErrorView from "@/app/views/error";
+import LoadingView from "@/app/views/loading";
+import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
+import { VideoView } from "@/app/frames/components/frames";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
   sample: Sample;
 };
+
 const SampleDataBreadCrumbs = ({
   project,
   sample,
@@ -50,192 +45,95 @@ const SampleDataBreadCrumbs = ({
   );
 };
 
-type SampleViewInfo = {
-  project: Project;
-  data: Data;
-  annotations: Annotation[];
-  setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
-  ) => void;
-  plotProps: PlotProps;
+const SampleView = () => {
+  const { project, isLoading, error } = useSample();
+
+  if (error) return <ErrorView message={error} />;
+
+  if (!project) return isLoading ? <LoadingView /> : null;
+
+  // Video: keep the video UI mounted while fetching the next frame.
+  if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
+
+  if (isLoading) return <LoadingView />;
+
+  if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
+  if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
+
+  return null;
 };
 
-const SampleView = ({
-  project,
-  data,
-  annotations,
-  setAnnotations,
-  plotProps,
-}: SampleViewInfo) => {
-  if (project.task == "disruption") {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for disruption view");
-    }
-    return (
-      <DisruptionView
-        data={result.data}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-      />
-    );
-  } else if (project.task == "ELM") {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for ELM view");
-    }
-    return (
-      <ELMView
-        data={result.data}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-      />
-    );
-  } else if (project.task == "MHD") {
-    console.log(data);
-    const result = CompositeDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for MHD view");
-    }
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"],
-    );
-    if (!mhdData.success) {
-      throw new Error("Invalid data for MHD view");
-    }
-    return (
-      <SpectrogramView
-        data={mhdData.data}
-        annotations={annotations}
-        setAnnotations={setAnnotations}
-        plotProps={plotProps}
-      />
-    );
+function VideoViewWrapperFromContext() {
+  const {
+    project,
+    sample,
+    data,
+    annotations,
+    setAnnotations,
+    dataParams,
+    setDataParams,
+  } = useSample();
+
+  if (!project || !sample) return null;
+
+  // On initial load, block until we have frame data.
+  // During frame-to-frame fetches, SampleContext keeps previous data set, so VideoView stays mounted.
+  if (!data) return <LoadingView />;
+
+  return (
+    <VideoView
+      data={data}
+      annotations={annotations ?? []}
+      setAnnotations={setAnnotations}
+      dataParams={dataParams}
+      setDataParams={setDataParams}
+      projectId={project._id}
+      sampleId={sample._id}
+    />
+  );
+}
+
+function SamplePageContent() {
+  const { project, sample, isLoading } = useSample();
+
+  if (!project && !isLoading) {
+    return <ErrorView message="Project not found." />;
   }
-};
 
-async function getData<T>(url: string): Promise<T> {
-  const response = await fetch(url);
-  const payload = await response.json();
-  return payload as T;
-}
+  if (!sample && !isLoading) {
+    return <ErrorView message="Sample not found." />;
+  }
 
-async function getSample(
-  project_id: string,
-  sample_id: string,
-): Promise<Sample> {
-  return await getData<Sample>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
-  );
-}
-
-async function getProject(project_id: string): Promise<Project> {
-  return await getData<Project>(`${BACKEND_API_URL}/projects/${project_id}`);
-}
-
-async function getAnnotations(
-  project_id: string,
-  sample_id: string,
-): Promise<Annotation[]> {
-  return await getData<Annotation[]>(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`,
-  );
-}
-
-export default function SamplePage() {
-  const { project_id, sample_id } = useParams();
-  const hasIds = project_id !== undefined && sample_id !== undefined;
-
-  const [project, setProject] = useState<Project | null>(null);
-  const [sample, setSample] = useState<Sample | null>(null);
-  const [data, setData] = useState<Data | null>(null);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [viewParams, setViewParams] = useState<ViewParams>({
-    name: "identity",
-  });
-  const [plotProps, setPlotProps] = useState<PlotProps>({
-    colorMap: "Cividis",
-  }); // Set default color map
-
-  useEffect(() => {
-    const refreshData = async (params: ViewParams) => {
-      if (!hasIds) {
-        return;
-      }
-
-      const project = await getProject(project_id);
-      setProject(project);
-
-      const sample = await getSample(project_id, sample_id);
-      setSample(sample);
-
-      const dbAnnotations = await getAnnotations(project_id, sample_id);
-      setAnnotations(dbAnnotations);
-
-      if (project.task == "MHD") {
-        params = {
-          ...params,
-          name: "spectrogram",
-          nperseg: 256,
-        } as SpectrogramViewParams;
-      }
-
-      const response = await fetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/data`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(params),
-        },
-      );
-      const data: Data = await response.json();
-      setData(data);
-    };
-
-    const run = async (viewParams: ViewParams) => {
-      await refreshData(viewParams);
-    };
-
-    run(viewParams);
-  }, [project_id, sample_id, viewParams, hasIds]);
-
-  if (!data || !project || !sample || !hasIds) {
-    return;
+  if (!project || !sample) {
+    return null;
   }
 
   return (
     <div>
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
-        <SampleDataBreadCrumbs
-          project={project}
-          sample={sample}
-        ></SampleDataBreadCrumbs>
-        <div className="flex">
-          <ToolBar
-            project={project}
-            sample={sample}
-            data={data}
-            annotations={annotations}
-            setAnnotations={setAnnotations}
-            viewParams={viewParams}
-            setViewParams={setViewParams}
-            plotProps={plotProps}
-            setPlotProps={setPlotProps}
-          />
-          <div className="flex-1 justify-center">
-            <SampleView
-              project={project}
-              data={data}
-              annotations={annotations}
-              setAnnotations={setAnnotations}
-              plotProps={plotProps}
-            />
-          </div>
-        </div>
+        <SampleDataBreadCrumbs project={project} sample={sample} />
+        <ModelTrainModal project={project} />
+        <ModelPredictModal project={project} />
+        <Flex>
+          <ToolBar />
+          <SampleView />
+        </Flex>
       </Provider>
     </div>
+  );
+}
+
+export default function SamplePage() {
+  const { project_id, sample_id } = useParams();
+
+  if (!project_id || !sample_id) {
+    return null;
+  }
+
+  return (
+    <SampleProvider projectId={project_id} sampleId={sample_id}>
+      <SamplePageContent />
+    </SampleProvider>
   );
 }

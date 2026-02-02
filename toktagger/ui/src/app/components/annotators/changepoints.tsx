@@ -11,6 +11,7 @@ import {
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 enum ChangePointMethod {
   PELT = "pelt",
@@ -21,17 +22,15 @@ type ChangePointDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function ChangePointDetectionTool({
   project_id,
   sample_id,
   data,
-  setAnnotations,
 }: ChangePointDetectionType) {
+  const { annotations, dataParams, setAnnotations } = useSample();
+
   const methodOptions = [
     { id: 0, name: ChangePointMethod.PELT },
     { id: 1, name: ChangePointMethod.HMM },
@@ -41,7 +40,12 @@ export function ChangePointDetectionTool({
     name: value,
   }));
 
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.CHANGE_POINT_DETECTION,
+    );
+  });
+
   const [signalName, setSignalName] = useState<string | null>(null);
   const [penalty, setPenalty] = useState<number>(5);
   const [numPoints, setNumPoints] = useState<number>(500);
@@ -51,14 +55,18 @@ export function ChangePointDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignalName || !isEnabled) {
-        setAnnotations((previousAnnotations) => {
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
+        setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
+              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION ||
+              annotation.validated,
           );
           return otherAnnotations;
         });
+        return;
+      } else if (!validSignalName) {
         return;
       }
 
@@ -70,11 +78,14 @@ export function ChangePointDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            method: method,
-            penalty: penalty,
-            num_points: numPoints,
-            num_components: numComponents,
+            annotator_params: {
+              signal_name: signalName,
+              method: method,
+              penalty: penalty,
+              num_points: numPoints,
+              num_components: numComponents,
+            },
+            data_params: dataParams,
           }),
         },
       );
@@ -83,7 +94,8 @@ export function ChangePointDetectionTool({
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION,
+            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });
@@ -99,6 +111,7 @@ export function ChangePointDetectionTool({
     numComponents,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

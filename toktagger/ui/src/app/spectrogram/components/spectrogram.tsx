@@ -1,6 +1,5 @@
 "use client";
 
-import { SpectrogramViewTable } from "./spectrogram-table";
 import {
   SpectrogramData,
   Category,
@@ -14,7 +13,6 @@ import {
   Annotation,
   SpectrogramMaskSchema,
   SpectrogramMask,
-  PlotProps,
 } from "@/types";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
@@ -27,15 +25,18 @@ import {
   createAnnotationToDisplayAnnotationFunc,
   updateAnnotations,
 } from "@/app/utils";
-import { useEffect } from "react";
+import { useSample } from "@/app/contexts/SampleContext";
+import { useEffect, useState } from "react";
+import { Flex, View } from "@adobe/react-spectrum";
 
-const lockedModeCategories: Category[] = [
-  { name: "Locked Mode", color: "rgb(255, 0, 0)" },
+const vspanCategories: Category[] = [
+  { name: "Mode Locked", color: "rgb(255, 0, 0)" },
 ];
 
 const zoneCategories: Category[] = [
   { name: "NTM", color: "rgb(0, 255, 255)" },
   { name: "LLM", color: "rgb(200, 100, 100)" },
+  { name: "Sawteeth", color: "rgb(100, 200, 100)" },
 ];
 
 const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
@@ -46,72 +47,77 @@ const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
   {},
 );
 
-const lockedModeCategoryColors = lockedModeCategories.reduce<
-  Record<string, string>
->((acc, curr) => {
-  acc[curr.name] = curr.color;
-  return acc;
-}, {});
+const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
+  (acc, curr) => {
+    acc[curr.name] = curr.color;
+    return acc;
+  },
+  {},
+);
 
 const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
 
-type SpectrogramViewInfo = {
-  data: SpectrogramData;
-  annotations: Annotation[];
-  setAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
-  ) => void;
-  plotProps: PlotProps;
-};
+export const SpectrogramView = () => {
+  const { data, annotations, setAnnotations, plotProps } = useSample();
 
-export const SpectrogramView = ({
-  data,
-  annotations,
-  setAnnotations,
-  plotProps,
-}: SpectrogramViewInfo) => {
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [vspans, setVSpans] = useState<VSpan[]>([]);
+  const [mask, setMask] = useState<SpectrogramMask | null>(null);
+
+  const viewData: SpectrogramData | null = data as SpectrogramData | null;
+
   useEffect(() => {
-    console.log("SpectrogramView plotProps updated:", plotProps);
-    console.log("Threshold active:", plotProps.thresholdActive);
-  }, [plotProps]);
+    if (!annotations || !viewData) return;
 
-  console.log(annotations);
+    const convertAnnotationToDisplayAnnotation =
+      createAnnotationToDisplayAnnotationFunc(colorMapping);
 
-  const convertAnnotationToDisplayAnnotation =
-    createAnnotationToDisplayAnnotationFunc(colorMapping);
+    const displayAnnotations: DisplayAnnotation[] = annotations
+      .filter((x: Annotation) => x.type !== "class_label")
+      .map(convertAnnotationToDisplayAnnotation);
 
-  const displayAnnotations: DisplayAnnotation[] = annotations
-    .filter((x: Annotation) => x.type !== "class_label")
-    .map(convertAnnotationToDisplayAnnotation);
+    const newZones: Zone[] = displayAnnotations
+      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
+      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
 
-  const zones: Zone[] = displayAnnotations
-    .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-    .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
-  const vspans: VSpan[] = displayAnnotations
-    .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
-    .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
-  const mask: SpectrogramMask = displayAnnotations
-    .filter(
-      (x: DisplayAnnotation) => SpectrogramMaskSchema.safeParse(x).success,
-    )
-    .map((x: DisplayAnnotation) => SpectrogramMaskSchema.parse(x))[0];
+    const newVSpans: VSpan[] = displayAnnotations
+      .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
+      .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
 
-  const updateZones = (newZones: Array<Zone>) => {
-    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-  };
+    // Extract mask from annotations
+    const maskAnnotations = annotations.filter(
+      (x: Annotation) => SpectrogramMaskSchema.safeParse(x).success,
+    );
+    const newMask =
+      maskAnnotations.length > 0
+        ? SpectrogramMaskSchema.parse(maskAnnotations[0])
+        : null;
+
+    setZones(newZones);
+    setVSpans(newVSpans);
+    setMask(newMask);
+  }, [annotations, viewData]);
 
   const updateVSpans = (newVSpans: Array<VSpan>) => {
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
   };
 
+  const updateZones = (newZones: Array<Zone>) => {
+    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
+  };
+
+  if (!viewData) {
+    return null;
+  }
+
   const numDigits = plotProps.numSignificantDigits || 4;
   const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
 
-  const amplitude_og = data.amplitude;
+  const amplitude_og = viewData.amplitude;
   let amplitude: Array<Array<number>> = [];
+
   if (plotProps.thresholdActive) {
-    console.log("Applying threshold mask to amplitude data");
-    amplitude = data.amplitude.map((row: Array<number>, rowIndex: number) =>
+    amplitude = viewData.amplitude.map((row: Array<number>, rowIndex: number) =>
       row.map((value: number, colIndex: number) => {
         let maskValue = mask?.values[rowIndex]?.[colIndex];
         if (maskValue === undefined || maskValue === null) {
@@ -121,8 +127,9 @@ export const SpectrogramView = ({
       }),
     );
   } else {
-    amplitude = data.amplitude;
+    amplitude = viewData.amplitude;
   }
+
   const ampMin = Math.max(smallPrecisionFactor, Math.min(...amplitude.flat()));
   const ampMax = Math.max(...amplitude.flat());
 
@@ -190,10 +197,10 @@ export const SpectrogramView = ({
     {
       name: "Saddle Coil FFT",
       type: "heatmap",
-      x: data.time,
-      y: data.frequency,
+      x: viewData.time,
+      y: viewData.frequency,
       z: logAmplitude_og,
-      customdata: data.amplitude,
+      customdata: viewData.amplitude,
       hovertemplate:
         "time: %{x:.2f}s<br>freq: %{y:.2f}Hz<br>amp: %{customdata:.2e}<extra></extra>",
       // @ts-expect-error Plotly.React types do not define shared color axis, but Plotly supports it.
@@ -206,8 +213,8 @@ export const SpectrogramView = ({
     plotData.push({
       name: "Threshold Mask",
       type: "heatmap",
-      x: data.time,
-      y: data.frequency,
+      x: viewData.time,
+      y: viewData.frequency,
       z: logAmplitude,
       hoverinfo: "skip",
       coloraxis: "coloraxis",
@@ -291,7 +298,7 @@ export const SpectrogramView = ({
     modeBarButtonsToRemove: ["pan2d"],
   };
 
-  const applyGlobalStyle = (layout: Partial<Layout>) => {
+  const applyGlobalStyle = (layout: Partial<Plotly.Layout>) => {
     // Handle dark mode styling
     // We should probably move all the styling to this central component
     const isDarkMode = window.matchMedia(
@@ -324,34 +331,40 @@ export const SpectrogramView = ({
 
   plotLayout = applyGlobalStyle(plotLayout);
 
+  if (!viewData) {
+    return null;
+  }
+
   return (
-    <div className="flex flex-col items-center space-y-3">
-      <ContextMenuProvider menuId="locked-mode-menu">
-        <VSpanProvider
-          categories={lockedModeCategories}
-          initialData={vspans}
-          onModifyVSpan={updateVSpans}
-        >
-          <ZoneProvider
-            categories={zoneCategories}
-            initialData={zones}
-            onModifyZone={updateZones}
+    <View width="100%">
+      <Flex justifyContent="center" alignItems="center">
+        <ContextMenuProvider menuId="spectrogram-menu">
+          <VSpanProvider
+            categories={vspanCategories}
+            initialData={vspans}
+            onModifyVSpan={updateVSpans}
           >
-            <TimeSeries
-              plotId="LockedMode"
-              plotConfig={{
-                data: plotData,
-                config: plotConfig,
-                layout: plotLayout,
-              }}
+            <ZoneProvider
+              categories={zoneCategories}
+              initialData={zones}
+              onModifyZone={updateZones}
             >
-              <Zones onZoneUpdate={updateZones} />
-              <VSpans onZoneUpdate={updateVSpans} />
-            </TimeSeries>
-            <SpectrogramViewTable />
-          </ZoneProvider>
-        </VSpanProvider>
-      </ContextMenuProvider>
-    </div>
+              <TimeSeries
+                plotId="SpectrogramView"
+                plotConfig={{
+                  data: plotData,
+                  config: plotConfig,
+                  layout: plotLayout,
+                }}
+                rescaleOnZoom={false}
+              >
+                <Zones onUpdate={updateZones} />
+                <VSpans onUpdate={updateVSpans} />
+              </TimeSeries>
+            </ZoneProvider>
+          </VSpanProvider>
+        </ContextMenuProvider>
+      </Flex>
+    </View>
   );
 };

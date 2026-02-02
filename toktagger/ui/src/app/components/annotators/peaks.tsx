@@ -13,22 +13,25 @@ import {
 } from "@adobe/react-spectrum";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type PeakDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 export function PeakDetectionTool({
   project_id,
   sample_id,
-  data,
-  setAnnotations,
 }: PeakDetectionType) {
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const { annotations, setAnnotations, dataParams, data } = useSample();
+
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.PEAK_DETECTION,
+    );
+  });
+
   const [prominence, setProminance] = useState<number>(5);
   const [distance, setDistance] = useState<number>(1);
 
@@ -58,16 +61,18 @@ export function PeakDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignal || !isEnabled) {
+      if (!isEnabled) {
         // Remove previous annotations from this annotator
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
+              annotation.created_by !== AnnotatorTypes.PEAK_DETECTION ||
+              annotation.validated,
           );
           return otherAnnotations;
         });
-
+        return;
+      } else if (!validSignal) {
         return;
       }
 
@@ -79,11 +84,14 @@ export function PeakDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            prominence: prominence,
-            distance: distance,
-            time_min: timeRange.start,
-            time_max: timeRange.end,
+            annotator_params: {
+              signal_name: signalName,
+              prominence: prominence,
+              distance: distance,
+              time_min: timeRange.start,
+              time_max: timeRange.end,
+            },
+            data_params: dataParams,
           }),
         },
       );
@@ -92,7 +100,8 @@ export function PeakDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION,
+            annotation.created_by !== AnnotatorTypes.PEAK_DETECTION ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });
@@ -108,6 +117,7 @@ export function PeakDetectionTool({
     isEnabled,
     signalName,
     validSignal,
+    dataParams,
     setAnnotations,
   ]);
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import { Button, TextField, Flex } from "@adobe/react-spectrum";
 
 type ShotInputProps = {
   endpoint: string;
@@ -11,8 +12,7 @@ export default function ShotInput({ endpoint }: ShotInputProps) {
   const router = useRouter();
   const [shotId, setShotId] = useState("");
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (shotId) {
       router.push(`/${endpoint}/${shotId}`);
     }
@@ -21,19 +21,20 @@ export default function ShotInput({ endpoint }: ShotInputProps) {
   return (
     <div>
       <h1>Enter a shot ID</h1>
-      <form onSubmit={handleSubmit} className="flex space-x-1">
-        <input
+      <Flex gap="size-100" alignItems="end">
+        <TextField
           type="number"
           value={shotId}
-          onChange={(e) => setShotId(e.target.value)}
+          onChange={setShotId}
           placeholder="Shot ID..."
-          required
-          className="p-1 border rounded"
+          isRequired
+          label="Shot ID"
+          width="100%"
         />
-        <button type="submit" className="p-1 bg-blue-500 text-white rounded">
+        <Button variant="accent" onPress={handleSubmit} isDisabled={!shotId}>
           Go
-        </button>
-      </form>
+        </Button>
+      </Flex>
     </div>
   );
 }

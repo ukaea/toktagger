@@ -1,5 +1,7 @@
 from typing import Union
 from pydantic import BaseModel
+from enum import Enum
+from toktagger.api.schemas import ConfiguredModel
 
 
 class Data(BaseModel):
@@ -26,7 +28,22 @@ class SpectrogramData(Data):
 
 
 class ImageData(Data):
-    data: list[list[tuple[int, int, int]]]
+    frame: int
+    values: str  # Base64 encoded string
+
+
+class LoaderType(str, Enum):
+    IDENTITY = "identity"
+    IMAGE = "image"
+
+
+class DataParams(ConfiguredModel):
+    name: LoaderType = LoaderType.IDENTITY
+
+
+class ImageParams(DataParams):
+    name: LoaderType = LoaderType.IMAGE
+    frame: int | None
 
 
 DataResponseType = Union[
@@ -36,3 +53,5 @@ DataResponseType = Union[
     CompositeData,
     SpectrogramData,
 ]
+
+DataParamTypes = Union[DataParams, ImageParams]

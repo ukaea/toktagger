@@ -10,6 +10,7 @@ interface ZoneContextInfo {
   zones: Zone[];
   handleZoneUpdate: () => void;
   handleZoneDragFinish: () => void;
+  handleZoneDelete: (input: Zone) => void;
   addZone: (x0: number, x1: number, category: Category) => void;
   activateTooling: () => void;
   triggerUpdate: number;
@@ -46,7 +47,6 @@ export const ZoneProvider = ({
 }) => {
   const zones = useRef<Zone[]>([]);
   const [triggerUpdate, setTriggerUpdate] = useState(0); // Value should be changed to trigger refresh
-
   const { setToolingCallbacks, registerMenuItem } = useContextMenuProvider();
 
   // It is necessary for the context to trigger child refreshes
@@ -60,11 +60,14 @@ export const ZoneProvider = ({
   };
 
   const handleZoneDragFinish = () => {
+    triggerZoneUpdate();
     onModifyZone?.(zones.current);
   };
 
-  const handleDelete = (input: unknown) => {
+  const handleZoneDelete = (input: Zone) => {
+    // Remove the current zone and all selected zones
     zones.current = zones.current.filter((zone) => zone !== input);
+    zones.current = zones.current.filter((zone) => !zone.selected);
     triggerZoneUpdate();
     onModifyZone?.(zones.current);
   };
@@ -74,16 +77,19 @@ export const ZoneProvider = ({
     targetCategory: Category,
   ) => {
     zones.current = zones.current.map((zone) => {
-      if (zone === props.zone) {
+      if (zone === props.zone || zone.selected) {
         zone.category = targetCategory;
       }
+      zone.selected = false;
       return zone;
     });
     triggerZoneUpdate();
+    onModifyZone?.(zones.current);
   };
 
   const addZone = (x0: number, x1: number, category: Category) => {
     zones.current.push({
+      selected: false,
       created_by: "manual",
       category,
       x0,
@@ -120,6 +126,7 @@ export const ZoneProvider = ({
   useEffect(() => {
     const addZone = (x0: number, x1: number, category: Category) => {
       zones.current.push({
+        selected: false,
         created_by: "manual",
         category,
         x0,
@@ -171,7 +178,7 @@ export const ZoneProvider = ({
           {`Add ${categories[0].name}`}
         </Item>
       ) : (
-        <Submenu key="zone-submenu" label="Add zone">
+        <Submenu key="zone-submenu" label="Add Time Region">
           {addZoneItems}
         </Submenu>
       );
@@ -216,6 +223,7 @@ export const ZoneProvider = ({
         zones: zones.current,
         handleZoneUpdate,
         handleZoneDragFinish,
+        handleZoneDelete,
         addZone,
         activateTooling,
         triggerUpdate,
@@ -226,7 +234,7 @@ export const ZoneProvider = ({
         <Item
           id="delete"
           onClick={({ props }: ItemParams) => {
-            handleDelete(props.zone);
+            handleZoneDelete(props.zone);
           }}
         >
           Delete

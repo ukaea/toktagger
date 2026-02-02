@@ -10,6 +10,8 @@ from toktagger.api.crud.mongita_client import AsyncMongitaClient
 DATABASE_NAME = "event_db"
 COLLECTION_NAME = "shots"
 
+T = typing.TypeVar("T", bound=pydantic.BaseModel)
+
 
 class MongoDBClient:
     def __init__(self, url: str, db_name: str):
@@ -17,7 +19,7 @@ class MongoDBClient:
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
-            cache_dir = user_cache_dir("viz-annotation", "ukaea")
+            cache_dir = user_cache_dir("toktagger", "ukaea")
             cache_dir = Path(cache_dir)
             cache_dir.mkdir(parents=True, exist_ok=True)
             file_name = cache_dir / db_name
@@ -27,7 +29,7 @@ class MongoDBClient:
     async def insert(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        model: pydantic.BaseModel,
+        model: T,
         ids: dict[str, ObjectId] | None = None,
     ):
         ids = ids or {}
@@ -39,7 +41,7 @@ class MongoDBClient:
     async def insert_many(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        models: list[pydantic.BaseModel],
+        models: list[T],
         ids: typing.Union[dict, list[dict]] | None = None,
     ):
         ids = ids or {}
@@ -60,7 +62,7 @@ class MongoDBClient:
     async def update(
         self,
         collection: typing.Literal["projects", "annotations", "models", "samples"],
-        model: pydantic.BaseModel,
+        model: T,
         object_id: ObjectId,
     ):
         # Retrieve existing entry:
@@ -69,7 +71,7 @@ class MongoDBClient:
         # Add updates to db entry
         updated_document = {
             **document,
-            **model.model_dump(mode="python", exclude_unset=True),
+            **model.model_dump(mode="python", exclude_unset=True, exclude_none=True),
         }
 
         return await self.db[collection].update_one(

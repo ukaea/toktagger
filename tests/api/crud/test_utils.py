@@ -2,6 +2,8 @@ import pytest
 from bson.objectid import ObjectId
 from toktagger.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, SAMPLE_1, ANNOTATION_1, ANNOTATION_2
+from toktagger.api.schemas.samples import SampleUpdate
+from toktagger.api.schemas.models import ModelUpdate, ModelIn
 import toktagger.api.crud.utils as utils
 from fastapi import HTTPException
 import tempfile
@@ -78,17 +80,17 @@ async def test_get_samples(db_client, setup_db):
     # Check three samples returned
     assert len(samples) == 2
     # Check returned in correct order - reverse order of created
-    assert [sample.shot_id for sample in samples] == [3, 1]
+    assert [sample.shot_id for sample in samples] == [2, 1]
 
 
 @pytest.mark.asyncio
 async def test_get_samples_by_shot_id(db_client, setup_db):
     samples = await utils.get_samples(
-        db_client, project_id=setup_db["project_id_1"], shot_id=3
+        db_client, project_id=setup_db["project_id_1"], shot_id=1
     )
     # Should do an exact search for this shot_id
     assert len(samples) == 1
-    assert samples[0].shot_id == 3
+    assert samples[0].shot_id == 1
 
 
 @pytest.mark.asyncio
@@ -121,7 +123,7 @@ async def test_get_sample_summary(db_client, setup_db):
     )
     assert summary.total == 2
     assert summary.shot_min == 1
-    assert summary.shot_max == 3
+    assert summary.shot_max == 2
     assert summary.data is not None
 
 
@@ -152,6 +154,27 @@ async def test_delete_specific_sample(db_client, setup_db):
     samples = await db_client.get_filtered_documents("samples")
     assert len(samples) == 3
     assert 1 not in [sample["shot_id"] for sample in samples]
+
+
+@pytest.mark.asyncio
+async def test_update_sample(db_client, setup_db):
+    # Check Sample 1 has validated_annotations = False
+    sample_1 = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_1"])
+    )
+    assert not sample_1["validated_annotations"]
+
+    # Update sample to set validated_annotations to True
+    updates = SampleUpdate(validated_annotations=True)
+    await utils.update_sample(
+        db_client, sample_id=setup_db["sample_id_1"], updates=updates
+    )
+
+    # Check sample is updated
+    sample_1_updated = await db_client.get_document_by_id(
+        "samples", ObjectId(setup_db["sample_id_1"])
+    )
+    assert sample_1_updated["validated_annotations"]
 
 
 @pytest.mark.asyncio
@@ -260,3 +283,195 @@ async def test_delete_specific_annotation(db_client, setup_db):
     assert setup_db["annotation_id_1"] not in [
         str(annotation["_id"] for annotation in annotations)
     ]
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_success(db_client, setup_db):
+    # Create new annotations with sample_id references
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+        ANNOTATION_2.model_copy(update={"sample_id": setup_db["sample_id_2"]}),
+    ]
+
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=new_annotations,
+    )
+
+    # Verify annotations were added
+    all_annotations = await db_client.get_filtered_documents("annotations")
+    assert len(all_annotations) == 7  # 5 existing + 2 new
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_empty_list(db_client, setup_db):
+    # Should handle empty list gracefully
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=[],
+    )
+
+    # Verify no changes
+    all_annotations = await db_client.get_filtered_documents("annotations")
+    assert len(all_annotations) == 5
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_project_not_found(db_client, setup_db):
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"sample_id": setup_db["sample_id_1"]}),
+    ]
+
+    with pytest.raises(HTTPException, match="Project not found with that ID"):
+        await utils.import_annotations(
+            db_client,
+            project_id=str(ObjectId()),
+            annotations=new_annotations,
+        )
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_sample_not_found(db_client, setup_db):
+    # Use invalid sample_id
+    shot_id = 10
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"shot_id": shot_id}),
+    ]
+
+    with pytest.raises(HTTPException, match=f"Sample not found with shot ID {shot_id}"):
+        await utils.import_annotations(
+            db_client,
+            project_id=setup_db["project_id_1"],
+            annotations=new_annotations,
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_models(db_client, setup_db):
+    models = await utils.get_models(db_client, project_id=setup_db["project_id_1"])
+    # Check three models returned
+    assert len(models) == 3
+    # Check returned in correct order - reverse order of created
+    assert [model.version for model in models] == [3, 2, 1]
+
+
+@pytest.mark.asyncio
+async def test_get_models_by_type(db_client, setup_db):
+    models = await utils.get_models(
+        db_client, project_id=setup_db["project_id_1"], model_type="mock_disruption_cnn"
+    )
+    # Check two models returned
+    assert len(models) == 2
+    # Check returned in correct order - reverse order of created, not version 3
+    assert [model.version for model in models] == [2, 1]
+    assert all(model.type == "mock_disruption_cnn" for model in models)
+
+
+@pytest.mark.asyncio
+async def test_get_models_by_status(db_client, setup_db):
+    models = await utils.get_models(
+        db_client, project_id=setup_db["project_id_1"], status="started"
+    )
+    # Check one model returned
+    assert len(models) == 1
+    # Check this is the correct model
+    assert models[0].version == 3
+    assert models[0].type == "disruption_cnn"
+
+
+@pytest.mark.asyncio
+async def test_get_model(db_client, setup_db):
+    model = await utils.get_model(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        model_type="mock_disruption_cnn",
+        version=2,
+    )
+    assert model.id == setup_db["model_id_2"]
+
+
+@pytest.mark.asyncio
+async def test_get_model_doesnt_exist(db_client, setup_db):
+    with pytest.raises(
+        HTTPException,
+        match="No trained models found of that type for this project!",
+    ):
+        await utils.get_model(
+            db_client,
+            project_id=setup_db["project_id_1"],
+            model_type="mock_disruption_cnn",
+            version=4,
+        )
+
+
+@pytest.mark.asyncio
+async def test_import_annotations_multiple_samples(db_client, setup_db):
+    # Import annotations for multiple samples
+    new_annotations = [
+        ANNOTATION_1.model_copy(update={"shot_id": 1}),
+        ANNOTATION_2.model_copy(update={"shot_id": 1}),
+        ANNOTATION_1.model_copy(update={"shot_id": 2}),
+    ]
+
+    await utils.import_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        annotations=new_annotations,
+    )
+
+    # Verify annotations were added correctly
+    sample1_annotations = await utils.get_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
+    )
+    sample2_annotations = await utils.get_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_2"],
+    )
+
+    assert len(sample1_annotations) == 5  # 3 existing + 2 new
+    assert len(sample2_annotations) == 2  # 1 existing + 1 new
+
+
+@pytest.mark.asyncio
+async def test_update_model(db_client, setup_db):
+    model_updates = ModelUpdate(training_status="completed", progress=100, score=80)
+    await utils.update_model(
+        db_client, model_id=setup_db["model_id_3"], updates=model_updates
+    )
+    # Check model has been updates
+    model_updated = await db_client.get_document_by_id(
+        "models", ObjectId(setup_db["model_id_1"])
+    )
+    assert model_updated["training_status"] == "completed"
+    assert model_updated["progress"] == 100
+    assert model_updated["score"] == 80
+
+
+@pytest.mark.asyncio
+async def test_add_model(db_client, setup_db):
+    model = ModelIn(
+        type="mock_disruption_cnn",
+        version=3,
+        training_status="queued",
+        progress=0,
+        score=0,
+    )
+    await utils.add_model(db_client, project_id=setup_db["project_id_1"], model=model)
+    # Check a new model has been added
+    models = await db_client.get_all_documents(collection="models")
+    assert len(models) == 4
+
+
+@pytest.mark.asyncio
+async def test_delete_model(db_client, setup_db):
+    await utils.delete_model(
+        db_client, setup_db["project_id_1"], setup_db["model_id_1"]
+    )
+    models = await db_client.get_filtered_documents("models")
+    assert len(models) == 2
+    assert setup_db["model_id_1"] not in [model["_id"] for model in models]

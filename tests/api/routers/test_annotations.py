@@ -275,3 +275,134 @@ async def test_create_annotation_invalid(api_client, setup_db, db_client):
     assert setup_db["sample_id_3"] not in [
         annotation["sample_id"] for annotation in annotations
     ]
+
+
+@pytest.mark.asyncio
+async def test_export_annotations(api_client, setup_db):
+    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/annotations")
+    assert response.status_code == 200
+    exported_data = response.json()
+
+    # Check that all annotations for the sample are exported
+    assert len(exported_data) == 4
+    # Verify annotation IDs match
+    exported_ids = [annotation["_id"] for annotation in exported_data]
+    assert setup_db["annotation_id_1"] in exported_ids
+    assert setup_db["annotation_id_2"] in exported_ids
+    assert setup_db["annotation_id_3"] in exported_ids
+
+
+@pytest.mark.asyncio
+async def test_import_annotations(api_client, setup_db, db_client):
+    import_data = [
+        {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_2"],
+            "shot_id": 2,
+            "label": "new_annotation",
+            "time_min": 0.3,
+            "time_max": 0.4,
+            "created_by": "manual",
+            "type": "time_region",
+            "validated": False,
+        },
+        {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_2"],
+            "shot_id": 2,
+            "label": "another_annotation",
+            "time": 0.6,
+            "created_by": "manual",
+            "type": "time_point",
+            "validated": True,
+        },
+    ]
+
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/annotations",
+        json=import_data,
+    )
+    assert response.status_code == 200
+
+    # Check annotations were added to database
+    annotations = await db_client.get_all_documents("annotations")
+    assert len(annotations) == 7
+
+    # Verify imported annotations
+    db_annotations = await db_client.get_filtered_documents(
+        "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_2"])}
+    )
+    imported_annotations = [
+        ann for ann in db_annotations if ann["created_by"] == "manual"
+    ]
+    assert len(imported_annotations) == 2
+
+
+@pytest.mark.asyncio
+async def test_batch_update_annotations(api_client, setup_db, db_client):
+    """Test batch updating annotations by first deleting existing ones then importing new ones."""
+    # First delete existing annotations for the samples we're updating
+    await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations"
+    )
+    await api_client.delete(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_2']}/annotations"
+    )
+
+    annotations_batch = [
+        {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_1"],
+            "shot_id": 1,
+            "type": "time_point",
+            "label": "TestAnnotation1",
+            "time": 1,
+            "created_by": "disruption_cnn",
+        },
+        {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_1"],
+            "shot_id": 1,
+            "type": "time_point",
+            "label": "TestAnnotation2",
+            "time": 2,
+            "created_by": "disruption_cnn",
+        },
+        {
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_2"],
+            "shot_id": 2,
+            "label": "TestAnnotation",
+            "type": "time_region",
+            "time_min": 1,
+            "time_max": 2,
+            "created_by": "disruption_cnn",
+        },
+    ]
+
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/annotations", json=annotations_batch
+    )
+    assert response.status_code == 200
+
+    # Check annotations for sample 1 have been updated
+    annotations_sample_1 = await db_client.get_filtered_documents(
+        "annotations",
+        filters={"sample_id": ObjectId(setup_db["sample_id_1"])},
+        sort_by="time",
+        sort_direction="ascending",
+    )
+    assert len(annotations_sample_1) == 2
+    assert annotations_sample_1[0]["label"] == "TestAnnotation1"
+    assert annotations_sample_1[0]["time"] == 1
+    assert annotations_sample_1[1]["label"] == "TestAnnotation2"
+    assert annotations_sample_1[1]["time"] == 2
+
+    # Check annotation for sample 2 also updated
+    annotations_sample_1 = await db_client.get_filtered_documents(
+        "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_2"])}
+    )
+    assert len(annotations_sample_1) == 1
+    assert annotations_sample_1[0]["label"] == "TestAnnotation"
+    assert annotations_sample_1[0]["time_min"] == 1
+    assert annotations_sample_1[0]["time_max"] == 2

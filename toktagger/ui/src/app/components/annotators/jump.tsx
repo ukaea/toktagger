@@ -11,23 +11,27 @@ import {
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
 
 type JumpDetectionType = {
   project_id: string;
   sample_id: string;
   data: MultiVariateTimeSeriesData;
-  setAnnotations: (
-    annotations: Annotation[] | ((prev: Annotation[]) => Annotation[]),
-  ) => void;
 };
 
 export function JumpDetectionTool({
   project_id,
   sample_id,
   data,
-  setAnnotations,
 }: JumpDetectionType) {
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const { annotations, dataParams, setAnnotations } = useSample();
+
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return annotations.some(
+      (ann) => ann.created_by === AnnotatorTypes.JUMP_DETECTION,
+    );
+  });
+
   const [signalName, setSignalName] = useState<string | null>(null);
   const signalOptions = Object.keys(data.values).map((value, index) => ({
     id: index,
@@ -41,14 +45,18 @@ export function JumpDetectionTool({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!validSignalName || !isEnabled) {
+      if (!isEnabled) {
+        // Remove previous annotations from this annotator
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION ||
+              annotation.validated,
           );
           return otherAnnotations;
         });
+        return;
+      } else if (!validSignalName) {
         return;
       }
 
@@ -60,11 +68,14 @@ export function JumpDetectionTool({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            signal_name: signalName,
-            threshold: threshold,
-            min_distance: minDistance,
-            smoothing: smoothingValue,
-            num_points: numPoints,
+            annotator_params: {
+              signal_name: signalName,
+              threshold: threshold,
+              min_distance: minDistance,
+              smoothing: smoothingValue,
+              num_points: numPoints,
+            },
+            data_params: dataParams,
           }),
         },
       );
@@ -73,7 +84,8 @@ export function JumpDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION,
+            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION ||
+            annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });
@@ -89,6 +101,7 @@ export function JumpDetectionTool({
     numPoints,
     isEnabled,
     validSignalName,
+    dataParams,
     setAnnotations,
   ]);
 

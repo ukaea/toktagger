@@ -51,6 +51,8 @@ services:
       UDA_META_PLUGINNAME: "MASTU_DB"
       UDA_METANEW_PLUGINNAME: "MAST_DB"
       SAL_HOST: "https://sal.jetdata.eu"
+      MODEL_STORAGE: "/app/data/models"
+      API_URL: "http://api_app:8002"
       CUSTOM_SCRIPT: ${CUSTOM_SCRIPT}
       RELOAD: "true"
     working_dir: /app
