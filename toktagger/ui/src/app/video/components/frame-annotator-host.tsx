@@ -260,8 +260,13 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   /**
    * Track id allocator for "AUTO" mode (no explicit trackId selected).
-   * The allocator memoizes per-class used ids across calls.
-   */
+   *
+   * makeAllocator() returns an allocator function that closes over usedByClass,
+   * so per-class used ids are memoized across calls to that allocator instance.
+   *
+   * Note: each call to makeAllocator() creates a fresh map 
+   * (i.e. the memoization lifetime is the lifetime of the returned function).
+  */
   const makeAllocator = useCallback(() => {
     const usedByClass = new Map<string, Set<string>>();
 
