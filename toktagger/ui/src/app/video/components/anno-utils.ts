@@ -126,23 +126,41 @@ export function isRectangleAnno(a: ImageAnnotation): boolean {
   return a.target.selector.type === ShapeType.RECTANGLE;
 }
 
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+/** Rectangle geometry shape we rely on at runtime. */
+type RectGeometry = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 /** Read rectangle geometry (returns null if missing/invalid). */
 export function readRectGeometry(
   a: ImageAnnotation,
 ): { x: number; y: number; w: number; h: number } | null {
-  const g = a.target.selector.geometry as unknown;
+  // Make this function self-contained: only rectangles have x/y/w/h.
+  if (!isRectangleAnno(a)) return null;
 
+  const g = a.target.selector.geometry;
   if (!g || typeof g !== "object") return null;
-  const rec = g as UnknownRecord;
 
-  const x = rec["x"];
-  const y = rec["y"];
-  const w = rec["w"];
-  const h = rec["h"];
+  const rg = g as Partial<RectGeometry>;
 
-  if (![x, y, w, h].every((v) => typeof v === "number" && Number.isFinite(v)))
+  const x = rg.x;
+  const y = rg.y;
+  const w = rg.w;
+  const h = rg.h;
+
+  // TS now narrows x/y/w/h to `number` after these checks.
+  if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(w) || !isFiniteNumber(h))
     return null;
+
   if (w <= 0 || h <= 0) return null;
+
   return { x, y, w, h };
 }
 
