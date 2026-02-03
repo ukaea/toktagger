@@ -20,6 +20,26 @@ import { classIdForName } from "./types";
 
 type UnknownRecord = Record<string, unknown>;
 
+// Our app stores a frame key on target.source (not present in upstream Annotorious types).
+type VideoImageAnnotation = ImageAnnotation & {
+  target: ImageAnnotation["target"] & {
+    source?: string;
+  };
+};
+
+function withTargetSource(
+  a: ImageAnnotation,
+  source: string,
+): VideoImageAnnotation {
+  return {
+    ...(a as VideoImageAnnotation),
+    target: {
+      ...(a.target as VideoImageAnnotation["target"]),
+      source,
+    },
+  };
+}
+
 function isImageAnnotationLike(v: unknown): v is ImageAnnotation {
   if (!v || typeof v !== "object") return false;
 
@@ -155,8 +175,13 @@ export function readRectGeometry(
   const w = rg.w;
   const h = rg.h;
 
-  // TS now narrows x/y/w/h to `number` after these checks.
-  if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(w) || !isFiniteNumber(h))
+  // TS now narrows x/y/w/h to number after these checks.
+  if (
+    !isFiniteNumber(x) ||
+    !isFiniteNumber(y) ||
+    !isFiniteNumber(w) ||
+    !isFiniteNumber(h)
+  )
     return null;
 
   if (w <= 0 || h <= 0) return null;
@@ -193,10 +218,7 @@ export function normalizeOverlay(
   for (const a of src) {
     if (!isRectangleAnno(a)) continue;
 
-    const withSource: ImageAnnotation = {
-      ...a,
-      target: { ...a.target, source: frameKey },
-    };
+    const withSource = withTargetSource(a, frameKey);
 
     const got = getLabelTrack(withSource);
     const className = (got.className ?? fallback.className)?.trim() || null;
@@ -281,17 +303,19 @@ export function videoBBoxToAnno(
     w,
     h,
     bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h },
-  } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
+  } as ImageAnnotation["target"]["selector"]["geometry"];
 
   const selector = {
     type: ShapeType.RECTANGLE,
     geometry,
-  } as unknown as ImageAnnotation["target"]["selector"];
+  } as ImageAnnotation["target"]["selector"];
 
-  const anno: ImageAnnotation = {
+  const anno: VideoImageAnnotation = {
     id,
     bodies: [],
     target: {
+      // Required by the upstream type; links target -> parent annotation id.
+      annotation: id,
       source: frameKey,
       selector,
     },
