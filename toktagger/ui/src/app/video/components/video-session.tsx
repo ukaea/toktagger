@@ -85,6 +85,9 @@ type VideoSessionCtx = {
   deleteAnnotation: (id: string) => void;
   closePopup: () => void;
 
+  /** Request a one-shot focus/selection for a given instance once overlays sync. */
+  requestFocusInstance: (className: string, trackId: string) => void;
+
   // frame ops
   getFrameList: (frame: FrameIndex) => ImageAnnotation[];
   /** Set overlay for a frame without marking dirty (used for seeding). */
@@ -154,6 +157,10 @@ export function VideoSessionProvider(props: {
    * emits update events. During that window we ignore change handlers.
    */
   const suppressRef = useRef(false);
+
+  const focusRequestRef = useRef<{ className: string; trackId: string } | null>(
+    null,
+  );
 
   const [imageNatural, setImageNatural] = useState<{
     w: number;
@@ -239,6 +246,13 @@ export function VideoSessionProvider(props: {
 
   const setSelection = useCallback((next: Selection) => {
     setSelectionState(next);
+  }, []);
+
+  const requestFocusInstance = useCallback((className: string, trackId: string) => {
+    const cls = (className || "").trim();
+    const tid = canonicalizeTrackId(trackId || "");
+    if (!cls || !tid) return;
+    focusRequestRef.current = { className: cls, trackId: tid };
   }, []);
 
   const createNewInstanceForClass = useCallback(
@@ -508,6 +522,25 @@ export function VideoSessionProvider(props: {
     suppressRef.current = true;
     api.setAnnotations(desiredOverlay, true);
 
+    // NEW: attempt focus after overlay mounts
+    const pending = focusRequestRef.current;
+    if (pending) {
+      const match = desiredOverlay.find((a) => {
+        const got = getLabelTrack(a);
+        return (
+          (got.className ?? "").trim() === pending.className &&
+          canonicalizeTrackId(got.trackId ?? "") === pending.trackId
+        );
+      });
+
+      if (match) {
+        (api.setSelected as unknown as (v?: ImageAnnotation | ImageAnnotation[]) => void)([
+          match,
+        ]);
+        focusRequestRef.current = null; // one-shot
+      }
+    }
+
     void doubleRAF().then(() => {
       suppressRef.current = false;
     });
@@ -629,6 +662,7 @@ export function VideoSessionProvider(props: {
       setImageNatural,
       deleteAnnotation,
       closePopup,
+      requestFocusInstance,
       getFrameList,
       seedFrame,
       setFrameList,
@@ -658,6 +692,7 @@ export function VideoSessionProvider(props: {
       setImageNatural,
       deleteAnnotation,
       closePopup,
+      requestFocusInstance,
       getFrameList,
       seedFrame,
       setFrameList,

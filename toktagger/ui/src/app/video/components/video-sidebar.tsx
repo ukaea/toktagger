@@ -24,7 +24,7 @@ import {
   InstancePanel as VideoInstancePanel,
   ConfirmModal,
 } from "@/app/video/components/ui_elements";
-
+import { useSample } from "@/app/contexts/SampleContext";
 import { ExportTool } from "@/app/components/tools/export";
 import { ImportButton } from "@/app/components/tools/import";
 import { VideoNavigationBar } from "@/app/video/components/video-navigation-bar";
@@ -124,6 +124,8 @@ export function VideoSidebar(_props: {
     trackId: string;
   } | null>(null);
 
+  const { setDataParams } = useSample();
+
   // Restore the last selected class to reduce clicks between samples.
   useEffect(() => {
     const last = loadLastClassName();
@@ -151,6 +153,7 @@ export function VideoSidebar(_props: {
       class_id: classIdByName.get(inst.className) ?? inst.classId ?? -1,
       class_name: inst.className,
       track_id: canonicalizeTrackId(inst.trackId),
+      first_frame: inst.frames[0] ?? null,
     }));
 
     arr.sort((a, b) => compareProfiles(a, b));
@@ -206,6 +209,32 @@ export function VideoSidebar(_props: {
     });
 
     saveLastClassName(hit.class_name);
+  };
+
+  const onActivateProfile = (p: {
+    class_name: string;
+    track_id: string;
+    first_frame?: number | null;
+  }) => {
+    const cls = (p.class_name || "").trim();
+    const tid = canonicalizeTrackId(p.track_id || "");
+    const first = p.first_frame;
+
+    if (!cls || !tid || typeof first !== "number") return;
+
+    // Ensure selection matches (so drawing/UX consistent)
+    session.setSelection({ className: cls, trackId: tid, source: "explicit" });
+    saveLastClassName(cls);
+
+    // Ask session to focus/highlight this instance once the frame overlay is mounted
+    session.requestFocusInstance(cls, tid);
+
+    // Trigger the actual frame fetch/navigation (existing pipeline)
+    setDataParams((prev) => ({
+      ...(prev as Record<string, unknown>),
+      name: "image",
+      frame: first,
+    }));
   };
 
   // Right-click on an instance row triggers a confirm flow (no immediate deletion).
@@ -354,6 +383,7 @@ export function VideoSidebar(_props: {
                       profiles={profiles}
                       selectedKey={selectedKey}
                       onSelect={onSelectInstance}
+                      onActivate={onActivateProfile}
                       onCreateProfile={() => {
                         // Instances are derived from annotations; creation happens via drawing.
                       }}
