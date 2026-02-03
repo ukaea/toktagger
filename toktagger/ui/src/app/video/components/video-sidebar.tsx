@@ -398,10 +398,6 @@ export function VideoSidebar(_props: {
             </Button>
           </ButtonGroup>
 
-          <div className="mt-2 text-xs opacity-70">
-            {session.dirty ? "● unsaved" : "saved"} — frame {session.frame}
-          </div>
-
           {!hasClass && (
             <div className="mt-2 text-[12px] opacity-80 leading-snug">
               Select a <b>class</b> to start drawing.
