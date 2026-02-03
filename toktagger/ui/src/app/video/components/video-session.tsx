@@ -483,31 +483,44 @@ export function VideoSessionProvider(props: {
     ],
   );
 
-  /**
-   * When the frame changes, replace the annotator overlay from the session store.
-   */
-  useEffect(() => {
-    if (!api?.setAnnotations) return;
+/**
+ * Keep the Annotorious overlay in sync with the session source-of-truth.
+ *
+ * Annotorious maintains its own internal annotation state and does not automatically
+ * swap overlays when our notion of "current frame" changes (or when session state
+ * changes due to seeding, forward-prop, clear/delete actions).
+ *
+ * So when either:
+ *  - the active frame changes, OR
+ *  - the session overlay for the active frame changes,
+ * we push the session overlay into Annotorious.
+ */
+const desiredOverlay = useMemo(
+  () => byFrame.get(frame) ?? [],
+  [byFrame, frame],
+);
 
-    const desired = getFrameList(frame) ?? [];
-    const cur = api.getAnnotations ? api.getAnnotations() : [];
-    if (sameOverlay(cur, desired)) return;
+useEffect(() => {
+  if (!api?.setAnnotations) return;
 
-    // Clear selection so popup closes when switching frames
-    api.setSelected?.();
+  const cur = api.getAnnotations ? api.getAnnotations() : [];
+  if (sameOverlay(cur, desiredOverlay)) return;
 
-    suppressRef.current = true;
-    api.setAnnotations(desired, true);
+  // Clear selection so popup closes when switching frames / overlays
+  api.setSelected?.();
 
-    void doubleRAF().then(() => {
-      suppressRef.current = false;
-    });
-  }, [api, frame, getFrameList]);
+  suppressRef.current = true;
+  api.setAnnotations(desiredOverlay, true);
+
+  void doubleRAF().then(() => {
+    suppressRef.current = false;
+  });
+}, [api, desiredOverlay]);
 
   /**
    * Event wiring:
    * - create/update/delete all funnel through commitFromAnnotorious
-   * - selectionChanged kept only for the "deselect commits" behavior you already had
+   * - selectionChanged kept only for the "deselect commits" behavior 
    */
   useEffect(() => {
     if (!api?.on || !api?.off || !api?.getAnnotations) return;
