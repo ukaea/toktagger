@@ -175,21 +175,6 @@ export function existingTrackIdsForClass(
   return out;
 }
 
-/**
- * Allocate a fresh human-readable track id for this class, unique within the session.
- */
-export function nextReadableTrackIdForClass(
-  byFrame: ByFrameMap,
-  className: string,
-  getLabelTrack: (a: ImageAnnotation) => {
-    className?: string | null;
-    trackId?: string | null;
-  },
-): string {
-  const existing = existingTrackIdsForClass(byFrame, className, getLabelTrack);
-  return uniqueReadableTrackId(existing);
-}
-
 /** Immutable update: set a frame's overlay list. */
 export function mapSetFrame(
   prev: ByFrameMap,
