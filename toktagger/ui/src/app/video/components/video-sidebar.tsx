@@ -292,7 +292,7 @@ export function VideoSidebar(_props: {
   };
 
   // Save only when needed (used before navigation).
-  const maybeSave = async () => {
+  const saveIfDirty = async () => {
     if (!session.dirty) return;
     await saveNow();
   };
@@ -307,7 +307,7 @@ export function VideoSidebar(_props: {
     }
 
     try {
-      await maybeSave();
+      await saveIfDirty();
       const next = await getNextSample(project_id);
       const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${next._id}`;
       navigate(NEXT_SAMPLE_URL);
@@ -414,7 +414,7 @@ export function VideoSidebar(_props: {
           <VideoShotSearchV2
             project_id={project_id}
             sample_id={sample_id}
-            onBeforeNavigate={maybeSave}
+            onBeforeNavigate={saveIfDirty}
           />
         </div>
 
