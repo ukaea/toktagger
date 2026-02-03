@@ -266,7 +266,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     const usedByClass = new Map<string, Set<string>>();
 
     return (className: string) => {
-      const cls = (className || "").trim() || "UFO";
+      const cls = className.trim() || "UFO";
 
       let used = usedByClass.get(cls);
       if (!used) {
