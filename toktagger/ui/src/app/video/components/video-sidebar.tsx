@@ -12,6 +12,7 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
+  Button,
 } from "@adobe/react-spectrum";
 import type { Project, Sample } from "@/types";
 
@@ -316,38 +317,11 @@ export function VideoSidebar(_props: {
                     <div className="max-w-[16rem] mx-auto mb-4">
                       <div className="mb-2">
                         <Flex gap="size-100" alignItems="center" wrap>
-                          <button
-                            className="spectrum-Button spectrum-Button--secondary spectrum-Button--outline spectrum-Button--sizeM"
-                            disabled
-                          >
-                            <span className="spectrum-Button-label">
-                              Rectangle
-                            </span>
-                          </button>
+                          <Button variant="secondary" style="fill" isDisabled>
+                            Rectangle
+                          </Button>
                         </Flex>
                       </div>
-
-                      <hr className="m-4 h-px opacity-30 border-gray-200" />
-
-                      <div className="mb-1">
-                        <Flex
-                          gap="size-100"
-                          alignItems="center"
-                          justifyContent="center"
-                          wrap
-                        >
-                          <button
-                            className="spectrum-Button spectrum-Button--primary spectrum-Button--outline spectrum-Button--sizeM"
-                            onClick={() => session.clearCurrentFrame()}
-                          >
-                            <span className="spectrum-Button-label">
-                              Clear Current Frame
-                            </span>
-                          </button>
-                        </Flex>
-                      </div>
-
-                      <hr className="m-4 h-px opacity-30 border-gray-200" />
                     </div>
                   </div>
                 </DisclosurePanel>
