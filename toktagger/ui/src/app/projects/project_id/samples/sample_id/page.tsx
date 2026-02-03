@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import {
   Provider,
@@ -20,8 +19,7 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import { VideoViewInner } from "@/app/video/components/video-view";
-import { VideoSessionProvider } from "@/app/video/components/video-session";
+import { VideoView } from "@/app/frames/components/frames";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -54,27 +52,53 @@ const SampleView = () => {
   if (isLoading) return <LoadingView />;
   if (error) return <ErrorView message={error} />;
 
+  if (error) return <ErrorView message={error} />;
+
+  if (!project) return isLoading ? <LoadingView /> : null;
+
+  // Video: keep the video UI mounted while fetching the next frame.
+  if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
+
+  if (isLoading) return <LoadingView />;
+
   if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
   if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
+
   return null;
 };
 
-function SamplePageContent(props: { projectId: string; sampleId: string }) {
+function VideoViewWrapperFromContext() {
   const {
     project,
     sample,
     data,
     annotations,
+    setAnnotations,
     dataParams,
     setDataParams,
-    isLoading,
-    error,
   } = useSample();
 
-  const isVideo = project?.task === TaskType.Video;
+  if (!project || !sample) return null;
 
-  // Early returns AFTER all hooks
-  if (error) return <ErrorView message={error} />;
+  // On initial load, block until we have frame data.
+  // During frame-to-frame fetches, SampleContext keeps previous data set, so VideoView stays mounted.
+  if (!data) return <LoadingView />;
+
+  return (
+    <VideoView
+      data={data}
+      annotations={annotations ?? []}
+      setAnnotations={setAnnotations}
+      dataParams={dataParams}
+      setDataParams={setDataParams}
+      projectId={project._id}
+      sampleId={sample._id}
+    />
+  );
+}
+
+function SamplePageContent() {
+  const { project, sample, isLoading } = useSample();
 
   if (!project) {
     return isLoading ? (

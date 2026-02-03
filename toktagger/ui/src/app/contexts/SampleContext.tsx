@@ -163,7 +163,8 @@ export function SampleProvider({
   }
 
   function isMissingFrameError(status: number, detail: string): boolean {
-    // Treat 404 + common "missing frame" phrasing as "navigation boundary" rather than fatal.
+    // Your backend message example: "Could not find image on disk for this frame index"
+    // Treat 404 + that phrasing as "navigation boundary" rather than fatal.
     if (status === 404) return true;
     const msg = (detail || "").toLowerCase();
     return (
@@ -244,8 +245,10 @@ export function SampleProvider({
 
           // Video-only: treat missing frame as "boundary" and stay on last good frame.
           if (projectData.task === TaskType.Video) {
-            const requestedFrame = (effectiveDataParams as { frame?: unknown })
-              ?.frame;
+            const requestedFrame = effectiveDataParams?.frame as
+              | number
+              | null
+              | undefined;
 
             const lastGood = lastGoodVideoFrameRef.current;
 
@@ -260,15 +263,11 @@ export function SampleProvider({
               });
 
               // Roll back params; do NOT set error and do NOT clear data.
-              setDataParams(
-                (prev) =>
-                  ({
-                    ...(prev as Record<string, unknown>),
-                    name: "image",
-                    frame: lastGood,
-                  }) as DataParams,
-              );
-
+              setDataParams((prev) => ({
+                ...prev,
+                name: "image",
+                frame: lastGood,
+              }));
               setIsLoading(false);
               return;
             }
@@ -290,9 +289,9 @@ export function SampleProvider({
 
         setData(viewData);
 
-        // Video: remember last good frame so we can roll back on missing-frame errors.
+        // video: remember last good frame so we can roll back on missing-frame errors
         if (projectData.task === TaskType.Video) {
-          const frame = (viewData as { frame?: unknown }).frame;
+          const frame = (viewData as unknown as { frame?: unknown }).frame;
           if (typeof frame === "number" && Number.isFinite(frame)) {
             lastGoodVideoFrameRef.current = frame;
           }

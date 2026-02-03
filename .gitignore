@@ -175,6 +175,5 @@ node_modules
 package-lock.json
 package.json
 
-.vscode/
 data/jet_images/
 toktagger/ui/.vite/
