@@ -3,17 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Provider,
-  ButtonGroup,
-  ToastQueue,
-  Button,
   Flex,
-  SearchField,
   DialogContainer,
   AlertDialog,
+  View,
+  Header,
+  Accordion,
+  Disclosure,
+  DisclosureTitle,
+  DisclosurePanel,
 } from "@adobe/react-spectrum";
-import { useNavigate } from "react-router-dom";
-import { BACKEND_API_URL } from "@/app/core";
-import type { Annotation, Project, Sample } from "@/types";
+import type { Project, Sample } from "@/types";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
@@ -23,6 +23,11 @@ import {
   InstancePanel as VideoInstancePanel,
   ConfirmModal,
 } from "@/app/video/components/ui_elements";
+
+import { ExportTool } from "@/app/components/tools/export";
+import { ImportButton } from "@/app/components/tools/import";
+import { ShotLabels } from "@/app/components/annotators/labels";
+import { VideoNavigationBar } from "@/app/video/components/video-navigation-bar";
 
 /**
  * Persist the last selected class so the annotator can immediately draw
@@ -48,38 +53,6 @@ function saveLastClassName(name: string) {
   } catch {
     // ignore
   }
-}
-
-/**
- * Backend helpers for saving annotations and navigating between samples.
- * These mirror existing endpoints used elsewhere in the app.
- */
-async function saveVideoAnnotations(
-  project_id: string,
-  sample_id: string,
-  payload: Annotation[],
-) {
-  const url = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
-  return await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-}
-
-async function getNextSample(project_id: string) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
-  const sampleResult = await fetch(NEXT_URL);
-  return await sampleResult.json();
-}
-
-async function getShotSample(project_id: string, shot_id: string) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
-  const sampleResult = await fetch(NEXT_URL);
-  const sampleArray = await sampleResult.json();
-  return Array.isArray(sampleArray) && sampleArray.length > 0
-    ? sampleArray[0]
-    : null;
 }
 
 /**
@@ -127,68 +100,6 @@ function compareProfiles(
 }
 
 /**
- * Jump-to-shot control. Before navigating, it calls `onBeforeNavigate` so we can
- * save any unsaved session annotations.
- */
-function VideoShotSearchV2(props: {
-  project_id: string;
-  sample_id: string;
-  onBeforeNavigate: () => Promise<void>;
-}) {
-  const navigate = useNavigate();
-  const [errorMessage, setErrorMessage] = useState<string>("");
-  const [shotQuery, setShotQuery] = useState<string>("");
-
-  const onSubmit = async (raw: string) => {
-    const value = raw.trim();
-
-    if (value === "") {
-      setErrorMessage("");
-      setShotQuery("");
-      return;
-    }
-
-    if (!/^[0-9]+$/.test(value)) {
-      setErrorMessage("Please enter a number.");
-      return;
-    }
-
-    try {
-      const nextSample = await getShotSample(props.project_id, value);
-      if (!nextSample) {
-        setErrorMessage("Shot not found!");
-        return;
-      }
-
-      await props.onBeforeNavigate();
-
-      const NEXT_SAMPLE_URL = `/ui/projects/${props.project_id}/samples/${nextSample._id}`;
-      navigate(NEXT_SAMPLE_URL);
-
-      setShotQuery("");
-      setErrorMessage("");
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("Failed to fetch shot.");
-    }
-  };
-
-  return (
-    <SearchField
-      label="Jump to Shot"
-      value={shotQuery}
-      onChange={(v) => {
-        setShotQuery(v);
-        if (errorMessage) setErrorMessage("");
-      }}
-      onSubmit={onSubmit}
-      validationState={errorMessage ? "invalid" : undefined}
-      errorMessage={errorMessage}
-    />
-  );
-}
-
-/**
  * Left sidebar controls for the frame annotator:
  * - Save / Next sample navigation
  * - Jump-to-shot navigation
@@ -201,7 +112,6 @@ export function VideoSidebar(_props: {
   sample: Sample;
   onSaved?: () => Promise<void> | void;
 }) {
-  const navigate = useNavigate();
   const session = useVideoSession();
 
   const project_id = session.projectId;
@@ -222,8 +132,6 @@ export function VideoSidebar(_props: {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const hasClass = Boolean(session.selection.className);
 
   const classItems = useMemo(() => {
     // ClassPanel only needs { name }.
@@ -268,53 +176,6 @@ export function VideoSidebar(_props: {
       track_id: session.selection.trackId,
     });
   }, [session.selection.className, session.selection.trackId]);
-
-  const saveNow = async () => {
-    try {
-      const payload = session.collectAllVideoBBoxes() as Annotation[];
-      const res = await saveVideoAnnotations(project_id, sample_id, payload);
-      if (!res.ok)
-        throw new Error(`Failed to save annotations: ${res.statusText}`);
-
-      session.markSaved();
-      ToastQueue.positive(`Saved ${payload.length} annotations!`, {
-        timeout: 5000,
-      });
-
-      // refresh SampleContext annotations after save
-      await _props.onSaved?.();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to save annotations.";
-      ToastQueue.negative(msg, { timeout: 5000 });
-    }
-  };
-
-  // Save only when needed (used before navigation).
-  const saveIfDirty = async () => {
-    if (!session.dirty) return;
-    await saveNow();
-  };
-
-  const handleNextSample = async () => {
-    if (!project_id || !sample_id) {
-      ToastQueue.negative(
-        "Cannot load next sample: missing project or sample id.",
-        { timeout: 5000 },
-      );
-      return;
-    }
-
-    try {
-      await saveIfDirty();
-      const next = await getNextSample(project_id);
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${next._id}`;
-      navigate(NEXT_SAMPLE_URL);
-    } catch (err) {
-      console.error(err);
-      ToastQueue.negative("Failed to load next sample.", { timeout: 5000 });
-    }
-  };
 
   const onSelectClassName = (name: string | null) => {
     const cls = (name ?? "").trim();
@@ -384,132 +245,202 @@ export function VideoSidebar(_props: {
   return (
     <Provider height="100vh">
       <div className="h-screen text-center w-72 shrink-0 overflow-y-auto">
-        <div className="pl-4 pr-4 pt-4">
-          <ButtonGroup>
-            <Button
-              variant="primary"
-              onPress={saveNow}
-              isDisabled={!session.dirty}
+        <View overflow="auto" height="100vh">
+          <Flex
+            direction="column"
+            alignItems="center"
+            justifyContent="center"
+            gap="size-100"
+            width="100%"
+          >
+            <Flex
+              direction="column"
+              alignItems="center"
+              justifyContent="center"
+              gap="size-100"
             >
-              Save
-            </Button>
-            <Button variant="primary" onPress={handleNextSample}>
-              Next
-            </Button>
-          </ButtonGroup>
+              <Header height="size-300" marginBottom="size-100">
+                <span style={{ fontSize: "1.2rem" }}>Controls</span>
+              </Header>
 
-          {!hasClass && (
-            <div className="mt-2 text-[12px] opacity-80 leading-snug">
-              Select a <b>class</b> to start drawing.
-            </div>
-          )}
-        </div>
+              <VideoNavigationBar
+                project_id={project_id}
+                sample_id={sample_id}
+                onSaved={_props.onSaved}
+              />
 
-        <div className="pl-4 pr-4 pb-4 pt-2">
-          <VideoShotSearchV2
-            project_id={project_id}
-            sample_id={sample_id}
-            onBeforeNavigate={saveIfDirty}
-          />
-        </div>
+              <Accordion allowsMultipleExpanded={true} width="100%">
+                <Disclosure>
+                  <DisclosureTitle>
+                    <span style={{ fontSize: "0.8rem" }}>
+                      Export Annotations
+                    </span>
+                  </DisclosureTitle>
+                  <DisclosurePanel>
+                    <ExportTool project={_props.project} sample={_props.sample} />
+                  </DisclosurePanel>
+                </Disclosure>
 
-        <div className="pl-4 pr-4 pb-4">
-          <div className="max-w-[16rem] mx-auto mb-4">
-            <div className="mb-2">
-              <Flex gap="size-100" alignItems="center" wrap>
-                <Button
-                  variant="secondary"
-                  style="outline"
-                  isDisabled
-                  UNSAFE_className="!px-2.5 !py-1.5 text-xs"
-                >
-                  Rectangle
-                </Button>
-              </Flex>
-            </div>
+                <Disclosure>
+                  <DisclosureTitle>
+                    <span style={{ fontSize: "0.8rem" }}>
+                      Import Annotations
+                    </span>
+                  </DisclosureTitle>
+                  <DisclosurePanel>
+                    <ImportButton
+                      project={_props.project}
+                      sample={_props.sample}
+                      refreshAnnotations={async () => {
+                        await _props.onSaved?.();
+                      }}
+                    />
+                  </DisclosurePanel>
+                </Disclosure>
+              </Accordion>
+            </Flex>
 
-            <hr className="m-4 h-px opacity-30 border-gray-200" />
+            <Flex justifyContent="center" alignItems="center">
+              <Header height="size-300" marginBottom="size-100">
+                <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+              </Header>
+            </Flex>
 
-            <div className="mb-1">
-              <Flex
-                gap="size-100"
-                alignItems="center"
-                justifyContent="center"
-                wrap
+            <Accordion allowsMultipleExpanded={true} width="100%">
+              <Disclosure>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.8rem" }}>Shot Labels</span>
+                </DisclosureTitle>
+                <DisclosurePanel>
+                  <ShotLabels labels={["Valid Shot", "Invalid Shot"]} />
+                </DisclosurePanel>
+              </Disclosure>
+
+              <Disclosure defaultExpanded>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.8rem" }}>Frame Tools</span>
+                </DisclosureTitle>
+                <DisclosurePanel>
+                  <div className="pl-4 pr-4 pb-4">
+                    <div className="max-w-[16rem] mx-auto mb-4">
+                      <div className="mb-2">
+                        <Flex gap="size-100" alignItems="center" wrap>
+                          <button
+                            className="spectrum-Button spectrum-Button--secondary spectrum-Button--outline spectrum-Button--sizeM"
+                            disabled
+                          >
+                            <span className="spectrum-Button-label">
+                              Rectangle
+                            </span>
+                          </button>
+                        </Flex>
+                      </div>
+
+                      <hr className="m-4 h-px opacity-30 border-gray-200" />
+
+                      <div className="mb-1">
+                        <Flex
+                          gap="size-100"
+                          alignItems="center"
+                          justifyContent="center"
+                          wrap
+                        >
+                          <button
+                            className="spectrum-Button spectrum-Button--primary spectrum-Button--outline spectrum-Button--sizeM"
+                            onClick={() => session.clearCurrentFrame()}
+                          >
+                            <span className="spectrum-Button-label">
+                              Clear Current Frame
+                            </span>
+                          </button>
+                        </Flex>
+                      </div>
+
+                      <hr className="m-4 h-px opacity-30 border-gray-200" />
+                    </div>
+                  </div>
+                </DisclosurePanel>
+              </Disclosure>
+
+              <Disclosure defaultExpanded>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.8rem" }}>Class</span>
+                </DisclosureTitle>
+                <DisclosurePanel>
+                  <div className="pl-4 pr-4 pb-4">
+                    <VideoClassPanel
+                      items={classItems}
+                      selectedClassName={session.selection.className}
+                      setSelectedClassName={onSelectClassName}
+                    />
+                  </div>
+                </DisclosurePanel>
+              </Disclosure>
+
+              <Disclosure defaultExpanded>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.8rem" }}>Instances</span>
+                </DisclosureTitle>
+                <DisclosurePanel>
+                  <div className="pl-4 pr-4 pb-4">
+                    <VideoInstancePanel
+                      profiles={profiles}
+                      selectedKey={selectedKey}
+                      onSelect={onSelectInstance}
+                      onCreateProfile={() => {
+                        // Instances are derived from annotations; creation happens via drawing.
+                      }}
+                      onRequestBulkDelete={onRequestBulkDelete}
+                      onRequestDeleteAllInstances={onRequestDeleteAllInstances}
+                      profileCounts={profileCounts}
+                      showCreator={false}
+                      classItems={classItems}
+                    />
+                  </div>
+                </DisclosurePanel>
+              </Disclosure>
+            </Accordion>
+          </Flex>
+
+          {/* Confirm: clear the entire session overlay */}
+          <DialogContainer onDismiss={cancelClearAll}>
+            {confirmClearAllOpen && (
+              <AlertDialog
+                title="Clear all frames?"
+                variant="destructive"
+                primaryActionLabel="Clear all"
+                cancelLabel="Cancel"
+                onPrimaryAction={confirmClearAll}
+                onCancel={cancelClearAll}
               >
-                <Button
-                  variant="primary"
-                  style="outline"
-                  UNSAFE_className="!px-2.5 !py-1.5 text-xs"
-                  onPress={() => session.clearCurrentFrame()}
-                >
-                  Clear Current Frame
-                </Button>
-              </Flex>
-            </div>
+                This will remove all annotations across all frames in the current
+                session. You can’t undo this.
+              </AlertDialog>
+            )}
+          </DialogContainer>
 
-            <hr className="m-4 h-px opacity-30 border-gray-200" />
-          </div>
-
-          <VideoClassPanel
-            items={classItems}
-            selectedClassName={session.selection.className}
-            setSelectedClassName={onSelectClassName}
+          {/* Confirm: delete one instance across all frames */}
+          <ConfirmModal
+            open={Boolean(pendingDeleteInstance)}
+            title="Delete instance?"
+            message="This deletes all annotations for this instance across all frames. You can’t undo this."
+            details={
+              pendingDeleteInstance ? (
+                <div>
+                  Target:{" "}
+                  <b>
+                    {pendingDeleteInstance.className} /{" "}
+                    {pendingDeleteInstance.trackId}
+                  </b>
+                </div>
+              ) : null
+            }
+            confirmLabel="Delete"
+            cancelLabel="Cancel"
+            onConfirm={confirmDeleteInstance}
+            onCancel={cancelDeleteInstance}
           />
-
-          <VideoInstancePanel
-            profiles={profiles}
-            selectedKey={selectedKey}
-            onSelect={onSelectInstance}
-            onCreateProfile={() => {
-              // Instances are derived from annotations; creation happens via drawing.
-            }}
-            onRequestBulkDelete={onRequestBulkDelete}
-            onRequestDeleteAllInstances={onRequestDeleteAllInstances}
-            profileCounts={profileCounts}
-            showCreator={false}
-            classItems={classItems}
-          />
-        </div>
-
-        {/* Confirm: clear the entire session overlay */}
-        <DialogContainer onDismiss={cancelClearAll}>
-          {confirmClearAllOpen && (
-            <AlertDialog
-              title="Clear all frames?"
-              variant="destructive"
-              primaryActionLabel="Clear all"
-              cancelLabel="Cancel"
-              onPrimaryAction={confirmClearAll}
-              onCancel={cancelClearAll}
-            >
-              This will remove all annotations across all frames in the current
-              session. You can’t undo this.
-            </AlertDialog>
-          )}
-        </DialogContainer>
-
-        {/* Confirm: delete one instance across all frames */}
-        <ConfirmModal
-          open={Boolean(pendingDeleteInstance)}
-          title="Delete instance?"
-          message="This deletes all annotations for this instance across all frames. You can’t undo this."
-          details={
-            pendingDeleteInstance ? (
-              <div>
-                Target:{" "}
-                <b>
-                  {pendingDeleteInstance.className} /{" "}
-                  {pendingDeleteInstance.trackId}
-                </b>
-              </div>
-            ) : null
-          }
-          confirmLabel="Delete"
-          cancelLabel="Cancel"
-          onConfirm={confirmDeleteInstance}
-          onCancel={cancelDeleteInstance}
-        />
+        </View>
       </div>
     </Provider>
   );
