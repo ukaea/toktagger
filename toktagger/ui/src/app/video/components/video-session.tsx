@@ -8,8 +8,10 @@ import React, {
   useState,
   useEffect,
   useLayoutEffect,
+  useRef,
 } from "react";
-import type { ImageAnnotation } from "@annotorious/react";
+import { useAnnotator, type ImageAnnotation } from "@annotorious/react";
+import type { Annotator } from "@annotorious/annotorious";
 
 import type { Annotation, DataParams } from "@/types";
 import { VideoBoundingBoxSchema } from "@/types";
@@ -30,12 +32,21 @@ import {
   mapClearFrame,
   mapSetFrame,
   nextTrackIdForClass,
+  existingTrackIdsForClass,
+  uniqueReadableTrackId,
 } from "./video-utils";
 import {
   annoToVideoBBox,
   getLabelTrack,
   videoBBoxToAnno,
+  stampLabelAndTrack,
+  normalizeOverlayForSession,
 } from "./anno-utils";
+import {
+  clampOverlayToNaturalImage,
+  doubleRAF,
+  sameOverlay,
+} from "./overlay-sync-utils";
 
 /**
  * Session state for the frame-by-frame annotation workflow.
@@ -65,6 +76,14 @@ type VideoSessionCtx = {
 
   /** Derived instance summary across all frames (used by sidebar UI). */
   instances: InstanceProfile[];
+
+  /** Natural image dimensions for the currently loaded frame (used for clamping). */
+  imageNatural: { w: number; h: number } | null;
+  setImageNatural: (n: { w: number; h: number } | null) => void;
+
+  /** Popup helpers so view components don't need direct access to the Annotorious API. */
+  deleteAnnotation: (id: string) => void;
+  closePopup: () => void;
 
   // frame ops
   getFrameList: (frame: FrameIndex) => ImageAnnotation[];
@@ -127,6 +146,18 @@ export function VideoSessionProvider(props: {
   children: React.ReactNode;
 }) {
   const { projectId, sampleId, children } = props;
+
+  const api = useAnnotator<Annotator<ImageAnnotation, ImageAnnotation>>();
+
+  /**
+   * Guard against feedback loops: when we call `api.setAnnotations`, Annotorious
+   * emits update events. During that window we ignore change handlers.
+   */
+  const suppressRef = useRef(false);
+
+  const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(
+    null,
+  );
 
   const [videoFrame, setVideoFrame] = useState<number | null>(null);
 
@@ -359,6 +390,209 @@ export function VideoSessionProvider(props: {
     seedFromDbIfEmpty(props.dbAnnotations);
   }, [props.dbAnnotations, seedFromDbIfEmpty]);
 
+  /**
+   * Single commit point for all Annotorious mutations (create/update/delete).
+   * This normalizes bodies, clamps geometry to image bounds, and syncs the session store.
+   */
+  const commitFromAnnotorious = useCallback(
+    (rawOverride?: ImageAnnotation[]) => {
+      if (!api?.getAnnotations) return;
+      if (suppressRef.current) return;
+
+      // Some Annotorious events pass a single annotation (not an array).
+      const raw = rawOverride ?? api.getAnnotations();
+
+      // Enforce image bounds so rectangles can't persist outside the frame.
+      const clamped = clampOverlayToNaturalImage(raw, imageNatural);
+
+      const firstClassFrom = (list: ImageAnnotation[]) => {
+        for (const a of list ?? []) {
+          const { className } = getLabelTrack(a);
+          const s = (className ?? "").trim();
+          if (s) return s;
+        }
+        return null;
+      };
+
+      const cls = selection.className ?? firstClassFrom(clamped);
+
+      const fallbackTrackId = selection.trackId ?? null;
+
+      // Allocator is only needed within THIS normalization pass.
+      // It allocates unique ids per-class for annotations missing trackId.
+      const allocTrackId =
+        fallbackTrackId
+          ? undefined
+          : (() => {
+              const usedByClass = new Map<string, Set<string>>();
+
+              return (className: string) => {
+                const c = (className || "").trim() || "UFO";
+
+                let used = usedByClass.get(c);
+                if (!used) {
+                  const existing = existingTrackIdsForClass(
+                    byFrame,
+                    c,
+                    getLabelTrack,
+                  );
+                  used = new Set(existing.map((t) => canonicalizeTrackId(t)));
+                  usedByClass.set(c, used);
+                }
+
+                const next = uniqueReadableTrackId(used);
+                used.add(canonicalizeTrackId(next));
+                return next;
+              };
+            })();
+
+      const normalized = normalizeOverlayForSession({
+        raw: clamped,
+        frameKey,
+        fallback: { className: cls, trackId: fallbackTrackId },
+        allocTrackId,
+        enforceBothBodies: true,
+        dedupeByInstance: true,
+      });
+
+      // Push corrected overlay back into Annotorious when it diverges.
+      if (!sameOverlay(raw, normalized)) {
+        suppressRef.current = true;
+        api.setAnnotations?.(normalized, true);
+        void doubleRAF().then(() => {
+          suppressRef.current = false;
+        });
+      }
+
+      // Persist normalized overlay for this frame in the session store.
+      const prev = getFrameList(frame);
+      if (!sameOverlay(prev, normalized)) {
+        setFrameList(frame, normalized);
+      }
+    },
+    [
+      api,
+      byFrame,
+      frame,
+      frameKey,
+      getFrameList,
+      imageNatural,
+      selection.className,
+      selection.trackId,
+      setFrameList,
+    ],
+  );
+
+  /**
+   * When the frame changes, replace the annotator overlay from the session store.
+   */
+  useEffect(() => {
+    if (!api?.setAnnotations) return;
+
+    const desired = getFrameList(frame) ?? [];
+    const cur = api.getAnnotations ? api.getAnnotations() : [];
+    if (sameOverlay(cur, desired)) return;
+
+    // Clear selection so popup closes when switching frames
+    api.setSelected?.();
+
+    suppressRef.current = true;
+    api.setAnnotations(desired, true);
+
+    void doubleRAF().then(() => {
+      suppressRef.current = false;
+    });
+  }, [api, frame, getFrameList]);
+
+  /**
+   * Event wiring:
+   * - create/update/delete all funnel through commitFromAnnotorious
+   * - selectionChanged kept only for the "deselect commits" behavior you already had
+   */
+  useEffect(() => {
+    if (!api?.on || !api?.off || !api?.getAnnotations) return;
+
+    const onSelectionChanged = (arr: ImageAnnotation[]) => {
+      if (arr.length === 0) {
+        if (!suppressRef.current) commitFromAnnotorious();
+      }
+    };
+
+    const onCreate = (created: ImageAnnotation) => {
+      if (suppressRef.current) return;
+
+      const cls = selection.className;
+      if (!cls) return;
+
+      const createdId = created?.id;
+      if (!createdId) {
+        commitFromAnnotorious();
+        return;
+      }
+
+      const raw = api.getAnnotations();
+
+      // Track ids already used for this class (session + current overlay).
+      const used = new Set<string>();
+
+      for (const tid of existingTrackIdsForClass(byFrame, cls, getLabelTrack)) {
+        const c = canonicalizeTrackId(tid);
+        if (c) used.add(c);
+      }
+
+      for (const a of raw) {
+        const got = getLabelTrack(a);
+        if ((got.className ?? "").trim() !== cls) continue;
+
+        const tid = canonicalizeTrackId(got.trackId ?? "");
+        if (tid) used.add(tid);
+      }
+
+      let trackId = selection.trackId ?? null;
+      if (!trackId) {
+        trackId = uniqueReadableTrackId(used);
+      }
+
+      const stamped = raw.map((a) =>
+        a?.id === createdId ? stampLabelAndTrack(a, cls, String(trackId)) : a,
+      );
+
+      commitFromAnnotorious(stamped);
+    };
+
+    const onUpdate = (_updated: ImageAnnotation, _previous: ImageAnnotation) => {
+      commitFromAnnotorious();
+    };
+
+    const onDelete = (_deleted: ImageAnnotation) => {
+      commitFromAnnotorious();
+    };
+
+    api.on("createAnnotation", onCreate);
+    api.on("updateAnnotation", onUpdate);
+    api.on("deleteAnnotation", onDelete);
+    api.on("selectionChanged", onSelectionChanged);
+
+    return () => {
+      api.off("createAnnotation", onCreate);
+      api.off("updateAnnotation", onUpdate);
+      api.off("deleteAnnotation", onDelete);
+      api.off("selectionChanged", onSelectionChanged);
+    };
+  }, [api, byFrame, commitFromAnnotorious, selection.className, selection.trackId]);
+
+  const closePopup = useCallback(() => {
+    api?.setSelected?.();
+  }, [api]);
+
+  const deleteAnnotation = useCallback(
+    (id: string) => {
+      if (!id) return;
+      api?.removeAnnotation?.(id);
+      api?.setSelected?.();
+    },
+    [api],
+  );
 
   const value = useMemo<VideoSessionCtx>(
     () => ({
@@ -373,6 +607,10 @@ export function VideoSessionProvider(props: {
       selection,
       setSelection,
       instances,
+      imageNatural,
+      setImageNatural,
+      deleteAnnotation,
+      closePopup,
       getFrameList,
       seedFrame,
       setFrameList,
@@ -398,6 +636,10 @@ export function VideoSessionProvider(props: {
       selection,
       setSelection,
       instances,
+      imageNatural,
+      setImageNatural,
+      deleteAnnotation,
+      closePopup,
       getFrameList,
       seedFrame,
       setFrameList,
