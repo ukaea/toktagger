@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Provider,
-  defaultTheme,
   ButtonGroup,
   ToastQueue,
   Button,
@@ -383,7 +382,7 @@ export function VideoSidebar(_props: {
   const cancelClearAll = () => setConfirmClearAllOpen(false);
 
   return (
-    <Provider theme={defaultTheme} height="100vh">
+    <Provider height="100vh">
       <div className="h-screen text-center w-72 shrink-0 overflow-y-auto">
         <div className="pl-4 pr-4 pt-4">
           <ButtonGroup>
