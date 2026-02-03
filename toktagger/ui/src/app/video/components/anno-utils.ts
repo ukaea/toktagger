@@ -59,7 +59,7 @@ export function upsertBody(
     } as AnnotationBody;
     return list;
   }
-  list.push({ purpose, value } as unknown as AnnotationBody);
+  list.push({ purpose, value } as AnnotationBody);
   return list;
 }
 
