@@ -14,6 +14,9 @@ export UDA_META_PLUGINNAME="MASTU_DB"
 export UDA_METANEW_PLUGINNAME="MAST_DB"
 ```
 
+## UDA Camera
+This data loader uses [UDA](https://ukaea.github.io/UDA/) to access camera data from MAST and MAST-U. In order for this data loader to work, you must be connected to a machine with access to one of the UDA servers as above.
+
 ## SAL
 This data loader uses [SAL](https://data.jet.uk/guides/sal/python_client.html) to access data from the JET data centre. In order for this data loader to work, you must be connected to a machine with access to the JDC or connected to the JDC VPN. Furthermore, you must have configured a local authentication details file at `~/.sal/credentials`, with contents looking the the following:
 
@@ -23,5 +26,5 @@ user=<your-username>
 password=<your-password>
 ```
 
-## Toksearch
-This data loader uses [Toksearch](https://github.com/GA-FDP/toksearch) to access data. Currently only access to data with Zarr signals is implemented.
+## FAIR MAST
+This data loader access data from the [FAIR MAST](https://mastapp.site) project.

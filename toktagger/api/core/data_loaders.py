@@ -1,8 +1,5 @@
 from pathlib import Path
-import sys
-import types
 import os
-import s3fs
 import pandas as pd
 import xarray as xr
 import pathlib
@@ -28,7 +25,6 @@ from toktagger.api.schemas.samples import (
     Sample,
     ShotData,
     TimeSeriesFileData,
-    ToksearchShotData,
 )
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -42,13 +38,6 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
 # Setup SAL environment variables with defaults if not already set. This is required for
 # the SAL client to work correctly.
 os.environ["SAL_HOST"] = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
-
-
-# Toksearch specific patch
-# Create a Fake MDS plus module to avoid the need to install MDSPlus on the system.
-mds = types.ModuleType("MDSplus")
-mds.Connection = None
-sys.modules["MDSplus"] = mds
 
 
 class DataLoaderError(Exception):
@@ -88,7 +77,6 @@ class LoaderRegistry:
                 ShotData,
                 FileData,
                 TimeSeriesFileData,
-                ToksearchShotData,
             ):
                 raise ValueError(
                     f"Loader '{name}' must expect a supported data type as an input, but got '{sample_data_type}'."
@@ -411,11 +399,11 @@ class SALDataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
-@LoaderRegistry.register("toksearch")
-class TokSearchDataLoader(DataLoader):
+@LoaderRegistry.register("fair_mast")
+class FAIRMASTDataLoader(DataLoader):
     @classmethod
-    def sample_data_type(self) -> Type[ToksearchShotData]:
-        return ToksearchShotData
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
 
     def get_sample(
         self,
@@ -425,28 +413,22 @@ class TokSearchDataLoader(DataLoader):
         min_time_step: Optional[float] = None,
         **kwargs,
     ) -> MultiVariateTimeSeriesData:
-        assert isinstance(sample.data, ToksearchShotData), (
-            "Sample data must be of type ToksearchShotData"
+        assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
+        sample_data: ShotData = sample.data
+
+        endpoint = "https://s3.echo.stfc.ac.uk/mast/level2/shots"
+        file_path = f"{endpoint}/{sample.shot_id}.zarr"
+
+        data_tree = xr.open_datatree(
+            file_path, chunks=None, create_default_indexes=False
         )
-        sample_data: ToksearchShotData = sample.data
-
-        endpoint = sample_data.endpoint
-        base_path = sample_data.base_path
-
-        if sample_data.backend_type != "zarr":
-            raise ValueError("Only zarr backend is currently supported")
-
-        self.fs = s3fs.S3FileSystem(anon=True, endpoint_url=endpoint, asynchronous=True)
-
-        from toksearch.signal.zarr import ZarrSignal
 
         results = {}
         for name in sample_data.signal_names:
             try:
-                signal = ZarrSignal(base_path, name, fs=self.fs)
-                ds = signal.fetch_as_xarray(sample.shot_id)
-                data = ds.data
-                time = ds.times.data
+                ds = data_tree[name]
+                data = ds.values
+                time = ds.time.values
 
                 if time_min is not None:
                     mask = time >= time_min

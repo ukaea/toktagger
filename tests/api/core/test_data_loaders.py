@@ -10,7 +10,6 @@ from toktagger.api.schemas.samples import (
     FileType,
     FileProtocol,
     ShotProtocol,
-    ToksearchShotData,
 )
 from toktagger.api.schemas.data import (
     TimeSeriesData,
@@ -224,22 +223,20 @@ def test_sal_loader():
     assert numpy.max(ip_values) == 4664.5283203125
 
 
-def test_toksearch_loader():
-    toksearch_shot = data_loaders.ToksearchShotData(
-        protocol=ShotProtocol.TOKSEARCH,
+def test_fair_mast_dataloader():
+    fair_mast_shot = data_loaders.ShotData(
+        protocol=ShotProtocol.FAIR_MAST,
         signal_names=["magnetics/ip"],
-        backend_type="zarr",
-        base_path="s3://mast/level2/shots/",
-        endpoint="https://echo.stfc.ac.uk",
     )
+
     sample = Sample(
         shot_id=30421,
-        data=toksearch_shot,
+        data=fair_mast_shot,
         _id="test",
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.TokSearchDataLoader(params=DataParams(name="identity"))
+    data_loader = data_loaders.FAIRMASTDataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
@@ -319,7 +316,7 @@ async def test_custom_data_loader(api_client):
         ("tabular", data_loaders.TabularDataLoader, TimeSeriesFileData),
         ("uda", data_loaders.UDADataLoader, ShotData),
         ("sal", data_loaders.SALDataLoader, ShotData),
-        ("toksearch", data_loaders.TokSearchDataLoader, ToksearchShotData),
+        ("fair_mast", data_loaders.FAIRMASTDataLoader, ShotData),
     ],
 )
 def test_loader_registry(name, data_loader, sample_data_model):

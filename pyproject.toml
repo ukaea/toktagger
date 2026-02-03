@@ -29,7 +29,6 @@ dependencies = [
   "pillow",
   "uda",
   "sal",
-  "toksearch @ git+https://github.com/GA-FDP/toksearch",
   "ruptures @ git+https://github.com/deepcharles/ruptures.git@e88da13b5f625f37321abd07c5d14b91701c6655",
   "pytest",
   "mkdocs",

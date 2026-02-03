@@ -63,7 +63,7 @@ def create_sal_samples(project_id: str, shot_ids: list[int]):
     requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
-def create_toksearch_samples(project_id: str, shot_ids: list[int]):
+def create_fair_mast_samples(project_id: str, shot_ids: list[int]):
     samples = []
     for shot_id in shot_ids:
         sample = {
@@ -71,10 +71,7 @@ def create_toksearch_samples(project_id: str, shot_ids: list[int]):
             "shot_id": shot_id,
             "data": {
                 "signal_names": ["magnetics/ip"],
-                "protocol": "toksearch",
-                "backend_type": "zarr",
-                "base_path": "s3://mast/level2/shots/",
-                "endpoint": "https://echo.stfc.ac.uk",
+                "protocol": "fair_mast",
             },
         }
         samples.append(sample)
@@ -201,15 +198,15 @@ def main():
     shot_ids = [87737]
     create_sal_samples(project_id, shot_ids)
 
-    # Toksearch - FAIR MAST
+    # FAIR MAST
     project_id = create_project(
-        "Toksearch MAST Project",
+        "FAIR MAST Project",
         "time-series",
-        "toksearch",
+        "fair_mast",
         query_strategy="sequential",
     )
     shot_ids = [30421]
-    create_toksearch_samples(project_id, shot_ids)
+    create_fair_mast_samples(project_id, shot_ids)
 
     shot_ids = [30421]
     project_id = create_project(

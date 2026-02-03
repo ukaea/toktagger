@@ -4117,11 +4117,6 @@ wheels = [
 ]
 
 [[package]]
-name = "toksearch"
-version = "2.2.3+4.g0fba41a"
-source = { git = "https://github.com/GA-FDP/toksearch#0fba41a639267fa227dafa0a14f257235508054b" }
-
-[[package]]
 name = "toktagger"
 version = "2025.0.0"
 source = { virtual = "." }
@@ -4159,7 +4154,6 @@ dependencies = [
     { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "scipy", version = "1.17.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "toksearch" },
     { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "uda" },
@@ -4216,7 +4210,6 @@ requires-dist = [
     { name = "sal-xarray", specifier = ">=0.2.1" },
     { name = "scikit-learn" },
     { name = "scipy" },
-    { name = "toksearch", git = "https://github.com/GA-FDP/toksearch" },
     { name = "torch" },
     { name = "uda" },
     { name = "uda-xarray", specifier = ">=0.2.1" },

@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional, Union, Literal
+from typing import Annotated, List, Optional, Union
 from enum import Enum
 from pydantic import Field, BaseModel, computed_field
 from toktagger.api.schemas import ConfiguredModel
@@ -26,7 +26,7 @@ class ShotProtocol(str, Enum):
     UDA = "uda"
     UDA_CAMERA = "uda_camera"
     SAL = "sal"
-    TOKSEARCH = "toksearch"
+    FAIR_MAST = "fair_mast"
 
 
 class FileData(BaseModel):
@@ -44,13 +44,7 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 
-class ToksearchShotData(ShotData):
-    backend_type: Literal["zarr"]
-    base_path: str
-    endpoint: str
-
-
-DataTypes = Union[TimeSeriesFileData, FileData, ShotData, ToksearchShotData]
+DataTypes = Union[TimeSeriesFileData, FileData, ShotData]
 
 
 class SampleBase(ConfiguredModel):

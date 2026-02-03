@@ -60,9 +60,8 @@ const DataLoaderOptionsSchema = z.object({
   name: z.string(),
   data_type: z.string(),
 });
-export type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
 
-const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
+const ShotDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   signal_names: z.array(z.string()),
   shot_min: z.number(),
   shot_max: z.number(),
@@ -76,7 +75,7 @@ const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
     path: ["shot_max"], // attach error to `max`
   },
 );
-type UDADataLoaderOptions = z.infer<typeof UDADataLoaderOptionsSchema>;
+type ShotDataLoaderOptions = z.infer<typeof ShotDataLoaderOptionsSchema>;
 
 const FileDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
   file_type: z.string(),
@@ -93,6 +92,11 @@ const TimeSeriesFileDataLoaderOptionsSchema =
 type TimeSeriesFileDataLoaderOptions = z.infer<
   typeof TimeSeriesFileDataLoaderOptionsSchema
 >;
+
+export type DataLoaderOptions =
+  | FileDataLoaderOptions
+  | ShotDataLoaderOptions
+  | TimeSeriesFileDataLoaderOptions;
 
 export function useFileLoaderState(
   initialPath: string,
@@ -254,7 +258,7 @@ const SignalNamesUI = ({
   );
 };
 
-const UDADataLoaderOptionsUI = ({
+const ShotDataLoaderOptionsUI = ({
   dataLoader,
   dataType,
   dataLoaderOptions,
@@ -262,7 +266,7 @@ const UDADataLoaderOptionsUI = ({
 }: {
   dataLoader: string;
   dataType: string;
-  dataLoaderOptions: UDADataLoaderOptions;
+  dataLoaderOptions: ShotDataLoaderOptions;
   setDataLoaderOptions: (options: DataLoaderOptions) => void;
 }) => {
   const [shotRange, setShotRange] = useState<NumericalRangeType>({
@@ -275,7 +279,7 @@ const UDADataLoaderOptionsUI = ({
   );
 
   useEffect(() => {
-    const options = UDADataLoaderOptionsSchema.safeParse({
+    const options = ShotDataLoaderOptionsSchema.safeParse({
       name: dataLoader,
       data_type: dataType,
       signal_names: signalNames,
@@ -466,12 +470,12 @@ export const SelectDataLoaderUI = (
 
   let ui = null;
   if (dataType === "ShotData") {
-    const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
+    const shotOptions = dataLoaderOptions as ShotDataLoaderOptions;
     ui = (
-      <UDADataLoaderOptionsUI
+      <ShotDataLoaderOptionsUI
         dataLoader={dataLoader || ""}
         dataType={dataType}
-        dataLoaderOptions={udaOptions}
+        dataLoaderOptions={shotOptions}
         setDataLoaderOptions={setDataLoaderOptions}
       />
     );
@@ -628,7 +632,7 @@ export const buildSamples = (
   dataLoaderOptions: DataLoaderOptions,
 ): Sample[] => {
   if (dataLoaderOptions.data_type === "ShotData") {
-    return createUDASamples(dataLoaderOptions);
+    return createShotSamples(dataLoaderOptions);
   } else if (dataLoaderOptions.data_type === "FileData") {
     return createFileSamples(dataLoaderOptions);
   } else if (dataLoaderOptions.data_type === "TimeSeriesFileData") {
@@ -638,8 +642,8 @@ export const buildSamples = (
   }
 };
 
-const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
-  const { shot_min, shot_max } = dataLoaderOptions as UDADataLoaderOptions;
+const createShotSamples = (dataLoaderOptions: DataLoaderOptions) => {
+  const { shot_min, shot_max } = dataLoaderOptions as ShotDataLoaderOptions;
 
   const shots = Array.from(
     { length: shot_max - shot_min + 1 },
@@ -859,34 +863,6 @@ export const ProjectConfigEditor = ({
     await createSamples(projectId, samples);
     if (onModify) onModify();
   };
-
-  // const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {
-  //   const dataLoaderName = samplesSummary?.data?.protocol;
-
-  //   if (dataLoaderName === "uda") {
-  //     // UDA data loader
-  //     const dataInfo = samplesSummary.data as ShotData;
-  //     setDataLoaderOptions({
-  //       name: dataLoaderName,
-  //       signal_names: dataInfo.signal_names || [],
-  //       shot_min: samplesSummary.shot_min || null,
-  //       shot_max: samplesSummary.shot_max || null,
-  //     } as UDADataLoaderOptions);
-  //   } else if (dataLoaderName === "file") {
-  //     // File data loader
-  //     const dataInfo = samplesSummary.data as FileData;
-  //     setDataLoaderOptions({
-  //       name: dataLoaderName,
-  //       signal_names: dataInfo.column_names || [],
-  //       file_type: dataLoaderName,
-  //       file_names: [],
-  //       file_name: dataInfo.file_name || [],
-  //     } as FileDataLoaderOptions);
-  //   } else {
-  //     // Unknown data loader
-  //     setDataLoaderOptions(null);
-  //   }
-  // };
 
   useEffect(() => {
     if (project && samplesSummary !== null) {
