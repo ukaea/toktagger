@@ -29,62 +29,9 @@ import {
   uniqueReadableTrackId,
 } from "./video-utils";
 import { AnnotationPopup } from "./annotation-popup";
-
-/**
- * Narrow API surface we rely on from Annotorious.
- * We keep it small so the component doesn't depend on internal implementation details.
- */
-type AnnotatorApi = {
-  getAnnotations?: () => unknown;
-  setAnnotations?: (anns: ImageAnnotation[], replace?: boolean) => void;
-  on?: (event: string, cb: (...args: unknown[]) => void) => void;
-  off?: (event: string, cb: (...args: unknown[]) => void) => void;
-};
+import type { Annotator } from "@annotorious/annotorious";
 
 type UnknownRecord = Record<string, unknown>;
-
-function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
-  return typeof v === "function";
-}
-
-/**
- * Best-effort adapter for the object returned by `useAnnotator()`.
- * If the expected methods aren't present, we treat the API as unavailable.
- */
-function asAnnotatorApi(a: unknown): AnnotatorApi | null {
-  if (!a || (typeof a !== "object" && typeof a !== "function")) return null;
-  const r = a as Record<string, unknown>;
-  if (
-    "getAnnotations" in r &&
-    r.getAnnotations != null &&
-    !isFunction(r.getAnnotations)
-  )
-    return null;
-  if (
-    "setAnnotations" in r &&
-    r.setAnnotations != null &&
-    !isFunction(r.setAnnotations)
-  )
-    return null;
-  if ("on" in r && r.on != null && !isFunction(r.on)) return null;
-  if ("off" in r && r.off != null && !isFunction(r.off)) return null;
-  return a as AnnotatorApi;
-}
-
-/**
- * Normalize Annotorious return shapes into a plain list.
- * Some versions return arrays; others return an object with a `.list` field.
- */
-function toAnnoList(got: unknown): ImageAnnotation[] {
-  if (Array.isArray(got)) return got as ImageAnnotation[];
-
-  if (got && typeof got === "object") {
-    const rec = got as UnknownRecord;
-    const list = rec["list"];
-    if (Array.isArray(list)) return list as ImageAnnotation[];
-  }
-  return [];
-}
 
 /**
  * Stable signature for comparing overlays by content (not by reference).
@@ -257,8 +204,7 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
   const session = useVideoSession();
-  const annoRaw = useAnnotator();
-  const api = useMemo(() => asAnnotatorApi(annoRaw), [annoRaw]);
+  const api = useAnnotator<Annotator<ImageAnnotation, ImageAnnotation>>();
 
   /**
    * Guard against feedback loops: when we call `api.setAnnotations`, Annotorious
@@ -405,11 +351,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
    */
   const refreshPopupForId = useCallback(
     async (id: string) => {
-      if (!id || !api?.getAnnotations) return;
+      if (!id) return;
 
       await doubleRAF();
 
-      const raw = toAnnoList(api.getAnnotations());
+      const raw = api.getAnnotations();
       const hit = raw.find((a) => a?.id === id);
       if (!hit) {
         clearPopup();
@@ -430,7 +376,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
    * This normalizes bodies, clamps geometry to image bounds, and syncs the session store.
    */
   const onAnyChange = useCallback(
-    (rawOverride?: unknown) => {
+    (rawOverride?: ImageAnnotation[]) => {
       if (!api?.getAnnotations) return;
       if (suppressRef.current) return;
 
@@ -444,9 +390,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       };
 
       // Some Annotorious events pass a single annotation (not an array).
-      const raw = Array.isArray(rawOverride)
-        ? (rawOverride as ImageAnnotation[])
-        : toAnnoList(api.getAnnotations());
+      const raw = rawOverride ?? api.getAnnotations();
 
       // Enforce image bounds so rectangles can't persist outside the frame.
       const clamped = clampOverlayToImage(raw, imgRef.current);
@@ -491,7 +435,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   useEffect(() => {
     if (!api?.setAnnotations) return;
 
-    const cur = api.getAnnotations ? toAnnoList(api.getAnnotations()) : [];
+    const cur = api.getAnnotations ? api.getAnnotations() : [];
     if (sameOverlay(cur, overlayForFrame ?? [])) return;
 
     clearPopup();
@@ -509,22 +453,17 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
    * - selectionChanged updates popup state
    * - create/update/delete all funnel through onAnyChange
    */
-  useEffect(() => {
+    useEffect(() => {
     if (!api?.on || !api?.off || !api?.getAnnotations) return;
 
-    const onSelectionChanged = (selected: unknown) => {
-      // Keep selection UI responsive even during suppression.
-      const arr = Array.isArray(selected)
-        ? (selected as ImageAnnotation[])
-        : [];
-
+    const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
         clearPopup();
         if (!suppressRef.current) onAnyChange();
         return;
       }
 
-      const first = arr[0] as ImageAnnotation | undefined;
+      const first = arr[0];
       const id = first?.id;
       if (!id) return;
 
@@ -538,27 +477,23 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       void refreshPopupForId(id);
     };
 
-    /**
-     * On creation we assign a track id for the current class selection.
-     * This ensures new rectangles immediately satisfy the "label + track" invariant.
-     */
-    const onCreate = (...args: unknown[]) => {
+    const onCreate = (created: ImageAnnotation) => {
       if (suppressRef.current) return;
 
       const cls = session.selection.className;
       if (!cls) return;
 
-      const created = args[0] as ImageAnnotation | undefined;
       const createdId = created?.id;
       if (!createdId) {
         onAnyChange();
         return;
       }
 
-      const raw = toAnnoList(api.getAnnotations());
+      const raw = api.getAnnotations();
 
       // Track ids already used for this class (session + current overlay).
       const used = new Set<string>();
+
       for (const tid of existingTrackIdsForClass(
         session.byFrame,
         cls,
@@ -567,9 +502,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         const c = canonicalizeTrackId(tid);
         if (c) used.add(c);
       }
+
       for (const a of raw) {
         const got = getLabelTrack(a);
         if ((got.className ?? "").trim() !== cls) continue;
+
         const tid = canonicalizeTrackId(got.trackId ?? "");
         if (tid) used.add(tid);
       }
@@ -586,20 +523,30 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       onAnyChange(stamped);
     };
 
+    const onUpdate = (_updated: ImageAnnotation, _previous: ImageAnnotation) => {
+      onAnyChange();
+    };
+
+    const onDelete = (_deleted: ImageAnnotation) => {
+      onAnyChange();
+    };
+
     api.on("createAnnotation", onCreate);
-    api.on("updateAnnotation", onAnyChange);
-    api.on("deleteAnnotation", onAnyChange);
+    api.on("updateAnnotation", onUpdate);
+    api.on("deleteAnnotation", onDelete);
     api.on("selectionChanged", onSelectionChanged);
 
     return () => {
-      api.off?.("createAnnotation", onCreate);
-      api.off?.("updateAnnotation", onAnyChange);
-      api.off?.("deleteAnnotation", onAnyChange);
-      api.off?.("selectionChanged", onSelectionChanged);
+      api.off("createAnnotation", onCreate);
+      api.off("updateAnnotation", onUpdate);
+      api.off("deleteAnnotation", onDelete);
+      api.off("selectionChanged", onSelectionChanged);
     };
   }, [
     api,
-    session,
+    session.byFrame,
+    session.selection.className,
+    session.selection.trackId,
     onAnyChange,
     clearPopup,
     computePopupPos,
@@ -611,7 +558,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   const onDeleteBox = () => {
     if (!selectedId || !api?.getAnnotations) return;
-    const raw = toAnnoList(api.getAnnotations());
+    const raw = api.getAnnotations();
     const next = raw.filter((a) => a?.id !== selectedId);
     clearPopup();
     onAnyChange(next);
