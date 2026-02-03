@@ -83,7 +83,7 @@ export function upsertBody(
     // Preserve existing body id if present; otherwise assign one once.
     const existingId =
       typeof (prev as unknown as { id?: unknown })?.id === "string"
-        ? ((prev as unknown as { id: string }).id || null)
+        ? (prev as unknown as { id: string }).id || null
         : null;
 
     list[idx] = {

@@ -103,7 +103,12 @@ type ButtonInfo = {
   saveOnNavigate?: boolean;
 };
 
-function NextButton({ project_id, sample_id, onSaved, saveOnNavigate }: ButtonInfo) {
+function NextButton({
+  project_id,
+  sample_id,
+  onSaved,
+  saveOnNavigate,
+}: ButtonInfo) {
   const navigate = useNavigate();
   const session = useVideoSession();
 

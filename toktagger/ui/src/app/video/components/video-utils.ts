@@ -200,7 +200,7 @@ export function mapClearAll(prev: ByFrameMap): ByFrameMap {
 /** Flatten all frame overlays into one list. */
 export function flattenByFrame(byFrame: ByFrameMap): ImageAnnotation[] {
   const out: ImageAnnotation[] = [];
-  for (const list of byFrame.values()) out.push(...(list));
+  for (const list of byFrame.values()) out.push(...list);
   return out;
 }
 
@@ -270,7 +270,7 @@ export function deleteTrackAcrossFrames(
   const next = new Map<FrameIndex, ImageAnnotation[]>();
 
   for (const [frame, list] of byFrame.entries()) {
-    const filtered = (list).filter((a) => {
+    const filtered = list.filter((a) => {
       const got = getLabelTrack(a);
       const c = (got.className || "").trim();
       const t = ensureTrackId(got.trackId || "");
@@ -316,7 +316,6 @@ export function forwardPropagateIfEmpty(
   next.set(nextFrame, seeded);
   return next;
 }
-
 
 /**
  * Allocate the next numeric track id for a class by scanning existing instances.

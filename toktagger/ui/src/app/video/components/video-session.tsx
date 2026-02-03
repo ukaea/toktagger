@@ -155,9 +155,10 @@ export function VideoSessionProvider(props: {
    */
   const suppressRef = useRef(false);
 
-  const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(
-    null,
-  );
+  const [imageNatural, setImageNatural] = useState<{
+    w: number;
+    h: number;
+  } | null>(null);
 
   const [videoFrame, setVideoFrame] = useState<number | null>(null);
 
@@ -420,27 +421,26 @@ export function VideoSessionProvider(props: {
 
       // Allocator is only needed within THIS normalization pass.
       // It allocates unique ids per-class for annotations missing trackId.
-      const allocTrackId =
-        fallbackTrackId
-          ? undefined
-          : (() => {
-              const usedByClass = new Map<string, Set<string>>();
+      const allocTrackId = fallbackTrackId
+        ? undefined
+        : (() => {
+            const usedByClass = new Map<string, Set<string>>();
 
-              return (className: string) => {
-                const c = (className || "").trim() || "UFO";
+            return (className: string) => {
+              const c = (className || "").trim() || "UFO";
 
-                let used = usedByClass.get(c);
-                if (!used) {
-                  const existing = existingTrackIdsForClass(byFrame, c);
-                  used = new Set(existing.map((t) => canonicalizeTrackId(t)));
-                  usedByClass.set(c, used);
-                }
+              let used = usedByClass.get(c);
+              if (!used) {
+                const existing = existingTrackIdsForClass(byFrame, c);
+                used = new Set(existing.map((t) => canonicalizeTrackId(t)));
+                usedByClass.set(c, used);
+              }
 
-                const next = uniqueReadableTrackId(used);
-                used.add(canonicalizeTrackId(next));
-                return next;
-              };
-            })();
+              const next = uniqueReadableTrackId(used);
+              used.add(canonicalizeTrackId(next));
+              return next;
+            };
+          })();
 
       const normalized = normalizeOverlayForSession({
         raw: clamped,
@@ -479,44 +479,44 @@ export function VideoSessionProvider(props: {
     ],
   );
 
-/**
- * Keep the Annotorious overlay in sync with the session source-of-truth.
- *
- * Annotorious maintains its own internal annotation state and does not automatically
- * swap overlays when our notion of "current frame" changes (or when session state
- * changes due to seeding, forward-prop, clear/delete actions).
- *
- * So when either:
- *  - the active frame changes, OR
- *  - the session overlay for the active frame changes,
- * we push the session overlay into Annotorious.
- */
-const desiredOverlay = useMemo(
-  () => byFrame.get(frame) ?? [],
-  [byFrame, frame],
-);
+  /**
+   * Keep the Annotorious overlay in sync with the session source-of-truth.
+   *
+   * Annotorious maintains its own internal annotation state and does not automatically
+   * swap overlays when our notion of "current frame" changes (or when session state
+   * changes due to seeding, forward-prop, clear/delete actions).
+   *
+   * So when either:
+   *  - the active frame changes, OR
+   *  - the session overlay for the active frame changes,
+   * we push the session overlay into Annotorious.
+   */
+  const desiredOverlay = useMemo(
+    () => byFrame.get(frame) ?? [],
+    [byFrame, frame],
+  );
 
-useEffect(() => {
-  if (!api?.setAnnotations) return;
+  useEffect(() => {
+    if (!api?.setAnnotations) return;
 
-  const cur = api.getAnnotations ? api.getAnnotations() : [];
-  if (sameOverlay(cur, desiredOverlay)) return;
+    const cur = api.getAnnotations ? api.getAnnotations() : [];
+    if (sameOverlay(cur, desiredOverlay)) return;
 
-  // Clear selection so popup closes when switching frames / overlays
-  api.setSelected?.();
+    // Clear selection so popup closes when switching frames / overlays
+    api.setSelected?.();
 
-  suppressRef.current = true;
-  api.setAnnotations(desiredOverlay, true);
+    suppressRef.current = true;
+    api.setAnnotations(desiredOverlay, true);
 
-  void doubleRAF().then(() => {
-    suppressRef.current = false;
-  });
-}, [api, desiredOverlay]);
+    void doubleRAF().then(() => {
+      suppressRef.current = false;
+    });
+  }, [api, desiredOverlay]);
 
   /**
    * Event wiring:
    * - create/update/delete all funnel through commitFromAnnotorious
-   * - selectionChanged kept only for the "deselect commits" behavior 
+   * - selectionChanged kept only for the "deselect commits" behavior
    */
   useEffect(() => {
     if (!api?.on || !api?.off || !api?.getAnnotations) return;
@@ -569,7 +569,10 @@ useEffect(() => {
       commitFromAnnotorious(stamped);
     };
 
-    const onUpdate = (_updated: ImageAnnotation, _previous: ImageAnnotation) => {
+    const onUpdate = (
+      _updated: ImageAnnotation,
+      _previous: ImageAnnotation,
+    ) => {
       commitFromAnnotorious();
     };
 
@@ -588,7 +591,13 @@ useEffect(() => {
       api.off("deleteAnnotation", onDelete);
       api.off("selectionChanged", onSelectionChanged);
     };
-  }, [api, byFrame, commitFromAnnotorious, selection.className, selection.trackId]);
+  }, [
+    api,
+    byFrame,
+    commitFromAnnotorious,
+    selection.className,
+    selection.trackId,
+  ]);
 
   const closePopup = useCallback(() => {
     api?.setSelected?.();

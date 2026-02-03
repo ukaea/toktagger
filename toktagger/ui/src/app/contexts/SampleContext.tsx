@@ -244,9 +244,8 @@ export function SampleProvider({
 
           // Video-only: treat missing frame as "boundary" and stay on last good frame.
           if (projectData.task === TaskType.Video) {
-            const requestedFrame = (
-              effectiveDataParams as { frame?: unknown }
-            )?.frame;
+            const requestedFrame = (effectiveDataParams as { frame?: unknown })
+              ?.frame;
 
             const lastGood = lastGoodVideoFrameRef.current;
 
@@ -261,12 +260,13 @@ export function SampleProvider({
               });
 
               // Roll back params; do NOT set error and do NOT clear data.
-              setDataParams((prev) =>
-                ({
-                  ...(prev as Record<string, unknown>),
-                  name: "image",
-                  frame: lastGood,
-                }) as DataParams,
+              setDataParams(
+                (prev) =>
+                  ({
+                    ...(prev as Record<string, unknown>),
+                    name: "image",
+                    frame: lastGood,
+                  }) as DataParams,
               );
 
               setIsLoading(false);

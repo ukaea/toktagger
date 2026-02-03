@@ -1,7 +1,7 @@
 "use client";
 
-import React, {useState } from "react";
-import type {  DataParams } from "@/types";
+import React, { useState } from "react";
+import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 import { useVideoSession } from "@/app/video/components/video-session";
@@ -73,7 +73,6 @@ function VideoFrameAnnotator(props: {
   onNext?: () => void;
   onJump?: (n: number) => void;
 }) {
-
   const session = useVideoSession();
 
   const handlePrev = () => {

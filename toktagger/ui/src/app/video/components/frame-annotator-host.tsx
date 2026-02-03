@@ -91,7 +91,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     // - inner inline-block shrink-wraps to the image width we set
     <div ref={containerRef} className="w-full flex justify-center">
       <div className="relative inline-block max-w-full">
-        <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled} autoSave>
+        <ImageAnnotator
+          tool="rectangle"
+          drawingEnabled={drawingEnabled}
+          autoSave
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}

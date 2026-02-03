@@ -277,7 +277,10 @@ export function VideoSidebar(_props: {
                     </span>
                   </DisclosureTitle>
                   <DisclosurePanel>
-                    <ExportTool project={_props.project} sample={_props.sample} />
+                    <ExportTool
+                      project={_props.project}
+                      sample={_props.sample}
+                    />
                   </DisclosurePanel>
                 </Disclosure>
 
@@ -307,7 +310,6 @@ export function VideoSidebar(_props: {
             </Flex>
 
             <Accordion allowsMultipleExpanded={true} width="100%">
-
               <Disclosure defaultExpanded>
                 <DisclosureTitle>
                   <span style={{ fontSize: "0.8rem" }}>Frame Tools</span>
@@ -378,8 +380,8 @@ export function VideoSidebar(_props: {
                 onPrimaryAction={confirmClearAll}
                 onCancel={cancelClearAll}
               >
-                This will remove all annotations across all frames in the current
-                session. You can’t undo this.
+                This will remove all annotations across all frames in the
+                current session. You can’t undo this.
               </AlertDialog>
             )}
           </DialogContainer>

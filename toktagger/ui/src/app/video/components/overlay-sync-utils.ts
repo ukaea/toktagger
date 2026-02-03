@@ -37,7 +37,10 @@ function annoSig(a: ImageAnnotation): string {
   ].join("|");
 }
 
-export function sameOverlay(a: ImageAnnotation[], b: ImageAnnotation[]): boolean {
+export function sameOverlay(
+  a: ImageAnnotation[],
+  b: ImageAnnotation[],
+): boolean {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
