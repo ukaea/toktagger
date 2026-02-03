@@ -26,7 +26,6 @@ import {
 
 import { ExportTool } from "@/app/components/tools/export";
 import { ImportButton } from "@/app/components/tools/import";
-import { ShotLabels } from "@/app/components/annotators/labels";
 import { VideoNavigationBar } from "@/app/video/components/video-navigation-bar";
 
 /**
@@ -307,14 +306,6 @@ export function VideoSidebar(_props: {
             </Flex>
 
             <Accordion allowsMultipleExpanded={true} width="100%">
-              <Disclosure>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>Shot Labels</span>
-                </DisclosureTitle>
-                <DisclosurePanel>
-                  <ShotLabels labels={["Valid Shot", "Invalid Shot"]} />
-                </DisclosurePanel>
-              </Disclosure>
 
               <Disclosure defaultExpanded>
                 <DisclosureTitle>
