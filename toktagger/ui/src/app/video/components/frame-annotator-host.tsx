@@ -8,7 +8,6 @@ import React, {
   useState,
 } from "react";
 import {
-  Annotorious,
   ImageAnnotator,
   useAnnotator,
   type ImageAnnotation,
@@ -246,9 +245,7 @@ function clampOverlayToImage(
  */
 export function FrameAnnotatorHost(props: { imageBase64: string }) {
   return (
-    <Annotorious>
       <Inner imageBase64={props.imageBase64} />
-    </Annotorious>
   );
 }
 

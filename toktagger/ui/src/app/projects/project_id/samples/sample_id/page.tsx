@@ -9,6 +9,7 @@ import {
   ToastContainer,
   Flex,
 } from "@adobe/react-spectrum";
+import { Annotorious } from "@annotorious/react";
 import { Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
@@ -105,25 +106,27 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
         <ModelPredictModal project={project} />
         <Flex>
           {isVideo ? (
-            <VideoSessionProvider
-              key={`${props.projectId}:${props.sampleId}`}
-              projectId={props.projectId}
-              sampleId={props.sampleId}
-              data={data}
-              dataParams={dataParams}
-              dbAnnotations={annotations ?? []}
-            >
-              <ToolBar />
-              <div className="flex-1 flex justify-center">
-                <VideoViewInner
-                  data={data}
-                  projectId={props.projectId}
-                  sampleId={props.sampleId}
-                  dataParams={dataParams}
-                  setDataParams={setDataParams}
-                />
-              </div>
-            </VideoSessionProvider>
+            <Annotorious>
+              <VideoSessionProvider
+                key={`${props.projectId}:${props.sampleId}`}
+                projectId={props.projectId}
+                sampleId={props.sampleId}
+                data={data}
+                dataParams={dataParams}
+                dbAnnotations={annotations ?? []}
+              >
+                <ToolBar />
+                <div className="flex-1 flex justify-center">
+                  <VideoViewInner
+                    data={data}
+                    projectId={props.projectId}
+                    sampleId={props.sampleId}
+                    dataParams={dataParams}
+                    setDataParams={setDataParams}
+                  />
+                </div>
+              </VideoSessionProvider>
+            </Annotorious>
           ) : (
             <>
               <ToolBar />
