@@ -5,7 +5,9 @@ import React, {
   useState,
   useEffect,
   ReactNode,
+  useRef,
 } from "react";
+import { ToastQueue } from "@adobe/react-spectrum";
 import {
   Project,
   Sample,
@@ -139,6 +141,39 @@ export function SampleProvider({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Video: remember the last successfully loaded frame so missing frames become navigation bounds.
+  const lastGoodVideoFrameRef = useRef<number | null>(null);
+
+  function extractDetail(payload: unknown): string {
+    if (!payload) return "Unknown error";
+    if (typeof payload === "string") return payload;
+    if (typeof payload === "object") {
+      const d = (payload as { detail?: unknown }).detail;
+      if (typeof d === "string" && d.trim()) return d;
+      if (Array.isArray(d)) {
+        const first = d.find((x) => typeof x === "string" && x.trim());
+        if (typeof first === "string") return first;
+      }
+    }
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return "Unknown error";
+    }
+  }
+
+  function isMissingFrameError(status: number, detail: string): boolean {
+    // Treat 404 + common "missing frame" phrasing as "navigation boundary" rather than fatal.
+    if (status === 404) return true;
+    const msg = (detail || "").toLowerCase();
+    return (
+      msg.includes("could not find image") ||
+      msg.includes("file not found") ||
+      msg.includes("no such file") ||
+      msg.includes("frame index")
+    );
+  }
+
   // Consolidated data fetching - fetch everything together
   useEffect(() => {
     const refreshData = async () => {
@@ -198,8 +233,48 @@ export function SampleProvider({
         );
 
         if (!response.ok) {
-          const body = await response.json();
-          setError(`${body.detail}`);
+          let payload: unknown = null;
+          try {
+            payload = await response.json();
+          } catch {
+            // ignore; payload stays null
+          }
+
+          const detail = extractDetail(payload);
+
+          // Video-only: treat missing frame as "boundary" and stay on last good frame.
+          if (projectData.task === TaskType.Video) {
+            const requestedFrame = (
+              effectiveDataParams as { frame?: unknown }
+            )?.frame;
+
+            const lastGood = lastGoodVideoFrameRef.current;
+
+            if (
+              typeof requestedFrame === "number" &&
+              typeof lastGood === "number" &&
+              requestedFrame !== lastGood &&
+              isMissingFrameError(response.status, detail)
+            ) {
+              ToastQueue.negative(`Frame ${requestedFrame} not found.`, {
+                timeout: 2500,
+              });
+
+              // Roll back params; do NOT set error and do NOT clear data.
+              setDataParams((prev) =>
+                ({
+                  ...(prev as Record<string, unknown>),
+                  name: "image",
+                  frame: lastGood,
+                }) as DataParams,
+              );
+
+              setIsLoading(false);
+              return;
+            }
+          }
+
+          setError(detail);
           setData(null);
           setIsLoading(false);
           return;
@@ -214,6 +289,14 @@ export function SampleProvider({
         }
 
         setData(viewData);
+
+        // Video: remember last good frame so we can roll back on missing-frame errors.
+        if (projectData.task === TaskType.Video) {
+          const frame = (viewData as { frame?: unknown }).frame;
+          if (typeof frame === "number" && Number.isFinite(frame)) {
+            lastGoodVideoFrameRef.current = frame;
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
