@@ -1,22 +1,15 @@
 "use client";
 
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import {
   ImageAnnotator,
+  ImageAnnotationPopup,
   useAnnotator,
   type ImageAnnotation,
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
 
-import {
-  useVideoSession,
-} from "@/app/video/components/video-session";
+import { useVideoSession } from "@/app/video/components/video-session";
 import {
   getLabelTrack,
   readRectGeometry,
@@ -191,16 +184,14 @@ function clampOverlayToImage(
  * Top-level host that provides the Annotorious context and renders the annotator.
  */
 export function FrameAnnotatorHost(props: { imageBase64: string }) {
-  return (
-      <Inner imageBase64={props.imageBase64} />
-  );
+  return <Inner imageBase64={props.imageBase64} />;
 }
 
 /**
  * Core annotator integration:
  * - syncs per-frame overlay between Annotorious and the session store
  * - assigns track ids on create (based on current class selection)
- * - keeps a small popup anchored to the selected rectangle
+ * - popup uses Annotorious ImageAnnotationPopup (no manual positioning)
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
   const session = useVideoSession();
@@ -212,20 +203,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
    */
   const suppressRef = useRef(false);
 
-  // Selection + popup state (driven by Annotorious selectionChanged)
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedMeta, setSelectedMeta] = useState<{
-    className: string | null;
-    trackId: string | null;
-    geom: { x: number; y: number; w: number; h: number } | null;
-  } | null>(null);
-  const [popupPos, setPopupPos] = useState<{
-    left: number;
-    top: number;
-  } | null>(null);
-
   // --- Responsive upscale measurement state ---
+  const imgRef = useRef<HTMLImageElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [containerW, setContainerW] = useState<number>(0);
@@ -274,12 +253,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     return Math.min(maxAvailable, maxScaled, desired);
   }, [containerW, natural]);
 
-  const clearPopup = useCallback(() => {
-    setSelectedId(null);
-    setSelectedMeta(null);
-    setPopupPos(null);
-  }, []);
-
   const overlayForFrame = useMemo(
     () => session.getFrameList(session.frame),
     [session],
@@ -311,65 +284,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       return next;
     };
   }, [session.byFrame]);
-
-  /**
-   * Convert annotation geometry in natural pixels to a popup position
-   * in the displayed image's client space.
-   */
-  const computePopupPos = useCallback(
-    (g: { x: number; y: number; w: number; h: number }) => {
-      const img = imgRef.current;
-      if (!img) return null;
-
-      const nw = img.naturalWidth;
-      const nh = img.naturalHeight;
-      if (!nw || !nh) return null;
-
-      const cw = img.clientWidth;
-      const ch = img.clientHeight;
-      if (!cw || !ch) return null;
-
-      const scaleX = cw / nw;
-      const scaleY = ch / nh;
-
-      // Anchor near the top-right corner of the rectangle, with padding.
-      let left = (g.x + g.w) * scaleX + 8;
-      let top = g.y * scaleY + 8;
-
-      // Keep the popup inside the image bounds.
-      left = Math.max(8, Math.min(left, cw - 8));
-      top = Math.max(8, Math.min(top, ch - 8));
-
-      return { left, top };
-    },
-    [],
-  );
-
-  /**
-   * Re-read the selected annotation after programmatic updates so the popup
-   * follows the most recent geometry.
-   */
-  const refreshPopupForId = useCallback(
-    async (id: string) => {
-      if (!id) return;
-
-      await doubleRAF();
-
-      const raw = api.getAnnotations();
-      const hit = raw.find((a) => a?.id === id);
-      if (!hit) {
-        clearPopup();
-        return;
-      }
-
-      const lt = getLabelTrack(hit);
-      const geom = readRectGeometry(hit);
-
-      setSelectedMeta({ className: lt.className, trackId: lt.trackId, geom });
-      setPopupPos(geom ? computePopupPos(geom) : null);
-    },
-    [api, clearPopup, computePopupPos],
-  );
 
   /**
    * Single commit point for all Annotorious mutations (create/update/delete).
@@ -423,10 +337,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       if (!sameOverlay(prev, normalized)) {
         session.setFrameList(session.frame, normalized);
       }
-
-      if (selectedId) void refreshPopupForId(selectedId);
     },
-    [api, session, makeAllocator, selectedId, refreshPopupForId],
+    [api, session, makeAllocator],
   );
 
   /**
@@ -438,7 +350,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     const cur = api.getAnnotations ? api.getAnnotations() : [];
     if (sameOverlay(cur, overlayForFrame ?? [])) return;
 
-    clearPopup();
+    // Clear selection so popup closes when switching frames
+    api.setSelected?.();
 
     suppressRef.current = true;
     api.setAnnotations(overlayForFrame ?? [], true);
@@ -446,35 +359,20 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     void doubleRAF().then(() => {
       suppressRef.current = false;
     });
-  }, [api, overlayForFrame, clearPopup]);
+  }, [api, overlayForFrame]);
 
   /**
    * Event wiring:
-   * - selectionChanged updates popup state
    * - create/update/delete all funnel through onAnyChange
+   * - selectionChanged kept only for the "deselect commits" behavior you already had
    */
-    useEffect(() => {
+  useEffect(() => {
     if (!api?.on || !api?.off || !api?.getAnnotations) return;
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
-        clearPopup();
         if (!suppressRef.current) onAnyChange();
-        return;
       }
-
-      const first = arr[0];
-      const id = first?.id;
-      if (!id) return;
-
-      setSelectedId(id);
-
-      const lt = getLabelTrack(first);
-      const geom = readRectGeometry(first);
-      setSelectedMeta({ className: lt.className, trackId: lt.trackId, geom });
-      setPopupPos(geom ? computePopupPos(geom) : null);
-
-      void refreshPopupForId(id);
     };
 
     const onCreate = (created: ImageAnnotation) => {
@@ -548,21 +446,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     session.selection.className,
     session.selection.trackId,
     onAnyChange,
-    clearPopup,
-    computePopupPos,
-    refreshPopupForId,
   ]);
 
   const drawingEnabled = !!session.selection.className;
   const label = session.frame;
-
-  const onDeleteBox = () => {
-    if (!selectedId || !api?.getAnnotations) return;
-    const raw = api.getAnnotations();
-    const next = raw.filter((a) => a?.id !== selectedId);
-    clearPopup();
-    onAnyChange(next);
-  };
 
   return (
     // This keeps your previous centering approach:
@@ -570,11 +457,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     // - inner inline-block shrink-wraps to the image width we set
     <div ref={containerRef} className="w-full flex justify-center">
       <div className="relative inline-block max-w-full">
-        <ImageAnnotator
-          tool="rectangle"
-          drawingEnabled={drawingEnabled}
-          autoSave={true}
-        >
+        <ImageAnnotator tool="rectangle" drawingEnabled={drawingEnabled} autoSave>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}
@@ -583,9 +466,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             draggable={false}
             onLoad={() => {
               const img = imgRef.current;
-              if (img)
-                setNatural({ w: img.naturalWidth, h: img.naturalHeight });
-              if (selectedId) void refreshPopupForId(selectedId);
+              if (img) setNatural({ w: img.naturalWidth, h: img.naturalHeight });
             }}
             className="block mx-auto h-auto object-contain select-none"
             // Key change: explicitly set width on the IMG so Annotorious can't shrink-wrap it away.
@@ -599,17 +480,33 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           />
         </ImageAnnotator>
 
-        {selectedId && selectedMeta && popupPos && (
-          <AnnotationPopup
-            left={popupPos.left}
-            top={popupPos.top}
-            className={selectedMeta.className}
-            trackId={selectedMeta.trackId}
-            geometry={selectedMeta.geom}
-            onDeleteBox={onDeleteBox}
-            onClose={clearPopup}
-          />
-        )}
+        {/* Built-in Annotorious popup positioning (no manual geometry->pixel mapping) */}
+        <ImageAnnotationPopup
+          popup={(props) => {
+            const annotation = props.annotation as ImageAnnotation;
+
+            const { className, trackId } = getLabelTrack(annotation);
+            const geometry = readRectGeometry(annotation);
+
+            return (
+              <AnnotationPopup
+                className={className}
+                trackId={trackId}
+                geometry={geometry}
+                onDeleteBox={() => {
+                  const id = annotation?.id;
+                  if (!id) return;
+                  api.removeAnnotation?.(id);
+                  // Clear selection so the popup closes immediately
+                  api.setSelected?.();
+                }}
+                onClose={() => {
+                  api.setSelected?.();
+                }}
+              />
+            );
+          }}
+        />
       </div>
     </div>
   );

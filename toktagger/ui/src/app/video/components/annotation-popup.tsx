@@ -5,27 +5,24 @@ import React from "react";
 /**
  * Lightweight floating UI for the currently selected annotation.
  *
- * Positioning is computed by the host (in image pixel space -> client space) and
- * passed in as absolute coordinates so this component stays purely presentational.
+ * Positioning is handled by Annotorious' ImageAnnotationPopup wrapper.
+ * This component stays purely presentational.
  */
 export function AnnotationPopup(props: {
-  left: number;
-  top: number;
   className: string | null;
   trackId: string | null;
   geometry?: { x: number; y: number; w: number; h: number } | null;
   onDeleteBox: () => void;
   onClose: () => void;
 }) {
-  const { left, top, className, trackId, geometry } = props;
+  const { className, trackId, geometry } = props;
 
   const label = className ?? "—";
   const tid = trackId ?? "—";
 
   return (
     <div
-      className="absolute z-[60] pointer-events-auto"
-      style={{ left, top }}
+      className="z-[60] pointer-events-auto"
       role="dialog"
       aria-label="Annotation actions"
     >
