@@ -43,7 +43,12 @@ export function getBodyValue(
   return typeof v === "string" ? v : null;
 }
 
-/** Insert or replace a body by purpose (returns a new array). */
+/** Insert or replace a body by purpose (returns a new array).
+ *
+ * Annotorious bodies should have a unique `id`. Annotorious may auto-generate
+ * missing IDs on load, but we ensure IDs here so our normalized/session state
+ * is explicit and stable.
+ */
 export function upsertBody(
   bodies: AnnotationBody[] | undefined,
   purpose: string,
@@ -51,15 +56,28 @@ export function upsertBody(
 ): AnnotationBody[] {
   const list = Array.isArray(bodies) ? bodies.slice() : [];
   const idx = list.findIndex((b) => b?.purpose === purpose);
+
   if (idx >= 0) {
+    const prev = list[idx] as AnnotationBody;
+
+    // Preserve existing body id if present; otherwise assign one once.
+    const existingId =
+      typeof (prev as unknown as { id?: unknown })?.id === "string"
+        ? ((prev as unknown as { id: string }).id || null)
+        : null;
+
     list[idx] = {
-      ...(list[idx] as AnnotationBody),
+      ...prev,
+      id: existingId ?? newBodyId(),
       purpose,
       value,
     } as AnnotationBody;
+
     return list;
   }
-  list.push({ purpose, value } as AnnotationBody);
+
+  // New body: assign an id explicitly.
+  list.push({ id: newBodyId(), purpose, value } as unknown as AnnotationBody);
   return list;
 }
 
@@ -92,6 +110,13 @@ export function getLabelTrack(a: ImageAnnotation): {
     className: getBodyValue(a, "tagging"),
     trackId: getBodyValue(a, "identifying"),
   };
+}
+
+function newBodyId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `body-${Math.random().toString(36).slice(2)}`
+  );
 }
 
 /** True if the annotation target is a rectangle selector. */
