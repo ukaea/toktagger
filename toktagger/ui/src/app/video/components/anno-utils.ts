@@ -127,12 +127,9 @@ export function readRectGeometry(
  * - stamp target.source with frameKey
  * - ensure class label exists (uses fallback if missing)
  * - ensure track id exists (uses fallback or allocator)
- * - optionally dedupe to one annotation per (class, trackId) in this frame
- *
- * `list` is `unknown` because Annotorious event payloads are not always arrays.
  */
 export function normalizeOverlay(
-  list: unknown,
+  list: ImageAnnotation[],
   frameKey: string,
   fallback: { className: string | null; trackId: string | null },
   allocTrackId?: (className: string) => string,
@@ -146,9 +143,8 @@ export function normalizeOverlay(
   const enforceBothBodies = opts?.enforceBothBodies ?? true;
   const dedupeByInstance = opts?.dedupeByInstance ?? true;
 
-  const src: ImageAnnotation[] = Array.isArray(list)
-    ? list.filter(isImageAnnotationLike)
-    : [];
+  // Defensive filter: keep only annotation-ish object.
+  const src: ImageAnnotation[] = list.filter(isImageAnnotationLike);
   const out: ImageAnnotation[] = [];
 
   for (const a of src) {
