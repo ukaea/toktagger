@@ -431,11 +431,7 @@ export function VideoSessionProvider(props: {
 
                 let used = usedByClass.get(c);
                 if (!used) {
-                  const existing = existingTrackIdsForClass(
-                    byFrame,
-                    c,
-                    getLabelTrack,
-                  );
+                  const existing = existingTrackIdsForClass(byFrame, c);
                   used = new Set(existing.map((t) => canonicalizeTrackId(t)));
                   usedByClass.set(c, used);
                 }
@@ -548,7 +544,7 @@ useEffect(() => {
       // Track ids already used for this class (session + current overlay).
       const used = new Set<string>();
 
-      for (const tid of existingTrackIdsForClass(byFrame, cls, getLabelTrack)) {
+      for (const tid of existingTrackIdsForClass(byFrame, cls)) {
         const c = canonicalizeTrackId(tid);
         if (c) used.add(c);
       }

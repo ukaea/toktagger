@@ -8,6 +8,7 @@ import type {
   TrackKey,
 } from "./types";
 import { classIdForName, makeTrackKey, buildSourceKey } from "./types";
+import { getLabelTrack } from "./anno-utils";
 
 /**
  * Simple deep clone for annotation payloads.
@@ -155,10 +156,6 @@ export function uniqueReadableTrackId(
 export function existingTrackIdsForClass(
   byFrame: ByFrameMap,
   className: string,
-  getLabelTrack: (a: ImageAnnotation) => {
-    className?: string | null;
-    trackId?: string | null;
-  },
 ): string[] {
   const cls = className.trim();
   if (!cls) return [];
