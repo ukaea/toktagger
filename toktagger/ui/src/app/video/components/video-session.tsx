@@ -587,7 +587,8 @@ export function VideoSessionProvider(props: {
 
     // Small re-read to avoid races if Annotorious mutates objects between frames.
     const live2 = api.getAnnotations() ?? [];
-    const match2 = findMatch(live2, pending.className, pending.trackId) ?? match;
+    const match2 =
+      findMatch(live2, pending.className, pending.trackId) ?? match;
 
     const ok = selectAnno(match2);
     if (ok) {
