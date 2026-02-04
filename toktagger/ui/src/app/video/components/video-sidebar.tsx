@@ -189,19 +189,33 @@ export function VideoSidebar(_props: {
   };
 
   const onSelectInstance = (key: string) => {
+    // Auto mode row (or "cleared")
     if (!key) {
-      // Auto mode: keep the selected class, allocate a new instance per draw.
       session.setSelection({
         className: session.selection.className ?? null,
         trackId: null,
         source: "explicit",
       });
+      session.closePopup();
       return;
     }
 
     const hit = profiles.find((p) => p.key === key);
     if (!hit) return;
 
+    // if user clicks the already-selected instance, toggle back to Auto mode.
+    if (selectedKey === key) {
+      session.setSelection({
+        className: hit.class_name,
+        trackId: null,
+        source: "explicit",
+      });
+      saveLastClassName(hit.class_name);
+      session.closePopup();
+      return;
+    }
+
+    // Normal select behaviour
     session.setSelection({
       className: hit.class_name,
       trackId: hit.track_id,
@@ -209,6 +223,11 @@ export function VideoSidebar(_props: {
     });
 
     saveLastClassName(hit.class_name);
+
+    // Highlight/select anno on current frame (if present)
+    session.requestFocusInstance(hit.class_name, hit.track_id, {
+      onlyIfOnCurrentFrame: true,
+    });
   };
 
   const onActivateProfile = (p: {

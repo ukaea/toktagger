@@ -85,8 +85,16 @@ type VideoSessionCtx = {
   deleteAnnotation: (id: string) => void;
   closePopup: () => void;
 
-  /** Request a one-shot focus/selection for a given instance once overlays sync. */
-  requestFocusInstance: (className: string, trackId: string) => void;
+  /**
+   * Sidebar focus helper:
+   * A click in the sidebar can request focusing a (className, trackId) instance.
+   * This queues a request which we attempt to fulfill against the LIVE Annotorious overlay.
+   */
+  requestFocusInstance: (
+    className: string,
+    trackId: string,
+    opts?: { onlyIfOnCurrentFrame?: boolean },
+  ) => void;
 
   // frame ops
   getFrameList: (frame: FrameIndex) => ImageAnnotation[];
@@ -158,9 +166,15 @@ export function VideoSessionProvider(props: {
    */
   const suppressRef = useRef(false);
 
-  const focusRequestRef = useRef<{ className: string; trackId: string } | null>(
-    null,
-  );
+  // Track pending focus requests from sidebar (single click or double click)
+  const focusRequestRef = useRef<{
+    className: string;
+    trackId: string;
+    onlyIfOnCurrentFrame?: boolean;
+  } | null>(null);
+
+  // bump to trigger effects when a focus request happens on the same frame
+  const [focusNonce, setFocusNonce] = useState(0);
 
   const [imageNatural, setImageNatural] = useState<{
     w: number;
@@ -248,12 +262,25 @@ export function VideoSessionProvider(props: {
     setSelectionState(next);
   }, []);
 
-  const requestFocusInstance = useCallback((className: string, trackId: string) => {
-    const cls = (className || "").trim();
-    const tid = canonicalizeTrackId(trackId || "");
-    if (!cls || !tid) return;
-    focusRequestRef.current = { className: cls, trackId: tid };
-  }, []);
+  const requestFocusInstance = useCallback(
+    (
+      className: string,
+      trackId: string,
+      opts?: { onlyIfOnCurrentFrame?: boolean },
+    ) => {
+      const cls = (className || "").trim();
+      const tid = canonicalizeTrackId(trackId || "");
+      if (!cls || !tid) return;
+      focusRequestRef.current = {
+        className: cls,
+        trackId: tid,
+        onlyIfOnCurrentFrame: Boolean(opts?.onlyIfOnCurrentFrame),
+      };
+      // force a React update so effects can process the ref
+      setFocusNonce((n) => n + 1);
+    },
+    [],
+  );
 
   const createNewInstanceForClass = useCallback(
     (className: string) => {
@@ -319,10 +346,8 @@ export function VideoSessionProvider(props: {
           projectId,
           sampleId,
         });
-
         // Only mark dirty if we actually seeded the next frame.
         if (next !== prev) setDirty(true);
-
         return next;
       });
     },
@@ -362,7 +387,6 @@ export function VideoSessionProvider(props: {
       if (!dbAnnotations || dbAnnotations.length === 0) return;
 
       const byF = new Map<number, ImageAnnotation[]>();
-
       let invalid = 0;
 
       for (const a of dbAnnotations) {
@@ -430,7 +454,6 @@ export function VideoSessionProvider(props: {
       };
 
       const cls = selection.className ?? firstClassFrom(clamped);
-
       const fallbackTrackId = selection.trackId ?? null;
 
       // Allocator is only needed within THIS normalization pass.
@@ -493,6 +516,90 @@ export function VideoSessionProvider(props: {
     ],
   );
 
+  const desiredOverlay = useMemo(
+    () => byFrame.get(frame) ?? [],
+    [byFrame, frame],
+  );
+
+  // --- Focus/selection helpers ---
+  const findMatch = useCallback(
+    (list: ImageAnnotation[], cls: string, tid: string) => {
+      const wantCls = (cls || "").trim();
+      const wantTid = canonicalizeTrackId(tid || "");
+      if (!wantCls || !wantTid) return null;
+
+      return (
+        list.find((a) => {
+          const got = getLabelTrack(a);
+          return (
+            (got.className ?? "").trim() === wantCls &&
+            canonicalizeTrackId(got.trackId ?? "") === wantTid
+          );
+        }) ?? null
+      );
+    },
+    [],
+  );
+
+  const selectAnno = useCallback(
+    (anno: ImageAnnotation) => {
+      const id = anno?.id as string | undefined;
+      if (!id) return false;
+
+      const setSelected = api?.setSelected as
+        | ((id?: string, editable?: boolean) => void)
+        | undefined;
+
+      if (!setSelected) return false;
+
+      try {
+        setSelected(id, true); // true => editable (move/resize immediately)
+        return true;
+      } catch {
+        try {
+          setSelected(id);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    },
+    [api],
+  );
+
+  const tryFocusPending = useCallback(async () => {
+    const pending = focusRequestRef.current;
+    if (!pending) return;
+
+    if (!api?.getAnnotations) return;
+
+    // Always search in the LIVE annotorious overlay, not desiredOverlay
+    // (desiredOverlay objects/ids can differ from api's internal objects)
+    const live = api.getAnnotations() ?? [];
+    const match = findMatch(live, pending.className, pending.trackId);
+
+    if (!match) {
+      if (pending.onlyIfOnCurrentFrame) {
+        focusRequestRef.current = null;
+      }
+      return;
+    }
+
+    // Small re-read to avoid races if Annotorious mutates objects between frames.
+    const live2 = api.getAnnotations() ?? [];
+    const match2 = findMatch(live2, pending.className, pending.trackId) ?? match;
+
+    const ok = selectAnno(match2);
+    if (ok) {
+      focusRequestRef.current = null; // one-shot
+    }
+  }, [api, findMatch, selectAnno]);
+
+  // process focus requests even if we're staying on the same frame and overlay doesn't change
+  useEffect(() => {
+    void tryFocusPending();
+  }, [focusNonce, tryFocusPending]);
+
   /**
    * Keep the Annotorious overlay in sync with the session source-of-truth.
    *
@@ -504,47 +611,35 @@ export function VideoSessionProvider(props: {
    *  - the active frame changes, OR
    *  - the session overlay for the active frame changes,
    * we push the session overlay into Annotorious.
+   *
+   * Note: focus requests from the sidebar are fulfilled against the LIVE Annotorious overlay
+   * (api.getAnnotations), because ids/objects in desiredOverlay can diverge from Annotorious' internal state.
    */
-  const desiredOverlay = useMemo(
-    () => byFrame.get(frame) ?? [],
-    [byFrame, frame],
-  );
-
   useEffect(() => {
     if (!api?.setAnnotations) return;
 
     const cur = api.getAnnotations ? api.getAnnotations() : [];
-    if (sameOverlay(cur, desiredOverlay)) return;
+    const overlayChanged = !sameOverlay(cur, desiredOverlay);
 
-    // Clear selection so popup closes when switching frames / overlays
-    api.setSelected?.();
+    if (overlayChanged) {
+      suppressRef.current = true;
 
-    suppressRef.current = true;
-    api.setAnnotations(desiredOverlay, true);
+      // Set overlay first
+      api.setAnnotations(desiredOverlay, true);
 
-    // NEW: attempt focus after overlay mounts
-    const pending = focusRequestRef.current;
-    if (pending) {
-      const match = desiredOverlay.find((a) => {
-        const got = getLabelTrack(a);
-        return (
-          (got.className ?? "").trim() === pending.className &&
-          canonicalizeTrackId(got.trackId ?? "") === pending.trackId
-        );
-      });
-
-      if (match) {
-        (api.setSelected as unknown as (v?: ImageAnnotation | ImageAnnotation[]) => void)([
-          match,
-        ]);
-        focusRequestRef.current = null; // one-shot
-      }
+      suppressRef.current = false;
     }
 
-    void doubleRAF().then(() => {
-      suppressRef.current = false;
-    });
-  }, [api, desiredOverlay]);
+    // Whether overlay changed or not, try focus:
+    // - single click often happens without overlay changing
+    void tryFocusPending();
+  }, [api, desiredOverlay, tryFocusPending]);
+
+  // Also retry focus when the frame changes (covers quick next/prev navigation)
+  useEffect(() => {
+    void tryFocusPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frame]);
 
   /**
    * Event wiring:
@@ -602,14 +697,11 @@ export function VideoSessionProvider(props: {
       commitFromAnnotorious(stamped);
     };
 
-    const onUpdate = (
-      _updated: ImageAnnotation,
-      _previous: ImageAnnotation,
-    ) => {
+    const onUpdate = () => {
       commitFromAnnotorious();
     };
 
-    const onDelete = (_deleted: ImageAnnotation) => {
+    const onDelete = () => {
       commitFromAnnotorious();
     };
 
