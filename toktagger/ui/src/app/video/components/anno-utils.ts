@@ -82,8 +82,8 @@ export function upsertBody(
 
     // Preserve existing body id if present; otherwise assign one once.
     const existingId =
-      typeof (prev as unknown as { id?: unknown })?.id === "string"
-        ? (prev as unknown as { id: string }).id || null
+      typeof (prev as { id?: unknown })?.id === "string"
+        ? (prev as { id: string }).id || null
         : null;
 
     list[idx] = {
@@ -97,7 +97,7 @@ export function upsertBody(
   }
 
   // New body: assign an id explicitly.
-  list.push({ id: newBodyId(), purpose, value } as unknown as AnnotationBody);
+  list.push({ id: newBodyId(), purpose, value } as AnnotationBody);
   return list;
 }
 
