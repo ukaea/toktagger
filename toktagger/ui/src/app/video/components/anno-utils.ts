@@ -147,7 +147,7 @@ export function isRectangleAnno(a: ImageAnnotation): boolean {
 }
 
 function isFiniteNumber(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v);
+  return Number.isFinite(v);
 }
 
 /** Rectangle geometry shape we rely on at runtime. */
