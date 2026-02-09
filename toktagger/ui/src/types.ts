@@ -15,8 +15,6 @@ export const BaseAnnotationSchema = z.object({
 });
 
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
-export const ClassLabelSchema = BaseAnnotationSchema;
-export type ClassLabel = z.infer<typeof ClassLabelSchema>;
 
 export const TimeRegionSchema = BaseAnnotationSchema.extend({
   time_min: z.number(),
@@ -29,7 +27,10 @@ export const TimePointSchema = BaseAnnotationSchema.extend({
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
 
-// add near other annotation schemas
+export const ClassLabelSchema = BaseAnnotationSchema.extend({
+  type: z.literal("class_label"),
+});
+export type ClassLabel = z.infer<typeof ClassLabelSchema>;
 
 export const BoundingBoxSchema = BaseAnnotationSchema.extend({
   type: z.literal("bounding_box"),
