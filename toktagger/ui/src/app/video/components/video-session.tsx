@@ -499,7 +499,7 @@ export function VideoSessionProvider(props: {
   useEffect(() => {
     if (!api?.setAnnotations) return;
 
-    const cur = api.getAnnotations ? api.getAnnotations() : [];
+    const cur = api.getAnnotations!();
     if (sameOverlay(cur, desiredOverlay)) return;
 
     // Clear selection so popup closes when switching frames / overlays
