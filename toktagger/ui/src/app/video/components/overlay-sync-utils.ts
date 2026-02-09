@@ -1,14 +1,7 @@
 import type { ImageAnnotation } from "@annotorious/react";
-import { getLabelTrack, readRectGeometry } from "./anno-utils";
+import { getLabelTrack, readRectGeometry, VideoImageAnnotation } from "./anno-utils";
 
 type UnknownRecord = Record<string, unknown>;
-
-// Our app stores a frame key on target.source (not present in upstream Annotorious types).
-type VideoImageAnnotation = ImageAnnotation & {
-  target: ImageAnnotation["target"] & {
-    source?: string;
-  };
-};
 
 function getTargetSource(a: ImageAnnotation): string {
   return (a as VideoImageAnnotation).target.source ?? "";

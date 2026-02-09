@@ -21,7 +21,7 @@ import { classIdForName } from "./types";
 type UnknownRecord = Record<string, unknown>;
 
 // Our app stores a frame key on target.source (not present in upstream Annotorious types).
-type VideoImageAnnotation = ImageAnnotation & {
+export type VideoImageAnnotation = ImageAnnotation & {
   target: ImageAnnotation["target"] & {
     source?: string;
   };
