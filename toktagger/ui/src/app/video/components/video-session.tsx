@@ -165,14 +165,14 @@ export function VideoSessionProvider(props: {
   // For video we assume backend returns { frame: number, values: base64, ... }
   const frameFromBackend = useMemo(() => {
     if (!props.data) return 0;
-    const maybe = props.data as unknown as { frame?: number };
+    const maybe = props.data as { frame?: number };
     return maybe?.frame ?? 0;
   }, [props.data]);
 
   useLayoutEffect(() => {
     if (!props.data) return;
 
-    const dp = props.dataParams as unknown as {
+    const dp = props.dataParams as {
       name?: string;
       frame?: number | null;
     };
