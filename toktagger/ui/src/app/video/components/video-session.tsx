@@ -150,10 +150,13 @@ export function VideoSessionProvider(props: {
   const api = useAnnotator<Annotator<ImageAnnotation, ImageAnnotation>>();
 
   /**
-   * Guard against feedback loops: when we call `api.setAnnotations`, Annotorious
-   * emits update events. During that window we ignore change handlers.
-   */
-  const suppressRef = useRef(false);
+   * Annotorious emits create/update/delete events even when annotations are set
+   * programmatically (e.g. when we sync the overlay on frame change).
+   *
+   * This ref guards against re-entrant feedback loops during those programmatic writes.
+   * Session state (`byFrame`) remains the source of truth; Annotorious is the interactive editor.
+  */
+  const isProgrammaticAnnoSyncRef = useRef(false);
 
   const [imageNatural, setImageNatural] = useState<{
     w: number;
@@ -398,7 +401,7 @@ export function VideoSessionProvider(props: {
   const commitFromAnnotorious = useCallback(
     (rawOverride?: ImageAnnotation[]) => {
       if (!api?.getAnnotations) return;
-      if (suppressRef.current) return;
+      if (isProgrammaticAnnoSyncRef.current) return;
 
       // Some Annotorious events pass a single annotation (not an array).
       const raw = rawOverride ?? api.getAnnotations();
@@ -453,10 +456,10 @@ export function VideoSessionProvider(props: {
 
       // Push corrected overlay back into Annotorious when it diverges.
       if (!sameOverlay(raw, normalized)) {
-        suppressRef.current = true;
+        isProgrammaticAnnoSyncRef.current = true;
         api.setAnnotations?.(normalized, true);
         void doubleRAF().then(() => {
-          suppressRef.current = false;
+          isProgrammaticAnnoSyncRef.current = false;
         });
       }
 
@@ -505,11 +508,11 @@ export function VideoSessionProvider(props: {
     // Clear selection so popup closes when switching frames / overlays
     api.setSelected?.();
 
-    suppressRef.current = true;
+    isProgrammaticAnnoSyncRef.current = true;
     api.setAnnotations(desiredOverlay, true);
 
     void doubleRAF().then(() => {
-      suppressRef.current = false;
+      isProgrammaticAnnoSyncRef.current = false;
     });
   }, [api, desiredOverlay]);
 
@@ -523,12 +526,12 @@ export function VideoSessionProvider(props: {
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
-        if (!suppressRef.current) commitFromAnnotorious();
+        if (!isProgrammaticAnnoSyncRef.current) commitFromAnnotorious();
       }
     };
 
     const onCreate = (created: ImageAnnotation) => {
-      if (suppressRef.current) return;
+      if (isProgrammaticAnnoSyncRef.current) return;
 
       const cls = selection.className;
       if (!cls) return;
