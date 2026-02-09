@@ -267,7 +267,7 @@ function ClearButton() {
   const session = useVideoSession();
 
   const handleClick = () => {
-    session.clearCurrentFrame(); 
+    session.clearCurrentFrame();
   };
 
   return (
