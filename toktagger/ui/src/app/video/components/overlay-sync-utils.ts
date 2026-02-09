@@ -1,5 +1,9 @@
 import type { ImageAnnotation } from "@annotorious/react";
-import { getLabelTrack, readRectGeometry, VideoImageAnnotation } from "./anno-utils";
+import {
+  getLabelTrack,
+  readRectGeometry,
+  VideoImageAnnotation,
+} from "./anno-utils";
 
 type UnknownRecord = Record<string, unknown>;
 
