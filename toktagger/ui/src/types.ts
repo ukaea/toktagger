@@ -160,6 +160,12 @@ export const ProjectSchema = z.object({
   time_max: z.number().nullable().optional(),
   min_time_step: z.number().nullable().optional(),
   model_types: z.array(z.string()),
+  shot_labels: z.array(z.string()).default([]),
+  time_region_labels: z.array(z.string()).default([]),
+  time_point_labels: z.array(z.string()).default([]),
+  bounding_box_labels: z.array(z.string()).default([]),
+  polygon_labels: z.array(z.string()).default([]),
+  video_bounding_box_labels: z.array(z.string()).default([]),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

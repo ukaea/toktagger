@@ -14,15 +14,15 @@ export default function NumericalRange({
   maximumFractionDigits,
   onChange,
 }: {
-  defaultMin: number | null;
-  defaultMax: number | null;
+  defaultMin?: number;
+  defaultMax?: number;
   label: string;
   isRequired?: boolean;
   maximumFractionDigits?: number | undefined;
   onChange?: (range: NumericalRangeType) => void;
 }) {
-  const [minValue, setMinValue] = useState<number | null>(defaultMin);
-  const [maxValue, setMaxValue] = useState<number | null>(defaultMax);
+  const [minValue, setMinValue] = useState<number | null>(defaultMin ?? null);
+  const [maxValue, setMaxValue] = useState<number | null>(defaultMax ?? null);
 
   useEffect(() => {
     onChange?.({ min: minValue, max: maxValue });

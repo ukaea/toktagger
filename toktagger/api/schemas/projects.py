@@ -51,6 +51,66 @@ class ProjectIn(ConfiguredModel):
         description="The minimum time step (in seconds) between samples in this project.",
     )
 
+    shot_labels: Optional[List[str]] = Field(
+        default=["Valid", "Invalid"],
+        description="The list of labels to use for shot labelling (if applicable).",
+    )
+
+    time_region_labels: Optional[List[str]] = Field(
+        default=[
+            "ELM",
+            "L-mode",
+            "H-mode",
+            "Thermal Quench",
+            "Current Quench",
+            "Sawtooth",
+            "IRE",
+            "Locked Mode",
+            "VDE",
+            "Flat Top",
+            "Ramp Up",
+            "Ramp Down",
+            "NTM",
+            "LLM",
+            "Sawteeth",
+            "Unknown",
+        ],
+        description="The list of labels to use for time region labelling (if applicable).",
+    )
+
+    time_point_labels: Optional[List[str]] = Field(
+        default=[
+            "Disruption",
+            "Thermal Quench",
+            "Current Quench",
+            "Control Loss",
+            "Locked Mode",
+            "VDE",
+        ],
+        description="The list of labels to use for time point labelling (if applicable).",
+    )
+
+    bounding_box_labels: Optional[List[str]] = Field(
+        default=["NTM", "LLM", "Sawteeth", "Locked Mode"],
+        description="The list of labels to use for bounding box labelling (if applicable).",
+    )
+
+    polygon_labels: Optional[List[str]] = Field(
+        default=["NTM", "LLM", "Sawteeth", "Locked Mode"],
+        description="The list of labels to use for polygon labelling (if applicable).",
+    )
+
+    video_bounding_box_labels: Optional[List[str]] = Field(
+        default=[
+            "UFO",
+            "Minor UFO",
+            "Major UFO",
+            "MARFE",
+            "Other Anomaly",
+        ],
+        description="The list of labels to use for video bounding box labelling (if applicable).",
+    )
+
     @computed_field
     @property
     def model_types(self) -> List[str]:

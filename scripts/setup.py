@@ -84,7 +84,9 @@ def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
                 "project_id": project_id,
                 "shot_id": int(shot_id),
                 "data": {
-                    "file_name": str(image_dir),  # directory, not a file
+                    "file_name": str(
+                        Path(image_dir) / str(shot_id)
+                    ),  # directory, not a file
                     "type": "png",  # extension
                     "protocol": "file",  # MUST be file or s3
                 },
@@ -141,7 +143,7 @@ def main():
     )
     # ---- Image / UFO demo project ----
     project_id = create_project("Frame Project", "video", "image", "random")
-    create_image_samples(project_id, [30000], Path("./data/images"))
+    create_image_samples(project_id, [30000], Path("./data/test/video/"))
 
 
 if __name__ == "__main__":

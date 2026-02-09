@@ -418,6 +418,13 @@ async def get_files(dir_path: str, file_type: str) -> list[str]:
     return file_names
 
 
+async def get_directories(dir_path: str) -> list[str]:
+    dir_names = Path(dir_path).glob("*/")
+    dir_names = map(str, dir_names)
+    dir_names = list(sorted(dir_names))
+    return dir_names
+
+
 async def get_sample_summary(
     db_client: MongoDBClient, project_id: str
 ) -> SampleSummary:
