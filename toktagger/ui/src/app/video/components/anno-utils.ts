@@ -197,14 +197,12 @@ export function readRectGeometry(
  * - ensure track id exists (uses fallback or allocator)
  */
 export function normalizeOverlay(
-  list: ImageAnnotation[],
+  list: unknown[],
   frameKey: string,
   fallback: { className: string | null; trackId: string | null },
   allocTrackId?: (className: string) => string,
   opts?: {
-    /** If true, drop any annotation that can't end up with BOTH bodies. Default: true */
     enforceBothBodies?: boolean;
-    /** If true, keep at most 1 anno per (class, trackId) in this frame. Default: true */
     dedupeByInstance?: boolean;
   },
 ): ImageAnnotation[] {
@@ -212,7 +210,7 @@ export function normalizeOverlay(
   const dedupeByInstance = opts?.dedupeByInstance ?? true;
 
   // Defensive filter: keep only annotation-ish object.
-  const src: ImageAnnotation[] = list.filter(isImageAnnotationLike);
+  const src = list.filter(isImageAnnotationLike);
   const out: ImageAnnotation[] = [];
 
   for (const a of src) {
@@ -240,7 +238,6 @@ export function normalizeOverlay(
 
   if (!dedupeByInstance) return out;
 
-  // Enforce: one box per (class, trackId) per frame (keep last seen).
   const byKey = new Map<string, ImageAnnotation>();
   const order: string[] = [];
 
