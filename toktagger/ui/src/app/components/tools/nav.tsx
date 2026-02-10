@@ -41,23 +41,6 @@ async function getNextSample(project_id: string, current_sample_id: string) {
   return sample;
 }
 
-async function getPreviousSample(
-  project_id: string,
-  current_sample_id: string,
-) {
-  const PREVIOUS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/previous?current_sample_id=${current_sample_id}`;
-  const sampleResult = await fetch(PREVIOUS_URL);
-  if (sampleResult.status === 204) {
-    return null; // No previous sample available
-  } else if (!sampleResult.ok) {
-    throw new Error(
-      `Failed to fetch previous sample: ${sampleResult.status} ${sampleResult.statusText}`,
-    );
-  }
-  const sample = await sampleResult.json();
-  return sample;
-}
-
 type ButtonInfo = {
   project_id: string;
   sample_id: string;
@@ -65,12 +48,22 @@ type ButtonInfo = {
   saveOnNavigate?: boolean;
 };
 
+type NextButtonInfo = ButtonInfo & {
+  seenSampleIds: string[];
+  addSeenSampleId: (id: string) => void;
+};
+
+type PreviousButtonInfo = ButtonInfo & {
+  popSeenSampleId: () => string | null;
+};
+
 function NextButton({
   project_id,
   sample_id,
   annotations,
+  addSeenSampleId,
   saveOnNavigate,
-}: ButtonInfo) {
+}: NextButtonInfo) {
   const navigate = useNavigate();
 
   const moveNextShot = useCallback(async () => {
@@ -80,6 +73,7 @@ function NextButton({
       annotations,
       saveOnNavigate,
     );
+    addSeenSampleId(sample_id);
     try {
       const sample = await getNextSample(project_id, sample_id);
       if (!sample) {
@@ -96,7 +90,7 @@ function NextButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, annotations, navigate, saveOnNavigate]);
+  }, [project_id, sample_id, annotations, navigate, saveOnNavigate, addSeenSampleId]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -124,8 +118,9 @@ function PreviousButton({
   project_id,
   sample_id,
   annotations,
+  popSeenSampleId,
   saveOnNavigate,
-}: ButtonInfo) {
+}: PreviousButtonInfo) {
   const navigate = useNavigate();
 
   const movePreviousShot = useCallback(async () => {
@@ -137,14 +132,15 @@ function PreviousButton({
     );
 
     try {
-      const sample = await getPreviousSample(project_id, sample_id);
-      if (!sample) {
+      const previous_sample_id: string | null = popSeenSampleId();
+
+      if (!previous_sample_id) {
         ToastQueue.negative("No earlier samples available!", {
           timeout: TOAST_TIMEOUT,
         });
         return;
       }
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${previous_sample_id}`;
       navigate(NEXT_SAMPLE_URL);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -152,7 +148,7 @@ function PreviousButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, annotations, navigate, saveOnNavigate]);
+  }, [project_id, sample_id, annotations, navigate, saveOnNavigate, popSeenSampleId]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -286,7 +282,7 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { annotations, setAnnotations } = useSample();
+  const { annotations, setAnnotations, seenSampleIds, addSeenSampleId, popSeenSampleId } = useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
     <Flex alignItems="center" direction="column" gap="size-100">
@@ -301,12 +297,15 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           sample_id={sample_id}
           annotations={annotations}
           saveOnNavigate={SaveOnNavigate}
+          popSeenSampleId={popSeenSampleId}
         />
         <NextButton
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
           saveOnNavigate={SaveOnNavigate}
+          seenSampleIds={seenSampleIds}
+          addSeenSampleId={addSeenSampleId}
         />
         <ClearButton setAnnotations={setAnnotations} />
       </ButtonGroup>

@@ -37,6 +37,7 @@ interface SampleContextType {
   viewParams: ViewParams;
   plotProps: PlotProps;
   isLoading: boolean;
+  seenSampleIds: string[];
   error: string | null;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
@@ -44,6 +45,8 @@ interface SampleContextType {
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
+  addSeenSampleId: (id: string) => void;
+  popSeenSampleId: () => string | null;
 }
 
 const SampleContext = createContext<SampleContextType | undefined>(undefined);
@@ -139,6 +142,29 @@ export function SampleProvider({
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const [seenSampleIds, setSeenSampleIds] = useState<string[]>([]);
+
+  const addSeenSampleId = (id: string) => {
+    setSeenSampleIds(prev =>
+      [...prev, id]
+    );
+  };
+
+  const popSeenSampleId = (): string | null => {
+    let popped: string | null = null;
+    setSeenSampleIds(prev => {
+      if (prev.length == 0) {
+        popped = null
+        return prev
+      } else {
+        popped = prev.at(-1);
+        return prev.slice(0, -1)
+      }
+    })
+    return popped
+  }
+
   const [error, setError] = useState<string | null>(null);
 
   const lastGoodVideoFrameRef = useRef<number | null>(null);
@@ -314,11 +340,14 @@ export function SampleProvider({
     viewParams,
     plotProps,
     isLoading,
+    seenSampleIds,
     error,
     setAnnotations,
     setPlotProps,
     setViewParams,
     setDataParams,
+    addSeenSampleId,
+    popSeenSampleId
   };
 
   return (
