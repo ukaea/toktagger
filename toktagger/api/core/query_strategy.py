@@ -34,20 +34,6 @@ class QueryStrategy(ABC):
             raise RuntimeError("No more samples available!")
         return next_sample
 
-    def get_previous_sample(self, current_sample_id: Optional[str] = None) -> Sample:
-        """Get the previous sample based on the current sample ID"""
-
-        if current_sample_id is None:
-            if len(self.samples) == 0:
-                raise RuntimeError("No samples available!")
-            return self.samples[-1]
-
-        index = self._get_matching_sample(current_sample_id)
-        previous_index = index - 1
-        previous_index = previous_index % len(self.samples)
-
-        return self.samples[previous_index]
-
 
 class SequentialQueryStrategy(QueryStrategy):
     """Sequential query strategy
