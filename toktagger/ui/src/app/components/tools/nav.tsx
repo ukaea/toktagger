@@ -28,8 +28,17 @@ import { useSample } from "@/app/contexts/SampleContext";
 const TOAST_TIMEOUT = 5000;
 
 async function getNextSample(project_id: string, seen_sample_ids: string[]) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next?seen_sample_ids=${seen_sample_ids}`;
-  const sampleResult = await fetch(NEXT_URL);
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
+  const sampleResult = await fetch(
+        NEXT_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(seen_sample_ids),
+        });
+
   if (sampleResult.status === 204) {
     return null; // No next sample available
   } else if (!sampleResult.ok) {

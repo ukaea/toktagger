@@ -30,6 +30,9 @@ class QueryStrategy(ABC):
             (sample for sample in self.samples if sample.id not in seen_sample_ids),
             None,
         )
+        print(next_sample.id)
+        print(seen_sample_ids)
+        print(next_sample.id in seen_sample_ids)
         if not next_sample:
             raise RuntimeError("No more samples available!")
         return next_sample

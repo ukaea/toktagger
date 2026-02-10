@@ -210,9 +210,11 @@ export function SampleProvider({
         setProject(projectData);
         setSample(sampleData);
         setAnnotations(dbAnnotations);
-        setSeenSampleIds(prev =>
-          [...prev, sampleId]
-        );
+
+        setSeenSampleIds(prev => {
+          if (prev.at(-1) === sampleId) return prev;   // avoid duplicates
+          return [...prev, sampleId];
+        });
 
         let params = viewParams;
         if (projectData.task === TaskType.Spectrogram) {

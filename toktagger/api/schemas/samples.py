@@ -79,3 +79,7 @@ class SampleSummary(BaseModel):
     shot_min: Optional[int] = None
     shot_max: Optional[int] = None
     data: Optional[DataTypes] = None
+
+
+class SeenSamples(BaseModel):
+    seen_sample_ids: list[str]
