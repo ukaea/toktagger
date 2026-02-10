@@ -45,7 +45,6 @@ interface SampleContextType {
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
-  addSeenSampleId: (id: string) => void;
   popSeenSampleId: () => string | null;
 }
 
@@ -145,12 +144,6 @@ export function SampleProvider({
 
   const [seenSampleIds, setSeenSampleIds] = useState<string[]>([]);
 
-  const addSeenSampleId = (id: string) => {
-    setSeenSampleIds(prev =>
-      [...prev, id]
-    );
-  };
-
   const popSeenSampleId = (): string | null => {
     let popped: string | null = null;
     setSeenSampleIds(prev => {
@@ -217,6 +210,9 @@ export function SampleProvider({
         setProject(projectData);
         setSample(sampleData);
         setAnnotations(dbAnnotations);
+        setSeenSampleIds(prev =>
+          [...prev, sampleId]
+        );
 
         let params = viewParams;
         if (projectData.task === TaskType.Spectrogram) {
@@ -346,7 +342,6 @@ export function SampleProvider({
     setPlotProps,
     setViewParams,
     setDataParams,
-    addSeenSampleId,
     popSeenSampleId
   };
 

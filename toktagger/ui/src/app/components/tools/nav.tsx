@@ -27,8 +27,8 @@ import { useSample } from "@/app/contexts/SampleContext";
 
 const TOAST_TIMEOUT = 5000;
 
-async function getNextSample(project_id: string, current_sample_id: string) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next?current_sample_id=${current_sample_id}`;
+async function getNextSample(project_id: string, seen_sample_ids: string[]) {
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next?seen_sample_ids=${seen_sample_ids}`;
   const sampleResult = await fetch(NEXT_URL);
   if (sampleResult.status === 204) {
     return null; // No next sample available
@@ -50,7 +50,6 @@ type ButtonInfo = {
 
 type NextButtonInfo = ButtonInfo & {
   seenSampleIds: string[];
-  addSeenSampleId: (id: string) => void;
 };
 
 type PreviousButtonInfo = ButtonInfo & {
@@ -61,7 +60,7 @@ function NextButton({
   project_id,
   sample_id,
   annotations,
-  addSeenSampleId,
+  seenSampleIds,
   saveOnNavigate,
 }: NextButtonInfo) {
   const navigate = useNavigate();
@@ -73,9 +72,8 @@ function NextButton({
       annotations,
       saveOnNavigate,
     );
-    addSeenSampleId(sample_id);
     try {
-      const sample = await getNextSample(project_id, sample_id);
+      const sample = await getNextSample(project_id, seenSampleIds);
       if (!sample) {
         ToastQueue.negative("No more samples available!", {
           timeout: TOAST_TIMEOUT,
@@ -90,7 +88,7 @@ function NextButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, annotations, navigate, saveOnNavigate, addSeenSampleId]);
+  }, [project_id, sample_id, annotations, navigate, saveOnNavigate, seenSampleIds]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -282,7 +280,7 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { annotations, setAnnotations, seenSampleIds, addSeenSampleId, popSeenSampleId } = useSample();
+  const { annotations, setAnnotations, seenSampleIds, popSeenSampleId } = useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
     <Flex alignItems="center" direction="column" gap="size-100">
@@ -305,7 +303,6 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           annotations={annotations}
           saveOnNavigate={SaveOnNavigate}
           seenSampleIds={seenSampleIds}
-          addSeenSampleId={addSeenSampleId}
         />
         <ClearButton setAnnotations={setAnnotations} />
       </ButtonGroup>
