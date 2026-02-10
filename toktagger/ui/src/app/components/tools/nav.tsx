@@ -53,6 +53,7 @@ type NextButtonInfo = ButtonInfo & {
 };
 
 type PreviousButtonInfo = ButtonInfo & {
+  isDisabled: boolean;
   popSeenSampleId: () => string | null;
 };
 
@@ -116,6 +117,7 @@ function PreviousButton({
   project_id,
   sample_id,
   annotations,
+  isDisabled,
   popSeenSampleId,
   saveOnNavigate,
 }: PreviousButtonInfo) {
@@ -163,7 +165,7 @@ function PreviousButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton aria-label="Previous Sample" onPress={movePreviousShot}>
+      <ActionButton isDisabled={isDisabled} aria-label="Previous Sample" onPress={movePreviousShot}>
         <StepBackward />
       </ActionButton>
     </View>
@@ -294,15 +296,16 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          saveOnNavigate={SaveOnNavigate}
+          isDisabled={seenSampleIds.length == 0}
           popSeenSampleId={popSeenSampleId}
+          saveOnNavigate={SaveOnNavigate}
         />
         <NextButton
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          saveOnNavigate={SaveOnNavigate}
           seenSampleIds={seenSampleIds}
+          saveOnNavigate={SaveOnNavigate}
         />
         <ClearButton setAnnotations={setAnnotations} />
       </ButtonGroup>
