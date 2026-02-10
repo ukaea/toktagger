@@ -54,11 +54,13 @@ def test_sequential_strategy(samples, annotations):
     )
 
     next_sample_id = None
+    seen_sample_ids = []
 
     for i in range(len(samples)):
-        next_sample = strategy.get_next_sample(next_sample_id)
+        next_sample = strategy.get_next_sample(seen_sample_ids)
         next_sample_id = next_sample.id
         assert next_sample == samples[i]
+        seen_sample_ids.append(next_sample_id)
 
     # Should cycle back to start
     next_sample = strategy.get_next_sample(next_sample_id)
