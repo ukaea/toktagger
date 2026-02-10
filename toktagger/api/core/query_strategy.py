@@ -30,9 +30,6 @@ class QueryStrategy(ABC):
             (sample for sample in self.samples if sample.id not in seen_sample_ids),
             None,
         )
-        print(next_sample.id)
-        print(seen_sample_ids)
-        print(next_sample.id in seen_sample_ids)
         if not next_sample:
             raise RuntimeError("No more samples available!")
         return next_sample
@@ -80,7 +77,8 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
         annotations: Optional[list[Annotation]] = None,
         seed: int = 42,
     ):
-        super().__init__(samples, annotations, seed)
+        annotations_nonvalidated = [ann for ann in annotations if not ann.validated]
+        super().__init__(samples, annotations_nonvalidated, seed)
 
         if self.annotations:
             self.annotations = sorted(
@@ -88,12 +86,21 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
             )
             sample_ids = [annotation.sample_id for annotation in self.annotations]
             sample_ids = list(dict.fromkeys(sample_ids))
+            # List of samples which have unvalidated annotations
+            samples_nonvalidated = [
+                sample for sample in self.samples if not sample.validated_annotations
+            ]
+            # Sort in order of annotation uncertainty, samples with no annotations go last (randomised)
             self.samples = sorted(
-                self.samples,
+                samples_nonvalidated,
                 key=lambda sample: sample_ids.index(sample.id)
                 if sample.id in sample_ids
                 else float("inf"),
             )
+            # Then add in samples which *are* validated at the end
+            self.samples += [
+                sample for sample in self.samples if sample.validated_annotations
+            ]
 
 
 QUERY_STRATEGIES = {
