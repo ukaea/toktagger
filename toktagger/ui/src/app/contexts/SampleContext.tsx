@@ -146,17 +146,17 @@ export function SampleProvider({
 
   const popSeenSampleId = (): string | null => {
     let popped: string | null = null;
-    setSeenSampleIds(prev => {
+    setSeenSampleIds((prev) => {
       if (prev.length < 2) {
-        popped = null
-        return prev
+        popped = null;
+        return prev;
       } else {
         popped = prev.at(-2); // since the current sample will be at -1
-        return prev.slice(0, -1)
+        return prev.slice(0, -1);
       }
-    })
-    return popped
-  }
+    });
+    return popped;
+  };
 
   const [error, setError] = useState<string | null>(null);
 
@@ -211,8 +211,8 @@ export function SampleProvider({
         setSample(sampleData);
         setAnnotations(dbAnnotations);
 
-        setSeenSampleIds(prev => {
-          if (prev.at(-1) === sampleId) return prev;   // avoid duplicates
+        setSeenSampleIds((prev) => {
+          if (prev.at(-1) === sampleId) return prev; // avoid duplicates
           return [...prev, sampleId];
         });
 
@@ -344,7 +344,7 @@ export function SampleProvider({
     setPlotProps,
     setViewParams,
     setDataParams,
-    popSeenSampleId
+    popSeenSampleId,
   };
 
   return (

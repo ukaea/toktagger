@@ -29,15 +29,13 @@ const TOAST_TIMEOUT = 5000;
 
 async function getNextSample(project_id: string, seen_sample_ids: string[]) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
-  const sampleResult = await fetch(
-        NEXT_URL,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(seen_sample_ids),
-        });
+  const sampleResult = await fetch(NEXT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(seen_sample_ids),
+  });
 
   if (sampleResult.status === 204) {
     return null; // No next sample available
@@ -98,7 +96,14 @@ function NextButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, annotations, navigate, saveOnNavigate, seenSampleIds]);
+  }, [
+    project_id,
+    sample_id,
+    annotations,
+    navigate,
+    saveOnNavigate,
+    seenSampleIds,
+  ]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -157,7 +162,14 @@ function PreviousButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, annotations, navigate, saveOnNavigate, popSeenSampleId]);
+  }, [
+    project_id,
+    sample_id,
+    annotations,
+    navigate,
+    saveOnNavigate,
+    popSeenSampleId,
+  ]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -174,7 +186,11 @@ function PreviousButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton isDisabled={isDisabled} aria-label="Previous Sample" onPress={movePreviousShot}>
+      <ActionButton
+        isDisabled={isDisabled}
+        aria-label="Previous Sample"
+        onPress={movePreviousShot}
+      >
         <StepBackward />
       </ActionButton>
     </View>
@@ -291,7 +307,8 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { annotations, setAnnotations, seenSampleIds, popSeenSampleId } = useSample();
+  const { annotations, setAnnotations, seenSampleIds, popSeenSampleId } =
+    useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
     <Flex alignItems="center" direction="column" gap="size-100">
