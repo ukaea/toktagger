@@ -296,7 +296,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          isDisabled={seenSampleIds.length == 0}
+          isDisabled={seenSampleIds.length == 1}
           popSeenSampleId={popSeenSampleId}
           saveOnNavigate={SaveOnNavigate}
         />

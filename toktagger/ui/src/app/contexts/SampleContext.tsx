@@ -147,11 +147,11 @@ export function SampleProvider({
   const popSeenSampleId = (): string | null => {
     let popped: string | null = null;
     setSeenSampleIds(prev => {
-      if (prev.length == 0) {
+      if (prev.length < 2) {
         popped = null
         return prev
       } else {
-        popped = prev.at(-1);
+        popped = prev.at(-2); // since the current sample will be at -1
         return prev.slice(0, -1)
       }
     })
