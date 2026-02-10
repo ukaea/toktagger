@@ -24,32 +24,15 @@ class QueryStrategy(ABC):
         self.samples = samples
         self.annotations = annotations if annotations is not None else []
 
-    def _get_matching_sample(self, current_sample_id: str) -> int:
-        index = next(
-            (
-                i
-                for i, sample in enumerate(self.samples)
-                if sample.id == current_sample_id
-            ),
+    def get_next_sample(self, seen_sample_ids: list[str]) -> Sample:
+        """Get the next sample"""
+        next_sample = next(
+            (sample for sample in self.samples if sample.id not in seen_sample_ids),
             None,
         )
-        if index is None:
-            raise RuntimeError("Current sample ID not found in the list of samples.")
-        return index
-
-    def get_next_sample(self, current_sample_id: Optional[str] = None) -> Sample:
-        """Get the next sample based on the current sample ID"""
-
-        if current_sample_id is None:
-            if len(self.samples) == 0:
-                raise RuntimeError("No samples available!")
-            return self.samples[0]
-
-        index = self._get_matching_sample(current_sample_id)
-        next_index = index + 1
-        next_index = next_index % len(self.samples)
-
-        return self.samples[next_index]
+        if not next_sample:
+            raise RuntimeError("No more samples available!")
+        return next_sample
 
     def get_previous_sample(self, current_sample_id: Optional[str] = None) -> Sample:
         """Get the previous sample based on the current sample ID"""
