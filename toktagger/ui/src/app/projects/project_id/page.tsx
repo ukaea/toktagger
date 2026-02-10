@@ -26,7 +26,7 @@ import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
-
+import { JumpToNextButton } from "@/app/components/tools/nav";
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
   return (
@@ -204,6 +204,7 @@ export default function ProjectView() {
                 <Flex gap="size-100" alignItems="center" marginTop="size-200">
                   <ImportButton project={project} />
                   <ExportButton project={project} />
+                  <JumpToNextButton project={project} />
                 </Flex>
                 <SearchField
                   label="Search By Shot ID"

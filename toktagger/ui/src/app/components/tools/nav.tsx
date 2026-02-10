@@ -1,7 +1,8 @@
 "use client";
-import { Annotation } from "@/types";
+import { Annotation, Project } from "@/types";
 import {
   Flex,
+  Button,
   ActionButton,
   ButtonGroup,
   ToastQueue,
@@ -22,7 +23,7 @@ import {
   getShotSample,
   saveSampleAnnotations,
 } from "@/app/core";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, NavigateFunction } from "react-router-dom";
 import { useSample } from "@/app/contexts/SampleContext";
 
 const TOAST_TIMEOUT = 5000;
@@ -46,6 +47,29 @@ async function getNextSample(project_id: string, seen_sample_ids: string[]) {
   }
   const sample = await sampleResult.json();
   return sample;
+}
+
+async function navigateToNextSample(
+  project_id: string,
+  navigate: NavigateFunction,
+  seen_sample_ids: string[],
+) {
+  try {
+    const sample = await getNextSample(project_id, seen_sample_ids);
+    if (!sample) {
+      ToastQueue.negative("No more samples available!", {
+        timeout: TOAST_TIMEOUT,
+      });
+      return;
+    }
+    const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+    navigate(NEXT_SAMPLE_URL);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    ToastQueue.negative(`Failed to fetch next sample: ${message}`, {
+      timeout: TOAST_TIMEOUT,
+    });
+  }
 }
 
 type ButtonInfo = {
@@ -80,22 +104,7 @@ function NextButton({
       annotations,
       saveOnNavigate,
     );
-    try {
-      const sample = await getNextSample(project_id, seenSampleIds);
-      if (!sample) {
-        ToastQueue.negative("No more samples available!", {
-          timeout: TOAST_TIMEOUT,
-        });
-        return;
-      }
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-      navigate(NEXT_SAMPLE_URL);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      ToastQueue.negative(`Failed to fetch next sample: ${message}`, {
-        timeout: TOAST_TIMEOUT,
-      });
-    }
+    await navigateToNextSample(project_id, navigate, seenSampleIds);
   }, [
     project_id,
     sample_id,
@@ -123,6 +132,22 @@ function NextButton({
       <ActionButton aria-label="Next Sample" onPress={moveNextShot}>
         <StepForward />
       </ActionButton>
+    </View>
+  );
+}
+
+export function JumpToNextButton({ project }: { project: Project }) {
+  const navigate = useNavigate();
+
+  const moveNextShot = useCallback(async () => {
+    await navigateToNextSample(project._id, navigate, []);
+  }, [project._id, navigate]);
+
+  return (
+    <View marginStart="size-100">
+      <Button variant="primary" aria-label="Next Sample" onPress={moveNextShot}>
+        <Text>Jump to Next Sample</Text> <StepForward />
+      </Button>
     </View>
   );
 }
