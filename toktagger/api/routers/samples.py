@@ -219,11 +219,11 @@ async def get_next_sample(
         ..., description="The IDs of the samples already seen in this session."
     ),
     sort_by: str = Query(
-        "_id",
+        "shot_id",
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
     ),
     sort_direction: Literal["ascending", "descending"] = Query(
-        "descending",
+        "ascending",
         description="Direction to sort responses, by default 'descending'",
     ),
 ) -> Sample:
