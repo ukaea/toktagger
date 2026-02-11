@@ -37,7 +37,7 @@ interface SampleContextType {
   viewParams: ViewParams;
   plotProps: PlotProps;
   isLoading: boolean;
-  seenSampleIds: string[];
+  visitedSampleIds: string[];
   error: string | null;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
@@ -45,7 +45,7 @@ interface SampleContextType {
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
-  popSeenSampleId: () => string | null;
+  popvisitedSampleId: () => string | null;
 }
 
 const SampleContext = createContext<SampleContextType | undefined>(undefined);
@@ -142,11 +142,11 @@ export function SampleProvider({
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const [seenSampleIds, setSeenSampleIds] = useState<string[]>([]);
+  const [visitedSampleIds, setvisitedSampleIds] = useState<string[]>([]);
 
-  const popSeenSampleId = (): string | null => {
+  const popvisitedSampleId = (): string | null => {
     let popped: string | null = null;
-    setSeenSampleIds((prev) => {
+    setvisitedSampleIds((prev) => {
       if (prev.length < 2) {
         popped = null;
         return prev;
@@ -211,7 +211,7 @@ export function SampleProvider({
         setSample(sampleData);
         setAnnotations(dbAnnotations);
 
-        setSeenSampleIds((prev) => {
+        setvisitedSampleIds((prev) => {
           if (prev.at(-1) === sampleId) return prev; // avoid duplicates
           return [...prev, sampleId];
         });
@@ -338,13 +338,13 @@ export function SampleProvider({
     viewParams,
     plotProps,
     isLoading,
-    seenSampleIds,
+    visitedSampleIds,
     error,
     setAnnotations,
     setPlotProps,
     setViewParams,
     setDataParams,
-    popSeenSampleId,
+    popvisitedSampleId,
   };
 
   return (

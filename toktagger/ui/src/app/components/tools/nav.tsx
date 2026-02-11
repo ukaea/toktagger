@@ -28,14 +28,14 @@ import { useSample } from "@/app/contexts/SampleContext";
 
 const TOAST_TIMEOUT = 5000;
 
-async function getNextSample(project_id: string, seen_sample_ids: string[]) {
+async function getNextSample(project_id: string, visited_sample_ids: string[]) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
   const sampleResult = await fetch(NEXT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(seen_sample_ids),
+    body: JSON.stringify(visited_sample_ids),
   });
 
   if (sampleResult.status === 204) {
@@ -52,10 +52,10 @@ async function getNextSample(project_id: string, seen_sample_ids: string[]) {
 async function navigateToNextSample(
   project_id: string,
   navigate: NavigateFunction,
-  seen_sample_ids: string[],
+  visited_sample_ids: string[],
 ) {
   try {
-    const sample = await getNextSample(project_id, seen_sample_ids);
+    const sample = await getNextSample(project_id, visited_sample_ids);
     if (!sample) {
       ToastQueue.negative("No more samples available!", {
         timeout: TOAST_TIMEOUT,
