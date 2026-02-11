@@ -24,10 +24,10 @@ class QueryStrategy(ABC):
         self.samples = samples
         self.annotations = annotations if annotations is not None else []
 
-    def get_next_sample(self, seen_sample_ids: list[str]) -> Sample:
+    def get_next_sample(self, visited_sample_ids: list[str]) -> Sample:
         """Get the next sample"""
         next_sample = next(
-            (sample for sample in self.samples if sample.id not in seen_sample_ids),
+            (sample for sample in self.samples if sample.id not in visited_sample_ids),
             None,
         )
         if not next_sample:

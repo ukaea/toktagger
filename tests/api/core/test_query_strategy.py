@@ -54,33 +54,33 @@ def test_sequential_strategy(samples, annotations):
     )
 
     next_sample_id = None
-    seen_sample_ids = []
+    visited_sample_ids = []
 
     for i in range(len(samples)):
-        next_sample = strategy.get_next_sample(seen_sample_ids)
+        next_sample = strategy.get_next_sample(visited_sample_ids)
         next_sample_id = next_sample.id
         assert next_sample == samples[i]
-        seen_sample_ids.append(next_sample_id)
+        visited_sample_ids.append(next_sample_id)
 
     # Should say there are no more samples
     with pytest.raises(RuntimeError, match="No more samples available!"):
-        next_sample = strategy.get_next_sample(seen_sample_ids)
+        next_sample = strategy.get_next_sample(visited_sample_ids)
 
 
 def test_random_strategy(samples, annotations):
     random.seed(42)
     strategy = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
 
-    seen_sample_ids = []
+    visited_sample_ids = []
     for i in range(len(samples)):
-        next_sample = strategy.get_next_sample(seen_sample_ids)
-        seen_sample_ids.append(next_sample.id)
+        next_sample = strategy.get_next_sample(visited_sample_ids)
+        visited_sample_ids.append(next_sample.id)
 
-    assert len(seen_sample_ids) == len(samples)
-    assert seen_sample_ids != [sample.id for sample in samples]
+    assert len(visited_sample_ids) == len(samples)
+    assert visited_sample_ids != [sample.id for sample in samples]
 
     with pytest.raises(RuntimeError, match="No more samples available!"):
-        next_sample = strategy.get_next_sample(seen_sample_ids)
+        next_sample = strategy.get_next_sample(visited_sample_ids)
 
 
 def test_uncertainty_strategy(samples, annotations):
@@ -88,13 +88,13 @@ def test_uncertainty_strategy(samples, annotations):
         samples.copy(), annotations.copy()
     )
     expected_order = ["sample_4", "sample_2", "sample_1", "sample_3"]
-    seen_sample_ids = []
+    visited_sample_ids = []
     for i in range(len(samples)):
-        next_sample = strategy.get_next_sample(seen_sample_ids)
+        next_sample = strategy.get_next_sample(visited_sample_ids)
         next_sample_id = next_sample.id
         assert next_sample_id == expected_order[i]
-        seen_sample_ids.append(next_sample_id)
+        visited_sample_ids.append(next_sample_id)
 
     # Should say there are no more samples
     with pytest.raises(RuntimeError, match="No more samples available!"):
-        next_sample = strategy.get_next_sample(seen_sample_ids)
+        next_sample = strategy.get_next_sample(visited_sample_ids)

@@ -215,7 +215,7 @@ async def update_samples(
 async def get_next_sample(
     request: Request,
     project_id: str = Path(description="The project to return the next sample from."),
-    seen_sample_ids: list[str] = Body(
+    visited_sample_ids: list[str] = Body(
         ..., description="The IDs of the samples already seen in this session."
     ),
 ) -> Sample:
@@ -234,7 +234,7 @@ async def get_next_sample(
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
 
     try:
-        sample = query_strategy.get_next_sample(seen_sample_ids)
+        sample = query_strategy.get_next_sample(visited_sample_ids)
     except RuntimeError as e:
         raise HTTPException(status_code=204, detail="No next sample available!") from e
 

@@ -80,19 +80,19 @@ type ButtonInfo = {
 };
 
 type NextButtonInfo = ButtonInfo & {
-  seenSampleIds: string[];
+  visitedSampleIds: string[];
 };
 
 type PreviousButtonInfo = ButtonInfo & {
   isDisabled: boolean;
-  popSeenSampleId: () => string | null;
+  popvisitedSampleId: () => string | null;
 };
 
 function NextButton({
   project_id,
   sample_id,
   annotations,
-  seenSampleIds,
+  visitedSampleIds,
   saveOnNavigate,
 }: NextButtonInfo) {
   const navigate = useNavigate();
@@ -104,14 +104,14 @@ function NextButton({
       annotations,
       saveOnNavigate,
     );
-    await navigateToNextSample(project_id, navigate, seenSampleIds);
+    await navigateToNextSample(project_id, navigate, visitedSampleIds);
   }, [
     project_id,
     sample_id,
     annotations,
     navigate,
     saveOnNavigate,
-    seenSampleIds,
+    visitedSampleIds,
   ]);
 
   useEffect(() => {
@@ -157,7 +157,7 @@ function PreviousButton({
   sample_id,
   annotations,
   isDisabled,
-  popSeenSampleId,
+  popvisitedSampleId,
   saveOnNavigate,
 }: PreviousButtonInfo) {
   const navigate = useNavigate();
@@ -171,7 +171,7 @@ function PreviousButton({
     );
 
     try {
-      const previous_sample_id: string | null = popSeenSampleId();
+      const previous_sample_id: string | null = popvisitedSampleId();
 
       if (!previous_sample_id) {
         ToastQueue.negative("No earlier samples available!", {
@@ -193,7 +193,7 @@ function PreviousButton({
     annotations,
     navigate,
     saveOnNavigate,
-    popSeenSampleId,
+    popvisitedSampleId,
   ]);
 
   useEffect(() => {
@@ -332,7 +332,7 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { annotations, setAnnotations, seenSampleIds, popSeenSampleId } =
+  const { annotations, setAnnotations, visitedSampleIds, popvisitedSampleId } =
     useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
@@ -347,15 +347,15 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          isDisabled={seenSampleIds.length == 1}
-          popSeenSampleId={popSeenSampleId}
+          isDisabled={visitedSampleIds.length == 1}
+          popvisitedSampleId={popvisitedSampleId}
           saveOnNavigate={SaveOnNavigate}
         />
         <NextButton
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
-          seenSampleIds={seenSampleIds}
+          visitedSampleIds={visitedSampleIds}
           saveOnNavigate={SaveOnNavigate}
         />
         <ClearButton setAnnotations={setAnnotations} />
