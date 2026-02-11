@@ -1,9 +1,8 @@
 from typing import Literal, Optional, Union
 
-from pydantic import Field, TypeAdapter, create_model, field_validator, model_validator
+from pydantic import Field, TypeAdapter, create_model, model_validator
 
 from toktagger.api.schemas import ConfiguredModel
-from toktagger.api.schemas.annotators import AnnotatorTypes
 
 
 class AnnotationBase(ConfiguredModel):
@@ -22,18 +21,6 @@ class AnnotationBase(ConfiguredModel):
             elif values.get("uncertainty") is None:
                 values["uncertainty"] = 1
         return values
-
-    @field_validator("created_by")
-    def check_created_by(cls, value):
-        from toktagger.api.models.base import ModelRegistry
-
-        if value not in (models := ModelRegistry.names()) and value not in (
-            annotators := [ann.value for ann in AnnotatorTypes]
-        ):
-            raise ValueError(
-                f"Invalid created_by '{value}' - valid options are ML Models '{models}', or Annotators '{annotators}'."
-            )
-        return value
 
 
 class Annotation(AnnotationBase):

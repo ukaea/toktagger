@@ -593,7 +593,7 @@ def test_samples_page_export_annotations(server_setup, page: Page):
     assert exported_control_loss["sample_id"] == sample_ids[1]
 
 
-def test_model_train(server_setup, setup_model_samples, page: Page):
+def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     project_id, sample_ids = create_model_samples(setup_model_samples)
 
     # Navigate to projects page
@@ -633,9 +633,59 @@ def test_model_train(server_setup, setup_model_samples, page: Page):
     expect(page.get_by_role("button", name="Close")).to_be_hidden()
     expect(page.get_by_role("button", name="Train", exact=True)).to_be_hidden()
 
-    # Open predict modal, check entry is there
+    # Open predict modal, check structure is correct
     page.get_by_role("button", name="Create Predictions from ML Model").click()
     modal = page.get_by_role("dialog", name="Create Predictions from ML Model")
+
+    expect(
+        page.get_by_role("heading", name="Create Predictions from ML Model")
+    ).to_be_visible()
+    expect(modal.get_by_role("textbox", name="Number of Predictions")).to_be_visible()
+    expect(
+        modal.get_by_role("button", name="Cancel Training", exact=True)
+    ).to_be_visible()
+    expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_visible()
+    expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_disabled()
+    expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
+
+    # Check entry is there for newly trained model
     expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_disruption_cnn")
     expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
     expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
+
+    # Check cancel training button disabled after training complete
+    expect(
+        modal.get_by_role("button", name="Cancel Training", exact=True)
+    ).to_be_disabled()
+
+    # Click to select 10 predicions
+    modal.get_by_role("button", name="Decrease Number of Predictions").click()
+    expect(modal.get_by_role("textbox", name="Number of Predictions")).to_have_value(
+        "10"
+    )
+
+    # Select our model from the list
+    modal.get_by_role("checkbox", name="Select mock_disruption_cnn").click()
+
+    # Check Predict button has been enabled, click it
+    expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_enabled()
+    modal.get_by_role("button", name="Predict", exact=True).click()
+
+    # Check message is shown
+    expect(page.get_by_text("Model predictions added to job queue!")).to_be_visible()
+
+    # Close the modal, check it closes
+    modal.get_by_role("button", name="Close", exact=True).click()
+    expect(
+        page.get_by_role("heading", name="Create Predictions from ML Model")
+    ).to_be_hidden()
+
+    # Wait for a short time
+    time.sleep(1)
+
+    # Check 10 non-validated predictions added
+    response = requests.get(
+        f"http://localhost:8002/projects/{project_id}/annotations?validated=False",
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 10
