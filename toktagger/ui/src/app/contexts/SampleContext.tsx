@@ -45,7 +45,7 @@ interface SampleContextType {
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
-  popvisitedSampleId: () => string | null;
+  popVisitedSampleId: () => string | null;
 }
 
 const SampleContext = createContext<SampleContextType | undefined>(undefined);
@@ -142,19 +142,22 @@ export function SampleProvider({
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const [visitedSampleIds, setvisitedSampleIds] = useState<string[]>([]);
+  const [visitedSampleIds, setvisitedSampleIds] = useState<string[]>(() => {
+    const cached: string | null = sessionStorage.getItem(projectId);
+    if (!cached) {
+      return [];
+    }
+    return JSON.parse(cached);
+  });
 
-  const popvisitedSampleId = (): string | null => {
-    let popped: string | null = null;
-    setvisitedSampleIds((prev) => {
-      if (prev.length < 2) {
-        popped = null;
-        return prev;
-      } else {
-        popped = prev.at(-2); // since the current sample will be at -1
-        return prev.slice(0, -1);
-      }
-    });
+  const popVisitedSampleId = (): string | null => {
+    if (visitedSampleIds.length < 2) {
+      return null;
+    }
+    const popped: string = visitedSampleIds.at(-2)!; // since the current sample will be at -1
+    const updated: string[] = visitedSampleIds.slice(0, -1);
+    sessionStorage.setItem(projectId, JSON.stringify(updated));
+    setvisitedSampleIds(updated);
     return popped;
   };
 
@@ -213,7 +216,9 @@ export function SampleProvider({
 
         setvisitedSampleIds((prev) => {
           if (prev.at(-1) === sampleId) return prev; // avoid duplicates
-          return [...prev, sampleId];
+          const updated: string[] = [...prev, sampleId];
+          sessionStorage.setItem(projectId, JSON.stringify(updated));
+          return updated;
         });
 
         let params = viewParams;
@@ -344,7 +349,7 @@ export function SampleProvider({
     setPlotProps,
     setViewParams,
     setDataParams,
-    popvisitedSampleId,
+    popVisitedSampleId,
   };
 
   return (

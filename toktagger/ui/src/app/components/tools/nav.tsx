@@ -85,7 +85,7 @@ type NextButtonInfo = ButtonInfo & {
 
 type PreviousButtonInfo = ButtonInfo & {
   isDisabled: boolean;
-  popvisitedSampleId: () => string | null;
+  popVisitedSampleId: () => string | null;
 };
 
 function NextButton({
@@ -157,7 +157,7 @@ function PreviousButton({
   sample_id,
   annotations,
   isDisabled,
-  popvisitedSampleId,
+  popVisitedSampleId,
   saveOnNavigate,
 }: PreviousButtonInfo) {
   const navigate = useNavigate();
@@ -171,7 +171,7 @@ function PreviousButton({
     );
 
     try {
-      const previous_sample_id: string | null = popvisitedSampleId();
+      const previous_sample_id: string | null = popVisitedSampleId();
 
       if (!previous_sample_id) {
         ToastQueue.negative("No earlier samples available!", {
@@ -193,7 +193,7 @@ function PreviousButton({
     annotations,
     navigate,
     saveOnNavigate,
-    popvisitedSampleId,
+    popVisitedSampleId,
   ]);
 
   useEffect(() => {
@@ -332,7 +332,7 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { annotations, setAnnotations, visitedSampleIds, popvisitedSampleId } =
+  const { annotations, setAnnotations, visitedSampleIds, popVisitedSampleId } =
     useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
@@ -348,7 +348,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           sample_id={sample_id}
           annotations={annotations}
           isDisabled={visitedSampleIds.length == 1}
-          popvisitedSampleId={popvisitedSampleId}
+          popVisitedSampleId={popVisitedSampleId}
           saveOnNavigate={SaveOnNavigate}
         />
         <NextButton
