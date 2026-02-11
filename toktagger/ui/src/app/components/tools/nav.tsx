@@ -18,51 +18,30 @@ import StepForward from "@spectrum-icons/workflow/StepForward";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import SaveFloppy from "@spectrum-icons/workflow/SaveFloppy";
 import Delete from "@spectrum-icons/workflow/Delete";
-import {
-  BACKEND_API_URL,
-  getShotSample,
-  saveSampleAnnotations,
-} from "@/app/core";
+import { getShotSample, saveSampleAnnotations } from "@/app/core";
 import { useNavigate, NavigateFunction } from "react-router-dom";
 import { useSample } from "@/app/contexts/SampleContext";
+import { getNextSample } from "@/app/core";
+import type { SortDescriptor } from "@react-types/shared";
 
 const TOAST_TIMEOUT = 5000;
 
-async function getNextSample(project_id: string, visited_sample_ids: string[]) {
-  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next`;
-  const sampleResult = await fetch(NEXT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(visited_sample_ids),
-  });
-
-  if (sampleResult.status === 204) {
-    return null; // No next sample available
-  } else if (!sampleResult.ok) {
-    throw new Error(
-      `Failed to fetch next sample: ${sampleResult.status} ${sampleResult.statusText}`,
-    );
-  }
-  const sample = await sampleResult.json();
-  return sample;
-}
-
-async function navigateToNextSample(
+async function navigateToSample(
   project_id: string,
+  sample_id: string,
   navigate: NavigateFunction,
-  visited_sample_ids: string[],
+  sortDescriptor: SortDescriptor | null,
 ) {
+  const params = new URLSearchParams();
+  if (sortDescriptor) {
+    params.append("sortColumn", sortDescriptor.column.toString());
+    params.append("sortDirection", sortDescriptor.direction);
+  }
+
   try {
-    const sample = await getNextSample(project_id, visited_sample_ids);
-    if (!sample) {
-      ToastQueue.negative("No more samples available!", {
-        timeout: TOAST_TIMEOUT,
-      });
-      return;
-    }
-    const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+    const NEXT_SAMPLE_URL =
+      `/ui/projects/${project_id}/samples/${sample_id}` +
+      (params.toString() ? `?${params.toString()}` : "");
     navigate(NEXT_SAMPLE_URL);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -70,6 +49,26 @@ async function navigateToNextSample(
       timeout: TOAST_TIMEOUT,
     });
   }
+}
+
+async function navigateToNextSample(
+  project_id: string,
+  navigate: NavigateFunction,
+  visited_sample_ids: string[],
+  sortDescriptor: SortDescriptor | null,
+) {
+  const sample = await getNextSample(
+    project_id,
+    visited_sample_ids,
+    sortDescriptor,
+  );
+  if (!sample) {
+    ToastQueue.negative("No more samples available!", {
+      timeout: TOAST_TIMEOUT,
+    });
+    return;
+  }
+  navigateToSample(project_id, sample._id, navigate, sortDescriptor);
 }
 
 type ButtonInfo = {
@@ -81,11 +80,13 @@ type ButtonInfo = {
 
 type NextButtonInfo = ButtonInfo & {
   visitedSampleIds: string[];
+  sortDescriptor: SortDescriptor | null;
 };
 
 type PreviousButtonInfo = ButtonInfo & {
   isDisabled: boolean;
   popVisitedSampleId: () => string | null;
+  sortDescriptor: SortDescriptor | null;
 };
 
 function NextButton({
@@ -94,6 +95,7 @@ function NextButton({
   annotations,
   visitedSampleIds,
   saveOnNavigate,
+  sortDescriptor,
 }: NextButtonInfo) {
   const navigate = useNavigate();
 
@@ -104,7 +106,12 @@ function NextButton({
       annotations,
       saveOnNavigate,
     );
-    await navigateToNextSample(project_id, navigate, visitedSampleIds);
+    await navigateToNextSample(
+      project_id,
+      navigate,
+      visitedSampleIds,
+      sortDescriptor,
+    );
   }, [
     project_id,
     sample_id,
@@ -112,6 +119,7 @@ function NextButton({
     navigate,
     saveOnNavigate,
     visitedSampleIds,
+    sortDescriptor,
   ]);
 
   useEffect(() => {
@@ -136,12 +144,20 @@ function NextButton({
   );
 }
 
-export function JumpToNextButton({ project }: { project: Project }) {
+export function JumpToNextButton({
+  project,
+  sortDescriptor,
+}: {
+  project: Project;
+  sortDescriptor: SortDescriptor;
+}) {
   const navigate = useNavigate();
 
   const moveNextShot = useCallback(async () => {
-    await navigateToNextSample(project._id, navigate, []);
-  }, [project._id, navigate]);
+    if (project._id) {
+      await navigateToNextSample(project._id, navigate, [], sortDescriptor);
+    }
+  }, [project._id, navigate, sortDescriptor]);
 
   return (
     <View marginStart="size-100">
@@ -159,6 +175,7 @@ function PreviousButton({
   isDisabled,
   popVisitedSampleId,
   saveOnNavigate,
+  sortDescriptor,
 }: PreviousButtonInfo) {
   const navigate = useNavigate();
 
@@ -170,23 +187,15 @@ function PreviousButton({
       saveOnNavigate,
     );
 
-    try {
-      const previous_sample_id: string | null = popVisitedSampleId();
+    const previous_sample_id: string | null = popVisitedSampleId();
 
-      if (!previous_sample_id) {
-        ToastQueue.negative("No earlier samples available!", {
-          timeout: TOAST_TIMEOUT,
-        });
-        return;
-      }
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${previous_sample_id}`;
-      navigate(NEXT_SAMPLE_URL);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      ToastQueue.negative(`Failed to fetch previous sample: ${message}`, {
+    if (!previous_sample_id) {
+      ToastQueue.negative("No earlier samples available!", {
         timeout: TOAST_TIMEOUT,
       });
+      return;
     }
+    navigateToSample(project_id, previous_sample_id, navigate, sortDescriptor);
   }, [
     project_id,
     sample_id,
@@ -194,6 +203,7 @@ function PreviousButton({
     navigate,
     saveOnNavigate,
     popVisitedSampleId,
+    sortDescriptor,
   ]);
 
   useEffect(() => {
@@ -277,6 +287,7 @@ type SaveInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
+  sortDescriptor: SortDescriptor;
   saveOnNavigate?: boolean;
 };
 
@@ -284,6 +295,7 @@ export function ShotSearch({
   project_id,
   sample_id,
   annotations,
+  sortDescriptor,
   saveOnNavigate,
 }: SaveInfo) {
   const navigate = useNavigate();
@@ -304,8 +316,7 @@ export function ShotSearch({
             annotations,
             saveOnNavigate,
           );
-          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
-          navigate(NEXT_SAMPLE_URL);
+          navigateToSample(project_id, sample._id, navigate, sortDescriptor);
         } else {
           setErrorMessage("Shot not found!");
         }
@@ -332,8 +343,13 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { annotations, setAnnotations, visitedSampleIds, popVisitedSampleId } =
-    useSample();
+  const {
+    annotations,
+    setAnnotations,
+    visitedSampleIds,
+    popVisitedSampleId,
+    sortDescriptor,
+  } = useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
     <Flex alignItems="center" direction="column" gap="size-100">
@@ -350,6 +366,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           isDisabled={visitedSampleIds.length == 1}
           popVisitedSampleId={popVisitedSampleId}
           saveOnNavigate={SaveOnNavigate}
+          sortDescriptor={sortDescriptor}
         />
         <NextButton
           project_id={project_id}
@@ -357,6 +374,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           annotations={annotations}
           visitedSampleIds={visitedSampleIds}
           saveOnNavigate={SaveOnNavigate}
+          sortDescriptor={sortDescriptor}
         />
         <ClearButton setAnnotations={setAnnotations} />
       </ButtonGroup>
@@ -373,6 +391,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
         project_id={project_id}
         sample_id={sample_id}
         annotations={annotations}
+        sortDescriptor={sortDescriptor}
         saveOnNavigate={SaveOnNavigate}
       />
     </Flex>

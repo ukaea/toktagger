@@ -218,6 +218,14 @@ async def get_next_sample(
     visited_sample_ids: list[str] = Body(
         ..., description="The IDs of the samples already seen in this session."
     ),
+    sort_by: str = Query(
+        "_id",
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "descending",
+        description="Direction to sort responses, by default 'descending'",
+    ),
 ) -> Sample:
     """
     Get the next sample to annotate for this project, according to query strategy.
@@ -229,7 +237,12 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
+    samples = await utils.get_samples(
+        db_client,
+        project_id,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+    )
     annotations = await utils.get_annotations(db_client, project_id)
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
 

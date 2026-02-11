@@ -20,7 +20,6 @@ class QueryStrategy(ABC):
         samples: list[Sample],
         annotations: Optional[list[Annotation]] = None,
     ):
-        samples = sorted(samples, key=lambda s: s.shot_id)
         self.samples = samples
         self.annotations = annotations if annotations is not None else []
 

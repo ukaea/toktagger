@@ -27,6 +27,8 @@ import {
   DataParams,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
+import { SortDescriptor, SortDirection, Key } from "@react-types/shared";
+import { useSearchParams } from "react-router-dom";
 
 interface SampleContextType {
   project: Project | null;
@@ -39,6 +41,7 @@ interface SampleContextType {
   isLoading: boolean;
   visitedSampleIds: string[];
   error: string | null;
+  sortDescriptor: SortDescriptor;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
@@ -127,6 +130,18 @@ export function SampleProvider({
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+
+  const [searchParamsObj] = useSearchParams();
+  const [sortDescriptor] = useState<SortDescriptor | null>(() => {
+    const column: Key | null = searchParamsObj.get("sortColumn");
+    const raw_direction: string | null = searchParamsObj.get("sortDirection");
+    if (!column || !raw_direction) {
+      return null;
+    }
+    const direction: SortDirection =
+      (raw_direction as SortDirection) || "ascending";
+    return { column, direction };
+  });
 
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
@@ -345,6 +360,7 @@ export function SampleProvider({
     isLoading,
     visitedSampleIds,
     error,
+    sortDescriptor,
     setAnnotations,
     setPlotProps,
     setViewParams,

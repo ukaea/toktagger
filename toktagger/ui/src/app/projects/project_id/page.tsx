@@ -83,7 +83,9 @@ const SamplesTable = ({
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row href={`/ui/projects/${project_id}/samples/${item["id"]}`}>
+              <Row
+                href={`/ui/projects/${project_id}/samples/${item["id"]}?sortColumn=${sortDescriptor.column}&sortDirection=${sortDescriptor.direction}`}
+              >
                 <Cell>{item["shot_id"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
               </Row>
@@ -204,7 +206,10 @@ export default function ProjectView() {
                 <Flex gap="size-100" alignItems="center" marginTop="size-200">
                   <ImportButton project={project} />
                   <ExportButton project={project} />
-                  <JumpToNextButton project={project} />
+                  <JumpToNextButton
+                    project={project}
+                    sortDescriptor={sortDescriptor}
+                  />
                 </Flex>
                 <SearchField
                   label="Search By Shot ID"
