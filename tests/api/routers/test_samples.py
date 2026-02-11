@@ -185,6 +185,39 @@ async def test_get_next_sample_sequential(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_get_next_sample_sequential_reversed(api_client, setup_db):
+    # Sort by shot ID, descending
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/next?sort_by=shot_id&sort_direction=descending",
+        json=[],
+    )
+    assert response.status_code == 200
+    returned_sample = response.json()
+    # Should return me the sample with the last shot ID sequentially
+    assert returned_sample.get("shot_id") == 2
+
+    # Then also check ID and timestamp are returned - should have been added automatically
+    assert returned_sample.get("_id") == setup_db["sample_id_2"]
+    assert returned_sample.get("project_id") == setup_db["project_id_1"]
+    assert returned_sample.get("timestamp")
+
+    # Ask for next again, providing list of seen samples
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/next?sort_by=shot_id&sort_direction=descending",
+        json=[str(returned_sample.get("_id"))],
+    )
+    assert response.status_code == 200
+    returned_sample = response.json()
+    # Should return me the sample with the next shot ID sequentially
+    assert returned_sample.get("shot_id") == 1
+
+    # Then also check ID and timestamp are returned - should have been added automatically
+    assert returned_sample.get("_id") == setup_db["sample_id_1"]
+    assert returned_sample.get("project_id") == setup_db["project_id_1"]
+    assert returned_sample.get("timestamp")
+
+
+@pytest.mark.asyncio
 async def test_create_samples(api_client, setup_db, db_client):
     in_samples = [
         {
