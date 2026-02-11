@@ -474,3 +474,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
         ann for ann in annotations if ann["label"] == "Disruption"
     )
     assert round(disruption_annotation["time"], 6) == updated_disruption_time
+
+
+# TODO: Annotators
+# TODO: Model predict

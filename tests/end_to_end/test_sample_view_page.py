@@ -6,6 +6,10 @@ from tests.endpoints import (
     create_uda_samples,
 )
 import pytest
+import tempfile
+import json
+from toktagger.api.schemas.annotations import TimePoint, TimeRegion
+import requests
 
 
 def check_base_page(page):
@@ -200,5 +204,163 @@ def test_search_for_shot(request, data_loader, server_setup, page: Page):
     expect(page.get_by_text("Shot not found!")).to_be_visible()
 
 
+def test_import_annotations(sample_id: bool, server_setup, page: Page):
+    # Create a project
+    project_id = create_project("Test Project", "time-series", "parquet")
+    # And a sample
+    sample_ids = create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    # Navigate to samples page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Create a Time Point annotation using sample ID in schema
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as file:
+        annotations = [
+            {
+                "label": "Disruption",
+                "created_by": "manual",
+                "time": 71,
+            },
+            {
+                "label": "Flat Top",
+                "created_by": "manual",
+                "time_min": 50,
+                "time_max": 70,
+            },
+        ]
+
+        json.dump(annotations, file)
+        file.flush()
+
+        # Expand Import Annotations group
+        expect(page.get_by_role("button", name="Import Annotations")).to_be_visible()
+        page.get_by_role("button", name="Import Annotations").click()
+        expect(page.get_by_role("group", name="Import Annotations")).to_be_visible()
+
+        # Import annotation
+        with page.expect_file_chooser() as fc_info:
+            page.get_by_role("button", name="Import", exact=True).click()
+            file_chooser = fc_info.value
+            file_chooser.set_files(file.name)
+
+        # Check annotations visible
+        expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+        expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
+
+        expect(page.get_by_label("zone", exact=True)).to_have_count(1)
+        expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
+
+
+@pytest.mark.parametrize("all_samples", (True, False))
+def test_export_annotations(server_setup, page: Page, all_samples: bool):
+    # Create project
+    project_id = create_project("Test Project", "time-series", "parquet")
+    # And a sample
+    sample_ids = create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    # Add annotations
+    flat_top = TimeRegion(
+        label="Flat Top", created_by="peak_detection", time_min=50, time_max=70
+    )
+    disruption = TimePoint(label="Disruption", created_by="peak_detection", time=71)
+    response = requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_ids[0]}/annotations",
+        json=[model.model_dump(mode="json") for model in (flat_top, disruption)],
+    )
+    assert response.status_code == 200
+
+    ramp_up = TimeRegion(
+        label="Ramp Up", created_by="peak_detection", time_min=40, time_max=60
+    )
+    control_loss = TimePoint(label="Control Loss", created_by="peak_detection", time=61)
+    response = requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_ids[1]}/annotations",
+        json=[model.model_dump(mode="json") for model in (ramp_up, control_loss)],
+    )
+
+    assert response.status_code == 200
+
+    # Navigate to sample page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Expand Export Annotations dropdown
+    expect(page.get_by_role("button", name="Export Annotations")).to_be_visible()
+    page.get_by_role("button", name="Export Annotations").click()
+    expect(page.get_by_role("group", name="Export Annotations")).to_be_visible()
+
+    # Select either All or Current Sample
+    page.get_by_role("button", name="Show suggestions Export").click()
+    page.get_by_role(
+        "option", name="All" if all_samples else "Current Sample", exact=True
+    ).click()
+
+    # Press export annotations
+    with page.expect_download() as download_info:
+        page.get_by_role("button", name="Export", exact=True).click()
+
+        download = download_info.value
+        with tempfile.TemporaryDirectory() as tempd:
+            download.save_as(pathlib.Path(tempd).joinpath("annotations.json"))
+
+            with open(pathlib.Path(tempd).joinpath("annotations.json"), "r") as file:
+                annotations = json.load(file)
+
+    # Get flat top annotation
+    exported_flat_top = next(ann for ann in annotations if ann["label"] == "Flat Top")
+    # Check values are correct
+    assert exported_flat_top["time_min"] == 50
+    assert exported_flat_top["time_max"] == 70
+    assert exported_flat_top["shot_id"] == 10000
+    assert exported_flat_top["sample_id"] == sample_ids[0]
+
+    # Get disruption annotation
+    exported_disruption = next(
+        ann for ann in annotations if ann["label"] == "Disruption"
+    )
+    # Check values are correct
+    assert exported_disruption["time"] == 71
+    assert exported_disruption["shot_id"] == 10000
+    assert exported_disruption["sample_id"] == sample_ids[0]
+
+    # Get ramp up annotation
+    exported_ramp_up = next(
+        (ann for ann in annotations if ann["label"] == "Ramp Up"), None
+    )
+    if all_samples:
+        # Check values are correct
+        assert exported_ramp_up["time_min"] == 40
+        assert exported_ramp_up["time_max"] == 60
+        assert exported_ramp_up["shot_id"] == 10001
+        assert exported_ramp_up["sample_id"] == sample_ids[1]
+    else:
+        assert not exported_ramp_up
+
+    # Get control loss annotation
+    exported_control_loss = next(
+        (ann for ann in annotations if ann["label"] == "Control Loss"), None
+    )
+    if all_samples:
+        # Check values are correct
+        assert exported_control_loss["time"] == 61
+        assert exported_control_loss["shot_id"] == 10001
+        assert exported_control_loss["sample_id"] == sample_ids[1]
+    else:
+        assert not exported_control_loss
+
+
 # TODO: Test Next button with each query strategy
-# TODO:
+# Save
+# Save on navigate
+# Clear
+# Import
+# Export
