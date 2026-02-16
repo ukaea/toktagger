@@ -194,6 +194,10 @@ async def update_annotations(
     sample_id: str = Path(
         description="The ID of the sample to update annotations for."
     ),
+    validated: bool = Query(
+        None,
+        description="Whether to set sample to validated (useful if no annotations present).",
+    ),
 ):
     """
     Update the list of annotations to a given sample for a specified project. Will overwrite existing annotations.
@@ -222,7 +226,7 @@ async def update_annotations(
     )
 
     # Update sample to show that annotations are validated
-    if any(annotation.validated for annotation in annotations):
+    if validated or any(annotation.validated for annotation in annotations):
         await utils.update_sample(
             db_client=db_client,
             sample_id=sample_id,

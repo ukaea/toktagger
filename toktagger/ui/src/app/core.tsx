@@ -194,7 +194,7 @@ export async function saveSampleAnnotations(
     return annotation;
   });
 
-  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations?validated=True`;
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {

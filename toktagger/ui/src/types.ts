@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { boolean, z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
   project_id: z.string().nullable().default(null),
@@ -200,6 +200,7 @@ export const SampleSchema = z.object({
   project_id: z.string().optional(),
   shot_id: z.number(),
   data: SampleDataSchema,
+  validated_annotations: z.boolean(),
 });
 export type Sample = z.infer<typeof SampleSchema>;
 

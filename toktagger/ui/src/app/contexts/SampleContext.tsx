@@ -39,6 +39,7 @@ interface SampleContextType {
   viewParams: ViewParams;
   plotProps: PlotProps;
   isLoading: boolean;
+  isValidated: boolean | null;
   visitedSampleIds: string[];
   error: string | null;
   sortDescriptor: SortDescriptor;
@@ -48,6 +49,7 @@ interface SampleContextType {
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
+  setIsValidated: (validated: boolean) => void;
   popVisitedSampleId: () => string | null;
 }
 
@@ -157,6 +159,8 @@ export function SampleProvider({
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const [isValidated, setIsValidated] = useState<boolean | null>(null);
+
   const [visitedSampleIds, setvisitedSampleIds] = useState<string[]>(() => {
     const cached: string | null = sessionStorage.getItem(projectId);
     if (!cached) {
@@ -228,6 +232,7 @@ export function SampleProvider({
         setProject(projectData);
         setSample(sampleData);
         setAnnotations(dbAnnotations);
+        setIsValidated(sampleData.validated_annotations);
 
         setvisitedSampleIds((prev) => {
           if (prev.at(-1) === sampleId) return prev; // avoid duplicates
@@ -358,6 +363,7 @@ export function SampleProvider({
     viewParams,
     plotProps,
     isLoading,
+    isValidated,
     visitedSampleIds,
     error,
     sortDescriptor,
@@ -365,6 +371,7 @@ export function SampleProvider({
     setPlotProps,
     setViewParams,
     setDataParams,
+    setIsValidated,
     popVisitedSampleId,
   };
 
