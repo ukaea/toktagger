@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
   SearchField,
   InlineAlert,
-  Heading
+  Heading,
 } from "@adobe/react-spectrum";
 import { useCallback, useEffect, useState } from "react";
 import StepForward from "@spectrum-icons/workflow/StepForward";
@@ -243,7 +243,7 @@ function SaveButton({
   sample_id,
   annotations,
   saveOnNavigate: _saveOnNavigate,
-  setIsValidated
+  setIsValidated,
 }: SaveButtonInfo) {
   const handleClick = async () => {
     try {
@@ -251,7 +251,7 @@ function SaveButton({
       ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
         timeout: TOAST_TIMEOUT,
       });
-      setIsValidated(true)
+      setIsValidated(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       ToastQueue.negative(`Failed to save annotations: ${message}`, {
@@ -358,7 +358,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
     popVisitedSampleId,
     sortDescriptor,
     isValidated,
-    setIsValidated
+    setIsValidated,
   } = useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   return (
@@ -405,11 +405,23 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
         sortDescriptor={sortDescriptor}
         saveOnNavigate={SaveOnNavigate}
       />
-      { isValidated !== null && 
-        <InlineAlert variant={isValidated ? "positive" : "notice" } UNSAFE_style={{ paddingTop: "5px", paddingBottom: "5px", paddingLeft: "10px", paddingRight: "10px"}}>
-          <Heading>{isValidated ? "Annotations Validated" : "Annotations Not Validated"}</Heading>
+      {isValidated !== null && (
+        <InlineAlert
+          variant={isValidated ? "positive" : "notice"}
+          UNSAFE_style={{
+            paddingTop: "5px",
+            paddingBottom: "5px",
+            paddingLeft: "10px",
+            paddingRight: "10px",
+          }}
+        >
+          <Heading>
+            {isValidated
+              ? "Annotations Validated"
+              : "Annotations Not Validated"}
+          </Heading>
         </InlineAlert>
-      }
+      )}
     </Flex>
   );
 }

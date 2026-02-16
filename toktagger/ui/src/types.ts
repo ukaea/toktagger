@@ -1,4 +1,4 @@
-import { boolean, z } from "zod/v4";
+import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
   project_id: z.string().nullable().default(null),
