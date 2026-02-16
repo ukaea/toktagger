@@ -1,6 +1,5 @@
 import toktagger.api.core.query_strategy as query_strategy
 import pytest
-import random
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import TimePointOut
 import tests.db_definitions as db_definitions
@@ -62,14 +61,15 @@ def test_sequential_strategy(samples, annotations):
         assert next_sample == samples[i]
         visited_sample_ids.append(next_sample_id)
 
-    # Should say there are no more samples
-    with pytest.raises(RuntimeError, match="No more samples available!"):
-        next_sample = strategy.get_next_sample(visited_sample_ids)
+    # Should loop back to beginning
+    next_sample = strategy.get_next_sample(visited_sample_ids)
+    assert next_sample == samples[0]
 
 
 def test_random_strategy(samples, annotations):
-    random.seed(42)
-    strategy = query_strategy.RandomQueryStrategy(samples.copy(), annotations.copy())
+    strategy = query_strategy.RandomQueryStrategy(
+        samples.copy(), annotations.copy(), seed=42
+    )
 
     visited_sample_ids = []
     for i in range(len(samples)):
