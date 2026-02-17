@@ -92,6 +92,11 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
     );
   }
 
+  //  Prevent a stale render during route param transitions 
+  if (sample._id !== props.sampleId) {
+    return <LoadingView />;
+  }
+
   // Hard-block on loading for all tasks.
   if (isLoading && !data) return <LoadingView />;
 
