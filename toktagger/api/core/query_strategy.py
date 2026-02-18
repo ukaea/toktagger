@@ -68,7 +68,8 @@ class SequentialQueryStrategy(QueryStrategy):
         # Find index of last visited sample in samples list
         index = self._get_matching_sample(visited_sample_ids[-1])
         next_index = index + 1
-        next_index = next_index % len(self.samples)
+        if next_index == len(self.samples):
+            raise RuntimeError("No more samples available!")
 
         return self.samples[next_index]
 

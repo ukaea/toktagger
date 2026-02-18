@@ -61,9 +61,9 @@ def test_sequential_strategy(samples, annotations):
         assert next_sample == samples[i]
         visited_sample_ids.append(next_sample_id)
 
-    # Should loop back to beginning
-    next_sample = strategy.get_next_sample(visited_sample_ids)
-    assert next_sample == samples[0]
+    # Should say there are no more samples
+    with pytest.raises(RuntimeError, match="No more samples available!"):
+        next_sample = strategy.get_next_sample(visited_sample_ids)
 
 
 def test_random_strategy(samples, annotations):
