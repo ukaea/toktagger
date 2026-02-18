@@ -149,7 +149,6 @@ export default function ToolBar() {
     return null;
   }
 
-  const isVideo = project.task === TaskType.Video;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
   if (data && project.task == TaskType.TimeSeries) {
@@ -260,6 +259,11 @@ export default function ToolBar() {
         />
       ),
     });
+  } else if (data && project.task === TaskType.Video) {
+    tools.push({
+      name: "Video Tools",
+      component: <VideoToolbox />,
+    });
   }
 
   const refreshAnnotations = async () => {
@@ -323,27 +327,24 @@ export default function ToolBar() {
               </Disclosure>
             </Accordion>
           </Flex>
-          {(isVideo || tools.length > 0) && (
+          {tools.length > 0 && (
             <>
               <Flex justifyContent="center" alignItems="center">
                 <Header height="size-300" marginBottom="size-100">
                   <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
                 </Header>
               </Flex>
-              {isVideo ? (
-                <VideoToolbox />
-              ) : (
-                <Accordion allowsMultipleExpanded={true} width="100%">
-                  {tools.map((item, i) => (
-                    <Disclosure key={i}>
-                      <DisclosureTitle>
-                        <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                      </DisclosureTitle>
-                      <DisclosurePanel>{item.component}</DisclosurePanel>
-                    </Disclosure>
-                  ))}
-                </Accordion>
-              )}
+
+              <Accordion allowsMultipleExpanded={true} width="100%">
+                {tools.map((item, i) => (
+                  <Disclosure key={i}>
+                    <DisclosureTitle>
+                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                    </DisclosureTitle>
+                    <DisclosurePanel>{item.component}</DisclosurePanel>
+                  </Disclosure>
+                ))}
+              </Accordion>
             </>
           )}
         </Flex>
