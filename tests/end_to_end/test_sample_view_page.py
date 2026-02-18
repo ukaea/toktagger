@@ -359,8 +359,6 @@ def test_export_annotations(server_setup, page: Page, all_samples: bool):
 
 
 @pytest.mark.parametrize("num_annotations", [0, 1, 2])
-# TODO: Test Next button with each query strategy
-
 def test_save_button(server_setup, page: Page, num_annotations):
     # Create project
     project_id = create_project("Test Project", "time-series", "parquet")
