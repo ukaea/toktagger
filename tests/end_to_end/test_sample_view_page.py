@@ -12,6 +12,46 @@ from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 import requests
 
 
+def setup_annotations(page: Page, num_annotations: int):
+    # Create project
+    project_id = create_project("Test Project", "time-series", "parquet")
+    # And a sample
+    sample_id = create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )[0]
+
+    # If > 0 annotations, Add 1 pre-existing annotation
+    if num_annotations > 0:
+        flat_top = TimeRegion(
+            label="Flat Top",
+            created_by="peak_detection",
+            time_min=10,
+            time_max=20,
+            validateD=False,
+            uncertainty=0.9,
+        )
+        response = requests.put(
+            f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
+            json=[flat_top.model_dump(mode="json")],
+        )
+
+        assert response.status_code == 200
+
+    # Navigate to sample page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # If 2 annotations, add a new annotation via UI
+    if num_annotations == 2:
+        page.get_by_label("time-series").click(button="right")
+        page.get_by_role("menuitem", name="Add Time Point").click(force=True)
+        page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
+
+    return page, project_id, sample_id
+
+
 def check_base_page(page):
     # Expect page is called TokTagger
     expect(page).to_have_title("TokTagger")
@@ -359,42 +399,9 @@ def test_export_annotations(server_setup, page: Page, all_samples: bool):
 
 
 @pytest.mark.parametrize("num_annotations", [0, 1, 2])
-def test_save_button(server_setup, page: Page, num_annotations):
-    # Create project
-    project_id = create_project("Test Project", "time-series", "parquet")
-    # And a sample
-    sample_id = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )[0]
-
-    # If > 0 annotations, Add 1 pre-existing annotation
-    if num_annotations > 0:
-        flat_top = TimeRegion(
-            label="Flat Top",
-            created_by="peak_detection",
-            time_min=10,
-            time_max=20,
-            validateD=False,
-            uncertainty=0.9,
-        )
-        response = requests.put(
-            f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
-            json=[flat_top.model_dump(mode="json")],
-        )
-
-        assert response.status_code == 200
-
-    # Navigate to sample page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check basic structure of page is correct
-    check_base_page(page)
-
-    # If 2 annotations, add a new annotation via UI
-    if num_annotations == 2:
-        page.get_by_label("time-series").click(button="right")
-        page.get_by_role("menuitem", name="Add Time Point").click(force=True)
-        page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
+def test_save_button(server_setup, page: Page, num_annotations: int):
+    # Create annotations
+    page, project_id, sample_id = setup_annotations(page, num_annotations)
 
     # Click save
     page.get_by_role("button", name="Save").click()
@@ -424,6 +431,78 @@ def test_save_button(server_setup, page: Page, num_annotations):
     assert sample["validated_annotations"]
 
 
-# Save
-# Save on navigate
-# Clear
+@pytest.mark.parametrize("num_annotations", [0, 1, 2])
+@pytest.mark.parametrize("save_on_navigate", [True, False])
+@pytest.mark.parametrize("navigate_direction", ["Previous", "Next"])
+def test_save_on_navigate(
+    server_setup,
+    page: Page,
+    num_annotations: int,
+    save_on_navigate: bool,
+    navigate_direction: str,
+):
+    # Create annotations
+    page, project_id, sample_id = setup_annotations(page, num_annotations)
+
+    # Disable Save on Navigate if required
+    expect(page.get_by_role("checkbox", name="Save on Navigate")).to_be_checked()
+    if not save_on_navigate:
+        page.get_by_role("checkbox", name="Save on Navigate").click()
+        expect(
+            page.get_by_role("checkbox", name="Save on Navigate")
+        ).not_to_be_checked()
+
+    # Go to next/previous sample
+    page.get_by_role("button", name=f"{navigate_direction}").click()
+
+    # Check if annotations saved
+    response = requests.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    )
+    assert response.status_code == 200
+    annotations = response.json()
+    if save_on_navigate:
+        assert len(annotations) == num_annotations
+    else:
+        assert len(annotations) == (
+            0 if num_annotations == 0 else 1
+        )  # Because it shouldnt have saved the human annotation if num_annotations=2
+
+    # Check all marked as validated if saved
+    for annotation in annotations:
+        assert annotation["validated"] == (True if save_on_navigate else False)
+
+    # Check sample is now marked as validated if saved
+    response = requests.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}"
+    )
+    assert response.status_code == 200
+    sample = response.json()
+    assert sample["validated_annotations"] == (True if save_on_navigate else False)
+
+
+def test_clear_button(server_setup, page: Page):
+    page, project_id, sample_id = setup_annotations(page, 2)
+
+    # Check both annotations visible
+    expect(page.get_by_label("vspan").first).to_be_visible()
+    expect(page.get_by_label("zone").first).to_be_visible()
+
+    # Press Clear
+    page.get_by_role("button", name="Clear").click()
+
+    # Check no annotations visible
+    expect(page.get_by_label("vspan").first).to_be_hidden()
+    expect(page.get_by_label("zone").first).to_be_hidden()
+
+    # Press save, check no annotations in db
+    page.get_by_role("button", name="Save").click()
+
+    # Pull from backend, check correct number of annotations saved
+    response = requests.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    )
+    assert response.status_code == 200
+    annotations = response.json()
+
+    assert len(annotations) == 0
