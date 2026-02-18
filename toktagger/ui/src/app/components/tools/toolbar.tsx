@@ -140,11 +140,19 @@ export default function ToolBar() {
   }
 
   if (project.task === TaskType.Video) {
+    const project_id = project._id;
+    const sample_id = sample._id;
+
+    if (!project_id || !sample_id) {
+      return null;
+    }
+    
     const refreshAnnotations = async () => {
       const dbAnnotations = await getAnnotationsForSample(
-        project._id,
-        sample._id,
+        project_id,
+        sample_id,
       );
+
       setAnnotations(() => dbAnnotations);
     };
 
