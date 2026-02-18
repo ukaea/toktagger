@@ -251,7 +251,11 @@ export function VideoToolbox() {
           </DisclosurePanel>
         </Disclosure>
 
-        <Disclosure defaultExpanded>
+        <Disclosure
+          defaultExpanded
+          // Remove the trailing divider line at the bottom of the inner accordion.
+          UNSAFE_style={{ borderBottom: "none" }}
+        >
           <DisclosureTitle>
             <span style={{ fontSize: "0.8rem" }}>Instances</span>
           </DisclosureTitle>
