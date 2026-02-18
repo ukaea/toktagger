@@ -27,8 +27,6 @@ import {
   DataParams,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
-import { SortDescriptor, SortDirection, Key } from "@react-types/shared";
-import { useSearchParams } from "react-router-dom";
 
 interface SampleContextType {
   project: Project | null;
@@ -42,7 +40,6 @@ interface SampleContextType {
   isValidated: boolean | null;
   visitedSampleIds: string[];
   error: string | null;
-  sortDescriptor: SortDescriptor;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
@@ -133,18 +130,6 @@ export function SampleProvider({
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
-  const [searchParamsObj] = useSearchParams();
-  const [sortDescriptor] = useState<SortDescriptor | null>(() => {
-    const column: Key | null = searchParamsObj.get("sortColumn");
-    const raw_direction: string | null = searchParamsObj.get("sortDirection");
-    if (!column || !raw_direction) {
-      return null;
-    }
-    const direction: SortDirection =
-      (raw_direction as SortDirection) || "ascending";
-    return { column, direction };
-  });
-
   const [viewParams, setViewParams] = useState<ViewParams>({
     name: "identity",
   });
@@ -161,7 +146,7 @@ export function SampleProvider({
 
   const [isValidated, setIsValidated] = useState<boolean | null>(null);
 
-  const [visitedSampleIds, setvisitedSampleIds] = useState<string[]>(() => {
+  const [visitedSampleIds, setVisitedSampleIds] = useState<string[]>(() => {
     const cached: string | null = sessionStorage.getItem(projectId);
     if (!cached) {
       return [];
@@ -176,7 +161,7 @@ export function SampleProvider({
     const popped: string = visitedSampleIds.at(-2)!; // since the current sample will be at -1
     const updated: string[] = visitedSampleIds.slice(0, -1);
     sessionStorage.setItem(projectId, JSON.stringify(updated));
-    setvisitedSampleIds(updated);
+    setVisitedSampleIds(updated);
     return popped;
   };
 
@@ -234,7 +219,7 @@ export function SampleProvider({
         setAnnotations(dbAnnotations);
         setIsValidated(sampleData.validated_annotations);
 
-        setvisitedSampleIds((prev) => {
+        setVisitedSampleIds((prev) => {
           if (prev.at(-1) === sampleId) return prev; // avoid duplicates
           const updated: string[] = [...prev, sampleId];
           sessionStorage.setItem(projectId, JSON.stringify(updated));
@@ -366,7 +351,6 @@ export function SampleProvider({
     isValidated,
     visitedSampleIds,
     error,
-    sortDescriptor,
     setAnnotations,
     setPlotProps,
     setViewParams,

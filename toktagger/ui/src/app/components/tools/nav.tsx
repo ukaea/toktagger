@@ -19,10 +19,14 @@ import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import SaveFloppy from "@spectrum-icons/workflow/SaveFloppy";
 import Delete from "@spectrum-icons/workflow/Delete";
 import { getShotSample, saveSampleAnnotations } from "@/app/core";
-import { useNavigate, NavigateFunction } from "react-router-dom";
+import {
+  useNavigate,
+  NavigateFunction,
+  useSearchParams,
+} from "react-router-dom";
 import { useSample } from "@/app/contexts/SampleContext";
 import { getNextSample } from "@/app/core";
-import type { SortDescriptor } from "@react-types/shared";
+import type { SortDescriptor, SortDirection, Key } from "@react-types/shared";
 
 const TOAST_TIMEOUT = 5000;
 
@@ -86,8 +90,8 @@ type NextButtonInfo = ButtonInfo & {
 
 type PreviousButtonInfo = ButtonInfo & {
   isDisabled: boolean;
-  popVisitedSampleId: () => string | null;
   sortDescriptor: SortDescriptor | null;
+  popVisitedSampleId: () => string | null;
 };
 
 function NextButton({
@@ -96,8 +100,8 @@ function NextButton({
   annotations,
   setIsValidated,
   visitedSampleIds,
-  saveOnNavigate,
   sortDescriptor,
+  saveOnNavigate,
 }: NextButtonInfo) {
   const navigate = useNavigate();
 
@@ -300,7 +304,7 @@ type SaveInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
-  sortDescriptor: SortDescriptor;
+  sortDescriptor: SortDescriptor | null;
   saveOnNavigate?: boolean;
 };
 
@@ -361,10 +365,22 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
     setAnnotations,
     visitedSampleIds,
     popVisitedSampleId,
-    sortDescriptor,
     setIsValidated,
   } = useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
+
+  const [searchParamsObj] = useSearchParams();
+  const [sortDescriptor] = useState<SortDescriptor | null>(() => {
+    const column: Key | null = searchParamsObj.get("sortColumn");
+    const raw_direction: string | null = searchParamsObj.get("sortDirection");
+    if (!column || !raw_direction) {
+      return null;
+    }
+    const direction: SortDirection =
+      (raw_direction as SortDirection) || "ascending";
+    return { column, direction };
+  });
+
   return (
     <Flex alignItems="center" direction="column" gap="size-100">
       <ButtonGroup>
