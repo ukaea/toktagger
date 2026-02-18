@@ -358,9 +358,74 @@ def test_export_annotations(server_setup, page: Page, all_samples: bool):
         assert not exported_control_loss
 
 
+@pytest.mark.parametrize("num_annotations", [0, 1, 2])
 # TODO: Test Next button with each query strategy
+
+def test_save_button(server_setup, page: Page, num_annotations):
+    # Create project
+    project_id = create_project("Test Project", "time-series", "parquet")
+    # And a sample
+    sample_id = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )[0]
+
+    # If > 0 annotations, Add 1 pre-existing annotation
+    if num_annotations > 0:
+        flat_top = TimeRegion(
+            label="Flat Top",
+            created_by="peak_detection",
+            time_min=10,
+            time_max=20,
+            validateD=False,
+            uncertainty=0.9,
+        )
+        response = requests.put(
+            f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
+            json=[flat_top.model_dump(mode="json")],
+        )
+
+        assert response.status_code == 200
+
+    # Navigate to sample page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # If 2 annotations, add a new annotation via UI
+    if num_annotations == 2:
+        page.get_by_label("time-series").click(button="right")
+        page.get_by_role("menuitem", name="Add Time Point").click(force=True)
+        page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
+
+    # Click save
+    page.get_by_role("button", name="Save").click()
+
+    # Check 'Saved annotations' text visible
+    expect(page.get_by_text(f"Saved {num_annotations} annotations!")).to_be_visible()
+
+    # Pull from backend, check correct number of annotations saved
+    response = requests.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    )
+    assert response.status_code == 200
+    annotations = response.json()
+
+    assert len(annotations) == num_annotations
+
+    # Check all marked as validated:
+    for annotation in annotations:
+        assert annotation["validated"]
+
+    # Check sample is now marked as validated
+    response = requests.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}"
+    )
+    assert response.status_code == 200
+    sample = response.json()
+    assert sample["validated_annotations"]
+
+
 # Save
 # Save on navigate
 # Clear
-# Import
-# Export
