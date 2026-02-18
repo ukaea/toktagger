@@ -193,7 +193,13 @@ def main():
 
     # JET data
     project_id = create_project(
-        "SAL Disruption Project", "time-series", "sal", query_strategy="sequential"
+        "SAL Disruption Project",
+        "time-series",
+        "sal",
+        query_strategy="sequential",
+        time_min=38,
+        time_max=None,
+        min_time_step=0.0001,
     )
     shot_ids = [87737]
     create_sal_samples(project_id, shot_ids)

@@ -194,7 +194,8 @@ class TabularDataLoader(DataLoader):
         elif item.file_name.endswith(".parquet"):
             df = pd.read_parquet(item.file_name, columns=item.signal_names)
         elif item.file_name.endswith(".json"):
-            df = pd.read_json(item.file_name, columns=item.signal_names)
+            df = pd.read_json(item.file_name)
+            df = df[item.signal_names]
         elif item.file_name.endswith(".xlsx"):
             df = pd.read_excel(item.file_name, usecols=item.signal_names)
         elif item.file_name.endswith(".feather"):
@@ -364,6 +365,12 @@ class SALDataLoader(DataLoader):
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
 
+        has_user_credentials = Path("~/.sal/credentials").expanduser().exists()
+        if not has_user_credentials:
+            raise DataLoaderError(
+                "SAL authentication credentials not found. Please set up SAL credentials at '~/.sal/credentials' to use the SAL data loader."
+            )
+
         results = {}
         for name in sample_data.signal_names:
             full_name = f"pulse/{sample.shot_id}/{name}"
@@ -391,10 +398,17 @@ class SALDataLoader(DataLoader):
                     data = np.interp(time_base, time, data)
                     time = time_base
 
+                print(time_min, time_max, min_time_step)
+
                 item = TimeSeriesData(time=time, values=data)
                 results[name] = item
             except Exception:
                 results[name] = None
+
+        if all(values is None for values in results.values()):
+            raise DataLoaderError(
+                f"Could not load any signals for shot ID '{sample.shot_id}'. Check SAL connectivity and signal names."
+            )
 
         return MultiVariateTimeSeriesData(values=results)
 
