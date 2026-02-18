@@ -31,6 +31,9 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
 
   useEffect(() => {
     const scheduleTask = async () => {
+      if (!selectedModel) {
+        return;
+      }
       if (!isEnabled) {
         // Remove previous annotations from this model
         setAnnotations((previousAnnotations: Annotations) => {
@@ -40,9 +43,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           );
           return otherAnnotations;
         });
-      } else if (selectedModel == null) {
-        return;
-      }
+        return
+      };
       const response = await startSamplePredictions(
         project_id,
         sample_id,
@@ -63,16 +65,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (taskId == null || !isEnabled) {
-        // Remove previous annotations from this model
-        setAnnotations((previousAnnotations: Annotations) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) => annotation.created_by !== selectedModel,
-          );
-          return otherAnnotations;
-        });
-        return;
-      }
+      if (!taskId || !selectedModel || !isEnabled) return;
 
       let pollCounter = 0;
       // Poll for result from GET predictions endpoint
@@ -104,6 +97,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
               (annotation: Annotation) =>
                 annotation.created_by !== selectedModel,
             );
+            console.log("payload being set", payload)
+            console.log("concatted", otherAnnotations.concat(payload))
             return otherAnnotations.concat(payload);
           });
           clearInterval(interval);

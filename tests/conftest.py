@@ -218,15 +218,15 @@ async def setup_db_small(db_client):
 def setup_model_samples():
     # Create sample data for training / predicting a Disruption model
     samples = []
-    for i in range(10000, 10020):
+    for i in range(9980, 10000):
         # Generate sample data
-        disruption_time = random.randint(80, 120)
+        disruption_time = random.randint(80, 100)
         annotation = TimePointBatch(
             shot_id=i,
             validated=True,
             label="Disruption",
             time=disruption_time,
-            created_by="manual" if i < 10005 else "disruption_cnn",
+            created_by="manual" if i < 9985 else "disruption_cnn",
         )
 
         samples.append(
@@ -236,7 +236,7 @@ def setup_model_samples():
                     file_name=f"{i}.parquet",
                     type="parquet",
                 ),
-                annotations=[annotation] if i < 10010 else None,
+                annotations=[annotation] if i < 9990 else None,
             )
         )
 

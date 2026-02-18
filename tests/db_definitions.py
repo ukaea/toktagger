@@ -39,8 +39,8 @@ class MockDisruptionCNN(Model):
                 TimePoint(
                     validated=False,
                     uncertainty=random.random(),
-                    label=self.id,
-                    time=random.randint(80, 120),
+                    label="Disruption",
+                    time=random.randint(80, 100),
                     created_by=self.type,
                 )
             ]

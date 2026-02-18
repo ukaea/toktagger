@@ -1,9 +1,6 @@
 from playwright.sync_api import Page, expect
 import pathlib
-from tests.endpoints import (
-    create_project,
-    create_local_samples,
-)
+from tests.endpoints import create_project, create_local_samples, create_model_samples
 import pytest
 import requests
 import time
@@ -525,4 +522,96 @@ def test_timeseries_annotator(server_setup, page: Page):
     expect(page.get_by_label("zone", exact=True)).to_have_count(1)
 
 
-# TODO: Model predict
+def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page):
+    # Create Project
+    project_id, sample_ids = create_model_samples(setup_model_samples)
+
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    sample_id = ids[0]
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # Click on model train modal
+    page.get_by_role("button", name="Train ML Model").click()
+
+    # Check modal has opened
+    expect(page.get_by_role("heading", name="Train ML Model")).to_be_visible()
+    expect(page.get_by_role("combobox", name="Select Model Type")).to_be_visible()
+    expect(page.get_by_role("button", name="Close")).to_be_visible()
+    expect(page.get_by_role("button", name="Train", exact=True)).to_be_visible()
+
+    # Click on dropdown box, check 'disruption_cnn' is shown
+    page.get_by_role("button", name="Select Model Type").click()
+    expect(
+        page.get_by_role("option", name="disruption_cnn", exact=True)
+    ).to_be_visible()
+    expect(
+        page.get_by_role("option", name="mock_disruption_cnn", exact=True)
+    ).to_be_visible()
+    page.get_by_role("option", name="mock_disruption_cnn", exact=True).click()
+
+    # Click train, should get accepted message
+    page.get_by_role("button", name="Train", exact=True).click()
+    expect(page.get_by_text("Model training added to job queue!")).to_be_visible()
+
+    # Close modal, check it disappears
+    page.get_by_role("button", name="Close", exact=True).click()
+
+    expect(page.get_by_role("heading", name="Train ML Model")).to_be_hidden()
+    expect(page.get_by_role("combobox", name="Select Model Type")).to_be_hidden()
+    expect(page.get_by_role("button", name="Close")).to_be_hidden()
+    expect(page.get_by_role("button", name="Train", exact=True)).to_be_hidden()
+
+    # Open predict modal, check structure is correct
+    page.get_by_role("button", name="Create Predictions from ML Model").click()
+    modal = page.get_by_role("dialog", name="Create Predictions from ML Model")
+
+    expect(
+        page.get_by_role("heading", name="Create Predictions from ML Model")
+    ).to_be_visible()
+    expect(modal.get_by_role("textbox", name="Number of Predictions")).to_be_visible()
+    expect(
+        modal.get_by_role("button", name="Cancel Training", exact=True)
+    ).to_be_visible()
+    expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_visible()
+    expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_disabled()
+    expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
+
+    # Check entry is there for newly trained model, wait for it to complete
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_disruption_cnn")
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
+
+    # Close modal
+    modal.get_by_role("button", name="Close", exact=True).click()
+
+    # Expand Model Predict in toolbar
+    expect(page.get_by_role("button", name="Model Prediction")).to_be_visible()
+    page.get_by_role("button", name="Model Prediction").click()
+    model_predict = page.get_by_role("group", name="Model Prediction")
+    expect(model_predict).to_be_visible()
+    model_predict.get_by_role("switch", name="Enable Tool").click()
+
+    # Choose mock_disruption_cnn
+    model_predict.get_by_role(
+        "button", name="Show suggestions Select Model Type"
+    ).click()
+    page.get_by_role("option", name="mock_disruption_cnn").click()
+
+    # Should generate a new prediction after a short time
+    expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
+
+    # Check added to list
+    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+
+    # Disable tool, it should disappear
+    model_predict.get_by_role("switch", name="Enable Tool").click()
+    expect(page.get_by_label("vspan", exact=True)).to_have_count(0)
+
+    # Enable tool, it should reappear
+    model_predict.get_by_role("switch", name="Enable Tool").click()
+    expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
