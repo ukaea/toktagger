@@ -14,7 +14,7 @@ import {
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
-import { V2_LABELS } from "./types";
+import { useSample } from "@/app/contexts/SampleContext";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
@@ -93,6 +93,8 @@ function compareProfiles(
 
 export function VideoToolbox() {
   const session = useVideoSession();
+  const { annotationLabels } = useSample();
+  const labels = annotationLabels;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
 
@@ -111,14 +113,14 @@ export function VideoToolbox() {
   }, []);
 
   const classItems = useMemo(() => {
-    return V2_LABELS.map((c) => ({ name: c.name }));
-  }, []);
+    return labels.map((c) => ({ name: c.name }));
+  }, [labels]);
 
   const classIdByName = useMemo(() => {
     const map = new Map<string, number>();
-    for (const c of V2_LABELS) map.set(c.name, c.id);
+    for (const c of labels) map.set(c.name, c.id);
     return map;
-  }, []);
+  }, [labels]);
 
   const profiles = useMemo(() => {
     const arr = session.instances.map((inst) => ({

@@ -27,6 +27,7 @@ import {
   DataParams,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
+import { class_labels } from "@/app/video/components/types";
 
 interface SampleContextType {
   project: Project | null;
@@ -36,6 +37,7 @@ interface SampleContextType {
   dataParams: DataParams;
   viewParams: ViewParams;
   plotProps: PlotProps;
+  annotationLabels: { id: number; name: string }[];
   isLoading: boolean;
   error: string | null;
   setAnnotations: (
@@ -298,6 +300,8 @@ export function SampleProvider({
     refreshData();
   }, [projectId, sampleId, dataParams, viewParams, plotProps]);
 
+  const annotationLabels = project?.task === TaskType.Video ? class_labels : [];
+
   const value: SampleContextType = {
     project,
     sample,
@@ -306,6 +310,7 @@ export function SampleProvider({
     dataParams,
     viewParams,
     plotProps,
+    annotationLabels,
     isLoading,
     error,
     setAnnotations,

@@ -63,7 +63,7 @@ export type VideoBoundingBox = {
  * Supported label set for this UI.
  * These ids are used when exporting to backend formats that expect a numeric class id.
  */
-export const V2_LABELS: { id: number; name: string }[] = [
+export const class_labels: { id: number; name: string }[] = [
   { id: 1, name: "UFO" },
   { id: 2, name: "Minor UFO" },
   { id: 3, name: "Major UFO" },
@@ -75,7 +75,7 @@ export const V2_LABELS: { id: number; name: string }[] = [
 /** Resolve a human label name to a numeric class id (defaults to 1). */
 export function classIdForName(className: string): number {
   const key = (className || "").trim().toLowerCase();
-  const hit = V2_LABELS.find((c) => c.name.toLowerCase() === key);
+  const hit = class_labels.find((c) => c.name.toLowerCase() === key);
   return hit?.id ?? 1;
 }
 
