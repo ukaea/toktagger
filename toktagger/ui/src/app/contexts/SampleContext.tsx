@@ -38,7 +38,6 @@ interface SampleContextType {
   plotProps: PlotProps;
   isLoading: boolean;
   isValidated: boolean | null;
-  visitedSampleIds: string[];
   error: string | null;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
@@ -47,7 +46,6 @@ interface SampleContextType {
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
   setIsValidated: (validated: boolean) => void;
-  popVisitedSampleId: () => string | null;
 }
 
 const SampleContext = createContext<SampleContextType | undefined>(undefined);
@@ -146,25 +144,6 @@ export function SampleProvider({
 
   const [isValidated, setIsValidated] = useState<boolean | null>(null);
 
-  const [visitedSampleIds, setVisitedSampleIds] = useState<string[]>(() => {
-    const cached: string | null = sessionStorage.getItem(projectId);
-    if (!cached) {
-      return [];
-    }
-    return JSON.parse(cached);
-  });
-
-  const popVisitedSampleId = (): string | null => {
-    if (visitedSampleIds.length < 2) {
-      return null;
-    }
-    const popped: string = visitedSampleIds.at(-2)!; // since the current sample will be at -1
-    const updated: string[] = visitedSampleIds.slice(0, -1);
-    sessionStorage.setItem(projectId, JSON.stringify(updated));
-    setVisitedSampleIds(updated);
-    return popped;
-  };
-
   const [error, setError] = useState<string | null>(null);
 
   const lastGoodVideoFrameRef = useRef<number | null>(null);
@@ -218,13 +197,6 @@ export function SampleProvider({
         setSample(sampleData);
         setAnnotations(dbAnnotations);
         setIsValidated(sampleData.validated_annotations);
-
-        setVisitedSampleIds((prev) => {
-          if (prev.at(-1) === sampleId) return prev; // avoid duplicates
-          const updated: string[] = [...prev, sampleId];
-          sessionStorage.setItem(projectId, JSON.stringify(updated));
-          return updated;
-        });
 
         let params = viewParams;
         if (projectData.task === TaskType.Spectrogram) {
@@ -349,14 +321,12 @@ export function SampleProvider({
     plotProps,
     isLoading,
     isValidated,
-    visitedSampleIds,
     error,
     setAnnotations,
     setPlotProps,
     setViewParams,
     setDataParams,
     setIsValidated,
-    popVisitedSampleId,
   };
 
   return (

@@ -25,6 +25,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import { getNextSample } from "@/app/core";
 import type { SortDescriptor, SortDirection, Key } from "@react-types/shared";
 
@@ -360,13 +361,10 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const {
-    annotations,
-    setAnnotations,
-    visitedSampleIds,
-    popVisitedSampleId,
-    setIsValidated,
-  } = useSample();
+  const { annotations, setAnnotations, setIsValidated } = useSample();
+
+  const { visitedSampleIds, popVisitedSampleId } = useSampleHistory();
+
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
 
   const [searchParamsObj] = useSearchParams();
