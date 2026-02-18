@@ -12,8 +12,6 @@ import {
   Tooltip,
   TooltipTrigger,
   SearchField,
-  InlineAlert,
-  Heading,
 } from "@adobe/react-spectrum";
 import { useCallback, useEffect, useState } from "react";
 import StepForward from "@spectrum-icons/workflow/StepForward";
@@ -77,6 +75,7 @@ type ButtonInfo = {
   project_id: string;
   sample_id: string;
   annotations: Annotation[];
+  setIsValidated: (validated: boolean) => void;
   saveOnNavigate?: boolean;
 };
 
@@ -91,14 +90,11 @@ type PreviousButtonInfo = ButtonInfo & {
   sortDescriptor: SortDescriptor | null;
 };
 
-type SaveButtonInfo = ButtonInfo & {
-  setIsValidated: (validated: boolean) => void;
-};
-
 function NextButton({
   project_id,
   sample_id,
   annotations,
+  setIsValidated,
   visitedSampleIds,
   saveOnNavigate,
   sortDescriptor,
@@ -112,6 +108,9 @@ function NextButton({
       annotations,
       saveOnNavigate,
     );
+    if (saveOnNavigate) {
+      setIsValidated(true);
+    }
     await navigateToNextSample(
       project_id,
       navigate,
@@ -124,6 +123,7 @@ function NextButton({
     annotations,
     navigate,
     saveOnNavigate,
+    setIsValidated,
     visitedSampleIds,
     sortDescriptor,
   ]);
@@ -178,6 +178,7 @@ function PreviousButton({
   project_id,
   sample_id,
   annotations,
+  setIsValidated,
   isDisabled,
   popVisitedSampleId,
   saveOnNavigate,
@@ -192,6 +193,9 @@ function PreviousButton({
       annotations,
       saveOnNavigate,
     );
+    if (saveOnNavigate) {
+      setIsValidated(true);
+    }
 
     const previous_sample_id: string | null = popVisitedSampleId();
 
@@ -210,6 +214,7 @@ function PreviousButton({
     saveOnNavigate,
     popVisitedSampleId,
     sortDescriptor,
+    setIsValidated,
   ]);
 
   useEffect(() => {
@@ -242,9 +247,9 @@ function SaveButton({
   project_id,
   sample_id,
   annotations,
-  saveOnNavigate: _saveOnNavigate,
   setIsValidated,
-}: SaveButtonInfo) {
+  saveOnNavigate: _saveOnNavigate,
+}: ButtonInfo) {
   const handleClick = async () => {
     try {
       await saveSampleAnnotations(project_id, sample_id, annotations, true);
@@ -357,7 +362,6 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
     visitedSampleIds,
     popVisitedSampleId,
     sortDescriptor,
-    isValidated,
     setIsValidated,
   } = useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
@@ -374,6 +378,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
+          setIsValidated={setIsValidated}
           isDisabled={visitedSampleIds.length == 1}
           popVisitedSampleId={popVisitedSampleId}
           saveOnNavigate={SaveOnNavigate}
@@ -383,6 +388,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           project_id={project_id}
           sample_id={sample_id}
           annotations={annotations}
+          setIsValidated={setIsValidated}
           visitedSampleIds={visitedSampleIds}
           saveOnNavigate={SaveOnNavigate}
           sortDescriptor={sortDescriptor}
@@ -405,23 +411,6 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
         sortDescriptor={sortDescriptor}
         saveOnNavigate={SaveOnNavigate}
       />
-      {isValidated !== null && (
-        <InlineAlert
-          variant={isValidated ? "positive" : "notice"}
-          UNSAFE_style={{
-            paddingTop: "5px",
-            paddingBottom: "5px",
-            paddingLeft: "10px",
-            paddingRight: "10px",
-          }}
-        >
-          <Heading>
-            {isValidated
-              ? "Annotations Validated"
-              : "Annotations Not Validated"}
-          </Heading>
-        </InlineAlert>
-      )}
     </Flex>
   );
 }
