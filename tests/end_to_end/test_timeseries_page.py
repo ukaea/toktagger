@@ -550,9 +550,9 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
         page.get_by_role("option", name="disruption_cnn", exact=True)
     ).to_be_visible()
     expect(
-        page.get_by_role("option", name="mock_disruption_cnn", exact=True)
+        page.get_by_role("option", name="mock_timeseries_cnn", exact=True)
     ).to_be_visible()
-    page.get_by_role("option", name="mock_disruption_cnn", exact=True).click()
+    page.get_by_role("option", name="mock_timeseries_cnn", exact=True).click()
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
@@ -582,7 +582,7 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
     expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
 
     # Check entry is there for newly trained model, wait for it to complete
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_disruption_cnn")
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_timeseries_cnn")
     expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
     expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
 
@@ -596,22 +596,35 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
     expect(model_predict).to_be_visible()
     model_predict.get_by_role("switch", name="Enable Tool").click()
 
-    # Choose mock_disruption_cnn
+    # Choose mock_timeseries_cnn
     model_predict.get_by_role(
         "button", name="Show suggestions Select Model Type"
     ).click()
-    page.get_by_role("option", name="mock_disruption_cnn").click()
+    page.get_by_role("option", name="mock_timeseries_cnn").click()
 
-    # Should generate a new prediction after a short time
+    # Should generate a new set of predictions after a short time
     expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
+    expect(page.get_by_label("zone", exact=True)).to_have_count(2)
 
     # Check added to list
     expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+    expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_visible()
+    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
 
     # Disable tool, it should disappear
     model_predict.get_by_role("switch", name="Enable Tool").click()
     expect(page.get_by_label("vspan", exact=True)).to_have_count(0)
+    expect(page.get_by_label("zone", exact=True)).to_have_count(0)
+
+    expect(page.get_by_role("rowheader", name="Disruption")).to_be_hidden()
+    expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_hidden()
+    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_hidden()
 
     # Enable tool, it should reappear
     model_predict.get_by_role("switch", name="Enable Tool").click()
     expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
+    expect(page.get_by_label("zone", exact=True)).to_have_count(2)
+
+    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
+    expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_visible()
+    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()

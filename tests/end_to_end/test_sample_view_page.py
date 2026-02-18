@@ -244,7 +244,7 @@ def test_search_for_shot(request, data_loader, server_setup, page: Page):
     expect(page.get_by_text("Shot not found!")).to_be_visible()
 
 
-def test_import_annotations(sample_id: bool, server_setup, page: Page):
+def test_import_annotations(server_setup, page: Page):
     # Create a project
     project_id = create_project("Test Project", "time-series", "parquet")
     # And a sample

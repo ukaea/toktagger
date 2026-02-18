@@ -617,9 +617,9 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
         page.get_by_role("option", name="disruption_cnn", exact=True)
     ).to_be_visible()
     expect(
-        page.get_by_role("option", name="mock_disruption_cnn", exact=True)
+        page.get_by_role("option", name="mock_timeseries_cnn", exact=True)
     ).to_be_visible()
-    page.get_by_role("option", name="mock_disruption_cnn", exact=True).click()
+    page.get_by_role("option", name="mock_timeseries_cnn", exact=True).click()
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
@@ -649,7 +649,7 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
 
     # Check entry is there for newly trained model
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_disruption_cnn")
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_timeseries_cnn")
     expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
     expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
 
@@ -665,7 +665,7 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     )
 
     # Select our model from the list
-    modal.get_by_role("checkbox", name="Select mock_disruption_cnn").click()
+    modal.get_by_role("checkbox", name="Select mock_timeseries_cnn").click()
 
     # Check Predict button has been enabled, click it
     expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_enabled()
@@ -683,9 +683,9 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     # Wait for a short time
     time.sleep(1)
 
-    # Check 10 non-validated predictions added
+    # Check 10 * 3 non-validated predictions added
     response = requests.get(
         f"http://localhost:8002/projects/{project_id}/annotations?validated=False",
     )
     assert response.status_code == 200
-    assert len(response.json()) == 10
+    assert len(response.json()) == 30
