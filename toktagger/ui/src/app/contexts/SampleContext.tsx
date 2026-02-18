@@ -254,7 +254,11 @@ export function SampleProvider({
               });
 
               // Roll back params; do NOT set error and do NOT clear data.
-              setDataParams((prev) => ({ ...prev, name: "image", frame: lastGood }));
+              setDataParams((prev) => ({
+                ...prev,
+                name: "image",
+                frame: lastGood,
+              }));
 
               setIsLoading(false);
               return;

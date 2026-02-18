@@ -127,6 +127,7 @@ export default function ToolBar() {
     project,
     sample,
     data,
+    annotations,
     setAnnotations,
     viewParams,
     setViewParams,
@@ -143,17 +144,12 @@ export default function ToolBar() {
     const project_id = project._id;
     const sample_id = sample._id;
 
-    if (!project_id || !sample_id) {
+    if (project_id == null || sample_id == null) {
       return null;
     }
-    
-    const refreshAnnotations = async () => {
-      const dbAnnotations = await getAnnotationsForSample(
-        project_id,
-        sample_id,
-      );
 
-      setAnnotations(() => dbAnnotations);
+    const refreshAnnotations = async () => {
+      setAnnotations(() => annotations);
     };
 
     return (

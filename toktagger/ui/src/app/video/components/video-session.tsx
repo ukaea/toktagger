@@ -155,7 +155,7 @@ export function VideoSessionProvider(props: {
    *
    * This ref guards against re-entrant feedback loops during those programmatic writes.
    * Session state (`byFrame`) remains the source of truth; Annotorious is the interactive editor.
-  */
+   */
   const isProgrammaticAnnoSyncRef = useRef(false);
 
   const [imageNatural, setImageNatural] = useState<{
