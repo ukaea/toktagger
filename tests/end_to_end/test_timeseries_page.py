@@ -476,5 +476,53 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     assert round(disruption_annotation["time"], 6) == updated_disruption_time
 
 
-# TODO: Annotators
+def test_timeseries_annotator(server_setup, page: Page):
+    # Create Project
+    project_id = create_project("Test Project", "time-series", "parquet")
+    # And a sample for disruption
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    sample_id = ids[0]
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # Expand find peaks annotator
+    expect(page.get_by_role("button", name="Peak Detection")).to_be_visible()
+    page.get_by_role("button", name="Peak Detection").click()
+    peak_detection = page.get_by_role("group", name="Peak Detection")
+    expect(peak_detection).to_be_visible()
+    peak_detection.get_by_role("switch", name="Enable Tool").click()
+
+    # Choose ip
+    peak_detection.get_by_role("button", name="Show suggestions Signal Name").click()
+    page.get_by_role("option", name="Ip").click()
+
+    # Check that 4 peaks have been identified
+    expect(page.get_by_label("zone", exact=True)).to_have_count(4)
+
+    # Disable tool, these should disappear
+    peak_detection.get_by_role("switch", name="Enable Tool").click()
+    expect(page.get_by_label("zone", exact=True)).to_have_count(0)
+
+    # Enable tool, they should reappear
+    peak_detection.get_by_role("switch", name="Enable Tool").click()
+    expect(page.get_by_label("zone", exact=True)).to_have_count(4)
+
+    # Change settings in toolbar, check they impact on annotations
+    # Here drags min time to 74, so should only have one peak within window
+    time_range = peak_detection.get_by_role("group", name="Time Range")
+    min_slider = time_range.get_by_role("slider").nth(0)
+    box = min_slider.bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(box["x"] + 140, box["y"])  # drag horizontally
+    page.mouse.up()
+
+    # Check one annotation present
+    expect(page.get_by_label("zone", exact=True)).to_have_count(1)
+
+
 # TODO: Model predict
