@@ -35,7 +35,8 @@ import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
-import { VideoSidebar } from "@/app/video/components/video-sidebar";
+import { VideoToolbox } from "@/app/video/components/video-sidebar";
+import { VideoNavigationBar } from "@/app/video/components/video-navigation-bar";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -140,35 +141,15 @@ export default function ToolBar() {
     return null;
   }
 
-  if (project.task === TaskType.Video) {
-    const project_id = project._id;
-    const sample_id = sample._id;
-
-    if (project_id == null || sample_id == null) {
-      return null;
-    }
-
-    const refreshAnnotations = async () => {
-      setAnnotations(() => annotations);
-    };
-
-    return (
-      <VideoSidebar
-        project={project}
-        sample={sample}
-        onSaved={refreshAnnotations}
-      />
-    );
-  }
-
   const project_id = project._id;
   const sample_id = sample._id;
 
-  if (!project_id || !sample_id) {
+  if (project_id == null || sample_id == null) {
     console.warn("Invalid project_id or sample_id in ToolBar");
     return null;
   }
 
+  const isVideo = project.task === TaskType.Video;
   const tools: { name: string; component: React.ReactNode }[] = [];
 
   if (data && project.task == TaskType.TimeSeries) {
@@ -282,6 +263,11 @@ export default function ToolBar() {
   }
 
   const refreshAnnotations = async () => {
+    if (project.task === TaskType.Video) {
+      setAnnotations(() => annotations);
+      return;
+    }
+
     const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
     setAnnotations(() => dbAnnotations);
   };
@@ -305,7 +291,15 @@ export default function ToolBar() {
             <Header height="size-300" marginBottom="size-100">
               <span style={{ fontSize: "1.2rem" }}>Controls</span>
             </Header>
-            <NavigationBar project_id={project_id} sample_id={sample_id} />
+            {project.task === TaskType.Video ? (
+              <VideoNavigationBar
+                project_id={project_id}
+                sample_id={sample_id}
+                onSaved={refreshAnnotations}
+              />
+            ) : (
+              <NavigationBar project_id={project_id} sample_id={sample_id} />
+            )}
             <Accordion allowsMultipleExpanded={true} width="100%">
               <Disclosure>
                 <DisclosureTitle>
@@ -329,23 +323,27 @@ export default function ToolBar() {
               </Disclosure>
             </Accordion>
           </Flex>
-          {tools.length > 0 && (
+          {(isVideo || tools.length > 0) && (
             <>
               <Flex justifyContent="center" alignItems="center">
                 <Header height="size-300" marginBottom="size-100">
                   <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
                 </Header>
               </Flex>
-              <Accordion allowsMultipleExpanded={true} width="100%">
-                {tools.map((item, i) => (
-                  <Disclosure key={i}>
-                    <DisclosureTitle>
-                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                    </DisclosureTitle>
-                    <DisclosurePanel>{item.component}</DisclosurePanel>
-                  </Disclosure>
-                ))}
-              </Accordion>
+              {isVideo ? (
+                <VideoToolbox />
+              ) : (
+                <Accordion allowsMultipleExpanded={true} width="100%">
+                  {tools.map((item, i) => (
+                    <Disclosure key={i}>
+                      <DisclosureTitle>
+                        <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                      </DisclosureTitle>
+                      <DisclosurePanel>{item.component}</DisclosurePanel>
+                    </Disclosure>
+                  ))}
+                </Accordion>
+              )}
             </>
           )}
         </Flex>
