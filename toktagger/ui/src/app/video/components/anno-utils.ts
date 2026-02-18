@@ -81,10 +81,7 @@ export function upsertBody(
     const prev = list[idx] as AnnotationBody;
 
     // Preserve existing body id if present; otherwise assign one once.
-    const existingId =
-      typeof (prev as { id?: unknown })?.id === "string"
-        ? (prev as { id: string }).id || null
-        : null;
+    const existingId = prev.id?.trim() ? prev.id : null;
 
     list[idx] = {
       ...prev,
@@ -197,7 +194,7 @@ export function readRectGeometry(
  * - ensure track id exists (uses fallback or allocator)
  */
 export function normalizeOverlay(
-  list: unknown[],
+  list: ImageAnnotation[],
   frameKey: string,
   fallback: { className: string | null; trackId: string | null },
   allocTrackId?: (className: string) => string,
