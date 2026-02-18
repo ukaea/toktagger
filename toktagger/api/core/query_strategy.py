@@ -120,27 +120,24 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
         self.annotations = [ann for ann in annotations if not ann.validated]
         samples = self._random_shuffle_samples(samples=samples, seed=seed)
 
-        if self.annotations:
-            self.annotations = sorted(
-                self.annotations, key=lambda ann: ann.uncertainty, reverse=True
-            )
-            sample_ids = [annotation.sample_id for annotation in self.annotations]
-            sample_ids = list(dict.fromkeys(sample_ids))
-            # List of samples which have unvalidated annotations
-            samples_nonvalidated = [
-                sample for sample in samples if not sample.validated_annotations
-            ]
-            # Sort in order of annotation uncertainty, samples with no annotations go last (randomised)
-            self.samples = sorted(
-                samples_nonvalidated,
-                key=lambda sample: sample_ids.index(sample.id)
-                if sample.id in sample_ids
-                else float("inf"),
-            )
-            # Then add in samples which *are* validated at the end
-            self.samples += [
-                sample for sample in samples if sample.validated_annotations
-            ]
+        self.annotations = sorted(
+            self.annotations, key=lambda ann: ann.uncertainty, reverse=True
+        )
+        sample_ids = [annotation.sample_id for annotation in self.annotations]
+        sample_ids = list(dict.fromkeys(sample_ids))
+        # List of samples which have unvalidated annotations
+        samples_nonvalidated = [
+            sample for sample in samples if not sample.validated_annotations
+        ]
+        # Sort in order of annotation uncertainty, samples with no annotations go last (randomised)
+        self.samples = sorted(
+            samples_nonvalidated,
+            key=lambda sample: sample_ids.index(sample.id)
+            if sample.id in sample_ids
+            else float("inf"),
+        )
+        # Then add in samples which *are* validated at the end
+        self.samples += [sample for sample in samples if sample.validated_annotations]
 
 
 QUERY_STRATEGIES = {
