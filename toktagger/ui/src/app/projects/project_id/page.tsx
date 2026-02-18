@@ -25,7 +25,12 @@ import {
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
-import { getSamples, getProject, BACKEND_API_URL } from "@/app/core";
+import {
+  getSamples,
+  getProject,
+  deleteSample,
+  deleteSamples,
+} from "@/app/core";
 import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
@@ -48,21 +53,6 @@ const SampleBreadCrumbs = ({ project }: { project: Project }) => {
       </Breadcrumbs>
     </Provider>
   );
-};
-
-const deleteSample = async (project_id: string, sample_id: string) => {
-  await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
-    {
-      method: "DELETE",
-    },
-  );
-};
-
-const deleteSamples = async (project_id: string) => {
-  await fetch(`${BACKEND_API_URL}/projects/${project_id}/samples`, {
-    method: "DELETE",
-  });
 };
 
 type SamplesTableProps = {

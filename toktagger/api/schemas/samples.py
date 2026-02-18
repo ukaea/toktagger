@@ -1,39 +1,25 @@
-from typing import Annotated, List, Optional, Union
-from enum import Enum
+from typing import Annotated, List, Optional, Union, Literal
 from pydantic import Field, BaseModel, computed_field
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 
 
-class FileType(str, Enum):
-    CSV = "csv"
-    PARQUET = "parquet"
-    PNG = "png"
-    JPG = "jpg"
-
-
-class FileProtocol(str, Enum):
-    S3 = "s3"
-    LOCAL = "file"
-
-
-class ShotProtocol(str, Enum):
-    UDA = "uda"
-    SAL = "sal"
-
-
 class FileData(BaseModel):
     file_name: str
-    type: FileType
-    protocol: FileProtocol = FileProtocol.LOCAL
+    protocol: Literal["file"] | Literal["s3"] = "file"
+
+
+class ImageFileData(FileData):
+    type: Literal["png"] | Literal["jpg"]
 
 
 class TimeSeriesFileData(FileData):
+    type: Literal["csv"] | Literal["parquet"]
     signal_names: Optional[list[str]] = None
 
 
 class ShotData(BaseModel):
-    protocol: ShotProtocol
+    protocol: Literal["uda"] | Literal["sal"]
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 

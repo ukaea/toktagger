@@ -7,6 +7,8 @@ export type NumericalRangeType = {
 };
 
 export default function NumericalRange({
+  rangeMin,
+  rangeMax,
   defaultMin,
   defaultMax,
   label,
@@ -14,6 +16,8 @@ export default function NumericalRange({
   maximumFractionDigits,
   onChange,
 }: {
+  rangeMin?: number;
+  rangeMax?: number;
   defaultMin?: number;
   defaultMax?: number;
   label: string;
@@ -31,6 +35,8 @@ export default function NumericalRange({
   return (
     <Flex direction="row" gap="size-200" alignItems="center">
       <NumberField
+        minValue={rangeMin ?? Number.MIN_SAFE_INTEGER}
+        maxValue={rangeMax ?? Number.MAX_SAFE_INTEGER}
         label={`${label} Min`}
         isRequired={isRequired}
         value={minValue ?? undefined}
@@ -49,6 +55,8 @@ export default function NumericalRange({
         }}
       />
       <NumberField
+        minValue={rangeMin ?? Number.MIN_SAFE_INTEGER}
+        maxValue={rangeMax ?? Number.MAX_SAFE_INTEGER}
         label={`${label} Max`}
         isRequired={isRequired}
         value={maxValue ?? undefined}

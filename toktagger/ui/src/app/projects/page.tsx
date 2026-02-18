@@ -20,6 +20,12 @@ import {
   Flex,
   SearchField,
   ToastContainer,
+  DialogTrigger,
+  Dialog,
+  Divider,
+  Heading,
+  Content,
+  ButtonGroup,
 } from "@adobe/react-spectrum";
 import type { SortDescriptor } from "@react-types/shared";
 import type { Project } from "@/types";
@@ -92,20 +98,39 @@ const ProjectsTable = ({
                 <Cell>
                   <Flex direction="row" gap="size-100">
                     <ProjectConfigEditor project={item} onModify={onModify} />
-                    <Button
-                      variant="negative"
-                      onPress={async () => {
-                        if (item._id == null) {
-                          return;
-                        }
-
-                        deleteProject(item._id).then(() => {
-                          onModify?.();
-                        });
-                      }}
-                    >
-                      <Delete />
-                    </Button>
+                    <DialogTrigger>
+                      <Button variant="negative">
+                        <Delete />
+                      </Button>
+                      {(close) => (
+                        <Dialog>
+                          <Heading>Confirm Deletion</Heading>
+                          <Divider />
+                          <Content>
+                            Are you sure you want to delete project{" "}
+                            <strong>{item["name"]}</strong>? You will also lose{" "}
+                            <strong>all annotations</strong> associated with
+                            this project. This action cannot be undone.
+                          </Content>
+                          <ButtonGroup>
+                            <Button variant="secondary" onPress={close}>
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="negative"
+                              onPress={async () => {
+                                await deleteProject(item._id).then(() => {
+                                  onModify?.();
+                                  close();
+                                });
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </ButtonGroup>
+                        </Dialog>
+                      )}
+                    </DialogTrigger>
                   </Flex>
                 </Cell>
               </Row>

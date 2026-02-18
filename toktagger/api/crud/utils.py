@@ -416,9 +416,21 @@ async def get_files(dir_path: str, file_type: str) -> list[str]:
 
 async def get_directories(dir_path: str) -> list[str]:
     dir_names = Path(dir_path).glob("*/")
+    dir_names = filter(lambda p: p.is_dir(), dir_names)
     dir_names = map(str, dir_names)
     dir_names = list(sorted(dir_names))
     return dir_names
+
+
+async def filter_directories_by_file_type(
+    dir_paths: list[str], file_type: str
+) -> list[str]:
+    filtered_dirs = []
+    for dir_path in dir_paths:
+        files = await get_files(dir_path, file_type)
+        if files:
+            filtered_dirs.append(dir_path)
+    return filtered_dirs
 
 
 async def get_sample_summary(

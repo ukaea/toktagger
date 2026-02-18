@@ -7,7 +7,6 @@ from toktagger.api.schemas.samples import (
     SampleIn,
     ShotData,
     TimeSeriesFileData,
-    ShotProtocol,
 )
 from toktagger.api.schemas.annotations import (
     TimePoint,
@@ -77,12 +76,12 @@ PROJECT_3 = ProjectIn(
 
 SAMPLE_1 = SampleIn(
     shot_id=1,
-    data=ShotData(protocol=ShotProtocol.UDA, signal_names=["Ip"]),
+    data=ShotData(protocol="uda", signal_names=["Ip"]),
     annotations=None,
 )
 SAMPLE_2 = SampleIn(
     shot_id=2,
-    data=ShotData(protocol=ShotProtocol.SAL, signal_names=["Ip"]),
+    data=ShotData(protocol="sal", signal_names=["Ip"]),
     annotations=None,
 )
 SAMPLE_3 = SampleIn(

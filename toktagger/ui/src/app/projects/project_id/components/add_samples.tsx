@@ -34,21 +34,13 @@ export const AddSamplesEditor = ({
 }) => {
   const dataLoader = project.data_loader;
 
-  let fileTypes: { key: string; value: string }[] = [];
-  if (dataLoader == "image") {
-    fileTypes = [
-      { key: "png", value: "PNG" },
-      { key: "jpg", value: "JPEG" },
-    ];
-  } else if (dataLoader == "parquet") {
-    fileTypes = [
-      { key: "parquet", value: "Parquet" },
-      { key: "csv", value: "CSV" },
-    ];
-  }
-
   // Data schema state
-  const [dataSchemaType, setDataSchemaType] = useState<string | null>(null);
+  const [dataSchema, setDataSchema] = useState<Record<string, unknown> | null>(
+    null,
+  );
+  const [fileTypes, setFileTypes] = useState<{ key: string; value: string }[]>(
+    [],
+  );
 
   // Form state
   const [shotInputMethod, setShotInputMethod] = useState<string>("range"); // "range" or "file"
@@ -64,8 +56,7 @@ export const AddSamplesEditor = ({
   const [columnNames, setColumnNames] = useState<string>(""); // For time series files
 
   // Determine if we should use directories (for image data)
-  const useDirectories =
-    dataSchemaType === "FileData" && (fileType === "png" || fileType === "jpg");
+  const useDirectories = dataSchema?.title === "ImageFileData";
 
   // Fetch the data schema type from the load registry
   useEffect(() => {
@@ -78,7 +69,14 @@ export const AddSamplesEditor = ({
           const schema = await response.json();
           // The schema has a "title" field that indicates the type
           // e.g., "ShotData", "FileData", "TimeSeriesFileData"
-          setDataSchemaType(schema.title);
+          setDataSchema(schema);
+          const fileTypes = schema.properties.type.anyOf;
+          setFileTypes(
+            fileTypes.map((ft: Record<string, string>) => ({
+              key: ft.const,
+              value: ft.const.toUpperCase(),
+            })),
+          );
         } else {
           ToastQueue.negative(`Error fetching data schema for ${dataLoader}.`, {
             timeout: 3000,
@@ -159,7 +157,7 @@ export const AddSamplesEditor = ({
     async function fetchFileSamples() {
       let apiUrl = `${BACKEND_API_URL}/paths/files?dir_path=${dirPath}&file_type=${fileType}`;
       if (useDirectories) {
-        apiUrl = `${BACKEND_API_URL}/paths/directories?dir_path=${dirPath}`;
+        apiUrl = `${BACKEND_API_URL}/paths/directories?dir_path=${dirPath}&file_type=${fileType}`;
       }
       const response = await fetch(apiUrl);
 
@@ -170,8 +168,8 @@ export const AddSamplesEditor = ({
         // Extract shot IDs from file names using regex (assuming shot ID is a number in the file name)
         const extractedShotIds = fileNames
           .map((fileName) => {
-            const match = fileName.match(/(\d+)/);
-            return match ? parseInt(match[1], 10) : null;
+            const match = fileName.split("/").pop()?.match(/^\d+$/);
+            return match ? parseInt(match[0], 10) : null;
           })
           .filter((id): id is number => id !== null);
 
@@ -194,7 +192,7 @@ export const AddSamplesEditor = ({
           timestamp: new Date().toISOString(),
         };
 
-        if (dataSchemaType === "ShotData") {
+        if (dataSchema?.title === "ShotData") {
           // Shot Data
           const signals = signalNames
             .split(",")
@@ -215,8 +213,8 @@ export const AddSamplesEditor = ({
             } as ShotData,
           };
         } else if (
-          dataSchemaType === "FileData" ||
-          dataSchemaType === "TimeSeriesFileData"
+          dataSchema?.title === "ImageFileData" ||
+          dataSchema?.title === "TimeSeriesFileData"
         ) {
           // File Data or Time Series File Data
           let fileName: string =
@@ -232,7 +230,10 @@ export const AddSamplesEditor = ({
           };
 
           // Add column_names for time series file data
-          if (dataSchemaType === "TimeSeriesFileData" && columnNames.trim()) {
+          if (
+            dataSchema?.title === "TimeSeriesFileData" &&
+            columnNames.trim()
+          ) {
             const columns = columnNames
               .split(",")
               .map((s) => s.trim())
@@ -286,7 +287,7 @@ export const AddSamplesEditor = ({
 
   useEffect(() => {
     setShotIds([]);
-  }, [dataSchemaType, shotInputMethod]);
+  }, [dataSchema, shotInputMethod]);
 
   return (
     <DialogTrigger>
@@ -300,15 +301,15 @@ export const AddSamplesEditor = ({
           <Divider />
           <Content>
             {/* Display data type info from schema */}
-            {dataSchemaType && (
+            {dataSchema && (
               <Text>
-                Data Type: <strong>{dataSchemaType}</strong> (from {dataLoader}{" "}
-                data loader)
+                Data Type: <strong>{dataSchema.title}</strong> (from{" "}
+                {dataLoader} data loader)
               </Text>
             )}
 
             {/* Conditional fields based on data schema type */}
-            {dataSchemaType === "ShotData" && (
+            {dataSchema?.title === "ShotData" && (
               <Form maxWidth="size-6000">
                 <TextField
                   label="Signal Names"
@@ -331,6 +332,8 @@ export const AddSamplesEditor = ({
                     label="Shot"
                     isRequired
                     onChange={setShotRange}
+                    maximumFractionDigits={0}
+                    rangeMin={0}
                   />
                 ) : (
                   <></>
@@ -367,8 +370,8 @@ export const AddSamplesEditor = ({
               </Form>
             )}
 
-            {(dataSchemaType === "FileData" ||
-              dataSchemaType === "TimeSeriesFileData") && (
+            {(dataSchema?.title === "ImageFileData" ||
+              dataSchema?.title === "TimeSeriesFileData") && (
               <Form maxWidth="size-6000">
                 <ComboBox
                   label="File Type"
@@ -399,18 +402,22 @@ export const AddSamplesEditor = ({
             )}
 
             {/* Display found shot IDs */}
-            {(dataSchemaType === "FileData" ||
-              dataSchemaType === "TimeSeriesFileData") &&
-              shotIds.length > 0 && (
-                <Text>
-                  Found <strong>{shotIds.length}</strong>{" "}
-                  {useDirectories ? "directories" : "files"} with shot IDs:{" "}
-                  {shotIds.slice(0, 5).join(", ")}
-                  {shotIds.length > 5 && ` ... and ${shotIds.length - 5} more`}
-                </Text>
-              )}
+            {(dataSchema?.title === "ImageFileData" ||
+              dataSchema?.title === "TimeSeriesFileData") &&
+            shotIds.length > 0 ? (
+              <Text>
+                Found <strong>{shotIds.length}</strong>{" "}
+                {useDirectories ? "directories" : "files"} with shot IDs:{" "}
+                {shotIds.slice(0, 5).join(", ")}
+                {shotIds.length > 5 && ` ... and ${shotIds.length - 5} more`}
+              </Text>
+            ) : (
+              <Text>
+                No files found for the specified directory and file type.
+              </Text>
+            )}
 
-            {dataSchemaType === "TimeSeriesFileData" && (
+            {dataSchema?.title === "TimeSeriesFileData" && (
               <Form maxWidth="size-6000">
                 <TextField
                   label="Column Names (comma-separated)"

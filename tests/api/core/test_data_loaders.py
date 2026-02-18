@@ -4,9 +4,9 @@ from toktagger.api.schemas.projects import Task
 from typing import Type
 from toktagger.api.schemas.samples import (
     Sample,
-    FileData,
     TimeSeriesFileData,
     ShotData,
+    ImageFileData,
 )
 from toktagger.api.schemas.data import (
     TimeSeriesData,
@@ -23,7 +23,7 @@ import io
 
 
 def test_image_file_loader_jpg():
-    img_file = FileData(
+    img_file = ImageFileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
         type="jpg",
         protocol="file",
@@ -49,7 +49,7 @@ def test_image_file_loader_jpg():
 
 
 def test_image_file_loader_png():
-    img_file = FileData(
+    img_file = ImageFileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
         type="png",
         protocol="file",
@@ -224,7 +224,7 @@ async def test_custom_data_loader(api_client):
 @pytest.mark.parametrize(
     "name,data_loader,sample_data_model",
     [
-        ("image", data_loaders.ImageDataLoader, FileData),
+        ("image", data_loaders.ImageDataLoader, ImageFileData),
         ("parquet", data_loaders.ParquetDataLoader, TimeSeriesFileData),
         ("uda", data_loaders.UDADataLoader, ShotData),
     ],
