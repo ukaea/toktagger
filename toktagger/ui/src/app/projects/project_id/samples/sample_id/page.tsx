@@ -19,6 +19,7 @@ import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
 import { VideoView } from "@/app/frames/components/frames";
+import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -133,7 +134,9 @@ export default function SamplePage() {
 
   return (
     <SampleProvider projectId={project_id} sampleId={sample_id}>
-      <SamplePageContent />
+      <SampleHistoryProvider projectId={project_id}>
+        <SamplePageContent />
+      </SampleHistoryProvider>
     </SampleProvider>
   );
 }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException, Query, Path
+from fastapi import APIRouter, Request, HTTPException, Query, Path, Body
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.crud import utils
 from toktagger.api.schemas.samples import (
@@ -9,7 +9,7 @@ from toktagger.api.schemas.samples import (
 )
 from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas import convert_to_objectid
-from typing import Literal, Optional
+from typing import Literal
 import logging
 
 logger = logging.getLogger(__name__)
@@ -200,7 +200,7 @@ async def update_samples(
         )
 
 
-@router.get(
+@router.post(
     "/next",
     response_model=Sample,
     responses={
@@ -216,8 +216,16 @@ async def update_samples(
 async def get_next_sample(
     request: Request,
     project_id: str = Path(description="The project to return the next sample from."),
-    current_sample_id: Optional[str] = Query(
-        None, description="The ID of the current sample being annotated."
+    visited_sample_ids: list[str] = Body(
+        ..., description="The IDs of the samples already seen in this session."
+    ),
+    sort_by: str = Query(
+        "shot_id",
+        description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
+    ),
+    sort_direction: Literal["ascending", "descending"] = Query(
+        "ascending",
+        description="Direction to sort responses, by default 'descending'",
     ),
 ) -> Sample:
     """
@@ -230,61 +238,19 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(db_client, project_id)
-    annotations = await utils.get_annotations(db_client, project_id)
-    query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
-
-    try:
-        sample = query_strategy.get_next_sample(current_sample_id)
-    except RuntimeError as e:
-        raise HTTPException(status_code=204, detail="No next sample available!") from e
-
-    return sample
-
-
-@router.get(
-    "/previous",
-    response_model=Sample,
-    responses={
-        200: {
-            "description": "The previous sample to annotate has been returned, according to the project's query strategy."
-        },
-        204: {
-            "description": "No more samples are available to annotate for this project."
-        },
-        409: {"description": "Server is not setup to use the selected project."},
-    },
-)
-async def get_previous_sample(
-    request: Request,
-    project_id: str = Path(
-        description="The project to return the previous sample from."
-    ),
-    current_sample_id: Optional[str] = Query(
-        None, description="The ID of the current sample being annotated."
-    ),
-) -> Sample:
-    """
-    Get the previous sample to annotate for this project, according to query strategy.
-    ------------------------------------------------------------------------------
-    """
-    # Return the previous sample for human validation for this project
-    # Should use the query strategy, which access the database to determine the previous sample to annotate
-    # This should then be passed in to the /data endpoint to get required data for visualisation
-    # And the /annotation endpoint to get initial prediction (if available)
-    db_client = request.app.state.db_client
-    project = await utils.get_project(db_client, project_id)
     samples = await utils.get_samples(
-        db_client, project_id, sort_by="shot_id", sort_direction="descending"
+        db_client,
+        project_id,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
     )
     annotations = await utils.get_annotations(db_client, project_id)
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
+
     try:
-        sample = query_strategy.get_previous_sample(current_sample_id)
+        sample = query_strategy.get_next_sample(visited_sample_ids)
     except RuntimeError as e:
-        raise HTTPException(
-            status_code=204, detail="No previous sample available!"
-        ) from e
+        raise HTTPException(status_code=204, detail="No next sample available!") from e
 
     return sample
 

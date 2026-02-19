@@ -200,6 +200,7 @@ export const SampleSchema = z.object({
   project_id: z.string().optional(),
   shot_id: z.number(),
   data: SampleDataSchema,
+  validated_annotations: z.boolean(),
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
