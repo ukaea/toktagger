@@ -94,7 +94,7 @@ def test_single_sample(server_setup, page: Page):
 
     # Expect next and previous buttons to be disabled
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
-    expect(page.get_by_role("button", name="Next")).to_be_disabled()
+    expect(page.get_by_role("button", name="Next", exact=True)).to_be_disabled()
 
     # Check sample information is shown
     expect(page.get_by_text("10000", exact=True)).to_be_visible()

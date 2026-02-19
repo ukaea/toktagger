@@ -518,6 +518,7 @@ def test_timeseries_annotator(server_setup, page: Page):
     # Here drags min time to 74, so should only have one peak within window
     time_range = peak_detection.get_by_role("group", name="Time Range")
     min_slider = time_range.get_by_role("slider").nth(0)
+    min_slider.scroll_into_view_if_needed()
     box = min_slider.bounding_box()
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
     page.mouse.down()
@@ -603,6 +604,9 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
     model_predict.get_by_role("switch", name="Enable Tool").click()
 
     # Choose mock_timeseries_cnn
+    model_predict.get_by_role(
+        "combobox", name="Select Model Type"
+    ).scroll_into_view_if_needed()
     model_predict.get_by_role(
         "button", name="Show suggestions Select Model Type"
     ).click()
