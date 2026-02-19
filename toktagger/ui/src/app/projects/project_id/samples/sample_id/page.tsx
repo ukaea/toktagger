@@ -20,8 +20,9 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import { VideoView } from "@/app/frames/components/frames";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
+import { VideoViewInner } from "@/app/video/components/video-view";
+import { VideoSessionProvider } from "@/app/video/components/video-session";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -152,7 +153,7 @@ export default function SamplePage() {
   return (
     <SampleProvider projectId={project_id} sampleId={sample_id}>
       <SampleHistoryProvider projectId={project_id}>
-        <SamplePageContent />
+        <SamplePageContent projectId={project_id} sampleId={sample_id} />
       </SampleHistoryProvider>
     </SampleProvider>
   );
