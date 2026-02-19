@@ -17,6 +17,8 @@ import {
   Button,
   ToastQueue,
   SearchField,
+  Heading,
+  InlineAlert,
 } from "@adobe/react-spectrum";
 import type { ImageAnnotation } from "@annotorious/react";
 import {
@@ -340,6 +342,26 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
   );
 }
 
+function AnnotationStatusAlert({ isValidated }: { isValidated: boolean }) {
+  return (
+    <Flex justifyContent="center" width="100%" marginTop="size-200">
+      <InlineAlert
+        variant={isValidated ? "positive" : "notice"}
+        UNSAFE_style={{
+          paddingTop: "5px",
+          paddingBottom: "5px",
+          paddingLeft: "10px",
+          paddingRight: "10px",
+        }}
+      >
+        <Heading>
+          {isValidated ? "Annotations Validated" : "Annotations Not Validated"}
+        </Heading>
+      </InlineAlert>
+    </Flex>
+  );
+}
+
 // ------------------------------
 // Video toolbar types + window contract
 // ------------------------------
@@ -405,6 +427,7 @@ export default function ToolBar() {
     setViewParams,
     plotProps,
     setPlotProps,
+    isValidated,
   } = useSample();
 
   if (!project || !sample) {
@@ -558,6 +581,9 @@ export default function ToolBar() {
           gap="size-100"
           width="100%"
         >
+          {isValidated !== null && (
+            <AnnotationStatusAlert isValidated={isValidated} />
+          )}
           <Flex
             direction="column"
             alignItems="center"
