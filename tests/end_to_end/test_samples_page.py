@@ -692,3 +692,6 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     )
     assert response.status_code == 200
     assert len(response.json()) == 30
+
+
+# TODO test jump to next button
