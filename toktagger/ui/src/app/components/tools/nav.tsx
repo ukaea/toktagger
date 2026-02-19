@@ -172,7 +172,7 @@ export function JumpToNextButton({
 
   return (
     <View marginStart="size-100">
-      <Button variant="primary" aria-label="Next Sample" onPress={moveNextShot}>
+      <Button variant="primary" aria-label="Jump to Next Sample" onPress={moveNextShot}>
         <Text>Jump to Next Sample</Text> <StepForward />
       </Button>
     </View>

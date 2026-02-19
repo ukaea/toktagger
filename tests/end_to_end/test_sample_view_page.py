@@ -12,13 +12,15 @@ from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 import requests
 
 
-def setup_annotations(page: Page, num_annotations: int):
+def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False):
     # Create project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project(
+        "Test Project", "time-series", "parquet", query_strategy="sequential"
+    )
     # And a sample
-    sample_id = create_local_samples(
+    sample_ids = create_local_samples(
         project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
-    )[0]
+    )
 
     # If > 0 annotations, Add 1 pre-existing annotation
     if num_annotations > 0:
@@ -31,14 +33,18 @@ def setup_annotations(page: Page, num_annotations: int):
             uncertainty=0.9,
         )
         response = requests.put(
-            f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
+            f"http://localhost:8002/projects/{project_id}/samples/{sample_ids[0]}/annotations",
+            json=[flat_top.model_dump(mode="json")],
+        )
+        response = requests.put(
+            f"http://localhost:8002/projects/{project_id}/samples/{sample_ids[1]}/annotations",
             json=[flat_top.model_dump(mode="json")],
         )
 
         assert response.status_code == 200
 
     # Navigate to sample page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}")
 
     # Check basic structure of page is correct
     check_base_page(page)
@@ -49,7 +55,19 @@ def setup_annotations(page: Page, num_annotations: int):
         page.get_by_role("menuitem", name="Add Time Point").click(force=True)
         page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
 
-    return page, project_id, sample_id
+    if go_to_next:
+        # Go forwards, create new annotations
+        page.get_by_role("button", name="Next").click()
+        page.wait_for_timeout(200)
+
+        if num_annotations == 2:
+            page.get_by_label("time-series").click(button="right")
+            page.get_by_role("menuitem", name="Add Time Point").click(force=True)
+            page.get_by_role("menuitem", name="Disruption", exact=True).click(
+                force=True
+            )
+
+    return page, project_id, sample_ids
 
 
 def check_base_page(page):
@@ -109,7 +127,7 @@ def test_timeseries_navigation(data_loader, request, server_setup, page: Page):
 
     # Check I've navigated to the correct page
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}",
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}?sortColumn=shot_id&sortDirection=ascending",
         timeout=3000,
     )
 
@@ -210,7 +228,7 @@ def test_search_for_shot(request, data_loader, server_setup, page: Page):
 
     # Check I've navigated to the correct page
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10000_id}",
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10000_id}?sortColumn=shot_id&sortDirection=ascending",
         timeout=3000,
     )
 
@@ -226,7 +244,7 @@ def test_search_for_shot(request, data_loader, server_setup, page: Page):
 
     # Check I've navigated to new page
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10001_id}",
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10001_id}?sortColumn=shot_id&sortDirection=ascending",
         timeout=3000,
     )
 
@@ -239,7 +257,7 @@ def test_search_for_shot(request, data_loader, server_setup, page: Page):
 
     # Check I've not been moved off of the current page
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10001_id}",
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{shot_10001_id}?sortColumn=shot_id&sortDirection=ascending",
         timeout=3000,
     )
     # Check error message shown
@@ -403,7 +421,8 @@ def test_export_annotations(server_setup, page: Page, all_samples: bool):
 @pytest.mark.parametrize("num_annotations", [0, 1, 2])
 def test_save_button(server_setup, page: Page, num_annotations: int):
     # Create annotations
-    page, project_id, sample_id = setup_annotations(page, num_annotations)
+    page, project_id, sample_ids = setup_annotations(page, num_annotations)
+    sample_id = sample_ids[0]
 
     # Click save
     page.get_by_role("button", name="Save").click()
@@ -444,7 +463,12 @@ def test_save_on_navigate(
     navigate_direction: str,
 ):
     # Create annotations
-    page, project_id, sample_id = setup_annotations(page, num_annotations)
+    page, project_id, sample_ids = setup_annotations(
+        page,
+        num_annotations,
+        go_to_next=True if navigate_direction == "Previous" else False,
+    )
+    sample_id = sample_ids[0] if navigate_direction == "Next" else sample_ids[1]
 
     # Disable Save on Navigate if required
     expect(page.get_by_role("checkbox", name="Save on Navigate")).to_be_checked()
@@ -484,7 +508,8 @@ def test_save_on_navigate(
 
 
 def test_clear_button(server_setup, page: Page):
-    page, project_id, sample_id = setup_annotations(page, 2)
+    page, project_id, sample_ids = setup_annotations(page, 2)
+    sample_id = sample_ids[0]
 
     # Check both annotations visible
     expect(page.get_by_label("vspan").first).to_be_visible()

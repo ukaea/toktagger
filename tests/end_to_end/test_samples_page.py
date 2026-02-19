@@ -44,7 +44,7 @@ def check_base_page(page):
 
     # Expect page navigation to be visible
     expect(page.get_by_role("button", name="Previous")).to_be_visible()
-    expect(page.get_by_role("button", name="Next")).to_be_visible()
+    expect(page.get_by_role("button", name="Next", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Samples per Page:")).to_be_visible()
 
     # Expect to be on page 1
@@ -53,6 +53,9 @@ def check_base_page(page):
     # Expect import and export annotation buttons to be visible
     expect(page.get_by_role("button", name="Import Annotations")).to_be_visible()
     expect(page.get_by_role("button", name="Export Annotations")).to_be_visible()
+
+    # Expect Jump to Next Shot button to be visible
+    expect(page.get_by_role("button", name="Jump to Next Sample")).to_be_visible()
 
 
 def test_empty_samples_table(server_setup, page: Page):
@@ -67,7 +70,7 @@ def test_empty_samples_table(server_setup, page: Page):
 
     # Expect next and previous buttons to be disabled
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
-    expect(page.get_by_role("button", name="Next")).to_be_disabled()
+    expect(page.get_by_role("button", name="Next", exact=True)).to_be_disabled()
 
     # Check we can navigate back to Projects page via breadcrumbs
     page.get_by_role("link", name="Projects").click()
@@ -105,7 +108,7 @@ def test_single_sample(server_setup, page: Page):
     # Try clicking the row
     table_row.click()
     expect(page).to_have_url(
-        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}",
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}?sortColumn=shot_id&sortDirection=ascending",
         timeout=3000,
     )
 
@@ -124,7 +127,7 @@ def test_sample_page_navigation(server_setup, page: Page):
 
     # Expect next and previous buttons to be disabled since by default shows 10 samples
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
-    expect(page.get_by_role("button", name="Next")).to_be_disabled()
+    expect(page.get_by_role("button", name="Next", exact=True)).to_be_disabled()
 
     # Check all samples available
     expect(page.get_by_text("10001", exact=True)).to_be_visible()
@@ -140,10 +143,10 @@ def test_sample_page_navigation(server_setup, page: Page):
 
     # Previous button should still be disabled, next button should be enabled
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
-    expect(page.get_by_role("button", name="Next")).to_be_enabled()
+    expect(page.get_by_role("button", name="Next", exact=True)).to_be_enabled()
 
     # Try pressing Next button
-    page.get_by_role("button", name="Next").click()
+    page.get_by_role("button", name="Next", exact=True).click()
     expect(page.get_by_text("Page: 2")).to_be_visible()
 
     # Check sample 10006 is visible, 10005 is not
@@ -152,7 +155,7 @@ def test_sample_page_navigation(server_setup, page: Page):
 
     # Check Previous button enabled, Next button is not
     expect(page.get_by_role("button", name="Previous")).to_be_enabled()
-    expect(page.get_by_role("button", name="Next")).to_be_disabled()
+    expect(page.get_by_role("button", name="Next", exact=True)).to_be_disabled()
 
     # Press previous, check we go back to before
     page.get_by_role("button", name="Previous").click()
@@ -162,7 +165,7 @@ def test_sample_page_navigation(server_setup, page: Page):
     expect(page.get_by_text("10006", exact=True)).to_be_hidden()
 
     # Press Next
-    page.get_by_role("button", name="Next").click()
+    page.get_by_role("button", name="Next", exact=True).click()
     expect(page.get_by_text("Page: 2")).to_be_visible()
 
     # Now change samples per page back to 10, check we are sent back to page 1
@@ -176,7 +179,7 @@ def test_sample_page_navigation(server_setup, page: Page):
 
     # And both buttons disabled
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
-    expect(page.get_by_role("button", name="Next")).to_be_disabled()
+    expect(page.get_by_role("button", name="Next", exact=True)).to_be_disabled()
 
 
 def test_samples_sorting(server_setup, page: Page):
