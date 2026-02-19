@@ -12,6 +12,12 @@ import {
   ComboBox,
   Item,
   Key,
+  ButtonGroup,
+  Button,
+  ToastQueue,
+  SearchField,
+  Heading,
+  InlineAlert,
 } from "@adobe/react-spectrum";
 import {
   MultiVariateTimeSeriesDataSchema,
@@ -122,6 +128,80 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
   );
 }
 
+function AnnotationStatusAlert({ isValidated }: { isValidated: boolean }) {
+  return (
+    <Flex justifyContent="center" width="100%" marginTop="size-200">
+      <InlineAlert
+        variant={isValidated ? "positive" : "notice"}
+        UNSAFE_style={{
+          paddingTop: "5px",
+          paddingBottom: "5px",
+          paddingLeft: "10px",
+          paddingRight: "10px",
+        }}
+      >
+        <Heading>
+          {isValidated ? "Annotations Validated" : "Annotations Not Validated"}
+        </Heading>
+      </InlineAlert>
+    </Flex>
+  );
+}
+
+// ------------------------------
+// Video toolbar types + window contract
+// ------------------------------
+
+// Toolbar-side instance profiles used by FrameView via window.ufoInstanceProfiles.
+// FrameView expects: { id, class_name, class_id, track_id }.
+type VideoInstanceProfile = {
+  id: string; // `${class_name}:${track_id}`
+  class_name: string;
+  class_id: number;
+  track_id: string; // canonicalized slug
+};
+
+declare global {
+  interface Window {
+    // Shared state/events between the left VideoToolbar and the FrameView/AnnoBridge code.
+    ufoInstanceProfiles?: VideoInstanceProfile[];
+    ufoSelectedProfileId?: string | null;
+    ufoSelectedClassName?: string | null;
+    ufoSelectedTrackId?: string | null;
+    ufoSelectionSource?: "auto" | "explicit" | null;
+    ufoNotifySelectionChanged?: () => void;
+
+    // FrameView exposes these helpers so the toolbar can trigger save/clear actions.
+    ufoCollectForSave?: () => Promise<unknown>;
+    ufoClearCurrent?: () => Promise<void>;
+    ufoClearAllFrames?: () => Promise<void>;
+  }
+}
+
+// Stable key shared between the VideoInstancePanel UI and FrameView events.
+const instanceKey = (inst: VideoInstanceProfile) =>
+  `${inst.class_name.toLowerCase()}:${inst.track_id}`;
+
+type VideoWireProfile = {
+  class_name: string;
+  class_id: number;
+  track_id: string;
+};
+
+// Event payload from FrameView -> toolbar: keeps profiles/selection/badges in sync.
+type VideoStateDetail = {
+  profiles?: VideoWireProfile[];
+  selectedKey?: string;
+  selectedClassName?: string | null;
+  lastClassName?: string;
+  classRegistry?: Record<string, number>;
+  profileCounts?: Record<string, number>;
+};
+
+// ------------------------------
+// Main ToolBar (Context-driven)
+// ------------------------------
+
 export default function ToolBar() {
   const {
     project,
@@ -132,6 +212,7 @@ export default function ToolBar() {
     setViewParams,
     plotProps,
     setPlotProps,
+    isValidated,
   } = useSample();
 
   if (!project || !sample) {
@@ -292,6 +373,9 @@ export default function ToolBar() {
           gap="size-100"
           width="100%"
         >
+          {isValidated !== null && (
+            <AnnotationStatusAlert isValidated={isValidated} />
+          )}
           <Flex
             direction="column"
             alignItems="center"
