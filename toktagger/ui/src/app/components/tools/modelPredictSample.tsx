@@ -43,8 +43,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           );
           return otherAnnotations;
         });
-        return
-      };
+        return;
+      }
       const response = await startSamplePredictions(
         project_id,
         sample_id,
@@ -97,8 +97,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
               (annotation: Annotation) =>
                 annotation.created_by !== selectedModel,
             );
-            console.log("payload being set", payload)
-            console.log("concatted", otherAnnotations.concat(payload))
+            console.log("payload being set", payload);
+            console.log("concatted", otherAnnotations.concat(payload));
             return otherAnnotations.concat(payload);
           });
           clearInterval(interval);

@@ -336,13 +336,20 @@ const FileDataLoaderOptionsUI = ({
       data_type: dataType,
       file_type: fileType,
       file_names: fileNames,
-      dir_name: filePath
+      dir_name: filePath,
     });
 
     if (options.success) {
       setDataLoaderOptions(options.data);
     }
-  }, [dataLoader, dataType, fileNames, fileType, filePath, setDataLoaderOptions]);
+  }, [
+    dataLoader,
+    dataType,
+    fileNames,
+    fileType,
+    filePath,
+    setDataLoaderOptions,
+  ]);
 
   return (
     <View
@@ -668,8 +675,8 @@ const parseFileNames = (fileNames: string[]) => {
   const shots = fileNames.map((name: string) => {
     const lastDotIndex = name.lastIndexOf(".");
     const lastSlashIndex = name.lastIndexOf("/");
-    let shotName: string = ""
-    if (lastDotIndex === -1){
+    let shotName: string = "";
+    if (lastDotIndex === -1) {
       shotName = name.substring(lastSlashIndex + 1);
     } else {
       shotName = name.substring(lastSlashIndex + 1, lastDotIndex);
@@ -691,10 +698,10 @@ const parseFileNames = (fileNames: string[]) => {
 const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
   const options = dataLoaderOptions as FileDataLoaderOptions;
   const fileNames = options.file_names;
-  let samples: Sample[] = []
+  let samples: Sample[] = [];
 
   if (options.file_type === "png" || options.file_type === "jpeg") {
-    const shot_id = parseFileNames([options.dir_name])[0]
+    const shot_id = parseFileNames([options.dir_name])[0];
     samples = [
       {
         shot_id: shot_id,
@@ -704,8 +711,8 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
           type: options.file_type,
           protocol: options.protocol || "file",
         } as FileData,
-      }
-    ]
+      },
+    ];
   } else {
     const shots = parseFileNames(fileNames);
     samples = shots.map((shot_id: number, i: number) => ({
@@ -716,7 +723,7 @@ const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
         type: options.file_type,
         protocol: options.protocol || "file",
       } as FileData,
-      }));
+    }));
   }
   return samples;
 };
