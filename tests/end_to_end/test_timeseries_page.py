@@ -68,9 +68,12 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
+    # Wait for a bit for Zone to fully delete
+    page.wait_for_timeout(200)
+
     # Check it no longer exists
-    expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
-    expect(page.get_by_label("zone").first).to_be_hidden()
+    expect(page.get_by_role("rowheader", name=zone_type, exact=True)).to_have_count(0)
+    expect(page.get_by_label("zone").first).to_have_count(0)
 
 
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
@@ -197,8 +200,11 @@ def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
     page.get_by_label("vspan").first.click(button="right", force=True)
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
+    # Wait for a bit for Vspan to fully delete
+    page.wait_for_timeout(200)
+
     # # Check it no longer exists
-    expect(page.get_by_role("rowheader", name=zone_type)).to_be_hidden()
+    expect(page.get_by_role("rowheader", name=zone_type, exact=True)).to_have_count(0)
     expect(page.get_by_label("vspan")).to_have_count(0)
 
 

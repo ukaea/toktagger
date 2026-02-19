@@ -117,7 +117,9 @@ def test_timeseries_navigation(data_loader, request, server_setup, page: Page):
     check_base_page(page)
 
     # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
+    expect(page.get_by_label("time-series")).to_be_visible(
+        timeout=60000
+    )  # For UDA this might be slow...
 
     # Check Ip trace rendered
     expect(page.get_by_text("Ip", exact=True)).to_be_visible()
