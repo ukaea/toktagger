@@ -95,6 +95,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           tool="rectangle"
           drawingEnabled={drawingEnabled}
           autoSave
+          style={(_annotation, state) => ({
+            strokeWidth: state?.selected ? 3 : state?.hovered ? 3 : 2,
+          })}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
