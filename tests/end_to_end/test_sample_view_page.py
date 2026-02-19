@@ -4,6 +4,7 @@ from tests.endpoints import (
     create_project,
     create_local_samples,
     create_uda_samples,
+    create_query_strategy_samples,
 )
 import pytest
 import tempfile
@@ -533,3 +534,165 @@ def test_clear_button(server_setup, page: Page):
     annotations = response.json()
 
     assert len(annotations) == 0
+
+
+@pytest.mark.parametrize(
+    ("query_strategy", "expected_order", "sort_by", "sort_direction"),
+    [
+        (
+            "uncertainty",
+            [
+                0,
+                4,
+                2,
+                3,
+                1,
+            ],  # Most uncertain, least uncertain, no annotations, validated annotations
+            "shot_id",
+            "ascending",
+        ),
+        (
+            "uncertainty",
+            [
+                0,
+                4,
+                2,
+                3,
+                1,
+            ],  # Most uncertain, least uncertain, no annotations, validated annotations
+            "shot_id",
+            "descending",  # Order of samples shouldn't make any difference
+        ),
+        (
+            "random",
+            [
+                0,
+                3,
+                4,
+                2,
+                1,
+            ],  # Random order of non-validated, then validated annotations
+            "shot_id",
+            "ascending",
+        ),
+        (
+            "random",
+            [
+                0,
+                3,
+                2,
+                4,
+                1,
+            ],  # Random order of non-validated, then validated annotations
+            "shot_id",
+            "descending",  # Different sample order, so different random order
+        ),
+        (
+            "sequential",
+            [0, 1, 2, 3, 4],  # Increasing order of shot
+            "shot_id",
+            "ascending",
+        ),
+        (
+            "sequential",
+            [2, 3, 4],  # Increasing order of shot, doesn't cycle back to earlier shots
+            "shot_id",
+            "ascending",
+        ),
+        (
+            "sequential",
+            [4, 3, 2, 1, 0],  # Decreasing order of shot
+            "shot_id",
+            "descending",
+        ),
+        (
+            "sequential",
+            [2, 1, 0],  # Decreasing order of shot, doesn't cycle back to later shots
+            "shot_id",
+            "descending",
+        ),
+        (
+            "sequential",
+            [
+                4,
+                3,
+                2,
+                1,
+                0,
+            ],  # Increasing order of time created (which is inverse of shot ID)
+            "_id",
+            "ascending",
+        ),
+        (
+            "sequential",
+            [
+                2,
+                1,
+                0,
+            ],  # Decreasing order of time created, doesn't cycle back to earlier shots
+            "_id",
+            "ascending",
+        ),
+        (
+            "sequential",
+            [
+                0,
+                1,
+                2,
+                3,
+                4,
+            ],  # Decreasing order of time created (which is inverse of shot ID)
+            "_id",
+            "descending",
+        ),
+        (
+            "sequential",
+            [
+                2,
+                3,
+                4,
+            ],  # Decreasing order of time created, doesn't cycle back to later shots
+            "_id",
+            "descending",
+        ),
+    ],
+)
+def test_query_strategies(
+    server_setup, page: Page, query_strategy, expected_order, sort_by, sort_direction
+):
+    project_id, sample_ids = create_query_strategy_samples(
+        query_strategy=query_strategy
+    )
+
+    # Go to shot starting shot, with given query params
+    page.goto(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[expected_order[0]]}?sortColumn={sort_by}&sortDirection={sort_direction}"
+    )
+
+    # Press Next, check it gives the correct sample each time
+    for i in range(1, len(expected_order)):
+        page.get_by_role("button", name="Next").click()
+
+        # Check navigated to next sample
+        expect(page).to_have_url(
+            f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[expected_order[i]]}?sortColumn={sort_by}&sortDirection={sort_direction}"
+        )
+        expect(page.get_by_label("time-series")).to_be_visible()
+
+    # Press Next a final time, shouldn't navigate anywhere, should display 'No more samples'
+    page.get_by_role("button", name="Next").click()
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[expected_order[-1]]}?sortColumn={sort_by}&sortDirection={sort_direction}"
+    )
+    expect(page.get_by_text("No more samples available")).to_be_visible()
+
+    # Now navigate backwards with previous button, should do reverse order of visited
+    for i in range(len(expected_order) - 1, 0, -1):
+        page.get_by_role("button", name="Previous").click()
+        expect(page).to_have_url(
+            f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[expected_order[i - 1]]}?sortColumn={sort_by}&sortDirection={sort_direction}"
+        )
+        expect(page.get_by_label("time-series")).to_be_visible()
+
+    # Should be back to start, previous button should be greyed out
+    expect(page.get_by_role("button", name="Previous")).to_be_disabled()
