@@ -26,9 +26,6 @@ import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
-import { data } from "react-router-dom";
-import { set } from "zod/v4";
-
 // Default label values
 const DEFAULT_SHOT_LABELS = ["Valid", "Not Valid"];
 const DEFAULT_TIME_REGION_LABELS = [

@@ -96,7 +96,7 @@ export const SpectrogramView = () => {
     setZones(newZones);
     setVSpans(newVSpans);
     setMask(newMask);
-  }, [annotations, viewData]);
+  }, [annotations, viewData, colorMapping]);
 
   const updateVSpans = (newVSpans: Array<VSpan>) => {
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);

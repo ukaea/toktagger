@@ -14,6 +14,8 @@ import {
   Item,
   Flex,
   ToastQueue,
+  RadioGroup,
+  Radio,
 } from "@adobe/react-spectrum";
 import { Project, Sample, ShotData, FileData } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
@@ -22,7 +24,6 @@ import { BACKEND_API_URL } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
 } from "@/app/components/ui/numerical_range";
-import { fi } from "zod/v4/locales";
 
 export const AddSamplesEditor = ({
   project,
@@ -33,7 +34,7 @@ export const AddSamplesEditor = ({
 }) => {
   const dataLoader = project.data_loader;
 
-  let fileTypes = [];
+  let fileTypes: { key: string; value: string }[] = [];
   if (dataLoader == "image") {
     fileTypes = [
       { key: "png", value: "PNG" },
@@ -50,6 +51,7 @@ export const AddSamplesEditor = ({
   const [dataSchemaType, setDataSchemaType] = useState<string | null>(null);
 
   // Form state
+  const [shotInputMethod, setShotInputMethod] = useState<string>("range"); // "range" or "file"
   const [shotRange, setShotRange] = useState<NumericalRangeType>();
   const [shotIds, setShotIds] = useState<number[]>([]);
 
@@ -94,13 +96,64 @@ export const AddSamplesEditor = ({
   }, [dataLoader]);
 
   useEffect(() => {
-    setShotIds(
-      Array.from(
-        { length: (shotRange?.max ?? 0) - (shotRange?.min ?? 0) + 1 },
-        (_, i) => i + (shotRange?.min ?? 0),
-      ),
-    );
-  }, [shotRange]);
+    if (shotInputMethod === "range") {
+      setShotIds(
+        Array.from(
+          { length: (shotRange?.max ?? 0) - (shotRange?.min ?? 0) + 1 },
+          (_, i) => i + (shotRange?.min ?? 0),
+        ),
+      );
+    }
+  }, [shotRange, shotInputMethod]);
+
+  // Read and parse CSV file when selected
+  const handleFileSelect = (files: FileList | null) => {
+    if (files && files.length > 0) {
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          // Parse CSV: split by lines, skip header (first line), get first column
+          const lines = content.split(/\r?\n/).filter((line) => line.trim());
+          if (lines.length <= 1) {
+            ToastQueue.negative("CSV file is empty or has no data rows", {
+              timeout: 3000,
+            });
+            return;
+          }
+          // Skip header (index 0), parse remaining lines
+          const ids = lines
+            .slice(1)
+            .map((line) => {
+              // Get first column (split by comma, take first element)
+              const firstColumn = line.split(",")[0].trim();
+              return parseInt(firstColumn, 10);
+            })
+            .filter((id) => !isNaN(id));
+
+          if (ids.length === 0) {
+            ToastQueue.negative("No valid shot IDs found in first column", {
+              timeout: 3000,
+            });
+          } else {
+            setShotIds(ids);
+            ToastQueue.positive(`Loaded ${ids.length} shot IDs from CSV`, {
+              timeout: 3000,
+            });
+          }
+        } catch (error) {
+          ToastQueue.negative(`Error parsing CSV file: ${error}`, {
+            timeout: 3000,
+          });
+        }
+      };
+      reader.onerror = () => {
+        ToastQueue.negative("Error reading file", { timeout: 3000 });
+      };
+      reader.readAsText(file);
+    }
+  };
 
   useEffect(() => {
     async function fetchFileSamples() {
@@ -231,6 +284,10 @@ export const AddSamplesEditor = ({
     }
   };
 
+  useEffect(() => {
+    setShotIds([]);
+  }, [dataSchemaType, shotInputMethod]);
+
   return (
     <DialogTrigger>
       <Button variant="primary">
@@ -260,11 +317,53 @@ export const AddSamplesEditor = ({
                   onChange={setSignalNames}
                   description="Signal names to load as a comma-separated list, e.g., ip, dalpha, ANE_DENSITY"
                 />
-                <NumericalRange
-                  label="Shot"
-                  isRequired
-                  onChange={setShotRange}
-                />
+                <RadioGroup
+                  label="Shot ID Input Method"
+                  value={shotInputMethod}
+                  onChange={setShotInputMethod}
+                >
+                  <Radio value="range">Numerical Range</Radio>
+                  <Radio value="file">Text File</Radio>
+                </RadioGroup>
+
+                {shotInputMethod === "range" ? (
+                  <NumericalRange
+                    label="Shot"
+                    isRequired
+                    onChange={setShotRange}
+                  />
+                ) : (
+                  <></>
+                )}
+
+                {shotInputMethod === "file" ? (
+                  <Flex direction="column" gap="size-100">
+                    <input
+                      type="file"
+                      accept=".txt,.csv"
+                      onChange={(e) => handleFileSelect(e.target.files)}
+                      style={{
+                        padding: "8px",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                      }}
+                    />
+                    <Text>
+                      Upload a CSV file with shot IDs in the first column
+                      (header row will be skipped)
+                    </Text>
+                    {shotIds.length > 0 && (
+                      <Text>
+                        Loaded <strong>{shotIds.length}</strong> shot IDs:{" "}
+                        {shotIds.slice(0, 5).join(", ")}
+                        {shotIds.length > 5 &&
+                          ` ... and ${shotIds.length - 5} more`}
+                      </Text>
+                    )}
+                  </Flex>
+                ) : (
+                  <></>
+                )}
               </Form>
             )}
 
