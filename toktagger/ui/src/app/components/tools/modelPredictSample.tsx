@@ -40,6 +40,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           );
           return otherAnnotations;
         });
+        return;
       } else if (selectedModel == null) {
         return;
       }
