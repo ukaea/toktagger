@@ -14,6 +14,8 @@ import {
   Button,
   ToastQueue,
   SearchField,
+  Heading,
+  InlineAlert,
 } from "@adobe/react-spectrum";
 import type { ImageAnnotation } from "@annotorious/react";
 import { Annotation, Project, Sample, TaskType } from "@/types";
@@ -242,6 +244,26 @@ function VideoShotSearch({
   );
 }
 
+function AnnotationStatusAlert({ isValidated }: { isValidated: boolean }) {
+  return (
+    <Flex justifyContent="center" width="100%" marginTop="size-200">
+      <InlineAlert
+        variant={isValidated ? "positive" : "notice"}
+        UNSAFE_style={{
+          paddingTop: "5px",
+          paddingBottom: "5px",
+          paddingLeft: "10px",
+          paddingRight: "10px",
+        }}
+      >
+        <Heading>
+          {isValidated ? "Annotations Validated" : "Annotations Not Validated"}
+        </Heading>
+      </InlineAlert>
+    </Flex>
+  );
+}
+
 // ------------------------------
 // Video toolbar types + window contract
 // ------------------------------
@@ -297,7 +319,8 @@ type VideoStateDetail = {
 // ------------------------------
 
 export default function ToolBar() {
-  const { project, sample, annotations, setAnnotations } = useSample();
+  const { project, sample, annotations, setAnnotations, isValidated } =
+    useSample();
 
   if (!project || !sample) {
     console.warn("Project or sample not found in ToolBar");
@@ -387,11 +410,6 @@ export default function ToolBar() {
       component: <SpectrogramViewParamsWidget />,
     });
 
-    // tools.push({
-    //   name: "Amplitude Range",
-    //   component: <AmplitudeSlider />,
-    // });
-
     tools.push({
       name: "Color Map",
       component: <ColorMapPicker />,
@@ -423,6 +441,9 @@ export default function ToolBar() {
           gap="size-100"
           width="100%"
         >
+          {isValidated !== null && (
+            <AnnotationStatusAlert isValidated={isValidated} />
+          )}
           <Flex
             direction="column"
             alignItems="center"

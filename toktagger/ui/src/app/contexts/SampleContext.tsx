@@ -36,6 +36,7 @@ interface SampleContextType {
   viewParams: ViewParams | SpectrogramViewParams | null;
   plotProps: PlotProps;
   isLoading: boolean;
+  isValidated: boolean | null;
   error: string | null;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
@@ -43,6 +44,7 @@ interface SampleContextType {
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams | SpectrogramViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
+  setIsValidated: (validated: boolean) => void;
 }
 
 const SampleContext = createContext<SampleContextType | undefined>(undefined);
@@ -240,6 +242,9 @@ export function SampleProvider({
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const [isValidated, setIsValidated] = useState<boolean | null>(null);
+
   const [error, setError] = useState<string | null>(null);
 
   const lastGoodVideoFrameRef = useRef<number | null>(null);
@@ -261,6 +266,7 @@ export function SampleProvider({
         setProject(projectData);
         setSample(sampleData);
         setAnnotations(dbAnnotations);
+        setIsValidated(sampleData.validated_annotations);
 
         setViewParams((prevViewParams) => {
           if (prevViewParams) {
@@ -363,11 +369,13 @@ export function SampleProvider({
     viewParams,
     plotProps,
     isLoading,
+    isValidated,
     error,
     setAnnotations,
     setPlotProps,
     setViewParams,
     setDataParams,
+    setIsValidated,
   };
 
   return (
