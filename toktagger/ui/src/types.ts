@@ -169,16 +169,6 @@ export const ProjectSchema = z.object({
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
-export const ProjectUpdateSchema = z.object({
-  name: z.string().optional(),
-  task: TaskSchema.optional(),
-  query_strategy: z.string().optional(),
-  time_min: z.number().nullable().optional(),
-  time_max: z.number().nullable().optional(),
-  min_time_step: z.number().nullable().optional(),
-});
-export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
-
 export const FileDataSchema = z.object({
   file_name: z.string(),
   type: z.string(),

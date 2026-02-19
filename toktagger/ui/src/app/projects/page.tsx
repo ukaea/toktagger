@@ -80,7 +80,7 @@ const ProjectsTable = ({
             <Column key="data_loader" allowsSorting>
               Loader
             </Column>
-            <Column key="edit">Edit</Column>
+            <Column key="actions">Actions</Column>
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (

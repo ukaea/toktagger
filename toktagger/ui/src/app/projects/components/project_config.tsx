@@ -26,6 +26,8 @@ import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
+import { data } from "react-router-dom";
+import { set } from "zod/v4";
 
 // Default label values
 const DEFAULT_SHOT_LABELS = ["Valid", "Not Valid"];
@@ -166,7 +168,7 @@ export function ProjectConfigEditor({
             value: item,
           }));
           setDataLoaders(loaders);
-          if (loaders.length > 0) {
+          if (loaders.length > 0 && !dataLoader) {
             setDataLoader(loaders[0].key);
           }
         } else {
@@ -182,7 +184,7 @@ export function ProjectConfigEditor({
       }
     }
     fetchDataLoaders();
-  }, []);
+  }, [dataLoader]);
 
   const onFormSubmit = async (close: () => void) => {
     try {
@@ -214,9 +216,20 @@ export function ProjectConfigEditor({
         video_bounding_box_labels: videoBoundingBoxLabels,
       };
 
+      if (isEditing && _project?._id) {
+        newProject._id = _project._id;
+      }
+
+      let url = `${BACKEND_API_URL}/projects`;
+      let method: "POST" | "PUT" = "POST";
+      if (isEditing && _project?._id) {
+        url += `/${_project._id}`;
+        method = "PUT";
+      }
+
       // Create project via API
-      const response = await fetch(`${BACKEND_API_URL}/projects`, {
-        method: "POST",
+      const response = await fetch(url, {
+        method: method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -280,9 +293,9 @@ export function ProjectConfigEditor({
                 items={dataLoaders}
                 isRequired
                 selectedKey={dataLoader}
-                onSelectionChange={(key) =>
-                  setDataLoader(key ? String(key) : null)
-                }
+                onSelectionChange={(key) => {
+                  setDataLoader(key ? String(key) : dataLoaders[0].key);
+                }}
               >
                 {(item: Record<string, string>) => (
                   <Item key={item.key}>{item.value}</Item>

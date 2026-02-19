@@ -130,12 +130,3 @@ class ProjectIn(ConfiguredModel):
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
-
-
-class ProjectUpdate(ConfiguredModel):
-    name: Optional[str] = None
-    task: Optional[Task] = None
-    query_strategy: Optional[QueryStrategyType] = None
-    time_min: Optional[float] = None
-    time_max: Optional[float] = None
-    min_time_step: Optional[float] = None
