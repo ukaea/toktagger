@@ -23,7 +23,7 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 
-DataTypes = Union[TimeSeriesFileData, FileData, ShotData]
+DataTypes = Union[TimeSeriesFileData, ImageFileData, ShotData]
 
 
 class SampleBase(ConfiguredModel):

@@ -45,7 +45,9 @@ class DataLoader(ABC):
 
     @classmethod
     @abstractmethod
-    def sample_data_type(cls) -> Type[ShotData | FileData | TimeSeriesFileData]:
+    def sample_data_type(
+        cls,
+    ) -> Type[ShotData | ImageFileData | FileData | TimeSeriesFileData]:
         # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
         pass
 

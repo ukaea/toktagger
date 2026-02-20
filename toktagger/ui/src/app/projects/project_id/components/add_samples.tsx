@@ -19,7 +19,7 @@ import {
 } from "@adobe/react-spectrum";
 import { Project, Sample, ShotData, FileData } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { BACKEND_API_URL } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
@@ -70,6 +70,11 @@ export const AddSamplesEditor = ({
           // The schema has a "title" field that indicates the type
           // e.g., "ShotData", "FileData", "TimeSeriesFileData"
           setDataSchema(schema);
+
+          if (schema.title === "ShotData") {
+            return;
+          }
+
           const fileTypes = schema.properties.type.anyOf;
           setFileTypes(
             fileTypes.map((ft: Record<string, string>) => ({
@@ -168,7 +173,11 @@ export const AddSamplesEditor = ({
         // Extract shot IDs from file names using regex (assuming shot ID is a number in the file name)
         const extractedShotIds = fileNames
           .map((fileName) => {
-            const match = fileName.split("/").pop()?.match(/^\d+$/);
+            const regex = useDirectories
+              ? /^\d+$/
+              : new RegExp(`^\\d+\\.${fileType}$`);
+
+            const match = fileName.split("/").pop()?.match(regex);
             return match ? parseInt(match[0], 10) : null;
           })
           .filter((id): id is number => id !== null);
