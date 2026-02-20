@@ -19,7 +19,7 @@ import {
 } from "@adobe/react-spectrum";
 import { Project, Sample, ShotData, FileData } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
