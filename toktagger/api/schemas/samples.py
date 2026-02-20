@@ -7,7 +7,12 @@ from toktagger.api.schemas.annotations import AnnotationBatchTypes
 
 class FileType(str, Enum):
     CSV = "csv"
+    TSV = "tsv"
     PARQUET = "parquet"
+    FEATHER = "feather"
+    JSON = "json"
+    XLSX = "xlsx"
+    MP4 = "mp4"
     PNG = "png"
     JPG = "jpg"
 
@@ -19,7 +24,9 @@ class FileProtocol(str, Enum):
 
 class ShotProtocol(str, Enum):
     UDA = "uda"
+    UDA_CAMERA = "uda_camera"
     SAL = "sal"
+    FAIR_MAST = "fair_mast"
 
 
 class FileData(BaseModel):

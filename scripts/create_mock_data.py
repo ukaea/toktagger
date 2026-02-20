@@ -65,7 +65,7 @@ def main():
     project_id = create_project(
         "Mock Disruption Project",
         "time-series",
-        "parquet",
+        "tabular",
         "uncertainty",
         time_max=time[-1],
     )
