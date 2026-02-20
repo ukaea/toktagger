@@ -1,31 +1,26 @@
-from pathlib import Path
+import base64
+import inspect
+import io
 import os
-import pandas as pd
-import xarray as xr
 import pathlib
 from abc import ABC, abstractmethod
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Type
 
 import numpy as np
+import pandas as pd
+import pydantic
+import xarray as xr
 from PIL import Image
 
-import io
-import base64
-import pydantic
-from typing import Type
 from toktagger.api.schemas.data import (
     Data,
+    DataParamTypes,
+    ImageData,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
-    ImageData,
-    DataParamTypes,
 )
-from toktagger.api.schemas.samples import (
-    FileData,
-    Sample,
-    ShotData,
-    TimeSeriesFileData,
-)
+from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
 
 # Set up UDA environment variables with defaults if not already set. This is required for
 # the pyuda client to work correctly outside of Freia.
@@ -433,9 +428,15 @@ class FAIRMASTDataLoader(DataLoader):
         endpoint = "https://s3.echo.stfc.ac.uk/mast/level2/shots"
         file_path = f"{endpoint}/{sample.shot_id}.zarr"
 
-        data_tree = xr.open_datatree(
-            file_path, chunks=None, create_default_indexes=False
-        )
+        kwargs = {"chunks": None}
+
+        # check if xarray version supports create_default_indexes argument, and if so, set it to False
+        # to avoid unnecessary index creation which can cause performance issues with large datasets
+        sig = inspect.signature(xr.open_dataset)
+        if "create_default_indexes" in sig.parameters:
+            kwargs["create_default_indexes"] = False
+
+        data_tree = xr.open_datatree(file_path, **kwargs)
 
         results = {}
         for name in sample_data.signal_names:
