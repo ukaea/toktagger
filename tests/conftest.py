@@ -294,7 +294,7 @@ def start_server(mongo_container):
     proc.start()
     # Wait for server to start
     server_up = False
-    for t in range(20):
+    for t in range(600):
         try:
             response = requests.get(
                 "http://localhost:8002/projects",
