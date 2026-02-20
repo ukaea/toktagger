@@ -1,6 +1,5 @@
-from typing import Union
+from typing import Union, Literal
 from pydantic import BaseModel
-from enum import Enum
 from toktagger.api.schemas import ConfiguredModel
 
 
@@ -32,17 +31,12 @@ class ImageData(Data):
     values: str  # Base64 encoded string
 
 
-class LoaderType(str, Enum):
-    IDENTITY = "identity"
-    IMAGE = "image"
-
-
 class DataParams(ConfiguredModel):
-    name: LoaderType = LoaderType.IDENTITY
+    name: Literal["identity"] = "identity"
 
 
 class ImageParams(DataParams):
-    name: LoaderType = LoaderType.IMAGE
+    name: Literal["image"]
     frame: int | None
 
 

@@ -1,22 +1,24 @@
+import base64
+import inspect
+import io
 import os
 import pathlib
 from abc import ABC, abstractmethod
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Type
 
 import numpy as np
 import pandas as pd
+import pydantic
+import xarray as xr
 from PIL import Image
 
-import io
-import base64
-import pydantic
-from typing import Type
 from toktagger.api.schemas.data import (
     Data,
+    DataParamTypes,
+    ImageData,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
-    ImageData,
-    DataParamTypes,
 )
 from toktagger.api.schemas.samples import (
     FileData,
@@ -33,6 +35,10 @@ os.environ["UDA_META_PLUGINNAME"] = os.environ.get("UDA_META_PLUGINNAME", "MASTU
 os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
     "UDA_METANEW_PLUGINNAME", "MAST_DB"
 )
+
+# Setup SAL environment variables with defaults if not already set. This is required for
+# the SAL client to work correctly.
+os.environ["SAL_HOST"] = os.environ.get("SAL_HOST", "https://sal.jetdata.eu")
 
 
 class DataLoaderError(Exception):
@@ -154,9 +160,9 @@ class ImageDataLoader(DataLoader):
         )
 
 
-@LoaderRegistry.register("parquet")
-class ParquetDataLoader(DataLoader):
-    """DataLoader for retrieving data using a folder of Parquet files"""
+@LoaderRegistry.register("tabular")
+class TabularDataLoader(DataLoader):
+    """DataLoader for retrieving data from a tabular file format (e.g., CSV, Parquet)"""
 
     @classmethod
     def sample_data_type(cls) -> Type[TimeSeriesFileData]:
@@ -176,13 +182,31 @@ class ParquetDataLoader(DataLoader):
                 f"Expected sample data of type 'TimeSeriesFileData' but got '{type(sample.data)}'"
             )
 
-        sample_data: TimeSeriesFileData = sample.data
-
-        if not pathlib.Path(sample_data.file_name).exists():
+        if not pathlib.Path(sample.data.file_name).exists():
             raise FileNotFoundError(
-                f"Could not find file at '{sample_data.file_name}', relative to {pathlib.Path().cwd()}"
+                f"Could not find file at '{sample.data.file_name}', relative to {pathlib.Path().cwd()}"
             )
-        df = pd.read_parquet(sample_data.file_name, columns=sample_data.signal_names)
+
+        item: TimeSeriesFileData = sample.data
+
+        if item.file_name.endswith(".csv"):
+            df = pd.read_csv(item.file_name, usecols=item.signal_names)
+        elif item.file_name.endswith(".tsv"):
+            df = pd.read_csv(item.file_name, sep="\t", usecols=item.signal_names)
+        elif item.file_name.endswith(".parquet"):
+            df = pd.read_parquet(item.file_name, columns=item.signal_names)
+        elif item.file_name.endswith(".json"):
+            df = pd.read_json(item.file_name)
+            df = df[item.signal_names]
+        elif item.file_name.endswith(".xlsx"):
+            df = pd.read_excel(item.file_name, usecols=item.signal_names)
+        elif item.file_name.endswith(".feather"):
+            df = pd.read_feather(item.file_name, columns=item.signal_names)
+        else:
+            raise ValueError(
+                "Unsupported file format {}".format(Path(item.file_name).suffix)
+            )
+
         df = df.fillna(0)
 
         df.index = pd.to_timedelta(df.index, unit="s")
@@ -211,12 +235,6 @@ class ParquetDataLoader(DataLoader):
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
-    def __init__(self, params):
-        super().__init__(params)
-        import pyuda
-
-        self.client = pyuda.Client()
-
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
@@ -239,9 +257,9 @@ class UDADataLoader(DataLoader):
         results = {}
         for name in sample_data.signal_names:
             try:
-                signal = self.client.get(name, sample.shot_id)
-                data = signal.data
-                time = signal.time.data
+                signal = xr.open_dataset(f"uda://{name}:{sample.shot_id}", engine="uda")
+                data = signal["data"].values
+                time = signal["time"].values
 
                 if time_min is not None:
                     mask = time >= time_min
@@ -271,5 +289,191 @@ class UDADataLoader(DataLoader):
             raise DataLoaderError(
                 f"Could not load any signals for shot ID '{sample.shot_id}'. Check UDA connectivity and signal names."
             )
+
+        return MultiVariateTimeSeriesData(values=results)
+
+
+@LoaderRegistry.register("uda_camera")
+class UDACameraDataLoader(DataLoader):
+    """DataLoader for retrieving camera image data using the UDA access layer"""
+
+    def __init__(self, params: DataParamTypes):
+        super().__init__(params)
+
+    @classmethod
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
+
+    def get_sample(
+        self,
+        sample: Sample,
+        **kwargs,
+    ) -> ImageData:
+        if not isinstance(sample.data, ShotData):
+            raise TypeError(
+                f"Expected sample data of type 'ShotData' but got '{type(sample.data)}'"
+            )
+
+        sample_data: ShotData = sample.data
+
+        if len(sample_data.signal_names) != 1:
+            raise ValueError("UDA Camera DataLoader expects exactly one signal name.")
+
+        signal_name = sample_data.signal_names[0]
+        try:
+            if self.params.frame is None:
+                self.params.frame = 0  # Default to first frame if not specified
+
+            signal = xr.open_dataset(
+                f"uda://{signal_name}:{sample.shot_id}",
+                engine="uda",
+                frame_number=self.params.frame,
+            )
+
+            image_array = signal["data"].values
+            image_array = np.squeeze(image_array)
+
+            im = Image.fromarray(image_array)
+            buffer = io.BytesIO()
+            im.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            return ImageData(
+                frame=str(self.params.frame),
+                values=base64.b64encode(buffer.getvalue()).decode(),
+            )
+        except Exception as e:
+            raise DataLoaderError(
+                f"Could not load image signal '{signal_name}' for shot ID '{sample.shot_id}': {e}"
+            )
+
+
+@LoaderRegistry.register("sal")
+class SALDataLoader(DataLoader):
+    """DataLoader for retrieving data using the SAL access layer"""
+
+    @classmethod
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
+
+    def get_sample(
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
+        **kwargs,
+    ) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
+        sample_data: ShotData = sample.data
+
+        has_user_credentials = Path("~/.sal/credentials").expanduser().exists()
+        if not has_user_credentials:
+            raise DataLoaderError(
+                "SAL authentication credentials not found. Please set up SAL credentials at '~/.sal/credentials' to use the SAL data loader."
+            )
+
+        results = {}
+        for name in sample_data.signal_names:
+            full_name = f"pulse/{sample.shot_id}/{name}"
+            try:
+                signal = xr.open_dataset(f"sal://{full_name}", engine="sal")
+                data = signal["data"].values
+                time = signal["time"].values
+
+                if time_min is not None:
+                    mask = time >= time_min
+                    time = time[mask]
+                    data = data[mask]
+
+                if time_max is not None:
+                    mask = time <= time_max
+                    time = time[mask]
+                    data = data[mask]
+
+                if (
+                    min_time_step is not None
+                    and len(time) > 1
+                    and np.diff(time).mean() < min_time_step
+                ):
+                    time_base = np.arange(time[0], time[-1], min_time_step)
+                    data = np.interp(time_base, time, data)
+                    time = time_base
+
+                print(time_min, time_max, min_time_step)
+
+                item = TimeSeriesData(time=time, values=data)
+                results[name] = item
+            except Exception:
+                results[name] = None
+
+        if all(values is None for values in results.values()):
+            raise DataLoaderError(
+                f"Could not load any signals for shot ID '{sample.shot_id}'. Check SAL connectivity and signal names."
+            )
+
+        return MultiVariateTimeSeriesData(values=results)
+
+
+@LoaderRegistry.register("fair_mast")
+class FAIRMASTDataLoader(DataLoader):
+    @classmethod
+    def sample_data_type(self) -> Type[ShotData]:
+        return ShotData
+
+    def get_sample(
+        self,
+        sample: Sample,
+        time_min: Optional[float] = None,
+        time_max: Optional[float] = None,
+        min_time_step: Optional[float] = None,
+        **kwargs,
+    ) -> MultiVariateTimeSeriesData:
+        assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
+        sample_data: ShotData = sample.data
+
+        endpoint = "https://s3.echo.stfc.ac.uk/mast/level2/shots"
+        file_path = f"{endpoint}/{sample.shot_id}.zarr"
+
+        kwargs = {"chunks": None}
+
+        # check if xarray version supports create_default_indexes argument, and if so, set it to False
+        # to avoid unnecessary index creation which can cause performance issues with large datasets
+        sig = inspect.signature(xr.open_dataset)
+        if "create_default_indexes" in sig.parameters:
+            kwargs["create_default_indexes"] = False
+
+        data_tree = xr.open_datatree(file_path, **kwargs)
+
+        results = {}
+        for name in sample_data.signal_names:
+            try:
+                ds = data_tree[name]
+                data = ds.values
+                time = ds.time.values
+
+                if time_min is not None:
+                    mask = time >= time_min
+                    time = time[mask]
+                    data = data[mask]
+
+                if time_max is not None:
+                    mask = time <= time_max
+                    time = time[mask]
+                    data = data[mask]
+
+                if (
+                    min_time_step is not None
+                    and len(time) > 1
+                    and np.diff(time).mean() < min_time_step
+                ):
+                    time_base = np.arange(time[0], time[-1], min_time_step)
+                    data = np.interp(time_base, time, data)
+                    time = time_base
+
+                item = TimeSeriesData(time=time, values=data)
+                results[name] = item
+            except Exception:
+                results[name] = None
 
         return MultiVariateTimeSeriesData(values=results)

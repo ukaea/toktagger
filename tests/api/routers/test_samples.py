@@ -160,8 +160,11 @@ async def test_get_next_sample_sequential(api_client, setup_db):
     )
     assert response.status_code == 200
     returned_sample = response.json()
+
     # Should return me the sample with the next shot ID sequentially
     assert returned_sample.get("shot_id") == 1
+    assert returned_sample["data"]["protocol"] == "uda"
+    assert returned_sample["data"]["signal_names"] == ["Ip"]
 
     # Then also check ID and timestamp are returned - should have been added automatically
     assert returned_sample.get("_id") == setup_db["sample_id_1"]

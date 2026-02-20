@@ -64,7 +64,7 @@ PROJECT_2 = ProjectIn(
     name="test_project_1",
     task=Task.TIME_SERIES,
     query_strategy=QueryStrategyType.SEQUENTIAL,
-    data_loader="parquet",
+    data_loader="tabular",
 )
 PROJECT_3 = ProjectIn(
     name="project_2",
@@ -87,17 +87,18 @@ SAMPLE_2 = SampleIn(
 SAMPLE_3 = SampleIn(
     shot_id=3,
     data=TimeSeriesFileData(
-        file_name="test.csv", type="csv", protocol="s3", signal_names=["Ip"]
+        file_name="test.csv",
+        type="csv",
+        protocol="s3",
+        signal_names=["Ip"],
     ),
     annotations=None,
 )
 SAMPLE_4 = SampleIn(
     shot_id=4,
     data=TimeSeriesFileData(
-        file_name=str(
-            pathlib.Path(__file__).parent.joinpath("test.parquet").absolute()
-        ),
-        type="parquet",
+        file_name=str(pathlib.Path(__file__).parent.joinpath("test.csv").absolute()),
+        type="csv",
         protocol="file",
         signal_names=["Ip"],
     ),

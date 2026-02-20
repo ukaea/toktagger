@@ -75,11 +75,11 @@ export const AddSamplesEditor = ({
             return;
           }
 
-          const fileTypes = schema.properties.type.anyOf;
+          const fileTypes = schema.properties.type.enum;
           setFileTypes(
-            fileTypes.map((ft: Record<string, string>) => ({
-              key: ft.const,
-              value: ft.const.toUpperCase(),
+            fileTypes.map((ft: string) => ({
+              key: ft,
+              value: ft.toUpperCase(),
             })),
           );
         } else {

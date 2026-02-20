@@ -6,20 +6,20 @@ from toktagger.api.schemas.annotations import AnnotationBatchTypes
 
 class FileData(BaseModel):
     file_name: str
-    protocol: Literal["file"] | Literal["s3"] = "file"
+    protocol: Literal["file", "s3"] = "file"
 
 
 class ImageFileData(FileData):
-    type: Literal["png"] | Literal["jpg"]
+    type: Literal["png", "jpg"]
 
 
 class TimeSeriesFileData(FileData):
-    type: Literal["csv"] | Literal["parquet"]
+    type: Literal["csv", "tsv", "parquet", "feather", "json", "xlsx"]
     signal_names: Optional[list[str]] = None
 
 
 class ShotData(BaseModel):
-    protocol: Literal["uda"] | Literal["sal"]
+    protocol: Literal["uda", "uda_camera", "sal", "fair_mast"]
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 
