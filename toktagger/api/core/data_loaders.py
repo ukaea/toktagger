@@ -20,7 +20,13 @@ from toktagger.api.schemas.data import (
     MultiVariateTimeSeriesData,
     TimeSeriesData,
 )
-from toktagger.api.schemas.samples import FileData, Sample, ShotData, TimeSeriesFileData
+from toktagger.api.schemas.samples import (
+    FileData,
+    Sample,
+    ShotData,
+    TimeSeriesFileData,
+    ImageFileData,
+)
 
 # Set up UDA environment variables with defaults if not already set. This is required for
 # the pyuda client to work correctly outside of Freia.
@@ -45,7 +51,9 @@ class DataLoader(ABC):
 
     @classmethod
     @abstractmethod
-    def sample_data_type(cls) -> Type[ShotData | FileData | TimeSeriesFileData]:
+    def sample_data_type(
+        cls,
+    ) -> Type[ShotData | ImageFileData | FileData | TimeSeriesFileData]:
         # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
         pass
 
@@ -71,6 +79,7 @@ class LoaderRegistry:
             if (sample_data_type := loader_class.sample_data_type()) not in (
                 ShotData,
                 FileData,
+                ImageFileData,
                 TimeSeriesFileData,
             ):
                 raise ValueError(
@@ -108,17 +117,17 @@ class ImageDataLoader(DataLoader):
         super().__init__(params)
 
     @classmethod
-    def sample_data_type(self) -> Type[FileData]:
-        return FileData
+    def sample_data_type(cls) -> Type[ImageFileData]:
+        return ImageFileData
 
     @pydantic.validate_call
     def get_sample(self, sample: Sample, **kwargs) -> ImageData:
-        if not isinstance(sample.data, FileData):
+        if not isinstance(sample.data, ImageFileData):
             raise TypeError(
-                f"Expected sample data of type 'FileData' but got '{type(sample.data)}'"
+                f"Expected sample data of type 'ImageFileData' but got '{type(sample.data)}'"
             )
 
-        sample_data: FileData = sample.data
+        sample_data: ImageFileData = sample.data
 
         # Find directory of images
         dir_path = pathlib.Path(sample_data.file_name)
@@ -135,9 +144,7 @@ class ImageDataLoader(DataLoader):
                 raise FileNotFoundError("No files exist in specified directory!")
             file_path = files[0]
         else:
-            file_path = dir_path.joinpath(
-                f"{self.params.frame}.{sample_data.type.value}"
-            )
+            file_path = dir_path.joinpath(f"{self.params.frame}.{sample_data.type}")
         if not file_path.exists():
             raise FileNotFoundError(
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
@@ -158,7 +165,7 @@ class TabularDataLoader(DataLoader):
     """DataLoader for retrieving data from a tabular file format (e.g., CSV, Parquet)"""
 
     @classmethod
-    def sample_data_type(self) -> Type[TimeSeriesFileData]:
+    def sample_data_type(cls) -> Type[TimeSeriesFileData]:
         return TimeSeriesFileData
 
     @pydantic.validate_call

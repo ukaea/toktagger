@@ -23,42 +23,42 @@ import { VSpans } from "@/app/components/tools/vspans";
 import * as d3 from "d3";
 import {
   createAnnotationToDisplayAnnotationFunc,
+  randomColor,
   updateAnnotations,
 } from "@/app/utils";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 
-const vspanCategories: Category[] = [
-  { name: "Mode Locked", color: "rgb(255, 0, 0)" },
-];
-
-const zoneCategories: Category[] = [
-  { name: "NTM", color: "rgb(0, 255, 255)" },
-  { name: "LLM", color: "rgb(200, 100, 100)" },
-  { name: "Sawteeth", color: "rgb(100, 200, 100)" },
-];
-
-const zoneCategoryColors = zoneCategories.reduce<Record<string, string>>(
-  (acc, curr) => {
-    acc[curr.name] = curr.color;
-    return acc;
-  },
-  {},
-);
-
-const lockedModeCategoryColors = vspanCategories.reduce<Record<string, string>>(
-  (acc, curr) => {
-    acc[curr.name] = curr.color;
-    return acc;
-  },
-  {},
-);
-
-const colorMapping = { ...lockedModeCategoryColors, ...zoneCategoryColors };
-
 export const SpectrogramView = () => {
-  const { data, annotations, setAnnotations, plotProps } = useSample();
+  const { project, data, annotations, setAnnotations, plotProps } = useSample();
+
+  const zoneCategories: Category[] = useMemo(() => {
+    const timeRegionLabels = project?.time_region_labels || [];
+    return timeRegionLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project]);
+
+  const vspanCategories: Category[] = useMemo(() => {
+    const timePointLabels = project?.time_point_labels || [];
+    return timePointLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project]);
+
+  const colorMapping = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    zoneCategories.forEach((category) => {
+      mapping[category.name] = category.color;
+    });
+    vspanCategories.forEach((category) => {
+      mapping[category.name] = category.color;
+    });
+    return mapping;
+  }, [zoneCategories, vspanCategories]);
 
   const [zones, setZones] = useState<Zone[]>([]);
   const [vspans, setVSpans] = useState<VSpan[]>([]);
@@ -96,7 +96,7 @@ export const SpectrogramView = () => {
     setZones(newZones);
     setVSpans(newVSpans);
     setMask(newMask);
-  }, [annotations, viewData]);
+  }, [annotations, viewData, colorMapping]);
 
   const updateVSpans = (newVSpans: Array<VSpan>) => {
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);

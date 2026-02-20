@@ -14,6 +14,30 @@ import {
   SpectrogramMask,
 } from "@/types";
 
+const colorPalette = [
+  "#FF5733",
+  "#33FF57",
+  "#3357FF",
+  "#FF33A8",
+  "#A833FF",
+  "#33FFF6",
+  "#FFC733",
+  "#8DFF33",
+  "#FF3380",
+  "#33A8FF",
+  "#FF8D33",
+  "#3380FF",
+  "#33FFAA",
+  "#FFAA33",
+  "#AA33FF",
+  "#FF3333",
+];
+
+export function randomColor(index: number): string {
+  const color = colorPalette[index % colorPalette.length];
+  return color;
+}
+
 export const linspace = (start: number, end: number, num: number) => {
   const step = (end - start) / (num - 1);
   const arr = [];

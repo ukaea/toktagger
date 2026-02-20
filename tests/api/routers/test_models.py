@@ -3,7 +3,7 @@ import pytest_asyncio
 import random
 import pathlib
 from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
-from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData, FileType
+from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
 from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.models import ModelUpdate
 from tests.db_definitions import MODEL_1, MODEL_2
@@ -76,7 +76,7 @@ async def setup_model_db(db_client):
             shot_id=i,
             data=TimeSeriesFileData(
                 file_name=f"{i}.parquet",
-                type=FileType.PARQUET,
+                type="parquet",
             ),
             annotations=[annotation] if i < 10 else None,
         )

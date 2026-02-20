@@ -322,3 +322,48 @@ async def test_get_samples_summary(api_client, setup_db):
     assert summary.get("total") == 2
     assert summary.get("shot_min") == 1
     assert summary.get("shot_max") == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_all_samples(api_client, setup_db, db_client):
+    # Delete all samples from project 1
+    response = await api_client.delete(f"/projects/{setup_db['project_id_1']}/samples")
+    assert response.status_code == 200
+
+    # Check that samples from project 1 have been deleted
+    samples = await db_client.get_all_documents("samples")
+    # Should have 2 samples left (from project 2)
+    assert len(samples) == 2
+    # Verify the deleted samples are from project 1
+    assert setup_db["sample_id_1"] not in [str(sample.get("_id")) for sample in samples]
+    assert setup_db["sample_id_2"] not in [str(sample.get("_id")) for sample in samples]
+    # Verify samples from project 2 still exist
+    assert setup_db["sample_id_3"] in [str(sample.get("_id")) for sample in samples]
+    assert setup_db["sample_id_4"] in [str(sample.get("_id")) for sample in samples]
+
+    # Check that annotations associated with project 1 samples have been deleted
+    annotations = await db_client.get_all_documents("annotations")
+    # Should have 1 annotation left (from project 2)
+    assert len(annotations) == 1
+    # Verify annotations from project 1 are deleted
+    assert setup_db["annotation_id_1"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    assert setup_db["annotation_id_2"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    assert setup_db["annotation_id_3"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    assert setup_db["annotation_id_4"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    # Verify annotation from project 2 still exists
+    assert setup_db["annotation_id_5"] in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+
+    # Check that the project itself has NOT been deleted
+    projects = await db_client.get_all_documents("projects")
+    assert len(projects) == 3
+    assert setup_db["project_id_1"] in [str(project.get("_id")) for project in projects]

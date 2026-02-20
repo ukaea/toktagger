@@ -10,7 +10,7 @@ from toktagger.api.schemas.annotations import (
     AnnotationOutTypeAdapter,
     AnnotationBatchTypes,
 )
-from toktagger.api.schemas.projects import Project, ProjectUpdate
+from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import FileData, Sample, SampleUpdate, SampleSummary
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models.base import ModelRegistry
@@ -235,7 +235,7 @@ async def delete_model(
 
 
 async def update_project(
-    db_client: MongoDBClient, project_id: str, project: ProjectUpdate
+    db_client: MongoDBClient, project_id: str, project: Project
 ) -> None:
     project_id = convert_to_objectid(project_id, "projects")
 
@@ -378,11 +378,7 @@ async def delete_annotations(
         collection="annotations", filters=filters
     )
 
-    if result.deleted_count == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="Annotations not found belonging to this Sample and/or Project.",
-        )
+    return result.deleted_count
 
 
 async def update_annotations(
@@ -416,6 +412,25 @@ async def get_files(dir_path: str, file_type: str) -> list[str]:
     file_names = map(str, file_names)
     file_names = list(sorted(file_names))
     return file_names
+
+
+async def get_directories(dir_path: str) -> list[str]:
+    dir_names = Path(dir_path).glob("*/")
+    dir_names = filter(lambda p: p.is_dir(), dir_names)
+    dir_names = map(str, dir_names)
+    dir_names = list(sorted(dir_names))
+    return dir_names
+
+
+async def filter_directories_by_file_type(
+    dir_paths: list[str], file_type: str
+) -> list[str]:
+    filtered_dirs = []
+    for dir_path in dir_paths:
+        files = await get_files(dir_path, file_type)
+        if files:
+            filtered_dirs.append(dir_path)
+    return filtered_dirs
 
 
 async def get_sample_summary(

@@ -7,9 +7,6 @@ from toktagger.api.schemas.samples import (
     SampleIn,
     ShotData,
     TimeSeriesFileData,
-    ShotProtocol,
-    FileType,
-    FileProtocol,
 )
 from toktagger.api.schemas.annotations import (
     TimePoint,
@@ -79,20 +76,20 @@ PROJECT_3 = ProjectIn(
 
 SAMPLE_1 = SampleIn(
     shot_id=1,
-    data=ShotData(protocol=ShotProtocol.UDA, signal_names=["Ip"]),
+    data=ShotData(protocol="uda", signal_names=["Ip"]),
     annotations=None,
 )
 SAMPLE_2 = SampleIn(
     shot_id=2,
-    data=ShotData(protocol=ShotProtocol.SAL, signal_names=["Ip"]),
+    data=ShotData(protocol="sal", signal_names=["Ip"]),
     annotations=None,
 )
 SAMPLE_3 = SampleIn(
     shot_id=3,
     data=TimeSeriesFileData(
         file_name="test.csv",
-        type=FileType.CSV,
-        protocol=FileProtocol.S3,
+        type="csv",
+        protocol="s3",
         signal_names=["Ip"],
     ),
     annotations=None,
@@ -101,8 +98,8 @@ SAMPLE_4 = SampleIn(
     shot_id=4,
     data=TimeSeriesFileData(
         file_name=str(pathlib.Path(__file__).parent.joinpath("test.csv").absolute()),
-        type=FileType.CSV,
-        protocol=FileProtocol.LOCAL,
+        type="csv",
+        protocol="file",
         signal_names=["Ip"],
     ),
     annotations=None,

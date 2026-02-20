@@ -1,6 +1,5 @@
 import pytest
 from bson.objectid import ObjectId
-from toktagger.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, SAMPLE_1, ANNOTATION_1, ANNOTATION_2
 from toktagger.api.schemas.samples import SampleUpdate
 from toktagger.api.schemas.models import ModelUpdate, ModelIn
@@ -65,11 +64,9 @@ async def test_delete_project_wrong_id(db_client, setup_db):
 
 @pytest.mark.asyncio
 async def test_update_project(db_client, setup_db):
-    await utils.update_project(
-        db_client,
-        setup_db["project_id_1"],
-        project=ProjectUpdate(name="Updated Project Name"),
-    )
+    project = await utils.get_project(db_client, setup_db["project_id_1"])
+    project.name = "Updated Project Name"
+    await utils.update_project(db_client, setup_db["project_id_1"], project=project)
     # Check project has been updated
     await db_client.db["projects"].find_one({"_id": ObjectId(setup_db["project_id_1"])})
 

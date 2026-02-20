@@ -1,6 +1,6 @@
+from toktagger.api.schemas.projects import Project, ProjectIn
 from typing import Literal
 from fastapi import APIRouter, Request, HTTPException, Query, Path
-from toktagger.api.schemas.projects import ProjectIn, Project, ProjectUpdate
 from toktagger.api.crud import utils
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import MongoDBClient
@@ -111,7 +111,7 @@ async def get_project(
 )
 async def update_project(
     request: Request,
-    project: ProjectUpdate,
+    project: Project,
     project_id: str = Path(description="The ID of the project to activate"),
 ):
     """Update a project's information.

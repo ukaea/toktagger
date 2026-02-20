@@ -2,7 +2,6 @@
 import {
   MultiVariateTimeSeriesData,
   Zone,
-  Category,
   DisplayAnnotation,
   ZoneSchema,
   TimeRegionSchema,
@@ -11,6 +10,7 @@ import {
   VSpanSchema,
   VSpan,
   TimePointSchema,
+  Category,
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
@@ -22,6 +22,7 @@ import {
   arrayMax,
   arrayMin,
   createAnnotationToDisplayAnnotationFunc,
+  randomColor,
   updateAnnotations,
 } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
@@ -31,38 +32,35 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 
-const zoneCategories: Category[] = [
-  { name: "ELM", color: "#FF5733" },
-  { name: "L-mode", color: "#33FF57" },
-  { name: "H-mode", color: "#3357FF" },
-  { name: "Thermal Quench", color: "#FF33A8" },
-  { name: "Current Quench", color: "#A833FF" },
-  { name: "Sawtooth", color: "#33FFF6" },
-  { name: "IRE", color: "#FFC733" },
-  { name: "Locked Mode", color: "#8DFF33" },
-  { name: "VDE", color: "#FF3380" },
-  { name: "Flat Top", color: "#33A8FF" },
-  { name: "Ramp Up", color: "#FF8D33" },
-  { name: "Ramp Down", color: "#3380FF" },
-  { name: "Unknown", color: "#B0B0B0" },
-];
-
-const vspanCategories: Category[] = [
-  { name: "Disruption", color: "#33FFAA" },
-  { name: "Thermal Quench", color: "#FFAA33" },
-  { name: "Current Quench", color: "#AA33FF" },
-  { name: "Control Loss", color: "#FF3333" },
-];
-
-const categoryColors = zoneCategories
-  .concat(vspanCategories)
-  .reduce<Record<string, string>>((acc, curr) => {
-    acc[curr.name] = curr.color;
-    return acc;
-  }, {});
-
 export const TimeSeriesView = () => {
-  const { data, annotations, setAnnotations } = useSample();
+  const { project, data, annotations, setAnnotations } = useSample();
+
+  const zoneCategories: Category[] = useMemo(() => {
+    const timeRegionLabels = project?.time_region_labels || [];
+    return timeRegionLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.time_region_labels]);
+
+  const vspanCategories: Category[] = useMemo(() => {
+    const timePointLabels = project?.time_point_labels || [];
+    return timePointLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.time_point_labels]);
+
+  const categoryColors = useMemo(
+    () =>
+      zoneCategories
+        .concat(vspanCategories)
+        .reduce<Record<string, string>>((acc, curr) => {
+          acc[curr.name] = curr.color;
+          return acc;
+        }, {}),
+    [zoneCategories, vspanCategories],
+  );
 
   const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -90,7 +88,7 @@ export const TimeSeriesView = () => {
 
     setZones(newZones);
     setVSpans(newVSpans);
-  }, [annotations, viewData]);
+  }, [annotations, viewData, categoryColors]);
 
   const updateVSpans = (newVSpans: Array<VSpan>) => {
     updateAnnotations(setAnnotations, newVSpans, TimePointSchema);

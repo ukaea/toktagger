@@ -424,8 +424,7 @@ export const TimeSeries = ({
       }
     };
 
-    // Delete selected spans on Delete/Backspace keypress
-    document.addEventListener("keydown", (e) => {
+    const deleteSelected = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key == "Backspace") {
         e.preventDefault(); // Prevent default delete behavior
 
@@ -439,7 +438,10 @@ export const TimeSeries = ({
           handleZoneDelete(zone);
         }
       }
-    });
+    };
+
+    // Delete selected spans on Delete/Backspace keypress
+    document.addEventListener("keydown", deleteSelected);
 
     dragElements.forEach((dragElement) => {
       dragElement.addEventListener("contextmenu", contextHandler); // add context-menu listener
@@ -459,6 +461,7 @@ export const TimeSeries = ({
         dragElement.removeEventListener("mousemove", updateTool);
       });
       document.removeEventListener("keyup", cancelToolCreation);
+      document.removeEventListener("keydown", deleteSelected);
     };
   }, [
     plotId,
