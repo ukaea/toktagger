@@ -698,4 +698,79 @@ def test_query_strategies(
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
 
 
-# TODO: Test validated annotations alert box
+def test_validated_alertbox(server_setup, page: Page):
+    project_id, sample_ids = create_query_strategy_samples(query_strategy="sequential")
+    # Go to sample with validated annotations
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}")
+    # Check box says they are validated
+    expect(page.get_by_text("Annotations Validated")).to_be_visible()
+
+    # Go to sample with non validated annotations
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[2]}")
+
+    # Check box says they are NOT validated
+    expect(page.get_by_text("Annotations Not Validated")).to_be_visible()
+
+    # Press Save
+    page.get_by_role("button", name="Save").click()
+
+    # Check updates to validated
+    expect(page.get_by_text("Annotations Validated")).to_be_visible()
+
+    # Go to sample with no annotations
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[3]}")
+
+    # Check box says they are NOT validated
+    expect(page.get_by_text("Annotations Not Validated")).to_be_visible()
+
+    # Disable save on navigate
+    page.get_by_role("checkbox", name="Save on Navigate").click()
+    expect(page.get_by_role("checkbox", name="Save on Navigate")).not_to_be_checked()
+
+    # Press Next
+    page.get_by_role("button", name="Next").click()
+
+    # Check page updated
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[4]}"
+    )
+
+    # Go back
+    page.get_by_role("button", name="Previous").click()
+
+    # Check page updated
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[3]}"
+    )
+
+    # Check box says they are NOT validated since it wasn't saved
+    expect(page.get_by_text("Annotations Not Validated")).to_be_visible()
+
+    # Re-enable Save on Navigate
+    page.get_by_role("checkbox", name="Save on Navigate").click()
+    expect(page.get_by_role("checkbox", name="Save on Navigate")).to_be_checked()
+
+    # Press Next
+    page.get_by_role("button", name="Next").click()
+
+    # Check page updated
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[4]}"
+    )
+
+    # This sample should be non validated
+    expect(page.get_by_text("Annotations Not Validated")).to_be_visible()
+
+    # Press Next, should not change sample since there are no more, but should update to validated
+    page.get_by_role("button", name="Next").click()
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[4]}"
+    )
+    expect(page.get_by_text("Annotations Validated")).to_be_visible()
+
+    # Go back to previous sample, check now it says Validated since it was saved on navigate before
+    page.get_by_role("button", name="Previous").click()
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[3]}"
+    )
+    expect(page.get_by_text("Annotations Validated")).to_be_visible()
