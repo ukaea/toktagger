@@ -696,3 +696,6 @@ def test_query_strategies(
 
     # Should be back to start, previous button should be greyed out
     expect(page.get_by_role("button", name="Previous")).to_be_disabled()
+
+
+# TODO: Test validated annotations alert box

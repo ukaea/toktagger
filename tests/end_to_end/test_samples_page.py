@@ -7,6 +7,7 @@ from tests.endpoints import (
     create_local_samples,
     create_uda_samples,
     create_model_samples,
+    create_query_strategy_samples,
 )
 import time
 import requests
@@ -262,6 +263,89 @@ def test_samples_search(server_setup, page: Page):
     # Should find all 6 entries
     expect(page.get_by_role("row").nth(6)).to_contain_text("10006")
     expect(page.get_by_role("row").nth(7)).to_be_hidden()
+
+
+@pytest.mark.parametrize(
+    ("query_strategy", "expected_next", "sort_by", "sort_direction"),
+    [
+        (
+            "uncertainty",
+            4,  # Most uncertain
+            "shot_id",
+            "ascending",
+        ),
+        (
+            "uncertainty",
+            4,  # Most uncertain,
+            "shot_id",
+            "descending",  # Order of samples shouldn't make any difference
+        ),
+        (
+            "random",
+            3,  # Random order of non-validated
+            "shot_id",
+            "ascending",
+        ),
+        (
+            "random",
+            3,  # Random order of non-validated
+            "shot_id",
+            "descending",
+        ),
+        (
+            "sequential",
+            2,  # Increasing order of shot, first non-validated
+            "shot_id",
+            "ascending",
+        ),
+        (
+            "sequential",
+            4,  # Decreasing order of shot, first non validated
+            "shot_id",
+            "descending",
+        ),
+        (
+            "sequential",
+            4,  # Increasing order of time created, first non validated
+            "_id",
+            "ascending",
+        ),
+        (
+            "sequential",
+            2,  # Decreasing order of time created, first non validated
+            "_id",
+            "descending",
+        ),
+    ],
+)
+def test_samples_jump_to_next_button(
+    server_setup, page: Page, query_strategy, expected_next, sort_by, sort_direction
+):
+    project_id = create_project("Test Project", "time-series", "parquet")
+
+    project_id, sample_ids = create_query_strategy_samples(
+        query_strategy=query_strategy
+    )
+    # Go to samples table
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+    check_base_page(page)
+
+    # Click columns if needed to set ordering
+    if sort_by == "_id":
+        page.get_by_role("columnheader", name="Date Created").click()
+        if sort_direction == "descending":
+            page.get_by_role("columnheader", name="Date Created").click()
+    elif sort_direction == "descending":
+        page.get_by_role("columnheader", name="Shot ID").click()
+
+    # Press Jump to Next Sample
+    page.get_by_role("button", name="Jump to Next Sample").click()
+
+    # Check navigated to next sample
+    expect(page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[expected_next]}?sortColumn={sort_by}&sortDirection={sort_direction}"
+    )
+    expect(page.get_by_label("time-series")).to_be_visible()
 
 
 def test_create_samples_shot_data(server_setup, page: Page):
@@ -692,6 +776,3 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     )
     assert response.status_code == 200
     assert len(response.json()) == 30
-
-
-# TODO test jump to next button
