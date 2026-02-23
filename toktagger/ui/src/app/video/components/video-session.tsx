@@ -44,7 +44,6 @@ import {
 } from "./anno-utils";
 import {
   clampOverlayToNaturalImage,
-  doubleRAF,
   sameOverlay,
 } from "./overlay-sync-utils";
 
@@ -457,10 +456,12 @@ export function VideoSessionProvider(props: {
       // Push corrected overlay back into Annotorious when it diverges.
       if (!sameOverlay(raw, normalized)) {
         isProgrammaticAnnoSyncRef.current = true;
-        api.setAnnotations?.(normalized, true);
-        void doubleRAF().then(() => {
+        try {
+          api.clearAnnotations?.();
+          api.setAnnotations?.(normalized);
+        } finally {
           isProgrammaticAnnoSyncRef.current = false;
-        });
+        }
       }
 
       // Persist normalized overlay for this frame in the session store.
@@ -501,20 +502,21 @@ export function VideoSessionProvider(props: {
 
   useEffect(() => {
     if (!api?.setAnnotations) return;
+    if (!imageNatural?.w || !imageNatural?.h) return;
 
     const cur = api.getAnnotations!();
     if (sameOverlay(cur, desiredOverlay)) return;
 
-    // Clear selection so popup closes when switching frames / overlays
-    api.setSelected?.();
-
     isProgrammaticAnnoSyncRef.current = true;
-    api.setAnnotations(desiredOverlay, true);
-
-    void doubleRAF().then(() => {
+    try {
+      // Clear selection so popup closes when switching frames / overlays
+      api.setSelected?.();
+      api.clearAnnotations?.();
+      api.setAnnotations?.(desiredOverlay);
+    } finally {
       isProgrammaticAnnoSyncRef.current = false;
-    });
-  }, [api, desiredOverlay]);
+    }
+  }, [api, desiredOverlay, imageNatural?.h, imageNatural?.w]);
 
   /**
    * Event wiring:

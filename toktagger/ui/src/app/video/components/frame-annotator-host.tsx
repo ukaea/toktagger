@@ -30,13 +30,38 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  * to the session store directly.
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
-  const session = useVideoSession();
+  const { frame, setImageNatural, selection, deleteAnnotation, closePopup } =
+    useVideoSession();
 
   // --- Responsive upscale measurement state ---
   const imgRef = useRef<HTMLImageElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [containerW, setContainerW] = useState<number>(0);
+
+  useEffect(() => {
+    setNatural(null);
+    setImageNatural(null);
+  }, [frame, setImageNatural]);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+
+    const onLoad = () => {
+      const next = { w: img.naturalWidth, h: img.naturalHeight };
+      if (next.w > 0 && next.h > 0) {
+        setNatural(next);
+        setImageNatural(next);
+      }
+    };
+
+    // Handle cached images that may already be complete before listener registration.
+    if (img.complete && img.naturalWidth > 0) onLoad();
+
+    img.addEventListener("load", onLoad);
+    return () => img.removeEventListener("load", onLoad);
+  }, [imageBase64, setImageNatural]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -82,8 +107,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     return Math.min(maxAvailable, maxScaled, desired);
   }, [containerW, natural]);
 
-  const drawingEnabled = !!session.selection.className;
-  const label = session.frame;
+  const drawingEnabled = !!selection.className;
+  const label = frame;
 
   return (
     // This keeps centering approach:
@@ -105,13 +130,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             src={`data:image/png;base64,${imageBase64}`}
             alt={`Frame ${label}`}
             draggable={false}
-            onLoad={() => {
-              const img = imgRef.current;
-              if (!img) return;
-              const next = { w: img.naturalWidth, h: img.naturalHeight };
-              setNatural(next);
-              session.setImageNatural(next);
-            }}
             className="block mx-auto h-auto object-contain select-none"
             // Key change: explicitly set width on the IMG so Annotorious can't shrink-wrap it away.
             style={{
@@ -140,10 +158,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                 onDeleteBox={() => {
                   const id = annotation?.id;
                   if (!id) return;
-                  session.deleteAnnotation(id);
+                  deleteAnnotation(id);
                 }}
                 onClose={() => {
-                  session.closePopup();
+                  closePopup();
                 }}
               />
             );

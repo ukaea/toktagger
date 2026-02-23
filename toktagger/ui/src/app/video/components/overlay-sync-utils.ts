@@ -48,12 +48,6 @@ export function sameOverlay(
   return true;
 }
 
-export async function doubleRAF() {
-  await new Promise<void>((r) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => r())),
-  );
-}
-
 export function clampRectToImage(
   g: { x: number; y: number; w: number; h: number },
   nw: number,
