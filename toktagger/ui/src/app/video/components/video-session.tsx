@@ -42,10 +42,7 @@ import {
   stampLabelAndTrack,
   normalizeOverlayForSession,
 } from "./anno-utils";
-import {
-  clampOverlayToNaturalImage,
-  sameOverlay,
-} from "./overlay-sync-utils";
+import { clampOverlayToNaturalImage, sameOverlay } from "./overlay-sync-utils";
 
 /**
  * Session state for the frame-by-frame annotation workflow.
