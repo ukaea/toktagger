@@ -15,6 +15,8 @@ import {
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { TimeSeries } from "@/app/components/plots/time-series";
+import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
+import {TimeSeriesProvider} from "@/app/contexts/TimeSeriesContext"
 import { Zones } from "@/app/components/tools/zones";
 import "react-contexify/ReactContexify.css";
 
@@ -206,28 +208,30 @@ export const TimeSeriesView = () => {
     <View width="100%">
       <Flex justifyContent="center" alignItems="center">
         <ContextMenuProvider menuId="time-series-menu">
-          <ZoneProvider
-            categories={zoneCategories}
-            initialData={zones}
-            onModifyZone={updateZones}
-          >
-            <VSpanProvider
-              categories={vspanCategories}
-              initialData={vspans}
-              onModifyVSpan={updateVSpans}
+          <TimeSeriesProvider>
+            <ZoneProvider
+              categories={zoneCategories}
+              initialData={zones}
+              onModifyZone={updateZones}
             >
-              <Flex direction="column" gap="size-200">
-                <TimeSeries
-                  plotId="TimesSeriesView"
-                  plotConfig={{ data: plotData, layout: plotLayout }}
-                >
-                  <Zones onUpdate={updateZones} />
-                  <VSpans onUpdate={updateVSpans} />
-                </TimeSeries>
-                <AnnotationsTable />
-              </Flex>
-            </VSpanProvider>
-          </ZoneProvider>
+              <VSpanProvider
+                categories={vspanCategories}
+                initialData={vspans}
+                onModifyVSpan={updateVSpans}
+              >
+                <Flex direction="column" gap="size-200">
+                  <BaseTimeSeriesPlot
+                    plotId="TimesSeriesView"
+                    plotConfig={{ data: plotData, layout: plotLayout }}
+                  >
+                    <Zones onUpdate={updateZones} />
+                    <VSpans onUpdate={updateVSpans} />
+                  </BaseTimeSeriesPlot>
+                  <AnnotationsTable />
+                </Flex>
+              </VSpanProvider>
+            </ZoneProvider>
+          </TimeSeriesProvider>
         </ContextMenuProvider>
       </Flex>
     </View>
