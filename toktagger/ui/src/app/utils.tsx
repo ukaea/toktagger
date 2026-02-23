@@ -25,6 +25,30 @@ import {
   BoundingBoxAnnotation,
 } from "@/types";
 
+const colorPalette = [
+  "#FF5733",
+  "#33FF57",
+  "#3357FF",
+  "#FF33A8",
+  "#A833FF",
+  "#33FFF6",
+  "#FFC733",
+  "#8DFF33",
+  "#FF3380",
+  "#33A8FF",
+  "#FF8D33",
+  "#3380FF",
+  "#33FFAA",
+  "#FFAA33",
+  "#AA33FF",
+  "#FF3333",
+];
+
+export function randomColor(index: number): string {
+  const color = colorPalette[index % colorPalette.length];
+  return color;
+}
+
 export const linspace = (start: number, end: number, num: number) => {
   const step = (end - start) / (num - 1);
   const arr = [];
@@ -116,7 +140,10 @@ export const createAnnotationToDisplayAnnotationFunc = (
         created_by: timeRegion.created_by,
         x0: timeRegion.time_min,
         x1: timeRegion.time_max,
-        category: { name: timeRegion.label, color: colors[timeRegion.label] },
+        category: {
+          name: timeRegion.label,
+          color: colors[timeRegion.label] || "rgb(150, 150, 150)",
+        },
       };
       return zone;
     } else if (TimePointSchema.safeParse(item).success) {
@@ -125,21 +152,26 @@ export const createAnnotationToDisplayAnnotationFunc = (
         selected: false,
         created_by: timePoint.created_by,
         x: timePoint.time,
-        category: { name: timePoint.label, color: colors[timePoint.label] },
+        category: {
+          name: timePoint.label,
+          color: colors[timePoint.label] || "rgb(150, 150, 150)",
+        },
       };
       return vspan;
     } else if (PolygonAnnotationSchema.safeParse(item).success) {
       const polygonData = PolygonAnnotationSchema.parse(item);
+      console.log(polygonData.label, colors);
       const polygon: Polygon = {
         x: polygonData.segmentation[0].filter((_, index) => index % 2 === 0),
         y: polygonData.segmentation[0].filter((_, index) => index % 2 === 1),
         created_by: polygonData.created_by,
         category: {
           name: polygonData.label,
-          color: colors[polygonData.label],
+          color: colors[polygonData.label] || "rgb(150, 150, 150)",
         },
         selected: false,
       };
+      console.log("Converted polygon annotation:", polygon);
       return polygon;
     } else if (BoundingBoxAnnotationSchema.safeParse(item).success) {
       const bboxData = BoundingBoxAnnotationSchema.parse(item);
@@ -151,7 +183,7 @@ export const createAnnotationToDisplayAnnotationFunc = (
         created_by: bboxData.created_by,
         category: {
           name: bboxData.label,
-          color: colors[bboxData.label],
+          color: colors[bboxData.label] || "rgb(150, 150, 150)",
         },
         selected: false,
       };

@@ -1,10 +1,12 @@
 "use client";
-import { MultiVariateTimeSeriesData, TimeSeriesData } from "@/types";
 import { PlotlyWidget } from "@/app/components/plots/plotly";
+import "react-contexify/ReactContexify.css";
+
+import { MultiVariateTimeSeriesData, TimeSeriesData, Category } from "@/types";
 import { Zones } from "@/app/components/tools/zones";
 import "react-contexify/ReactContexify.css";
 
-import { arrayMax, arrayMin } from "@/app/utils";
+import { arrayMax, arrayMin, randomColor } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
 import { VSpans } from "@/app/components/tools/vspans";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -12,7 +14,34 @@ import { Flex } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 
 export const TimeSeriesView = () => {
-  const { data } = useSample();
+  const { project, data } = useSample();
+
+  const zoneCategories: Category[] = useMemo(() => {
+    const timeRegionLabels = project?.time_region_labels || [];
+    return timeRegionLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.time_region_labels]);
+
+  const vspanCategories: Category[] = useMemo(() => {
+    const timePointLabels = project?.time_point_labels || [];
+    return timePointLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.time_point_labels]);
+
+  const categoryColors = useMemo(
+    () =>
+      zoneCategories
+        .concat(vspanCategories)
+        .reduce<Record<string, string>>((acc, curr) => {
+          acc[curr.name] = curr.color;
+          return acc;
+        }, {}),
+    [zoneCategories, vspanCategories],
+  );
 
   const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
 

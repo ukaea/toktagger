@@ -57,7 +57,7 @@ async def setup_model_db(db_client):
         name="Test",
         task=Task.TIME_SERIES,
         query_strategy=QueryStrategyType.RANDOM,
-        data_loader="parquet",
+        data_loader="tabular",
     )
     project_id = await db_client.insert("projects", project)
     sample_ids = []

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ListView, Item } from "@adobe/react-spectrum";
-import { Annotation } from "@/types";
+import { Annotation, ClassLabel } from "@/types";
 import { Selection } from "@react-types/shared";
 import { useSample } from "@/app/contexts/SampleContext";
 
@@ -9,7 +9,7 @@ export type ShotLabelsType = {
 };
 
 export function ShotLabels({ labels = [] }: ShotLabelsType) {
-  const { annotations, setAnnotations } = useSample();
+  const { project, sample, annotations, setAnnotations } = useSample();
   const items = labels.map((label, index) => ({ id: index, name: label }));
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
@@ -50,15 +50,18 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
           }
 
           newAnnotations.push({
+            project_id: project?._id,
+            sample_id: sample?._id,
+            shot_id: sample?.shot_id,
             type: "class_label",
             label: item.name,
             created_by: "manual",
-          });
+          } as ClassLabel);
         });
         return newAnnotations;
       });
     },
-    [items, setAnnotations],
+    [project, sample, items, setAnnotations],
   );
 
   useEffect(() => {

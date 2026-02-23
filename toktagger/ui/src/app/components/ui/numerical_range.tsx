@@ -7,6 +7,8 @@ export type NumericalRangeType = {
 };
 
 export default function NumericalRange({
+  rangeMin,
+  rangeMax,
   defaultMin,
   defaultMax,
   label,
@@ -14,15 +16,17 @@ export default function NumericalRange({
   maximumFractionDigits,
   onChange,
 }: {
-  defaultMin: number | null;
-  defaultMax: number | null;
+  rangeMin?: number;
+  rangeMax?: number;
+  defaultMin?: number;
+  defaultMax?: number;
   label: string;
   isRequired?: boolean;
   maximumFractionDigits?: number | undefined;
   onChange?: (range: NumericalRangeType) => void;
 }) {
-  const [minValue, setMinValue] = useState<number | null>(defaultMin);
-  const [maxValue, setMaxValue] = useState<number | null>(defaultMax);
+  const [minValue, setMinValue] = useState<number | null>(defaultMin ?? null);
+  const [maxValue, setMaxValue] = useState<number | null>(defaultMax ?? null);
 
   useEffect(() => {
     onChange?.({ min: minValue, max: maxValue });
@@ -31,6 +35,8 @@ export default function NumericalRange({
   return (
     <Flex direction="row" gap="size-200" alignItems="center">
       <NumberField
+        minValue={rangeMin ?? Number.MIN_SAFE_INTEGER}
+        maxValue={rangeMax ?? Number.MAX_SAFE_INTEGER}
         label={`${label} Min`}
         isRequired={isRequired}
         value={minValue ?? undefined}
@@ -49,6 +55,8 @@ export default function NumericalRange({
         }}
       />
       <NumberField
+        minValue={rangeMin ?? Number.MIN_SAFE_INTEGER}
+        maxValue={rangeMax ?? Number.MAX_SAFE_INTEGER}
         label={`${label} Max`}
         isRequired={isRequired}
         value={maxValue ?? undefined}

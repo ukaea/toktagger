@@ -283,6 +283,21 @@ export const exportAnnotations = async (project: Project, sample?: Sample) => {
   }
 };
 
+export const deleteSample = async (project_id: string, sample_id: string) => {
+  await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
+    {
+      method: "DELETE",
+    },
+  );
+};
+
+export const deleteSamples = async (project_id: string) => {
+  await fetch(`${BACKEND_API_URL}/projects/${project_id}/samples`, {
+    method: "DELETE",
+  });
+};
+
 export const startTraining = async (
   project_id: string,
   selected_model: string,

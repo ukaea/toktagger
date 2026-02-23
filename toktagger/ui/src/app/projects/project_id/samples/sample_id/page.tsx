@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Provider,
   defaultTheme,
@@ -25,6 +25,7 @@ import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { PolygonProvider } from "@/app/components/providers/polygon-provider";
 import { VideoView } from "@/app/frames/components/frames";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
+import { randomColor } from "@/app/utils";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -54,6 +55,38 @@ const SampleDataBreadCrumbs = ({
 const SampleView = () => {
   const { project, isLoading, error } = useSample();
 
+  const zoneCategories: Category[] = useMemo(() => {
+    const timeRegionLabels = project?.time_region_labels || [];
+    return timeRegionLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.time_region_labels]);
+
+  const vspanCategories: Category[] = useMemo(() => {
+    const timePointLabels = project?.time_point_labels || [];
+    return timePointLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.time_point_labels]);
+
+  const polygonCategories: Category[] = useMemo(() => {
+    const polygonLabels = project?.polygon_labels || [];
+    return polygonLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.polygon_labels]);
+
+  const boundingBoxCategories: Category[] = useMemo(() => {
+    const boundingBoxLabels = project?.bounding_box_labels || [];
+    return boundingBoxLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project?.bounding_box_labels]);
+
   if (error) return <ErrorView message={error} />;
 
   if (!project) return isLoading ? <LoadingView /> : null;
@@ -62,29 +95,6 @@ const SampleView = () => {
   if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
 
   if (project.task == TaskType.TimeSeries) {
-    const zoneCategories: Category[] = [
-      { name: "ELM", color: "#FF5733" },
-      { name: "L-mode", color: "#33FF57" },
-      { name: "H-mode", color: "#3357FF" },
-      { name: "Thermal Quench", color: "#FF33A8" },
-      { name: "Current Quench", color: "#A833FF" },
-      { name: "Sawtooth", color: "#33FFF6" },
-      { name: "IRE", color: "#FFC733" },
-      { name: "Locked Mode", color: "#8DFF33" },
-      { name: "VDE", color: "#FF3380" },
-      { name: "Flat Top", color: "#33A8FF" },
-      { name: "Ramp Up", color: "#FF8D33" },
-      { name: "Ramp Down", color: "#3380FF" },
-      { name: "Unknown", color: "#B0B0B0" },
-    ];
-
-    const vspanCategories: Category[] = [
-      { name: "Disruption", color: "#33FFAA" },
-      { name: "Thermal Quench", color: "#FFAA33" },
-      { name: "Current Quench", color: "#AA33FF" },
-      { name: "Control Loss", color: "#FF3333" },
-    ];
-
     return (
       <ContextMenuProvider menuId="time-series-menu">
         <ZoneProvider categories={zoneCategories}>
@@ -99,25 +109,6 @@ const SampleView = () => {
       </ContextMenuProvider>
     );
   } else if (project.task == TaskType.Spectrogram) {
-    const vspanCategories: Category[] = [
-      { name: "Mode Locked", color: "rgb(255, 0, 0)" },
-    ];
-
-    const zoneCategories: Category[] = [
-      { name: "NTM", color: "rgb(0, 255, 255)" },
-      { name: "LLM", color: "rgb(200, 100, 100)" },
-      { name: "Sawteeth", color: "rgb(100, 200, 100)" },
-    ];
-
-    const boundingBoxCategories: Category[] = [
-      { name: "Unknown", color: "rgb(150, 150, 150)" },
-      { name: "NTM", color: "rgb(0, 255, 255)" },
-      { name: "LLM", color: "rgb(200, 100, 100)" },
-      { name: "Sawteeth", color: "rgb(100, 200, 100)" },
-    ];
-
-    const polygonCategories: Category[] = boundingBoxCategories;
-
     return (
       <ContextMenuProvider menuId="spectrogram-menu">
         <ZoneProvider categories={zoneCategories}>

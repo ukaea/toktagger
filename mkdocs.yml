@@ -20,6 +20,7 @@ nav:
   - Time Series Labelling: time_series.md
   - Spectrogram Labelling: spectrogram.md
   - Annotators: annotators.md
+  - Data Loaders: data_loaders.md
   - Advanced:
     - Custom Data Loaders: custom_dataloaders.md
     - Custom Models: custom_models.md

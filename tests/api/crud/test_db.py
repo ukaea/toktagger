@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 from bson.objectid import ObjectId
+from toktagger.api.crud import utils
 from toktagger.api.crud.db import MongoDBClient
-from toktagger.api.schemas.projects import ProjectUpdate
 from tests.db_definitions import PROJECT_1, PROJECT_2, SAMPLE_1, SAMPLE_2
 import pytest_asyncio
 
@@ -89,8 +89,10 @@ async def test_insert_many_same_ids(db_client):
 @pytest.mark.asyncio
 async def test_update(db_client: MongoDBClient):
     project_id = await db_client.insert(collection="projects", model=PROJECT_1)
-    update = ProjectUpdate(name="New Project Name")
-    await db_client.update("projects", update, ObjectId(project_id))
+    project = await utils.get_project(db_client, project_id)
+    project.name = "New Project Name"
+
+    await db_client.update("projects", project, ObjectId(project_id))
 
     # Check project has been updated
     retrieved_project = await db_client.db["projects"].find_one(

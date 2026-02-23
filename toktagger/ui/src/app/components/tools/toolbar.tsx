@@ -348,13 +348,13 @@ export default function ToolBar() {
 
   const tools: { name: string; component: React.ReactNode }[] = [];
 
-  if (project.task == TaskType.TimeSeries) {
-    const labels = ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels}></ShotLabels>,
-    });
+  const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
+  tools.push({
+    name: "Shot Labels",
+    component: <ShotLabels labels={labels}></ShotLabels>,
+  });
 
+  if (project.task == TaskType.TimeSeries) {
     tools.push({
       name: "Peak Detection",
       component: (

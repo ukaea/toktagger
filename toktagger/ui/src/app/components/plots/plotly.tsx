@@ -734,8 +734,6 @@ export const PlotlyWidget = ({
     // Delete selected spans on Delete/Backspace keypress
     document.addEventListener("keydown", (e) => {
       if (e.key === "Delete" || e.key == "Backspace") {
-        e.preventDefault(); // Prevent default delete behavior
-
         const selectedSpans = vspans.filter((span: VSpan) => span.selected);
         for (const span of selectedSpans) {
           handleVSpanDelete(span);

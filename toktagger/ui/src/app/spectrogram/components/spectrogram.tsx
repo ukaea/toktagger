@@ -5,21 +5,51 @@ import {
   Annotation,
   SpectrogramMaskSchema,
   SpectrogramMask,
+  Category,
 } from "@/types";
 import { applyGlobalStyle, arrayMax, arrayMin } from "@/app/utils";
 import { PlotlyWidget } from "@/app/components/plots/plotly";
 import { Zones } from "@/app/components/tools/zones";
 import { VSpans } from "@/app/components/tools/vspans";
 import * as d3 from "d3";
-import { useSample } from "@/app/contexts/SampleContext";
-import { useEffect, useState } from "react";
-import { Flex } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import { useBoundingBoxContext } from "@/app/components/providers/bounding-box-provider";
 import { usePolygonContext } from "@/app/components/providers/polygon-provider";
+import { randomColor } from "@/app/utils";
+import { useSample } from "@/app/contexts/SampleContext";
+import { useEffect, useMemo, useState } from "react";
+import { Flex } from "@adobe/react-spectrum";
+import { Plotly } from "plotly.js-dist-min";
 
 export const SpectrogramView = () => {
-  const { data, annotations, plotProps } = useSample();
+  const { project, data, annotations, plotProps } = useSample();
+
+  const zoneCategories: Category[] = useMemo(() => {
+    const timeRegionLabels = project?.time_region_labels || [];
+    return timeRegionLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project]);
+
+  const vspanCategories: Category[] = useMemo(() => {
+    const timePointLabels = project?.time_point_labels || [];
+    return timePointLabels.map((label, index) => ({
+      name: label,
+      color: randomColor(index),
+    }));
+  }, [project]);
+
+  const colorMapping = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    zoneCategories.forEach((category) => {
+      mapping[category.name] = category.color;
+    });
+    vspanCategories.forEach((category) => {
+      mapping[category.name] = category.color;
+    });
+    return mapping;
+  }, [zoneCategories, vspanCategories]);
 
   const { polygons } = usePolygonContext();
   const { boundingBoxes } = useBoundingBoxContext();
