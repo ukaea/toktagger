@@ -1,3 +1,4 @@
+import { PlotlyHTMLElement } from "plotly.js";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
@@ -261,11 +262,26 @@ export enum ToolingTypes {
   VSPAN,
 }
 
+export enum TimeSeriesAnnotationType {
+  VSPAN = "VSPAN",
+  HZone = "HZONE",
+}
+
+export type TimeSeriesAnnotationPoint = {
+  x: number;
+  y: number;
+};
+
+export type TimeSeriesAnnotation = {
+  id: string;
+  type: TimeSeriesAnnotationType;
+  points: TimeSeriesAnnotationPoint[];
+};
+
 export type ToolingCallbacks = {
-  id: ToolingTypes;
   start: (x: number, y: number) => void;
   move: (x: number, y: number) => void;
-  end: (x: number, y: number) => void;
+  //end: (x: number, y: number) => void;
 };
 
 export type PlotProps = {
@@ -273,3 +289,10 @@ export type PlotProps = {
   numSignificantDigits?: number;
   thresholdActive?: boolean;
 };
+
+type PlotlyAxisTransforms = {
+  p2d: (pixels: number) => number;
+};
+export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
+  _fullLayout: Record<string, PlotlyAxisTransforms>;
+}

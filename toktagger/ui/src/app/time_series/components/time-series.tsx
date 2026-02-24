@@ -29,7 +29,8 @@ import {
 } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
-import { VSpans } from "@/app/components/tools/vspans";
+//import { VSpans } from "@/app/components/tools/vspans";
+import { VSpans } from "@/app/components/tools/vspans-update";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
@@ -176,7 +177,7 @@ export const TimeSeriesView = () => {
 
     return {
       uirevision: "true",
-      grid: { rows: 1, columns: 1, pattern: "independent" },
+      //grid: { rows: 1, columns: 1, pattern: "independent" },
       dragmode: "pan",
       width: window.innerWidth * 0.84,
       height: window.innerHeight * 0.9,
@@ -225,7 +226,7 @@ export const TimeSeriesView = () => {
                     plotConfig={{ data: plotData, layout: plotLayout }}
                   >
                     <Zones onUpdate={updateZones} />
-                    <VSpans onUpdate={updateVSpans} />
+                    <VSpans />
                   </BaseTimeSeriesPlot>
                   <AnnotationsTable />
                 </Flex>

@@ -8,9 +8,12 @@ import {
 } from "plotly.js"
 import {
     useEffect,
+    useRef,
     useState
 } from "react"
-import {TimeSeriesAnnotationType, useTimeSeriesActions} from "@/app/contexts/TimeSeriesContext"
+import {useTimeSeriesActions, useTimeSeriesState} from "@/app/contexts/TimeSeriesContext"
+import { ExtendedPlotlyHTMLElement, TimeSeriesAnnotationPoint } from "@/types"
+import React from "react"
 
 const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
     modeBarButtons: [
@@ -34,9 +37,17 @@ interface PlotConfiguration {
   config?: Partial<Config>;
 }
 
+type InjectedProps = {
+  plotId: string;
+  plotReady: boolean;
+};
+
 type TimeSeriesPlotProps = {
     plotId?: string;
     plotConfig: PlotConfiguration;
+    children:
+        | React.ReactElement<InjectedProps>
+        | React.ReactElement<InjectedProps>[];
 }
 
 export const BaseTimeSeriesPlot = ({
@@ -45,11 +56,15 @@ export const BaseTimeSeriesPlot = ({
         data,
         layout,
         config = DEFAULT_PLOTLY_CONFIG
-    }
+    },
+    children
 }: TimeSeriesPlotProps) => {
     const [plotReady, setPlotReady] = useState(false);
 
-    const {createAnnotation, addAnnotation} = useTimeSeriesActions();
+    const {createAnnotation, addAnnotation, triggerUpdate} = useTimeSeriesActions();
+    const {activeAnnotationTool, toolingCallbacks} = useTimeSeriesState();
+
+    const isDraggingRef = useRef(false);
 
     const plotId = externalId || "time-series";
     
@@ -99,51 +114,143 @@ export const BaseTimeSeriesPlot = ({
             setPlotReady(true);
         };
 
+        const relayoutHandler = () => {
+            triggerUpdate();
+        };
+
         const initGraph = async () => {
             react(plot, data, layout, config).then(generateOverplots);
+
+            plot.removeAllListeners("plotly_relayout"); // remove any existing listeners
+            plot.on("plotly_relayout", relayoutHandler);
         }
-        initGraph()
-    }, [config, data, layout, plotId])
+        initGraph();
+
+        return () => {
+            // cleanup on unmount / Fast-Refresh
+            overplots.forEach((overplot) => {
+                plot?.querySelector(`.${overplot}`)?.remove(); // remove custom overlay group
+            });
+            setPlotReady(false); // reset ready state
+        };
+    }, [config, data, layout, plotId, triggerUpdate])
 
     useEffect(() => {
         if (!plotReady) {
             // Plot may not have loaded yet - this will rerun after loading
             return;
         }
-        const plot = document.getElementById(plotId);
+        const plot = document.getElementById(plotId) as PlotlyHTMLElement;
         if (!plot) {
             console.error("Could not locate plot to assign click handler");
             return;
         }
 
+        function getClickData(event: MouseEvent, _plot: PlotlyHTMLElement): TimeSeriesAnnotationPoint {
+            const plot = _plot as ExtendedPlotlyHTMLElement;
+            let xaxis = plot._fullLayout.xaxis; // x-axis descriptor
+            let yaxis = plot._fullLayout.yaxis; // y-axis descriptor
+
+            const bb = (event.target as HTMLElement).getBoundingClientRect();
+            const relX = event.clientX - bb.left; // click X in pixels, relative to plot
+            const relY = event.clientY - bb.top; // click Y in pixels, relative to plot
+
+            const subplotId = (event.target as HTMLElement).dataset.subplot; // e.g. "x2y2"
+            if (subplotId) {
+                const m = subplotId.match(/^x(\d*)y(\d*)$/); // ['', '2', '2']
+                // m[1]/m[2] hold numeric suffixes empty string -> primary axis
+                if (m) {
+                const suffixX = m[1] ?? ""; // '' -> xaxis
+                const suffixY = m[2] ?? ""; // '' -> yaxis
+                // Swap to subplot-specific axes if they exist
+                xaxis = plot._fullLayout[`xaxis${suffixX}`] ?? plot._fullLayout.xaxis;
+                yaxis = plot._fullLayout[`yaxis${suffixY}`] ?? plot._fullLayout.yaxis;
+                }
+            }
+            // final catch-all fallback – runs whether or not we found a subplotId
+            xaxis = xaxis ?? plot._fullLayout.xaxis;
+            yaxis = yaxis ?? plot._fullLayout.yaxis;
+
+            // Coordinates in data space
+            const x = xaxis.p2d(relX); // data-space X at click
+            const y = yaxis.p2d(relY); // data-space Y at click
+
+            return {x, y};
+        }
+
         console.log("Assigning click handlers to plots")
-        const draggableElements = plot.querySelectorAll<HTMLDivElement>(".drag");
+        const draggableElements = plot.querySelectorAll<HTMLDivElement>(".nsewdrag");
         if (draggableElements.length === 0) {
             console.error("Could not locate drag element to assign click handler");
             return;
         }
 
-        const startToolCreation = (_event: MouseEvent) => {
-            const annotation = createAnnotation(TimeSeriesAnnotationType.VSPAN);
-            addAnnotation(annotation);
+        const startAnnotationCreation = (event: MouseEvent) => {
+            if (activeAnnotationTool && event.ctrlKey) {
+                console.log(`Triggering start call for ${activeAnnotationTool} tool`)
+                isDraggingRef.current = true;
+                const clickLocation = getClickData(event, plot);
+                toolingCallbacks.get(activeAnnotationTool)?.start(clickLocation.x, clickLocation.y);
+            }
         }
 
+        const updateAnnotation = (event: MouseEvent) => {
+            if (activeAnnotationTool && isDraggingRef.current) {
+                const clickLocation = getClickData(event, plot);
+                toolingCallbacks.get(activeAnnotationTool)?.move(clickLocation.x, clickLocation.y);
+            }
+        }
+
+        const finishAnnotationCreation = (_event: MouseEvent) => {
+            console.log("Finish")
+            isDraggingRef.current = false;
+            if (toolingCallbacks) {
+                //const [x, y] = getClickData(event, plot);
+                //toolingCallbacks.end(x, y);
+            }
+        };
+
+        // This is a backup listener in case the user lifts the control key first - this isn't ideal as a final update won't be sent
+        const cancelToolCreation = (event: KeyboardEvent) => {
+            if (event.key === "Control" && isDraggingRef.current) {
+                isDraggingRef.current = false;
+            }
+        };
+
         draggableElements.forEach((element) => {
-            element.addEventListener("mousedown", startToolCreation);
+            element.addEventListener("mousedown", startAnnotationCreation);
+            element.addEventListener("mousemove", updateAnnotation);
+            element.addEventListener("mouseup", finishAnnotationCreation);
         })
+
+        document.addEventListener("keyup", cancelToolCreation);
 
         return (() => {
             console.log("Cleaning up click handler from plots")
             draggableElements.forEach((element) => {
-                element.removeEventListener("mousedown", startToolCreation);
+                element.removeEventListener("mousedown", startAnnotationCreation);
+                element.removeEventListener("mousemove", updateAnnotation);
+                element.removeEventListener("mouseup", finishAnnotationCreation);
             })
+            document.removeEventListener("keyup", cancelToolCreation);
         })
-    }, [addAnnotation, createAnnotation, plotId, plotReady])
+    }, [activeAnnotationTool, addAnnotation, createAnnotation, plotId, plotReady, toolingCallbacks])
 
     return (
         <div className="w-full px-6 py-3 space-y-3 flex-col">
             {/* Div where plot is inserted */}
-            <div id={plotId} className="" />
+            <div id={plotId} className="">
+                <>
+                    {React.Children.map(children, (child) => {
+                        return React.isValidElement(child)
+                        ? React.cloneElement(child, {
+                            plotId,
+                            plotReady,
+                            })
+                        : child;
+                    })}
+                </>
+            </div>
         </div>
     )
 }

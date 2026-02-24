@@ -1,33 +1,24 @@
 "use client"
 
-import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from "react"
+import { TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks } from "@/types"
+import React, {createContext, useCallback, useContext, useMemo, useState} from "react"
 import {v4 as uuidv4} from "uuid"
-
-export enum TimeSeriesAnnotationType {
-    VSPAN,
-    VZone,
-}
-
-type TimeSeriesAnnotationPoint = {
-    x: number,
-    y: number
-}
-
-type TimeSeriesAnnotation = {
-    id: string,
-    type: TimeSeriesAnnotationType,
-    points: TimeSeriesAnnotationPoint[]
-}
 
 type TimeSeriesActions = {
     createAnnotation: (type: TimeSeriesAnnotationType) => TimeSeriesAnnotation;
     addAnnotation: (annotation: TimeSeriesAnnotation) => void;
+    updateAnnotation: (annotation: TimeSeriesAnnotation) => void;
+    getAnnotation: (id: string) => TimeSeriesAnnotation | null;
     setAnnotationTool: (tool: TimeSeriesAnnotationType | null) => void;
+    registerTooling: (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => void;
+    triggerUpdate: () => void;
 }
 
 type TimeSeriesState = {
     annotations: TimeSeriesAnnotation[];
     activeAnnotationTool: TimeSeriesAnnotationType | null;
+    toolingCallbacks: Map<TimeSeriesAnnotationType, ToolingCallbacks>;
+    forceUpdate: number;
 }
 
 const TimeSeriesActionsContext = createContext<TimeSeriesActions | null>(null);
@@ -55,7 +46,9 @@ export const useTimeSeriesState = () => {
 
 export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => {
     const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
-    const [activeTool, setActiveTool] = useState<TimeSeriesAnnotationType | null>(null);
+    const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
+    const [activeTool, setActiveTool] = useState<TimeSeriesAnnotationType | null>(TimeSeriesAnnotationType.VSPAN);
+    const [updateCounter, setUpdateCounter] = useState(0);
 
     const createAnnotation = useCallback((type: TimeSeriesAnnotationType) : TimeSeriesAnnotation => {
         const id = uuidv4();
@@ -70,18 +63,57 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         setAnnotations(prev => [...prev, annotation])
     }, [])
 
+    const getAnnotation = useCallback((id: string) => {
+        annotations.forEach((annotation) => {
+            if (annotation.id === id) return annotation
+        })
+        console.warn(`Annotation with id: ${id} could not be found`)
+        return null;
+    }, [annotations])
+
+    const registerTooling = useCallback((type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => {
+        setToolingCallbacks((prev) => {
+            if (prev.has(type)) return prev;
+            const newMap = new Map(prev);
+            newMap.set(type, callbacks);
+            return newMap;
+        })
+    }, [])
+
+    const setAnnotationTool = useCallback((type: TimeSeriesAnnotationType | null) => {
+        if (!type || toolingCallbacks.has(type)) {
+            setActiveTool(type);
+            return;
+        }
+        console.warn(`Could not set ${type} as active tool since no callback has been registered`)
+    }, [toolingCallbacks])
+
+    const updateAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
+        setAnnotations((prev) => prev.map(item => 
+            item.id === annotation.id ? annotation : item
+        ))
+    }, [])
+
+    const triggerUpdate = useCallback(() => {
+        setUpdateCounter((prev) => (prev + 1) % 100)
+    }, [])
+
     const actionsValue: TimeSeriesActions = useMemo(() => ({
         createAnnotation,
         addAnnotation,
-        setAnnotationTool: setActiveTool
-    }), [createAnnotation, addAnnotation, setActiveTool])
+        setAnnotationTool,
+        registerTooling,
+        updateAnnotation,
+        getAnnotation,
+        triggerUpdate
+    }), [createAnnotation, addAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, triggerUpdate])
 
     const stateValue: TimeSeriesState = useMemo(() => ({
         annotations,
-        activeAnnotationTool: activeTool
-    }), [annotations, activeTool])
-
-    console.log(annotations);
+        activeAnnotationTool: activeTool,
+        toolingCallbacks,
+        forceUpdate: updateCounter
+    }), [annotations, activeTool, toolingCallbacks, updateCounter])
 
     return (
         <TimeSeriesActionsContext.Provider
