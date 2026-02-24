@@ -12,10 +12,6 @@ import {
   ComboBox,
   Item,
   Key,
-  ButtonGroup,
-  Button,
-  ToastQueue,
-  SearchField,
   Heading,
   InlineAlert,
 } from "@adobe/react-spectrum";
@@ -126,6 +122,26 @@ function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
     >
       {(item) => <Item key={item.id}>{item.name}</Item>}
     </ComboBox>
+  );
+}
+
+function AnnotationStatusAlert({ isValidated }: { isValidated: boolean }) {
+  return (
+    <Flex justifyContent="center" width="100%" marginTop="size-200">
+      <InlineAlert
+        variant={isValidated ? "positive" : "notice"}
+        UNSAFE_style={{
+          paddingTop: "5px",
+          paddingBottom: "5px",
+          paddingLeft: "10px",
+          paddingRight: "10px",
+        }}
+      >
+        <Heading>
+          {isValidated ? "Annotations Validated" : "Annotations Not Validated"}
+        </Heading>
+      </InlineAlert>
+    </Flex>
   );
 }
 
