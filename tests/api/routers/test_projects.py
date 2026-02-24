@@ -22,15 +22,19 @@ async def test_get_all_projects(api_client, setup_db):
 
 @pytest.mark.asyncio
 async def test_update_project(api_client, setup_db):
-    in_update = {
-        "name": "updated_project_name",
-    }
+    response = await api_client.get(f"/projects/{setup_db['project_id_1']}")
+    assert response.status_code == 200
+
+    project = response.json()
+    project["name"] = "updated_project_name"
+
     response = await api_client.put(
-        f"/projects/{setup_db['project_id_1']}", json=in_update
+        f"/projects/{setup_db['project_id_1']}", json=project
     )
+    assert response.status_code == 200
 
     result = await api_client.get(f"/projects/{setup_db['project_id_1']}")
-    assert response.status_code == 200
+    assert result.status_code == 200
     assert result.json().get("name") == "updated_project_name"
 
 

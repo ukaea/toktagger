@@ -12,6 +12,12 @@ import {
   ComboBox,
   Item,
   Key,
+  ButtonGroup,
+  Button,
+  ToastQueue,
+  SearchField,
+  Heading,
+  InlineAlert,
 } from "@adobe/react-spectrum";
 import {
   MultiVariateTimeSeriesDataSchema,
@@ -134,6 +140,7 @@ export default function ToolBar() {
     setViewParams,
     plotProps,
     setPlotProps,
+    isValidated,
   } = useSample();
 
   if (!project || !sample) {
@@ -160,8 +167,7 @@ export default function ToolBar() {
     }
 
     const tsData = result.data;
-
-    const labels = ["Valid Shot", "Invalid Shot"];
+    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
     tools.push({
       name: "Shot Labels",
       component: <ShotLabels labels={labels}></ShotLabels>,
@@ -286,6 +292,9 @@ export default function ToolBar() {
           gap="size-100"
           width="100%"
         >
+          {isValidated !== null && (
+            <AnnotationStatusAlert isValidated={isValidated} />
+          )}
           <Flex
             direction="column"
             alignItems="center"

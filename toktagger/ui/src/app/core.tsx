@@ -65,6 +65,39 @@ export const getSample = async (
   return sample;
 };
 
+export const getNextSample = async (
+  project_id: string,
+  visited_sample_ids: string[],
+  sortDescriptor: SortDescriptor | null,
+): Promise<Sample | null> => {
+  const params = new URLSearchParams();
+  if (sortDescriptor) {
+    params.append("sort_by", sortDescriptor.column.toString());
+    params.append("sort_direction", sortDescriptor.direction);
+  }
+  const NEXT_URL =
+    `${BACKEND_API_URL}/projects/${project_id}/samples/next` +
+    (params.toString() ? `?${params.toString()}` : "");
+  const sampleResult = await fetch(NEXT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(visited_sample_ids),
+  });
+
+  if (sampleResult.status === 204) {
+    return null; // No next sample available
+  } else if (!sampleResult.ok) {
+    throw new Error(
+      `Failed to fetch next sample: ${sampleResult.status} ${sampleResult.statusText}`,
+    );
+  }
+  const data = await sampleResult.json();
+  const sample = data as Sample;
+  return sample;
+};
+
 export const getProjects = async (
   sortDescriptor: SortDescriptor,
   page: number,
@@ -161,7 +194,7 @@ export async function saveSampleAnnotations(
     return annotation;
   });
 
-  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations?validated=True`;
   const response = await fetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
@@ -247,6 +280,21 @@ export const exportAnnotations = async (project: Project, sample?: Sample) => {
     const annotations = await getAnnotations(project._id);
     saveJSONToFile(annotations, `${project.name}_all_annotations.json`);
   }
+};
+
+export const deleteSample = async (project_id: string, sample_id: string) => {
+  await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
+    {
+      method: "DELETE",
+    },
+  );
+};
+
+export const deleteSamples = async (project_id: string) => {
+  await fetch(`${BACKEND_API_URL}/projects/${project_id}/samples`, {
+    method: "DELETE",
+  });
 };
 
 export const startTraining = async (

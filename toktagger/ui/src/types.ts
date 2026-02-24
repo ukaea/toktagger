@@ -15,8 +15,6 @@ export const BaseAnnotationSchema = z.object({
 });
 
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
-export const ClassLabelSchema = BaseAnnotationSchema;
-export type ClassLabel = z.infer<typeof ClassLabelSchema>;
 
 export const TimeRegionSchema = BaseAnnotationSchema.extend({
   time_min: z.number(),
@@ -29,7 +27,10 @@ export const TimePointSchema = BaseAnnotationSchema.extend({
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
 
-// add near other annotation schemas
+export const ClassLabelSchema = BaseAnnotationSchema.extend({
+  type: z.literal("class_label"),
+});
+export type ClassLabel = z.infer<typeof ClassLabelSchema>;
 
 export const BoundingBoxSchema = BaseAnnotationSchema.extend({
   type: z.literal("bounding_box"),
@@ -160,18 +161,14 @@ export const ProjectSchema = z.object({
   time_max: z.number().nullable().optional(),
   min_time_step: z.number().nullable().optional(),
   model_types: z.array(z.string()),
+  shot_labels: z.array(z.string()).default([]),
+  time_region_labels: z.array(z.string()).default([]),
+  time_point_labels: z.array(z.string()).default([]),
+  bounding_box_labels: z.array(z.string()).default([]),
+  polygon_labels: z.array(z.string()).default([]),
+  video_bounding_box_labels: z.array(z.string()).default([]),
 });
 export type Project = z.infer<typeof ProjectSchema>;
-
-export const ProjectUpdateSchema = z.object({
-  name: z.string().optional(),
-  task: TaskSchema.optional(),
-  query_strategy: z.string().optional(),
-  time_min: z.number().nullable().optional(),
-  time_max: z.number().nullable().optional(),
-  min_time_step: z.number().nullable().optional(),
-});
-export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 
 export const FileDataSchema = z.object({
   file_name: z.string(),
@@ -200,6 +197,7 @@ export const SampleSchema = z.object({
   project_id: z.string().optional(),
   shot_id: z.number(),
   data: SampleDataSchema,
+  validated_annotations: z.boolean(),
 });
 export type Sample = z.infer<typeof SampleSchema>;
 

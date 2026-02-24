@@ -153,22 +153,69 @@ async def test_delete_sample(api_client, setup_db, db_client):
     assert setup_db["project_id_2"] in [str(project.get("_id")) for project in projects]
 
 
-async def get_next_sample(api_client, setup_db):
-    response = await api_client.get(
-        f"/projects/{setup_db['project_id_1']}/samples/next"
+@pytest.mark.asyncio
+async def test_get_next_sample_sequential(api_client, setup_db):
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/next", json=[]
     )
     assert response.status_code == 200
     returned_sample = response.json()
-    # Should return me the sample with the next shot ID sequentially which has not been annotated
-    # Sample 1 has been annotated, so sample 2 should be returned...
+
+    # Should return me the sample with the next shot ID sequentially
     assert returned_sample.get("shot_id") == 1
-    assert returned_sample.get("protocol") == "file"
-    assert returned_sample.get("type") == "csv"
-    assert returned_sample.get("file_name") == "test.csv"
-    assert returned_sample.get("column_names") == ["Ip"]
+    assert returned_sample["data"]["protocol"] == "uda"
+    assert returned_sample["data"]["signal_names"] == ["Ip"]
+
+    # Then also check ID and timestamp are returned - should have been added automatically
+    assert returned_sample.get("_id") == setup_db["sample_id_1"]
+    assert returned_sample.get("project_id") == setup_db["project_id_1"]
+    assert returned_sample.get("timestamp")
+
+    # Ask for next again, providing list of seen samples
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/next",
+        json=[str(returned_sample.get("_id"))],
+    )
+    assert response.status_code == 200
+    returned_sample = response.json()
+    # Should return me the sample with the next shot ID sequentially
+    assert returned_sample.get("shot_id") == 2
 
     # Then also check ID and timestamp are returned - should have been added automatically
     assert returned_sample.get("_id") == setup_db["sample_id_2"]
+    assert returned_sample.get("project_id") == setup_db["project_id_1"]
+    assert returned_sample.get("timestamp")
+
+
+@pytest.mark.asyncio
+async def test_get_next_sample_sequential_reversed(api_client, setup_db):
+    # Sort by shot ID, descending
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/next?sort_by=shot_id&sort_direction=descending",
+        json=[],
+    )
+    assert response.status_code == 200
+    returned_sample = response.json()
+    # Should return me the sample with the last shot ID sequentially
+    assert returned_sample.get("shot_id") == 2
+
+    # Then also check ID and timestamp are returned - should have been added automatically
+    assert returned_sample.get("_id") == setup_db["sample_id_2"]
+    assert returned_sample.get("project_id") == setup_db["project_id_1"]
+    assert returned_sample.get("timestamp")
+
+    # Ask for next again, providing list of seen samples
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/next?sort_by=shot_id&sort_direction=descending",
+        json=[str(returned_sample.get("_id"))],
+    )
+    assert response.status_code == 200
+    returned_sample = response.json()
+    # Should return me the sample with the next shot ID sequentially
+    assert returned_sample.get("shot_id") == 1
+
+    # Then also check ID and timestamp are returned - should have been added automatically
+    assert returned_sample.get("_id") == setup_db["sample_id_1"]
     assert returned_sample.get("project_id") == setup_db["project_id_1"]
     assert returned_sample.get("timestamp")
 
@@ -275,3 +322,48 @@ async def test_get_samples_summary(api_client, setup_db):
     assert summary.get("total") == 2
     assert summary.get("shot_min") == 1
     assert summary.get("shot_max") == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_all_samples(api_client, setup_db, db_client):
+    # Delete all samples from project 1
+    response = await api_client.delete(f"/projects/{setup_db['project_id_1']}/samples")
+    assert response.status_code == 200
+
+    # Check that samples from project 1 have been deleted
+    samples = await db_client.get_all_documents("samples")
+    # Should have 2 samples left (from project 2)
+    assert len(samples) == 2
+    # Verify the deleted samples are from project 1
+    assert setup_db["sample_id_1"] not in [str(sample.get("_id")) for sample in samples]
+    assert setup_db["sample_id_2"] not in [str(sample.get("_id")) for sample in samples]
+    # Verify samples from project 2 still exist
+    assert setup_db["sample_id_3"] in [str(sample.get("_id")) for sample in samples]
+    assert setup_db["sample_id_4"] in [str(sample.get("_id")) for sample in samples]
+
+    # Check that annotations associated with project 1 samples have been deleted
+    annotations = await db_client.get_all_documents("annotations")
+    # Should have 1 annotation left (from project 2)
+    assert len(annotations) == 1
+    # Verify annotations from project 1 are deleted
+    assert setup_db["annotation_id_1"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    assert setup_db["annotation_id_2"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    assert setup_db["annotation_id_3"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    assert setup_db["annotation_id_4"] not in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+    # Verify annotation from project 2 still exists
+    assert setup_db["annotation_id_5"] in [
+        str(annotation.get("_id")) for annotation in annotations
+    ]
+
+    # Check that the project itself has NOT been deleted
+    projects = await db_client.get_all_documents("projects")
+    assert len(projects) == 3
+    assert setup_db["project_id_1"] in [str(project.get("_id")) for project in projects]

@@ -47,6 +47,38 @@ def create_uda_samples(project_id: str, shot_ids: list[int]):
     requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
+def create_sal_samples(project_id: str, shot_ids: list[int]):
+    samples = []
+    for shot_id in shot_ids:
+        sample = {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "signal_names": ["ppf/signal/jetppf/magn/ipla"],
+                "protocol": "sal",
+            },
+        }
+        samples.append(sample)
+
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+
+
+def create_fair_mast_samples(project_id: str, shot_ids: list[int]):
+    samples = []
+    for shot_id in shot_ids:
+        sample = {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "signal_names": ["magnetics/ip"],
+                "protocol": "fair_mast",
+            },
+        }
+        samples.append(sample)
+
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+
+
 def create_local_samples(
     project_id: str,
     shot_ids: list[int],
@@ -84,9 +116,10 @@ def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
                 "project_id": project_id,
                 "shot_id": int(shot_id),
                 "data": {
-                    "file_name": str(image_dir),  # directory, not a file
+                    "file_name": str(
+                        Path(image_dir) / str(shot_id)
+                    ),  # directory, not a file
                     "type": "png",  # extension
-                    "protocol": "file",  # MUST be file or s3
                 },
             }
         )
@@ -95,6 +128,22 @@ def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
         f"http://localhost:8002/projects/{project_id}/samples", json=samples
     )
     r.raise_for_status()
+
+
+def create_uda_camera_samples(project_id: str, shot_ids: list[int]):
+    samples = []
+    for shot_id in shot_ids:
+        sample = {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "signal_names": ["rbb"],
+                "protocol": "uda_camera",
+            },
+        }
+        samples.append(sample)
+
+    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
 
 
 def main():
@@ -120,7 +169,7 @@ def main():
     create_uda_samples(project_id, shot_ids)
 
     project_id = create_project(
-        "Local ELM Project", "time-series", "parquet", "sequential"
+        "Local ELM Project", "time-series", "tabular", "sequential"
     )
     create_local_samples(
         project_id, shot_ids, base_path=base_path / "summary", file_type="parquet"
@@ -130,7 +179,7 @@ def main():
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
     project_id = create_project(
-        "Local MHD Project", "spectrogram", "parquet", "random", min_time_step=0.000001
+        "Local MHD Project", "spectrogram", "tabular", "random", min_time_step=0.000001
     )
     create_local_samples(
         project_id,
@@ -141,7 +190,38 @@ def main():
     )
     # ---- Image / UFO demo project ----
     project_id = create_project("Frame Project", "video", "image", "random")
-    create_image_samples(project_id, [30000], Path("./data/images"))
+    create_image_samples(project_id, [10101], Path("./data/test/video/"))
+
+    # JET data
+    project_id = create_project(
+        "SAL Disruption Project",
+        "time-series",
+        "sal",
+        query_strategy="sequential",
+        time_min=38,
+        time_max=None,
+        min_time_step=0.0001,
+    )
+    shot_ids = [87737]
+    create_sal_samples(project_id, shot_ids)
+
+    # FAIR MAST
+    project_id = create_project(
+        "FAIR MAST Project",
+        "time-series",
+        "fair_mast",
+        query_strategy="sequential",
+    )
+    shot_ids = [30421]
+    create_fair_mast_samples(project_id, shot_ids)
+
+    shot_ids = [30421]
+    project_id = create_project(
+        "UDA Camera Frame Project", "video", "uda_camera", "random"
+    )
+    create_uda_camera_samples(project_id, shot_ids)
+
+    print("Projects and samples created successfully.")
 
 
 if __name__ == "__main__":

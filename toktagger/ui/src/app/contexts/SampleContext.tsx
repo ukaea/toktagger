@@ -39,6 +39,7 @@ interface SampleContextType {
   plotProps: PlotProps;
   annotationLabels: { id: number; name: string }[];
   isLoading: boolean;
+  isValidated: boolean | null;
   error: string | null;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
@@ -46,6 +47,7 @@ interface SampleContextType {
   setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
+  setIsValidated: (validated: boolean) => void;
 }
 
 const SampleContext = createContext<SampleContextType | undefined>(undefined);
@@ -141,6 +143,9 @@ export function SampleProvider({
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const [isValidated, setIsValidated] = useState<boolean | null>(null);
+
   const [error, setError] = useState<string | null>(null);
 
   // Video: remember the last successfully loaded frame so missing frames become navigation bounds.
@@ -193,6 +198,7 @@ export function SampleProvider({
         setProject(projectData);
         setSample(sampleData);
         setAnnotations(dbAnnotations);
+        setIsValidated(sampleData.validated_annotations);
 
         let params = viewParams;
         if (projectData.task === TaskType.Spectrogram) {
@@ -312,11 +318,13 @@ export function SampleProvider({
     plotProps,
     annotationLabels,
     isLoading,
+    isValidated,
     error,
     setAnnotations,
     setPlotProps,
     setViewParams,
     setDataParams,
+    setIsValidated,
   };
 
   return (
