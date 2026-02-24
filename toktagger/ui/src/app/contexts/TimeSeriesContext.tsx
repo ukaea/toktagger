@@ -1,7 +1,7 @@
 "use client"
 
 import { TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks } from "@/types"
-import React, {createContext, useCallback, useContext, useMemo, useState} from "react"
+import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from "react"
 import {v4 as uuidv4} from "uuid"
 
 type TimeSeriesActions = {
@@ -19,6 +19,7 @@ type TimeSeriesState = {
     activeAnnotationTool: TimeSeriesAnnotationType | null;
     toolingCallbacks: Map<TimeSeriesAnnotationType, ToolingCallbacks>;
     forceUpdate: number;
+    isDrawing: boolean;
 }
 
 const TimeSeriesActionsContext = createContext<TimeSeriesActions | null>(null);
@@ -49,6 +50,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
     const [activeTool, setActiveTool] = useState<TimeSeriesAnnotationType | null>(TimeSeriesAnnotationType.VSPAN);
     const [updateCounter, setUpdateCounter] = useState(0);
+    const [isDrawing, setIsDrawing] = useState(false);
 
     const createAnnotation = useCallback((type: TimeSeriesAnnotationType) : TimeSeriesAnnotation => {
         const id = uuidv4();
@@ -112,8 +114,31 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         annotations,
         activeAnnotationTool: activeTool,
         toolingCallbacks,
-        forceUpdate: updateCounter
-    }), [annotations, activeTool, toolingCallbacks, updateCounter])
+        forceUpdate: updateCounter,
+        isDrawing
+    }), [annotations, activeTool, toolingCallbacks, updateCounter, isDrawing])
+
+    useEffect(() => {
+        const enterDrawMode = (event: KeyboardEvent) => {
+            if (event.key === "Control") {
+                setIsDrawing(true);
+            }
+        };
+
+        const exitDrawMode = (event: KeyboardEvent) => {
+            if (event.key === "Control") {
+                setIsDrawing(false);
+            }
+        };
+
+        document.addEventListener("keydown", enterDrawMode);
+        document.addEventListener("keyup", exitDrawMode);
+
+        return () => {
+            document.removeEventListener("keydown", enterDrawMode);
+            document.removeEventListener("keyup", exitDrawMode);
+        };
+    }, [])
 
     return (
         <TimeSeriesActionsContext.Provider

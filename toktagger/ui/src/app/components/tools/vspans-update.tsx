@@ -10,12 +10,12 @@ export const VSpans = ({
     plotReady,
 }: ToolingProps) => {
     const {registerTooling, createAnnotation, addAnnotation, updateAnnotation} = useTimeSeriesActions();
-    const {annotations, forceUpdate} = useTimeSeriesState()
+    const {annotations, forceUpdate, isDrawing} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
+    const dragOffset = useRef(0);
 
     useEffect(() => {
-        console.log("Registering VSpan callbacks")
         const toolingCallbacks: ToolingCallbacks = {
             start: (x, y) => {
                 const annotation = createAnnotation(TimeSeriesAnnotationType.VSPAN);
@@ -100,7 +100,25 @@ export const VSpans = ({
             if (vspan.type !== TimeSeriesAnnotationType.VSPAN) continue;
             const opacity = 0.5;
 
+            const drag = d3
+              .drag<SVGRectElement, TimeSeriesAnnotation>()
+              .on("start", function (event, d) {
+                dragOffset.current = xaxis.d2p(d.points[0].x) - event.x;
+              })
+              .on("drag", function (event, d) {
+                const newX = event.x + dragOffset.current;
+                d3.select(this).attr("x", newX);
+      
+                const x = xaxis.p2d(newX); // The context provider stores the decimal value rather than pixel
+                d.points[0].x = x;
+                updateAnnotation(d); // Global refresh must be triggered to update all linked plots
+              })
+              .on("end", function (_event, _d) {
+                //handleVSpanDragFinish();
+              });
+
             const x = xaxis.d2p(vspan.points[0].x);
+            const pointerEvent = isDrawing ? "none" : "all";
             graphGroup
               .append("line")
               .attr("class", "vspan disable-on-modifier")
@@ -111,7 +129,7 @@ export const VSpans = ({
               .attr("opacity", opacity)
               .attr("stroke", "black")
               .attr("stroke-width", 6)
-              .attr("style", `pointer-events: all`)
+              .attr("style", `pointer-events: ${pointerEvent}`)
               .style("cursor", "move");
     
             graphGroup
@@ -122,12 +140,13 @@ export const VSpans = ({
               .attr("width", 20)
               .attr("height", height)
               .attr("fill", "transparent")
-              .attr("style", `pointer-events: all`)
+              .attr("style", `pointer-events: ${pointerEvent}`)
               .style("cursor", "move")
               .datum(vspan)
+              .call(drag)
           }
         });
-      }, [annotations, plotId, plotReady, forceUpdate]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

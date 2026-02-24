@@ -4,7 +4,8 @@ import {
     PlotData,
     Layout,
     Config,
-    react
+    react,
+    relayout
 } from "plotly.js"
 import {
     useEffect,
@@ -62,14 +63,15 @@ export const BaseTimeSeriesPlot = ({
     const [plotReady, setPlotReady] = useState(false);
 
     const {createAnnotation, addAnnotation, triggerUpdate} = useTimeSeriesActions();
-    const {activeAnnotationTool, toolingCallbacks} = useTimeSeriesState();
+    const {activeAnnotationTool, toolingCallbacks, isDrawing} = useTimeSeriesState();
 
     const isDraggingRef = useRef(false);
 
     const plotId = externalId || "time-series";
+
+    if (!isDrawing) isDraggingRef.current = false;
     
     useEffect(() => {
-        console.log(`Initialising plot - ${plotId}`)
         const plot = document.getElementById(plotId) as PlotlyHTMLElement;
         if (!plot) {
             console.warn("Base plot element could not be located, skipping plot render")
@@ -140,6 +142,27 @@ export const BaseTimeSeriesPlot = ({
             // Plot may not have loaded yet - this will rerun after loading
             return;
         }
+
+        const plot = document.getElementById(plotId);
+
+        if (!plot) {
+            console.error("Could not locate plot to set drag mode");
+            return;
+        }
+
+        if (isDrawing) {
+            relayout(plot, { dragmode: false });
+            return;
+        }
+
+        relayout(plot, { dragmode: "pan" });
+    }, [isDrawing, plotId, plotReady])
+
+    useEffect(() => {
+        if (!plotReady) {
+            // Plot may not have loaded yet - this will rerun after loading
+            return;
+        }
         const plot = document.getElementById(plotId) as PlotlyHTMLElement;
         if (!plot) {
             console.error("Could not locate plot to assign click handler");
@@ -178,7 +201,6 @@ export const BaseTimeSeriesPlot = ({
             return {x, y};
         }
 
-        console.log("Assigning click handlers to plots")
         const draggableElements = plot.querySelectorAll<HTMLDivElement>(".nsewdrag");
         if (draggableElements.length === 0) {
             console.error("Could not locate drag element to assign click handler");
@@ -187,7 +209,6 @@ export const BaseTimeSeriesPlot = ({
 
         const startAnnotationCreation = (event: MouseEvent) => {
             if (activeAnnotationTool && event.ctrlKey) {
-                console.log(`Triggering start call for ${activeAnnotationTool} tool`)
                 isDraggingRef.current = true;
                 const clickLocation = getClickData(event, plot);
                 toolingCallbacks.get(activeAnnotationTool)?.start(clickLocation.x, clickLocation.y);
@@ -202,19 +223,7 @@ export const BaseTimeSeriesPlot = ({
         }
 
         const finishAnnotationCreation = (_event: MouseEvent) => {
-            console.log("Finish")
             isDraggingRef.current = false;
-            if (toolingCallbacks) {
-                //const [x, y] = getClickData(event, plot);
-                //toolingCallbacks.end(x, y);
-            }
-        };
-
-        // This is a backup listener in case the user lifts the control key first - this isn't ideal as a final update won't be sent
-        const cancelToolCreation = (event: KeyboardEvent) => {
-            if (event.key === "Control" && isDraggingRef.current) {
-                isDraggingRef.current = false;
-            }
         };
 
         draggableElements.forEach((element) => {
@@ -223,16 +232,12 @@ export const BaseTimeSeriesPlot = ({
             element.addEventListener("mouseup", finishAnnotationCreation);
         })
 
-        document.addEventListener("keyup", cancelToolCreation);
-
         return (() => {
-            console.log("Cleaning up click handler from plots")
             draggableElements.forEach((element) => {
                 element.removeEventListener("mousedown", startAnnotationCreation);
                 element.removeEventListener("mousemove", updateAnnotation);
                 element.removeEventListener("mouseup", finishAnnotationCreation);
-            })
-            document.removeEventListener("keyup", cancelToolCreation);
+            })  
         })
     }, [activeAnnotationTool, addAnnotation, createAnnotation, plotId, plotReady, toolingCallbacks])
 
