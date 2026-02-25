@@ -21,6 +21,7 @@ import Delete from "@spectrum-icons/workflow/Delete";
 import { BACKEND_API_URL, getShotSample } from "@/app/core";
 import { useNavigate } from "react-router-dom";
 import { useVideoSession } from "@/app/video/components/video-session";
+import { useSample } from "@/app/contexts/SampleContext";
 
 const TOAST_TIMEOUT = 5000;
 
@@ -60,7 +61,7 @@ async function saveVideoAnnotations(
   sample_id: string,
   payload: Annotation[],
 ) {
-  const url = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
+  const url = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations?validated=True`;
   return await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -99,6 +100,7 @@ async function saveVideoSessionAnnotations(
 type ButtonInfo = {
   project_id: string;
   sample_id: string;
+  setIsValidated: (validated: boolean) => void;
   onSaved?: () => Promise<void> | void;
   saveOnNavigate?: boolean;
 };
@@ -106,6 +108,7 @@ type ButtonInfo = {
 function NextButton({
   project_id,
   sample_id,
+  setIsValidated,
   onSaved,
   saveOnNavigate,
 }: ButtonInfo) {
@@ -133,6 +136,7 @@ function NextButton({
 
       if (saveOnNavigate) {
         session.markSaved();
+        setIsValidated(true);
         await onSaved?.();
       }
 
@@ -144,7 +148,15 @@ function NextButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, navigate, saveOnNavigate, session, onSaved]);
+  }, [
+    project_id,
+    sample_id,
+    navigate,
+    saveOnNavigate,
+    session,
+    setIsValidated,
+    onSaved,
+  ]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -171,6 +183,7 @@ function NextButton({
 function PreviousButton({
   project_id,
   sample_id,
+  setIsValidated,
   onSaved,
   saveOnNavigate,
 }: ButtonInfo) {
@@ -198,6 +211,7 @@ function PreviousButton({
 
       if (saveOnNavigate) {
         session.markSaved();
+        setIsValidated(true);
         await onSaved?.();
       }
 
@@ -209,7 +223,15 @@ function PreviousButton({
         timeout: TOAST_TIMEOUT,
       });
     }
-  }, [project_id, sample_id, navigate, saveOnNavigate, session, onSaved]);
+  }, [
+    project_id,
+    sample_id,
+    navigate,
+    saveOnNavigate,
+    session,
+    setIsValidated,
+    onSaved,
+  ]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -233,7 +255,12 @@ function PreviousButton({
   );
 }
 
-function SaveButton({ project_id, sample_id, onSaved }: ButtonInfo) {
+function SaveButton({
+  project_id,
+  sample_id,
+  setIsValidated,
+  onSaved,
+}: ButtonInfo) {
   const session = useVideoSession();
 
   const handleClick = async () => {
@@ -241,6 +268,7 @@ function SaveButton({ project_id, sample_id, onSaved }: ButtonInfo) {
     try {
       await saveVideoSessionAnnotations(project_id, sample_id, payload, true);
       session.markSaved();
+      setIsValidated(true);
       ToastQueue.positive(`Saved ${payload.length} annotations!`, {
         timeout: TOAST_TIMEOUT,
       });
@@ -283,6 +311,7 @@ function ClearButton() {
 type SaveInfo = {
   project_id: string;
   sample_id: string;
+  setIsValidated: (validated: boolean) => void;
   onSaved?: () => Promise<void> | void;
   saveOnNavigate?: boolean;
 };
@@ -290,6 +319,7 @@ type SaveInfo = {
 export function VideoShotSearch({
   project_id,
   sample_id,
+  setIsValidated,
   onSaved,
   saveOnNavigate,
 }: SaveInfo) {
@@ -316,6 +346,7 @@ export function VideoShotSearch({
 
           if (saveOnNavigate) {
             session.markSaved();
+            setIsValidated(true);
             await onSaved?.();
           }
 
@@ -353,6 +384,7 @@ export function VideoNavigationBar({
   sample_id,
   onSaved,
 }: NavigationBarInfo) {
+  const { setIsValidated } = useSample();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
 
   return (
@@ -361,17 +393,20 @@ export function VideoNavigationBar({
         <SaveButton
           project_id={project_id}
           sample_id={sample_id}
+          setIsValidated={setIsValidated}
           onSaved={onSaved}
         />
         <PreviousButton
           project_id={project_id}
           sample_id={sample_id}
+          setIsValidated={setIsValidated}
           onSaved={onSaved}
           saveOnNavigate={SaveOnNavigate}
         />
         <NextButton
           project_id={project_id}
           sample_id={sample_id}
+          setIsValidated={setIsValidated}
           onSaved={onSaved}
           saveOnNavigate={SaveOnNavigate}
         />
@@ -391,6 +426,7 @@ export function VideoNavigationBar({
       <VideoShotSearch
         project_id={project_id}
         sample_id={sample_id}
+        setIsValidated={setIsValidated}
         onSaved={onSaved}
         saveOnNavigate={SaveOnNavigate}
       />
