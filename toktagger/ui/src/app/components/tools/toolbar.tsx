@@ -296,11 +296,6 @@ export default function ToolBar() {
   }
 
   const refreshAnnotations = async () => {
-    if (project.task === TaskType.Video) {
-      setAnnotations(() => annotations);
-      return;
-    }
-
     const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
     setAnnotations(() => dbAnnotations);
   };
