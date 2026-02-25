@@ -5,10 +5,6 @@ import {
   Flex,
   DialogContainer,
   AlertDialog,
-  Accordion,
-  Disclosure,
-  DisclosureTitle,
-  DisclosurePanel,
   Button,
 } from "@adobe/react-spectrum";
 
@@ -216,68 +212,54 @@ export function VideoToolbox() {
 
   return (
     <>
-      <Accordion allowsMultipleExpanded={true} width="100%">
-        <Disclosure defaultExpanded>
-          <DisclosureTitle>
-            <span style={{ fontSize: "0.8rem" }}>Frame Tools</span>
-          </DisclosureTitle>
-          <DisclosurePanel>
-            <div className="pl-4 pr-4 pb-4">
-              <div className="max-w-[16rem] mx-auto mb-4">
-                <div className="mb-2">
-                  <Flex gap="size-100" alignItems="center" wrap>
-                    <Button variant="secondary" style="fill" isDisabled>
-                      Rectangle
-                    </Button>
-                  </Flex>
-                </div>
-              </div>
-            </div>
-          </DisclosurePanel>
-        </Disclosure>
+      <div className="w-full">
+        {/* Frame Tools section — commented out until more shapes are added
+        <div className="px-4 pb-4">
+          <div className="text-gray-200 text-sm font-medium mb-2">
+            Frame Tools
+          </div>
+          <div className="max-w-[16rem] mx-auto mb-2">
+            <Flex gap="size-100" alignItems="center" wrap>
+              <Button variant="secondary" style="fill" isDisabled>
+                Rectangle
+              </Button>
+            </Flex>
+          </div>
+        </div>
 
-        <Disclosure defaultExpanded>
-          <DisclosureTitle>
-            <span style={{ fontSize: "0.8rem" }}>Class</span>
-          </DisclosureTitle>
-          <DisclosurePanel>
-            <div className="pl-4 pr-4 pb-4">
-              <VideoClassPanel
-                items={classItems}
-                selectedClassName={session.selection.className}
-                setSelectedClassName={onSelectClassName}
-              />
-            </div>
-          </DisclosurePanel>
-        </Disclosure>
+        <div className="border-t border-gray-800 mx-4" />
+        */}
 
-        <Disclosure
-          defaultExpanded
-          // Remove the trailing divider line at the bottom of the inner accordion.
-          UNSAFE_style={{ borderBottom: "none" }}
-        >
-          <DisclosureTitle>
-            <span style={{ fontSize: "0.8rem" }}>Instances</span>
-          </DisclosureTitle>
-          <DisclosurePanel>
-            <div className="pl-4 pr-4 pb-4">
-              <VideoInstancePanel
-                profiles={profiles}
-                selectedKey={selectedKey}
-                onSelect={onSelectInstance}
-                onCreateProfile={() => {
-                  // Instances are derived from annotations; creation happens via drawing.
-                }}
-                onRequestBulkDelete={onRequestBulkDelete}
-                onRequestDeleteAllInstances={onRequestDeleteAllInstances}
-                profileCounts={profileCounts}
-                showCreator={false}
-                classItems={classItems}
-              />
-            </div>
-          </DisclosurePanel>
-        </Disclosure>
-      </Accordion>
+        <div className="px-4 py-4">
+          <div className="text-gray-200 text-sm font-medium mb-2">Class</div>
+          <VideoClassPanel
+            items={classItems}
+            selectedClassName={session.selection.className}
+            setSelectedClassName={onSelectClassName}
+          />
+        </div>
+
+        <div className="border-t border-gray-800 mx-4" />
+
+        <div className="px-4 py-4">
+          <div className="text-gray-200 text-sm font-medium mb-2">
+            Instances
+          </div>
+          <VideoInstancePanel
+            profiles={profiles}
+            selectedKey={selectedKey}
+            onSelect={onSelectInstance}
+            onCreateProfile={() => {
+              // Instances are derived from annotations; creation happens via drawing.
+            }}
+            onRequestBulkDelete={onRequestBulkDelete}
+            onRequestDeleteAllInstances={onRequestDeleteAllInstances}
+            profileCounts={profileCounts}
+            showCreator={false}
+            classItems={classItems}
+          />
+        </div>
+      </div>
 
       <DialogContainer onDismiss={cancelClearAll}>
         {confirmClearAllOpen && (

@@ -42,10 +42,7 @@ export function ClassPanel({
       >
         {(item) => <Item key={item.name}>{item.name}</Item>}
       </Picker>
-
-      <Text UNSAFE_className="text-xs mt-2 block text-white/80">
-        Drawing is enabled after you pick a class.
-      </Text>
+        
     </div>
   );
 }
@@ -100,9 +97,6 @@ export function InstancePanel({
 
   return (
     <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
-      <div className="text-gray-200 text-sm font-medium mb-2">
-        {showCreator ? "Class + Track" : "Instances"}
-      </div>
 
       {showCreator && (
         <div className="mb-3">
@@ -228,7 +222,7 @@ export function InstancePanel({
                     #{p.track_id}
                   </div>
                   <div className="text-[11px] text-gray-300 mt-0">
-                    Class: {p.class_name} (id {p.class_id})
+                    Class: {p.class_name}
                   </div>
                 </div>
 
