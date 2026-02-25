@@ -1,8 +1,10 @@
 "use client"
 
-import { TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks } from "@/types"
+import { Annotation, TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks } from "@/types"
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from "react"
 import {v4 as uuidv4} from "uuid"
+import { useSample } from "./SampleContext"
+import { convertRawAnnotationsToTimeSeries } from "../utils"
 
 type TimeSeriesActions = {
     createAnnotation: (type: TimeSeriesAnnotationType) => TimeSeriesAnnotation;
@@ -46,11 +48,26 @@ export const useTimeSeriesState = () => {
 }
 
 export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => {
+    const {annotations: rawAnnotations} = useSample();
+
     const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
-    const [activeTool, setActiveTool] = useState<TimeSeriesAnnotationType | null>(TimeSeriesAnnotationType.VSPAN);
+    const [activeTool, setActiveTool] = useState<TimeSeriesAnnotationType | null>(TimeSeriesAnnotationType.TIME_POINT);
     const [updateCounter, setUpdateCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
+
+    const parseRawAnnotations = useCallback((annotations: Annotation[]) => {
+        const parsedAnnotations: TimeSeriesAnnotation[] = [];
+        annotations.forEach((annotation) => {
+            const parsedAnnotation = convertRawAnnotationsToTimeSeries(annotation);
+            if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
+        })
+        return parsedAnnotations;
+    }, [])
+    
+    useEffect(() => {
+        setAnnotations(parseRawAnnotations(rawAnnotations));
+    }, [parseRawAnnotations, rawAnnotations]);
 
     const createAnnotation = useCallback((type: TimeSeriesAnnotationType) : TimeSeriesAnnotation => {
         const id = uuidv4();

@@ -5,7 +5,7 @@ import { TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks, Tooli
 import * as d3 from "d3";
 import { useEffect, useRef } from "react";
 
-export const VSpans = ({
+export const TimePoint = ({
     plotId,
     plotReady,
 }: ToolingProps) => {
@@ -18,7 +18,7 @@ export const VSpans = ({
     useEffect(() => {
         const toolingCallbacks: ToolingCallbacks = {
             start: (x, y) => {
-                const annotation = createAnnotation(TimeSeriesAnnotationType.VSPAN);
+                const annotation = createAnnotation(TimeSeriesAnnotationType.TIME_POINT);
                 currentAnnotation.current = annotation;
                 annotation.points.push({x, y})
                 addAnnotation(annotation)
@@ -32,7 +32,7 @@ export const VSpans = ({
                 updateAnnotation(currentAnnotation.current);
             },
         }
-        registerTooling(TimeSeriesAnnotationType.VSPAN, toolingCallbacks)
+        registerTooling(TimeSeriesAnnotationType.TIME_POINT, toolingCallbacks)
     }, [addAnnotation, createAnnotation, registerTooling, updateAnnotation]);
 
     // Main rendering effect
@@ -97,7 +97,7 @@ export const VSpans = ({
     
           // Create a line and a transparent drag handle for each VSpan
           for (const vspan of annotations) {
-            if (vspan.type !== TimeSeriesAnnotationType.VSPAN) continue;
+            if (vspan.type !== TimeSeriesAnnotationType.TIME_POINT) continue;
             const opacity = 0.5;
 
             const drag = d3

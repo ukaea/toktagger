@@ -12,7 +12,10 @@ import {
   TimeRegion,
   SpectrogramMaskSchema,
   SpectrogramMask,
+  TimeSeriesAnnotation,
+  TimeSeriesAnnotationType,
 } from "@/types";
+import {v4 as uuidv4} from "uuid"
 
 const colorPalette = [
   "#FF5733",
@@ -159,4 +162,35 @@ export function arrayMin(arr: number[]): number {
     if (arr[i] < traceMin) traceMin = arr[i];
   }
   return traceMin;
+}
+
+export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeSeriesAnnotation | null {
+  let timeSeriesAnnotation: TimeSeriesAnnotation;
+  if (TimeRegionSchema.safeParse(annotation).success) {
+    const timeRegion = TimeRegionSchema.parse(annotation);
+    timeSeriesAnnotation = {
+      id: uuidv4(),
+      type: TimeSeriesAnnotationType.TIME_REGION,
+      points: [
+        {x: timeRegion.time_min, y: 0},
+        {x: timeRegion.time_max, y: 0}
+      ]
+    }
+    return timeSeriesAnnotation;
+  }
+
+  if (TimePointSchema.safeParse(annotation).success) {
+    const timePoint = TimePointSchema.parse(annotation);
+    timeSeriesAnnotation = {
+      id: uuidv4(),
+      type: TimeSeriesAnnotationType.TIME_POINT,
+      points: [
+        {x: timePoint.time, y: 0},
+      ]
+    }
+    return timeSeriesAnnotation;
+  }
+
+  console.warn(`The following annotation could not be parsed into a time series annotation:\n ${annotation}`);
+  return null;
 }

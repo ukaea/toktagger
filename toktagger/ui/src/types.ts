@@ -263,8 +263,8 @@ export enum ToolingTypes {
 }
 
 export enum TimeSeriesAnnotationType {
-  VSPAN = "VSPAN",
-  HZone = "HZONE",
+  TIME_POINT = "TIME_POINT",
+  TIME_REGION = "TIME_REGION",
 }
 
 export type TimeSeriesAnnotationPoint = {

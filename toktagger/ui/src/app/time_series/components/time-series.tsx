@@ -18,6 +18,7 @@ import { TimeSeries } from "@/app/components/plots/time-series";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
 import {TimeSeriesProvider} from "@/app/contexts/TimeSeriesContext"
 import { Zones } from "@/app/components/tools/zones";
+import { TimeRegion } from "@/app/components/tools/timeRegion";
 import "react-contexify/ReactContexify.css";
 
 import {
@@ -30,7 +31,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 //import { VSpans } from "@/app/components/tools/vspans";
-import { VSpans } from "@/app/components/tools/vspans-update";
+import { TimePoint } from "@/app/components/tools/timePoint";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
@@ -225,8 +226,8 @@ export const TimeSeriesView = () => {
                     plotId="TimesSeriesView"
                     plotConfig={{ data: plotData, layout: plotLayout }}
                   >
-                    <Zones onUpdate={updateZones} />
-                    <VSpans />
+                    <TimeRegion />
+                    <TimePoint />
                   </BaseTimeSeriesPlot>
                   <AnnotationsTable />
                 </Flex>
