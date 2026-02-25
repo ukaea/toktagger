@@ -10,15 +10,15 @@ export const TimeRegion = ({
     plotReady,
 }: ToolingProps) => {
     const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
-    const {annotations, forceUpdate, isDrawing} = useTimeSeriesState()
+    const {annotations, forceUpdate, isDrawing, categories} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
     const dragOffset = useRef(0);
 
     useEffect(() => {
         const toolingCallbacks: ToolingCallbacks = {
-            start: (x, y) => {
-                const annotation = createAnnotation(TimeSeriesAnnotationType.TIME_REGION);
+            start: (x, y, label) => {
+                const annotation = createAnnotation(TimeSeriesAnnotationType.TIME_REGION, label);
                 currentAnnotation.current = annotation;
                 annotation.points.push({x, y})
                 annotation.points.push({x, y})
@@ -209,6 +209,8 @@ export const TimeRegion = ({
 
             const x0IsLeft = px0 <= px1;
 
+            const color = categories.get(zone.label)?.color || "black"
+
             // Span (center drag target)
             graphGroup
               .append("rect")
@@ -217,7 +219,7 @@ export const TimeRegion = ({
               .attr("y", upperLimit)
               .attr("width", spanWidth)
               .attr("height", height)
-              .attr("fill", "black")
+              .attr("fill", color)
               .attr("opacity", opacity)
               .attr("style", `pointer-events: ${pointerEvent}`)
               .attr("stroke", "black")
@@ -259,7 +261,7 @@ export const TimeRegion = ({
                 .call(getBoundaryHandler(false));
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

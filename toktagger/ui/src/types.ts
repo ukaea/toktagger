@@ -265,6 +265,17 @@ export enum TimeSeriesAnnotationType {
   TIME_REGION = "TIME_REGION",
 }
 
+export type TimeSeriesToolDefinition = {
+  type: TimeSeriesAnnotationType;
+  label: string;
+};
+
+export type TimeSeriesCategory = {
+  label: string;
+  color: string;
+  type: TimeSeriesAnnotationType;
+};
+
 export type TimeSeriesAnnotationPoint = {
   x: number;
   y: number;
@@ -272,12 +283,14 @@ export type TimeSeriesAnnotationPoint = {
 
 export type TimeSeriesAnnotation = {
   id: string;
+  created_by: string;
+  label: string;
   type: TimeSeriesAnnotationType;
   points: TimeSeriesAnnotationPoint[];
 };
 
 export type ToolingCallbacks = {
-  start: (x: number, y: number) => void;
+  start: (x: number, y: number, label: string) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
 };

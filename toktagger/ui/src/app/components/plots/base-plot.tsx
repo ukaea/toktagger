@@ -296,14 +296,14 @@ export const BaseTimeSeriesPlot = ({
             if (activeAnnotationTool && event.ctrlKey) {
                 isDraggingRef.current = true;
                 const clickLocation = getClickData(event, plot);
-                toolingCallbacks.get(activeAnnotationTool)?.start(clickLocation.x, clickLocation.y);
+                toolingCallbacks.get(activeAnnotationTool.type)?.start(clickLocation.x, clickLocation.y, activeAnnotationTool.label);
             }
         }
 
         const updateAnnotation = (event: MouseEvent) => {
             if (activeAnnotationTool && isDraggingRef.current) {
                 const clickLocation = getClickData(event, plot);
-                toolingCallbacks.get(activeAnnotationTool)?.move(clickLocation.x, clickLocation.y);
+                toolingCallbacks.get(activeAnnotationTool.type)?.move(clickLocation.x, clickLocation.y);
             }
         }
 
@@ -312,7 +312,7 @@ export const BaseTimeSeriesPlot = ({
             syncAnnotations();
             if (activeAnnotationTool && isDraggingRef.current) {
                 const clickLocation = getClickData(event, plot);
-                toolingCallbacks.get(activeAnnotationTool)?.end(clickLocation.x, clickLocation.y);
+                toolingCallbacks.get(activeAnnotationTool.type)?.end(clickLocation.x, clickLocation.y);
             }
         };
 

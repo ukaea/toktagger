@@ -10,15 +10,15 @@ export const TimePoint = ({
     plotReady,
 }: ToolingProps) => {
     const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
-    const {annotations, forceUpdate, isDrawing} = useTimeSeriesState()
+    const {annotations, forceUpdate, isDrawing, categories} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
     const dragOffset = useRef(0);
 
     useEffect(() => {
         const toolingCallbacks: ToolingCallbacks = {
-            start: (x, y) => {
-                const annotation = createAnnotation(TimeSeriesAnnotationType.TIME_POINT);
+            start: (x, y, label) => {
+                const annotation = createAnnotation(TimeSeriesAnnotationType.TIME_POINT, label);
                 currentAnnotation.current = annotation;
                 annotation.points.push({x, y})
                 addAnnotation(annotation)
@@ -118,6 +118,8 @@ export const TimePoint = ({
                 syncAnnotations();
               });
 
+            const color = categories.get(vspan.label)?.color || "black"
+
             const x = xaxis.d2p(vspan.points[0].x);
             const pointerEvent = isDrawing ? "none" : "all";
             graphGroup
@@ -128,7 +130,7 @@ export const TimePoint = ({
               .attr("y1", upperLimit)
               .attr("y2", upperLimit + height)
               .attr("opacity", opacity)
-              .attr("stroke", "black")
+              .attr("stroke", color)
               .attr("stroke-width", 6)
               .attr("style", `pointer-events: ${pointerEvent}`)
               .style("cursor", "move");
@@ -147,7 +149,7 @@ export const TimePoint = ({
               .call(drag)
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

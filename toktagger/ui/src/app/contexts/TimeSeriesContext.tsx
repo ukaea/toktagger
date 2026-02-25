@@ -1,17 +1,17 @@
 "use client"
 
-import { Annotation, TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks } from "@/types"
+import { Annotation, TimeSeriesAnnotation, TimeSeriesAnnotationType, TimeSeriesCategory, TimeSeriesToolDefinition, ToolingCallbacks } from "@/types"
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from "react"
 import {v4 as uuidv4} from "uuid"
 import { useSample } from "./SampleContext"
-import { convertRawAnnotationsToTimeSeries, convertTimeSeriesToRawAnnotations } from "../utils"
+import { convertRawAnnotationsToTimeSeries, convertTimeSeriesToRawAnnotations, randomColor } from "../utils"
 
 type TimeSeriesActions = {
-    createAnnotation: (type: TimeSeriesAnnotationType) => TimeSeriesAnnotation;
+    createAnnotation: (type: TimeSeriesAnnotationType, label: string) => TimeSeriesAnnotation;
     addAnnotation: (annotation: TimeSeriesAnnotation) => void;
     updateAnnotation: (annotation: TimeSeriesAnnotation) => void;
     getAnnotation: (id: string) => TimeSeriesAnnotation | null;
-    setAnnotationTool: (tool: TimeSeriesAnnotationType | null) => void;
+    setAnnotationTool: (tool: TimeSeriesToolDefinition | null) => void;
     registerTooling: (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => void;
     syncAnnotations: () => void;
     triggerUpdate: () => void;
@@ -19,10 +19,11 @@ type TimeSeriesActions = {
 
 type TimeSeriesState = {
     annotations: TimeSeriesAnnotation[];
-    activeAnnotationTool: TimeSeriesAnnotationType | null;
+    activeAnnotationTool: TimeSeriesToolDefinition | null;
     toolingCallbacks: Map<TimeSeriesAnnotationType, ToolingCallbacks>;
     forceUpdate: number;
     isDrawing: boolean;
+    categories: Map<string, TimeSeriesCategory>;
 }
 
 const TimeSeriesActionsContext = createContext<TimeSeriesActions | null>(null);
@@ -49,13 +50,16 @@ export const useTimeSeriesState = () => {
 }
 
 export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => {
-    const {annotations: rawAnnotations, setAnnotations: setRawAnnotations} = useSample();
+    const {annotations: rawAnnotations, setAnnotations: setRawAnnotations, project} = useSample();
 
     const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
-    const [activeTool, setActiveTool] = useState<TimeSeriesAnnotationType | null>(TimeSeriesAnnotationType.TIME_REGION);
+    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_REGION, label: "TEST_LABEL"});
     const [updateCounter, setUpdateCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
+    const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(new Map());
+
+    console.log(categories)
 
     const parseRawAnnotations = useCallback((annotations: Annotation[]): TimeSeriesAnnotation[] => {
         const parsedAnnotations: TimeSeriesAnnotation[] = [];
@@ -74,15 +78,43 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         })
         return parsedAnnotations;
     }, []);
+
+    useEffect(() => {
+        if (!project) return;
+        const timeSeriesCategories: Map<string, TimeSeriesCategory> = new Map();
+        if (project.time_point_labels) {
+            project.time_point_labels.forEach((label, index) => {
+                timeSeriesCategories.set(label, 
+                {
+                    label,
+                    color: randomColor(index),
+                    type: TimeSeriesAnnotationType.TIME_POINT
+                })
+            })
+        }
+        if (project.time_region_labels) {
+            project.time_region_labels.forEach((label, index) => {
+                timeSeriesCategories.set(label, 
+                {
+                    label,
+                    color: randomColor(index),
+                    type: TimeSeriesAnnotationType.TIME_REGION
+                })
+            })
+        }
+        setCategories(timeSeriesCategories)
+    }, [project])
     
     useEffect(() => {
         setAnnotations(parseRawAnnotations(rawAnnotations));
     }, [parseRawAnnotations, rawAnnotations]);
 
-    const createAnnotation = useCallback((type: TimeSeriesAnnotationType) : TimeSeriesAnnotation => {
+    const createAnnotation = useCallback((type: TimeSeriesAnnotationType, label: string) : TimeSeriesAnnotation => {
         const id = uuidv4();
         return {
             id,
+            created_by: "manual",
+            label,
             type,
             points: []
         }
@@ -109,12 +141,12 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         })
     }, [])
 
-    const setAnnotationTool = useCallback((type: TimeSeriesAnnotationType | null) => {
-        if (!type || toolingCallbacks.has(type)) {
-            setActiveTool(type);
+    const setAnnotationTool = useCallback((tool: TimeSeriesToolDefinition | null) => {
+        if (!tool || toolingCallbacks.has(tool.type)) {
+            setActiveTool(tool);
             return;
         }
-        console.warn(`Could not set ${type} as active tool since no callback has been registered`)
+        console.warn(`Could not set ${tool.type} as active tool since no callback has been registered`)
     }, [toolingCallbacks])
 
     const updateAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
@@ -148,8 +180,9 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         activeAnnotationTool: activeTool,
         toolingCallbacks,
         forceUpdate: updateCounter,
-        isDrawing
-    }), [annotations, activeTool, toolingCallbacks, updateCounter, isDrawing])
+        isDrawing,
+        categories,
+    }), [annotations, activeTool, toolingCallbacks, updateCounter, isDrawing, categories])
 
     useEffect(() => {
         const enterDrawMode = (event: KeyboardEvent) => {

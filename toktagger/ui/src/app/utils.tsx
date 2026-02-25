@@ -169,6 +169,8 @@ export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeS
     const timeRegion = TimeRegionSchema.parse(annotation);
     return {
       id: uuidv4(),
+      created_by: timeRegion.created_by,
+      label: timeRegion.label,
       type: TimeSeriesAnnotationType.TIME_REGION,
       points: [
         {x: timeRegion.time_min, y: 0},
@@ -181,6 +183,8 @@ export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeS
     const timePoint = TimePointSchema.parse(annotation);
     return {
       id: uuidv4(),
+      created_by: timePoint.created_by,
+      label: timePoint.label,
       type: TimeSeriesAnnotationType.TIME_POINT,
       points: [
         {x: timePoint.time, y: 0},
