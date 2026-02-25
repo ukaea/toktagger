@@ -4,9 +4,9 @@ from toktagger.api.schemas.projects import Task
 from typing import Type
 from toktagger.api.schemas.samples import (
     Sample,
-    FileData,
     TimeSeriesFileData,
     ShotData,
+    ImageFileData,
 )
 from toktagger.api.schemas.data import (
     TimeSeriesData,
@@ -23,7 +23,7 @@ import io
 
 
 def test_image_file_loader_jpeg():
-    img_file = FileData(
+    img_file = ImageFileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
         type="jpeg",
         protocol="file",
@@ -49,7 +49,7 @@ def test_image_file_loader_jpeg():
 
 
 def test_image_file_loader_png():
-    img_file = FileData(
+    img_file = ImageFileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
         type="png",
         protocol="file",
@@ -88,7 +88,7 @@ def test_parquet_file_loader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ParquetDataLoader(params=DataParams(name="identity"))
+    data_loader = data_loaders.TabularDataLoader(params=DataParams(name="identity"))
     data = data_loader.get_sample(sample)
     assert isinstance(data, MultiVariateTimeSeriesData)
 
@@ -136,7 +136,37 @@ def test_uda_loader(uda_test):
     assert numpy.max(times) < 1.5
 
 
-def test_uda_loader_data_doesnt_exist(uda_test):
+def test_uda_camera_loader(uda_env_vars):
+    try:
+        import pyuda
+
+        pyuda.Client().get("help::help()")
+    except Exception:
+        pytest.skip("Could not contact UDA server")
+
+    camera_name = "rba"
+    uda_shot = ShotData(protocol="uda", signal_names=[camera_name])
+    sample = Sample(
+        shot_id=30421,
+        data=uda_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data_loader = data_loaders.UDACameraDataLoader(
+        params=ImageParams(name="image", frame=0)
+    )
+    data = data_loader.get_sample(sample)
+    assert isinstance(data, ImageData)
+    # Check we got back base64 encoded string
+    assert isinstance(data.values, str)
+    # Convert back to numpy array
+    base64_decoded = base64.b64decode(data.values)
+    image = Image.open(io.BytesIO(base64_decoded))
+    assert numpy.array(image).shape == (912, 768)
+
+
+def test_uda_loader_data_doesnt_exist(uda_env_vars):
     try:
         import pyuda
 
@@ -159,6 +189,58 @@ def test_uda_loader_data_doesnt_exist(uda_test):
         pytest.fail("Expected DataLoaderError not raised")
     except data_loaders.DataLoaderError:
         pass
+
+
+def test_sal_loader():
+    try:
+        from sal.client import SALClient
+
+        client = SALClient("https://sal.jetdata.eu")
+        client.prompt_for_password = False
+        client.authenticate()
+    except Exception:
+        pytest.skip("Could not contact SAL server")
+
+    sal_shot = ShotData(protocol="sal", signal_names=["ppf/signal/jetppf/magn/ipla"])
+    sample = Sample(
+        shot_id=87737,
+        data=sal_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data_loader = data_loaders.SALDataLoader(DataParams(name="identity"))
+    data = data_loader.get_sample(sample)
+
+    ip_values = numpy.array(data.values.get("ppf/signal/jetppf/magn/ipla").values)
+    assert numpy.min(ip_values) == -1837277.75
+    assert numpy.max(ip_values) == 4664.5283203125
+
+
+def test_fair_mast_dataloader():
+    fair_mast_shot = data_loaders.ShotData(
+        protocol="fair_mast",
+        signal_names=["magnetics/ip"],
+    )
+
+    sample = Sample(
+        shot_id=30421,
+        data=fair_mast_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data_loader = data_loaders.FAIRMASTDataLoader(params=DataParams(name="identity"))
+    data = data_loader.get_sample(sample)
+    assert isinstance(data, MultiVariateTimeSeriesData)
+
+    # Check both columns requested are present
+    assert data.values.get("magnetics/ip")
+
+    # Check it contains values and times
+    ip_values = numpy.array(data.values.get("magnetics/ip").values)
+    assert numpy.min(ip_values) == -40806.55078125
+    assert numpy.max(ip_values) == 649008.875
 
 
 @pytest.mark.asyncio
@@ -224,9 +306,11 @@ async def test_custom_data_loader(api_client):
 @pytest.mark.parametrize(
     "name,data_loader,sample_data_model",
     [
-        ("image", data_loaders.ImageDataLoader, FileData),
-        ("parquet", data_loaders.ParquetDataLoader, TimeSeriesFileData),
+        ("image", data_loaders.ImageDataLoader, ImageFileData),
+        ("tabular", data_loaders.TabularDataLoader, TimeSeriesFileData),
         ("uda", data_loaders.UDADataLoader, ShotData),
+        ("sal", data_loaders.SALDataLoader, ShotData),
+        ("fair_mast", data_loaders.FAIRMASTDataLoader, ShotData),
     ],
 )
 def test_loader_registry(name, data_loader, sample_data_model):

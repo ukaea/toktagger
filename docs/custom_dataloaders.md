@@ -109,7 +109,7 @@ For shot-based data sources (like UDA, databases):
 
 ```python
 class ShotData(BaseModel):
-    protocol: ShotProtocol  # e.g., "uda", "sal"
+    protocol: Literal["uda", "sal"]
     signal_names: list[str]  # List of signals to retrieve
 ```
 
@@ -121,8 +121,8 @@ For file-based data sources (images, videos):
 ```python
 class FileData(BaseModel):
     file_name: str  # Path to file or directory
-    type: FileType  # e.g., "png", "jpg", "mp4"
-    protocol: FileProtocol  # "file" or "s3"
+    type: FileType  # e.g., "png", "jpeg", "mp4"
+    protocol: Literal["file", "s3"]  # "file" or "s3"
 ```
 
 **Use when**: Data is stored in individual files with different types.

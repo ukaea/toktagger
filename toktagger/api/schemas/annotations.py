@@ -103,6 +103,7 @@ TimeRegionOut = create_out_model(TimeRegion)
 BoundingBoxOut = create_out_model(BoundingBox)
 VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
 SpectrogramMaskOut = create_out_model(SpectrogramMask)
+ClassLabelOut = create_out_model(ClassLabel)
 
 # Generate Batch classes using factory function
 TimePointBatch = create_batch_model(TimePoint)
@@ -110,15 +111,21 @@ TimeRegionBatch = create_batch_model(TimeRegion)
 BoundingBoxBatch = create_batch_model(BoundingBox)
 VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
 SpectrogramMaskBatch = create_batch_model(SpectrogramMask)
+ClassLabelBatch = create_batch_model(ClassLabel)
 
 
 # Union types for annotations
 AnnotationTypes = Union[
-    TimePoint, TimeRegion, BoundingBox, VideoBoundingBox, SpectrogramMask
+    TimePoint, TimeRegion, BoundingBox, VideoBoundingBox, SpectrogramMask, ClassLabel
 ]
 
 AnnotationOutTypes = Union[
-    TimePointOut, TimeRegionOut, BoundingBoxOut, VideoBoundingBoxOut, SpectrogramMaskOut
+    TimePointOut,
+    TimeRegionOut,
+    BoundingBoxOut,
+    VideoBoundingBoxOut,
+    SpectrogramMaskOut,
+    ClassLabelOut,
 ]
 
 AnnotationBatchTypes = Union[
@@ -127,6 +134,7 @@ AnnotationBatchTypes = Union[
     BoundingBoxBatch,
     VideoBoundingBoxBatch,
     SpectrogramMaskBatch,
+    ClassLabelBatch,
 ]
 
 # TypeAdapters for annotations

@@ -7,7 +7,6 @@ from toktagger.api.schemas.samples import (
     SampleIn,
     ShotData,
     TimeSeriesFileData,
-    ShotProtocol,
 )
 from toktagger.api.schemas.annotations import (
     TimePoint,
@@ -123,7 +122,7 @@ PROJECT_2 = ProjectIn(
     name="test_project_1",
     task=Task.TIME_SERIES,
     query_strategy=QueryStrategyType.SEQUENTIAL,
-    data_loader="parquet",
+    data_loader="tabular",
 )
 PROJECT_3 = ProjectIn(
     name="project_2",
@@ -135,18 +134,21 @@ PROJECT_3 = ProjectIn(
 
 SAMPLE_1 = SampleIn(
     shot_id=1,
-    data=ShotData(protocol=ShotProtocol.UDA, signal_names=["Ip"]),
+    data=ShotData(protocol="uda", signal_names=["Ip"]),
     annotations=None,
 )
 SAMPLE_2 = SampleIn(
     shot_id=2,
-    data=ShotData(protocol=ShotProtocol.SAL, signal_names=["Ip"]),
+    data=ShotData(protocol="sal", signal_names=["Ip"]),
     annotations=None,
 )
 SAMPLE_3 = SampleIn(
     shot_id=3,
     data=TimeSeriesFileData(
-        file_name="test.csv", type="csv", protocol="s3", signal_names=["Ip"]
+        file_name="test.csv",
+        type="csv",
+        protocol="s3",
+        signal_names=["Ip"],
     ),
     annotations=None,
 )

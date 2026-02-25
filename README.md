@@ -60,7 +60,7 @@ uv pip install -e .
 
 ```sh
 nvm use v22.19.0
-npm --prefix toktagger/ui run install
+npm --prefix toktagger/ui install
 ```
 
 3. Run the backend API service in development mode. The backend API will be accessible at `http://localhost:8002`.

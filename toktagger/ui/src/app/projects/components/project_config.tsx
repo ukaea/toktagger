@@ -1,539 +1,194 @@
-"use client";
-import { z } from "zod/v4";
-import { useState, useEffect } from "react";
+import { Project, TaskType } from "@/types";
 import {
-  Form,
-  Flex,
   Button,
-  ToastQueue,
-  ListView,
-  View,
-  TextField,
-  Text,
-  ComboBox,
-  RadioGroup,
-  NumberField,
-  Radio,
-  Item,
-  DialogTrigger,
-  Dialog,
-  Divider,
-  Heading,
-  Content,
   ButtonGroup,
+  Content,
+  Dialog,
+  DialogTrigger,
+  Divider,
+  Form,
+  Heading,
+  TextField,
+  ComboBox,
+  Item,
+  RadioGroup,
+  Radio,
+  NumberField,
+  Flex,
+  Text,
+  ToastQueue,
+  ContextualHelp,
+  Disclosure,
+  DisclosureTitle,
+  DisclosurePanel,
 } from "@adobe/react-spectrum";
-import {
-  Project,
-  Sample,
-  SamplesSummary,
-  FileData,
-  TimeSeriesFileData,
-  ShotData,
-  ProjectUpdate,
-  TaskType,
-} from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
-import { BACKEND_API_URL, getSamplesSummary } from "@/app/core";
-import NumericalRange, {
-  NumericalRangeType,
-} from "@/app/components/ui/numerical_range";
+import { useState, useEffect } from "react";
+import { BACKEND_API_URL } from "@/app/core";
+import { useAPISchema } from "@/app/contexts/apiSchema";
+import { SchemaParser } from "@/schemaParser";
 
-const Tasks = Object.values(TaskType).map((task) => ({
-  key: task,
-  value: task,
-}));
-
+// Query strategies
 const QueryStrategies = [
   { key: "sequential", value: "Sequential" },
   { key: "random", value: "Random" },
   { key: "uncertainty", value: "Uncertainty Sampling" },
 ];
 
-const FileTypes = [
-  { key: "parquet", value: "Parquet" },
-  { key: "csv", value: "CSV" },
-  { key: "png", value: "PNG" },
-  { key: "jpeg", value: "JPEG" },
-];
-const DataLoaderOptionsSchema = z.object({
-  name: z.string(),
-  data_type: z.string(),
-});
-export type DataLoaderOptions = z.infer<typeof DataLoaderOptionsSchema>;
+// Tasks
+const Tasks = Object.values(TaskType).map((task) => ({
+  key: task,
+  value: task,
+}));
 
-const UDADataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
-  signal_names: z.array(z.string()),
-  shot_min: z.number(),
-  shot_max: z.number(),
-}).refine(
-  (data) =>
-    data.shot_max == null ||
-    data.shot_min == null ||
-    data.shot_min <= data.shot_max,
-  {
-    message: "shot min must be less than or equal to shot max",
-    path: ["shot_max"], // attach error to `max`
-  },
-);
-type UDADataLoaderOptions = z.infer<typeof UDADataLoaderOptionsSchema>;
+// Labels Form Component
+const LabelsForm = ({
+  label,
+  defaultLabels,
+  setLabels,
+}: {
+  label: string;
+  defaultLabels: string[];
+  setLabels: (labels: string[]) => void;
+}) => {
+  const [input, setInput] = useState<string>(defaultLabels.join(", "));
 
-const FileDataLoaderOptionsSchema = DataLoaderOptionsSchema.extend({
-  file_type: z.string(),
-  file_names: z.array(z.string()),
-  dir_name: z.string().optional(),
-  protocol: z.string().optional(),
-});
-type FileDataLoaderOptions = z.infer<typeof FileDataLoaderOptionsSchema>;
-
-const TimeSeriesFileDataLoaderOptionsSchema =
-  FileDataLoaderOptionsSchema.extend({
-    signal_names: z.array(z.string()),
-  });
-type TimeSeriesFileDataLoaderOptions = z.infer<
-  typeof TimeSeriesFileDataLoaderOptionsSchema
->;
-
-export function useFileLoaderState(
-  initialPath: string,
-  initialType: string,
-  fileTypes: { key: string; value: string }[],
-) {
-  const [filePath, setFilePath] = useState<string>(initialPath);
-  const [fileType, setFileType] = useState<string>(
-    initialType || fileTypes[0]?.key,
-  );
-  const [fileNames, setFileNames] = useState<string[]>([]);
   useEffect(() => {
-    async function fetchFileList() {
-      if (filePath) {
-        try {
-          const response = await fetch(
-            `${BACKEND_API_URL}/files?dir_path=${filePath}&file_type=${fileType}`,
-          );
-          if (response.ok) {
-            const fileList = await response.json();
-            setFileNames(fileList);
-          } else {
-            ToastQueue.negative(`Error fetching files from ${filePath}`, {
-              timeout: 3000,
-            });
-          }
-        } catch (error) {
-          ToastQueue.negative(`Error fetching files: ${error}`, {
-            timeout: 3000,
-          });
-        }
-      }
-    }
-    fetchFileList();
-  }, [filePath, fileType]);
+    setLabels(input.split(",").map((s) => s.trim()));
+  }, [input, setLabels]);
 
-  return {
-    filePath,
-    setFilePath,
-    fileType,
-    setFileType,
-    fileNames,
-  };
-}
-
-type FileLoaderFieldsProps = {
-  fileTypes: { key: string; value: string }[];
-  fileType: string;
-  setFileType: (type: string) => void;
-  filePath: string;
-  setFilePath: (path: string) => void;
-  fileNames: string[];
-};
-
-export function FileDataLoaderFields({
-  fileTypes,
-  fileType,
-  setFileType,
-  filePath,
-  setFilePath,
-  fileNames,
-}: FileLoaderFieldsProps) {
   return (
-    <Flex direction="column" gap="size-200">
-      <ComboBox
-        label="File Type"
-        items={fileTypes}
-        selectedKey={fileType}
-        onSelectionChange={(key) => setFileType(key ? String(key) : "")}
-        isRequired
-      >
-        {(item) => <Item>{item.value}</Item>}
-      </ComboBox>
-      <Flex direction="row" gap="size-200" alignItems="end">
-        <TextField
-          label="File Path"
-          value={filePath}
-          onChange={setFilePath}
-          isRequired
-        ></TextField>
-        <Text>
-          {fileNames.length} {fileType} files found.
-        </Text>
-      </Flex>
+    <Flex direction="row" gap="size-200" alignItems="center">
+      <TextField width="100%" label={label} value={input} onChange={setInput} />
+      <ContextualHelp placement="end bottom">
+        <Content>
+          <Text>
+            {label} in a comma-separated format, e.g. &quot;class 1, class
+            2&quot;. These labels will be used for {label.toLowerCase()}{" "}
+            annotation.
+          </Text>
+        </Content>
+      </ContextualHelp>
     </Flex>
   );
-}
-
-const SignalNamesUI = ({
-  displayName,
-  signalNames,
-  setSignalNames,
-}: {
-  displayName: string;
-  signalNames: string[];
-  setSignalNames: (items: string[]) => void;
-}) => {
-  const [items, setItems] = useState<string[]>(signalNames);
-  const [input, setInput] = useState("");
-
-  const handleAddItem = () => {
-    if (input.trim()) {
-      setItems((prev: string[]) => {
-        const newItems = [...prev, input.trim()];
-        return newItems;
-      });
-      setInput("");
-    }
-  };
-
-  const handleRemoveItem = (index: number) => {
-    setItems((prev: string[]) => {
-      const newItems = prev.filter((_, i) => i !== index);
-      return newItems;
-    });
-  };
-
-  useEffect(() => {
-    setSignalNames(items);
-  }, [items, setSignalNames]);
-
-  return (
-    <>
-      <Flex direction="column" gap="size-200" marginBottom="size-200">
-        <Flex direction="row" alignItems="end" gap="size-200">
-          <TextField label={displayName} value={input} onChange={setInput} />
-
-          <Button
-            variant="primary"
-            onPress={handleAddItem}
-            marginTop="size-100"
-          >
-            Add
-          </Button>
-        </Flex>
-
-        <ListView aria-label="Dynamic List" marginTop="size-200">
-          {items.map((item, index) => (
-            <Item key={index} textValue={item}>
-              <Flex
-                direction="row"
-                alignItems="center"
-                gap="size-200"
-                wrap="nowrap"
-              >
-                <Text>{item}</Text>
-                <Button
-                  variant="negative"
-                  onPress={() => handleRemoveItem(index)}
-                >
-                  Remove
-                </Button>
-              </Flex>
-            </Item>
-          ))}
-        </ListView>
-      </Flex>
-    </>
-  );
 };
 
-const UDADataLoaderOptionsUI = ({
-  dataLoader,
-  dataType,
-  dataLoaderOptions,
-  setDataLoaderOptions,
+export function ProjectConfigEditor({
+  project: _project,
+  onModify,
 }: {
-  dataLoader: string;
-  dataType: string;
-  dataLoaderOptions: UDADataLoaderOptions;
-  setDataLoaderOptions: (options: DataLoaderOptions) => void;
-}) => {
-  const [shotRange, setShotRange] = useState<NumericalRangeType>({
-    min: dataLoaderOptions?.shot_min || null,
-    max: dataLoaderOptions?.shot_max || null,
-  });
+  project?: Project;
+  onModify?: () => void;
+}) {
+  const isEditing = !!_project;
+  const titleText = isEditing ? "Edit Project" : "Create Project";
+  const createText = isEditing ? "Save Changes" : "Create";
+  const buttonText = isEditing ? "" : "Create";
+  const icon = isEditing ? <Edit /> : <AddCircle />;
 
-  const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
+  const { schema } = useAPISchema();
+
+  // Form state
+  const [projectName, setProjectName] = useState<string>(_project?.name || "");
+  const [task, setTask] = useState<string>(_project?.task || Tasks[0].key);
+  const [queryStrategy, setQueryStrategy] = useState<string>(
+    _project?.query_strategy || QueryStrategies[0].key,
   );
-
-  useEffect(() => {
-    const options = UDADataLoaderOptionsSchema.safeParse({
-      name: dataLoader,
-      data_type: dataType,
-      signal_names: signalNames,
-      shot_min: shotRange.min,
-      shot_max: shotRange.max,
-    });
-
-    if (options.success) {
-      setDataLoaderOptions(options.data);
-    }
-  }, [shotRange, signalNames, setDataLoaderOptions, dataLoader, dataType]);
-
-  return (
-    <View
-      borderWidth="thin"
-      borderColor="dark"
-      borderRadius="medium"
-      padding="size-250"
-    >
-      <Flex direction="column">
-        <NumericalRange
-          label="Shot"
-          defaultMin={shotRange.min}
-          defaultMax={shotRange.max}
-          onChange={setShotRange}
-        />
-        <SignalNamesUI
-          displayName={"Signal Names"}
-          signalNames={signalNames}
-          setSignalNames={setSignalNames}
-        />
-      </Flex>
-    </View>
+  const [dataLoader, setDataLoader] = useState<string | null>(
+    _project?.data_loader || null,
   );
-};
-
-const FileDataLoaderOptionsUI = ({
-  dataLoader,
-  dataType,
-  dataLoaderOptions,
-  setDataLoaderOptions,
-}: {
-  dataLoader: string;
-  dataType: string;
-  dataLoaderOptions: FileDataLoaderOptions;
-  setDataLoaderOptions: (options: FileDataLoaderOptions) => void;
-}) => {
-  const { filePath, setFilePath, fileType, setFileType, fileNames } =
-    useFileLoaderState(
-      dataLoaderOptions?.dir_name || "",
-      dataLoaderOptions?.protocol || FileTypes[0].key,
-      FileTypes,
-    );
-
-  useEffect(() => {
-    const options = FileDataLoaderOptionsSchema.safeParse({
-      name: dataLoader,
-      data_type: dataType,
-      file_type: fileType,
-      file_names: fileNames,
-      dir_name: filePath,
-    });
-
-    if (options.success) {
-      setDataLoaderOptions(options.data);
-    }
-  }, [
-    dataLoader,
-    dataType,
-    fileNames,
-    fileType,
-    filePath,
-    setDataLoaderOptions,
-  ]);
-
-  return (
-    <View
-      borderWidth="thin"
-      borderColor="dark"
-      borderRadius="medium"
-      padding="size-250"
-    >
-      <FileDataLoaderFields
-        fileTypes={FileTypes}
-        fileType={fileType}
-        setFileType={setFileType}
-        filePath={filePath}
-        setFilePath={setFilePath}
-        fileNames={fileNames}
-      />
-    </View>
-  );
-};
-
-const TimeSeriesFileDataLoaderOptionsUI = ({
-  dataLoader,
-  dataType,
-  dataLoaderOptions,
-  setDataLoaderOptions,
-}: {
-  dataLoader: string;
-  dataType: string;
-  dataLoaderOptions: TimeSeriesFileDataLoaderOptions;
-  setDataLoaderOptions: (options: TimeSeriesFileDataLoaderOptions) => void;
-}) => {
-  const { filePath, setFilePath, fileType, setFileType, fileNames } =
-    useFileLoaderState(
-      dataLoaderOptions?.dir_name || "",
-      dataLoaderOptions?.protocol || FileTypes[0].key,
-      FileTypes,
-    );
-
-  const [signalNames, setSignalNames] = useState<string[]>(
-    dataLoaderOptions?.signal_names || [],
-  );
-
-  useEffect(() => {
-    const options = TimeSeriesFileDataLoaderOptionsSchema.safeParse({
-      name: dataLoader,
-      data_type: dataType,
-      signal_names: signalNames,
-      file_type: fileType,
-      file_names: fileNames,
-    });
-
-    if (options.success) {
-      setDataLoaderOptions(options.data);
-    }
-  }, [
-    dataLoader,
-    dataType,
-    signalNames,
-    fileNames,
-    fileType,
-    setDataLoaderOptions,
-  ]);
-
-  return (
-    <View
-      borderWidth="thin"
-      borderColor="dark"
-      borderRadius="medium"
-      padding="size-250"
-    >
-      <FileDataLoaderFields
-        fileTypes={FileTypes}
-        fileType={fileType}
-        setFileType={setFileType}
-        filePath={filePath}
-        setFilePath={setFilePath}
-        fileNames={fileNames}
-      />
-      <SignalNamesUI
-        displayName={"File Columns"}
-        signalNames={signalNames}
-        setSignalNames={setSignalNames}
-      />
-    </View>
-  );
-};
-
-export const SelectDataLoaderUI = (
-  dataLoader: string | null,
-  dataLoaderOptions: DataLoaderOptions | null,
-  setDataLoaderOptions: (options: DataLoaderOptions) => void,
-) => {
-  const [dataType, setDataType] = useState<string | null>(null);
-  useEffect(() => {
-    if (!dataLoader) {
-      return;
-    }
-    async function fetchDataType() {
-      try {
-        const response = await fetch(
-          `${BACKEND_API_URL}/meta/dataloader/${dataLoader}`,
-        );
-        if (response.ok) {
-          const dataSchema = await response.json();
-          setDataType(dataSchema["title"]);
-        } else {
-          ToastQueue.negative(
-            `Error fetching available Data Loaders from server.`,
-            {
-              timeout: 3000,
-            },
-          );
-        }
-      } catch (error) {
-        ToastQueue.negative(`Error fetching data loaders: ${error}`, {
-          timeout: 3000,
-        });
-      }
-    }
-    fetchDataType();
-  }, [dataLoader]);
-
-  let ui = null;
-  if (dataType === "ShotData") {
-    const udaOptions = dataLoaderOptions as UDADataLoaderOptions;
-    ui = (
-      <UDADataLoaderOptionsUI
-        dataLoader={dataLoader || ""}
-        dataType={dataType}
-        dataLoaderOptions={udaOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  } else if (dataType === "FileData") {
-    const fileOptions = dataLoaderOptions as FileDataLoaderOptions;
-    ui = (
-      <FileDataLoaderOptionsUI
-        dataLoader={dataLoader || ""}
-        dataType={dataType}
-        dataLoaderOptions={fileOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  } else if (dataType === "TimeSeriesFileData") {
-    const fileOptions = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
-    ui = (
-      <TimeSeriesFileDataLoaderOptionsUI
-        dataLoader={dataLoader || ""}
-        dataType={dataType}
-        dataLoaderOptions={fileOptions}
-        setDataLoaderOptions={setDataLoaderOptions}
-      />
-    );
-  }
-  return ui;
-};
-
-const DataLoaderForm = ({
-  dataLoaderOptions,
-  setDataLoaderOptions,
-}: {
-  dataLoaderOptions: DataLoaderOptions | null;
-  setDataLoaderOptions: (options: DataLoaderOptions) => void;
-}) => {
-  const name = dataLoaderOptions?.name ? dataLoaderOptions.name : null;
   const [dataLoaders, setDataLoaders] = useState<
-    { key: string; name: string }[]
+    { key: string; value: string }[]
   >([]);
-  const [selectedKey, setSelectedKey] = useState<string | null>(name || null);
+
+  // Optional time range fields
+  const [timeMin, setTimeMin] = useState<number | null>(
+    _project?.time_min || null,
+  );
+  const [timeMax, setTimeMax] = useState<number | null>(
+    _project?.time_max || null,
+  );
+  const [minTimeStep, setMinTimeStep] = useState<number>(
+    _project?.min_time_step || 0.0001,
+  );
+
+  // Label fields
+  const [shotLabels, setShotLabels] = useState<string[]>(
+    _project?.shot_labels || [],
+  );
+  const [timeRegionLabels, setTimeRegionLabels] = useState<string[]>(
+    _project?.time_region_labels || [],
+  );
+  const [timePointLabels, setTimePointLabels] = useState<string[]>(
+    _project?.time_point_labels || [],
+  );
+  const [boundingBoxLabels, setBoundingBoxLabels] = useState<string[]>(
+    _project?.bounding_box_labels || [],
+  );
+  const [polygonLabels, setPolygonLabels] = useState<string[]>(
+    _project?.polygon_labels || [],
+  );
+  const [videoBoundingBoxLabels, setVideoBoundingBoxLabels] = useState<
+    string[]
+  >(_project?.video_bounding_box_labels || []);
+
+  useEffect(() => {
+    const parser = new SchemaParser(schema);
+    const defaultShotLabels = parser.parseDefaultShotLabels();
+    if (shotLabels.length === 0) {
+      setShotLabels(defaultShotLabels);
+    }
+    const defaultTimeRegionLabels = parser.parseDefaultTimeRegionLabels();
+    if (timeRegionLabels.length === 0) {
+      setTimeRegionLabels(defaultTimeRegionLabels);
+    }
+    const defaultTimePointLabels = parser.parseDefaultTimePointLabels();
+    if (timePointLabels.length === 0) {
+      setTimePointLabels(defaultTimePointLabels);
+    }
+    const defaultBoundingBoxLabels = parser.parseDefaultBoundingBoxLabels();
+    if (boundingBoxLabels.length === 0) {
+      setBoundingBoxLabels(defaultBoundingBoxLabels);
+    }
+    const defaultPolygonLabels = parser.parseDefaultPolygonLabels();
+    if (polygonLabels.length === 0) {
+      setPolygonLabels(defaultPolygonLabels);
+    }
+    const defaultVideoBoundingBoxLabels =
+      parser.parseDefaultVideoBoundingBoxLabels();
+    if (videoBoundingBoxLabels.length === 0) {
+      setVideoBoundingBoxLabels(defaultVideoBoundingBoxLabels);
+    }
+  }, [
+    schema,
+    shotLabels,
+    timeRegionLabels,
+    timePointLabels,
+    boundingBoxLabels,
+    polygonLabels,
+    videoBoundingBoxLabels,
+  ]);
+
+  // Fetch available data loaders on component mount
   useEffect(() => {
     async function fetchDataLoaders() {
       try {
         const response = await fetch(`${BACKEND_API_URL}/meta/dataloader`);
         if (response.ok) {
           const dataLoadersList = await response.json();
-          setDataLoaders(
-            dataLoadersList.map((item: string) => ({ key: item, value: item })),
-          );
+          const loaders = dataLoadersList.map((item: string) => ({
+            key: item,
+            value: item,
+          }));
+          setDataLoaders(loaders);
+          if (loaders.length > 0 && !dataLoader) {
+            setDataLoader(loaders[0].key);
+          }
         } else {
           ToastQueue.negative(
-            `Error fetching available Data Loaders from server.`,
-            {
-              timeout: 3000,
-            },
+            "Error fetching available Data Loaders from server.",
+            { timeout: 3000 },
           );
         }
       } catch (error) {
@@ -543,415 +198,86 @@ const DataLoaderForm = ({
       }
     }
     fetchDataLoaders();
-  }, []);
-  let ui = null;
-  ui = SelectDataLoaderUI(selectedKey, dataLoaderOptions, setDataLoaderOptions);
-
-  return (
-    <>
-      <ComboBox
-        label="Data Loader"
-        items={dataLoaders}
-        isRequired
-        onSelectionChange={(key) => setSelectedKey(key ? String(key) : null)}
-        selectedKey={selectedKey}
-      >
-        {(item: Record<string, string>) => (
-          <Item key={item.key}>{item.value}</Item>
-        )}
-      </ComboBox>
-      {ui}
-    </>
-  );
-};
-
-const TaskLoaderForm = ({
-  taskName,
-  setTaskName,
-}: {
-  taskName: string;
-  setTaskName: (selection: string) => void;
-}) => {
-  const handleSelectionChange = (key: React.Key | null) => {
-    setTaskName(key ? String(key) : Tasks[0].key);
-  };
-
-  return (
-    <>
-      <ComboBox
-        label="Task"
-        items={Tasks}
-        defaultInputValue={taskName}
-        onSelectionChange={handleSelectionChange}
-        isRequired
-        selectedKey={taskName}
-      >
-        {(item: Record<string, string>) => (
-          <Item key={item.key}>{item.value}</Item>
-        )}
-      </ComboBox>
-    </>
-  );
-};
-
-const editProject = async (
-  projectId: string,
-  project: ProjectUpdate,
-): Promise<string> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${projectId}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(project),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Error editing project ${projectId}: ${error.message}`);
-  }
-
-  return projectId;
-};
-
-const createProject = async (project: Project): Promise<string> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(project),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Error creating project: ${error.detail}`);
-  }
-
-  const projectId = (await response.json())["_id"];
-  return projectId;
-};
-
-export const buildSamples = (
-  dataLoaderOptions: DataLoaderOptions,
-): Sample[] => {
-  if (dataLoaderOptions.data_type === "ShotData") {
-    return createUDASamples(dataLoaderOptions);
-  } else if (dataLoaderOptions.data_type === "FileData") {
-    return createFileSamples(dataLoaderOptions);
-  } else if (dataLoaderOptions.data_type === "TimeSeriesFileData") {
-    return createTimeSeriesFileSamples(dataLoaderOptions);
-  } else {
-    throw new Error(`Unknown data loader ${dataLoaderOptions.name}`);
-  }
-};
-
-const createUDASamples = (dataLoaderOptions: DataLoaderOptions) => {
-  const { shot_min, shot_max } = dataLoaderOptions as UDADataLoaderOptions;
-
-  const shots = Array.from(
-    { length: shot_max - shot_min + 1 },
-    (_, i) => i + shot_min,
-  );
-  const shotData = {
-    signal_names: dataLoaderOptions.signal_names,
-    protocol: "uda",
-  } as ShotData;
-
-  const samples: Sample[] = shots.map((shot_id: number) => ({
-    timestamp: new Date().toISOString(),
-    shot_id: shot_id,
-    data: shotData,
-  }));
-  return samples;
-};
-
-const parseFileNames = (fileNames: string[]) => {
-  if (!fileNames || fileNames.length === 0) {
-    throw new Error("Directory must contain at least one file.");
-  }
-
-  // Assumption!: the file name must be the shot number.
-  const shots = fileNames.map((name: string) => {
-    const lastDotIndex = name.lastIndexOf(".");
-    const lastSlashIndex = name.lastIndexOf("/");
-    let shotName: string = "";
-    if (lastDotIndex === -1) {
-      shotName = name.substring(lastSlashIndex + 1);
-    } else {
-      shotName = name.substring(lastSlashIndex + 1, lastDotIndex);
-    }
-    const shotId = parseInt(shotName, 10);
-    return shotId;
-  });
-
-  for (let i = 0; i < shots.length; i++) {
-    const shot = shots[i];
-    if (Number.isNaN(shot)) {
-      throw new Error(`Invalid shot ID: ${shot} for file ${fileNames[i]}`);
-    }
-  }
-
-  return shots;
-};
-
-const createFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
-  const options = dataLoaderOptions as FileDataLoaderOptions;
-  const fileNames = options.file_names;
-  let samples: Sample[] = [];
-
-  if (options.file_type === "png" || options.file_type === "jpeg") {
-    const shot_id = parseFileNames([options.dir_name])[0];
-    samples = [
-      {
-        shot_id: shot_id,
-        timestamp: new Date().toISOString(),
-        data: {
-          file_name: options.dir_name,
-          type: options.file_type,
-          protocol: options.protocol || "file",
-        } as FileData,
-      },
-    ];
-  } else {
-    const shots = parseFileNames(fileNames);
-    samples = shots.map((shot_id: number, i: number) => ({
-      shot_id: shot_id,
-      timestamp: new Date().toISOString(),
-      data: {
-        file_name: fileNames[i],
-        type: options.file_type,
-        protocol: options.protocol || "file",
-      } as FileData,
-    }));
-  }
-  return samples;
-};
-
-const createTimeSeriesFileSamples = (dataLoaderOptions: DataLoaderOptions) => {
-  const options = dataLoaderOptions as TimeSeriesFileDataLoaderOptions;
-  const fileNames = options.file_names;
-  const shots = parseFileNames(fileNames);
-
-  const samples: Sample[] = shots.map((shot_id: number, i: number) => ({
-    shot_id: shot_id,
-    timestamp: new Date().toISOString(),
-    data: {
-      file_name: fileNames[i],
-      type: options.file_type,
-      protocol: options.protocol || "file",
-      signal_names: options.signal_names,
-    } as TimeSeriesFileData,
-  }));
-
-  return samples;
-};
-
-export const createSamples = async (projectId: string, samples: Sample[]) => {
-  const response = await fetch(
-    `${BACKEND_API_URL}/projects/${projectId}/samples`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(samples),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    if (error.message) {
-      throw new Error(`Error creating samples: ${error.message}`);
-    } else {
-      // Input data validation error
-      throw new Error(`Error creating samples: ${error.detail.msg}`);
-    }
-  }
-};
-
-const buildProject = (
-  projectName: string,
-  dataLoaderOptions: DataLoaderOptions,
-  task: string,
-  queryStrategy: string,
-  timeRange: NumericalRangeType,
-  minTimeStep: number,
-): Project => {
-  if (projectName === "") {
-    throw new Error("Project name cannot be empty");
-  }
-
-  if (dataLoaderOptions.name === "") {
-    throw new Error("Data loader name cannot be empty");
-  }
-
-  if (task === "") {
-    throw new Error("Task cannot be empty");
-  }
-
-  const project: Project = {
-    name: projectName,
-    data_loader: dataLoaderOptions.name,
-    task: task,
-    query_strategy: queryStrategy,
-    timestamp: new Date().toISOString(),
-    time_min: timeRange.min,
-    time_max: timeRange.max,
-    min_time_step: minTimeStep,
-  };
-
-  return project;
-};
-
-export const ProjectConfigEditor = ({
-  project,
-  onModify,
-}: {
-  project?: Project | null;
-  onModify?: () => void;
-}) => {
-  const editMode = project !== undefined && project !== null;
-  const text = editMode ? "Edit" : "Create";
-  const icon = editMode ? <Edit /> : <AddCircle />;
-  const [projectName, setProjectName] = useState<string>(project?.name || "");
-  const [timeRange, setTimeRange] = useState<NumericalRangeType>({
-    min: project?.time_min || null,
-    max: project?.time_max || null,
-  });
-  const [minTimeStep, setMinTimeStep] = useState<number>(
-    project?.min_time_step || 0.0001,
-  );
-  const [queryStrategy, setQueryStrategy] = useState<string>(
-    project?.query_strategy || QueryStrategies[0].key,
-  );
-  const [taskSelection, setTaskSelection] = useState<string>(Tasks[0].key);
-  const [dataLoaderOptions, setDataLoaderOptions] =
-    useState<DataLoaderOptions | null>(null);
-  const [samplesSummary, setSamplesSummary] = useState<SamplesSummary | null>(
-    null,
-  );
-
-  useEffect(() => {
-    const run = async () => {
-      if (!project || !project._id) {
-        return;
-      }
-      const summary = await getSamplesSummary(project._id);
-      setSamplesSummary(summary);
-    };
-    run();
-  }, [project]);
-
-  const doEditProject = async (project: Project) => {
-    const projectId = project._id;
-
-    if (!projectId) {
-      throw new Error(`Cannot edit a project with missing Project ID.`);
-    }
-
-    project.name = projectName;
-    project.query_strategy = queryStrategy;
-    project.task = taskSelection || "";
-
-    const updatedProject = {
-      name: project.name,
-      query_strategy: project.query_strategy,
-      task: project.task,
-      time_min: timeRange.min,
-      time_max: timeRange.max,
-      min_time_step: minTimeStep,
-    };
-
-    await editProject(projectId, updatedProject);
-    if (onModify) onModify();
-  };
-
-  const doCreateProject = async (dataLoaderOptions: DataLoaderOptions) => {
-    const project = buildProject(
-      projectName,
-      dataLoaderOptions,
-      taskSelection || "",
-      queryStrategy,
-      timeRange,
-      minTimeStep,
-    );
-
-    const samples = buildSamples(dataLoaderOptions);
-
-    const projectId = await createProject(project);
-    await createSamples(projectId, samples);
-    if (onModify) onModify();
-  };
-
-  // const updateDataLoaderOptions = (samplesSummary: SamplesSummary) => {
-  //   const dataLoaderName = samplesSummary?.data?.protocol;
-
-  //   if (dataLoaderName === "uda") {
-  //     // UDA data loader
-  //     const dataInfo = samplesSummary.data as ShotData;
-  //     setDataLoaderOptions({
-  //       name: dataLoaderName,
-  //       signal_names: dataInfo.signal_names || [],
-  //       shot_min: samplesSummary.shot_min || null,
-  //       shot_max: samplesSummary.shot_max || null,
-  //     } as UDADataLoaderOptions);
-  //   } else if (dataLoaderName === "file") {
-  //     // File data loader
-  //     const dataInfo = samplesSummary.data as FileData;
-  //     setDataLoaderOptions({
-  //       name: dataLoaderName,
-  //       signal_names: dataInfo.column_names || [],
-  //       file_type: dataLoaderName,
-  //       file_names: [],
-  //       file_name: dataInfo.file_name || [],
-  //     } as FileDataLoaderOptions);
-  //   } else {
-  //     // Unknown data loader
-  //     setDataLoaderOptions(null);
-  //   }
-  // };
-
-  useEffect(() => {
-    if (project && samplesSummary !== null) {
-      //updateDataLoaderOptions(samplesSummary);
-      setProjectName(project.name);
-      setQueryStrategy(project.query_strategy);
-      setTaskSelection(project.task);
-    }
-  }, [project, samplesSummary]);
+  }, [dataLoader]);
 
   const onFormSubmit = async (close: () => void) => {
-    if (editMode && project?._id) {
-      try {
-        await doEditProject(project).then(() => {
-          close();
-        });
-      } catch (error) {
-        ToastQueue.negative(`${error}`, { timeout: 3000 });
+    try {
+      // Validate required fields
+      if (!projectName.trim()) {
+        ToastQueue.negative("Project name is required", { timeout: 3000 });
+        return;
       }
-    } else {
-      try {
-        if (dataLoaderOptions === null) {
-          return;
-        }
-        await doCreateProject(dataLoaderOptions);
-        close();
-      } catch (error) {
-        ToastQueue.negative(`${error}`, { timeout: 3000 });
+      if (!dataLoader) {
+        ToastQueue.negative("Data loader is required", { timeout: 3000 });
+        return;
       }
+
+      // Build project object
+      const newProject: Partial<Project> = {
+        name: projectName,
+        task: task as TaskType,
+        query_strategy: queryStrategy,
+        data_loader: dataLoader,
+        timestamp: new Date().toISOString(),
+        time_min: timeMin,
+        time_max: timeMax,
+        min_time_step: minTimeStep,
+        shot_labels: shotLabels,
+        time_region_labels: timeRegionLabels,
+        time_point_labels: timePointLabels,
+        bounding_box_labels: boundingBoxLabels,
+        polygon_labels: polygonLabels,
+        video_bounding_box_labels: videoBoundingBoxLabels,
+      };
+
+      if (isEditing && _project?._id) {
+        newProject._id = _project._id;
+      }
+
+      let url = `${BACKEND_API_URL}/projects`;
+      let method: "POST" | "PUT" = "POST";
+      if (isEditing && _project?._id) {
+        url += `/${_project._id}`;
+        method = "PUT";
+      }
+
+      // Create project via API
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newProject),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Error creating project");
+      }
+
+      ToastQueue.positive("Project created successfully!", {
+        timeout: 3000,
+      });
+
+      if (onModify) {
+        onModify();
+      }
+
+      close();
+    } catch (error) {
+      ToastQueue.negative(`${error}`, { timeout: 3000 });
     }
   };
 
   return (
     <DialogTrigger>
-      <Button variant={editMode ? "accent" : "primary"} aria-label={text}>
+      <Button variant={isEditing ? "accent" : "primary"}>
         {icon}
-        {!editMode ? <Text>{text}</Text> : <></>}
+        {!isEditing ? <Text>{buttonText}</Text> : <></>}
       </Button>
       {(close) => (
         <Dialog>
-          <Heading>{text} Project</Heading>
+          <Heading>{titleText}</Heading>
           <Divider />
           <Content>
             <Form maxWidth="size-6000">
@@ -962,20 +288,35 @@ export const ProjectConfigEditor = ({
                 onChange={setProjectName}
               />
 
-              <>
-                {!editMode && (
-                  <>
-                    <DataLoaderForm
-                      dataLoaderOptions={dataLoaderOptions}
-                      setDataLoaderOptions={setDataLoaderOptions}
-                    />
-                    <TaskLoaderForm
-                      taskName={taskSelection}
-                      setTaskName={setTaskSelection}
-                    />
-                  </>
+              <ComboBox
+                label="Task"
+                items={Tasks}
+                isRequired
+                isDisabled={isEditing} // Disable task change when editing
+                selectedKey={task}
+                onSelectionChange={(key) =>
+                  setTask(key ? String(key) : Tasks[0].key)
+                }
+              >
+                {(item: Record<string, string>) => (
+                  <Item key={item.key}>{item.value}</Item>
                 )}
-              </>
+              </ComboBox>
+
+              <ComboBox
+                label="Data Loader"
+                items={dataLoaders}
+                isRequired
+                selectedKey={dataLoader}
+                onSelectionChange={(key) => {
+                  setDataLoader(key ? String(key) : dataLoaders[0].key);
+                }}
+                isDisabled={isEditing} // Disable data loader change when editing
+              >
+                {(item: Record<string, string>) => (
+                  <Item key={item.key}>{item.value}</Item>
+                )}
+              </ComboBox>
 
               <RadioGroup
                 label="Query Strategy"
@@ -989,44 +330,111 @@ export const ProjectConfigEditor = ({
                   </Radio>
                 ))}
               </RadioGroup>
+              <Disclosure>
+                {task !== TaskType.Video && (
+                  <>
+                    <DisclosureTitle>
+                      <span style={{ fontSize: "0.9rem" }}>
+                        Time Range Settings
+                      </span>
+                    </DisclosureTitle>
+                    <DisclosurePanel>
+                      <Flex direction="row" gap="size-200">
+                        <NumberField
+                          label="Time Min (s)"
+                          value={timeMin ?? undefined}
+                          onChange={(value) =>
+                            setTimeMin(isNaN(value) ? null : value)
+                          }
+                          formatOptions={{
+                            maximumFractionDigits: 10,
+                          }}
+                        />
+                        <NumberField
+                          label="Time Max (s)"
+                          value={timeMax ?? undefined}
+                          onChange={(value) =>
+                            setTimeMax(isNaN(value) ? null : value)
+                          }
+                          formatOptions={{
+                            maximumFractionDigits: 10,
+                          }}
+                        />
+                      </Flex>
 
-              <NumericalRange
-                label="Time"
-                defaultMin={timeRange.min}
-                defaultMax={timeRange.max}
-                onChange={setTimeRange}
-                isRequired={false}
-              />
-              <Flex direction="row" gap="size-200" alignItems="center">
-                <NumberField
-                  label="Min Time Step (s)"
-                  defaultValue={minTimeStep}
-                  onChange={setMinTimeStep}
-                  isRequired={false}
-                  validate={(value: number) => {
-                    if (!Number.isNaN(value) && minTimeStep <= 0) {
-                      return `Min Time Step must be greater than 0`;
-                    } else {
-                      return true;
-                    }
-                  }}
-                  formatOptions={{
-                    maximumFractionDigits: 10,
-                  }}
-                />
-              </Flex>
+                      <NumberField
+                        label="Min Time Step (s)"
+                        value={minTimeStep}
+                        onChange={setMinTimeStep}
+                        formatOptions={{
+                          maximumFractionDigits: 10,
+                        }}
+                      />
+                    </DisclosurePanel>
+                  </>
+                )}
+              </Disclosure>
+              <Disclosure>
+                <DisclosureTitle>
+                  <span style={{ fontSize: "0.9rem" }}>
+                    Annotation Label Settings
+                  </span>
+                </DisclosureTitle>
+                <DisclosurePanel>
+                  <LabelsForm
+                    label="Shot Labels"
+                    defaultLabels={shotLabels}
+                    setLabels={setShotLabels}
+                  />
+                  {task !== TaskType.Video && (
+                    <>
+                      <LabelsForm
+                        label="Time Region Labels"
+                        defaultLabels={timeRegionLabels}
+                        setLabels={setTimeRegionLabels}
+                      />
+                      <LabelsForm
+                        label="Time Point Labels"
+                        defaultLabels={timePointLabels}
+                        setLabels={setTimePointLabels}
+                      />
+                    </>
+                  )}
+                  {task === TaskType.Spectrogram ? (
+                    <>
+                      <LabelsForm
+                        label="Bounding Box Labels"
+                        defaultLabels={boundingBoxLabels}
+                        setLabels={setBoundingBoxLabels}
+                      />
+                      <LabelsForm
+                        label="Polygon Labels"
+                        defaultLabels={polygonLabels}
+                        setLabels={setPolygonLabels}
+                      />
+                    </>
+                  ) : null}
+                  {task === TaskType.Video && (
+                    <LabelsForm
+                      label="Video Bounding Box Labels"
+                      defaultLabels={videoBoundingBoxLabels}
+                      setLabels={setVideoBoundingBoxLabels}
+                    />
+                  )}
+                </DisclosurePanel>
+              </Disclosure>
             </Form>
           </Content>
           <ButtonGroup>
-            <Button variant="primary" onPress={close}>
-              Close
+            <Button variant="secondary" onPress={close}>
+              Cancel
             </Button>
             <Button variant="primary" onPress={async () => onFormSubmit(close)}>
-              {text}
+              {createText}
             </Button>
           </ButtonGroup>
         </Dialog>
       )}
     </DialogTrigger>
   );
-};
+}

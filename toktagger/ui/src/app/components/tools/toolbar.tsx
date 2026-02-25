@@ -465,8 +465,7 @@ export default function ToolBar() {
     }
 
     const tsData = result.data;
-
-    const labels = ["Valid Shot", "Invalid Shot"];
+    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
     tools.push({
       name: "Shot Labels",
       component: <ShotLabels labels={labels}></ShotLabels>,

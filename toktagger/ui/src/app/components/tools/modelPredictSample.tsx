@@ -45,6 +45,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         });
         return;
       }
+
       const response = await startSamplePredictions(
         project_id,
         sample_id,

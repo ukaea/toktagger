@@ -16,10 +16,22 @@ import {
   Picker,
   SearchField,
   ToastContainer,
+  DialogTrigger,
+  Dialog,
+  Heading,
+  Divider,
+  Content,
+  ButtonGroup,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
-import { getSamples, getProject } from "@/app/core";
+import {
+  getSamples,
+  getProject,
+  deleteSample,
+  deleteSamples,
+} from "@/app/core";
+import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
@@ -48,6 +60,7 @@ type SamplesTableProps = {
   samples: Sample[];
   sortDescriptor: SortDescriptor;
   onSortChange: (sort: SortDescriptor) => void;
+  onModify?: () => void;
 };
 
 const SamplesTable = ({
@@ -55,6 +68,7 @@ const SamplesTable = ({
   samples,
   sortDescriptor,
   onSortChange,
+  onModify,
 }: SamplesTableProps) => {
   const navigate = useNavigate();
   const rows = samples.map(({ _id, ...rest }) => ({
@@ -80,6 +94,7 @@ const SamplesTable = ({
             <Column key="_id" allowsSorting>
               Date Created
             </Column>
+            <Column key="actions">Actions</Column>
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
@@ -88,6 +103,45 @@ const SamplesTable = ({
               >
                 <Cell>{item["shot_id"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
+                <Cell>
+                  <Flex direction="row" gap="size-100">
+                    <DialogTrigger>
+                      <Button variant="negative">
+                        <Delete />
+                      </Button>
+                      {(close) => (
+                        <Dialog>
+                          <Heading>Confirm Deletion</Heading>
+                          <Divider />
+                          <Content>
+                            Are you sure you want to delete sample with Shot ID{" "}
+                            <strong>{item["shot_id"]}</strong>? You will also
+                            lose <strong>all annotations</strong> associated
+                            with this sample. This action cannot be undone.
+                          </Content>
+                          <ButtonGroup>
+                            <Button variant="secondary" onPress={close}>
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="negative"
+                              onPress={async () => {
+                                if (item["id"] == null) {
+                                  return;
+                                }
+                                await deleteSample(project_id, item["id"]);
+                                onModify?.();
+                                close();
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </ButtonGroup>
+                        </Dialog>
+                      )}
+                    </DialogTrigger>
+                  </Flex>
+                </Cell>
               </Row>
             )}
           </TableBody>
@@ -201,6 +255,41 @@ export default function ProjectView() {
             >
               <Flex gap="size-100" alignItems="center" justifyContent="start">
                 <AddSamplesEditor project={project} onModify={refreshSamples} />
+                <DialogTrigger>
+                  <Button variant="negative">
+                    <Delete /> Clear Samples
+                  </Button>
+                  {(close) => (
+                    <Dialog>
+                      <Heading>Confirm Clear All Samples</Heading>
+                      <Divider />
+                      <Content>
+                        Are you sure you want to delete{" "}
+                        <strong>all samples</strong> in this project? You will
+                        lose <strong>all annotations</strong> associated with
+                        the samples as well. This action cannot be undone.
+                      </Content>
+                      <ButtonGroup>
+                        <Button variant="secondary" onPress={close}>
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="negative"
+                          onPress={async () => {
+                            if (!project_id) {
+                              return;
+                            }
+                            await deleteSamples(project_id);
+                            refreshSamples();
+                            close();
+                          }}
+                        >
+                          Clear All
+                        </Button>
+                      </ButtonGroup>
+                    </Dialog>
+                  )}
+                </DialogTrigger>
               </Flex>
               <Flex gap="size-100" alignItems="center" justifyContent="end">
                 <Flex gap="size-100" alignItems="center" marginTop="size-200">
@@ -226,6 +315,7 @@ export default function ProjectView() {
               samples={samples}
               sortDescriptor={sortDescriptor}
               onSortChange={onSortChange}
+              onModify={refreshSamples}
             ></SamplesTable>
             <div className="flex items-center justify-between pl-4 pr-4">
               <Button

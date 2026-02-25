@@ -328,7 +328,29 @@ async def remove_sample(
     # Delete sample
     await utils.delete_samples(db_client, project_id=project_id, sample_id=sample_id)
 
-    # Delete annotations associated with this sample
+    # Delete any annotations associated with this sample
     await utils.delete_annotations(
         db_client, project_id=project_id, sample_id=sample_id
     )
+
+
+@router.delete("")
+async def remove_all_samples(
+    request: Request,
+    project_id: str = Path(
+        description="The ID of the project to delete all samples from."
+    ),
+):
+    """
+    Remove all samples from this project.
+    --------------------------------------------
+    """
+    db_client = request.app.state.db_client
+    # Check project exists
+    await utils.get_project(db_client, project_id=project_id)
+
+    # Delete all samples for this project
+    await utils.delete_samples(db_client, project_id=project_id)
+
+    # Delete any annotations associated with these samples
+    await utils.delete_annotations(db_client, project_id=project_id)
