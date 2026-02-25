@@ -22,34 +22,18 @@ import { BACKEND_API_URL, getShotSample } from "@/app/core";
 import { useNavigate } from "react-router-dom";
 import { useVideoSession } from "@/app/video/components/video-session";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 
 const TOAST_TIMEOUT = 5000;
 
 async function getNextSample(project_id: string, current_sample_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/next?current_sample_id=${current_sample_id}`;
   const sampleResult = await fetch(NEXT_URL);
-  if (sampleResult.status === 204) {
+  if (sampleResult.status === 204 || sampleResult.status === 400) {
     return null; // No next sample available
   } else if (!sampleResult.ok) {
     throw new Error(
       `Failed to fetch next sample: ${sampleResult.status} ${sampleResult.statusText}`,
-    );
-  }
-  const sample = await sampleResult.json();
-  return sample;
-}
-
-async function getPreviousSample(
-  project_id: string,
-  current_sample_id: string,
-) {
-  const PREVIOUS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/previous?current_sample_id=${current_sample_id}`;
-  const sampleResult = await fetch(PREVIOUS_URL);
-  if (sampleResult.status === 204) {
-    return null; // No previous sample available
-  } else if (!sampleResult.ok) {
-    throw new Error(
-      `Failed to fetch previous sample: ${sampleResult.status} ${sampleResult.statusText}`,
     );
   }
   const sample = await sampleResult.json();
@@ -114,6 +98,11 @@ type ButtonInfo = {
   setIsValidated: (validated: boolean) => void;
   onSaved?: () => Promise<void> | void;
   saveOnNavigate?: boolean;
+};
+
+type PreviousButtonInfo = ButtonInfo & {
+  isDisabled?: boolean;
+  popVisitedSampleId: () => string | null;
 };
 
 function NextButton({
@@ -199,12 +188,18 @@ function PreviousButton({
   setIsValidated,
   onSaved,
   saveOnNavigate,
-}: ButtonInfo) {
+  isDisabled,
+  popVisitedSampleId,
+}: PreviousButtonInfo) {
   const navigate = useNavigate();
   const session = useVideoSession();
   const { annotations } = useSample();
 
   const movePreviousShot = useCallback(async () => {
+    if (isDisabled) {
+      return;
+    }
+
     const payload = buildVideoSavePayload(session, annotations);
 
     try {
@@ -215,8 +210,8 @@ function PreviousButton({
         saveOnNavigate,
       );
 
-      const sample = await getPreviousSample(project_id, sample_id);
-      if (!sample) {
+      const previous_sample_id: string | null = popVisitedSampleId();
+      if (!previous_sample_id) {
         ToastQueue.negative("No earlier samples available!", {
           timeout: TOAST_TIMEOUT,
         });
@@ -229,7 +224,7 @@ function PreviousButton({
         await onSaved?.();
       }
 
-      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+      const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${previous_sample_id}`;
       navigate(NEXT_SAMPLE_URL);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -244,6 +239,8 @@ function PreviousButton({
     saveOnNavigate,
     session,
     annotations,
+    isDisabled,
+    popVisitedSampleId,
     setIsValidated,
     onSaved,
   ]);
@@ -251,7 +248,7 @@ function PreviousButton({
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       // Check for Shift + Left Arrow
-      if (e.shiftKey && e.key === "ArrowLeft") {
+      if (e.shiftKey && e.key === "ArrowLeft" && !isDisabled) {
         e.preventDefault();
         movePreviousShot();
       }
@@ -263,7 +260,11 @@ function PreviousButton({
 
   return (
     <View marginStart="size-100">
-      <ActionButton aria-label="Previous Sample" onPress={movePreviousShot}>
+      <ActionButton
+        aria-label="Previous Sample"
+        onPress={movePreviousShot}
+        isDisabled={isDisabled}
+      >
         <StepBackward />
       </ActionButton>
     </View>
@@ -402,6 +403,7 @@ export function VideoNavigationBar({
   onSaved,
 }: NavigationBarInfo) {
   const { setIsValidated } = useSample();
+  const { visitedSampleIds, popVisitedSampleId } = useSampleHistory();
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
 
   return (
@@ -419,6 +421,8 @@ export function VideoNavigationBar({
           setIsValidated={setIsValidated}
           onSaved={onSaved}
           saveOnNavigate={SaveOnNavigate}
+          isDisabled={visitedSampleIds.length <= 1}
+          popVisitedSampleId={popVisitedSampleId}
         />
         <NextButton
           project_id={project_id}
