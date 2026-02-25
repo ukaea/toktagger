@@ -4,7 +4,7 @@ import { Annotation, TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCall
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from "react"
 import {v4 as uuidv4} from "uuid"
 import { useSample } from "./SampleContext"
-import { convertRawAnnotationsToTimeSeries } from "../utils"
+import { convertRawAnnotationsToTimeSeries, convertTimeSeriesToRawAnnotations } from "../utils"
 
 type TimeSeriesActions = {
     createAnnotation: (type: TimeSeriesAnnotationType) => TimeSeriesAnnotation;
@@ -13,6 +13,7 @@ type TimeSeriesActions = {
     getAnnotation: (id: string) => TimeSeriesAnnotation | null;
     setAnnotationTool: (tool: TimeSeriesAnnotationType | null) => void;
     registerTooling: (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => void;
+    syncAnnotations: () => void;
     triggerUpdate: () => void;
 }
 
@@ -48,7 +49,7 @@ export const useTimeSeriesState = () => {
 }
 
 export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => {
-    const {annotations: rawAnnotations} = useSample();
+    const {annotations: rawAnnotations, setAnnotations: setRawAnnotations} = useSample();
 
     const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
@@ -56,14 +57,23 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     const [updateCounter, setUpdateCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
 
-    const parseRawAnnotations = useCallback((annotations: Annotation[]) => {
+    const parseRawAnnotations = useCallback((annotations: Annotation[]): TimeSeriesAnnotation[] => {
         const parsedAnnotations: TimeSeriesAnnotation[] = [];
         annotations.forEach((annotation) => {
             const parsedAnnotation = convertRawAnnotationsToTimeSeries(annotation);
             if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
         })
         return parsedAnnotations;
-    }, [])
+    }, []);
+
+    const parseTimeSeriesAnnotations = useCallback((annotations: TimeSeriesAnnotation[]): Annotation[] => {
+        const parsedAnnotations: Annotation[] = [];
+        annotations.forEach((annotation) => {
+            const parsedAnnotation = convertTimeSeriesToRawAnnotations(annotation);
+            if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
+        })
+        return parsedAnnotations;
+    }, []);
     
     useEffect(() => {
         setAnnotations(parseRawAnnotations(rawAnnotations));
@@ -110,8 +120,13 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     const updateAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
         setAnnotations((prev) => prev.map(item => 
             item.id === annotation.id ? annotation : item
-        ))
+        ));
     }, [])
+
+    const syncAnnotations = useCallback(() => {
+        const rawAnnotations = parseTimeSeriesAnnotations(annotations);
+        setRawAnnotations((_prev) => rawAnnotations);
+    }, [annotations, parseTimeSeriesAnnotations, setRawAnnotations])
 
     const triggerUpdate = useCallback(() => {
         setUpdateCounter((prev) => (prev + 1) % 100)
@@ -124,8 +139,9 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         registerTooling,
         updateAnnotation,
         getAnnotation,
+        syncAnnotations,
         triggerUpdate
-    }), [createAnnotation, addAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, triggerUpdate])
+    }), [createAnnotation, addAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, syncAnnotations, triggerUpdate])
 
     const stateValue: TimeSeriesState = useMemo(() => ({
         annotations,

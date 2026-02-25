@@ -64,7 +64,7 @@ export const BaseTimeSeriesPlot = ({
 }: TimeSeriesPlotProps) => {
     const [plotReady, setPlotReady] = useState(false);
 
-    const {createAnnotation, addAnnotation, triggerUpdate} = useTimeSeriesActions();
+    const {createAnnotation, addAnnotation, triggerUpdate, syncAnnotations} = useTimeSeriesActions();
     const {activeAnnotationTool, toolingCallbacks, isDrawing} = useTimeSeriesState();
 
     const isDraggingRef = useRef(false);
@@ -307,8 +307,13 @@ export const BaseTimeSeriesPlot = ({
             }
         }
 
-        const finishAnnotationCreation = (_event: MouseEvent) => {
+        const finishAnnotationCreation = (event: MouseEvent) => {
             isDraggingRef.current = false;
+            syncAnnotations();
+            if (activeAnnotationTool && isDraggingRef.current) {
+                const clickLocation = getClickData(event, plot);
+                toolingCallbacks.get(activeAnnotationTool)?.end(clickLocation.x, clickLocation.y);
+            }
         };
 
         draggableElements.forEach((element) => {
@@ -324,7 +329,7 @@ export const BaseTimeSeriesPlot = ({
                 element.removeEventListener("mouseup", finishAnnotationCreation);
             })  
         })
-    }, [activeAnnotationTool, addAnnotation, createAnnotation, plotId, plotReady, toolingCallbacks])
+    }, [activeAnnotationTool, addAnnotation, createAnnotation, plotId, plotReady, syncAnnotations, toolingCallbacks])
 
     return (
         <div className="w-full px-6 py-3 space-y-3 flex-col">

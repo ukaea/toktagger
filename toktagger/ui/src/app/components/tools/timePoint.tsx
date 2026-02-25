@@ -9,7 +9,7 @@ export const TimePoint = ({
     plotId,
     plotReady,
 }: ToolingProps) => {
-    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation} = useTimeSeriesActions();
+    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
     const {annotations, forceUpdate, isDrawing} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -31,6 +31,7 @@ export const TimePoint = ({
                 currentAnnotation.current.points[0] = {x, y};
                 updateAnnotation(currentAnnotation.current);
             },
+            end(_x, _y) {},
         }
         registerTooling(TimeSeriesAnnotationType.TIME_POINT, toolingCallbacks)
     }, [addAnnotation, createAnnotation, registerTooling, updateAnnotation]);
@@ -114,7 +115,7 @@ export const TimePoint = ({
                 updateAnnotation(d); // Global refresh must be triggered to update all linked plots
               })
               .on("end", function (_event, _d) {
-                //handleVSpanDragFinish();
+                syncAnnotations();
               });
 
             const x = xaxis.d2p(vspan.points[0].x);
@@ -146,7 +147,7 @@ export const TimePoint = ({
               .call(drag)
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

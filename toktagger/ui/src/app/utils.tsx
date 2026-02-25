@@ -165,10 +165,9 @@ export function arrayMin(arr: number[]): number {
 }
 
 export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeSeriesAnnotation | null {
-  let timeSeriesAnnotation: TimeSeriesAnnotation;
   if (TimeRegionSchema.safeParse(annotation).success) {
     const timeRegion = TimeRegionSchema.parse(annotation);
-    timeSeriesAnnotation = {
+    return {
       id: uuidv4(),
       type: TimeSeriesAnnotationType.TIME_REGION,
       points: [
@@ -176,21 +175,57 @@ export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeS
         {x: timeRegion.time_max, y: 0}
       ]
     }
-    return timeSeriesAnnotation;
   }
 
   if (TimePointSchema.safeParse(annotation).success) {
     const timePoint = TimePointSchema.parse(annotation);
-    timeSeriesAnnotation = {
+    return {
       id: uuidv4(),
       type: TimeSeriesAnnotationType.TIME_POINT,
       points: [
         {x: timePoint.time, y: 0},
       ]
     }
-    return timeSeriesAnnotation;
   }
 
   console.warn(`The following annotation could not be parsed into a time series annotation:\n ${annotation}`);
+  return null;
+}
+
+export function convertTimeSeriesToRawAnnotations(annotation: TimeSeriesAnnotation): Annotation | null {
+  if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
+    const timePoint: TimePoint = {
+      project_id: null,
+      sample_id: null,
+      shot_id: null,
+      validated: false,
+      uncertainty: 1,
+      created_by: "TODO",
+      type: "time_point",
+      time: annotation.points[0].x,
+      label: "TODO",
+      timestamp: null
+    };
+    return timePoint
+  }
+
+  if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
+    const timePoint: TimeRegion = {
+      project_id: null,
+      sample_id: null,
+      shot_id: null,
+      validated: false,
+      uncertainty: 1,
+      created_by: "TODO",
+      type: "time_point",
+      time_min: annotation.points[0].x,
+      time_max: annotation.points[1].x,
+      label: "TODO",
+      timestamp: null
+    };
+    return timePoint
+  }
+
+  console.warn(`The following annotation could not be parsed into a raw annotation:\n ${annotation}`);
   return null;
 }

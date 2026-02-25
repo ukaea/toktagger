@@ -9,7 +9,7 @@ export const TimeRegion = ({
     plotId,
     plotReady,
 }: ToolingProps) => {
-    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation} = useTimeSeriesActions();
+    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
     const {annotations, forceUpdate, isDrawing} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -35,6 +35,7 @@ export const TimeRegion = ({
                 currentAnnotation.current.points[1] = {x, y};
                 updateAnnotation(currentAnnotation.current);
             },
+            end(_x, _y) {},
         }
         registerTooling(TimeSeriesAnnotationType.TIME_REGION, toolingCallbacks)
     }, [addAnnotation, createAnnotation, registerTooling, updateAnnotation]);

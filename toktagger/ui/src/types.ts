@@ -9,8 +9,6 @@ export const BaseAnnotationSchema = z.object({
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
   created_by: z.string().default("manual"),
-  time_min: z.number().nullable().default(null),
-  time_max: z.number().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -281,7 +279,7 @@ export type TimeSeriesAnnotation = {
 export type ToolingCallbacks = {
   start: (x: number, y: number) => void;
   move: (x: number, y: number) => void;
-  //end: (x: number, y: number) => void;
+  end: (x: number, y: number) => void;
 };
 
 export type PlotProps = {
