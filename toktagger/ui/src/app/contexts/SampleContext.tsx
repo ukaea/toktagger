@@ -38,6 +38,7 @@ interface SampleContextType {
   viewParams: ViewParams;
   plotProps: PlotProps;
   annotationLabels: { id: number; name: string }[];
+  videoFrameBounds: { min: number | null; max: number | null };
   isLoading: boolean;
   isValidated: boolean | null;
   error: string | null;
@@ -147,9 +148,17 @@ export function SampleProvider({
   const [isValidated, setIsValidated] = useState<boolean | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [videoFrameBounds, setVideoFrameBounds] = useState<{
+    min: number | null;
+    max: number | null;
+  }>({ min: null, max: null });
 
   // Video: remember the last successfully loaded frame so missing frames become navigation bounds.
   const lastGoodVideoFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setVideoFrameBounds({ min: null, max: null });
+  }, [sampleId]);
 
   function extractDetail(payload: unknown): string {
     if (!payload) return "Unknown error";
@@ -261,6 +270,13 @@ export function SampleProvider({
                 timeout: 2500,
               });
 
+              setVideoFrameBounds((prev) => {
+                if (requestedFrame < lastGood) {
+                  return { ...prev, min: lastGood };
+                }
+                return { ...prev, max: lastGood };
+              });
+
               // Roll back params; do NOT set error and do NOT clear data.
               setDataParams((prev) => ({
                 ...prev,
@@ -294,6 +310,10 @@ export function SampleProvider({
           const frame = (viewData as { frame?: unknown }).frame;
           if (typeof frame === "number" && Number.isFinite(frame)) {
             lastGoodVideoFrameRef.current = frame;
+            setVideoFrameBounds((prev) => ({
+              ...prev,
+              min: prev.min === null ? frame : Math.min(prev.min, frame),
+            }));
           }
         }
       } catch (err) {
@@ -317,6 +337,7 @@ export function SampleProvider({
     viewParams,
     plotProps,
     annotationLabels,
+    videoFrameBounds,
     isLoading,
     isValidated,
     error,

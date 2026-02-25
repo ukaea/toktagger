@@ -6,6 +6,7 @@ import { ImageDataSchema } from "@/types";
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 import { useVideoSession } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
+import { useSample } from "@/app/contexts/SampleContext";
 
 /**
  * Small "jump to frame" input with validation. Delegates the actual navigation
@@ -74,14 +75,22 @@ function VideoFrameAnnotator(props: {
   onJump?: (n: number) => void;
 }) {
   const session = useVideoSession();
+  const { videoFrameBounds } = useSample();
+
+  const prevDisabled =
+    videoFrameBounds.min !== null && session.frame <= videoFrameBounds.min;
+  const nextDisabled =
+    videoFrameBounds.max !== null && session.frame >= videoFrameBounds.max;
 
   const handlePrev = () => {
+    if (prevDisabled) return;
     const prev = Math.max(0, session.frame - 1);
     props.onPrev?.();
     props.goToFrame(prev);
   };
 
   const handleNext = () => {
+    if (nextDisabled) return;
     const next = session.frame + 1;
 
     // Forward-propagate current annotations into the next frame if that frame is empty.
@@ -108,13 +117,13 @@ function VideoFrameAnnotator(props: {
 
         <div className="flex justify-center">
           <ButtonGroup>
-            <Button variant="primary" onPress={handlePrev}>
+            <Button variant="primary" onPress={handlePrev} isDisabled={prevDisabled}>
               Prev
             </Button>
             <Button variant="primary" isDisabled>
               Frame {session.frame}
             </Button>
-            <Button variant="primary" onPress={handleNext}>
+            <Button variant="primary" onPress={handleNext} isDisabled={nextDisabled}>
               Next
             </Button>
           </ButtonGroup>
