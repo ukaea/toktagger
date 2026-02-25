@@ -40,7 +40,7 @@ def uda_test(uda_env_vars):
 
 @pytest.fixture(scope="session")
 def mongo_container():
-    with MongoDbContainer("mongo:latest") as mongo:
+    with MongoDbContainer("mongo:8.0") as mongo:
         yield mongo.get_connection_url()
 
 

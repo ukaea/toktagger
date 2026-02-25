@@ -43,8 +43,14 @@ Tests that functionality such as the annotators, data loaders and query strategi
 ## End to End Tests
 These tests spin up a local instance of the server and UI, and use Playwright to test pressing buttons on the UI has the expected effect. 
 
+### Installing Playwright
+We use `playwright-pytest` to write the end to end tests, which is included in the dev dependencies of the package. Before running these tests you will also need to install playwright inside your virtual environment:
+```
+python -m playwright install --with-deps
+```
+
 ### Writing Playwright Tests
-We use `playwright-pytest` to write the end to end tests, meaning they are written and ran in the same way as any other Pytest unit test. You typically need to chain together a [locator](https://playwright.dev/docs/locators), which tells the test how to find an element on the page, and an [assertion](https://playwright.dev/docs/test-assertions) to check that UI element is in the correct form. Sometimes you may also want to chain a locator together with an [action](https://playwright.dev/docs/input), such as clicking a button or filling in a text box.
+Since we use `playwright-pytest`, they are written and ran in the same way as any other Pytest unit test. You typically need to chain together a [locator](https://playwright.dev/docs/locators), which tells the test how to find an element on the page, and an [assertion](https://playwright.dev/docs/test-assertions) to check that UI element is in the correct form. Sometimes you may also want to chain a locator together with an [action](https://playwright.dev/docs/input), such as clicking a button or filling in a text box.
 
 Locators typically work by selecting the `role` of an element, and then its `label`. If you find it really difficult to select an element on a webpage with Playwright, this typically indicates an accessibility issue within the code, as someone using a screen reader or other assistive technology will also struggle to navigate the page. A common example of this would be a button with only an icon (no text) which has not been assigned an `aria-label` within the code which describes what it is used for.
 
