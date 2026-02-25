@@ -25,14 +25,10 @@ dependencies = [
   "requests",
   "numpy<2",
   "scikit-learn",
-  "celery[redis]",
   "pillow",
   "uda",
   "sal",
   "ruptures @ git+https://github.com/deepcharles/ruptures.git@e88da13b5f625f37321abd07c5d14b91701c6655",
-  "pytest",
-  "mkdocs",
-  "mkdocs-material",
   "torch",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
@@ -57,6 +53,8 @@ exclude = [".venv", "notebooks"]
 
 [dependency-groups]
 dev = [
+    "mkdocs",
+    "mkdocs-material",
     "pooch>=1.8.2",
     "httpx>=0.28.1",
     "pytest>=8.4.1",
