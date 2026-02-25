@@ -282,6 +282,13 @@ export default function ToolBar() {
       ),
     });
   } else if (data && project.task === TaskType.Video) {
+    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
+
+    tools.push({
+      name: "Shot Labels",
+      component: <ShotLabels labels={labels} />,
+    });
+
     tools.push({
       name: "Video Tools",
       component: <VideoToolbox />,

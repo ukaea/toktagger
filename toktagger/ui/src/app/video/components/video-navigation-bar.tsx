@@ -97,6 +97,17 @@ async function saveVideoSessionAnnotations(
   }
 }
 
+function buildVideoSavePayload(
+  session: ReturnType<typeof useVideoSession>,
+  sampleAnnotations: Annotation[],
+): Annotation[] {
+  const videoBoxes = session.collectAllVideoBBoxes() as Annotation[];
+  const shotLabels = (sampleAnnotations ?? []).filter(
+    (annotation) => (annotation as any)?.type === "class_label",
+  );
+  return [...shotLabels, ...videoBoxes];
+}
+
 type ButtonInfo = {
   project_id: string;
   sample_id: string;
@@ -114,9 +125,10 @@ function NextButton({
 }: ButtonInfo) {
   const navigate = useNavigate();
   const session = useVideoSession();
+  const { annotations } = useSample();
 
   const moveNextShot = useCallback(async () => {
-    const payload = session.collectAllVideoBBoxes() as Annotation[];
+    const payload = buildVideoSavePayload(session, annotations);
 
     try {
       await saveVideoSessionAnnotations(
@@ -154,6 +166,7 @@ function NextButton({
     navigate,
     saveOnNavigate,
     session,
+    annotations,
     setIsValidated,
     onSaved,
   ]);
@@ -189,9 +202,10 @@ function PreviousButton({
 }: ButtonInfo) {
   const navigate = useNavigate();
   const session = useVideoSession();
+  const { annotations } = useSample();
 
   const movePreviousShot = useCallback(async () => {
-    const payload = session.collectAllVideoBBoxes() as Annotation[];
+    const payload = buildVideoSavePayload(session, annotations);
 
     try {
       await saveVideoSessionAnnotations(
@@ -229,6 +243,7 @@ function PreviousButton({
     navigate,
     saveOnNavigate,
     session,
+    annotations,
     setIsValidated,
     onSaved,
   ]);
@@ -262,9 +277,10 @@ function SaveButton({
   onSaved,
 }: ButtonInfo) {
   const session = useVideoSession();
+  const { annotations } = useSample();
 
   const handleClick = async () => {
-    const payload = session.collectAllVideoBBoxes() as Annotation[];
+    const payload = buildVideoSavePayload(session, annotations);
     try {
       await saveVideoSessionAnnotations(project_id, sample_id, payload, true);
       session.markSaved();
@@ -325,6 +341,7 @@ export function VideoShotSearch({
 }: SaveInfo) {
   const navigate = useNavigate();
   const session = useVideoSession();
+  const { annotations } = useSample();
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   const onSearchSubmit = async (newValue: string) => {
@@ -336,7 +353,7 @@ export function VideoShotSearch({
       try {
         const sample = await getShotSample(project_id, shot_id);
         if (sample !== null) {
-          const payload = session.collectAllVideoBBoxes() as Annotation[];
+          const payload = buildVideoSavePayload(session, annotations);
           await saveVideoSessionAnnotations(
             project_id,
             sample_id,
