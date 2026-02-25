@@ -5,16 +5,19 @@ import React, {createContext, useCallback, useContext, useEffect, useMemo, useSt
 import {v4 as uuidv4} from "uuid"
 import { useSample } from "./SampleContext"
 import { convertRawAnnotationsToTimeSeries, convertTimeSeriesToRawAnnotations, randomColor } from "../utils"
+import { Item, ItemParams, Menu, Submenu } from "react-contexify"
 
 type TimeSeriesActions = {
     createAnnotation: (type: TimeSeriesAnnotationType, label: string) => TimeSeriesAnnotation;
     addAnnotation: (annotation: TimeSeriesAnnotation) => void;
+    removeAnnotation: (id: string) => void;
     updateAnnotation: (annotation: TimeSeriesAnnotation) => void;
     getAnnotation: (id: string) => TimeSeriesAnnotation | null;
     setAnnotationTool: (tool: TimeSeriesToolDefinition | null) => void;
     registerTooling: (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => void;
     syncAnnotations: () => void;
     triggerUpdate: () => void;
+    findSelectedAnnotations: (range: {low: number, high: number} | null) => void;
 }
 
 type TimeSeriesState = {
@@ -49,17 +52,17 @@ export const useTimeSeriesState = () => {
     return context;
 }
 
+export const TIME_SERIES_ANNOTATION_MENU = "time-series-annotation-menu";
+
 export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => {
     const {annotations: rawAnnotations, setAnnotations: setRawAnnotations, project} = useSample();
 
     const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
-    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_REGION, label: "TEST_LABEL"});
+    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_REGION, label: "Disruption"});
     const [updateCounter, setUpdateCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
     const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(new Map());
-
-    console.log(categories)
 
     const parseRawAnnotations = useCallback((annotations: Annotation[]): TimeSeriesAnnotation[] => {
         const parsedAnnotations: TimeSeriesAnnotation[] = [];
@@ -116,13 +119,22 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
             created_by: "manual",
             label,
             type,
-            points: []
+            points: [],
+            selected: false,
         }
     }, [])
 
     const addAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
         setAnnotations(prev => [...prev, annotation])
     }, [])
+
+    const removeAnnotation = useCallback((id: string) => {
+        const currentAnnotations = annotations;
+        const newAnnotations = currentAnnotations.filter((annotation) => 
+            annotation.id !== id
+        )
+        setRawAnnotations((_prev) => parseTimeSeriesAnnotations(newAnnotations))
+    }, [annotations, parseTimeSeriesAnnotations, setRawAnnotations])
 
     const getAnnotation = useCallback((id: string) => {
         annotations.forEach((annotation) => {
@@ -164,16 +176,39 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         setUpdateCounter((prev) => (prev + 1) % 100)
     }, [])
 
+    const findSelectedAnnotations = useCallback((range: {low: number, high: number} | null) => {
+        if (!range) {
+            return
+        }
+
+        const updated_state: TimeSeriesAnnotation[] = annotations.map((annotation) => {
+            if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
+                if (annotation.points[0].x > range.low 
+                    && annotation.points[0].x < range.high
+                    && annotation.points[1].x < range.high
+                    && annotation.points[1].x > range.low) {
+                        return {...annotation, selected: true}
+                }
+                return {...annotation, selected: false}
+            }
+            return {...annotation, selected: false}
+        })
+
+        setAnnotations(updated_state);
+    }, [annotations])
+
     const actionsValue: TimeSeriesActions = useMemo(() => ({
         createAnnotation,
         addAnnotation,
+        removeAnnotation,
         setAnnotationTool,
         registerTooling,
         updateAnnotation,
         getAnnotation,
         syncAnnotations,
-        triggerUpdate
-    }), [createAnnotation, addAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, syncAnnotations, triggerUpdate])
+        triggerUpdate,
+        findSelectedAnnotations,
+    }), [createAnnotation, addAnnotation, removeAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, syncAnnotations, triggerUpdate, findSelectedAnnotations])
 
     const stateValue: TimeSeriesState = useMemo(() => ({
         annotations,
@@ -206,6 +241,22 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         };
     }, [])
 
+    const annotationLabels = Array.from(categories.values()).map((category, index) => {
+        return (
+            <Item
+                key={`update${index}`}
+                id={`update${index}`}
+                hidden={({props}) => (props.annotation.type !== category.type)}
+                onClick={({props}) => {
+                    const new_annotation: TimeSeriesAnnotation = {...props.annotation, label: category.label}
+                    const update = annotations.map((annotation) => annotation.id === new_annotation.id ? new_annotation : annotation)
+                    setRawAnnotations((_prev) => parseTimeSeriesAnnotations(update))
+                }}
+            >
+                {category.label}
+            </Item>
+    )})
+
     return (
         <TimeSeriesActionsContext.Provider
             value={actionsValue}
@@ -214,6 +265,19 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
                 value={stateValue}
             >
                 {children}
+                <Menu id={`${TIME_SERIES_ANNOTATION_MENU}`} >
+                    <Item
+                        id="delete"
+                        onClick={({ props }: ItemParams) => {
+                            removeAnnotation(props.annotation.id)
+                        }}
+                    >
+                        Delete
+                    </Item>
+                    <Submenu label="Set type">
+                        {annotationLabels}
+                    </Submenu>
+                </Menu>
             </TimeSeriesStateContext>
         </TimeSeriesActionsContext.Provider>
     )

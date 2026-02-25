@@ -1,9 +1,10 @@
 "use client"
 
-import { useTimeSeriesActions, useTimeSeriesState } from "@/app/contexts/TimeSeriesContext"
+import { TIME_SERIES_ANNOTATION_MENU, useTimeSeriesActions, useTimeSeriesState } from "@/app/contexts/TimeSeriesContext"
 import { TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks, ToolingProps } from "@/types";
 import * as d3 from "d3";
 import { useEffect, useRef } from "react";
+import { useContextMenu } from "react-contexify";
 
 export const TimeRegion = ({
     plotId,
@@ -14,6 +15,11 @@ export const TimeRegion = ({
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
     const dragOffset = useRef(0);
+
+    // Hook to trigger the context provider to render context menu
+    const { show: showZoneMenu } = useContextMenu({
+      id: TIME_SERIES_ANNOTATION_MENU,
+    });
 
     useEffect(() => {
         const toolingCallbacks: ToolingCallbacks = {
@@ -180,6 +186,19 @@ export const TimeRegion = ({
               syncAnnotations();
             });
 
+          function handleContextMenu(event: MouseEvent, annotation: TimeSeriesAnnotation) {
+            event.preventDefault(); // Prevent default context menu
+            const isRightClickEvent = event.button === 2 && !event.ctrlKey;
+            if (isRightClickEvent) {
+              showZoneMenu({
+                event,
+                props: {
+                  annotation
+                },
+              });
+            }
+          }
+
           // Create a line and a transparent drag handle for each VSpan
           for (const zone of annotations) {
             if (zone.type !== TimeSeriesAnnotationType.TIME_REGION) continue;
@@ -229,6 +248,7 @@ export const TimeRegion = ({
               .attr("stroke-width", 1)
               .datum(zone)
               .call(translateHandler)
+              .on("contextmenu", handleContextMenu);
 
               // x0 handle (moves x0): outside is away from the zone, inside points toward the other end
               const x0HandleX = x0IsLeft ? px0 - OUTER_HANDLE_PX : px0 - inner;
@@ -243,7 +263,8 @@ export const TimeRegion = ({
                 .attr("style", `pointer-events: ${pointerEvent}`)
                 .style("cursor", "w-resize")
                 .datum(zone)
-                .call(getBoundaryHandler(true));
+                .call(getBoundaryHandler(true))
+                .on("contextmenu", handleContextMenu);
 
               // x1 handle (moves x1)
               const x1HandleX = x0IsLeft ? px1 - inner : px1 - OUTER_HANDLE_PX;
@@ -258,10 +279,11 @@ export const TimeRegion = ({
                 .attr("style", `pointer-events: ${pointerEvent}`)
                 .style("cursor", "e-resize")
                 .datum(zone)
-                .call(getBoundaryHandler(false));
+                .call(getBoundaryHandler(false))
+                .on("contextmenu", handleContextMenu);
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, showZoneMenu]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

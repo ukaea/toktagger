@@ -175,7 +175,8 @@ export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeS
       points: [
         {x: timeRegion.time_min, y: 0},
         {x: timeRegion.time_max, y: 0}
-      ]
+      ],
+      selected: false
     }
   }
 
@@ -188,7 +189,8 @@ export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeS
       type: TimeSeriesAnnotationType.TIME_POINT,
       points: [
         {x: timePoint.time, y: 0},
-      ]
+      ],
+      selected: false
     }
   }
 
@@ -204,10 +206,10 @@ export function convertTimeSeriesToRawAnnotations(annotation: TimeSeriesAnnotati
       shot_id: null,
       validated: false,
       uncertainty: 1,
-      created_by: "TODO",
+      created_by: annotation.created_by,
       type: "time_point",
       time: annotation.points[0].x,
-      label: "TODO",
+      label: annotation.label,
       timestamp: null
     };
     return timePoint
@@ -220,11 +222,11 @@ export function convertTimeSeriesToRawAnnotations(annotation: TimeSeriesAnnotati
       shot_id: null,
       validated: false,
       uncertainty: 1,
-      created_by: "TODO",
-      type: "time_point",
+      created_by: annotation.created_by,
+      type: "time_region",
       time_min: annotation.points[0].x,
       time_max: annotation.points[1].x,
-      label: "TODO",
+      label: annotation.label,
       timestamp: null
     };
     return timePoint

@@ -16,12 +16,14 @@ export const BaseAnnotationSchema = z.object({
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 
 export const TimeRegionSchema = BaseAnnotationSchema.extend({
+  type: z.literal("time_region"),
   time_min: z.number(),
   time_max: z.number(),
 });
 export type TimeRegion = z.infer<typeof TimeRegionSchema>;
 
 export const TimePointSchema = BaseAnnotationSchema.extend({
+  type: z.literal("time_point"),
   time: z.number(),
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
@@ -287,6 +289,7 @@ export type TimeSeriesAnnotation = {
   label: string;
   type: TimeSeriesAnnotationType;
   points: TimeSeriesAnnotationPoint[];
+  selected: boolean;
 };
 
 export type ToolingCallbacks = {

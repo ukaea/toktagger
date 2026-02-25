@@ -64,7 +64,7 @@ export const BaseTimeSeriesPlot = ({
 }: TimeSeriesPlotProps) => {
     const [plotReady, setPlotReady] = useState(false);
 
-    const {createAnnotation, addAnnotation, triggerUpdate, syncAnnotations} = useTimeSeriesActions();
+    const {createAnnotation, addAnnotation, triggerUpdate, syncAnnotations, findSelectedAnnotations} = useTimeSeriesActions();
     const {activeAnnotationTool, toolingCallbacks, isDrawing} = useTimeSeriesState();
 
     const isDraggingRef = useRef(false);
@@ -209,7 +209,24 @@ export const BaseTimeSeriesPlot = ({
             react(plot, data, layout, config).then(generateOverplots);
 
             plot.removeAllListeners("plotly_relayout"); // remove any existing listeners
+            plot.removeAllListeners("plotly_selected");
             plot.on("plotly_relayout", relayoutHandler);
+
+            plot.on("plotly_selected", function (eventData) {
+                if (!eventData?.range) {
+                    //findSelectedAnnotations(null);
+                    return;
+                }
+
+                /* findSelectedAnnotations({
+                    low: eventData.range.x[0],
+                    high: eventData.range.x[1],
+                }) */
+            });
+
+            plot.on("plotly_deselect", function () {
+                console.log("Deselect")
+            });
         }
         initGraph();
 
@@ -220,7 +237,7 @@ export const BaseTimeSeriesPlot = ({
             });
             setPlotReady(false); // reset ready state
         };
-    }, [config, data, layout, plotId, triggerUpdate])
+    }, [config, data, findSelectedAnnotations, layout, plotId, triggerUpdate])
 
     useEffect(() => {
         if (!plotReady) {
