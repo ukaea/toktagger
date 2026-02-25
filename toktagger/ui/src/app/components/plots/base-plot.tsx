@@ -5,7 +5,8 @@ import {
     Layout,
     Config,
     react,
-    relayout
+    relayout,
+    PlotRelayoutEvent
 } from "plotly.js"
 import {
     useEffect,
@@ -15,6 +16,7 @@ import {
 import {useTimeSeriesActions, useTimeSeriesState} from "@/app/contexts/TimeSeriesContext"
 import { ExtendedPlotlyHTMLElement, TimeSeriesAnnotationPoint } from "@/types"
 import React from "react"
+import { arrayMax, arrayMin } from "@/app/utils"
 
 const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
     modeBarButtons: [
@@ -66,6 +68,7 @@ export const BaseTimeSeriesPlot = ({
     const {activeAnnotationTool, toolingCallbacks, isDrawing} = useTimeSeriesState();
 
     const isDraggingRef = useRef(false);
+    const allowRelayout = useRef(true);
 
     const plotId = externalId || "time-series";
 
@@ -116,7 +119,89 @@ export const BaseTimeSeriesPlot = ({
             setPlotReady(true);
         };
 
-        const relayoutHandler = () => {
+        // Sets the y axis range required for the current x range for each subplot
+        const rescale = (x0?: number, x1?: number) => {
+            const plot = document.getElementById(plotId) as Plotly.PlotlyHTMLElement;
+            if (!plot) {
+                return;
+            }
+    
+            if (!allowRelayout.current) return; // Prevents relayout triggering itself
+    
+            if (data.length === 0) {
+                return;
+            }
+            allowRelayout.current = false;
+    
+            // If no x range is passed, then the min/max is used
+            if (!x0) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                x0 = (plot as any)._fullData[0]._extremes.x.min[0].val as number;
+            }
+            if (!x1) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                x1 = (plot as any)._fullData[0]._extremes.x.max[0].val as number;
+            }
+    
+            let configUpdate = {};
+    
+            // Ensure each data set is handled (ensures all subplots are zoomed correctly)
+            data.forEach((dataSet) => {
+            let yAxisID = "";
+    
+            if (dataSet.yaxis) {
+                // Find the y axis ID relating to this subplot
+                const locatedID = dataSet.yaxis.match(/y(.*)$/)?.[1];
+                if (locatedID) {
+                    yAxisID = locatedID;
+                }
+            }
+    
+            const xArray = (dataSet as PlotData).x as number[];
+            const yArray = (dataSet as PlotData).y as number[];
+    
+            // Find min and max y data values
+            const yValues: number[] = [];
+            for (let i = 0; i < xArray.length; i++) {
+                const xVal = xArray[i];
+                if (xVal >= x0 && xVal <= x1) {
+                    yValues.push(yArray[i]);
+                }
+            }
+    
+            if (yValues.length > 0) {
+                const yMin = arrayMin(yValues);
+                const yMax = arrayMax(yValues);
+                const offset = 0.1 * (yMax - yMin); // 10 % offset
+    
+                configUpdate = {
+                ...configUpdate,
+                [`yaxis${yAxisID}.range`]: [yMin - offset, yMax + offset],
+                };
+            }
+            });
+    
+            relayout(plot, configUpdate);
+    
+            // Debounce the relayout calls
+            setTimeout(() => {
+                allowRelayout.current = true;
+            }, 100);
+        };
+
+        const relayoutHandler = (eventData: PlotRelayoutEvent) => {
+            // This makes use of the first graph displayed but this should be fine
+            // Note that the event fired by plotly is a bit strange hence the different handlers
+            if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+                // This logic is triggered after a normal zoom/pan event
+                rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
+            }
+            else if (eventData["xaxis.range"] && eventData["xaxis.range"].length === 2) {
+                // This logic is triggered after a range bar event
+                const x0 = eventData["xaxis.range"][0] as number;
+                const x1 = eventData["xaxis.range"][1] as number;
+                rescale(x0, x1)
+            }
             triggerUpdate();
         };
 
