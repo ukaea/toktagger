@@ -61,7 +61,7 @@ def check_base_page(page):
 
 def test_empty_samples_table(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -80,7 +80,7 @@ def test_empty_samples_table(server_setup, page: Page):
 
 def test_single_sample(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -321,7 +321,7 @@ def test_samples_search(server_setup, page: Page):
 def test_samples_jump_to_next_button(
     server_setup, page: Page, query_strategy, expected_next, sort_by, sort_direction
 ):
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
 
     project_id, sample_ids = create_query_strategy_samples(
         query_strategy=query_strategy
@@ -405,7 +405,7 @@ def test_create_samples_shot_data(server_setup, page: Page):
 
 def test_create_samples_file_data(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -516,7 +516,7 @@ def test_create_samples_image_data(server_setup, page: Page, file_type: str):
 @pytest.mark.parametrize("sample_id", (True, False))
 def test_samples_page_import_annotations(sample_id: bool, server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample
     sample_ids = create_local_samples(
         project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -600,7 +600,7 @@ def test_samples_page_import_annotations(sample_id: bool, server_setup, page: Pa
 
 def test_samples_page_export_annotations(server_setup, page: Page):
     # Create project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample
     sample_ids = create_local_samples(
         project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]

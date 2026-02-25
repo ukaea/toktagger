@@ -16,7 +16,7 @@ import requests
 def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False):
     # Create project
     project_id = create_project(
-        "Test Project", "time-series", "parquet", query_strategy="sequential"
+        "Test Project", "time-series", "tabular", query_strategy="sequential"
     )
     # And a sample
     sample_ids = create_local_samples(
@@ -105,7 +105,7 @@ def check_base_page(page):
     expect(page.get_by_role("group", name="Import Annotations")).to_be_hidden()
 
 
-@pytest.mark.parametrize("data_loader", ["parquet", "uda"])
+@pytest.mark.parametrize("data_loader", ["tabular", "uda"])
 def test_timeseries_navigation(data_loader, request, server_setup, page: Page):
     # Create Project
     project_id = create_project("Test Project", "time-series", data_loader)
@@ -204,7 +204,7 @@ def test_timeseries_navigation(data_loader, request, server_setup, page: Page):
 #     expect(page.get_by_role("img")).to_be_visible()
 
 
-@pytest.mark.parametrize("data_loader", ["parquet", "uda"])
+@pytest.mark.parametrize("data_loader", ["tabular", "uda"])
 def test_search_for_shot(request, data_loader, server_setup, page: Page):
     # Create Project
     project_id = create_project("Test Project", "time-series", data_loader)
@@ -267,7 +267,7 @@ def test_search_for_shot(request, data_loader, server_setup, page: Page):
 
 def test_import_annotations(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample
     sample_ids = create_local_samples(
         project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -320,7 +320,7 @@ def test_import_annotations(server_setup, page: Page):
 @pytest.mark.parametrize("all_samples", (True, False))
 def test_export_annotations(server_setup, page: Page, all_samples: bool):
     # Create project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample
     sample_ids = create_local_samples(
         project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]

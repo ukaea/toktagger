@@ -206,7 +206,7 @@ def test_projects_sorting(server_setup, page: Page):
     # Create some projects
     create_project("A Project", "time-series", "uda")
     time.sleep(0.1)
-    create_project("B Project", "spectrogram", "parquet")
+    create_project("B Project", "spectrogram", "tabular")
 
     # Navigate to page
     page.goto("http://localhost:8002")

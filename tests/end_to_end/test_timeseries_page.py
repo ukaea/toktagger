@@ -10,7 +10,7 @@ from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
 def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -81,7 +81,7 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
 def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -155,7 +155,7 @@ def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
 )
 def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -214,7 +214,7 @@ def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
 def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -264,7 +264,7 @@ def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page:
 
 def test_timeseries_save_annotations(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -344,7 +344,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
 def test_timeseries_load_annotations(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -407,7 +407,7 @@ def test_timeseries_load_annotations(server_setup, page: Page):
 
 def test_timeseries_update_annotations(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -481,7 +481,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
 def test_timeseries_annotator(server_setup, page: Page):
     # Create Project
-    project_id = create_project("Test Project", "time-series", "parquet")
+    project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]

@@ -129,7 +129,7 @@ def create_model_samples(setup_model_samples):
 def create_query_strategy_samples(query_strategy: str):
     # Create project
     project_id = create_project(
-        "Test Project", "time-series", "parquet", query_strategy=query_strategy
+        "Test Project", "time-series", "tabular", query_strategy=query_strategy
     )
     # And create samples,
     # but create them in reverse order of shot ID so that sorting by timestamp gives you opposite order
