@@ -59,7 +59,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
 
     const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
-    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_REGION, label: "Disruption"});
+    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_POINT, label: "Disruption"});
     const [updateCounter, setUpdateCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
     const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(new Map());
@@ -187,6 +187,13 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
             if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
                 if (annotation.points[0].x > range.low 
                     && annotation.points[1].x < range.high) {
+                        return {...annotation, selected: true}
+                }
+                return {...annotation, selected: false}
+            }
+            if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
+                if (annotation.points[0].x > range.low 
+                    && annotation.points[0].x < range.high) {
                         return {...annotation, selected: true}
                 }
                 return {...annotation, selected: false}

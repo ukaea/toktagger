@@ -99,7 +99,7 @@ export const TimePoint = ({
           // Create a line and a transparent drag handle for each VSpan
           for (const vspan of annotations) {
             if (vspan.type !== TimeSeriesAnnotationType.TIME_POINT) continue;
-            const opacity = 0.5;
+            const opacity = vspan.selected ? 0.8 : 0.5;
 
             const drag = d3
               .drag<SVGRectElement, TimeSeriesAnnotation>()

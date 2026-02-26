@@ -6,7 +6,8 @@ import {
     Config,
     react,
     relayout,
-    PlotRelayoutEvent
+    PlotRelayoutEvent,
+    PlotSelectionEvent
 } from "plotly.js"
 import {
     useEffect,
@@ -236,7 +237,7 @@ export const BaseTimeSeriesPlot = ({
             return;
         }
 
-        plot.on("plotly_selected", function (eventData) {
+        const onSelection = (eventData: PlotSelectionEvent) => {
             if (!eventData?.range) {
                 findSelectedAnnotations(null);
                 return;
@@ -246,12 +247,19 @@ export const BaseTimeSeriesPlot = ({
                 low: eventData.range.x[0],
                 high: eventData.range.x[1],
             })
-        });
+        }
 
-        plot.on("plotly_deselect", function () {
+        const onDeselect = () => {
             findSelectedAnnotations(null);
-            relayout(plot, { selections: [] }); // clear selection
-        });
+        }
+
+        plot.on("plotly_selected", onSelection);
+        plot.on("plotly_deselect", onDeselect);
+
+        return (() => {
+            plot.removeAllListeners("plotly_selected");
+            plot.removeAllListeners("plotly_deselect");
+        })
 
     }, [findSelectedAnnotations, plotId, plotReady])
 
