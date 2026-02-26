@@ -150,7 +150,6 @@ export default function ToolBar() {
     project,
     sample,
     data,
-    annotations,
     setAnnotations,
     viewParams,
     setViewParams,

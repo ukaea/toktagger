@@ -87,7 +87,7 @@ function buildVideoSavePayload(
 ): Annotation[] {
   const videoBoxes = session.collectAllVideoBBoxes() as Annotation[];
   const shotLabels = (sampleAnnotations ?? []).filter(
-    (annotation) => (annotation as any)?.type === "class_label",
+    (annotation) => annotation.type === "class_label",
   );
   return [...shotLabels, ...videoBoxes];
 }
@@ -256,7 +256,7 @@ function PreviousButton({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [movePreviousShot]);
+  }, [isDisabled, movePreviousShot]);
 
   return (
     <View marginStart="size-100">

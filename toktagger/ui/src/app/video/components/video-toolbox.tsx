@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Flex,
-  DialogContainer,
-  AlertDialog,
-  Button,
-} from "@adobe/react-spectrum";
+import { DialogContainer, AlertDialog } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";

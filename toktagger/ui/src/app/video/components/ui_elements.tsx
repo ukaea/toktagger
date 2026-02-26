@@ -42,7 +42,6 @@ export function ClassPanel({
       >
         {(item) => <Item key={item.name}>{item.name}</Item>}
       </Picker>
-        
     </div>
   );
 }
@@ -97,7 +96,6 @@ export function InstancePanel({
 
   return (
     <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
-
       {showCreator && (
         <div className="mb-3">
           <button

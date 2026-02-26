@@ -117,13 +117,21 @@ function VideoFrameAnnotator(props: {
 
         <div className="flex justify-center">
           <ButtonGroup>
-            <Button variant="primary" onPress={handlePrev} isDisabled={prevDisabled}>
+            <Button
+              variant="primary"
+              onPress={handlePrev}
+              isDisabled={prevDisabled}
+            >
               Prev
             </Button>
             <Button variant="primary" isDisabled>
               Frame {session.frame}
             </Button>
-            <Button variant="primary" onPress={handleNext} isDisabled={nextDisabled}>
+            <Button
+              variant="primary"
+              onPress={handleNext}
+              isDisabled={nextDisabled}
+            >
               Next
             </Button>
           </ButtonGroup>
