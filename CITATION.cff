@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "JacksonE"
+  given-names: "Samuel"
+  orcid: "https://orcid.org/0000-0001-5301-5095"
+- family-names: "Saleem"
+  given-names: "Abdullah"
+  orcid: "https://orcid.org/0000-0000-0000-0000"
+- family-names: "Blake"
+  given-names: "Josh"
+  orcid: "https://orcid.org/0000-0000-0000-0000"
+- family-names: "Costa"
+  given-names: "Rui"
+  orcid: "https://orcid.org/0000-0000-0000-0000"
+title: "toktagger"
+version: 1.0.0
+doi: 10.5281/zenodo.1234
+date-released: 2026-02-26
+url: "https://github.com/ukaea/toktagger"
