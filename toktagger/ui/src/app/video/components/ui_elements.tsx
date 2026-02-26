@@ -27,7 +27,7 @@ export function ClassPanel({
   return (
     <div className="rounded-xl border border-gray-700 bg-black shadow-sm p-3 w-48 mx-auto">
       <Text UNSAFE_className="text-sm font-medium mb-2 block text-white">
-        Class
+        Annotation Label
       </Text>
 
       <Picker

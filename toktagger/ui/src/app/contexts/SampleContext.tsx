@@ -27,7 +27,6 @@ import {
   DataParams,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
-import { class_labels } from "@/app/video/components/types";
 
 interface SampleContextType {
   project: Project | null;
@@ -326,7 +325,13 @@ export function SampleProvider({
     refreshData();
   }, [projectId, sampleId, dataParams, viewParams, plotProps]);
 
-  const annotationLabels = project?.task === TaskType.Video ? class_labels : [];
+  const annotationLabels =
+    project?.task === TaskType.Video
+      ? (project.video_bounding_box_labels || []).map((name, i) => ({
+          id: i + 1,
+          name,
+        }))
+      : [];
 
   const value: SampleContextType = {
     project,
