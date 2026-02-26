@@ -1,9 +1,10 @@
 "use client"
 
-import { useTimeSeriesActions, useTimeSeriesState } from "@/app/contexts/TimeSeriesContext"
-import { TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks, ToolingProps } from "@/types";
+import { TIME_SERIES_ANNOTATION_MENU, useTimeSeriesActions, useTimeSeriesState } from "@/app/contexts/TimeSeriesContext"
+import { ExtendedPlotlyHTMLElement, TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks, ToolingProps } from "@/types";
 import * as d3 from "d3";
 import { useEffect, useRef } from "react";
+import { useContextMenu } from "react-contexify";
 
 export const TimePoint = ({
     plotId,
@@ -14,6 +15,11 @@ export const TimePoint = ({
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
     const dragOffset = useRef(0);
+
+    // Hook to trigger the context provider to render context menu
+    const { show } = useContextMenu({
+      id: TIME_SERIES_ANNOTATION_MENU,
+    });
 
     useEffect(() => {
         const toolingCallbacks: ToolingCallbacks = {
@@ -44,7 +50,7 @@ export const TimePoint = ({
         }
     
         // Grab the handle set up in the main plot for D3 rendering
-        const plot = document.getElementById(plotId);
+        const plot = document.getElementById(plotId) as ExtendedPlotlyHTMLElement;
     
         // Rendering should not be attempted if the required handles are not found
         if (!plot) {
@@ -57,6 +63,19 @@ export const TimePoint = ({
         const subplotNames = [...subplots].map((el) =>
           [...el.classList].find((cls) => cls !== "subplot"),
         );
+
+        function handleContextMenu(event: MouseEvent, annotation: TimeSeriesAnnotation) {
+            event.preventDefault(); // Prevent default context menu
+            const isRightClickEvent = event.button === 2 && !event.ctrlKey;
+            if (isRightClickEvent) {
+              show({
+                event,
+                props: {
+                  annotation
+                },
+              });
+            }
+          }
     
         // For each subplot carry out the tooling generation
         subplotNames.forEach((subplotId) => {
@@ -82,15 +101,13 @@ export const TimePoint = ({
             return;
           }
           // Use the axis information to calculate the upper and lower limits of the zone
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const axis = (plot as any)._fullLayout[`yaxis${yAxisID}`];
+          const axis = (plot)._fullLayout[`yaxis${yAxisID}`];
           const range = axis._tmax - axis._tmin;
           const upperLimit = axis.d2p(axis._tmax + 2 * range);
           const lowerLimit = axis.d2p(axis._tmin - 2 * range);
           const height = lowerLimit - upperLimit;
     
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const xaxis = (plot as any)._fullLayout.xaxis;
+          const xaxis = (plot)._fullLayout.xaxis;
     
           const graphGroup = d3.select(overplot);
           graphGroup.selectAll(".vspan").remove(); // All VSpans are removed each render cycle
@@ -147,9 +164,10 @@ export const TimePoint = ({
               .style("cursor", "move")
               .datum(vspan)
               .call(drag)
+              .on("contextmenu", handleContextMenu);
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

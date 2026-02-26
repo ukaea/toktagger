@@ -306,6 +306,10 @@ export type PlotProps = {
 
 type PlotlyAxisTransforms = {
   p2d: (pixels: number) => number;
+  d2p: (value: number) => number;
+  _tmax: number;
+  _tmin: number;
+  range: [number, number];
 };
 export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
   _fullLayout: Record<string, PlotlyAxisTransforms>;

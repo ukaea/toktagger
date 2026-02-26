@@ -1,7 +1,7 @@
 "use client"
 
 import { TIME_SERIES_ANNOTATION_MENU, useTimeSeriesActions, useTimeSeriesState } from "@/app/contexts/TimeSeriesContext"
-import { TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks, ToolingProps } from "@/types";
+import { ExtendedPlotlyHTMLElement, TimeSeriesAnnotation, TimeSeriesAnnotationType, ToolingCallbacks, ToolingProps } from "@/types";
 import * as d3 from "d3";
 import { useEffect, useRef } from "react";
 import { useContextMenu } from "react-contexify";
@@ -17,7 +17,7 @@ export const TimeRegion = ({
     const dragOffset = useRef(0);
 
     // Hook to trigger the context provider to render context menu
-    const { show: showZoneMenu } = useContextMenu({
+    const { show } = useContextMenu({
       id: TIME_SERIES_ANNOTATION_MENU,
     });
 
@@ -55,7 +55,7 @@ export const TimeRegion = ({
         }
     
         // Grab the handle set up in the main plot for D3 rendering
-        const plot = document.getElementById(plotId);
+        const plot = document.getElementById(plotId) as ExtendedPlotlyHTMLElement;
     
         // Rendering should not be attempted if the required handles are not found
         if (!plot) {
@@ -93,18 +93,16 @@ export const TimeRegion = ({
             return;
           }
           // Use the axis information to calculate the upper and lower limits of the zone
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const axis = (plot as any)._fullLayout[`yaxis${yAxisID}`];
+          const axis = (plot)._fullLayout[`yaxis${yAxisID}`];
           const range = axis._tmax - axis._tmin;
           const upperLimit = axis.d2p(axis._tmax + 2 * range);
           const lowerLimit = axis.d2p(axis._tmin - 2 * range);
           const height = lowerLimit - upperLimit;
     
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const xaxis = (plot as any)._fullLayout.xaxis;
+          const xaxis = (plot)._fullLayout.xaxis;
 
           // Minimum width in data units: 0.1% of current x-range
-          const [xMin, xMax] = xaxis.range as [number, number];
+          const [xMin, xMax] = xaxis.range;
           const MIN_WIDTH_FRACTION = 0.001; // 0.1%
           const minWidth = (xMax - xMin) * MIN_WIDTH_FRACTION;
     
@@ -190,7 +188,7 @@ export const TimeRegion = ({
             event.preventDefault(); // Prevent default context menu
             const isRightClickEvent = event.button === 2 && !event.ctrlKey;
             if (isRightClickEvent) {
-              showZoneMenu({
+              show({
                 event,
                 props: {
                   annotation
@@ -264,7 +262,7 @@ export const TimeRegion = ({
                 .style("cursor", "w-resize")
                 .datum(zone)
                 .call(getBoundaryHandler(true))
-                .on("contextmenu", handleContextMenu);
+                .on("contextmenu", handleContextMenu)
 
               // x1 handle (moves x1)
               const x1HandleX = x0IsLeft ? px1 - inner : px1 - OUTER_HANDLE_PX;
@@ -283,7 +281,7 @@ export const TimeRegion = ({
                 .on("contextmenu", handleContextMenu);
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, showZoneMenu]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

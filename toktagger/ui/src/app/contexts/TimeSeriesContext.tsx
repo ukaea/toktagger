@@ -8,6 +8,7 @@ import { convertRawAnnotationsToTimeSeries, convertTimeSeriesToRawAnnotations, r
 import { Item, ItemParams, Menu, Submenu } from "react-contexify"
 
 type TimeSeriesActions = {
+    setAnnotations: (annotations: TimeSeriesAnnotation[]) => void;
     createAnnotation: (type: TimeSeriesAnnotationType, label: string) => TimeSeriesAnnotation;
     addAnnotation: (annotation: TimeSeriesAnnotation) => void;
     removeAnnotation: (id: string) => void;
@@ -59,7 +60,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
 
     const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
-    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_POINT, label: "Disruption"});
+    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_REGION, label: "Disruption"});
     const [updateCounter, setUpdateCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
     const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(new Map());
@@ -205,6 +206,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     }, [annotations])
 
     const actionsValue: TimeSeriesActions = useMemo(() => ({
+        setAnnotations,
         createAnnotation,
         addAnnotation,
         removeAnnotation,
@@ -228,7 +230,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
 
     useEffect(() => {
         const deleteSelection = (event: KeyboardEvent) => {
-            if (event.key === "Delete") {
+            if (event.key === "Delete" || event.key === "Backspace") {
                 const updatedState = annotations.filter((annotation) => !annotation.selected)
                 setRawAnnotations((_prev) => parseTimeSeriesAnnotations(updatedState))
             }
