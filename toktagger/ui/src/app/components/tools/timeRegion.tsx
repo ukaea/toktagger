@@ -11,7 +11,7 @@ export const TimeRegion = ({
     plotReady,
 }: ToolingProps) => {
     const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
-    const {annotations, forceUpdate, isDrawing, categories} = useTimeSeriesState()
+    const {annotations, forceUpdate, isDrawing, categories, editMode} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
     const dragOffset = useRef(0);
@@ -205,7 +205,7 @@ export const TimeRegion = ({
             // pixel positions for the two data boundaries
             const px0 = xaxis.d2p(zone.points[0].x);
             const px1 = xaxis.d2p(zone.points[1].x);
-            const pointerEvent = isDrawing ? "none" : "all";
+            const pointerEvent = isDrawing || !editMode ? "none" : "all";
 
             // render span using left-most x and absolute width, span in pixels
             const spanLeft = Math.min(px0, px1);
@@ -281,7 +281,7 @@ export const TimeRegion = ({
                 .on("contextmenu", handleContextMenu);
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show, editMode]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

@@ -19,6 +19,7 @@ type TimeSeriesActions = {
     syncAnnotations: () => void;
     triggerUpdate: () => void;
     findSelectedAnnotations: (range: {low: number, high: number} | null) => void;
+    setEditMode: (turnOn: boolean) => void;
 }
 
 type TimeSeriesState = {
@@ -28,6 +29,7 @@ type TimeSeriesState = {
     forceUpdate: number;
     isDrawing: boolean;
     categories: Map<string, TimeSeriesCategory>;
+    editMode: boolean;
 }
 
 const TimeSeriesActionsContext = createContext<TimeSeriesActions | null>(null);
@@ -64,6 +66,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     const [updateCounter, setUpdateCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
     const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(new Map());
+    const [editMode, setEditMode] = useState(false);
 
     const parseRawAnnotations = useCallback((annotations: Annotation[]): TimeSeriesAnnotation[] => {
         const parsedAnnotations: TimeSeriesAnnotation[] = [];
@@ -178,6 +181,8 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     }, [])
 
     const findSelectedAnnotations = useCallback((range: {low: number, high: number} | null) => {
+        if (!editMode) return;
+        
         if (!range) {
             const updated_state: TimeSeriesAnnotation[] = annotations.map((annotation) => ({...annotation, selected: false}))
             setAnnotations(updated_state);
@@ -203,7 +208,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         })
 
         setAnnotations(updated_state);
-    }, [annotations])
+    }, [annotations, editMode])
 
     const actionsValue: TimeSeriesActions = useMemo(() => ({
         setAnnotations,
@@ -217,6 +222,7 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         syncAnnotations,
         triggerUpdate,
         findSelectedAnnotations,
+        setEditMode,
     }), [createAnnotation, addAnnotation, removeAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, syncAnnotations, triggerUpdate, findSelectedAnnotations])
 
     const stateValue: TimeSeriesState = useMemo(() => ({
@@ -226,9 +232,12 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         forceUpdate: updateCounter,
         isDrawing,
         categories,
-    }), [annotations, activeTool, toolingCallbacks, updateCounter, isDrawing, categories])
+        editMode
+    }), [annotations, activeTool, toolingCallbacks, updateCounter, isDrawing, categories, editMode])
 
     useEffect(() => {
+        if (!editMode) return;
+
         const deleteSelection = (event: KeyboardEvent) => {
             if (event.key === "Delete" || event.key === "Backspace") {
                 const updatedState = annotations.filter((annotation) => !annotation.selected)
@@ -241,29 +250,33 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         return () => {
             document.removeEventListener("keydown", deleteSelection);
         };
-    }, [annotations, parseTimeSeriesAnnotations, setRawAnnotations])
+    }, [annotations, editMode, parseTimeSeriesAnnotations, setRawAnnotations])
 
-    useEffect(() => {
-        const enterDrawMode = (event: KeyboardEvent) => {
+    useEffect(() => {        
+        const keyDownHandler = (event: KeyboardEvent) => {
             if (event.key === "Control") {
                 setIsDrawing(true);
             }
+
+            if (event.key === "e") {
+                setEditMode((prev) => !prev);
+            }
         };
 
-        const exitDrawMode = (event: KeyboardEvent) => {
+        const keyUpHandler = (event: KeyboardEvent) => {
             if (event.key === "Control") {
                 setIsDrawing(false);
             }
         };
 
-        document.addEventListener("keydown", enterDrawMode);
-        document.addEventListener("keyup", exitDrawMode);
+        document.addEventListener("keydown", keyDownHandler);
+        document.addEventListener("keyup", keyUpHandler);
 
         return () => {
-            document.removeEventListener("keydown", enterDrawMode);
-            document.removeEventListener("keyup", exitDrawMode);
+            document.removeEventListener("keydown", keyDownHandler);
+            document.removeEventListener("keyup", keyUpHandler);
         };
-    }, [])
+    }, [editMode])
 
     const annotationLabels = Array.from(categories.values()).map((category, index) => {
         return (

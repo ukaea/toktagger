@@ -11,7 +11,7 @@ export const TimePoint = ({
     plotReady,
 }: ToolingProps) => {
     const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
-    const {annotations, forceUpdate, isDrawing, categories} = useTimeSeriesState()
+    const {annotations, forceUpdate, isDrawing, categories, editMode} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
     const dragOffset = useRef(0);
@@ -138,7 +138,7 @@ export const TimePoint = ({
             const color = categories.get(vspan.label)?.color || "black"
 
             const x = xaxis.d2p(vspan.points[0].x);
-            const pointerEvent = isDrawing ? "none" : "all";
+            const pointerEvent = isDrawing || !editMode ? "none" : "all";
             graphGroup
               .append("line")
               .attr("class", "vspan disable-on-modifier")
@@ -167,7 +167,7 @@ export const TimePoint = ({
               .on("contextmenu", handleContextMenu);
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show, editMode]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />
