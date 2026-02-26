@@ -178,15 +178,15 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
 
     const findSelectedAnnotations = useCallback((range: {low: number, high: number} | null) => {
         if (!range) {
-            return
+            const updated_state: TimeSeriesAnnotation[] = annotations.map((annotation) => ({...annotation, selected: false}))
+            setAnnotations(updated_state);
+            return;
         }
 
         const updated_state: TimeSeriesAnnotation[] = annotations.map((annotation) => {
             if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
                 if (annotation.points[0].x > range.low 
-                    && annotation.points[0].x < range.high
-                    && annotation.points[1].x < range.high
-                    && annotation.points[1].x > range.low) {
+                    && annotation.points[1].x < range.high) {
                         return {...annotation, selected: true}
                 }
                 return {...annotation, selected: false}
@@ -218,6 +218,21 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         isDrawing,
         categories,
     }), [annotations, activeTool, toolingCallbacks, updateCounter, isDrawing, categories])
+
+    useEffect(() => {
+        const deleteSelection = (event: KeyboardEvent) => {
+            if (event.key === "Delete") {
+                const updatedState = annotations.filter((annotation) => !annotation.selected)
+                setRawAnnotations((_prev) => parseTimeSeriesAnnotations(updatedState))
+            }
+        };
+
+        document.addEventListener("keydown", deleteSelection);
+
+        return () => {
+            document.removeEventListener("keydown", deleteSelection);
+        };
+    }, [annotations, parseTimeSeriesAnnotations, setRawAnnotations])
 
     useEffect(() => {
         const enterDrawMode = (event: KeyboardEvent) => {

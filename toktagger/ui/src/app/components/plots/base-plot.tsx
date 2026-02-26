@@ -211,22 +211,6 @@ export const BaseTimeSeriesPlot = ({
             plot.removeAllListeners("plotly_relayout"); // remove any existing listeners
             plot.removeAllListeners("plotly_selected");
             plot.on("plotly_relayout", relayoutHandler);
-
-            plot.on("plotly_selected", function (eventData) {
-                if (!eventData?.range) {
-                    //findSelectedAnnotations(null);
-                    return;
-                }
-
-                /* findSelectedAnnotations({
-                    low: eventData.range.x[0],
-                    high: eventData.range.x[1],
-                }) */
-            });
-
-            plot.on("plotly_deselect", function () {
-                console.log("Deselect")
-            });
         }
         initGraph();
 
@@ -237,7 +221,39 @@ export const BaseTimeSeriesPlot = ({
             });
             setPlotReady(false); // reset ready state
         };
-    }, [config, data, findSelectedAnnotations, layout, plotId, triggerUpdate])
+    }, [config, data, layout, plotId, triggerUpdate])
+
+    useEffect(() => {
+        if (!plotReady) {
+            // Plot may not have loaded yet - this will rerun after loading
+            return;
+        }
+
+        const plot = document.getElementById(plotId) as PlotlyHTMLElement;
+
+        if (!plot) {
+            console.error("Could not locate plot to set selection listener");
+            return;
+        }
+
+        plot.on("plotly_selected", function (eventData) {
+            if (!eventData?.range) {
+                findSelectedAnnotations(null);
+                return;
+            }
+
+            findSelectedAnnotations({
+                low: eventData.range.x[0],
+                high: eventData.range.x[1],
+            })
+        });
+
+        plot.on("plotly_deselect", function () {
+            findSelectedAnnotations(null);
+            relayout(plot, { selections: [] }); // clear selection
+        });
+
+    }, [findSelectedAnnotations, plotId, plotReady])
 
     useEffect(() => {
         if (!plotReady) {

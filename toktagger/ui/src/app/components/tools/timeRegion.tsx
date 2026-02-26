@@ -202,7 +202,7 @@ export const TimeRegion = ({
           // Create a line and a transparent drag handle for each VSpan
           for (const zone of annotations) {
             if (zone.type !== TimeSeriesAnnotationType.TIME_REGION) continue;
-            const opacity = 0.5;
+            const opacity = zone.selected ? 0.8 : 0.5;
 
             // pixel positions for the two data boundaries
             const px0 = xaxis.d2p(zone.points[0].x);
