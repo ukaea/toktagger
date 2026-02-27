@@ -17,8 +17,7 @@ import {
 } from "@annotorious/react";
 
 import type { Annotation, DataParams } from "@/types";
-import { useVideoUiState } from "@/app/video/components/video-context";
-import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
+import { VideoBoundingBoxAnnotationSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
   DrawingTool,
@@ -499,12 +498,13 @@ export function VideoSessionProvider(props: {
       for (const a of dbAnnotations) {
         const parsed =
           a.type === "video_bounding_box"
-            ? VideoBoundingBoxSchema.safeParse(a)
+            ? VideoBoundingBoxAnnotationSchema.safeParse(a)
             : a.type === "video_polygon"
               ? VideoPolygonSchema.safeParse(a)
               : null;
 
         if (!parsed) continue;
+
 
         if (!parsed.success) {
           invalid += 1;

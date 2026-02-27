@@ -6,7 +6,7 @@ import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
 import {
   type Annotation,
   type NavAdapter,
-  VideoBoundingBoxSchema,
+  VideoBoundingBoxAnnotationSchema,
   VideoPolygonSchema,
 } from "@/types";
 import { useVideoSession } from "./video-session";
@@ -30,7 +30,7 @@ export function VideoNavAdapterBridge({
         .collectAllVideoAnnotations()
         .map((annotation): Annotation => {
           if (annotation.type === "video_bounding_box") {
-            const parsed = VideoBoundingBoxSchema.parse(annotation);
+            const parsed = VideoBoundingBoxAnnotationSchema.parse(annotation);
             return {
               ...parsed,
               timestamp: parsed.timestamp ?? nowIso,

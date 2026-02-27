@@ -167,13 +167,14 @@ tmp
 # ignore yarn lock file
 *yarn.lock
 toktagger/ui/.next/*
+toktagger/ui/.vite/*
 toktagger/ui/node_modules/*
 data/elms
 data/elm-events
 data/test/mock_disruptions
-node_modules
-package-lock.json
-package.json
-
 data/jet_images/
-toktagger/ui/.vite/
+node_modules
+/package-lock.json
+/package.json
+.DS_Store
+.vscode

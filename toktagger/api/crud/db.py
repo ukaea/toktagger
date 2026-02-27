@@ -1,10 +1,10 @@
-from pathlib import Path
 import pymongo
 import pydantic
 import typing
 from bson.objectid import ObjectId
+from pathlib import Path
+from appdirs import user_cache_dir
 
-from platformdirs import user_cache_dir
 from toktagger.api.crud.mongita_client import AsyncMongitaClient
 
 DATABASE_NAME = "event_db"
@@ -15,7 +15,7 @@ T = typing.TypeVar("T", bound=pydantic.BaseModel)
 
 class MongoDBClient:
     def __init__(self, url: str, db_name: str):
-        if url.startswith("mongodb://"):
+        if db_name.startswith("mongodb://"):
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:

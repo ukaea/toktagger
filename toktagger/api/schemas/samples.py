@@ -45,9 +45,7 @@ class SampleIn(SampleBase):
         if not self.annotations:
             return False
 
-        return any(
-            [annotation.validated for annotation in self.annotations]
-        )  # TODO any or all?
+        return any([annotation.validated for annotation in self.annotations])
 
 
 class Sample(SampleBase):

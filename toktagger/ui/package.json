@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build --emptyOutDir",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,20 +19,22 @@
     "ajv": "^8.18.0",
     "buffer": "^6.0.3",
     "d3": "^7.9.0",
+    "lucide-react": "^0.468.0",
+    "plotly.js": "^3.1.0",
+    "plotly.js-dist-min": "^3.1.0",
+    "next": "15.4.10",
     "openseadragon": "^5.0.1",
-    "plotly.js": "^3.0.1",
-    "plotly.js-dist-min": "^2.27.0",
     "react": "^19.0.0",
     "react-contexify": "^6.0.0",
     "react-dom": "^19.0.0",
     "react-plotly.js": "^2.6.0",
     "react-router-dom": "^7.12.0",
     "rollup": "^4.59.0",
-    "stream-browserify": "^3.0.0",
     "typescript-eslint": "^8.56.1",
     "uuid": "^13.0.0",
     "vite": "^7.3.2",
-    "zod": "^3.25.67"
+    "zod": "^3.25.67",
+    "stream-browserify": "^3.0.0"
   },
   "devDependencies": {
     "@adobe/react-spectrum": "^3.14.0",

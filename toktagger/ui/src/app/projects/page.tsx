@@ -90,7 +90,7 @@ const ProjectsTable = ({
           </TableHeader>
           <TableBody items={rows}>
             {(item) => (
-              <Row href={`/ui/projects/${item._id}`}>
+              <Row href={`/ui/projects/${item.id}`}>
                 <Cell>{item["name"]}</Cell>
                 <Cell>{item["task"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
