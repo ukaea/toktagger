@@ -503,39 +503,22 @@ class SALDataLoader(DataLoader):
 
         results = {}
         for name in sample_data.signal_names:
-            full_name = f"pulse/{sample.shot_id}/{name}"
             try:
-                ds = xr.open_dataset(f"sal://{full_name}", engine="sal")
-                ds = ds.sel(time=slice(time_min, time_max))
-
-                time = ds["time"].values
-                if (
-                    min_time_step is not None
-                    and len(time) > 1
-                    and np.diff(time).mean() < min_time_step
-                ):
-                    time_base = np.arange(time[0], time[-1], min_time_step)
-                    ds = ds.interp(time=time_base, method="linear")
-
-                if len(ds.data.shape) == 1:
-                    data = ds["data"].values
-                    time = ds["time"].values
-
-                    item = TimeSeriesData(time=time, values=data)
-                    results[name] = item
-                elif len(ds.data.shape) == 2:
-                    time = ds["time"].values
-                    dim_1 = ds[ds.data.dims[1]].values
-                    values = ds["data"].values
-
-                    item = Profile2DData(time=time, dim_1=dim_1, values=values)
-                    results[name] = item
-                else:
-                    raise DataLoaderError(
-                        f"Unsupported data shape {ds.data.shape} for signal '{name}'"
-                    )
+                item = _get_sal_signal(
+                    name=name,
+                    shot_id=sample.shot_id,
+                    time_min=time_min,
+                    time_max=time_max,
+                    min_time_step=min_time_step,
+                )
+                results[name] = item
             except Exception:
                 results[name] = None
+
+        if all(values is None for values in results.values()):
+            raise DataLoaderError(
+                f"Could not load any signals for shot ID '{sample.shot_id}' from SAL. Check SAL connectivity and signal names."
+            )
 
         if all(isinstance(value, TimeSeriesData) for value in results.values()):
             return MultiVariateTimeSeriesData(values=results)
@@ -543,8 +526,48 @@ class SALDataLoader(DataLoader):
             return MultiProfile2DData(values=results)
         else:
             raise DataLoaderError(
-                f"Mixed data types found for shot ID '{sample.shot_id}'. Check UDA signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles)."
+                f"Mixed data types found for shot ID '{sample.shot_id}' from SAL. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles)."
             )
+
+
+@lru_cache(maxsize=128)
+def _get_sal_signal(
+    name: str,
+    shot_id: int,
+    time_min: Optional[float] = None,
+    time_max: Optional[float] = None,
+    min_time_step: Optional[float] = None,
+) -> Profile2DData | TimeSeriesData:
+    full_name = f"pulse/{shot_id}/{name}"
+    ds = xr.open_dataset(f"sal://{full_name}", engine="sal")
+    ds = ds.sel(time=slice(time_min, time_max))
+
+    time = ds["time"].values
+    if (
+        min_time_step is not None
+        and len(time) > 1
+        and np.diff(time).mean() < min_time_step
+    ):
+        time_base = np.arange(time[0], time[-1], min_time_step)
+        ds = ds.interp(time=time_base, method="linear")
+
+    if len(ds.data.shape) == 1:
+        data = ds["data"].values
+        time = ds["time"].values
+
+        item = TimeSeriesData(time=time, values=data)
+        return item
+    elif len(ds.data.shape) == 2:
+        time = ds["time"].values
+        dim_1 = ds[ds.data.dims[1]].values
+        data = ds["data"].values
+
+        item = Profile2DData(time=time, dim_1=dim_1, values=data)
+        return item
+    else:
+        raise DataLoaderError(
+            f"Unsupported data shape {ds.data.shape} for signal '{name}'"
+        )
 
 
 @LoaderRegistry.register("fair_mast")
@@ -565,65 +588,81 @@ class FAIRMASTDataLoader(DataLoader):
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
 
-        if not params.name == "identity":
-            raise TypeError(f"Expected blank parameters, but got '{params.name}'")
+        results = _get_fair_mast_signals(
+            file_path=f"https://s3.echo.stfc.ac.uk/mast/level2/shots/{sample.shot_id}.zarr",
+            signal_names=tuple(sample_data.signal_names),
+            time_min=time_min,
+            time_max=time_max,
+            min_time_step=min_time_step,
+        )
+        return results
 
-        endpoint = "https://s3.echo.stfc.ac.uk/mast/level2/shots"
-        file_path = f"{endpoint}/{sample.shot_id}.zarr"
 
-        kwargs = {"chunks": None}
+@lru_cache(maxsize=128)
+def _get_fair_mast_signals(
+    file_path: str,
+    signal_names: tuple[str],
+    time_min: Optional[float] = None,
+    time_max: Optional[float] = None,
+    min_time_step: Optional[float] = None,
+) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+    kwargs = {"chunks": None}
+    # check if xarray version supports create_default_indexes argument, and if so, set it to False
+    # to avoid unnecessary index creation which can cause performance issues with large datasets
+    sig = inspect.signature(xr.open_dataset)
+    if "create_default_indexes" in sig.parameters:
+        kwargs["create_default_indexes"] = False
 
-        # check if xarray version supports create_default_indexes argument, and if so, set it to False
-        # to avoid unnecessary index creation which can cause performance issues with large datasets
-        sig = inspect.signature(xr.open_dataset)
-        if "create_default_indexes" in sig.parameters:
-            kwargs["create_default_indexes"] = False
+    data_tree = xr.open_datatree(file_path, **kwargs)
 
-        data_tree = xr.open_datatree(file_path, **kwargs)
+    results = {}
+    for name in signal_names:
+        try:
+            ds = data_tree[name]
+        except KeyError:
+            results[name] = None
+            continue
 
-        results = {}
-        for name in sample_data.signal_names:
-            try:
-                ds = data_tree[name]
-                ds = ds.sel(time=slice(time_min, time_max))
+        ds = ds.sel(time=slice(time_min, time_max))
 
-                time = ds["time"].values
+        time = ds["time"].values
 
-                if (
-                    min_time_step is not None
-                    and len(time) > 1
-                    and np.diff(time).mean() < min_time_step
-                ):
-                    time_base = np.arange(time[0], time[-1], min_time_step)
-                    ds = ds.interp(time=time_base, method="linear")
+        if (
+            min_time_step is not None
+            and len(time) > 1
+            and np.diff(time).mean() < min_time_step
+        ):
+            time_base = np.arange(time[0], time[-1], min_time_step)
+            ds = ds.interp(time=time_base, method="linear")
 
-                time = ds["time"].values
+        if len(ds.data.shape) == 1:
+            data = ds.values
+            time = ds["time"].values
 
-                if len(ds.data.shape) == 1:
-                    data = ds["data"].values
-                    time = ds["time"].values
+            item = TimeSeriesData(time=time, values=data)
+            results[name] = item
+        elif len(ds.data.shape) == 2:
+            time = ds["time"].values
+            dim_1 = ds[ds.data.dims[1]].values
+            values = ds.values
 
-                    item = TimeSeriesData(time=time, values=data)
-                    results[name] = item
-                elif len(ds.data.shape) == 2:
-                    time = ds["time"].values
-                    dim_1 = ds[ds.data.dims[1]].values
-                    values = ds["data"].values
-
-                    item = Profile2DData(time=time, dim_1=dim_1, values=values)
-                    results[name] = item
-                else:
-                    raise DataLoaderError(
-                        f"Unsupported data shape {ds.data.shape} for signal '{name}'"
-                    )
-            except Exception:
-                results[name] = None
-
-        if all(isinstance(value, TimeSeriesData) for value in results.values()):
-            return MultiVariateTimeSeriesData(values=results)
-        elif all(isinstance(value, Profile2DData) for value in results.values()):
-            return MultiProfile2DData(values=results)
+            item = Profile2DData(time=time, dim_1=dim_1, values=values)
+            results[name] = item
         else:
             raise DataLoaderError(
-                f"Mixed data types found for shot ID '{sample.shot_id}'. Check UDA signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles)."
+                f"Unsupported data shape {ds.data.shape} for signal '{name}'"
             )
+
+    if all(values is None for values in results.values()):
+        raise DataLoaderError(
+            f"Could not load any signals from FAIR-MAST file at '{file_path}'. Check signal names and file accessibility."
+        )
+
+    if all(isinstance(value, TimeSeriesData) for value in results.values()):
+        return MultiVariateTimeSeriesData(values=results)
+    elif all(isinstance(value, Profile2DData) for value in results.values()):
+        return MultiProfile2DData(values=results)
+    else:
+        raise DataLoaderError(
+            f"Mixed data types found for file '{file_path}'. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles)."
+        )
