@@ -167,11 +167,11 @@ class MultiVariateTimeSeriesData(Data):
     values: dict[str, TimeSeriesData | None]  # Signal name -> data
 ```
 
-#### `SpectrogramData`
+#### `Profile2DData`
 For frequency-time representations:
 
 ```python
-class SpectrogramData(Data):
+class Profile2DData(Data):
     time: list[float]
     frequency: list[float]
     amplitude: list[list[float]]  # 2D array

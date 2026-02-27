@@ -9,24 +9,17 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
-  ComboBox,
-  Item,
-  Key,
+  SearchField,
   Heading,
   InlineAlert,
 } from "@adobe/react-spectrum";
-import {
-  MultiVariateTimeSeriesDataSchema,
-  PlotProps,
-  SpectrogramData,
-  SpectrogramDataSchema,
-  SpectrogramViewParamsSchema,
-  TaskType,
-  ViewParams,
-} from "@/types";
-import { getAnnotationsForSample } from "@/app/core";
+import { Annotation, TaskType } from "@/types";
+import { useNavigate } from "react-router-dom";
+
+import { BACKEND_API_URL, getAnnotationsForSample } from "@/app/core";
+import { useSample } from "@/app/contexts/SampleContext";
+
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
-import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
@@ -35,93 +28,97 @@ import { JumpDetectionTool } from "../annotators/jump";
 import { ExportTool } from "./export";
 import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
-import { useSample } from "@/app/contexts/SampleContext";
-import SpectrogramThresholdTool from "../annotators/thresholding";
+import { Profile2DViewParamsWidget } from "../tools/profile2dViewParamsWidget";
+
+import { ColorMapPicker } from "./colorMapPicker";
+import Profile2DThresholdTool from "../annotators/thresholding";
+import { useState } from "react";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
 import { useServerHealth } from "@/app/contexts/healthContext";
 
-type AmplitudeSliderInfo = {
-  data: SpectrogramData;
-  viewParams: ViewParams;
-  setViewParams: (viewParams: ViewParams) => void;
-  plotProps: PlotProps;
-};
+// ------------------------------
+// Helpers: backend save + sample navigation
+// ------------------------------
 
-function AmplitudeSlider({
-  data,
-  viewParams,
-  setViewParams,
-  plotProps,
-}: AmplitudeSliderInfo) {
-  const onAmplitudeRangeChange = async ({
-    start,
-    end,
-  }: {
-    start: number;
-    end: number;
-  }) => {
-    const params = SpectrogramViewParamsSchema.parse(viewParams);
-    params.amplitude_min = Math.pow(10, start);
-    params.amplitude_max = Math.pow(10, end);
-    setViewParams(params);
-  };
+async function saveAnnotationsValidated(
+  project_id: string,
+  sample_id: string,
+  annotations: Annotation[],
+) {
+  const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
 
-  const numDigits = plotProps.numSignificantDigits || 4;
-  const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
-  const largePrecisionFactor = Math.pow(10, numDigits);
-
-  let ampValues = data.amplitude.flat();
-  ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor)),
+  const validatedAnnotations: Annotation[] = annotations.map(
+    (annotation: Annotation) => ({
+      ...annotation,
+      validated: true,
+    }),
   );
 
-  const displayAmplitudeValues = (val: number) => {
-    return `${Math.round(Math.pow(10, val) * largePrecisionFactor) / largePrecisionFactor}`;
-  };
-
-  return (
-    <DataRangeSlider
-      name={"Amplitude Range"}
-      data={ampValues}
-      onChange={onAmplitudeRangeChange}
-      getValueLabel={(val) =>
-        `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(val.end)}`
-      }
-    />
-  );
+  const response = await fetch(ANNOTATIONS_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(validatedAnnotations),
+  });
+  return response;
 }
 
-type ColorMapPickerInfo = {
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
+async function getShotSample(project_id: string, shot_id: string) {
+  const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
+  const sampleResult = await fetch(NEXT_URL);
+  const sampleArray = await sampleResult.json();
+  let sample = null;
+  if (sampleArray.length > 0) {
+    sample = sampleArray[0];
+  }
+  return sample;
+}
+
+// ------------------------------
+// Standard TS/Profile2D controls
+// ------------------------------
+
+type SaveInfo = {
+  project_id: string;
+  sample_id: string;
+  annotations: Annotation[];
 };
 
-function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
-  const options = [
-    { id: 1, name: "Viridis" },
-    { id: 2, name: "Plasma" },
-    { id: 3, name: "Inferno" },
-    { id: 4, name: "Magma" },
-    { id: 5, name: "Cividis" },
-  ];
+export function ShotSearch({ project_id, sample_id, annotations }: SaveInfo) {
+  const navigate = useNavigate();
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const onColorMapChange = (key: Key | null) => {
-    if (key) {
-      const selectedColorMap = Number(key.toString());
-      const value = options.find((item) => item.id === selectedColorMap);
-      setPlotProps({ ...plotProps, colorMap: value?.name || "Cividis" });
+  const onSearchSubmit = async (newValue: string) => {
+    if (newValue == "") {
+      setErrorMessage("");
+    } else if (/^[0-9]*$/.test(newValue)) {
+      setErrorMessage("");
+      const shot_id = newValue;
+      try {
+        const sample = await getShotSample(project_id, shot_id);
+        if (sample !== null) {
+          await saveAnnotationsValidated(project_id, sample_id, annotations);
+          const NEXT_SAMPLE_URL = `/ui/projects/${project_id}/samples/${sample._id}`;
+          navigate(NEXT_SAMPLE_URL);
+        } else {
+          setErrorMessage("Shot not found!");
+        }
+      } catch (err) {
+        console.error("Failed to fetch data:", err);
+      }
+    } else {
+      setErrorMessage("Please enter a number.");
     }
   };
 
   return (
-    <ComboBox
-      label="Color Map"
-      defaultItems={options}
-      inputValue={plotProps.colorMap || "Cividis"}
-      onSelectionChange={onColorMapChange}
-    >
-      {(item) => <Item key={item.id}>{item.name}</Item>}
-    </ComboBox>
+    <SearchField
+      label="Jump to Shot"
+      onSubmit={onSearchSubmit}
+      validationState={errorMessage ? "invalid" : undefined}
+      errorMessage={errorMessage}
+    />
   );
 }
 
@@ -146,17 +143,7 @@ function AnnotationStatusAlert({ isValidated }: { isValidated: boolean }) {
 }
 
 export default function ToolBar() {
-  const {
-    project,
-    sample,
-    data,
-    setAnnotations,
-    viewParams,
-    setViewParams,
-    plotProps,
-    setPlotProps,
-    isValidated,
-  } = useSample();
+  const { project, sample, setAnnotations, isValidated } = useSample();
 
   const { modelsEnabled } = useServerHealth();
 
@@ -179,28 +166,19 @@ export default function ToolBar() {
     defaultExpanded?: boolean;
   }[] = [];
 
-  if (data && project.task == TaskType.TimeSeries) {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+  const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
+  tools.push({
+    name: "Shot Labels",
+    component: <ShotLabels labels={labels}></ShotLabels>,
+  });
 
-    if (!result.success) {
-      console.warn("Time series data is not available");
-      return;
-    }
-
-    const tsData = result.data;
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels}></ShotLabels>,
-    });
-
+  if (project.task == TaskType.TimeSeries) {
     tools.push({
       name: "Peak Detection",
       component: (
         <PeakDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></PeakDetectionTool>
       ),
     });
@@ -211,7 +189,6 @@ export default function ToolBar() {
         <OutlierDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></OutlierDetectionTool>
       ),
     });
@@ -222,7 +199,6 @@ export default function ToolBar() {
         <ChangePointDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></ChangePointDetectionTool>
       ),
     });
@@ -233,50 +209,27 @@ export default function ToolBar() {
         <JumpDetectionTool
           project_id={project_id}
           sample_id={sample_id}
-          data={tsData}
         ></JumpDetectionTool>
       ),
     });
-  } else if (data && project.task == TaskType.Spectrogram) {
-    const resultSpec = SpectrogramDataSchema.safeParse(data);
-    if (!resultSpec.success) {
-      console.warn("MHD spectrogram data is not available");
-      return null;
-    }
-
-    const mhdData = resultSpec.data;
+  } else if (project.task == TaskType.Profile2D) {
     tools.push({
-      name: "Amplitude Range",
-      component: (
-        <AmplitudeSlider
-          data={mhdData}
-          viewParams={viewParams}
-          setViewParams={setViewParams}
-          plotProps={plotProps}
-        />
-      ),
+      name: "View Parameters",
+      component: <Profile2DViewParamsWidget />,
     });
 
     tools.push({
       name: "Color Map",
-      component: (
-        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
-      ),
+      component: <ColorMapPicker />,
     });
 
     tools.push({
       name: "Threshold",
       component: (
-        <SpectrogramThresholdTool
-          project_id={project_id}
-          sample_id={sample_id}
-          signal_name={"mirnov"}
-          plotProps={plotProps}
-          setPlotProps={setPlotProps}
-        />
+        <Profile2DThresholdTool project_id={project_id} sample_id={sample_id} />
       ),
     });
-  } else if (data && project.task === TaskType.Video) {
+  } else if (project.task === TaskType.Video) {
     const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
 
     tools.push({

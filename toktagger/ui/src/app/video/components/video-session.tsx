@@ -16,10 +16,10 @@ import {
   type ImageAnnotation,
 } from "@annotorious/react";
 
-import type { Annotation } from "@/types";
+import type { Annotation, DataParams } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/video/components/video-context";
-import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
+import { VideoBoundingBoxAnnotationSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
   DrawingTool,
@@ -704,6 +704,106 @@ export function VideoSessionProvider(props: {
     },
     [frame, projectId, sampleId, updateByFrame],
   );
+
+  /** Flatten all per-frame overlays into a single list (useful for debugging/export). */
+  const collectAllNative = useCallback(() => {
+    const out: ImageAnnotation[] = [];
+    for (const list of byFrame.values()) out.push(...(list ?? []));
+    return out;
+  }, [byFrame]);
+
+  /** Convert the session overlays into backend video bounding boxes. */
+  const collectAllVideoBBoxes = useCallback(() => {
+    const out: VideoBoundingBox[] = [];
+    for (const [f, list] of byFrame.entries()) {
+      for (const a of list ?? []) {
+        const shape = annoToVideoAnnotation(a, f);
+        if (shape?.type === "video_bounding_box") out.push(shape);
+      }
+    }
+    return out;
+  }, [byFrame]);
+
+  /** Convert the session overlays into backend video annotation shapes. */
+  const collectAllVideoAnnotations = useCallback(() => {
+    const out: VideoAnnotationShape[] = [];
+    for (const [f, list] of byFrame.entries()) {
+      for (const a of list ?? []) {
+        const shape = annoToVideoAnnotation(a, f);
+        if (shape) out.push(shape);
+      }
+    }
+    return out;
+  }, [byFrame]);
+
+  /**
+   * Seed session overlays from backend annotations if the user hasn't edited anything yet.
+   * This is intentionally conservative:
+   * - no-op if session is dirty
+   * - no-op if we already have in-memory overlays
+   * - only consumes supported video annotation entries
+   */
+  const seedFromDbIfEmpty = useCallback(
+    (dbAnnotations: Annotation[]) => {
+      if (dirty) return;
+      if (byFrame.size > 0) return;
+      if (!dbAnnotations || dbAnnotations.length === 0) return;
+
+      const byF = new Map<number, ImageAnnotation[]>();
+
+      let invalid = 0;
+
+      for (const a of dbAnnotations) {
+        const parsed =
+          a.type === "video_bounding_box"
+            ? VideoBoundingBoxAnnotationSchema.safeParse(a)
+            : a.type === "video_polygon"
+              ? VideoPolygonSchema.safeParse(a)
+              : null;
+
+        if (!parsed) continue;
+
+
+        if (!parsed.success) {
+          invalid += 1;
+          continue;
+        }
+
+        const dbAnno = parsed.data;
+        const key = buildSourceKey({
+          projectId,
+          sampleId,
+          frame: dbAnno.frame,
+        });
+        const anno =
+          dbAnno.type === "video_bounding_box"
+            ? videoBBoxToAnno(dbAnno as VideoBoundingBox, key)
+            : videoPolygonToAnno(dbAnno as VideoPolygon, key);
+
+        const cur = byF.get(dbAnno.frame) ?? [];
+        cur.push(anno);
+        byF.set(dbAnno.frame, cur);
+      }
+
+      if (invalid > 0) {
+        console.warn(
+          `[video] seedFromDbIfEmpty: skipped ${invalid} invalid video annotation(s) from backend.`,
+        );
+      }
+
+      if (byF.size === 0) return;
+
+      setByFrame(byF);
+      setDirty(false);
+    },
+    [byFrame.size, dirty, projectId, sampleId],
+  );
+
+  // Seed session state from backend annotations once (no-op if the session already has data).
+  useEffect(() => {
+    if (!props.dbAnnotations || props.dbAnnotations.length === 0) return;
+    seedFromDbIfEmpty(props.dbAnnotations);
+  }, [props.dbAnnotations, seedFromDbIfEmpty]);
 
   /**
    * Single commit point for all Annotorious mutations (create/update/delete).
