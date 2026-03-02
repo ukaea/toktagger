@@ -10,21 +10,21 @@ uv venv --python 3.12.6
 source .venv/bin/activate
 uv pip install -e .
 ```
-
-2. Install the UI dependencies
+3. Install and setup `Node.js`: https://nodejs.org/en/download
+4. Install the UI dependencies
 
 ```sh
 nvm use v22.19.0
-npm --prefix toktagger/ui run install
+npm --prefix toktagger/ui install
 ```
 
-3. Run the backend API service in development mode. The backend API will be accessible at `http://localhost:8002`.
+5. Run the backend API service in development mode. The backend API will be accessible at `http://localhost:8002`.
 
 ```sh
 API_URL=http://0.0.0.0:8002 uvicorn toktagger.api.cli:app --host 0.0.0.0 --port 8002 --reload
 ```
 
-4. Run the frontend UI service in development mode. The UI will be accessible at `http://localhost:5173`
+6. Run the frontend UI service in development mode. The UI will be accessible at `http://localhost:5173`
 ```sh
 npm --prefix toktagger/ui run dev
 ```

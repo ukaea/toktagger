@@ -1,8 +1,8 @@
-#
+# TokTagger
 
 <figure markdown="span">
     ![TokTagger Logo](assets/logo_small.png){align=center}
-  <figcaption>An open source, interactive annotation platform for Tokamak diagnostic data.</figcaption>
+  <figcaption>TokTagger: an open source, interactive annotation platform for Tokamak diagnostic data.</figcaption>
 </figure>
 
 
@@ -12,18 +12,32 @@ It currently supports the following features:
 
 - **Data Browsing**: Explore tokamak shots, signals, and images through an intuitive interface.
 - **Annotation Tools**: Apply consistent labels to signals and images using a customizable tagging system.
+- **ML Models**: Train and infer from ML models within the UI.
 - **Dataset Management**: Organize and manage annotations in a central repository.
 - **Extensible API**: A Python API for integrating with existing workflows and tools.
 
-## Quick Start
 
-You can run the application locally through a simple pip install:
+## Installation
 
+To run the application locally:
+
+### Install via pip
+To install the package via `pip` (or similarly via `Poetry` or `uv` package managers):
+```sh
+python -m venv .venv
+source .venv/bin/activate
+GIT_LFS_SKIP_SMUDGE=1 pip install git+ssh://git@github.com/ukaea/toktagger.git
+```
+If you intend to add custom data loaders or models to your TokTagger instance, this is the recommended route.
+
+### Install as a uv tool
+Alternatively, it can be installed as a tool using `uv`:
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 git+ssh://git@github.com/ukaea/toktagger.git`
 ```
 
-Then run:
+## Quick Start
+To get started, run:
 
 ```sh
 toktagger
