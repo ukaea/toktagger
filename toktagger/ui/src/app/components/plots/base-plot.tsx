@@ -66,7 +66,7 @@ export const BaseTimeSeriesPlot = ({
 }: TimeSeriesPlotProps) => {
     const [plotReady, setPlotReady] = useState(false);
 
-    const {createAnnotation, addAnnotation, triggerUpdate, syncAnnotations, findSelectedAnnotations} = useTimeSeriesActions();
+    const {createAnnotation, addAnnotation, triggerUpdate, findSelectedAnnotations, setOngoingAction} = useTimeSeriesActions();
     const {activeAnnotationTool, toolingCallbacks, isDrawing, editMode} = useTimeSeriesState();
 
     const isDraggingRef = useRef(false);
@@ -338,6 +338,7 @@ export const BaseTimeSeriesPlot = ({
 
         const startAnnotationCreation = (event: MouseEvent) => {
             if (activeAnnotationTool && event.ctrlKey) {
+                setOngoingAction(true);
                 isDraggingRef.current = true;
                 const clickLocation = getClickData(event, plot);
                 toolingCallbacks.get(activeAnnotationTool.type)?.start(clickLocation.x, clickLocation.y, activeAnnotationTool.label);
@@ -352,12 +353,12 @@ export const BaseTimeSeriesPlot = ({
         }
 
         const finishAnnotationCreation = (event: MouseEvent) => {
-            if (activeAnnotationTool && isDraggingRef.current) {
-                isDraggingRef.current = false;
+            setOngoingAction(false);
+            isDraggingRef.current = false;
+            if (activeAnnotationTool) {
                 const clickLocation = getClickData(event, plot);
                 toolingCallbacks.get(activeAnnotationTool.type)?.end(clickLocation.x, clickLocation.y);
             }
-            syncAnnotations()
         };
 
         draggableElements.forEach((element) => {
@@ -373,7 +374,7 @@ export const BaseTimeSeriesPlot = ({
                 element.removeEventListener("mouseup", finishAnnotationCreation);
             })  
         })
-    }, [activeAnnotationTool, addAnnotation, createAnnotation, editMode, plotId, plotReady, syncAnnotations, toolingCallbacks])
+    }, [activeAnnotationTool, addAnnotation, createAnnotation, editMode, plotId, plotReady, setOngoingAction, toolingCallbacks])
 
     return (
         <div className="w-full px-6 py-3 space-y-3 flex-col">

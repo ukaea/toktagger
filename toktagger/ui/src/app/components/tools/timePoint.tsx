@@ -10,7 +10,7 @@ export const TimePoint = ({
     plotId,
     plotReady,
 }: ToolingProps) => {
-    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
+    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, setOngoingAction} = useTimeSeriesActions();
     const {annotations, forceUpdate, isDrawing, categories, editMode} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -26,8 +26,8 @@ export const TimePoint = ({
             start: (x, y, label) => {
                 const annotation = createAnnotation(TimeSeriesAnnotationType.TIME_POINT, label);
                 currentAnnotation.current = annotation;
-                annotation.points.push({x, y})
-                addAnnotation(annotation)
+                annotation.points.push({x, y});
+                addAnnotation(annotation);
             },
             move(x, y) {
                 if (!currentAnnotation.current) {
@@ -40,7 +40,7 @@ export const TimePoint = ({
             end(_x, _y) {},
         }
         registerTooling(TimeSeriesAnnotationType.TIME_POINT, toolingCallbacks)
-    }, [addAnnotation, createAnnotation, registerTooling, updateAnnotation]);
+    }, [addAnnotation, createAnnotation, registerTooling, setOngoingAction, updateAnnotation]);
 
     // Main rendering effect
       useEffect(() => {
@@ -122,6 +122,7 @@ export const TimePoint = ({
               .drag<SVGRectElement, TimeSeriesAnnotation>()
               .on("start", function (event, d) {
                 dragOffset.current = xaxis.d2p(d.points[0].x) - event.x;
+                setOngoingAction(true);
               })
               .on("drag", function (event, d) {
                 const newX = event.x + dragOffset.current;
@@ -132,7 +133,7 @@ export const TimePoint = ({
                 updateAnnotation(d); // Global refresh must be triggered to update all linked plots
               })
               .on("end", function (_event, _d) {
-                syncAnnotations();
+                setOngoingAction(false);
               });
 
             const color = categories.get(vspan.label)?.color || "black"
@@ -167,7 +168,7 @@ export const TimePoint = ({
               .on("contextmenu", handleContextMenu);
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show, editMode]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, categories, show, editMode, setOngoingAction]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />

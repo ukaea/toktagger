@@ -1,7 +1,7 @@
 "use client"
 
 import { Annotation, TimeSeriesAnnotation, TimeSeriesAnnotationType, TimeSeriesCategory, TimeSeriesToolDefinition, ToolingCallbacks } from "@/types"
-import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from "react"
+import React, {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react"
 import {v4 as uuidv4} from "uuid"
 import { useSample } from "./SampleContext"
 import { convertRawAnnotationsToTimeSeries, convertTimeSeriesToRawAnnotations, randomColor } from "../utils"
@@ -16,10 +16,10 @@ type TimeSeriesActions = {
     getAnnotation: (id: string) => TimeSeriesAnnotation | null;
     setAnnotationTool: (tool: TimeSeriesToolDefinition | null) => void;
     registerTooling: (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => void;
-    syncAnnotations: () => void;
     triggerUpdate: () => void;
     findSelectedAnnotations: (range: {low: number, high: number} | null) => void;
     setEditMode: (turnOn: boolean) => void;
+    setOngoingAction: (state: boolean) => void;
 }
 
 type TimeSeriesState = {
@@ -64,9 +64,14 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
     const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_REGION, label: "Disruption"});
     const [updateCounter, setUpdateCounter] = useState(0);
+    const [syncCounter, setSyncCounter] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
     const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(new Map());
     const [editMode, setEditMode] = useState(false);
+    const [ongoingAction, setOngoingAction] = useState(false);
+
+    const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastSyncCount = useRef<number>(0);
 
     const parseRawAnnotations = useCallback((annotations: Annotation[]): TimeSeriesAnnotation[] => {
         const parsedAnnotations: TimeSeriesAnnotation[] = [];
@@ -116,7 +121,30 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         setAnnotations(parseRawAnnotations(rawAnnotations));
     }, [parseRawAnnotations, rawAnnotations]);
 
-    const createAnnotation = useCallback((type: TimeSeriesAnnotationType, label: string) : TimeSeriesAnnotation => {
+    const triggerSync = useCallback(() => {
+        setSyncCounter((prev) => (prev + 1) % 100)
+    }, [])
+
+    const syncAnnotations = useCallback(() => {
+        if (ongoingAction) {
+            if (syncTimeoutRef.current !== null) {
+                clearTimeout(syncTimeoutRef.current)
+            }
+            syncTimeoutRef.current = setTimeout(triggerSync, 100);
+            return;
+        }
+        syncTimeoutRef.current = null;
+        const rawAnnotations = parseTimeSeriesAnnotations(annotations);
+        setRawAnnotations((_prev) => rawAnnotations);
+    }, [annotations, ongoingAction, parseTimeSeriesAnnotations, setRawAnnotations, triggerSync])
+
+    useEffect(() => {
+        if (lastSyncCount.current === syncCounter) return
+        lastSyncCount.current = syncCounter
+        syncAnnotations()
+    }, [syncAnnotations, syncCounter])
+
+    const createAnnotation = useCallback((type: TimeSeriesAnnotationType, label: string) : TimeSeriesAnnotation => {       
         const id = uuidv4();
         return {
             id,
@@ -129,10 +157,16 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     }, [])
 
     const addAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
+        if (syncTimeoutRef.current !== null) {
+            clearTimeout(syncTimeoutRef.current);
+            syncTimeoutRef.current = null;
+        }
+        syncTimeoutRef.current = setTimeout(triggerSync, 100);
+        
         setAnnotations(prev => [...prev, annotation])
-    }, [])
+    }, [triggerSync])
 
-    const removeAnnotation = useCallback((id: string) => {
+    const removeAnnotation = useCallback((id: string) => {        
         const currentAnnotations = annotations;
         const newAnnotations = currentAnnotations.filter((annotation) => 
             annotation.id !== id
@@ -166,15 +200,15 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
     }, [toolingCallbacks])
 
     const updateAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
+        if (syncTimeoutRef.current !== null) {
+            clearTimeout(syncTimeoutRef.current);
+        }
+        syncTimeoutRef.current = setTimeout(triggerSync, 100);
+        
         setAnnotations((prev) => prev.map(item => 
             item.id === annotation.id ? annotation : item
         ));
-    }, [])
-
-    const syncAnnotations = useCallback(() => {
-        const rawAnnotations = parseTimeSeriesAnnotations(annotations);
-        setRawAnnotations((_prev) => rawAnnotations);
-    }, [annotations, parseTimeSeriesAnnotations, setRawAnnotations])
+    }, [triggerSync])
 
     const triggerUpdate = useCallback(() => {
         setUpdateCounter((prev) => (prev + 1) % 100)
@@ -219,11 +253,11 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
         registerTooling,
         updateAnnotation,
         getAnnotation,
-        syncAnnotations,
         triggerUpdate,
         findSelectedAnnotations,
         setEditMode,
-    }), [createAnnotation, addAnnotation, removeAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, syncAnnotations, triggerUpdate, findSelectedAnnotations])
+        setOngoingAction,
+    }), [createAnnotation, addAnnotation, removeAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, triggerUpdate, findSelectedAnnotations])
 
     const stateValue: TimeSeriesState = useMemo(() => ({
         annotations,
@@ -285,9 +319,8 @@ export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => 
                 id={`update${index}`}
                 hidden={({props}) => (props.annotation.type !== category.type)}
                 onClick={({props}) => {
-                    const new_annotation: TimeSeriesAnnotation = {...props.annotation, label: category.label}
-                    const update = annotations.map((annotation) => annotation.id === new_annotation.id ? new_annotation : annotation)
-                    setRawAnnotations((_prev) => parseTimeSeriesAnnotations(update))
+                    const newAnnotation: TimeSeriesAnnotation = {...props.annotation, label: category.label}
+                    updateAnnotation(newAnnotation)
                 }}
             >
                 {category.label}

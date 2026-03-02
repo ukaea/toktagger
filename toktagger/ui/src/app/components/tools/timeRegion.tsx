@@ -10,7 +10,7 @@ export const TimeRegion = ({
     plotId,
     plotReady,
 }: ToolingProps) => {
-    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, syncAnnotations} = useTimeSeriesActions();
+    const {registerTooling, createAnnotation, addAnnotation, updateAnnotation, setOngoingAction} = useTimeSeriesActions();
     const {annotations, forceUpdate, isDrawing, categories, editMode} = useTimeSeriesState()
 
     const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -26,9 +26,9 @@ export const TimeRegion = ({
             start: (x, y, label) => {
                 const annotation = createAnnotation(TimeSeriesAnnotationType.TIME_REGION, label);
                 currentAnnotation.current = annotation;
-                annotation.points.push({x, y})
-                annotation.points.push({x, y})
-                addAnnotation(annotation)
+                annotation.points.push({x, y});
+                annotation.points.push({x, y});
+                addAnnotation(annotation);
             },
             move(x, y) {
                 if (!currentAnnotation.current) {
@@ -45,7 +45,7 @@ export const TimeRegion = ({
             end(_x, _y) {},
         }
         registerTooling(TimeSeriesAnnotationType.TIME_REGION, toolingCallbacks)
-    }, [addAnnotation, createAnnotation, registerTooling, updateAnnotation]);
+    }, [addAnnotation, createAnnotation, registerTooling, setOngoingAction, updateAnnotation]);
 
     // Main rendering effect
       useEffect(() => {
@@ -120,6 +120,7 @@ export const TimeRegion = ({
                 if (isLeft) d.points[0].x = x;
                 else d.points[1].x = x; // live-update only the boundary being dragged
                 updateAnnotation(d);
+                setOngoingAction(true);
               })
               .on("end", function (_event, d) {
                 // On drag end: enforce minimum width and normalize orientation
@@ -156,7 +157,7 @@ export const TimeRegion = ({
                 if (changed) {
                   updateAnnotation(d);
                 }
-                syncAnnotations();
+                setOngoingAction(false);
               });
             return resize;
           };
@@ -179,9 +180,10 @@ export const TimeRegion = ({
               d.points[0].x = x0Left ? x0 : x1;
               d.points[1].x = x0Left ? x1 : x0;
               updateAnnotation(d); // Global refresh must be triggered to update all linked plots
+              setOngoingAction(true);
             })
             .on("end", function (_event, _d) {
-              syncAnnotations();
+              setOngoingAction(false);
             });
 
           function handleContextMenu(event: MouseEvent, annotation: TimeSeriesAnnotation) {
@@ -281,7 +283,7 @@ export const TimeRegion = ({
                 .on("contextmenu", handleContextMenu);
           }
         });
-      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, syncAnnotations, categories, show, editMode]); // forceUpdate is required here to keep tooling correctly positioned
+      }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, categories, show, editMode, setOngoingAction]); // forceUpdate is required here to keep tooling correctly positioned
 
     return (
         <div />
