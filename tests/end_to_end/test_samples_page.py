@@ -31,8 +31,8 @@ def check_base_page(page):
     expect(page.get_by_role("columnheader", name="Shot ID")).to_be_visible()
     expect(page.get_by_role("columnheader", name="Date Created")).to_be_visible()
 
-    # Expect Create button visible
-    expect(page.get_by_role("button", name="Create", exact=True)).to_be_visible()
+    # Expect Add Samples button visible
+    expect(page.get_by_role("button", name="Add Samples", exact=True)).to_be_visible()
 
     # Expect Model Train/Predict buttons visible
     expect(
