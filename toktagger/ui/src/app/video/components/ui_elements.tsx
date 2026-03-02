@@ -211,7 +211,6 @@ export function InstancePanel({
               key={p.key}
               type="button"
               onClick={() => onSelect(p.key)}
-              onDoubleClick={() => onActivate?.(p)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 onRequestBulkDelete(p);

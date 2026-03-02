@@ -215,7 +215,12 @@ export function VideoToolbox() {
       });
     }
 
-    session.requestFocusInstance(cls, tid);
+    session.requestFocusInstance(cls, tid, {
+      targetFrame:
+        typeof firstFrame === "number" && Number.isFinite(firstFrame)
+          ? Math.max(0, Math.trunc(firstFrame))
+          : undefined,
+    });
   };
 
   const onRequestBulkDelete = (profile: {
