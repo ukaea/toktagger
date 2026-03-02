@@ -35,6 +35,7 @@ import { TimePoint } from "@/app/components/tools/timePoint";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
+import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 export const TimeSeriesView = () => {
   const { project, data, annotations, setAnnotations } = useSample();
@@ -180,7 +181,7 @@ export const TimeSeriesView = () => {
       uirevision: "true",
       //grid: { rows: 1, columns: 1, pattern: "independent" },
       dragmode: "pan",
-      width: window.innerWidth * 0.84,
+      autosize: true,
       height: window.innerHeight * 0.9,
       xaxis: {
         minallowed: minTime,
@@ -221,15 +222,18 @@ export const TimeSeriesView = () => {
                 initialData={vspans}
                 onModifyVSpan={updateVSpans}
               >
-                <Flex direction="column" gap="size-200">
-                  <BaseTimeSeriesPlot
-                    plotId="TimesSeriesView"
-                    plotConfig={{ data: plotData, layout: plotLayout }}
-                  >
-                    <TimeRegion />
-                    <TimePoint />
-                  </BaseTimeSeriesPlot>
-                  <AnnotationsTable />
+                <Flex direction="row" flex justifyContent="space-between">
+                  <Flex direction="column" flex gap="size-200">
+                    <BaseTimeSeriesPlot
+                      plotId="TimesSeriesView"
+                      plotConfig={{ data: plotData, layout: plotLayout }}
+                    >
+                      <TimeRegion />
+                      <TimePoint />
+                    </BaseTimeSeriesPlot>
+                    <AnnotationsTable />
+                  </Flex>
+                  <AnnotationToolbar />
                 </Flex>
               </VSpanProvider>
             </ZoneProvider>

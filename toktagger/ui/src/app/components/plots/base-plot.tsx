@@ -33,6 +33,7 @@ const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
     displaylogo: false,
     displayModeBar: true,
     scrollZoom: true,
+    responsive: true,
 }
 
 interface PlotConfiguration {
