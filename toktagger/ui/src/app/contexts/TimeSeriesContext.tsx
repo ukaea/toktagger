@@ -1,354 +1,465 @@
-"use client"
+"use client";
 
-import { Annotation, TimeSeriesAnnotation, TimeSeriesAnnotationType, TimeSeriesCategory, TimeSeriesToolDefinition, ToolingCallbacks } from "@/types"
-import React, {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react"
-import {v4 as uuidv4} from "uuid"
-import { useSample } from "./SampleContext"
-import { convertRawAnnotationsToTimeSeries, convertTimeSeriesToRawAnnotations, randomColor } from "../utils"
-import { Item, ItemParams, Menu, Submenu } from "react-contexify"
+import {
+  Annotation,
+  TimeSeriesAnnotation,
+  TimeSeriesAnnotationType,
+  TimeSeriesCategory,
+  TimeSeriesToolDefinition,
+  ToolingCallbacks,
+} from "@/types";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { v4 as uuidv4 } from "uuid";
+import { useSample } from "./SampleContext";
+import {
+  convertRawAnnotationsToTimeSeries,
+  convertTimeSeriesToRawAnnotations,
+  randomColor,
+} from "../utils";
+import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 
 type TimeSeriesActions = {
-    setAnnotations: (annotations: TimeSeriesAnnotation[]) => void;
-    createAnnotation: (type: TimeSeriesAnnotationType, label: string) => TimeSeriesAnnotation;
-    addAnnotation: (annotation: TimeSeriesAnnotation) => void;
-    removeAnnotation: (id: string) => void;
-    updateAnnotation: (annotation: TimeSeriesAnnotation) => void;
-    getAnnotation: (id: string) => TimeSeriesAnnotation | null;
-    setAnnotationTool: (tool: TimeSeriesToolDefinition | null) => void;
-    registerTooling: (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => void;
-    triggerUpdate: () => void;
-    findSelectedAnnotations: (range: {low: number, high: number} | null) => void;
-    setEditMode: (turnOn: boolean) => void;
-    setOngoingAction: (state: boolean) => void;
-}
+  setAnnotations: (annotations: TimeSeriesAnnotation[]) => void;
+  createAnnotation: (
+    type: TimeSeriesAnnotationType,
+    label: string,
+  ) => TimeSeriesAnnotation;
+  addAnnotation: (annotation: TimeSeriesAnnotation) => void;
+  removeAnnotation: (id: string) => void;
+  updateAnnotation: (annotation: TimeSeriesAnnotation) => void;
+  getAnnotation: (id: string) => TimeSeriesAnnotation | null;
+  setAnnotationTool: (tool: TimeSeriesToolDefinition | null) => void;
+  registerTooling: (
+    type: TimeSeriesAnnotationType,
+    callbacks: ToolingCallbacks,
+  ) => void;
+  triggerUpdate: () => void;
+  findSelectedAnnotations: (
+    range: { low: number; high: number } | null,
+  ) => void;
+  setEditMode: (turnOn: boolean) => void;
+  setOngoingAction: (state: boolean) => void;
+};
 
 type TimeSeriesState = {
-    annotations: TimeSeriesAnnotation[];
-    activeAnnotationTool: TimeSeriesToolDefinition | null;
-    toolingCallbacks: Map<TimeSeriesAnnotationType, ToolingCallbacks>;
-    forceUpdate: number;
-    isDrawing: boolean;
-    categories: Map<string, TimeSeriesCategory>;
-    editMode: boolean;
-}
+  annotations: TimeSeriesAnnotation[];
+  activeAnnotationTool: TimeSeriesToolDefinition | null;
+  toolingCallbacks: Map<TimeSeriesAnnotationType, ToolingCallbacks>;
+  forceUpdate: number;
+  isDrawing: boolean;
+  categories: Map<string, TimeSeriesCategory>;
+  editMode: boolean;
+};
 
 const TimeSeriesActionsContext = createContext<TimeSeriesActions | null>(null);
 const TimeSeriesStateContext = createContext<TimeSeriesState | null>(null);
 
 export const useTimeSeriesActions = () => {
-    const context = useContext(TimeSeriesActionsContext);
-    if (!context) {
-        throw new Error(
-            "useTimeSeriesActions must be used within a TimeSeriesProvider",
-        )
-    }
-    return context;
-}
+  const context = useContext(TimeSeriesActionsContext);
+  if (!context) {
+    throw new Error(
+      "useTimeSeriesActions must be used within a TimeSeriesProvider",
+    );
+  }
+  return context;
+};
 
 export const useTimeSeriesState = () => {
-    const context = useContext(TimeSeriesStateContext);
-    if (!context) {
-        throw new Error(
-            "useTimeSeriesState must be used within a TimeSeriesProvider",
-        )
-    }
-    return context;
-}
+  const context = useContext(TimeSeriesStateContext);
+  if (!context) {
+    throw new Error(
+      "useTimeSeriesState must be used within a TimeSeriesProvider",
+    );
+  }
+  return context;
+};
 
 export const TIME_SERIES_ANNOTATION_MENU = "time-series-annotation-menu";
 
-export const TimeSeriesProvider = ({children} : {children: React.ReactNode}) => {
-    const {annotations: rawAnnotations, setAnnotations: setRawAnnotations, project} = useSample();
+export const TimeSeriesProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const {
+    annotations: rawAnnotations,
+    setAnnotations: setRawAnnotations,
+    project,
+  } = useSample();
 
-    const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
-    const [toolingCallbacks, setToolingCallbacks] = useState<Map<TimeSeriesAnnotationType, ToolingCallbacks>>(new Map())
-    const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>({type: TimeSeriesAnnotationType.TIME_REGION, label: "Disruption"});
-    const [updateCounter, setUpdateCounter] = useState(0);
-    const [syncCounter, setSyncCounter] = useState(0);
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(new Map());
-    const [editMode, setEditMode] = useState(false);
-    const [ongoingAction, setOngoingAction] = useState(false);
+  const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
+  const [toolingCallbacks, setToolingCallbacks] = useState<
+    Map<TimeSeriesAnnotationType, ToolingCallbacks>
+  >(new Map());
+  const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>(
+    { type: TimeSeriesAnnotationType.TIME_REGION, label: "Disruption" },
+  );
+  const [updateCounter, setUpdateCounter] = useState(0);
+  const [syncCounter, setSyncCounter] = useState(0);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(
+    new Map(),
+  );
+  const [editMode, setEditMode] = useState(false);
+  const [ongoingAction, setOngoingAction] = useState(false);
 
-    const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const lastSyncCount = useRef<number>(0);
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncCount = useRef<number>(0);
 
-    const parseRawAnnotations = useCallback((annotations: Annotation[]): TimeSeriesAnnotation[] => {
-        const parsedAnnotations: TimeSeriesAnnotation[] = [];
-        annotations.forEach((annotation) => {
-            const parsedAnnotation = convertRawAnnotationsToTimeSeries(annotation);
-            if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
-        })
-        return parsedAnnotations;
-    }, []);
+  const parseRawAnnotations = useCallback(
+    (annotations: Annotation[]): TimeSeriesAnnotation[] => {
+      const parsedAnnotations: TimeSeriesAnnotation[] = [];
+      annotations.forEach((annotation) => {
+        const parsedAnnotation = convertRawAnnotationsToTimeSeries(annotation);
+        if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
+      });
+      return parsedAnnotations;
+    },
+    [],
+  );
 
-    const parseTimeSeriesAnnotations = useCallback((annotations: TimeSeriesAnnotation[]): Annotation[] => {
-        const parsedAnnotations: Annotation[] = [];
-        annotations.forEach((annotation) => {
-            const parsedAnnotation = convertTimeSeriesToRawAnnotations(annotation);
-            if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
-        })
-        return parsedAnnotations;
-    }, []);
+  const parseTimeSeriesAnnotations = useCallback(
+    (annotations: TimeSeriesAnnotation[]): Annotation[] => {
+      const parsedAnnotations: Annotation[] = [];
+      annotations.forEach((annotation) => {
+        const parsedAnnotation = convertTimeSeriesToRawAnnotations(annotation);
+        if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
+      });
+      return parsedAnnotations;
+    },
+    [],
+  );
 
-    useEffect(() => {
-        if (!project) return;
-        const timeSeriesCategories: Map<string, TimeSeriesCategory> = new Map();
-        if (project.time_point_labels) {
-            project.time_point_labels.forEach((label, index) => {
-                timeSeriesCategories.set(label, 
-                {
-                    label,
-                    color: randomColor(index),
-                    type: TimeSeriesAnnotationType.TIME_POINT
-                })
-            })
-        }
-        if (project.time_region_labels) {
-            project.time_region_labels.forEach((label, index) => {
-                timeSeriesCategories.set(label, 
-                {
-                    label,
-                    color: randomColor(index),
-                    type: TimeSeriesAnnotationType.TIME_REGION
-                })
-            })
-        }
-        setCategories(timeSeriesCategories)
-    }, [project])
-    
-    useEffect(() => {
-        setAnnotations(parseRawAnnotations(rawAnnotations));
-    }, [parseRawAnnotations, rawAnnotations]);
+  useEffect(() => {
+    if (!project) return;
+    const timeSeriesCategories: Map<string, TimeSeriesCategory> = new Map();
+    if (project.time_point_labels) {
+      project.time_point_labels.forEach((label, index) => {
+        timeSeriesCategories.set(label, {
+          label,
+          color: randomColor(index),
+          type: TimeSeriesAnnotationType.TIME_POINT,
+        });
+      });
+    }
+    if (project.time_region_labels) {
+      project.time_region_labels.forEach((label, index) => {
+        timeSeriesCategories.set(label, {
+          label,
+          color: randomColor(index),
+          type: TimeSeriesAnnotationType.TIME_REGION,
+        });
+      });
+    }
+    setCategories(timeSeriesCategories);
+  }, [project]);
 
-    const triggerSync = useCallback(() => {
-        setSyncCounter((prev) => (prev + 1) % 100)
-    }, [])
+  useEffect(() => {
+    setAnnotations(parseRawAnnotations(rawAnnotations));
+  }, [parseRawAnnotations, rawAnnotations]);
 
-    const syncAnnotations = useCallback(() => {
-        if (ongoingAction) {
-            if (syncTimeoutRef.current !== null) {
-                clearTimeout(syncTimeoutRef.current)
-            }
-            syncTimeoutRef.current = setTimeout(triggerSync, 100);
-            return;
-        }
+  const triggerSync = useCallback(() => {
+    setSyncCounter((prev) => (prev + 1) % 100);
+  }, []);
+
+  const syncAnnotations = useCallback(() => {
+    if (ongoingAction) {
+      if (syncTimeoutRef.current !== null) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      syncTimeoutRef.current = setTimeout(triggerSync, 100);
+      return;
+    }
+    syncTimeoutRef.current = null;
+    const rawAnnotations = parseTimeSeriesAnnotations(annotations);
+    setRawAnnotations((_prev) => rawAnnotations);
+  }, [
+    annotations,
+    ongoingAction,
+    parseTimeSeriesAnnotations,
+    setRawAnnotations,
+    triggerSync,
+  ]);
+
+  useEffect(() => {
+    if (lastSyncCount.current === syncCounter) return;
+    lastSyncCount.current = syncCounter;
+    syncAnnotations();
+  }, [syncAnnotations, syncCounter]);
+
+  const createAnnotation = useCallback(
+    (type: TimeSeriesAnnotationType, label: string): TimeSeriesAnnotation => {
+      const id = uuidv4();
+      return {
+        id,
+        created_by: "manual",
+        label,
+        type,
+        points: [],
+        selected: false,
+      };
+    },
+    [],
+  );
+
+  const addAnnotation = useCallback(
+    (annotation: TimeSeriesAnnotation) => {
+      if (syncTimeoutRef.current !== null) {
+        clearTimeout(syncTimeoutRef.current);
         syncTimeoutRef.current = null;
-        const rawAnnotations = parseTimeSeriesAnnotations(annotations);
-        setRawAnnotations((_prev) => rawAnnotations);
-    }, [annotations, ongoingAction, parseTimeSeriesAnnotations, setRawAnnotations, triggerSync])
+      }
+      syncTimeoutRef.current = setTimeout(triggerSync, 100);
 
-    useEffect(() => {
-        if (lastSyncCount.current === syncCounter) return
-        lastSyncCount.current = syncCounter
-        syncAnnotations()
-    }, [syncAnnotations, syncCounter])
+      setAnnotations((prev) => [...prev, annotation]);
+    },
+    [triggerSync],
+  );
 
-    const createAnnotation = useCallback((type: TimeSeriesAnnotationType, label: string) : TimeSeriesAnnotation => {       
-        const id = uuidv4();
-        return {
-            id,
-            created_by: "manual",
-            label,
-            type,
-            points: [],
-            selected: false,
-        }
-    }, [])
+  const removeAnnotation = useCallback(
+    (id: string) => {
+      const currentAnnotations = annotations;
+      const newAnnotations = currentAnnotations.filter(
+        (annotation) => annotation.id !== id,
+      );
+      setRawAnnotations((_prev) => parseTimeSeriesAnnotations(newAnnotations));
+    },
+    [annotations, parseTimeSeriesAnnotations, setRawAnnotations],
+  );
 
-    const addAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
-        if (syncTimeoutRef.current !== null) {
-            clearTimeout(syncTimeoutRef.current);
-            syncTimeoutRef.current = null;
-        }
-        syncTimeoutRef.current = setTimeout(triggerSync, 100);
-        
-        setAnnotations(prev => [...prev, annotation])
-    }, [triggerSync])
+  const getAnnotation = useCallback(
+    (id: string) => {
+      annotations.forEach((annotation) => {
+        if (annotation.id === id) return annotation;
+      });
+      console.warn(`Annotation with id: ${id} could not be found`);
+      return null;
+    },
+    [annotations],
+  );
 
-    const removeAnnotation = useCallback((id: string) => {        
-        const currentAnnotations = annotations;
-        const newAnnotations = currentAnnotations.filter((annotation) => 
-            annotation.id !== id
-        )
-        setRawAnnotations((_prev) => parseTimeSeriesAnnotations(newAnnotations))
-    }, [annotations, parseTimeSeriesAnnotations, setRawAnnotations])
+  const registerTooling = useCallback(
+    (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => {
+      setToolingCallbacks((prev) => {
+        if (prev.has(type)) return prev;
+        const newMap = new Map(prev);
+        newMap.set(type, callbacks);
+        return newMap;
+      });
+    },
+    [],
+  );
 
-    const getAnnotation = useCallback((id: string) => {
-        annotations.forEach((annotation) => {
-            if (annotation.id === id) return annotation
-        })
-        console.warn(`Annotation with id: ${id} could not be found`)
-        return null;
-    }, [annotations])
+  const setAnnotationTool = useCallback(
+    (tool: TimeSeriesToolDefinition | null) => {
+      if (!tool || toolingCallbacks.has(tool.type)) {
+        setActiveTool(tool);
+        return;
+      }
+      console.warn(
+        `Could not set ${tool.type} as active tool since no callback has been registered`,
+      );
+    },
+    [toolingCallbacks],
+  );
 
-    const registerTooling = useCallback((type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => {
-        setToolingCallbacks((prev) => {
-            if (prev.has(type)) return prev;
-            const newMap = new Map(prev);
-            newMap.set(type, callbacks);
-            return newMap;
-        })
-    }, [])
+  const updateAnnotation = useCallback(
+    (annotation: TimeSeriesAnnotation) => {
+      if (syncTimeoutRef.current !== null) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      syncTimeoutRef.current = setTimeout(triggerSync, 100);
 
-    const setAnnotationTool = useCallback((tool: TimeSeriesToolDefinition | null) => {
-        if (!tool || toolingCallbacks.has(tool.type)) {
-            setActiveTool(tool);
-            return;
-        }
-        console.warn(`Could not set ${tool.type} as active tool since no callback has been registered`)
-    }, [toolingCallbacks])
+      setAnnotations((prev) =>
+        prev.map((item) => (item.id === annotation.id ? annotation : item)),
+      );
+    },
+    [triggerSync],
+  );
 
-    const updateAnnotation = useCallback((annotation: TimeSeriesAnnotation) => {
-        if (syncTimeoutRef.current !== null) {
-            clearTimeout(syncTimeoutRef.current);
-        }
-        syncTimeoutRef.current = setTimeout(triggerSync, 100);
-        
-        setAnnotations((prev) => prev.map(item => 
-            item.id === annotation.id ? annotation : item
-        ));
-    }, [triggerSync])
+  const triggerUpdate = useCallback(() => {
+    setUpdateCounter((prev) => (prev + 1) % 100);
+  }, []);
 
-    const triggerUpdate = useCallback(() => {
-        setUpdateCounter((prev) => (prev + 1) % 100)
-    }, [])
+  const findSelectedAnnotations = useCallback(
+    (range: { low: number; high: number } | null) => {
+      if (!editMode) return;
 
-    const findSelectedAnnotations = useCallback((range: {low: number, high: number} | null) => {
-        if (!editMode) return;
-        
-        if (!range) {
-            const updated_state: TimeSeriesAnnotation[] = annotations.map((annotation) => ({...annotation, selected: false}))
-            setAnnotations(updated_state);
-            return;
-        }
-
-        const updated_state: TimeSeriesAnnotation[] = annotations.map((annotation) => {
-            if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
-                if (annotation.points[0].x > range.low 
-                    && annotation.points[1].x < range.high) {
-                        return {...annotation, selected: true}
-                }
-                return {...annotation, selected: false}
-            }
-            if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
-                if (annotation.points[0].x > range.low 
-                    && annotation.points[0].x < range.high) {
-                        return {...annotation, selected: true}
-                }
-                return {...annotation, selected: false}
-            }
-            return {...annotation, selected: false}
-        })
-
+      if (!range) {
+        const updated_state: TimeSeriesAnnotation[] = annotations.map(
+          (annotation) => ({ ...annotation, selected: false }),
+        );
         setAnnotations(updated_state);
-    }, [annotations, editMode])
+        return;
+      }
 
-    const actionsValue: TimeSeriesActions = useMemo(() => ({
-        setAnnotations,
-        createAnnotation,
-        addAnnotation,
-        removeAnnotation,
-        setAnnotationTool,
-        registerTooling,
-        updateAnnotation,
-        getAnnotation,
-        triggerUpdate,
-        findSelectedAnnotations,
-        setEditMode,
-        setOngoingAction,
-    }), [createAnnotation, addAnnotation, removeAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, triggerUpdate, findSelectedAnnotations])
-
-    const stateValue: TimeSeriesState = useMemo(() => ({
-        annotations,
-        activeAnnotationTool: activeTool,
-        toolingCallbacks,
-        forceUpdate: updateCounter,
-        isDrawing,
-        categories,
-        editMode
-    }), [annotations, activeTool, toolingCallbacks, updateCounter, isDrawing, categories, editMode])
-
-    useEffect(() => {
-        if (!editMode) return;
-
-        const deleteSelection = (event: KeyboardEvent) => {
-            if (event.key === "Delete" || event.key === "Backspace") {
-                const updatedState = annotations.filter((annotation) => !annotation.selected)
-                setRawAnnotations((_prev) => parseTimeSeriesAnnotations(updatedState))
+      const updated_state: TimeSeriesAnnotation[] = annotations.map(
+        (annotation) => {
+          if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
+            if (
+              annotation.points[0].x > range.low &&
+              annotation.points[1].x < range.high
+            ) {
+              return { ...annotation, selected: true };
             }
-        };
-
-        document.addEventListener("keydown", deleteSelection);
-
-        return () => {
-            document.removeEventListener("keydown", deleteSelection);
-        };
-    }, [annotations, editMode, parseTimeSeriesAnnotations, setRawAnnotations])
-
-    useEffect(() => {        
-        const keyDownHandler = (event: KeyboardEvent) => {
-            if (event.key === "Control") {
-                setIsDrawing(true);
+            return { ...annotation, selected: false };
+          }
+          if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
+            if (
+              annotation.points[0].x > range.low &&
+              annotation.points[0].x < range.high
+            ) {
+              return { ...annotation, selected: true };
             }
+            return { ...annotation, selected: false };
+          }
+          return { ...annotation, selected: false };
+        },
+      );
 
-            if (event.key === "e") {
-                setEditMode((prev) => !prev);
-            }
-        };
+      setAnnotations(updated_state);
+    },
+    [annotations, editMode],
+  );
 
-        const keyUpHandler = (event: KeyboardEvent) => {
-            if (event.key === "Control") {
-                setIsDrawing(false);
-            }
-        };
+  const actionsValue: TimeSeriesActions = useMemo(
+    () => ({
+      setAnnotations,
+      createAnnotation,
+      addAnnotation,
+      removeAnnotation,
+      setAnnotationTool,
+      registerTooling,
+      updateAnnotation,
+      getAnnotation,
+      triggerUpdate,
+      findSelectedAnnotations,
+      setEditMode,
+      setOngoingAction,
+    }),
+    [
+      createAnnotation,
+      addAnnotation,
+      removeAnnotation,
+      setAnnotationTool,
+      registerTooling,
+      updateAnnotation,
+      getAnnotation,
+      triggerUpdate,
+      findSelectedAnnotations,
+    ],
+  );
 
-        document.addEventListener("keydown", keyDownHandler);
-        document.addEventListener("keyup", keyUpHandler);
+  const stateValue: TimeSeriesState = useMemo(
+    () => ({
+      annotations,
+      activeAnnotationTool: activeTool,
+      toolingCallbacks,
+      forceUpdate: updateCounter,
+      isDrawing,
+      categories,
+      editMode,
+    }),
+    [
+      annotations,
+      activeTool,
+      toolingCallbacks,
+      updateCounter,
+      isDrawing,
+      categories,
+      editMode,
+    ],
+  );
 
-        return () => {
-            document.removeEventListener("keydown", keyDownHandler);
-            document.removeEventListener("keyup", keyUpHandler);
-        };
-    }, [editMode])
+  useEffect(() => {
+    if (!editMode) return;
 
-    const annotationLabels = Array.from(categories.values()).map((category, index) => {
-        return (
-            <Item
-                key={`update${index}`}
-                id={`update${index}`}
-                hidden={({props}) => (props.annotation.type !== category.type)}
-                onClick={({props}) => {
-                    const newAnnotation: TimeSeriesAnnotation = {...props.annotation, label: category.label}
-                    updateAnnotation(newAnnotation)
-                }}
-            >
-                {category.label}
-            </Item>
-    )})
+    const deleteSelection = (event: KeyboardEvent) => {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        const updatedState = annotations.filter(
+          (annotation) => !annotation.selected,
+        );
+        setRawAnnotations((_prev) => parseTimeSeriesAnnotations(updatedState));
+      }
+    };
 
-    return (
-        <TimeSeriesActionsContext.Provider
-            value={actionsValue}
+    document.addEventListener("keydown", deleteSelection);
+
+    return () => {
+      document.removeEventListener("keydown", deleteSelection);
+    };
+  }, [annotations, editMode, parseTimeSeriesAnnotations, setRawAnnotations]);
+
+  useEffect(() => {
+    const keyDownHandler = (event: KeyboardEvent) => {
+      if (event.key === "Control") {
+        setIsDrawing(true);
+      }
+
+      if (event.key === "e") {
+        setEditMode((prev) => !prev);
+      }
+    };
+
+    const keyUpHandler = (event: KeyboardEvent) => {
+      if (event.key === "Control") {
+        setIsDrawing(false);
+      }
+    };
+
+    document.addEventListener("keydown", keyDownHandler);
+    document.addEventListener("keyup", keyUpHandler);
+
+    return () => {
+      document.removeEventListener("keydown", keyDownHandler);
+      document.removeEventListener("keyup", keyUpHandler);
+    };
+  }, [editMode]);
+
+  const annotationLabels = Array.from(categories.values()).map(
+    (category, index) => {
+      return (
+        <Item
+          key={`update${index}`}
+          id={`update${index}`}
+          hidden={({ props }) => props.annotation.type !== category.type}
+          onClick={({ props }) => {
+            const newAnnotation: TimeSeriesAnnotation = {
+              ...props.annotation,
+              label: category.label,
+            };
+            updateAnnotation(newAnnotation);
+          }}
         >
-            <TimeSeriesStateContext
-                value={stateValue}
-            >
-                {children}
-                <Menu id={`${TIME_SERIES_ANNOTATION_MENU}`} >
-                    <Item
-                        id="delete"
-                        onClick={({ props }: ItemParams) => {
-                            removeAnnotation(props.annotation.id)
-                        }}
-                    >
-                        Delete
-                    </Item>
-                    <Submenu label="Set type">
-                        {annotationLabels}
-                    </Submenu>
-                </Menu>
-            </TimeSeriesStateContext>
-        </TimeSeriesActionsContext.Provider>
-    )
-}
+          {category.label}
+        </Item>
+      );
+    },
+  );
+
+  return (
+    <TimeSeriesActionsContext.Provider value={actionsValue}>
+      <TimeSeriesStateContext value={stateValue}>
+        {children}
+        <Menu id={`${TIME_SERIES_ANNOTATION_MENU}`}>
+          <Item
+            id="delete"
+            onClick={({ props }: ItemParams) => {
+              removeAnnotation(props.annotation.id);
+            }}
+          >
+            Delete
+          </Item>
+          <Submenu label="Set type">{annotationLabels}</Submenu>
+        </Menu>
+      </TimeSeriesStateContext>
+    </TimeSeriesActionsContext.Provider>
+  );
+};

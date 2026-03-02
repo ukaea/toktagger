@@ -15,7 +15,7 @@ import {
   TimeSeriesAnnotation,
   TimeSeriesAnnotationType,
 } from "@/types";
-import {v4 as uuidv4} from "uuid"
+import { v4 as uuidv4 } from "uuid";
 
 const colorPalette = [
   "#FF5733",
@@ -164,7 +164,9 @@ export function arrayMin(arr: number[]): number {
   return traceMin;
 }
 
-export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeSeriesAnnotation | null {
+export function convertRawAnnotationsToTimeSeries(
+  annotation: Annotation,
+): TimeSeriesAnnotation | null {
   if (TimeRegionSchema.safeParse(annotation).success) {
     const timeRegion = TimeRegionSchema.parse(annotation);
     return {
@@ -173,11 +175,11 @@ export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeS
       label: timeRegion.label,
       type: TimeSeriesAnnotationType.TIME_REGION,
       points: [
-        {x: timeRegion.time_min, y: 0},
-        {x: timeRegion.time_max, y: 0}
+        { x: timeRegion.time_min, y: 0 },
+        { x: timeRegion.time_max, y: 0 },
       ],
-      selected: false
-    }
+      selected: false,
+    };
   }
 
   if (TimePointSchema.safeParse(annotation).success) {
@@ -187,18 +189,20 @@ export function convertRawAnnotationsToTimeSeries(annotation: Annotation): TimeS
       created_by: timePoint.created_by,
       label: timePoint.label,
       type: TimeSeriesAnnotationType.TIME_POINT,
-      points: [
-        {x: timePoint.time, y: 0},
-      ],
-      selected: false
-    }
+      points: [{ x: timePoint.time, y: 0 }],
+      selected: false,
+    };
   }
 
-  console.warn(`The following annotation could not be parsed into a time series annotation:\n ${annotation}`);
+  console.warn(
+    `The following annotation could not be parsed into a time series annotation:\n ${annotation}`,
+  );
   return null;
 }
 
-export function convertTimeSeriesToRawAnnotations(annotation: TimeSeriesAnnotation): Annotation | null {
+export function convertTimeSeriesToRawAnnotations(
+  annotation: TimeSeriesAnnotation,
+): Annotation | null {
   if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
     const timePoint: TimePoint = {
       project_id: null,
@@ -210,9 +214,9 @@ export function convertTimeSeriesToRawAnnotations(annotation: TimeSeriesAnnotati
       type: "time_point",
       time: annotation.points[0].x,
       label: annotation.label,
-      timestamp: null
+      timestamp: null,
     };
-    return timePoint
+    return timePoint;
   }
 
   if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
@@ -227,11 +231,13 @@ export function convertTimeSeriesToRawAnnotations(annotation: TimeSeriesAnnotati
       time_min: annotation.points[0].x,
       time_max: annotation.points[1].x,
       label: annotation.label,
-      timestamp: null
+      timestamp: null,
     };
-    return timePoint
+    return timePoint;
   }
 
-  console.warn(`The following annotation could not be parsed into a raw annotation:\n ${annotation}`);
+  console.warn(
+    `The following annotation could not be parsed into a raw annotation:\n ${annotation}`,
+  );
   return null;
 }

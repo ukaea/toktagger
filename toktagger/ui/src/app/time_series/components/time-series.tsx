@@ -15,7 +15,7 @@ import {
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
-import {TimeSeriesProvider} from "@/app/contexts/TimeSeriesContext"
+import { TimeSeriesProvider } from "@/app/contexts/TimeSeriesContext";
 import { TimeRegion } from "@/app/components/tools/timeRegion";
 import "react-contexify/ReactContexify.css";
 
