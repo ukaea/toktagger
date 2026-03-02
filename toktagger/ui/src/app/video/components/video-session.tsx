@@ -645,13 +645,7 @@ export function VideoSessionProvider(props: {
     return () => {
       if (rafId != null) cancelAnimationFrame(rafId);
     };
-  }, [
-    api,
-    desiredOverlay,
-    imageNatural?.h,
-    imageNatural?.w,
-    tryFocusPending,
-  ]);
+  }, [api, desiredOverlay, imageNatural?.h, imageNatural?.w, tryFocusPending]);
 
   /**
    * Event wiring:
