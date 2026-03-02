@@ -174,3 +174,6 @@ data/test/mock_disruptions
 node_modules
 package-lock.json
 package.json
+
+data/jet_images/
+toktagger/ui/.vite/
