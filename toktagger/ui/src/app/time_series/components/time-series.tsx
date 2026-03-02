@@ -14,10 +14,8 @@ import {
 } from "@/types";
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { TimeSeries } from "@/app/components/plots/time-series";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
 import {TimeSeriesProvider} from "@/app/contexts/TimeSeriesContext"
-import { Zones } from "@/app/components/tools/zones";
 import { TimeRegion } from "@/app/components/tools/timeRegion";
 import "react-contexify/ReactContexify.css";
 
