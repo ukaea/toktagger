@@ -84,7 +84,7 @@ function compareProfiles(
 
 export function VideoToolbox() {
   const session = useVideoSession();
-  const { annotationLabels } = useSample();
+  const { annotationLabels, dataParams, setDataParams } = useSample();
   const labels = annotationLabels;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
@@ -119,6 +119,7 @@ export function VideoToolbox() {
       class_id: classIdByName.get(inst.className) ?? inst.classId ?? -1,
       class_name: inst.className,
       track_id: canonicalizeTrackId(inst.trackId),
+      first_frame: inst.frames[0] ?? null,
     }));
 
     arr.sort((a, b) => compareProfiles(a, b));
@@ -166,13 +167,55 @@ export function VideoToolbox() {
     const hit = profiles.find((p) => p.key === key);
     if (!hit) return;
 
+    if (selectedKey === key) {
+      session.setSelection({
+        className: hit.class_name,
+        trackId: null,
+        source: "explicit",
+      });
+      session.closePopup();
+      saveLastClassName(hit.class_name);
+      return;
+    }
+
     session.setSelection({
       className: hit.class_name,
       trackId: hit.track_id,
       source: "explicit",
     });
+    session.requestFocusInstance(hit.class_name, hit.track_id, {
+      onlyIfOnCurrentFrame: true,
+    });
 
     saveLastClassName(hit.class_name);
+  };
+
+  const onActivateProfile = (profile: {
+    class_name?: string;
+    track_id?: string;
+    first_frame?: number | null;
+  }) => {
+    const cls = (profile.class_name || "").trim();
+    const tid = canonicalizeTrackId(profile.track_id || "");
+    if (!cls || !tid) return;
+
+    session.setSelection({
+      className: cls,
+      trackId: tid,
+      source: "explicit",
+    });
+    saveLastClassName(cls);
+
+    const firstFrame = profile.first_frame;
+    if (typeof firstFrame === "number" && Number.isFinite(firstFrame)) {
+      setDataParams({
+        ...dataParams,
+        name: "image",
+        frame: Math.max(0, Math.trunc(firstFrame)),
+      });
+    }
+
+    session.requestFocusInstance(cls, tid);
   };
 
   const onRequestBulkDelete = (profile: {
@@ -244,6 +287,7 @@ export function VideoToolbox() {
             profiles={profiles}
             selectedKey={selectedKey}
             onSelect={onSelectInstance}
+            onActivate={onActivateProfile}
             onCreateProfile={() => {
               // Instances are derived from annotations; creation happens via drawing.
             }}

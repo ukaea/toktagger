@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Item, Text, Picker } from "@adobe/react-spectrum";
+import StepBackward from "@spectrum-icons/workflow/StepBackward";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -52,6 +53,7 @@ export type Profile = {
   class_id: number;
   class_name: string;
   track_id: string;
+  first_frame?: number | null;
 };
 
 /**
@@ -64,6 +66,7 @@ export function InstancePanel({
   profiles,
   selectedKey,
   onSelect,
+  onActivate,
   onCreateProfile,
   onRequestBulkDelete,
   onRequestDeleteAllInstances,
@@ -75,6 +78,7 @@ export function InstancePanel({
   profiles: Profile[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
+  onActivate?: (profile: Profile) => void;
   onCreateProfile: (className: string, trackId: string) => void;
   onRequestBulkDelete: (profile: Profile) => void;
   onRequestDeleteAllInstances: () => void;
@@ -198,11 +202,16 @@ export function InstancePanel({
 
         {profiles.map((p) => {
           const count = profileCounts?.[p.key] ?? 0;
+          const canActivate = Boolean(
+            onActivate && typeof p.first_frame === "number",
+          );
 
           return (
             <button
               key={p.key}
+              type="button"
               onClick={() => onSelect(p.key)}
+              onDoubleClick={() => onActivate?.(p)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 onRequestBulkDelete(p);
@@ -212,11 +221,11 @@ export function InstancePanel({
                   ? "bg-gray-900 border-gray-600 ring-1 ring-orange-400/60"
                   : "bg-black hover:bg-gray-900 border-gray-800"
               } text-white`}
-              title={`Select: ${p.class_name} (${p.track_id}). Right-click to bulk delete this instance.`}
+              title={`Select: ${p.class_name} (${p.track_id}). Use the rewind button to jump to first frame. Right-click to bulk delete.`}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-white">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-white truncate">
                     #{p.track_id}
                   </div>
                   <div className="text-[11px] text-gray-300 mt-0">
@@ -224,12 +233,74 @@ export function InstancePanel({
                   </div>
                 </div>
 
-                <span
-                  className="ml-2 shrink-0 inline-block text-[10px] px-1.5 py-0.5 rounded-full border border-gray-700 bg-gray-900 text-gray-200"
-                  title="Total annotations for this instance across all frames"
-                >
-                  {count}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className="inline-block text-[10px] px-1.5 py-0.5 rounded-full border border-gray-700 bg-gray-900 text-gray-200"
+                    title="Total annotations for this instance across all frames"
+                  >
+                    {count}
+                  </span>
+
+                  <div className="w-14 flex flex-col items-stretch gap-1 shrink-0">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRequestBulkDelete(p);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onRequestBulkDelete(p);
+                        }
+                      }}
+                      className="w-full rounded-md px-2 py-1 text-[10px] border border-red-400/60 text-red-200 hover:bg-red-500/15 cursor-pointer select-none text-center"
+                      title="Delete this instance across all frames"
+                      aria-label={`Delete ${p.class_name} ${p.track_id}`}
+                    >
+                      Delete
+                    </span>
+
+                    <span
+                      role="button"
+                      tabIndex={canActivate ? 0 : -1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!canActivate) return;
+                        onActivate?.(p);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!canActivate) return;
+                          onActivate?.(p);
+                        }
+                      }}
+                      className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${
+                        canActivate
+                          ? "border-gray-400/60 text-gray-100 hover:bg-gray-500/15 cursor-pointer"
+                          : "border-gray-800 text-white/30 cursor-not-allowed"
+                      }`}
+                      title={
+                        canActivate
+                          ? "Jump to the first frame where this instance appears"
+                          : "No known first frame for this instance"
+                      }
+                      aria-label={
+                        canActivate
+                          ? `Jump to first frame for ${p.class_name} ${p.track_id}`
+                          : `No first frame available for ${p.class_name} ${p.track_id}`
+                      }
+                    >
+                      <StepBackward aria-hidden="true" size="XS" />
+                    </span>
+                  </div>
+                </div>
               </div>
             </button>
           );
