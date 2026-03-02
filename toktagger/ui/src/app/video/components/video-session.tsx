@@ -83,7 +83,7 @@ type VideoSessionCtx = {
   requestFocusInstance: (
     className: string,
     trackId: string,
-    opts?: { onlyIfOnCurrentFrame?: boolean },
+    opts?: { onlyIfOnCurrentFrame?: boolean; targetFrame?: FrameIndex },
   ) => void;
 
   // frame ops
@@ -129,6 +129,7 @@ type FocusRequest = {
   className: string;
   trackId: string;
   onlyIfOnCurrentFrame: boolean;
+  targetFrame: FrameIndex | null;
 };
 
 type AnnotatorWithSetSelected = Annotator<ImageAnnotation, ImageAnnotation> & {
@@ -563,6 +564,9 @@ export function VideoSessionProvider(props: {
 
       const pending = pendingFocusRef.current;
       if (!pending) return false;
+      if (pending.targetFrame != null && frame !== pending.targetFrame) {
+        return false;
+      }
 
       const raw = rawOverride ?? api.getAnnotations();
       const hit = raw.find((annotation) => {
@@ -576,6 +580,13 @@ export function VideoSessionProvider(props: {
       if (!hit?.id) {
         if (
           pending.onlyIfOnCurrentFrame &&
+          !overlayHasInstance(desiredOverlay, pending)
+        ) {
+          pendingFocusRef.current = null;
+        }
+        if (
+          pending.targetFrame != null &&
+          frame === pending.targetFrame &&
           !overlayHasInstance(desiredOverlay, pending)
         ) {
           pendingFocusRef.current = null;
@@ -595,7 +606,7 @@ export function VideoSessionProvider(props: {
     (
       className: string,
       trackId: string,
-      opts?: { onlyIfOnCurrentFrame?: boolean },
+      opts?: { onlyIfOnCurrentFrame?: boolean; targetFrame?: FrameIndex },
     ) => {
       const cls = (className || "").trim();
       const tid = canonicalizeTrackId(trackId || "");
@@ -609,6 +620,11 @@ export function VideoSessionProvider(props: {
         className: cls,
         trackId: tid,
         onlyIfOnCurrentFrame: Boolean(opts?.onlyIfOnCurrentFrame),
+        targetFrame:
+          typeof opts?.targetFrame === "number" &&
+          Number.isFinite(opts.targetFrame)
+            ? opts.targetFrame
+            : null,
       };
       setFocusNonce((n) => n + 1);
     },
@@ -657,7 +673,12 @@ export function VideoSessionProvider(props: {
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
-        if (!isProgrammaticAnnoSyncRef.current) commitFromAnnotorious();
+        if (!isProgrammaticAnnoSyncRef.current) {
+          commitFromAnnotorious();
+          setSelectionState((prev) =>
+            prev.trackId ? { ...prev, trackId: null } : prev,
+          );
+        }
       }
     };
 
