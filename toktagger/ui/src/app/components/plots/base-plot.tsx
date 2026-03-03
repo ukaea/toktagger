@@ -284,8 +284,6 @@ export const BaseTimeSeriesPlot = ({
   }, [isDrawing, plotId, plotReady]);
 
   useEffect(() => {
-    if (!editMode) return;
-
     if (!plotReady) {
       // Plot may not have loaded yet - this will rerun after loading
       return;
@@ -338,6 +336,10 @@ export const BaseTimeSeriesPlot = ({
       return;
     }
 
+    const handleContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    }
+
     const startAnnotationCreation = (event: MouseEvent) => {
       if (activeAnnotationTool && event.ctrlKey) {
         setOngoingAction(true);
@@ -370,6 +372,12 @@ export const BaseTimeSeriesPlot = ({
     };
 
     draggableElements.forEach((element) => {
+      element.addEventListener("contextmenu", handleContextMenu);
+    });
+
+    if (!editMode) return;
+
+    draggableElements.forEach((element) => {
       element.addEventListener("mousedown", startAnnotationCreation);
       element.addEventListener("mousemove", updateAnnotation);
       element.addEventListener("mouseup", finishAnnotationCreation);
@@ -377,21 +385,13 @@ export const BaseTimeSeriesPlot = ({
 
     return () => {
       draggableElements.forEach((element) => {
+        element.removeEventListener("contextmenu", handleContextMenu);
         element.removeEventListener("mousedown", startAnnotationCreation);
         element.removeEventListener("mousemove", updateAnnotation);
         element.removeEventListener("mouseup", finishAnnotationCreation);
       });
     };
-  }, [
-    activeAnnotationTool,
-    addAnnotation,
-    createAnnotation,
-    editMode,
-    plotId,
-    plotReady,
-    setOngoingAction,
-    toolingCallbacks,
-  ]);
+  }, [activeAnnotationTool, addAnnotation, createAnnotation, editMode, plotId, plotReady, setOngoingAction, toolingCallbacks]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">
