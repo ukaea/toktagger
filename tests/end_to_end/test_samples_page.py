@@ -576,6 +576,65 @@ def test_create_samples_image_data(server_setup, page: Page, file_type: str):
         expect(page.get_by_role("row").nth(1)).to_contain_text("104000")
 
 
+def test_clear_samples(server_setup, page: Page):
+    # Create a project
+    project_id = create_project("Test Project", "time-series", "tabular")
+    # And samples
+    create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    # Navigate to samples page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Press clear samples button
+    page.get_by_role("button", name="Clear Samples").click()
+
+    # Check warning modal opens
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    expect(
+        modal.get_by_role("heading", name="Confirm Clear All Samples")
+    ).to_be_visible()
+
+    expect(
+        modal.get_by_text(
+            "Are you sure you want to delete all samples in this project? You will lose all annotations associated with the samples as well. This action cannot be undone."
+        )
+    ).to_be_visible()
+
+    expect(modal.get_by_role("button", name="Cancel")).to_be_visible()
+    expect(modal.get_by_role("button", name="Clear All")).to_be_visible()
+
+    # Press cancel, check samples still exist
+    modal.get_by_role("button", name="Cancel").click()
+
+    expect(page.get_by_role("row").nth(1)).to_contain_text("10000")
+    expect(page.get_by_role("row").nth(2)).to_contain_text("10001")
+
+    response = requests.get(f"http://localhost:8002/projects/{project_id}/samples")
+    samples = response.json()
+    assert len(samples) == 2
+
+    # Press clear samples
+    page.get_by_role("button", name="Clear Samples").click()
+
+    # Check warning modal opens
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+
+    # Press clear, check samples still exist
+    modal.get_by_role("button", name="Clear All").click()
+
+    expect(page.get_by_role("row").nth(1)).to_be_hidden()
+
+    response = requests.get(f"http://localhost:8002/projects/{project_id}/samples")
+    samples = response.json()
+    assert len(samples) == 0
+
+
 @pytest.mark.parametrize("sample_id", (True, False))
 def test_samples_page_import_annotations(sample_id: bool, server_setup, page: Page):
     # Create a project
