@@ -1,6 +1,7 @@
 import type { ImageAnnotation } from "@annotorious/react";
 import {
   getLabelTrack,
+  isPolygonAnno,
   readPolygonGeometry,
   readRectGeometry,
   VideoImageAnnotation,
@@ -107,6 +108,102 @@ function withRectGeometry(
   };
 }
 
+function clampPoint(
+  point: [number, number],
+  nw: number,
+  nh: number,
+): [number, number] {
+  const [x, y] = point;
+  return [Math.max(0, Math.min(nw, x)), Math.max(0, Math.min(nh, y))];
+}
+
+function samePoint(a: [number, number], b: [number, number]): boolean {
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+function polygonArea(points: [number, number][]): number {
+  let area = 0;
+
+  for (let i = 0; i < points.length; i += 1) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    area += x1 * y2 - x2 * y1;
+  }
+
+  return Math.abs(area) / 2;
+}
+
+function clampPolygonToImage(
+  points: [number, number][],
+  nw: number,
+  nh: number,
+): [number, number][] | null {
+  const clamped = points.map((point) => clampPoint(point, nw, nh));
+  const deduped: [number, number][] = [];
+
+  for (const point of clamped) {
+    if (
+      deduped.length === 0 ||
+      !samePoint(deduped[deduped.length - 1], point)
+    ) {
+      deduped.push(point);
+    }
+  }
+
+  if (
+    deduped.length > 1 &&
+    samePoint(deduped[0], deduped[deduped.length - 1])
+  ) {
+    deduped.pop();
+  }
+
+  const unique = new Set(deduped.map(([x, y]) => `${x},${y}`));
+  if (unique.size < 3) return null;
+  if (polygonArea(deduped) <= 0) return null;
+
+  return deduped;
+}
+
+function withPolygonGeometry(
+  a: ImageAnnotation,
+  points: [number, number][],
+): ImageAnnotation {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const [x, y] of points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+
+  const geom = a.target.selector.geometry as unknown;
+  const base =
+    geom && typeof geom === "object"
+      ? (geom as UnknownRecord)
+      : ({} as UnknownRecord);
+
+  const nextGeom = {
+    ...base,
+    points,
+    bounds: { minX, minY, maxX, maxY },
+  } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
+
+  return {
+    ...a,
+    target: {
+      ...a.target,
+      selector: {
+        ...a.target.selector,
+        geometry: nextGeom,
+      },
+    },
+  };
+}
+
 export function clampOverlayToNaturalImage(
   list: ImageAnnotation[],
   natural: { w: number; h: number } | null,
@@ -118,27 +215,50 @@ export function clampOverlayToNaturalImage(
 
   for (const a of list) {
     const g = readRectGeometry(a);
-    if (!g) {
+    if (g) {
+      const clamped = clampRectToImage(g, natural.w, natural.h);
+      if (!clamped) {
+        changed = true;
+        continue;
+      }
+
+      const same =
+        clamped.x === g.x &&
+        clamped.y === g.y &&
+        clamped.w === g.w &&
+        clamped.h === g.h;
+
+      if (same) out.push(a);
+      else {
+        changed = true;
+        out.push(withRectGeometry(a, clamped));
+      }
+      continue;
+    }
+
+    const polygon = readPolygonGeometry(a);
+    if (!polygon || !isPolygonAnno(a)) {
       out.push(a);
       continue;
     }
 
-    const clamped = clampRectToImage(g, natural.w, natural.h);
+    const clamped = clampPolygonToImage(polygon.points, natural.w, natural.h);
     if (!clamped) {
       changed = true;
       continue;
     }
 
     const same =
-      clamped.x === g.x &&
-      clamped.y === g.y &&
-      clamped.w === g.w &&
-      clamped.h === g.h;
+      clamped.length === polygon.points.length &&
+      clamped.every(
+        ([x, y], index) =>
+          x === polygon.points[index]?.[0] && y === polygon.points[index]?.[1],
+      );
 
     if (same) out.push(a);
     else {
       changed = true;
-      out.push(withRectGeometry(a, clamped));
+      out.push(withPolygonGeometry(a, clamped));
     }
   }
 
