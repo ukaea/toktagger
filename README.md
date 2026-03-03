@@ -11,109 +11,43 @@ An open source, interactive annotation platform for Tokamak diagnostic data.
 [![Testing: pytest](https://img.shields.io/badge/testing-pytest-red)](https://github.com/pylint-dev/pylint-pytest)
 
 
-## Quick Start
+## What It Does
 
-You run the application locally through a simple pip install:
+TokTagger is a web-based platform for curating labeled datasets from tokamak diagnostics. It lets users browse shots, inspect signals and images, apply consistent labels, and manage annotations in one place. The Python API and React UI support local or team workflows, making it straightforward to create datasets for downstream analysis and machine-learning models.
 
+It currently supports the following features:
+
+- **Data Browsing**: Explore tokamak shots, signals, and images through an intuitive interface.
+- **Annotation Tools**: Apply consistent labels to signals and images using a customizable tagging system.
+- **ML Models**: Train and infer from ML models within the UI.
+- **Dataset Management**: Organize and manage annotations in a central repository.
+- **Extensible API**: A Python API for integrating with existing workflows and tools.
+
+
+## Installation
+
+To run the application locally:
+
+### Install via pip
+To install the package via `pip` (or similarly via `Poetry` or `uv` package managers):
 ```sh
-GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/ukaea/toktagger.git
+python -m venv .venv
+source .venv/bin/activate
+GIT_LFS_SKIP_SMUDGE=1 pip install git+ssh://git@github.com/ukaea/toktagger.git
+```
+If you intend to add custom data loaders or models to your TokTagger instance, this is the recommended route.
+
+### Install as a uv tool
+Alternatively, it can be installed as a tool using `uv`:
+```sh
+GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 git+ssh://git@github.com/ukaea/toktagger.git`
 ```
 
-Then run:
+## Quick Start
+To get started, run:
 
 ```sh
 toktagger
 ```
 
 This will start a local instance of the application running at `http://localhost:8002`.
-
-
-## Project Overview
-
-Below is a high level overview of the project structure:
-```
-.
-├── data                # Sample experimental data
-├── docs                # Documentation files
-├── scripts             # Useful development scripts
-├── tests               # Unit tests 
-├── toktagger           # Implementations of different apis/toktagger
-│   ├── api             # API: backend for pulling data, annotations, running models.
-│   └── ui              # UI: the react front end of the application
-├── README.md           # This README doc
-```
-
-## Development Setup
-
-### Installation
-
-1. Install and setup `git lfs`: https://git-lfs.com/
-2. Create a new python environment and install the dependancies
-
-```sh
-uv venv --python 3.12.6 
-source .venv/bin/activate
-uv pip install -e .
-```
-
-2. Install the UI dependencies
-
-```sh
-nvm use v22.19.0
-npm --prefix toktagger/ui install
-```
-
-3. Run the backend API service in development mode. The backend API will be accessible at `http://localhost:8002`.
-
-```sh
-API_URL=http://0.0.0.0:8002 uvicorn toktagger.api.cli:app --host 0.0.0.0 --port 8002 --reload
-```
-
-4. Run the frontend UI service in development mode. The UI will be accessible at `http://localhost:5173`
-```sh
-npm --prefix toktagger/ui run dev
-```
-
-### Development Setup with Docker
-
-Alternatively, you can run the application in development mode using docker:
-
-```sh
-docker compose --env-file .env.dev -f docker-compose.dev.yml up --build
-```
-
-This will start both the backend API and the frontend UI at the following urls:
-
-| Service URL                     | Description                |
-|---------------------------------|----------------------------|
-| `http://localhost:5173/`        | User Interface             |
-| `http://localhost:8002/`        | Backend API                |
-| `http://localhost:27017/`       | MongoDB Database           |
-| `http://localhost:8081/`        | MongoExpress Admin Panel   |
-
-The development setup runs both the frontend and backend in development mode, so any changes to the code will automatically be reflected in the running application.
-
-### Setup local test data
-Once the application is running, the following setup script can be used to automatically set up a basic model
-
-Configure git LFS and pull the model
-
-```sh
-git lfs install
-git lfs pull
-```
-
-Create some example datasets for testing.
-```sh
-python -m scripts.setup 
-```
-
-### Building the Single Page Application (SPA)
-
-The version of the application which get served to users is built using the following command:
-
-```sh
-npm --prefix toktagger/ui run build
-```
-
-This will run vite build and create a production-ready version of the application in the `toktagger/api/static` directory. This is then packaged with the application when pip installed.

@@ -215,10 +215,12 @@ export const ModelSchema = z.object({
 export type Model = z.infer<typeof ModelSchema>;
 export const DataParamsSchema = z.object({
   name: z.string(),
+  // Only used for video/image loader params.
+  frame: z.number().nullable().optional(),
 });
 export type DataParams = z.infer<typeof DataParamsSchema>;
 export const ImageDataParamsSchema = DataParamsSchema.extend({
-  frame: z.number(),
+  frame: z.number().nullable(),
 });
 export type ImageDataParams = z.infer<typeof ImageDataParamsSchema>;
 export const SamplesSummarySchema = z.object({

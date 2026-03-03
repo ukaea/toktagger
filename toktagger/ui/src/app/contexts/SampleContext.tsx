@@ -36,6 +36,8 @@ interface SampleContextType {
   dataParams: DataParams;
   viewParams: ViewParams;
   plotProps: PlotProps;
+  annotationLabels: { id: number; name: string }[];
+  videoFrameBounds: { min: number | null; max: number | null };
   isLoading: boolean;
   isValidated: boolean | null;
   error: string | null;
@@ -145,8 +147,17 @@ export function SampleProvider({
   const [isValidated, setIsValidated] = useState<boolean | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [videoFrameBounds, setVideoFrameBounds] = useState<{
+    min: number | null;
+    max: number | null;
+  }>({ min: null, max: null });
 
+  // Video: remember the last successfully loaded frame so missing frames become navigation bounds.
   const lastGoodVideoFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setVideoFrameBounds({ min: null, max: null });
+  }, [sampleId]);
 
   function extractDetail(payload: unknown): string {
     if (!payload) return "Unknown error";
@@ -167,8 +178,7 @@ export function SampleProvider({
   }
 
   function isMissingFrameError(status: number, detail: string): boolean {
-    // Your backend message example: "Could not find image on disk for this frame index"
-    // Treat 404 + that phrasing as "navigation boundary" rather than fatal.
+    // Treat 404 + common "missing frame" phrasing as "navigation boundary" rather than fatal.
     if (status === 404) return true;
     const msg = (detail || "").toLowerCase();
     return (
@@ -215,16 +225,11 @@ export function SampleProvider({
         let effectiveDataParams: DataParams = dataParams;
 
         if (projectData.task === TaskType.Video) {
-          const prev = dataParams as unknown as {
-            name?: string;
-            frame?: number | null;
-          };
-
           effectiveDataParams = {
-            ...(dataParams as Record<string, unknown>),
+            ...dataParams,
             name: "image",
-            frame: prev.frame ?? null,
-          } as DataParams;
+            frame: dataParams.frame ?? null,
+          };
         }
 
         const response = await fetch(
@@ -250,10 +255,7 @@ export function SampleProvider({
 
           // Video-only: treat missing frame as "boundary" and stay on last good frame.
           if (projectData.task === TaskType.Video) {
-            const requestedFrame = effectiveDataParams?.frame as
-              | number
-              | null
-              | undefined;
+            const requestedFrame = effectiveDataParams.frame;
 
             const lastGood = lastGoodVideoFrameRef.current;
 
@@ -267,12 +269,20 @@ export function SampleProvider({
                 timeout: 2500,
               });
 
+              setVideoFrameBounds((prev) => {
+                if (requestedFrame < lastGood) {
+                  return { ...prev, min: lastGood };
+                }
+                return { ...prev, max: lastGood };
+              });
+
               // Roll back params; do NOT set error and do NOT clear data.
               setDataParams((prev) => ({
                 ...prev,
                 name: "image",
                 frame: lastGood,
               }));
+
               setIsLoading(false);
               return;
             }
@@ -294,11 +304,15 @@ export function SampleProvider({
 
         setData(viewData);
 
-        // video: remember last good frame so we can roll back on missing-frame errors
+        // Video: remember last good frame so we can roll back on missing-frame errors.
         if (projectData.task === TaskType.Video) {
-          const frame = (viewData as unknown as { frame?: unknown }).frame;
+          const frame = (viewData as { frame?: unknown }).frame;
           if (typeof frame === "number" && Number.isFinite(frame)) {
             lastGoodVideoFrameRef.current = frame;
+            setVideoFrameBounds((prev) => ({
+              ...prev,
+              min: prev.min === null ? frame : Math.min(prev.min, frame),
+            }));
           }
         }
       } catch (err) {
@@ -311,6 +325,14 @@ export function SampleProvider({
     refreshData();
   }, [projectId, sampleId, dataParams, viewParams, plotProps]);
 
+  const annotationLabels =
+    project?.task === TaskType.Video
+      ? (project.video_bounding_box_labels || []).map((name, i) => ({
+          id: i + 1,
+          name,
+        }))
+      : [];
+
   const value: SampleContextType = {
     project,
     sample,
@@ -319,6 +341,8 @@ export function SampleProvider({
     dataParams,
     viewParams,
     plotProps,
+    annotationLabels,
+    videoFrameBounds,
     isLoading,
     isValidated,
     error,

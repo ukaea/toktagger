@@ -1,4 +1,5 @@
 "use client";
+
 import React from "react";
 import {
   Provider,
@@ -8,6 +9,7 @@ import {
   ToastContainer,
   Flex,
 } from "@adobe/react-spectrum";
+import { Annotorious } from "@annotorious/react";
 import { Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
@@ -18,7 +20,8 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import { VideoView } from "@/app/frames/components/frames";
+import { VideoViewInner } from "@/app/video/components/video-view";
+import { VideoSessionProvider } from "@/app/video/components/video-session";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
 
 type SampleDataBreadCrumbsInfo = {
@@ -48,66 +51,57 @@ const SampleDataBreadCrumbs = ({
 
 const SampleView = () => {
   const { project, isLoading, error } = useSample();
-
-  if (error) return <ErrorView message={error} />;
-
-  if (!project) return isLoading ? <LoadingView /> : null;
-
-  // Video: keep the video UI mounted while fetching the next frame.
-  if (project.task === TaskType.Video) return <VideoViewWrapperFromContext />;
-
+  if (!project) return null;
   if (isLoading) return <LoadingView />;
+  if (error) return <ErrorView message={error} />;
 
   if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
   if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
-
   return null;
 };
 
-function VideoViewWrapperFromContext() {
+function SamplePageContent(props: { projectId: string; sampleId: string }) {
   const {
     project,
     sample,
     data,
     annotations,
-    setAnnotations,
     dataParams,
     setDataParams,
+    isLoading,
+    error,
   } = useSample();
 
-  if (!project || !sample) return null;
+  const isVideo = project?.task === TaskType.Video;
 
-  // On initial load, block until we have frame data.
-  // During frame-to-frame fetches, SampleContext keeps previous data set, so VideoView stays mounted.
-  if (!data) return <LoadingView />;
+  // Early returns AFTER all hooks
+  if (error) return <ErrorView message={error} />;
 
-  return (
-    <VideoView
-      data={data}
-      annotations={annotations ?? []}
-      setAnnotations={setAnnotations}
-      dataParams={dataParams}
-      setDataParams={setDataParams}
-      projectId={project._id}
-      sampleId={sample._id}
-    />
-  );
-}
-
-function SamplePageContent() {
-  const { project, sample, isLoading } = useSample();
-
-  if (!project && !isLoading) {
-    return <ErrorView message="Project not found." />;
+  if (!project) {
+    return isLoading ? (
+      <LoadingView />
+    ) : (
+      <ErrorView message="Project not found." />
+    );
   }
 
-  if (!sample && !isLoading) {
-    return <ErrorView message="Sample not found." />;
+  if (!sample) {
+    return isLoading ? (
+      <LoadingView />
+    ) : (
+      <ErrorView message="Sample not found." />
+    );
   }
 
-  if (!project || !sample) {
-    return null;
+  //  Prevent a stale render during route param transitions
+  if (sample._id !== props.sampleId) {
+    return <LoadingView />;
   }
+
+  // Hard-block on loading for all tasks.
+  if (isLoading && !data) return <LoadingView />;
+
+  if (!data) return null;
 
   return (
     <div>
@@ -117,8 +111,34 @@ function SamplePageContent() {
         <ModelTrainModal project={project} />
         <ModelPredictModal project={project} />
         <Flex>
-          <ToolBar />
-          <SampleView />
+          {isVideo ? (
+            <Annotorious>
+              <VideoSessionProvider
+                key={`${props.projectId}:${props.sampleId}`}
+                projectId={props.projectId}
+                sampleId={props.sampleId}
+                data={data}
+                dataParams={dataParams}
+                dbAnnotations={annotations ?? []}
+              >
+                <ToolBar />
+                <div className="flex-1 flex justify-center">
+                  <VideoViewInner
+                    data={data}
+                    projectId={props.projectId}
+                    sampleId={props.sampleId}
+                    dataParams={dataParams}
+                    setDataParams={setDataParams}
+                  />
+                </div>
+              </VideoSessionProvider>
+            </Annotorious>
+          ) : (
+            <>
+              <ToolBar />
+              <SampleView />
+            </>
+          )}
         </Flex>
       </Provider>
     </div>
@@ -128,14 +148,12 @@ function SamplePageContent() {
 export default function SamplePage() {
   const { project_id, sample_id } = useParams();
 
-  if (!project_id || !sample_id) {
-    return null;
-  }
+  if (!project_id || !sample_id) return null;
 
   return (
     <SampleProvider projectId={project_id} sampleId={sample_id}>
       <SampleHistoryProvider projectId={project_id}>
-        <SamplePageContent />
+        <SamplePageContent projectId={project_id} sampleId={sample_id} />
       </SampleHistoryProvider>
     </SampleProvider>
   );
