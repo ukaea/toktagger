@@ -99,7 +99,7 @@ const ProjectsTable = ({
                   <Flex direction="row" gap="size-100">
                     <ProjectConfigEditor project={item} onModify={onModify} />
                     <DialogTrigger>
-                      <Button variant="negative">
+                      <Button aria-label="Delete" variant="negative">
                         <Delete />
                       </Button>
                       {(close) => (

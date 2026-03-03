@@ -116,6 +116,63 @@ def test_single_sample(server_setup, page: Page):
     )
 
 
+def test_delete_sample(server_setup, page: Page):
+    # Create a project
+    project_id = create_project("Test Project", "time-series", "tabular")
+    # And a sample
+    create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Press delete next to 10000
+    page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
+
+    # Check warning modal opens
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    expect(modal.get_by_role("heading", name="Confirm Deletion")).to_be_visible()
+
+    expect(
+        modal.get_by_text("Are you sure you want to delete sample with shot ID 10000?")
+    ).to_be_visible()
+
+    expect(modal.get_by_role("button", name="Cancel")).to_be_visible()
+    expect(modal.get_by_role("button", name="Delete")).to_be_visible()
+
+    # Press cancel, check samples still exist
+    modal.get_by_role("button", name="Cancel").click()
+
+    expect(page.get_by_role("row").nth(1)).to_contain_text("10000")
+    expect(page.get_by_role("row").nth(2)).to_contain_text("10001")
+
+    # Press delete next to 10000 again
+    page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
+
+    # Check warning modal opens, press delete
+    modal = page.get_by_role("dialog")
+    modal.get_by_role("button", name="Delete").click()
+
+    # Check row 1 is now Project A, and it is the only row
+    expect(page.get_by_role("row").nth(1)).to_contain_text("10001")
+    expect(page.get_by_role("row").nth(2)).to_be_hidden()
+
+    # Now delete 10001
+    page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
+
+    # Check warning modal opens, press delete
+    modal = page.get_by_role("dialog")
+    modal.get_by_role("button", name="Delete").click()
+
+    # Check no projects remain
+    expect(page.get_by_role("row").nth(1)).to_be_hidden()
+
+
 def test_sample_page_navigation(server_setup, page: Page):
     # Create a project
     project_id = create_project("Test Project", "time-series", "uda")
@@ -601,7 +658,7 @@ def test_clear_samples(server_setup, page: Page):
 
     expect(
         modal.get_by_text(
-            "Are you sure you want to delete all samples in this project? You will lose all annotations associated with the samples as well. This action cannot be undone."
+            "Are you sure you want to delete all samples in this project?"
         )
     ).to_be_visible()
 
