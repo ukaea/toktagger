@@ -69,6 +69,16 @@ class VideoBoundingBox(BoundingBox):
     track_id: str
 
 
+class VideoPolygon(AnnotationBase):
+    type: Literal["video_polygon"] = "video_polygon"
+    frame: int
+    track_id: str
+    segmentation: list[int] = Field(
+        ...,
+        min_length=6,
+        description="COCO polygon segmentation as a flat list: [x1, y1, x2, y2, ...].",
+    )
+
 class SpectrogramMask(AnnotationBase):
     type: Literal["spectrogram_mask"] = "spectrogram_mask"
     values: list[list[float]]
@@ -115,6 +125,7 @@ TimePointOut = create_out_model(TimePoint)
 TimeRegionOut = create_out_model(TimeRegion)
 BoundingBoxOut = create_out_model(BoundingBox)
 VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
+VideoPolygonOut = create_out_model(VideoPolygon)
 SpectrogramMaskOut = create_out_model(SpectrogramMask)
 ClassLabelOut = create_out_model(ClassLabel)
 
@@ -123,13 +134,20 @@ TimePointBatch = create_batch_model(TimePoint)
 TimeRegionBatch = create_batch_model(TimeRegion)
 BoundingBoxBatch = create_batch_model(BoundingBox)
 VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
+VideoPolygonBatch = create_batch_model(VideoPolygon)
 SpectrogramMaskBatch = create_batch_model(SpectrogramMask)
 ClassLabelBatch = create_batch_model(ClassLabel)
 
 
 # Union types for annotations
 AnnotationTypes = Union[
-    TimePoint, TimeRegion, BoundingBox, VideoBoundingBox, SpectrogramMask, ClassLabel
+    TimePoint,
+    TimeRegion,
+    BoundingBox,
+    VideoBoundingBox,
+    VideoPolygon,
+    SpectrogramMask,
+    ClassLabel,
 ]
 
 AnnotationOutTypes = Union[
@@ -137,6 +155,7 @@ AnnotationOutTypes = Union[
     TimeRegionOut,
     BoundingBoxOut,
     VideoBoundingBoxOut,
+    VideoPolygonOut,
     SpectrogramMaskOut,
     ClassLabelOut,
 ]
@@ -146,6 +165,7 @@ AnnotationBatchTypes = Union[
     TimeRegionBatch,
     BoundingBoxBatch,
     VideoBoundingBoxBatch,
+    VideoPolygonBatch,
     SpectrogramMaskBatch,
     ClassLabelBatch,
 ]
