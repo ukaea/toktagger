@@ -86,6 +86,7 @@ export function VideoToolbox() {
   const session = useVideoSession();
   const { annotationLabels, dataParams, setDataParams } = useSample();
   const labels = annotationLabels;
+  const tool = session.drawingTool;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
 
@@ -256,22 +257,37 @@ export function VideoToolbox() {
   return (
     <>
       <div className="w-full">
-        {/* Frame Tools section — commented out until more shapes are added
         <div className="px-4 pb-4">
           <div className="text-gray-200 text-sm font-medium mb-2">
             Frame Tools
           </div>
-          <div className="max-w-[16rem] mx-auto mb-2">
-            <Flex gap="size-100" alignItems="center" wrap>
-              <Button variant="secondary" style="fill" isDisabled>
-                Rectangle
-              </Button>
-            </Flex>
+          <div className="mx-auto mb-2 flex w-fit max-w-[16rem] rounded-full border border-gray-200 bg-gray-100 p-1 shadow-sm dark:border-gray-800 dark:bg-gray-950/90 dark:shadow-inner">
+            <button
+              type="button"
+              onClick={() => session.setDrawingTool("rectangle")}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                tool === "rectangle"
+                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100"
+                  : "text-gray-500 hover:bg-white hover:text-gray-700 dark:text-gray-500 dark:hover:bg-gray-900 dark:hover:text-gray-200"
+              }`}
+            >
+              Rectangle
+            </button>
+            <button
+              type="button"
+              onClick={() => session.setDrawingTool("polygon")}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                tool === "polygon"
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "text-gray-500 hover:bg-white hover:text-gray-700 dark:text-gray-500 dark:hover:bg-gray-900 dark:hover:text-gray-200"
+              }`}
+            >
+              Polygon
+            </button>
           </div>
         </div>
 
         <div className="border-t border-gray-800 mx-4" />
-        */}
 
         <div className="px-4 py-4">
           <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">

@@ -1,6 +1,7 @@
 import type { ImageAnnotation } from "@annotorious/react";
 import {
   getLabelTrack,
+  readPolygonGeometry,
   readRectGeometry,
   VideoImageAnnotation,
 } from "./anno-utils";
@@ -18,17 +19,22 @@ function getTargetSource(a: ImageAnnotation): string {
 function annoSig(a: ImageAnnotation): string {
   const sel = a.target.selector;
   const source = getTargetSource(a);
-  const g = readRectGeometry(a);
+  const rect = readRectGeometry(a);
+  const poly = readPolygonGeometry(a);
   const { className, trackId } = getLabelTrack(a);
+  const polySig = poly
+    ? poly.points.map(([x, y]) => `${x},${y}`).join(";")
+    : "";
 
   return [
     a.id ?? "",
     sel?.type ?? "",
     source,
-    g?.x ?? "",
-    g?.y ?? "",
-    g?.w ?? "",
-    g?.h ?? "",
+    rect?.x ?? "",
+    rect?.y ?? "",
+    rect?.w ?? "",
+    rect?.h ?? "",
+    polySig,
     className ?? "",
     trackId ?? "",
   ].join("|");

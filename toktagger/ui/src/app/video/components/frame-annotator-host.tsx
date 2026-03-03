@@ -30,8 +30,14 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  * to the session store directly.
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
-  const { frame, setImageNatural, selection, deleteAnnotation, closePopup } =
-    useVideoSession();
+  const {
+    frame,
+    setImageNatural,
+    selection,
+    drawingTool,
+    deleteAnnotation,
+    closePopup,
+  } = useVideoSession();
 
   // --- Responsive upscale measurement state ---
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -117,7 +123,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     <div ref={containerRef} className="w-full flex justify-center">
       <div className="relative inline-block max-w-full">
         <ImageAnnotator
-          tool="rectangle"
+          tool={drawingTool}
           drawingEnabled={drawingEnabled}
           autoSave
           style={(_annotation, state) => ({

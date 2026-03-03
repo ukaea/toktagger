@@ -14,13 +14,16 @@ import { useAnnotator, type ImageAnnotation } from "@annotorious/react";
 import type { Annotator } from "@annotorious/annotorious";
 
 import type { Annotation, DataParams } from "@/types";
-import { VideoBoundingBoxSchema } from "@/types";
+import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
+  DrawingTool,
   FrameIndex,
   InstanceProfile,
   Selection,
+  VideoAnnotationShape,
   VideoBoundingBox,
+  VideoPolygon,
 } from "./types";
 import { buildSourceKey } from "./types";
 import {
@@ -37,9 +40,10 @@ import {
   uniqueReadableTrackId,
 } from "./video-utils";
 import {
-  annoToVideoBBox,
+  annoToVideoAnnotation,
   getLabelTrack,
   videoBBoxToAnno,
+  videoPolygonToAnno,
   stampLabelAndTrack,
   normalizeOverlayForSession,
 } from "./anno-utils";
@@ -73,6 +77,9 @@ type VideoSessionCtx = {
 
   /** Derived instance summary across all frames (used by sidebar UI). */
   instances: InstanceProfile[];
+
+  drawingTool: DrawingTool;
+  setDrawingTool: (tool: DrawingTool) => void;
 
   /** Natural image dimensions for the currently loaded frame (used for clamping). */
   imageNatural: { w: number; h: number } | null;
@@ -118,7 +125,7 @@ type VideoSessionCtx = {
 
   // conversion helpers for backend save
   collectAllNative: () => ImageAnnotation[];
-  collectAllVideoBBoxes: () => VideoBoundingBox[];
+  collectAllVideoAnnotations: () => VideoAnnotationShape[];
 
   // seeding from db annotations (one-shot helper)
   seedFromDbIfEmpty: (dbAnnotations: Annotation[]) => void;
@@ -222,6 +229,7 @@ export function VideoSessionProvider(props: {
     trackId: null,
     source: null,
   });
+  const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -264,6 +272,14 @@ export function VideoSessionProvider(props: {
   const setSelection = useCallback((next: Selection) => {
     setSelectionState(next);
   }, []);
+
+  const setDrawingTool = useCallback(
+    (tool: DrawingTool) => {
+      setDrawingToolState(tool);
+      api?.setSelected?.();
+    },
+    [api],
+  );
 
   const createNewInstanceForClass = useCallback((className: string) => {
     const cname = (className || "").trim();
@@ -343,13 +359,13 @@ export function VideoSessionProvider(props: {
     return out;
   }, [byFrame]);
 
-  /** Convert the session overlays into backend video bounding boxes. */
-  const collectAllVideoBBoxes = useCallback(() => {
-    const out: VideoBoundingBox[] = [];
+  /** Convert the session overlays into backend video annotation shapes. */
+  const collectAllVideoAnnotations = useCallback(() => {
+    const out: VideoAnnotationShape[] = [];
     for (const [f, list] of byFrame.entries()) {
       for (const a of list ?? []) {
-        const b = annoToVideoBBox(a, f);
-        if (b) out.push(b);
+        const shape = annoToVideoAnnotation(a, f);
+        if (shape) out.push(shape);
       }
     }
     return out;
@@ -360,7 +376,7 @@ export function VideoSessionProvider(props: {
    * This is intentionally conservative:
    * - no-op if session is dirty
    * - no-op if we already have in-memory overlays
-   * - only consumes `video_bounding_box` entries
+   * - only consumes supported video annotation entries
    */
   const seedFromDbIfEmpty = useCallback(
     (dbAnnotations: Annotation[]) => {
@@ -373,28 +389,39 @@ export function VideoSessionProvider(props: {
       let invalid = 0;
 
       for (const a of dbAnnotations) {
-        const parsed = VideoBoundingBoxSchema.safeParse(a);
+        const parsed =
+          a.type === "video_bounding_box"
+            ? VideoBoundingBoxSchema.safeParse(a)
+            : a.type === "video_polygon"
+              ? VideoPolygonSchema.safeParse(a)
+              : null;
+
+        if (!parsed) continue;
+
         if (!parsed.success) {
           invalid += 1;
           continue;
         }
 
-        const vb = parsed.data;
-        const key = buildSourceKey({ projectId, sampleId, frame: vb.frame });
-        const vbForAnno: VideoBoundingBox = {
-          ...vb,
-          timestamp: vb.timestamp ?? undefined,
-        };
-        const anno = videoBBoxToAnno(vbForAnno, key);
+        const dbAnno = parsed.data;
+        const key = buildSourceKey({
+          projectId,
+          sampleId,
+          frame: dbAnno.frame,
+        });
+        const anno =
+          dbAnno.type === "video_bounding_box"
+            ? videoBBoxToAnno(dbAnno as VideoBoundingBox, key)
+            : videoPolygonToAnno(dbAnno as VideoPolygon, key);
 
-        const cur = byF.get(vb.frame) ?? [];
+        const cur = byF.get(dbAnno.frame) ?? [];
         cur.push(anno);
-        byF.set(vb.frame, cur);
+        byF.set(dbAnno.frame, cur);
       }
 
       if (invalid > 0) {
         console.warn(
-          `[video] seedFromDbIfEmpty: skipped ${invalid} invalid annotation(s) from backend (failed VideoBoundingBoxSchema).`,
+          `[video] seedFromDbIfEmpty: skipped ${invalid} invalid video annotation(s) from backend.`,
         );
       }
 
@@ -799,6 +826,8 @@ export function VideoSessionProvider(props: {
       selection,
       setSelection,
       instances,
+      drawingTool,
+      setDrawingTool,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
@@ -814,7 +843,7 @@ export function VideoSessionProvider(props: {
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
       collectAllNative,
-      collectAllVideoBBoxes,
+      collectAllVideoAnnotations,
       seedFromDbIfEmpty,
     }),
     [
@@ -829,6 +858,8 @@ export function VideoSessionProvider(props: {
       selection,
       setSelection,
       instances,
+      drawingTool,
+      setDrawingTool,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
@@ -844,7 +875,7 @@ export function VideoSessionProvider(props: {
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
       collectAllNative,
-      collectAllVideoBBoxes,
+      collectAllVideoAnnotations,
       seedFromDbIfEmpty,
     ],
   );

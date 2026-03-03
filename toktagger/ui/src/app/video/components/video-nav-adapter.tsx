@@ -45,9 +45,10 @@ export function VideoNavAdapterBridge({
         (annotation): annotation is Annotation =>
           annotation.type === "class_label",
       );
-      const videoBoxes = session.collectAllVideoBBoxes() as Annotation[];
+      const videoAnnotations: Annotation[] =
+        session.collectAllVideoAnnotations();
 
-      return [...shotLabels, ...videoBoxes];
+      return [...shotLabels, ...videoAnnotations];
     },
     clear: () => {
       session.clearCurrentFrame();

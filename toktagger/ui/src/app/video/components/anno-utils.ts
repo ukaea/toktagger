@@ -5,7 +5,11 @@ import {
   type AnnotationBody,
   type ImageAnnotation,
 } from "@annotorious/react";
-import type { VideoBoundingBox } from "./types";
+import type {
+  VideoAnnotationShape,
+  VideoBoundingBox,
+  VideoPolygon,
+} from "./types";
 import { classIdForName } from "./types";
 
 /**
@@ -136,11 +140,31 @@ function newBodyId(): string {
   );
 }
 
+function buildVideoAnnotationBase(className: string) {
+  return {
+    project_id: null,
+    sample_id: null,
+    shot_id: null,
+    timestamp: null,
+    validated: null,
+    uncertainty: 1,
+    created_by: "manual",
+    time_min: null,
+    time_max: null,
+    label: String(className),
+  };
+}
+
 /** True if the annotation target is a rectangle selector. */
 export function isRectangleAnno(a: ImageAnnotation): boolean {
   // ShapeType.RECTANGLE is already the string literal "RECTANGLE",
   // so we don't need a separate check for the string form.
   return a.target.selector.type === ShapeType.RECTANGLE;
+}
+
+/** True if the annotation target is a polygon selector. */
+export function isPolygonAnno(a: ImageAnnotation): boolean {
+  return a.target.selector.type === ShapeType.POLYGON;
 }
 
 function isFiniteNumber(v: unknown): v is number {
@@ -153,6 +177,10 @@ type RectGeometry = {
   y: number;
   w: number;
   h: number;
+};
+
+type PolygonGeometry = {
+  points: [number, number][];
 };
 
 /** Read rectangle geometry (returns null if missing/invalid). */
@@ -186,9 +214,35 @@ export function readRectGeometry(
   return { x, y, w, h };
 }
 
+/** Read polygon geometry (returns null if missing/invalid). */
+export function readPolygonGeometry(
+  a: ImageAnnotation,
+): { points: [number, number][] } | null {
+  if (!isPolygonAnno(a)) return null;
+
+  const g = a.target.selector.geometry;
+  if (!g || typeof g !== "object") return null;
+
+  const pg = g as Partial<PolygonGeometry>;
+  const points = pg.points;
+  if (!Array.isArray(points) || points.length < 3) return null;
+
+  const out: [number, number][] = [];
+  for (const point of points) {
+    if (!Array.isArray(point) || point.length !== 2) return null;
+
+    const [x, y] = point;
+    if (!isFiniteNumber(x) || !isFiniteNumber(y)) return null;
+
+    out.push([x, y]);
+  }
+
+  return { points: out };
+}
+
 /**
  * Normalize an overlay list into a backend-safe shape:
- * - keep rectangles only
+ * - keep supported video shapes only
  * - stamp target.source with frameKey
  * - ensure class label exists (uses fallback if missing)
  * - ensure track id exists (uses fallback or allocator)
@@ -211,7 +265,7 @@ export function normalizeOverlay(
   const out: ImageAnnotation[] = [];
 
   for (const a of src) {
-    if (!isRectangleAnno(a)) continue;
+    if (!isRectangleAnno(a) && !isPolygonAnno(a)) continue;
 
     const withSource = withTargetSource(a, frameKey);
 
@@ -262,17 +316,55 @@ export function annoToVideoBBox(
   if (!className || !trackId) return null;
 
   return {
+    ...buildVideoAnnotationBase(className),
     type: "video_bounding_box",
     frame,
     track_id: String(trackId),
-    label: String(className),
     class_id: classIdForName(className),
     x_min: Math.round(g.x),
     y_min: Math.round(g.y),
     width: Math.round(g.w),
     height: Math.round(g.h),
-    created_by: "manual",
   };
+}
+
+/** Convert a normalized ImageAnnotation -> backend VideoPolygon. */
+export function annoToVideoPolygon(
+  a: ImageAnnotation,
+  frame: number,
+): VideoPolygon | null {
+  if (!isPolygonAnno(a)) return null;
+  const g = readPolygonGeometry(a);
+  if (!g) return null;
+
+  const { className, trackId } = getLabelTrack(a);
+  if (!className || !trackId) return null;
+
+  const segmentation = g.points.flatMap(([x, y]) => [
+    Math.round(x),
+    Math.round(y),
+  ]);
+
+  if (segmentation.length < 6) return null;
+
+  return {
+    ...buildVideoAnnotationBase(className),
+    type: "video_polygon",
+    frame,
+    track_id: String(trackId),
+    class_id: classIdForName(className),
+    segmentation,
+  };
+}
+
+/** Convert a normalized ImageAnnotation -> backend video annotation shape. */
+export function annoToVideoAnnotation(
+  a: ImageAnnotation,
+  frame: number,
+): VideoAnnotationShape | null {
+  if (isRectangleAnno(a)) return annoToVideoBBox(a, frame);
+  if (isPolygonAnno(a)) return annoToVideoPolygon(a, frame);
+  return null;
 }
 
 /** Convert backend VideoBoundingBox -> Annotorious rectangle annotation. */
@@ -318,9 +410,62 @@ export function videoBBoxToAnno(
   return stampLabelAndTrack(anno, b.label, String(b.track_id));
 }
 
+/** Convert backend VideoPolygon -> Annotorious polygon annotation. */
+export function videoPolygonToAnno(
+  p: VideoPolygon,
+  frameKey: string,
+): ImageAnnotation {
+  const points: [number, number][] = [];
+
+  for (let i = 0; i < p.segmentation.length - 1; i += 2) {
+    const x = Number(p.segmentation[i]);
+    const y = Number(p.segmentation[i + 1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    points.push([x, y]);
+  }
+
+  const id =
+    globalThis.crypto?.randomUUID?.() ??
+    `anno-${Math.random().toString(36).slice(2)}`;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const [x, y] of points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+
+  const geometry = {
+    points,
+    bounds: { minX, minY, maxX, maxY },
+  } as ImageAnnotation["target"]["selector"]["geometry"];
+
+  const selector = {
+    type: ShapeType.POLYGON,
+    geometry,
+  } as ImageAnnotation["target"]["selector"];
+
+  const anno: VideoImageAnnotation = {
+    id,
+    bodies: [],
+    target: {
+      annotation: id,
+      source: frameKey,
+      selector,
+    },
+  };
+
+  return stampLabelAndTrack(anno, p.label, String(p.track_id));
+}
+
 /**
  * Normalizes a raw overlay list into our session invariants:
- * - rectangles only
+ * - supported video shapes only
  * - stamps the frame source key
  * - ensures class/track bodies exist (allocating track ids when needed)
  * - optional per-instance de-duplication within the frame

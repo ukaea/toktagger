@@ -5,6 +5,8 @@ import type { ImageAnnotation } from "@annotorious/react";
 /** Frame number within a video (0-based). */
 export type FrameIndex = number;
 
+export type DrawingTool = "rectangle" | "polygon";
+
 /**
  * Stable identifier for a tracked instance in the UI/session.
  * Format: "<className>::<trackId>"
@@ -41,23 +43,43 @@ export type InstanceProfile = {
 /** In-memory annotation storage keyed by frame, using the native Annotorious model. */
 export type ByFrameMap = Map<FrameIndex, ImageAnnotation[]>;
 
+type VideoAnnotationBase = {
+  project_id: string | null;
+  sample_id: string | null;
+  shot_id: number | null;
+  timestamp: string | null;
+  validated: boolean | null;
+  uncertainty: number | null;
+  created_by: string;
+  time_min: number | null;
+  time_max: number | null;
+  label: string;
+};
+
 /**
  * Minimal backend payload for a video bounding box annotation.
  * This matches what we emit back to the server.
  */
-export type VideoBoundingBox = {
+export type VideoBoundingBox = VideoAnnotationBase & {
   type: "video_bounding_box";
   frame: number;
   track_id: string;
-  label: string;
   x_min: number;
   y_min: number;
   width: number;
   height: number;
-  created_by?: string;
-  timestamp?: string;
   class_id?: number;
 };
+
+export type VideoPolygon = VideoAnnotationBase & {
+  type: "video_polygon";
+  frame: number;
+  track_id: string;
+  segmentation: number[];
+  class_id?: number;
+};
+
+export type VideoAnnotationShape = VideoBoundingBox | VideoPolygon;
 
 /**
  * Supported label set for this UI.
