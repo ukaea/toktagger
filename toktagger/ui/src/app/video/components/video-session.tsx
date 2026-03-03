@@ -265,16 +265,13 @@ export function VideoSessionProvider(props: {
     setSelectionState(next);
   }, []);
 
-  const createNewInstanceForClass = useCallback(
-    (className: string) => {
-      const cname = (className || "").trim();
-      const trackId = allocateNextTrackId(nextTrackNumsRef.current, cname);
+  const createNewInstanceForClass = useCallback((className: string) => {
+    const cname = (className || "").trim();
+    const trackId = allocateNextTrackId(nextTrackNumsRef.current, cname);
 
-      setSelectionState({ className: cname, trackId, source: "auto" });
-      return { className: cname, trackId };
-    },
-    [],
-  );
+    setSelectionState({ className: cname, trackId, source: "auto" });
+    return { className: cname, trackId };
+  }, []);
 
   /**
    * Delete a specific (className, trackId) across all frames.
