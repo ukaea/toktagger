@@ -274,7 +274,9 @@ export function VideoToolbox() {
         */}
 
         <div className="px-4 py-4">
-          <div className="text-gray-200 text-sm font-medium mb-2">Class</div>
+          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Class
+          </div>
           <VideoClassPanel
             items={classItems}
             selectedClassName={session.selection.className}
@@ -282,10 +284,10 @@ export function VideoToolbox() {
           />
         </div>
 
-        <div className="border-t border-gray-800 mx-4" />
+        <div className="mx-4 border-t border-gray-200 dark:border-gray-800" />
 
         <div className="px-4 py-4">
-          <div className="text-gray-200 text-sm font-medium mb-2">
+          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Instances
           </div>
           <VideoInstancePanel

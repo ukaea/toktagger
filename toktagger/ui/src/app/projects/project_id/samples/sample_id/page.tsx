@@ -9,7 +9,6 @@ import {
   ToastContainer,
   Flex,
 } from "@adobe/react-spectrum";
-import { Annotorious } from "@annotorious/react";
 import { Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
@@ -20,8 +19,7 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import { VideoViewInner } from "@/app/video/components/video-view";
-import { VideoSessionProvider } from "@/app/video/components/video-session";
+import { VideoProviders, VideoView } from "@/app/video/components/video-view";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
 
 type SampleDataBreadCrumbsInfo = {
@@ -50,29 +48,28 @@ const SampleDataBreadCrumbs = ({
 };
 
 const SampleView = () => {
-  const { project, isLoading, error } = useSample();
+  const { project, error } = useSample();
   if (!project) return null;
-  if (isLoading) return <LoadingView />;
   if (error) return <ErrorView message={error} />;
 
   if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
   if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
+  if (project.task === TaskType.Video) return <VideoView />;
   return null;
 };
 
-function SamplePageContent(props: { projectId: string; sampleId: string }) {
-  const {
-    project,
-    sample,
-    data,
-    annotations,
-    dataParams,
-    setDataParams,
-    isLoading,
-    error,
-  } = useSample();
+function SampleTaskProviders({ children }: { children: React.ReactNode }) {
+  const { project } = useSample();
 
-  const isVideo = project?.task === TaskType.Video;
+  if (project?.task === TaskType.Video) {
+    return <VideoProviders>{children}</VideoProviders>;
+  }
+
+  return <>{children}</>;
+}
+
+function SamplePageContent(props: { sampleId: string }) {
+  const { project, sample, data, isLoading, error } = useSample();
 
   // Early returns AFTER all hooks
   if (error) return <ErrorView message={error} />;
@@ -111,34 +108,10 @@ function SamplePageContent(props: { projectId: string; sampleId: string }) {
         <ModelTrainModal project={project} />
         <ModelPredictModal project={project} />
         <Flex>
-          {isVideo ? (
-            <Annotorious>
-              <VideoSessionProvider
-                key={`${props.projectId}:${props.sampleId}`}
-                projectId={props.projectId}
-                sampleId={props.sampleId}
-                data={data}
-                dataParams={dataParams}
-                dbAnnotations={annotations ?? []}
-              >
-                <ToolBar />
-                <div className="flex-1 flex justify-center">
-                  <VideoViewInner
-                    data={data}
-                    projectId={props.projectId}
-                    sampleId={props.sampleId}
-                    dataParams={dataParams}
-                    setDataParams={setDataParams}
-                  />
-                </div>
-              </VideoSessionProvider>
-            </Annotorious>
-          ) : (
-            <>
-              <ToolBar />
-              <SampleView />
-            </>
-          )}
+          <SampleTaskProviders>
+            <ToolBar />
+            <SampleView />
+          </SampleTaskProviders>
         </Flex>
       </Provider>
     </div>
@@ -153,7 +126,7 @@ export default function SamplePage() {
   return (
     <SampleProvider projectId={project_id} sampleId={sample_id}>
       <SampleHistoryProvider projectId={project_id}>
-        <SamplePageContent projectId={project_id} sampleId={sample_id} />
+        <SamplePageContent sampleId={sample_id} />
       </SampleHistoryProvider>
     </SampleProvider>
   );

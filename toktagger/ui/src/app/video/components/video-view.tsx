@@ -1,12 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
+import { Annotorious } from "@annotorious/react";
 import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
-import { useVideoSession } from "@/app/video/components/video-session";
+import {
+  VideoSessionProvider,
+  useVideoSession,
+} from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 import { useSample } from "@/app/contexts/SampleContext";
+import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
+import { useParams } from "react-router-dom";
 
 /**
  * Small "jump to frame" input with validation. Delegates the actual navigation
@@ -42,21 +48,6 @@ export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
   );
 }
 
-export type VideoViewProps = {
-  data: unknown; // ImageData
-  projectId: string;
-  sampleId: string;
-
-  dataParams: DataParams;
-  setDataParams: (
-    updater: (prev: DataParams) => DataParams | DataParams,
-  ) => void;
-
-  onPrev?: () => void;
-  onNext?: () => void;
-  onJump?: (n: number) => void;
-};
-
 /**
  * Frame annotator UI wrapper:
  * - Renders the frame navigation (prev/next + jump)
@@ -69,10 +60,6 @@ export type VideoViewProps = {
 function VideoFrameAnnotator(props: {
   imageBase64: string;
   goToFrame: (n: number) => void;
-
-  onPrev?: () => void;
-  onNext?: () => void;
-  onJump?: (n: number) => void;
 }) {
   const session = useVideoSession();
   const { videoFrameBounds } = useSample();
@@ -85,7 +72,6 @@ function VideoFrameAnnotator(props: {
   const handlePrev = () => {
     if (prevDisabled) return;
     const prev = Math.max(0, session.frame - 1);
-    props.onPrev?.();
     props.goToFrame(prev);
   };
 
@@ -97,13 +83,11 @@ function VideoFrameAnnotator(props: {
     // This is purely in-session state; image loading is driven by goToFrame().
     session.forwardPropToNextIfEmpty(next);
 
-    props.onNext?.();
     props.goToFrame(next);
   };
 
   const handleJump = (n: number) => {
     const target = Math.max(0, Math.trunc(n));
-    props.onJump?.(target);
     props.goToFrame(target);
   };
 
@@ -146,12 +130,40 @@ function VideoFrameAnnotator(props: {
   );
 }
 
+export function VideoProviders({ children }: { children: React.ReactNode }) {
+  const { project_id, sample_id } = useParams();
+  const { data, annotations, dataParams } = useSample();
+
+  if (!project_id || !sample_id || !data) {
+    return <>{children}</>;
+  }
+
+  return (
+    <Annotorious>
+      <VideoSessionProvider
+        key={`${project_id}:${sample_id}`}
+        projectId={project_id}
+        sampleId={sample_id}
+        data={data}
+        dataParams={dataParams}
+        dbAnnotations={annotations ?? []}
+      >
+        <VideoNavAdapterBridge>{children}</VideoNavAdapterBridge>
+      </VideoSessionProvider>
+    </Annotorious>
+  );
+}
+
 /**
- * Render the image view and wire "go to frame" to the host page via dataParams.
+ * Render the image view and wire "go to frame" through SampleContext.
  * This component assumes it is already inside a VideoSessionProvider.
  */
-export function VideoViewInner(props: VideoViewProps) {
-  const parsed = ImageDataSchema.safeParse(props.data);
+export function VideoView() {
+  const { data, setDataParams } = useSample();
+
+  if (!data) return null;
+
+  const parsed = ImageDataSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error("Invalid data for UFO view (expected ImageData)");
   }
@@ -167,7 +179,7 @@ export function VideoViewInner(props: VideoViewProps) {
     if (!Number.isFinite(n)) return;
     const target = Math.max(0, Math.trunc(n));
 
-    props.setDataParams(
+    setDataParams(
       (prev) =>
         ({
           ...(prev as Record<string, unknown>),
@@ -180,13 +192,7 @@ export function VideoViewInner(props: VideoViewProps) {
   return (
     <div className="w-full flex justify-center">
       <div className="w-full max-w-5xl mx-auto px-4 py-3">
-        <VideoFrameAnnotator
-          imageBase64={imageBase64}
-          goToFrame={goToFrame}
-          onPrev={props.onPrev}
-          onNext={props.onNext}
-          onJump={props.onJump}
-        />
+        <VideoFrameAnnotator imageBase64={imageBase64} goToFrame={goToFrame} />
       </div>
     </div>
   );

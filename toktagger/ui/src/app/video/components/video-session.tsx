@@ -24,6 +24,8 @@ import type {
 } from "./types";
 import { buildSourceKey } from "./types";
 import {
+  allocateNextTrackId,
+  buildNextTrackIdState,
   deleteTrackAcrossFrames,
   canonicalizeTrackId,
   deriveInstances,
@@ -31,7 +33,6 @@ import {
   mapClearAll,
   mapClearFrame,
   mapSetFrame,
-  nextTrackIdForClass,
   existingTrackIdsForClass,
   uniqueReadableTrackId,
 } from "./video-utils";
@@ -173,6 +174,9 @@ export function VideoSessionProvider(props: {
    */
   const isProgrammaticAnnoSyncRef = useRef(false);
   const pendingFocusRef = useRef<FocusRequest | null>(null);
+  const nextTrackNumsRef = useRef<Map<string, number>>(
+    buildNextTrackIdState(props.dbAnnotations),
+  );
 
   const [imageNatural, setImageNatural] = useState<{
     w: number;
@@ -264,12 +268,12 @@ export function VideoSessionProvider(props: {
   const createNewInstanceForClass = useCallback(
     (className: string) => {
       const cname = (className || "").trim();
-      const trackId = nextTrackIdForClass(byFrame, cname, getLabelTrack);
+      const trackId = allocateNextTrackId(nextTrackNumsRef.current, cname);
 
       setSelectionState({ className: cname, trackId, source: "auto" });
       return { className: cname, trackId };
     },
-    [byFrame],
+    [],
   );
 
   /**

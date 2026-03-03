@@ -28,6 +28,10 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import { getNextSample } from "@/app/core";
 import type { SortDescriptor, SortDirection, Key } from "@react-types/shared";
+import {
+  useNavAdapterOptional,
+  type NavAdapter,
+} from "@/app/video/components/video-nav-adapter";
 
 const TOAST_TIMEOUT = 5000;
 
@@ -82,6 +86,7 @@ type ButtonInfo = {
   annotations: Annotation[];
   setIsValidated: (validated: boolean) => void;
   saveOnNavigate?: boolean;
+  navAdapter?: NavAdapter | null;
 };
 
 type NextButtonInfo = ButtonInfo & {
@@ -103,16 +108,23 @@ function NextButton({
   visitedSampleIds,
   sortDescriptor,
   saveOnNavigate,
+  navAdapter,
 }: NextButtonInfo) {
   const navigate = useNavigate();
 
   const moveNextShot = useCallback(async () => {
+    const annotationsToSave = navAdapter
+      ? navAdapter.getAnnotations()
+      : annotations;
     await saveSampleAnnotations(
       project_id,
       sample_id,
-      annotations,
+      annotationsToSave,
       saveOnNavigate,
     );
+    if (saveOnNavigate) {
+      navAdapter?.afterSave?.();
+    }
     if (saveOnNavigate) {
       setIsValidated(true);
     }
@@ -131,6 +143,7 @@ function NextButton({
     setIsValidated,
     visitedSampleIds,
     sortDescriptor,
+    navAdapter,
   ]);
 
   useEffect(() => {
@@ -188,16 +201,23 @@ function PreviousButton({
   popVisitedSampleId,
   saveOnNavigate,
   sortDescriptor,
+  navAdapter,
 }: PreviousButtonInfo) {
   const navigate = useNavigate();
 
   const movePreviousShot = useCallback(async () => {
+    const annotationsToSave = navAdapter
+      ? navAdapter.getAnnotations()
+      : annotations;
     await saveSampleAnnotations(
       project_id,
       sample_id,
-      annotations,
+      annotationsToSave,
       saveOnNavigate,
     );
+    if (saveOnNavigate) {
+      navAdapter?.afterSave?.();
+    }
     if (saveOnNavigate) {
       setIsValidated(true);
     }
@@ -220,6 +240,7 @@ function PreviousButton({
     popVisitedSampleId,
     sortDescriptor,
     setIsValidated,
+    navAdapter,
   ]);
 
   useEffect(() => {
@@ -254,11 +275,21 @@ function SaveButton({
   annotations,
   setIsValidated,
   saveOnNavigate: _saveOnNavigate,
+  navAdapter,
 }: ButtonInfo) {
   const handleClick = async () => {
     try {
-      await saveSampleAnnotations(project_id, sample_id, annotations, true);
-      ToastQueue.positive(`Saved ${annotations.length} annotations!`, {
+      const annotationsToSave = navAdapter
+        ? navAdapter.getAnnotations()
+        : annotations;
+      await saveSampleAnnotations(
+        project_id,
+        sample_id,
+        annotationsToSave,
+        true,
+      );
+      navAdapter?.afterSave?.();
+      ToastQueue.positive(`Saved ${annotationsToSave.length} annotations!`, {
         timeout: TOAST_TIMEOUT,
       });
       setIsValidated(true);
@@ -282,12 +313,19 @@ function SaveButton({
 
 function ClearButton({
   setAnnotations,
+  navAdapter,
 }: {
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[],
   ) => void;
+  navAdapter?: NavAdapter | null;
 }) {
   const handleClick = () => {
+    if (navAdapter) {
+      navAdapter.clear();
+      return;
+    }
+
     setAnnotations(() => []);
   };
 
@@ -307,6 +345,8 @@ type SaveInfo = {
   annotations: Annotation[];
   sortDescriptor: SortDescriptor | null;
   saveOnNavigate?: boolean;
+  setIsValidated: (validated: boolean) => void;
+  navAdapter?: NavAdapter | null;
 };
 
 export function ShotSearch({
@@ -315,6 +355,8 @@ export function ShotSearch({
   annotations,
   sortDescriptor,
   saveOnNavigate,
+  setIsValidated,
+  navAdapter,
 }: SaveInfo) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -328,12 +370,19 @@ export function ShotSearch({
       try {
         const sample = await getShotSample(project_id, shot_id);
         if (sample !== null) {
+          const annotationsToSave = navAdapter
+            ? navAdapter.getAnnotations()
+            : annotations;
           await saveSampleAnnotations(
             project_id,
             sample_id,
-            annotations,
+            annotationsToSave,
             saveOnNavigate,
           );
+          if (saveOnNavigate) {
+            navAdapter?.afterSave?.();
+            setIsValidated(true);
+          }
           navigateToSample(project_id, sample._id, navigate, sortDescriptor);
         } else {
           setErrorMessage("Shot not found!");
@@ -362,6 +411,7 @@ type NavigationBarInfo = {
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
   const { annotations, setAnnotations, setIsValidated } = useSample();
+  const navAdapter = useNavAdapterOptional();
 
   const { visitedSampleIds, popVisitedSampleId } = useSampleHistory();
 
@@ -387,6 +437,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           sample_id={sample_id}
           annotations={annotations}
           setIsValidated={setIsValidated}
+          navAdapter={navAdapter}
         />
         <PreviousButton
           project_id={project_id}
@@ -397,6 +448,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           popVisitedSampleId={popVisitedSampleId}
           saveOnNavigate={SaveOnNavigate}
           sortDescriptor={sortDescriptor}
+          navAdapter={navAdapter}
         />
         <NextButton
           project_id={project_id}
@@ -406,8 +458,9 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           visitedSampleIds={visitedSampleIds}
           saveOnNavigate={SaveOnNavigate}
           sortDescriptor={sortDescriptor}
+          navAdapter={navAdapter}
         />
-        <ClearButton setAnnotations={setAnnotations} />
+        <ClearButton setAnnotations={setAnnotations} navAdapter={navAdapter} />
       </ButtonGroup>
       <TooltipTrigger delay={1000} placement="bottom">
         <Checkbox isSelected={SaveOnNavigate} onChange={setSaveOnNavigate}>
@@ -424,6 +477,8 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
         annotations={annotations}
         sortDescriptor={sortDescriptor}
         saveOnNavigate={SaveOnNavigate}
+        setIsValidated={setIsValidated}
+        navAdapter={navAdapter}
       />
     </Flex>
   );
