@@ -80,6 +80,8 @@ type VideoSessionCtx = {
 
   drawingTool: DrawingTool;
   setDrawingTool: (tool: DrawingTool) => void;
+  propagate: boolean;
+  setPropagate: (v: boolean) => void;
 
   /** Natural image dimensions for the currently loaded frame (used for clamping). */
   imageNatural: { w: number; h: number } | null;
@@ -230,6 +232,7 @@ export function VideoSessionProvider(props: {
     source: null,
   });
   const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
+  const [propagate, setPropagateState] = useState(true);
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -280,6 +283,10 @@ export function VideoSessionProvider(props: {
     },
     [api],
   );
+
+  const setPropagate = useCallback((v: boolean) => {
+    setPropagateState(v);
+  }, []);
 
   const createNewInstanceForClass = useCallback((className: string) => {
     const cname = (className || "").trim();
@@ -828,6 +835,8 @@ export function VideoSessionProvider(props: {
       instances,
       drawingTool,
       setDrawingTool,
+      propagate,
+      setPropagate,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
@@ -860,6 +869,8 @@ export function VideoSessionProvider(props: {
       instances,
       drawingTool,
       setDrawingTool,
+      propagate,
+      setPropagate,
       imageNatural,
       setImageNatural,
       deleteAnnotation,

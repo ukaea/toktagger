@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DialogContainer, AlertDialog } from "@adobe/react-spectrum";
+import { DialogContainer, AlertDialog, Switch } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
@@ -108,9 +108,7 @@ export function VideoToolbox() {
   useEffect(() => {
     const panel = rootRef.current?.closest<HTMLElement>("[aria-labelledby]");
     const triggerId = panel?.getAttribute("aria-labelledby");
-    const trigger = triggerId
-      ? document.getElementById(triggerId)
-      : null;
+    const trigger = triggerId ? document.getElementById(triggerId) : null;
 
     if (!(trigger instanceof HTMLButtonElement)) {
       return;
@@ -301,6 +299,14 @@ export function VideoToolbox() {
             >
               Polygon
             </button>
+          </div>
+          <div className="flex items-center justify-center">
+            <Switch
+              isSelected={session.propagate}
+              onChange={session.setPropagate}
+            >
+              Forward Propagation
+            </Switch>
           </div>
         </div>
 

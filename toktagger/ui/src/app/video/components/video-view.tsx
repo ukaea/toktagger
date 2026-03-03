@@ -81,7 +81,7 @@ function VideoFrameAnnotator(props: {
 
     // Forward-propagate current annotations into the next frame if that frame is empty.
     // This is purely in-session state; image loading is driven by goToFrame().
-    session.forwardPropToNextIfEmpty(next);
+    if (session.propagate) session.forwardPropToNextIfEmpty(next);
 
     props.goToFrame(next);
   };
