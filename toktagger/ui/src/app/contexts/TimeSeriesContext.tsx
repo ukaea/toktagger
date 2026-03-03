@@ -99,9 +99,7 @@ export const TimeSeriesProvider = ({
   const [toolingCallbacks, setToolingCallbacks] = useState<
     Map<TimeSeriesAnnotationType, ToolingCallbacks>
   >(new Map());
-  const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>(
-    { type: TimeSeriesAnnotationType.TIME_REGION, label: "Disruption" },
-  );
+  const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>(null);
   const [updateCounter, setUpdateCounter] = useState(0);
   const [syncCounter, setSyncCounter] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
