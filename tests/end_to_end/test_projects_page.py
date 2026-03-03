@@ -3,9 +3,8 @@ from playwright.sync_api import Page, expect
 import re
 from datetime import datetime
 import time
-import tempfile
-import pathlib
 from tests.endpoints import create_project
+import pytest
 
 
 def check_base_page(page):
@@ -23,9 +22,9 @@ def check_base_page(page):
     expect(page.get_by_role("columnheader", name="Task")).to_be_visible()
     expect(page.get_by_role("columnheader", name="Date Created")).to_be_visible()
     expect(page.get_by_role("columnheader", name="Loader")).to_be_visible()
-    expect(page.get_by_role("columnheader", name="Edit")).to_be_visible()
+    expect(page.get_by_role("columnheader", name="Actions")).to_be_visible()
 
-    # Expect Create button visible
+    # Expect Create, Edit, Delete buttons visible
     expect(page.get_by_role("button", name="Create")).to_be_visible()
 
     # Expect searchbar visible
@@ -38,33 +37,6 @@ def check_base_page(page):
 
     # Expect to be on page 1
     expect(page.get_by_text("Page: 1")).to_be_visible()
-
-
-def check_create_modal(page):
-    # Press create button
-    page.get_by_role("button", name="Create").click()
-
-    # Check modal has opened
-    modal = page.get_by_role("dialog")
-    expect(modal).to_be_visible()
-
-    # Check it appears as expected
-    expect(modal.get_by_role("heading", name="Create Project")).to_be_visible()
-    expect(modal.get_by_role("button", name="Create")).to_be_visible()
-    expect(modal.get_by_role("button", name="Close")).to_be_visible()
-    # Check form contains required fields
-    expect(modal.get_by_text("Project Name")).to_be_visible()
-    expect(modal.get_by_text("Data Loader")).to_be_visible()
-    expect(modal.get_by_text("Task")).to_be_visible()
-    expect(modal.get_by_text("Query Strategy")).to_be_visible()
-
-    # Fill in common info
-    modal.get_by_role("button", name="Task").click()
-    page.get_by_role("option", name="time-series").click()
-    modal.get_by_role("radio", name="Random").click()
-    modal.get_by_role("textbox", name="Project Name").fill("Test Project")
-
-    return modal
 
 
 def test_empty_projects_table(server_setup, page: Page):
@@ -295,7 +267,7 @@ def test_projects_search(server_setup, page: Page):
 def test_delete_project(server_setup, page: Page):
     # Create some projects
     create_project("Project A", "time-series", "uda")
-    create_project("Project B", "time-series", "parquet")
+    create_project("Project B", "time-series", "tabular")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -306,12 +278,44 @@ def test_delete_project(server_setup, page: Page):
     # Press delete next to project B
     page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
 
+    # Check warning modal opens
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    expect(modal.get_by_role("heading", name="Confirm Deletion")).to_be_visible()
+
+    expect(
+        modal.get_by_text("Are you sure you want to delete project Project B?")
+    ).to_be_visible()
+
+    expect(modal.get_by_role("button", name="Cancel")).to_be_visible()
+    expect(modal.get_by_role("button", name="Delete")).to_be_visible()
+
+    # Press cancel, check samples still exist
+    modal.get_by_role("button", name="Cancel").click()
+
+    # Check both projects still present
+    expect(page.get_by_role("row").nth(1)).to_contain_text("Project B")
+    expect(page.get_by_role("row").nth(2)).to_contain_text("Project A")
+
+    # Press delete next to project B
+    page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
+
+    # Check warning modal opens, click delete
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    modal.get_by_role("button", name="Delete").click()
+
     # Check row 1 is now Project A, and it is the only row
     expect(page.get_by_role("row").nth(1)).to_contain_text("Project A")
     expect(page.get_by_role("row").nth(2)).to_be_hidden()
 
     # Now delete project A
     page.get_by_role("row").nth(1).get_by_role("button", name="Delete").click()
+
+    # Check warning modal opens, click delete
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    modal.get_by_role("button", name="Delete").click()
 
     # Check no projects remain
     expect(page.get_by_role("row").nth(1)).to_be_hidden()
@@ -336,12 +340,29 @@ def test_edit_project(server_setup, page: Page):
 
     # Check edit project modal has opened
     expect(modal.get_by_role("heading", name="Edit Project")).to_be_visible()
-    expect(modal.get_by_role("button", name="Edit")).to_be_visible()
-    expect(modal.get_by_role("button", name="Close")).to_be_visible()
+    expect(modal.get_by_role("button", name="Save Changes")).to_be_visible()
+    expect(modal.get_by_role("button", name="Cancel")).to_be_visible()
 
     # Check you can edit project name and query strategy
-    expect(modal.get_by_text("Project Name")).to_be_visible()
+    expect(modal.get_by_role("textbox", name="Project Name")).to_be_visible()
     expect(modal.get_by_text("Query Strategy")).to_be_visible()
+    expect(modal.get_by_role("radio", name="Sequential")).to_be_enabled()
+
+    # Check you cannot edit project task or data loader
+    expect(modal.get_by_role("combobox", name="Task")).to_be_disabled()
+    expect(modal.get_by_role("combobox", name="Data Loader")).to_be_disabled()
+
+    # Open annotation label settings, check they are editable
+    modal.get_by_role("button", name="Annotation Label Settings").click()
+    expect(modal.get_by_role("textbox", name="Shot Labels")).to_be_editable()
+    expect(modal.get_by_role("textbox", name="Time Region Labels")).to_be_editable()
+    expect(modal.get_by_role("textbox", name="Time Point Labels")).to_be_editable()
+
+    # Open Time Range settings, check they are editable
+    modal.get_by_role("button", name="Time Range Settings").click()
+    expect(modal.get_by_role("textbox", name="Time Min (s)")).to_be_editable()
+    expect(modal.get_by_role("textbox", name="Time Max (s)")).to_be_editable()
+    expect(modal.get_by_role("textbox", name="Min Time Step (s)")).to_be_editable()
 
     # Edit the project name
     modal.get_by_role("textbox", name="Project Name").fill("Updated Project")
@@ -350,10 +371,7 @@ def test_edit_project(server_setup, page: Page):
     modal.get_by_role("radio", name="Sequential").click()
 
     # Save changes
-    modal.get_by_role("button", name="Edit").click()
-
-    # Check modal has closed
-    check_base_page(page)
+    modal.get_by_role("button", name="Save Changes").click()
 
     # Check project name updated
     expect(page.get_by_role("row").nth(1)).to_contain_text("Updated Project")
@@ -367,43 +385,148 @@ def test_edit_project(server_setup, page: Page):
     assert project["data_loader"] == "uda"
 
 
-def test_create_project_shot_data(server_setup, page: Page):
+@pytest.mark.parametrize(
+    ("task", "data_loader", "time_range_visible", "expected_annotation_label_types"),
+    [
+        (
+            "time-series",
+            "tabular",
+            True,
+            ["Shot Labels", "Time Region Labels", "Time Point Labels"],
+        ),
+        (
+            "time-series",
+            "uda",
+            True,
+            ["Shot Labels", "Time Region Labels", "Time Point Labels"],
+        ),
+        (
+            "spectrogram",
+            "sal",
+            True,
+            [
+                "Shot Labels",
+                "Time Region Labels",
+                "Time Point Labels",
+                "Bounding Box Labels",
+                "Polygon Labels",
+            ],
+        ),
+        (
+            "spectrogram",
+            "fair_mast",
+            True,
+            [
+                "Shot Labels",
+                "Time Region Labels",
+                "Time Point Labels",
+                "Bounding Box Labels",
+                "Polygon Labels",
+            ],
+        ),
+        (
+            "video",
+            "image",
+            False,
+            [
+                "Shot Labels",
+                "Video Bounding Box Labels",
+            ],
+        ),
+        (
+            "video",
+            "uda_camera",
+            False,
+            [
+                "Shot Labels",
+                "Video Bounding Box Labels",
+            ],
+        ),
+    ],
+)
+def test_create_project(
+    server_setup,
+    page: Page,
+    task: str,
+    data_loader: str,
+    time_range_visible: bool,
+    expected_annotation_label_types: list[str],
+):
+    non_expected_annotation_label_types = [
+        item
+        for item in [
+            "Shot Labels",
+            "Time Region Labels",
+            "Time Point Labels",
+            "Bounding Box Labels",
+            "Polygon Labels",
+            "Video Bounding Box Labels",
+        ]
+        if item not in expected_annotation_label_types
+    ]
     # Navigate to page
     page.goto("http://localhost:8002")
 
     # Check basic structure of page is correct
     check_base_page(page)
 
-    modal = check_create_modal(page)
+    # Press create button
+    page.get_by_role("button", name="Create").click()
 
-    # Select UDA data loader - should open ShotData form
+    # Check modal has opened
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+
+    # Check it appears as expected
+    expect(modal.get_by_role("heading", name="Create Project")).to_be_visible()
+    expect(modal.get_by_role("button", name="Create")).to_be_visible()
+    expect(modal.get_by_role("button", name="Cancel")).to_be_visible()
+
+    # Check form contains required fields
+    expect(modal.get_by_role("textbox", name="Project Name")).to_be_visible()
+    expect(modal.get_by_role("combobox", name="Data Loader")).to_be_visible()
+    expect(modal.get_by_role("combobox", name="Task")).to_be_visible()
+
+    expect(modal.get_by_role("radio", name="Sequential")).to_be_visible()
+    expect(modal.get_by_role("radio", name="Random")).to_be_visible()
+    expect(modal.get_by_role("radio", name="Uncertainty Sampling")).to_be_visible()
+
+    # Fill in common info
+    modal.get_by_role("button", name="Task").click()
+    page.get_by_role("option", name=task).click()
+
     modal.get_by_role("button", name="Data Loader").click()
-    page.get_by_role("option", name="UDA").click()
+    page.get_by_role("option", name=data_loader, exact=True).click()
 
-    # Check we can now see Shot Min, Shot Max, and UDA Signal Names
-    expect(modal.get_by_text("Shot Min", exact=True)).to_be_visible()
-    expect(modal.get_by_text("Shot Max", exact=True)).to_be_visible()
-    expect(modal.get_by_text("Signal Names")).to_be_visible()
+    modal.get_by_role("radio", name="Random").click()
+    modal.get_by_role("textbox", name="Project Name").fill("Test Project")
 
-    # Fill in these fields
-    modal.get_by_role("textbox", name="Shot Min").fill("12380")
-    modal.get_by_role("textbox", name="Shot Max").fill("12385")
+    # Check if Time Range settings appear
+    if time_range_visible:
+        expect(modal.get_by_role("button", name="Time Range Settings")).to_be_visible()
+        modal.get_by_role("button", name="Time Range Settings").click()
 
-    # Add signal name
-    modal.get_by_role("textbox", name="Signal Names").fill("ANE_DENSITY")
-    modal.get_by_role("button", name="Add").click()
-    expect(modal.get_by_text("ANE_DENSITY")).to_be_visible()
+        modal.get_by_role("textbox", name="Time Min (s)").fill("1")
+        modal.get_by_role("textbox", name="Time Max (s)").fill("5")
+        modal.get_by_role("textbox", name="Min Time Step (s)").fill("0.1")
 
-    # Check it can be removed
-    modal.get_by_role("button", name="Remove").click()
-    expect(modal.get_by_text("ANE_DENSITY")).to_be_hidden()
+        modal.get_by_role("button", name="Time Range Settings").click()
+    else:
+        expect(modal.get_by_role("button", name="Time Range Settings")).to_be_hidden()
 
-    # Add another signal name
-    modal.get_by_role("textbox", name="Signal Names").fill("ip")
-    modal.get_by_role("button", name="Add").click()
-    expect(modal.get_by_text("ip")).to_be_visible()
+    # Check correct annotation label boxes present
+    modal.get_by_role("button", name="Annotation Label Settings").click()
 
-    # Create project
+    for label_type in expected_annotation_label_types:
+        expect(
+            modal.get_by_role("textbox", name=label_type, exact=True)
+        ).to_be_visible()
+        modal.get_by_role("textbox", name=label_type).fill(label_type)
+
+    for label_type in non_expected_annotation_label_types:
+        expect(modal.get_by_role("textbox", name=label_type, exact=True)).to_be_hidden()
+
+    # Press create
     modal.get_by_role("button", name="Create").click()
 
     # Check project added to table
@@ -414,76 +537,16 @@ def test_create_project_shot_data(server_setup, page: Page):
     project = response.json()[0]
     assert project["name"] == "Test Project"
     assert project["query_strategy"] == "random"
-    assert project["task"] == "time-series"
-    assert project["data_loader"] == "uda"
+    assert project["task"] == task
+    assert project["data_loader"] == data_loader
+    if time_range_visible:
+        assert project["time_min"] == 1
+        assert project["time_max"] == 5
+        assert project["min_time_step"] == 0.1
 
-    # Check 6 samples added (12380 to 12385 inclusive)
-    response = requests.get(f"http://localhost:8002/projects/{project['_id']}/samples")
-    samples = response.json()
-    assert len(samples) == 6
-    assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
+    for label_type in expected_annotation_label_types:
+        assert project[f"{label_type.lower().replace(' ', '_')}"] == [label_type]
 
-
-def test_create_project_file_data(server_setup, page: Page):
-    # Navigate to page
-    page.goto("http://localhost:8002")
-
-    # Check basic structure of page is correct
-    check_base_page(page)
-
-    modal = check_create_modal(page)
-
-    # Create some Parquet files
-    with tempfile.TemporaryDirectory() as tempd:
-        pathlib.Path(tempd).joinpath("10000.parquet").touch()
-        pathlib.Path(tempd).joinpath("10001.parquet").touch()
-
-        # Select Local File data loader - should open FileData form
-        modal.get_by_role("button", name="Data Loader").click()
-        page.get_by_role("option", name="parquet").click()
-
-        # Check we can now see File Type, File Path, and File Columns visible
-        expect(modal.get_by_text("File Type")).to_be_visible()
-        expect(modal.get_by_text("File Path")).to_be_visible()
-        expect(modal.get_by_text("File Columns")).to_be_visible()
-
-        # Add temp dir as file path, check 2 files are found
-        modal.get_by_role("textbox", name="File Path").fill(tempd)
-        expect(modal.get_by_text("2 parquet files found.")).to_be_visible()
-
-        # Add column name
-        modal.get_by_role("textbox", name="File Columns").fill("ANE_DENSITY")
-        modal.get_by_role("button", name="Add").click()
-        expect(modal.get_by_text("ANE_DENSITY")).to_be_visible()
-
-        # Check it can be removed
-        modal.get_by_role("button", name="Remove").click()
-        expect(modal.get_by_text("ANE_DENSITY")).to_be_hidden()
-
-        # Add another column name
-        modal.get_by_role("textbox", name="File Columns").fill("ip")
-        modal.get_by_role("button", name="Add").click()
-        expect(modal.get_by_text("ip")).to_be_visible()
-
-        # Create project
-        modal.get_by_role("button", name="Create").click()
-
-        # Check project added to table
-        expect(page.get_by_role("row").nth(1)).to_contain_text("Test Project")
-
-        # Get project from API, check details are all correct
-        response = requests.get("http://localhost:8002/projects")
-        project = response.json()[0]
-        assert project["name"] == "Test Project"
-        assert project["query_strategy"] == "random"
-        assert project["task"] == "time-series"
-        assert project["data_loader"] == "parquet"
-
-        # Check 2 samples added (10000 and 10001)
-        response = requests.get(
-            f"http://localhost:8002/projects/{project['_id']}/samples"
-        )
-        samples = response.json()
-        assert len(samples) == 2
-        assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
-        assert sorted(sample["shot_id"] for sample in samples) == [10000, 10001]
+    for label_type in non_expected_annotation_label_types:
+        # These are assigned default values by the server
+        assert project[f"{label_type.lower().replace(' ', '_')}"] != [label_type]

@@ -596,41 +596,42 @@ def test_create_samples_image_data(server_setup, page: Page, file_type: str):
     check_base_page(page)
 
     # Press create button
-    page.get_by_role("button", name="Create", exact=True).click()
+    page.get_by_role("button", name="Add Samples", exact=True).click()
 
     # Check modal has opened
     modal = page.get_by_role("dialog")
     expect(modal).to_be_visible()
-    expect(modal.get_by_role("heading", name="Add Samples")).to_be_visible()
+    expect(modal.get_by_role("heading", name="Add Samples to Project")).to_be_visible()
 
     # Create some image files
     with tempfile.TemporaryDirectory() as tempd:
-        pathlib.Path(tempd).joinpath("104000").mkdir()
-        pathlib.Path(tempd).joinpath("104000", "101.png").touch()
-        pathlib.Path(tempd).joinpath("104000", "102.png").touch()
-        pathlib.Path(tempd).joinpath("104000", "101.jpeg").touch()
-        pathlib.Path(tempd).joinpath("104000", "102.jpeg").touch()
+        for shot_id in ("10000", "10001"):
+            pathlib.Path(tempd).joinpath(shot_id).mkdir()
+            pathlib.Path(tempd).joinpath(shot_id, "101.png").touch()
+            pathlib.Path(tempd).joinpath(shot_id, "102.png").touch()
+            pathlib.Path(tempd).joinpath(shot_id, "101.jpeg").touch()
+            pathlib.Path(tempd).joinpath(shot_id, "102.jpeg").touch()
 
         # Check we can see File Type, File Path, and NOT File Columns
-        expect(modal.get_by_text("File Type")).to_be_visible()
-        expect(modal.get_by_text("File Path")).to_be_visible()
-        expect(modal.get_by_text("File Columns")).to_be_hidden()
+        expect(modal.get_by_role("combobox", name="File Type")).to_be_visible()
+        expect(modal.get_by_role("textbox", name="Directory Path")).to_be_visible()
 
         # Choose the relevant file type
         modal.get_by_role("button", name="File Type").click()
         page.get_by_role("option", name=file_type).click()
 
-        # Add temp dir as file path, check 2 files are found
-        modal.get_by_role("textbox", name="File Path").fill(
-            pathlib.Path(tempd).joinpath("104000")
-        )
-        expect(modal.get_by_text(f"2 {file_type.lower()} files found.")).to_be_visible()
+        # Add temp dir as file path, check 2 directories are found
+        modal.get_by_role("textbox", name="Directory Path").fill(tempd)
+        expect(
+            modal.get_by_text("Found 2 directories with shot IDs: 10000, 10001")
+        ).to_be_visible()
 
-        # Create sample
-        modal.get_by_role("button", name="Create").click()
+        # Create samples
+        modal.get_by_role("button", name="Add Samples").click()
 
-        # Check sample added to table - currently must add one sample at a time since each one is a directory of images
-        expect(page.get_by_role("row").nth(1)).to_contain_text("104000")
+        # Check samples added to table
+        expect(page.get_by_role("row").nth(1)).to_contain_text("10000")
+        expect(page.get_by_role("row").nth(2)).to_contain_text("10001")
 
 
 def test_clear_samples(server_setup, page: Page):
