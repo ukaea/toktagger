@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DialogContainer, AlertDialog } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
@@ -87,6 +87,7 @@ export function VideoToolbox() {
   const { annotationLabels, dataParams, setDataParams } = useSample();
   const labels = annotationLabels;
   const tool = session.drawingTool;
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
 
@@ -102,6 +103,22 @@ export function VideoToolbox() {
       session.setSelection({ className: last, trackId: null, source: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const panel = rootRef.current?.closest<HTMLElement>("[aria-labelledby]");
+    const triggerId = panel?.getAttribute("aria-labelledby");
+    const trigger = triggerId
+      ? document.getElementById(triggerId)
+      : null;
+
+    if (!(trigger instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    if (trigger.getAttribute("aria-expanded") !== "true") {
+      trigger.click();
+    }
   }, []);
 
   const classItems = useMemo(() => {
@@ -256,7 +273,7 @@ export function VideoToolbox() {
 
   return (
     <>
-      <div className="w-full">
+      <div ref={rootRef} className="w-full">
         <div className="px-4 pb-4">
           <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Frame Tools
