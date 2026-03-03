@@ -17,6 +17,7 @@ markdown_extensions:
     generic: true
 nav:
   - Home: index.md
+  - Creating Projects: creating_projects.md
   - Time Series Labelling: time_series.md
   - Annotators: annotators.md
   - Data Loaders: data_loaders.md
