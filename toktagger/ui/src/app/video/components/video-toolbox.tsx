@@ -258,7 +258,7 @@ export function VideoToolbox() {
     <>
       <div className="w-full">
         <div className="px-4 pb-4">
-          <div className="text-gray-200 text-sm font-medium mb-2">
+          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Frame Tools
           </div>
           <div className="mx-auto mb-2 flex w-fit max-w-[16rem] rounded-full border border-gray-200 bg-gray-100 p-1 shadow-sm dark:border-gray-800 dark:bg-gray-950/90 dark:shadow-inner">

@@ -43,39 +43,32 @@ export type InstanceProfile = {
 /** In-memory annotation storage keyed by frame, using the native Annotorious model. */
 export type ByFrameMap = Map<FrameIndex, ImageAnnotation[]>;
 
-type VideoAnnotationBase = {
-  project_id: string | null;
-  sample_id: string | null;
-  shot_id: number | null;
-  timestamp: string | null;
-  validated: boolean | null;
-  uncertainty: number | null;
-  created_by: string;
-  time_min: number | null;
-  time_max: number | null;
-  label: string;
-};
-
 /**
  * Minimal backend payload for a video bounding box annotation.
  * This matches what we emit back to the server.
  */
-export type VideoBoundingBox = VideoAnnotationBase & {
+export type VideoBoundingBox = {
   type: "video_bounding_box";
   frame: number;
   track_id: string;
+  label: string;
   x_min: number;
   y_min: number;
   width: number;
   height: number;
+  created_by?: string;
+  timestamp?: string;
   class_id?: number;
 };
 
-export type VideoPolygon = VideoAnnotationBase & {
+export type VideoPolygon = {
   type: "video_polygon";
   frame: number;
   track_id: string;
+  label: string;
   segmentation: number[];
+  created_by?: string;
+  timestamp?: string;
   class_id?: number;
 };
 

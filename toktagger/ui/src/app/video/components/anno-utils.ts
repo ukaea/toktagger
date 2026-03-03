@@ -140,21 +140,6 @@ function newBodyId(): string {
   );
 }
 
-function buildVideoAnnotationBase(className: string) {
-  return {
-    project_id: null,
-    sample_id: null,
-    shot_id: null,
-    timestamp: null,
-    validated: null,
-    uncertainty: 1,
-    created_by: "manual",
-    time_min: null,
-    time_max: null,
-    label: String(className),
-  };
-}
-
 /** True if the annotation target is a rectangle selector. */
 export function isRectangleAnno(a: ImageAnnotation): boolean {
   // ShapeType.RECTANGLE is already the string literal "RECTANGLE",
@@ -316,15 +301,16 @@ export function annoToVideoBBox(
   if (!className || !trackId) return null;
 
   return {
-    ...buildVideoAnnotationBase(className),
     type: "video_bounding_box",
     frame,
     track_id: String(trackId),
+    label: String(className),
     class_id: classIdForName(className),
     x_min: Math.round(g.x),
     y_min: Math.round(g.y),
     width: Math.round(g.w),
     height: Math.round(g.h),
+    created_by: "manual",
   };
 }
 
@@ -348,12 +334,13 @@ export function annoToVideoPolygon(
   if (segmentation.length < 6) return null;
 
   return {
-    ...buildVideoAnnotationBase(className),
     type: "video_polygon",
     frame,
     track_id: String(trackId),
+    label: String(className),
     class_id: classIdForName(className),
     segmentation,
+    created_by: "manual",
   };
 }
 
