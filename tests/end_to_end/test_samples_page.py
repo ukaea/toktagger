@@ -14,6 +14,7 @@ import requests
 import tempfile
 import pytest
 import json
+import csv
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 
 
@@ -31,8 +32,9 @@ def check_base_page(page):
     expect(page.get_by_role("columnheader", name="Shot ID")).to_be_visible()
     expect(page.get_by_role("columnheader", name="Date Created")).to_be_visible()
 
-    # Expect Add Samples button visible
+    # Expect Add and Clear Samples button visible
     expect(page.get_by_role("button", name="Add Samples", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Clear Samples", exact=True)).to_be_visible()
 
     # Expect Model Train/Predict buttons visible
     expect(
@@ -348,7 +350,7 @@ def test_samples_jump_to_next_button(
     expect(page.get_by_label("time-series")).to_be_visible()
 
 
-def test_create_samples_shot_data(server_setup, page: Page):
+def test_create_samples_shot_data_range(server_setup, page: Page):
     # Create a project
     project_id = create_project("Test Project", "time-series", "uda")
 
@@ -359,38 +361,27 @@ def test_create_samples_shot_data(server_setup, page: Page):
     check_base_page(page)
 
     # Press create button
-    page.get_by_role("button", name="Create", exact=True).click()
+    page.get_by_role("button", name="Add Samples", exact=True).click()
 
     # Check modal has opened
     modal = page.get_by_role("dialog")
     expect(modal).to_be_visible()
-    expect(modal.get_by_role("heading", name="Add Samples")).to_be_visible()
+    expect(modal.get_by_role("heading", name="Add Samples to Project")).to_be_visible()
 
-    # Check we can now see Shot Min, Shot Max, and UDA Signal Names
+    # Check we can now see Shot Min, Shot Max, and Signal Names
     expect(modal.get_by_text("Shot Min", exact=True)).to_be_visible()
     expect(modal.get_by_text("Shot Max", exact=True)).to_be_visible()
-    expect(modal.get_by_text("Signal Names")).to_be_visible()
+    expect(modal.get_by_role("textbox", name="Signal Names")).to_be_visible()
 
     # Fill in these fields
     modal.get_by_role("textbox", name="Shot Min").fill("12380")
     modal.get_by_role("textbox", name="Shot Max").fill("12385")
 
-    # Add signal name
-    modal.get_by_role("textbox", name="Signal Names").fill("ANE_DENSITY")
-    modal.get_by_role("button", name="Add").click()
-    expect(modal.get_by_text("ANE_DENSITY")).to_be_visible()
-
-    # Check it can be removed
-    modal.get_by_role("button", name="Remove").click()
-    expect(modal.get_by_text("ANE_DENSITY")).to_be_hidden()
-
-    # Add another signal name
-    modal.get_by_role("textbox", name="Signal Names").fill("ip")
-    modal.get_by_role("button", name="Add").click()
-    expect(modal.get_by_text("ip")).to_be_visible()
+    # Add signal names
+    modal.get_by_role("textbox", name="Signal Names").fill("ip, dalpha")
 
     # Create samples
-    modal.get_by_role("button", name="Create").click()
+    modal.get_by_role("button", name="Add Samples").click()
 
     # Check samples added to table
     expect(page.get_by_role("row").nth(1)).to_contain_text("12380")
@@ -400,10 +391,83 @@ def test_create_samples_shot_data(server_setup, page: Page):
     response = requests.get(f"http://localhost:8002/projects/{project_id}/samples")
     samples = response.json()
     assert len(samples) == 6
-    assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
+    assert all(
+        sorted(sample["data"]["signal_names"]) == ["dalpha", "ip"] for sample in samples
+    )
 
 
-def test_create_samples_file_data(server_setup, page: Page):
+def test_create_samples_shot_data_file(server_setup, page: Page):
+    # Create a project
+    project_id = create_project("Test Project", "time-series", "uda")
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Press create button
+    page.get_by_role("button", name="Add Samples", exact=True).click()
+
+    # Check modal has opened
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    expect(modal.get_by_role("heading", name="Add Samples to Project")).to_be_visible()
+
+    # Select Text File option
+    modal.get_by_role("radio", name="Text File").click()
+
+    # Check we can now see Choose File button and Signal Names textbox
+    expect(modal.get_by_role("button", name="Choose File")).to_be_visible()
+    expect(modal.get_by_role("textbox", name="Signal Names")).to_be_visible()
+
+    # Create a Time Point annotation using sample ID in schema
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv") as file:
+        data = [
+            ["Shot ID", "Disruption"],
+            [12380, True],
+            [12381, False],
+            [12382, False],
+            [12383, True],
+            [12384, False],
+            [12385, False],
+        ]
+
+        # Create a csv.writer object
+        writer = csv.writer(file)
+        # Write data to the CSV file
+        writer.writerows(data)
+        file.flush()
+
+        # Import annotation
+        with page.expect_file_chooser() as fc_info:
+            page.get_by_role("button", name="Choose File").click()
+            file_chooser = fc_info.value
+            file_chooser.set_files(file.name)
+
+    # Add signal names
+    modal.get_by_role("textbox", name="Signal Names").fill("ip, dalpha")
+
+    # Create samples
+    modal.get_by_role("button", name="Add Samples").click()
+
+    # Check samples added to table
+    expect(page.get_by_role("row").nth(1)).to_contain_text("12380")
+    expect(page.get_by_role("row").nth(6)).to_contain_text("12385")
+
+    # Check 6 samples added (12380 to 12385 inclusive)
+    response = requests.get(f"http://localhost:8002/projects/{project_id}/samples")
+    samples = response.json()
+    assert len(samples) == 6
+    assert all(
+        sorted(sample["data"]["signal_names"]) == ["dalpha", "ip"] for sample in samples
+    )
+
+
+@pytest.mark.parametrize(
+    "file_type", ["CSV", "TSV", "PARQUET", "FEATHER", "JSON", "XLSX"]
+)
+def test_create_samples_file_data(server_setup, page: Page, file_type: str):
     # Create a project
     project_id = create_project("Test Project", "time-series", "tabular")
 
@@ -414,43 +478,39 @@ def test_create_samples_file_data(server_setup, page: Page):
     check_base_page(page)
 
     # Press create button
-    page.get_by_role("button", name="Create", exact=True).click()
+    page.get_by_role("button", name="Add Samples", exact=True).click()
 
     # Check modal has opened
     modal = page.get_by_role("dialog")
     expect(modal).to_be_visible()
-    expect(modal.get_by_role("heading", name="Add Samples")).to_be_visible()
+    expect(modal.get_by_role("heading", name="Add Samples to Project")).to_be_visible()
 
-    # Create some Parquet files
+    # Create some files of given type
     with tempfile.TemporaryDirectory() as tempd:
-        pathlib.Path(tempd).joinpath("10000.parquet").touch()
-        pathlib.Path(tempd).joinpath("10001.parquet").touch()
+        pathlib.Path(tempd).joinpath(f"10000.{file_type.lower()}").touch()
+        pathlib.Path(tempd).joinpath(f"10001.{file_type.lower()}").touch()
 
-        # Check we can see File Type, File Path, and File Columns visible
-        expect(modal.get_by_text("File Type")).to_be_visible()
-        expect(modal.get_by_text("File Path")).to_be_visible()
-        expect(modal.get_by_text("File Columns")).to_be_visible()
+        # Check we can see File Type, Directory Path, and Column Names input fields
+        expect(modal.get_by_role("combobox", name="File Type")).to_be_visible()
+        expect(modal.get_by_role("textbox", name="Directory Path")).to_be_visible()
+        expect(modal.get_by_role("textbox", name="Column Names")).to_be_visible()
+
+        # Select given file type in dropdown
+        modal.get_by_role("button", name="File Type").click()
+        expect(page.get_by_role("option", name=file_type, exact=True)).to_be_visible()
+        page.get_by_role("option", name=file_type, exact=True).click()
 
         # Add temp dir as file path, check 2 files are found
-        modal.get_by_role("textbox", name="File Path").fill(tempd)
-        expect(modal.get_by_text("2 parquet files found.")).to_be_visible()
+        modal.get_by_role("textbox", name="Directory Path").fill(tempd)
+        expect(
+            modal.get_by_text("Found 2 files with shot IDs: 10000, 10001")
+        ).to_be_visible()
 
-        # Add column name
-        modal.get_by_role("textbox", name="File Columns").fill("ANE_DENSITY")
-        modal.get_by_role("button", name="Add").click()
-        expect(modal.get_by_text("ANE_DENSITY")).to_be_visible()
-
-        # Check it can be removed
-        modal.get_by_role("button", name="Remove").click()
-        expect(modal.get_by_text("ANE_DENSITY")).to_be_hidden()
-
-        # Add another column name
-        modal.get_by_role("textbox", name="File Columns").fill("ip")
-        modal.get_by_role("button", name="Add").click()
-        expect(modal.get_by_text("ip")).to_be_visible()
+        # Add column names
+        modal.get_by_role("textbox", name="Column Names").fill("ip, dalpha")
 
         # Create samples
-        modal.get_by_role("button", name="Create").click()
+        modal.get_by_role("button", name="Add Samples").click()
 
         # Check sample added to table
         expect(page.get_by_role("row").nth(1)).to_contain_text("10000")
@@ -460,7 +520,10 @@ def test_create_samples_file_data(server_setup, page: Page):
         response = requests.get(f"http://localhost:8002/projects/{project_id}/samples")
         samples = response.json()
         assert len(samples) == 2
-        assert all(sample["data"]["signal_names"][0] == "ip" for sample in samples)
+        assert all(
+            sorted(sample["data"]["signal_names"]) == ["dalpha", "ip"]
+            for sample in samples
+        )
         assert sorted(sample["shot_id"] for sample in samples) == [10000, 10001]
 
 
