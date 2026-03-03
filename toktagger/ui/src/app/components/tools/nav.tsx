@@ -367,7 +367,12 @@ type NavigationBarInfo = {
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
   const { annotations, setAnnotations, setIsValidated } = useSample();
 
-  const { visitedSampleIds, popVisitedSampleId, SaveOnNavigate, setSaveOnNavigate } = useSampleHistory();
+  const {
+    visitedSampleIds,
+    popVisitedSampleId,
+    SaveOnNavigate,
+    setSaveOnNavigate,
+  } = useSampleHistory();
 
   const [searchParamsObj] = useSearchParams();
   const [sortDescriptor] = useState<SortDescriptor | null>(() => {

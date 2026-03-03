@@ -65,7 +65,7 @@ export function SampleHistoryProvider({
     visitedSampleIds,
     popVisitedSampleId,
     SaveOnNavigate,
-    setSaveOnNavigate
+    setSaveOnNavigate,
   };
 
   return (
