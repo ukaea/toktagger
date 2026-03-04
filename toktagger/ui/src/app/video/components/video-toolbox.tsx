@@ -100,7 +100,7 @@ export function VideoToolbox() {
     if (last && !session.selection.className) {
       session.setSelection({ className: last, trackId: null, source: null });
     }
-  }, []);
+  }, [session]);
 
   const classItems = useMemo(() => {
     return labels.map((c) => ({ name: c.name }));
