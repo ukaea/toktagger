@@ -124,7 +124,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             strokeWidth: state?.selected ? 3 : state?.hovered ? 3 : 2,
           })}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}
             src={`data:image/png;base64,${imageBase64}`}

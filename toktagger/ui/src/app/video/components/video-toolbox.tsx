@@ -100,7 +100,6 @@ export function VideoToolbox() {
     if (last && !session.selection.className) {
       session.setSelection({ className: last, trackId: null, source: null });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const classItems = useMemo(() => {

@@ -19,6 +19,29 @@ const eslintConfig = [
       ".next/**",
     ],
   },
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    plugins: {
+      "@typescript-eslint": (await import("@typescript-eslint/eslint-plugin"))
+        .default,
+    },
+    languageOptions: {
+      parser: (await import("@typescript-eslint/parser")).default,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+        },
+      ],
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
 ];
 
 export default eslintConfig;
