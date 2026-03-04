@@ -482,6 +482,8 @@ def test_save_on_navigate(
     # Go to next/previous sample
     page.get_by_role("button", name=f"{navigate_direction}").click()
 
+    page.wait_for_timeout(200)
+
     # Check if annotations saved
     response = requests.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"

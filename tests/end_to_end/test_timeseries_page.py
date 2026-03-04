@@ -278,8 +278,13 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     # Check time series plot rendered
     expect(page.get_by_label("time-series")).to_be_visible()
 
+    page.wait_for_timeout(500)
+
     # Add a new vspan
-    page.get_by_label("time-series").click(button="right")
+    page.get_by_label("time-series").click(button="right", force=True)
+
+    page.wait_for_timeout(500)
+
     page.get_by_role("menuitem", name="Add Time Point").click(force=True)
     page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
 
