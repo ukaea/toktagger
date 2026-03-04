@@ -599,7 +599,7 @@ export function VideoSessionProvider(props: {
       pendingFocusRef.current = null;
       return true;
     },
-    [api, desiredOverlay, overlayHasInstance, selectAnnotationById],
+    [api, desiredOverlay, frame, overlayHasInstance, selectAnnotationById],
   );
 
   const requestFocusInstance = useCallback(
