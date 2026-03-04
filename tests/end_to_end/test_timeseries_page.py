@@ -283,9 +283,13 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     # Add a new vspan
     page.get_by_label("time-series").click(button="right", force=True)
 
-    page.wait_for_timeout(500)
+    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
+    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
 
-    page.get_by_role("menuitem", name="Add Time Point").click(force=True)
+    # Choose Add Time Point
+    page.get_by_role("menuitem", name="Add Time Point").hover(force=True)
+
+    expect(page.get_by_role("menuitem", name="Disruption", exact=True)).to_be_visible()
     page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
 
     expect(page.get_by_label("vspan").first).to_be_visible()
