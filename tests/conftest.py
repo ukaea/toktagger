@@ -279,16 +279,17 @@ async def setup_model_db(setup_model_samples, db_client):
     }
 
 
+def run_server():
+    # Import to register mock model
+
+    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
+        os.environ["MODEL_STORAGE"] = tempd
+        server = Server()
+        server.run()
+
+
 @pytest.fixture(scope="package")
 def start_server(mongo_container):
-    def run_server():
-        # Import to register mock model
-
-        with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
-            os.environ["MODEL_STORAGE"] = tempd
-            server = Server()
-            server.run()
-
     os.environ["MONGO_URL"] = mongo_container
     proc = multiprocessing.Process(target=run_server)
     proc.start()
