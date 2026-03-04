@@ -30,6 +30,7 @@ dependencies = [
   "sal",
   "ruptures @ git+https://github.com/deepcharles/ruptures.git@e88da13b5f625f37321abd07c5d14b91701c6655",
   "torch",
+  "platformdirs",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
   "psutil>=7.0.0",
