@@ -1,18 +1,9 @@
 "use client";
 import {
   MultiVariateTimeSeriesData,
-  Zone,
-  DisplayAnnotation,
-  ZoneSchema,
-  TimeRegionSchema,
-  Annotation,
   TimeSeriesData,
-  VSpanSchema,
-  VSpan,
-  TimePointSchema,
   Category,
 } from "@/types";
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
 import { TimeSeriesProvider } from "@/app/contexts/TimeSeriesContext";
@@ -22,13 +13,9 @@ import "react-contexify/ReactContexify.css";
 import {
   arrayMax,
   arrayMin,
-  createAnnotationToDisplayAnnotationFunc,
   randomColor,
-  updateAnnotations,
 } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
-import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
-//import { VSpans } from "@/app/components/tools/vspans";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
@@ -36,7 +23,7 @@ import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 export const TimeSeriesView = () => {
-  const { project, data, annotations, setAnnotations } = useSample();
+  const { project, data } = useSample();
 
   const zoneCategories: Category[] = useMemo(() => {
     const timeRegionLabels = project?.time_region_labels || [];
@@ -66,40 +53,8 @@ export const TimeSeriesView = () => {
   );
 
   const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [vspans, setVSpans] = useState<VSpan[]>([]);
 
   const viewData = data as MultiVariateTimeSeriesData | null;
-
-  useEffect(() => {
-    if (!annotations || !viewData) return;
-
-    const convertAnnotationToDisplayAnnotation =
-      createAnnotationToDisplayAnnotationFunc(categoryColors);
-
-    const displayAnnotations: DisplayAnnotation[] = annotations
-      .filter((x: Annotation) => x.type !== "class_label")
-      .map(convertAnnotationToDisplayAnnotation);
-
-    const newZones: Zone[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
-
-    const newVSpans: VSpan[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
-
-    setZones(newZones);
-    setVSpans(newVSpans);
-  }, [annotations, viewData, categoryColors]);
-
-  const updateVSpans = (newVSpans: Array<VSpan>) => {
-    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
-  };
-
-  const updateZones = (newZones: Array<Zone>) => {
-    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-  };
 
   useEffect(() => {
     if (!viewData) return;
@@ -210,31 +165,19 @@ export const TimeSeriesView = () => {
       <Flex justifyContent="center" alignItems="center">
         <ContextMenuProvider menuId="time-series-menu">
           <TimeSeriesProvider>
-            <ZoneProvider
-              categories={zoneCategories}
-              initialData={zones}
-              onModifyZone={updateZones}
-            >
-              <VSpanProvider
-                categories={vspanCategories}
-                initialData={vspans}
-                onModifyVSpan={updateVSpans}
-              >
-                <Flex direction="row" flex justifyContent="space-between">
-                  <Flex direction="column" flex gap="size-200">
-                    <BaseTimeSeriesPlot
-                      plotId="TimesSeriesView"
-                      plotConfig={{ data: plotData, layout: plotLayout }}
-                    >
-                      <TimeRegion />
-                      <TimePoint />
-                    </BaseTimeSeriesPlot>
-                    <AnnotationsTable />
-                  </Flex>
-                  <AnnotationToolbar />
-                </Flex>
-              </VSpanProvider>
-            </ZoneProvider>
+            <Flex direction="row" flex justifyContent="space-between">
+              <Flex direction="column" flex gap="size-200">
+                <BaseTimeSeriesPlot
+                  plotId="TimesSeriesView"
+                  plotConfig={{ data: plotData, layout: plotLayout }}
+                >
+                  <TimeRegion />
+                  <TimePoint />
+                </BaseTimeSeriesPlot>
+                <AnnotationsTable />
+              </Flex>
+              <AnnotationToolbar />
+            </Flex>
           </TimeSeriesProvider>
         </ContextMenuProvider>
       </Flex>

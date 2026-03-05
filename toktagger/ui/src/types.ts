@@ -263,8 +263,8 @@ export enum ToolingTypes {
 }
 
 export enum TimeSeriesAnnotationType {
-  TIME_POINT = "TIME_POINT",
-  TIME_REGION = "TIME_REGION",
+  TIME_POINT = "TIME POINT",
+  TIME_REGION = "TIME REGION",
 }
 
 export type TimeSeriesToolDefinition = {
