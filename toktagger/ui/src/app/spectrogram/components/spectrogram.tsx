@@ -16,6 +16,7 @@ import { Flex, View } from "@adobe/react-spectrum";
 import { TimeSeriesProvider } from "@/app/contexts/TimeSeriesContext";
 import { TimeRegion } from "@/app/components/tools/timeRegion";
 import { TimePoint } from "@/app/components/tools/timePoint";
+import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 export const SpectrogramView = () => {
   const { project, data, annotations, plotProps } = useSample();
@@ -299,18 +300,21 @@ export const SpectrogramView = () => {
     <View width="100%">
       <Flex justifyContent="center" alignItems="center">
         <TimeSeriesProvider>
-          <BaseTimeSeriesPlot
-            plotId="SpectrogramView"
-            plotConfig={{
-              data: plotData,
-              config: plotConfig,
-              layout: plotLayout,
-            }}
-            rescaleOnZoom={false}
-          >
-            <TimeRegion />
-            <TimePoint />
-          </BaseTimeSeriesPlot>
+          <Flex direction="row" flex justifyContent="space-between">
+            <BaseTimeSeriesPlot
+              plotId="SpectrogramView"
+              plotConfig={{
+                data: plotData,
+                config: plotConfig,
+                layout: plotLayout,
+              }}
+              rescaleOnZoom={false}
+            >
+              <TimeRegion />
+              <TimePoint />
+            </BaseTimeSeriesPlot>
+            <AnnotationToolbar />
+          </Flex>
         </TimeSeriesProvider>
       </Flex>
     </View>
