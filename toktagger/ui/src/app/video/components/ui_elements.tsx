@@ -225,9 +225,6 @@ export function InstancePanel({
                   ? "border-orange-200 bg-orange-50 ring-1 ring-orange-400/40 dark:border-gray-600 dark:bg-gray-900 dark:ring-orange-400/60"
                   : "border-gray-200 bg-transparent hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
               } text-gray-900 dark:text-gray-100`}
-                  ? "bg-gray-900 border-gray-600 ring-1 ring-orange-400/60"
-                  : "bg-black hover:bg-gray-900 border-gray-800"
-              } text-white`}
               title={`Select: ${p.class_name} (${p.track_id}). Use the rewind button to jump to first frame. Right-click to bulk delete.`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -290,8 +287,8 @@ export function InstancePanel({
                       }}
                       className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${
                         canJumpToFirstFrame
-                          ? "border-gray-400/60 text-gray-100 hover:bg-gray-500/15 cursor-pointer"
-                          : "border-gray-800 text-white/30 cursor-not-allowed"
+                          ? "cursor-pointer border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-400/60 dark:text-gray-100 dark:hover:bg-gray-500/15"
+                          : "cursor-not-allowed border-gray-200 text-gray-300 dark:border-gray-800 dark:text-white/30"
                       }`}
                       title={
                         canJumpToFirstFrame
