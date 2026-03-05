@@ -59,6 +59,7 @@ export type Profile = {
 /**
  * Instance list + optional "profile creator" UI.
  * - Selecting an instance calls `onSelect`.
+ * - Jump control calls `onJumpToFirstFrame`.
  * - Right-clicking an instance calls `onRequestBulkDelete`.
  * - The creator UI is gated by `showCreator` and `classItems`.
  */
@@ -66,7 +67,7 @@ export function InstancePanel({
   profiles,
   selectedKey,
   onSelect,
-  onActivate,
+  onJumpToFirstFrame,
   onCreateProfile,
   onRequestBulkDelete,
   onRequestDeleteAllInstances,
@@ -78,7 +79,7 @@ export function InstancePanel({
   profiles: Profile[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
-  onActivate?: (profile: Profile) => void;
+  onJumpToFirstFrame?: (profile: Profile) => void;
   onCreateProfile: (className: string, trackId: string) => void;
   onRequestBulkDelete: (profile: Profile) => void;
   onRequestDeleteAllInstances: () => void;
@@ -206,8 +207,8 @@ export function InstancePanel({
 
         {profiles.map((p) => {
           const count = profileCounts?.[p.key] ?? 0;
-          const canActivate = Boolean(
-            onActivate && typeof p.first_frame === "number",
+          const canJumpToFirstFrame = Boolean(
+            onJumpToFirstFrame && p.first_frame != null,
           );
 
           return (
@@ -224,6 +225,9 @@ export function InstancePanel({
                   ? "border-orange-200 bg-orange-50 ring-1 ring-orange-400/40 dark:border-gray-600 dark:bg-gray-900 dark:ring-orange-400/60"
                   : "border-gray-200 bg-transparent hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
               } text-gray-900 dark:text-gray-100`}
+                  ? "bg-gray-900 border-gray-600 ring-1 ring-orange-400/60"
+                  : "bg-black hover:bg-gray-900 border-gray-800"
+              } text-white`}
               title={`Select: ${p.class_name} (${p.track_id}). Use the rewind button to jump to first frame. Right-click to bulk delete.`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -269,33 +273,33 @@ export function InstancePanel({
 
                     <span
                       role="button"
-                      tabIndex={canActivate ? 0 : -1}
+                      tabIndex={canJumpToFirstFrame ? 0 : -1}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!canActivate) return;
-                        onActivate?.(p);
+                        if (!canJumpToFirstFrame) return;
+                        onJumpToFirstFrame?.(p);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (!canActivate) return;
-                          onActivate?.(p);
+                          if (!canJumpToFirstFrame) return;
+                          onJumpToFirstFrame?.(p);
                         }
                       }}
                       className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${
-                        canActivate
-                          ? "cursor-pointer border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-400/60 dark:text-gray-100 dark:hover:bg-gray-500/15"
-                          : "cursor-not-allowed border-gray-200 text-gray-300 dark:border-gray-800 dark:text-white/30"
+                        canJumpToFirstFrame
+                          ? "border-gray-400/60 text-gray-100 hover:bg-gray-500/15 cursor-pointer"
+                          : "border-gray-800 text-white/30 cursor-not-allowed"
                       }`}
                       title={
-                        canActivate
+                        canJumpToFirstFrame
                           ? "Jump to the first frame where this instance appears"
                           : "No known first frame for this instance"
                       }
                       aria-label={
-                        canActivate
+                        canJumpToFirstFrame
                           ? `Jump to first frame for ${p.class_name} ${p.track_id}`
                           : `No first frame available for ${p.class_name} ${p.track_id}`
                       }
