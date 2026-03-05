@@ -3,35 +3,24 @@
 import {
   SpectrogramData,
   Category,
-  Zone,
-  TimeRegionSchema,
-  TimePointSchema,
-  DisplayAnnotation,
-  ZoneSchema,
-  VSpanSchema,
-  VSpan,
   Annotation,
   SpectrogramMaskSchema,
   SpectrogramMask,
 } from "@/types";
-import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
-import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
-import { TimeSeries } from "@/app/components/plots/time-series";
-import { Zones } from "@/app/components/tools/zones";
-import { VSpans } from "@/app/components/tools/vspans";
+import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
 import * as d3 from "d3";
 import {
-  createAnnotationToDisplayAnnotationFunc,
   randomColor,
-  updateAnnotations,
 } from "@/app/utils";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
+import { TimeSeriesProvider } from "@/app/contexts/TimeSeriesContext";
+import { TimeRegion } from "@/app/components/tools/timeRegion";
+import { TimePoint } from "@/app/components/tools/timePoint";
 
 export const SpectrogramView = () => {
-  const { project, data, annotations, setAnnotations, plotProps } = useSample();
+  const { project, data, annotations, plotProps } = useSample();
 
   const zoneCategories: Category[] = useMemo(() => {
     const timeRegionLabels = project?.time_region_labels || [];
@@ -60,29 +49,12 @@ export const SpectrogramView = () => {
     return mapping;
   }, [zoneCategories, vspanCategories]);
 
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [vspans, setVSpans] = useState<VSpan[]>([]);
   const [mask, setMask] = useState<SpectrogramMask | null>(null);
 
   const viewData: SpectrogramData | null = data as SpectrogramData | null;
 
   useEffect(() => {
     if (!annotations || !viewData) return;
-
-    const convertAnnotationToDisplayAnnotation =
-      createAnnotationToDisplayAnnotationFunc(colorMapping);
-
-    const displayAnnotations: DisplayAnnotation[] = annotations
-      .filter((x: Annotation) => x.type !== "class_label")
-      .map(convertAnnotationToDisplayAnnotation);
-
-    const newZones: Zone[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
-
-    const newVSpans: VSpan[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
 
     // Extract mask from annotations
     const maskAnnotations = annotations.filter(
@@ -93,18 +65,8 @@ export const SpectrogramView = () => {
         ? SpectrogramMaskSchema.parse(maskAnnotations[0])
         : null;
 
-    setZones(newZones);
-    setVSpans(newVSpans);
     setMask(newMask);
   }, [annotations, viewData, colorMapping]);
-
-  const updateVSpans = (newVSpans: Array<VSpan>) => {
-    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
-  };
-
-  const updateZones = (newZones: Array<Zone>) => {
-    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-  };
 
   if (!viewData) {
     return null;
@@ -338,32 +300,20 @@ export const SpectrogramView = () => {
   return (
     <View width="100%">
       <Flex justifyContent="center" alignItems="center">
-        <ContextMenuProvider menuId="spectrogram-menu">
-          <VSpanProvider
-            categories={vspanCategories}
-            initialData={vspans}
-            onModifyVSpan={updateVSpans}
+        <TimeSeriesProvider>
+          <BaseTimeSeriesPlot
+            plotId="SpectrogramView"
+            plotConfig={{
+              data: plotData,
+              config: plotConfig,
+              layout: plotLayout,
+            }}
+            rescaleOnZoom={false}
           >
-            <ZoneProvider
-              categories={zoneCategories}
-              initialData={zones}
-              onModifyZone={updateZones}
-            >
-              <TimeSeries
-                plotId="SpectrogramView"
-                plotConfig={{
-                  data: plotData,
-                  config: plotConfig,
-                  layout: plotLayout,
-                }}
-                rescaleOnZoom={false}
-              >
-                <Zones onUpdate={updateZones} />
-                <VSpans onUpdate={updateVSpans} />
-              </TimeSeries>
-            </ZoneProvider>
-          </VSpanProvider>
-        </ContextMenuProvider>
+            <TimeRegion />
+            <TimePoint />
+          </BaseTimeSeriesPlot>
+        </TimeSeriesProvider>
       </Flex>
     </View>
   );

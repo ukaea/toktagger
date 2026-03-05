@@ -42,6 +42,7 @@ type InjectedProps = {
 type TimeSeriesPlotProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
+  rescaleOnZoom?: boolean;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -50,6 +51,7 @@ type TimeSeriesPlotProps = {
 export const BaseTimeSeriesPlot = ({
   plotId: externalId,
   plotConfig: { data, layout, config = DEFAULT_PLOTLY_CONFIG },
+  rescaleOnZoom = true,
   children,
 }: TimeSeriesPlotProps) => {
   const [plotReady, setPlotReady] = useState(false);
@@ -189,19 +191,21 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-      // This makes use of the first graph displayed but this should be fine
-      // Note that the event fired by plotly is a bit strange hence the different handlers
-      if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
-        // This logic is triggered after a normal zoom/pan event
-        rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
-      } else if (
-        eventData["xaxis.range"] &&
-        eventData["xaxis.range"].length === 2
-      ) {
-        // This logic is triggered after a range bar event
-        const x0 = eventData["xaxis.range"][0] as number;
-        const x1 = eventData["xaxis.range"][1] as number;
-        rescale(x0, x1);
+      if (rescaleOnZoom) {
+        // This makes use of the first graph displayed but this should be fine
+        // Note that the event fired by plotly is a bit strange hence the different handlers
+        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+          // This logic is triggered after a normal zoom/pan event
+          rescale(eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]);
+        } else if (
+          eventData["xaxis.range"] &&
+          eventData["xaxis.range"].length === 2
+        ) {
+          // This logic is triggered after a range bar event
+          const x0 = eventData["xaxis.range"][0] as number;
+          const x1 = eventData["xaxis.range"][1] as number;
+          rescale(x0, x1);
+        }
       }
       triggerUpdate();
     };
@@ -222,7 +226,7 @@ export const BaseTimeSeriesPlot = ({
       });
       setPlotReady(false); // reset ready state
     };
-  }, [config, data, layout, plotId, triggerUpdate]);
+  }, [config, data, layout, plotId, rescaleOnZoom, triggerUpdate]);
 
   useEffect(() => {
     if (!plotReady) {
@@ -338,7 +342,7 @@ export const BaseTimeSeriesPlot = ({
 
     const handleContextMenu = (event: MouseEvent) => {
       event.preventDefault();
-    }
+    };
 
     const startAnnotationCreation = (event: MouseEvent) => {
       if (activeAnnotationTool && event.ctrlKey) {
@@ -391,7 +395,16 @@ export const BaseTimeSeriesPlot = ({
         element.removeEventListener("mouseup", finishAnnotationCreation);
       });
     };
-  }, [activeAnnotationTool, addAnnotation, createAnnotation, editMode, plotId, plotReady, setOngoingAction, toolingCallbacks]);
+  }, [
+    activeAnnotationTool,
+    addAnnotation,
+    createAnnotation,
+    editMode,
+    plotId,
+    plotReady,
+    setOngoingAction,
+    toolingCallbacks,
+  ]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">

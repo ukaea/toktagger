@@ -12,8 +12,10 @@ export const AnnotationToolbar = () => {
   const { editMode, toolingCallbacks, categories, activeAnnotationTool } =
     useTimeSeriesState();
   const { setEditMode, setAnnotationTool } = useTimeSeriesActions();
-  
-  const [categoryAllocations, setCategoryAllocations] = useState<Map<TimeSeriesAnnotationType, string>>(new Map());
+
+  const [categoryAllocations, setCategoryAllocations] = useState<
+    Map<TimeSeriesAnnotationType, string>
+  >(new Map());
 
   const modeVariant: "accent" | "primary" = editMode ? "accent" : "primary";
   const modeText = editMode ? "Edit Mode" : "View Mode";
@@ -22,9 +24,9 @@ export const AnnotationToolbar = () => {
     const categoryMap: Map<TimeSeriesAnnotationType, string> = new Map();
     categories.forEach((category) => {
       categoryMap.getOrInsert(category.type, category.label);
-    })
+    });
     setCategoryAllocations(categoryMap);
-  }, [categories])
+  }, [categories]);
 
   return (
     <div className="flex flex-col w-400 items-center space-y-3 ">
@@ -47,11 +49,12 @@ export const AnnotationToolbar = () => {
               <ToggleButton
                 width="size-1600"
                 isDisabled={!editMode}
-                isSelected={
-                  info === activeAnnotationTool?.type
-                }
+                isSelected={info === activeAnnotationTool?.type}
                 onPress={() => {
-                  setAnnotationTool({ type: info, label: categoryAllocations.get(info)! });
+                  setAnnotationTool({
+                    type: info,
+                    label: categoryAllocations.get(info)!,
+                  });
                 }}
               >
                 {info}
@@ -60,18 +63,20 @@ export const AnnotationToolbar = () => {
                 label="Select label"
                 width="size-2400"
                 isDisabled={!editMode}
-                items={categories.values().filter((category) => category.type === info)}
+                items={categories
+                  .values()
+                  .filter((category) => category.type === info)}
                 selectedKey={categoryAllocations.get(info)}
                 onSelectionChange={(key) => {
-                  setCategoryAllocations(prev => {
+                  setCategoryAllocations((prev) => {
                     const newMap = new Map(prev);
                     newMap.set(info, key as string);
                     return newMap;
-                  })
+                  });
                   setAnnotationTool({ type: info, label: key as string });
                 }}
               >
-                {(item) => (<Item key={item.label}>{item.label}</Item>)}
+                {(item) => <Item key={item.label}>{item.label}</Item>}
               </Picker>
             </div>
           </div>

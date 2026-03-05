@@ -99,7 +99,9 @@ export const TimeSeriesProvider = ({
   const [toolingCallbacks, setToolingCallbacks] = useState<
     Map<TimeSeriesAnnotationType, ToolingCallbacks>
   >(new Map());
-  const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>(null);
+  const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>(
+    null,
+  );
   const [updateCounter, setUpdateCounter] = useState(0);
   const [syncCounter, setSyncCounter] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);

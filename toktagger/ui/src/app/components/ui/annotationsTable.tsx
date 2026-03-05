@@ -1,6 +1,6 @@
 "use client";
 
-import { Category, TimeSeriesAnnotationPoint, TimeSeriesAnnotationType, TimeSeriesCategory } from "@/types";
+import { TimeSeriesAnnotationType, TimeSeriesCategory } from "@/types";
 import { useMemo } from "react";
 import {
   TableView,
@@ -26,43 +26,47 @@ interface TableEntry {
 }
 
 export const AnnotationsTable = () => {
-  const {annotations, categories} = useTimeSeriesState()
+  const { annotations, categories } = useTimeSeriesState();
 
   const entries = useMemo<TableEntry[]>(() => {
     const entriesBuffer: TableEntry[] = [];
-    for (const [_index, annotation] of annotations.entries()) {
+    annotations.forEach((annotation) => {
       const category = categories.get(annotation.label);
       if (!category) {
-        console.error(`Could not locate ${annotation.label} when assigning table entry`)
-        continue;
+        console.error(
+          `Could not locate ${annotation.label} when assigning table entry`,
+        );
+        return;
       }
 
       let data: string;
       let marker: TableEntry["marker"] = {
         width: "size-250",
-        height: "size-250"
+        height: "size-250",
       };
-      switch (annotation.type){
+      switch (annotation.type) {
         case TimeSeriesAnnotationType.TIME_POINT:
           marker = {
             width: "size-75",
-            height: "size-250"
+            height: "size-250",
           };
           data = `${annotation.points[0].x.toFixed(4)}`;
           break;
         case TimeSeriesAnnotationType.TIME_REGION:
           marker = {
             width: "size-250",
-            height: "size-250"
+            height: "size-250",
           };
           const points: string[] = [];
           annotation.points.forEach((point) => {
-            points.push(`${point.x.toFixed(4)}`)
-          })
-          data = `${points[0]} - ${points[1]}`
+            points.push(`${point.x.toFixed(4)}`);
+          });
+          data = `${points[0]} - ${points[1]}`;
           break;
         default:
-          console.warn(`Could not parse data for ${annotation.type} when adding to table`)
+          console.warn(
+            `Could not parse data for ${annotation.type} when adding to table`,
+          );
           data = "";
       }
 
@@ -72,7 +76,7 @@ export const AnnotationsTable = () => {
         data,
         marker,
       });
-    }
+    });
 
     return entriesBuffer;
   }, [annotations, categories]);
@@ -99,11 +103,11 @@ export const AnnotationsTable = () => {
           </Column>
         </TableHeader>
         <TableBody items={entries}>
-          {(item) => (
+          {(item: TableEntry) => (
             <Row key={item.id}>
               <Cell>
                 <Flex justifyContent="center">
-                  <View 
+                  <View
                     width={item.marker.width}
                     height={item.marker.height}
                     borderRadius="small"
@@ -114,9 +118,7 @@ export const AnnotationsTable = () => {
               <Cell>
                 <span>{item.category.label}</span>
               </Cell>
-              <Cell>
-                {item.category.type}
-              </Cell>
+              <Cell>{item.category.type}</Cell>
               <Cell>{item.data}</Cell>
             </Row>
           )}
