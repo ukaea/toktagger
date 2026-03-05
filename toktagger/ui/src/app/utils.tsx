@@ -207,14 +207,12 @@ export function convertTimeSeriesToRawAnnotations(
     const timePoint: TimePoint = {
       project_id: null,
       sample_id: null,
-      shot_id: null,
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
       type: "time_point",
       time: annotation.points[0].x,
       label: annotation.label,
-      timestamp: null,
     };
     return timePoint;
   }
@@ -223,7 +221,6 @@ export function convertTimeSeriesToRawAnnotations(
     const timePoint: TimeRegion = {
       project_id: null,
       sample_id: null,
-      shot_id: null,
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
@@ -231,7 +228,6 @@ export function convertTimeSeriesToRawAnnotations(
       time_min: annotation.points[0].x,
       time_max: annotation.points[1].x,
       label: annotation.label,
-      timestamp: null,
     };
     return timePoint;
   }
