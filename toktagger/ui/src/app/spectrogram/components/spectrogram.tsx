@@ -9,9 +9,7 @@ import {
 } from "@/types";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
 import * as d3 from "d3";
-import {
-  randomColor,
-} from "@/app/utils";
+import { randomColor } from "@/app/utils";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
