@@ -132,9 +132,9 @@ class UncertaintyQueryStrategy(RandomQueryStrategy):
         # Sort in order of annotation uncertainty, samples with no annotations go last (randomised)
         self.samples = sorted(
             samples_nonvalidated,
-            key=lambda sample: sample_ids.index(sample.id)
-            if sample.id in sample_ids
-            else float("inf"),
+            key=lambda sample: (
+                sample_ids.index(sample.id) if sample.id in sample_ids else float("inf")
+            ),
         )
         # Then add in samples which *are* validated at the end
         self.samples += [sample for sample in samples if sample.validated_annotations]

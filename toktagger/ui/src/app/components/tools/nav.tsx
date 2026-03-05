@@ -172,7 +172,11 @@ export function JumpToNextButton({
 
   return (
     <View marginStart="size-100">
-      <Button variant="primary" aria-label="Next Sample" onPress={moveNextShot}>
+      <Button
+        variant="primary"
+        aria-label="Jump to Next Sample"
+        onPress={moveNextShot}
+      >
         <Text>Jump to Next Sample</Text> <StepForward />
       </Button>
     </View>
@@ -363,9 +367,12 @@ type NavigationBarInfo = {
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
   const { annotations, setAnnotations, setIsValidated } = useSample();
 
-  const { visitedSampleIds, popVisitedSampleId } = useSampleHistory();
-
-  const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
+  const {
+    visitedSampleIds,
+    popVisitedSampleId,
+    SaveOnNavigate,
+    setSaveOnNavigate,
+  } = useSampleHistory();
 
   const [searchParamsObj] = useSearchParams();
   const [sortDescriptor] = useState<SortDescriptor | null>(() => {

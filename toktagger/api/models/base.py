@@ -152,6 +152,7 @@ class ModelRegistry:
 
     @classmethod
     def get(cls, name: str):
+        print(cls._registry)
         model_class: Model | None = cls._registry.get(name)
         if not model_class:
             raise ValueError(f"No Model class called '{name}' found in registry!")
@@ -177,3 +178,15 @@ class ModelRegistry:
         if not tasks:
             raise ValueError(f"No tasks associated with model '{name}'!")
         return tasks
+
+
+@ray.remote
+class WorkerModelRegistry:
+    def __init__(self, registry):
+        self._registry: dict[str, Model] = registry
+
+    def get(self, name):
+        model_class: Model | None = self._registry.get(name)
+        if not model_class:
+            raise ValueError(f"No Model class called '{name}' found in registry!")
+        return ray.remote(model_class)

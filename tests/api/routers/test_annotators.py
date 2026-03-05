@@ -29,7 +29,7 @@ async def test_annotators(api_client, setup_db):
 
     returned_annotations = response.json()
     # Check it found 4 ELMs since we added 4 spikes to the data at 20, 40, 60, 80
-    assert len(returned_annotations) == 17
+    assert len(returned_annotations) == 4
     for annotation in returned_annotations:
         assert annotation["label"] == "Unknown"
         assert annotation["created_by"] == AnnotatorTypes.PEAK_DETECTION

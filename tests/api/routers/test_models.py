@@ -1,12 +1,6 @@
 import pytest
-import pytest_asyncio
-import random
 import pathlib
-from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
-from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.models import ModelUpdate
-from tests.db_definitions import MODEL_1, MODEL_2
 from unittest.mock import patch
 from bson import ObjectId
 import os
@@ -48,67 +42,6 @@ async def send_to_url(api_client, url, method):
             await api_client.put(put_url, json=payload)
 
     return response.json(), RESULTS
-
-
-@pytest_asyncio.fixture(scope="function")
-async def setup_model_db(db_client):
-    # Create sample data for training / predicting a Disruption model
-    project = ProjectIn(
-        name="Test",
-        task=Task.TIME_SERIES,
-        query_strategy=QueryStrategyType.RANDOM,
-        data_loader="tabular",
-    )
-    project_id = await db_client.insert("projects", project)
-    sample_ids = []
-    for i in range(20):
-        # Generate sample data
-        disruption_time = random.randint(80, 120)
-        annotation = TimePointBatch(
-            shot_id=i,
-            validated=True,
-            label="Disruption",
-            time=disruption_time,
-            created_by="manual" if i < 5 else "disruption_cnn",
-        )
-
-        sample = SampleIn(
-            shot_id=i,
-            data=TimeSeriesFileData(
-                file_name=f"{i}.parquet",
-                type="parquet",
-            ),
-            annotations=[annotation] if i < 10 else None,
-        )
-        sample_id = await db_client.insert(
-            "samples", sample, ids={"project_id": ObjectId(project_id)}
-        )
-        sample_ids.append(sample_id)
-
-        if i < 10:
-            await db_client.insert(
-                "annotations",
-                annotation,
-                ids={
-                    "project_id": ObjectId(project_id),
-                    "sample_id": ObjectId(sample_ids[i]),
-                },
-            )
-
-    model_id_1 = await db_client.insert(
-        "models", MODEL_1, ids={"project_id": ObjectId(project_id)}
-    )
-
-    model_id_2 = await db_client.insert(
-        "models", MODEL_2, ids={"project_id": ObjectId(project_id)}
-    )
-
-    yield {
-        "project_id": project_id,
-        "sample_ids": sample_ids,
-        "model_id_1": model_id_1,
-        "model_id_2": model_id_2,
-    }
 
 
 KILL_COUNT = 0
