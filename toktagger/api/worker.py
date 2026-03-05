@@ -40,17 +40,14 @@ def get_actor(project, model):
         # Actor not alive, so load from weights
         logger.info("Actor not found, loading from disk...")
 
-        # Lazy loading so it doesnt initialize tensorflow every time TODO is this ok?
-        from toktagger.api.models.base import ModelRegistry
+        model_registry = ray.get_actor("WorkerModelRegistry")
+        model_type = ray.get(model_registry.get.remote(model.type))
 
-        ml_model = (
-            ModelRegistry.get(model.type)
-            .options(name=model.id, lifetime="detached")
-            .remote(
-                model_id=str(model.id),
-                project=project,
-            )
+        ml_model = model_type.options(name=model.id, lifetime="detached").remote(
+            model_id=str(model.id),
+            project=project,
         )
+
         model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
             f"{str(model.id)}.model"
         )

@@ -107,8 +107,15 @@ jobs:
       - name: Install dependencies (with dev extras)
         run: uv sync
 
-      - name: Run tests
-        run: uv run pytest
+      - name: Install playwright
+        run: uv run python -m playwright install --with-deps
+
+      - name: Run unit tests
+        run: uv run pytest tests/api
+
+      - name: Run end to end tests
+        run: uv run pytest tests/end_to_end
+        
   build:
     runs-on: ubuntu-latest
     steps:

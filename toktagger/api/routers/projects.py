@@ -70,6 +70,8 @@ async def create_project(request: Request, project: ProjectIn):
     if project.data_loader not in LoaderRegistry.names():
         raise HTTPException(422, detail="Invalid data loader specified.")
 
+    print(project)
+
     _id = await request.app.state.db_client.insert(collection="projects", model=project)
     return {"_id": _id}
 

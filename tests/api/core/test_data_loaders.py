@@ -22,10 +22,10 @@ import base64
 import io
 
 
-def test_image_file_loader_jpg():
+def test_image_file_loader_jpeg():
     img_file = ImageFileData(
         file_name=str(pathlib.Path(__file__).parents[2].joinpath("mast_images")),
-        type="jpg",
+        type="jpeg",
         protocol="file",
     )
     sample = Sample(
@@ -76,7 +76,7 @@ def test_image_file_loader_png():
 
 def test_parquet_file_loader():
     parquet_file = TimeSeriesFileData(
-        file_name=str(pathlib.Path(__file__).parents[2].joinpath("test.parquet")),
+        file_name=str(pathlib.Path(__file__).parents[2].joinpath("10000.parquet")),
         type="parquet",
         protocol="file",
         signal_names=["Ip", "dalpha"],
@@ -105,7 +105,7 @@ def test_parquet_file_loader():
     assert len(numpy.where(numpy.isclose(ip_values, 1000))[0]) == 4
 
 
-def test_uda_loader(uda_env_vars):
+def test_uda_loader(uda_test):
     try:
         import pyuda
 

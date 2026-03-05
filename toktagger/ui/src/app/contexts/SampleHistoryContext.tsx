@@ -11,6 +11,8 @@ import { useSample } from "@/app/contexts/SampleContext";
 interface SampleHistoryContextType {
   visitedSampleIds: string[];
   popVisitedSampleId: () => string | null;
+  SaveOnNavigate: boolean;
+  setSaveOnNavigate: (saveOnNavigate: boolean) => void;
 }
 
 const SampleHistoryContext = createContext<
@@ -26,6 +28,8 @@ export function SampleHistoryProvider({
 }) {
   const { sample } = useSample(); // ← uses SampleContext
   const sampleId = sample?._id ?? null;
+
+  const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
 
   const [visitedSampleIds, setVisitedSampleIds] = useState<string[]>(() => {
     const cached: string | null = sessionStorage.getItem(projectId);
@@ -60,6 +64,8 @@ export function SampleHistoryProvider({
   const value: SampleHistoryContextType = {
     visitedSampleIds,
     popVisitedSampleId,
+    SaveOnNavigate,
+    setSaveOnNavigate,
   };
 
   return (

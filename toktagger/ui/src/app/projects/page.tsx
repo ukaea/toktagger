@@ -80,7 +80,7 @@ const ProjectsTable = ({
             <Column key="task" allowsSorting>
               Task
             </Column>
-            <Column key="date_created" allowsSorting>
+            <Column key="timestamp" allowsSorting>
               Date Created
             </Column>
             <Column key="data_loader" allowsSorting>
@@ -99,7 +99,7 @@ const ProjectsTable = ({
                   <Flex direction="row" gap="size-100">
                     <ProjectConfigEditor project={item} onModify={onModify} />
                     <DialogTrigger>
-                      <Button variant="negative">
+                      <Button aria-label="Delete" variant="negative">
                         <Delete />
                       </Button>
                       {(close) => (

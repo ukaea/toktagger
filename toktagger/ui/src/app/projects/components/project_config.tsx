@@ -271,7 +271,10 @@ export function ProjectConfigEditor({
 
   return (
     <DialogTrigger>
-      <Button variant={isEditing ? "accent" : "primary"}>
+      <Button
+        aria-label={isEditing ? "Edit" : buttonText}
+        variant={isEditing ? "accent" : "primary"}
+      >
         {icon}
         {!isEditing ? <Text>{buttonText}</Text> : <></>}
       </Button>

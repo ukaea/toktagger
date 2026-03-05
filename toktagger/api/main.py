@@ -14,6 +14,7 @@ from toktagger.api.routers.paths import router as paths_router
 from toktagger.api.routers.meta import router as meta_router
 
 from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.models.base import ModelRegistry, WorkerModelRegistry
 from contextlib import asynccontextmanager
 import uvicorn
 import ray
@@ -96,9 +97,6 @@ async def lifespan(app: FastAPI):
 
     app.state.db_client = MongoDBClient(mongo_url, db_name)
     app.state.project = None
-
-    if not ray.is_initialized():
-        ray.init()
     app.state.task_registry = TaskRegistry(max_actors=5)
 
     yield
@@ -106,9 +104,37 @@ async def lifespan(app: FastAPI):
     await app.state.db_client.client.close()
 
 
+def setup_worker(registry, tasks):
+    print("HIIIIIIIIIIIIIIIIIIIIIIII")
+    registry_hex = os.environ.get("registry")
+    tasks_hex = os.environ.get("tasks")
+    if registry_hex and tasks_hex:
+        registry_data = ray.get(ray.ObjectRef.from_hex(registry_hex))
+        tasks_data = ray.get(ray.ObjectRef.from_hex(tasks_hex))
+
+    # Restore the state in the worker's memory space
+    ModelRegistry.restore_state(registry_data, tasks_data)
+
+
 class Server:
     def __init__(self):
         self.frontend_path = pathlib.Path(__file__).parent / "static"
+
+    def _setup_ray(self, api_url: str, model_storage_path: str | None = None):
+        if not ray.is_initialized():
+            ray.init(
+                runtime_env={
+                    "env_vars": {
+                        "API_URL": api_url,
+                        "MODEL_STORAGE": model_storage_path,
+                    }
+                }
+            )
+
+        # Create a ray actor for use as a model registry
+        WorkerModelRegistry.options(
+            name="WorkerModelRegistry", lifetime="detached"
+        ).remote(ModelRegistry._registry)
 
     def _setup_app(self):
         self.app = FastAPI(lifespan=lifespan)
@@ -150,5 +176,5 @@ class Server:
         port: int = 8002,
     ):
         self._setup_app()
-        os.environ["API_URL"] = f"http://{host}:{port}"
+        self._setup_ray(f"http://{host}:{port}", os.environ.get("MODEL_STORAGE"))
         uvicorn.run(self.app, host=host, port=port)

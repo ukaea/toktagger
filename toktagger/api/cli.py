@@ -42,7 +42,9 @@ def main():
     if open_browser:
         threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
 
-    os.environ["API_URL"] = f"http://{args.host}:{args.port}"
+    server._setup_ray(
+        f"http://{args.host}:{args.port}", os.environ.get("MODEL_STORAGE")
+    )
     uvicorn.run(
         "toktagger.api.cli:app", host=args.host, port=args.port, reload=args.reload
     )
