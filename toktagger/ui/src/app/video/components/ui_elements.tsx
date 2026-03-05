@@ -203,7 +203,7 @@ export function InstancePanel({
 
         {profiles.map((p) => {
           const count = profileCounts?.[p.key] ?? 0;
-          const canActivate = Boolean(
+          const canJumpToFirstFrame = Boolean(
             onJumpToFirstFrame && p.first_frame != null,
           );
 
@@ -266,33 +266,33 @@ export function InstancePanel({
 
                     <span
                       role="button"
-                      tabIndex={canActivate ? 0 : -1}
+                      tabIndex={canJumpToFirstFrame ? 0 : -1}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!canActivate) return;
+                        if (!canJumpToFirstFrame) return;
                         onJumpToFirstFrame?.(p);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (!canActivate) return;
+                          if (!canJumpToFirstFrame) return;
                           onJumpToFirstFrame?.(p);
                         }
                       }}
                       className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${
-                        canActivate
+                        canJumpToFirstFrame
                           ? "border-gray-400/60 text-gray-100 hover:bg-gray-500/15 cursor-pointer"
                           : "border-gray-800 text-white/30 cursor-not-allowed"
                       }`}
                       title={
-                        canActivate
+                        canJumpToFirstFrame
                           ? "Jump to the first frame where this instance appears"
                           : "No known first frame for this instance"
                       }
                       aria-label={
-                        canActivate
+                        canJumpToFirstFrame
                           ? `Jump to first frame for ${p.class_name} ${p.track_id}`
                           : `No first frame available for ${p.class_name} ${p.track_id}`
                       }
