@@ -294,6 +294,8 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     expect(page.get_by_label("vspan").first).to_be_visible()
 
+    page.wait_for_timeout(500)
+
     # Drag to new position on right
     page.get_by_label("vspan").drag_to(page.locator(".edrag"))
 
