@@ -59,6 +59,7 @@ export type Profile = {
 /**
  * Instance list + optional "profile creator" UI.
  * - Selecting an instance calls `onSelect`.
+ * - Jump control calls `onJumpToFirstFrame`.
  * - Right-clicking an instance calls `onRequestBulkDelete`.
  * - The creator UI is gated by `showCreator` and `classItems`.
  */
@@ -66,7 +67,7 @@ export function InstancePanel({
   profiles,
   selectedKey,
   onSelect,
-  onActivate,
+  onJumpToFirstFrame,
   onCreateProfile,
   onRequestBulkDelete,
   onRequestDeleteAllInstances,
@@ -78,7 +79,7 @@ export function InstancePanel({
   profiles: Profile[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
-  onActivate?: (profile: Profile) => void;
+  onJumpToFirstFrame?: (profile: Profile) => void;
   onCreateProfile: (className: string, trackId: string) => void;
   onRequestBulkDelete: (profile: Profile) => void;
   onRequestDeleteAllInstances: () => void;
@@ -203,7 +204,7 @@ export function InstancePanel({
         {profiles.map((p) => {
           const count = profileCounts?.[p.key] ?? 0;
           const canActivate = Boolean(
-            onActivate && typeof p.first_frame === "number",
+            onJumpToFirstFrame && p.first_frame != null,
           );
 
           return (
@@ -270,14 +271,14 @@ export function InstancePanel({
                         e.preventDefault();
                         e.stopPropagation();
                         if (!canActivate) return;
-                        onActivate?.(p);
+                        onJumpToFirstFrame?.(p);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           e.stopPropagation();
                           if (!canActivate) return;
-                          onActivate?.(p);
+                          onJumpToFirstFrame?.(p);
                         }
                       }}
                       className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${

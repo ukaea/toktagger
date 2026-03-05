@@ -152,7 +152,7 @@ export function VideoToolbox() {
     saveLastClassName(hit.class_name);
   };
 
-  const onActivateProfile = (profile: {
+  const onJumpToFirstFrame = (profile: {
     class_name?: string;
     track_id?: string;
     first_frame?: number | null;
@@ -254,7 +254,7 @@ export function VideoToolbox() {
             profiles={profiles}
             selectedKey={selectedKey}
             onSelect={onSelectInstance}
-            onActivate={onActivateProfile}
+            onJumpToFirstFrame={onJumpToFirstFrame}
             onCreateProfile={() => {
               // Instances are derived from annotations; creation happens via drawing.
             }}

@@ -216,8 +216,6 @@ export function deriveInstances(
   },
 ): InstanceProfile[] {
   const map = new Map<TrackKey, InstanceProfile>();
-  const firstSeenOrder = new Map<TrackKey, number>();
-  let nextFirstSeenOrder = 0;
 
   const frames = Array.from(byFrame.keys()).sort((a, b) => a - b);
 
@@ -230,7 +228,6 @@ export function deriveInstances(
       const key = makeTrackKey(className, trackId);
       const existing = map.get(key);
       if (!existing) {
-        firstSeenOrder.set(key, nextFirstSeenOrder++);
         map.set(key, {
           key,
           className,
@@ -249,10 +246,13 @@ export function deriveInstances(
   const out = Array.from(map.values());
   for (const inst of out) inst.frames.sort((a, b) => a - b);
 
-  // Show the most recently introduced instances first.
+  // Show instances by the first frame they appear in, with stable ordering
+  // for ties based on alphabetical track id.
   out.sort(
     (a, b) =>
-      (firstSeenOrder.get(b.key) ?? -1) - (firstSeenOrder.get(a.key) ?? -1),
+      (a.frames[0] ?? Number.POSITIVE_INFINITY) -
+        (b.frames[0] ?? Number.POSITIVE_INFINITY) ||
+      a.trackId.localeCompare(b.trackId),
   );
 
   return out;
