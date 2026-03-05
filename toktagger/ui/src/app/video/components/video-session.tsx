@@ -80,6 +80,11 @@ type VideoSessionCtx = {
   /** Popup helpers so view components don't need direct access to the Annotorious API. */
   deleteAnnotation: (id: string) => void;
   closePopup: () => void;
+  requestFocusInstance: (
+    className: string,
+    trackId: string,
+    opts?: { onlyIfOnCurrentFrame?: boolean; targetFrame?: FrameIndex },
+  ) => void;
 
   // frame ops
   getFrameList: (frame: FrameIndex) => ImageAnnotation[];
@@ -120,6 +125,13 @@ type VideoSessionCtx = {
 
 const Ctx = createContext<VideoSessionCtx | null>(null);
 
+type FocusRequest = {
+  className: string;
+  trackId: string;
+  onlyIfOnCurrentFrame: boolean;
+  targetFrame: FrameIndex | null;
+};
+
 export function useVideoSession(): VideoSessionCtx {
   const v = useContext(Ctx);
   if (!v)
@@ -153,11 +165,13 @@ export function VideoSessionProvider(props: {
    * Session state (`byFrame`) remains the source of truth; Annotorious is the interactive editor.
    */
   const isProgrammaticAnnoSyncRef = useRef(false);
+  const pendingFocusRef = useRef<FocusRequest | null>(null);
 
   const [imageNatural, setImageNatural] = useState<{
     w: number;
     h: number;
   } | null>(null);
+  const [focusNonce, setFocusNonce] = useState(0);
 
   const [videoFrame, setVideoFrame] = useState<number | null>(null);
 
@@ -497,23 +511,140 @@ export function VideoSessionProvider(props: {
     [byFrame, frame],
   );
 
+  const overlayHasInstance = useCallback(
+    (list: ImageAnnotation[], req: FocusRequest) => {
+      const wantClass = (req.className || "").trim();
+      const wantTrackId = canonicalizeTrackId(req.trackId || "");
+      if (!wantClass || !wantTrackId) return false;
+
+      return list.some((annotation) => {
+        const got = getLabelTrack(annotation);
+        return (
+          (got.className ?? "").trim() === wantClass &&
+          canonicalizeTrackId(got.trackId ?? "") === wantTrackId
+        );
+      });
+    },
+    [],
+  );
+
+  const selectAnnotationById = useCallback(
+    (id: string) => {
+      if (!id) return false;
+      if (!api) return false;
+
+      api.setSelected(id, true);
+      return true;
+    },
+    [api],
+  );
+
+  const tryFocusPending = useCallback(
+    (rawOverride?: ImageAnnotation[]) => {
+      if (!api) return false;
+
+      const pending = pendingFocusRef.current;
+      if (!pending) return false;
+      if (pending.targetFrame != null && frame !== pending.targetFrame) {
+        return false;
+      }
+
+      const raw = rawOverride ?? api.getAnnotations();
+      const hit = raw.find((annotation) => {
+        const got = getLabelTrack(annotation);
+        return (
+          (got.className ?? "").trim() === pending.className &&
+          canonicalizeTrackId(got.trackId ?? "") === pending.trackId
+        );
+      });
+
+      if (!hit?.id) {
+        if (
+          pending.onlyIfOnCurrentFrame &&
+          !overlayHasInstance(desiredOverlay, pending)
+        ) {
+          pendingFocusRef.current = null;
+        }
+        if (
+          pending.targetFrame != null &&
+          frame === pending.targetFrame &&
+          !overlayHasInstance(desiredOverlay, pending)
+        ) {
+          pendingFocusRef.current = null;
+        }
+        return false;
+      }
+
+      if (!selectAnnotationById(hit.id)) return false;
+
+      pendingFocusRef.current = null;
+      return true;
+    },
+    [api, desiredOverlay, frame, overlayHasInstance, selectAnnotationById],
+  );
+
+  const requestFocusInstance = useCallback(
+    (
+      className: string,
+      trackId: string,
+      opts?: { onlyIfOnCurrentFrame?: boolean; targetFrame?: FrameIndex },
+    ) => {
+      const cls = (className || "").trim();
+      const tid = canonicalizeTrackId(trackId || "");
+
+      if (!cls || !tid) {
+        pendingFocusRef.current = null;
+        return;
+      }
+
+      pendingFocusRef.current = {
+        className: cls,
+        trackId: tid,
+        onlyIfOnCurrentFrame: Boolean(opts?.onlyIfOnCurrentFrame),
+        targetFrame:
+          typeof opts?.targetFrame === "number" &&
+          Number.isFinite(opts.targetFrame)
+            ? opts.targetFrame
+            : null,
+      };
+      setFocusNonce((n) => n + 1);
+    },
+    [],
+  );
+
+  // Required integration boundary: Annotorious keeps its own internal overlay
+  // state, so we must push session state on frame/overlay changes.
   useEffect(() => {
-    if (!api?.setAnnotations) return;
+    if (!api) return;
     if (!imageNatural?.w || !imageNatural?.h) return;
 
-    const cur = api.getAnnotations!();
-    if (sameOverlay(cur, desiredOverlay)) return;
+    let rafId: number | null = null;
+    const cur = api.getAnnotations();
+    if (sameOverlay(cur, desiredOverlay)) {
+      rafId = requestAnimationFrame(() => {
+        tryFocusPending();
+      });
+      return () => {
+        if (rafId != null) cancelAnimationFrame(rafId);
+      };
+    }
 
     isProgrammaticAnnoSyncRef.current = true;
     try {
       // Clear selection so popup closes when switching frames / overlays
-      api.setSelected?.();
-      api.clearAnnotations?.();
-      api.setAnnotations?.(desiredOverlay);
+      api.setSelected();
+      api.clearAnnotations();
+      api.setAnnotations(desiredOverlay);
+      rafId = requestAnimationFrame(() => {
+        tryFocusPending();
+      });
     } finally {
       isProgrammaticAnnoSyncRef.current = false;
     }
-  }, [api, desiredOverlay, imageNatural?.h, imageNatural?.w]);
+    return () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+    };
+  }, [api, desiredOverlay, imageNatural?.h, imageNatural?.w, tryFocusPending]);
 
   /**
    * Event wiring:
@@ -525,7 +656,12 @@ export function VideoSessionProvider(props: {
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
-        if (!isProgrammaticAnnoSyncRef.current) commitFromAnnotorious();
+        if (!isProgrammaticAnnoSyncRef.current) {
+          commitFromAnnotorious();
+          setSelectionState((prev) =>
+            prev.trackId ? { ...prev, trackId: null } : prev,
+          );
+        }
       }
     };
 
@@ -614,6 +750,24 @@ export function VideoSessionProvider(props: {
     [api],
   );
 
+  useEffect(() => {
+    if (focusNonce === 0) return;
+
+    const rafId = requestAnimationFrame(() => {
+      tryFocusPending();
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [focusNonce, tryFocusPending]);
+
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => {
+      tryFocusPending();
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [frame, tryFocusPending]);
+
   const value = useMemo<VideoSessionCtx>(
     () => ({
       projectId,
@@ -631,6 +785,7 @@ export function VideoSessionProvider(props: {
       setImageNatural,
       deleteAnnotation,
       closePopup,
+      requestFocusInstance,
       getFrameList,
       seedFrame,
       setFrameList,
@@ -660,6 +815,7 @@ export function VideoSessionProvider(props: {
       setImageNatural,
       deleteAnnotation,
       closePopup,
+      requestFocusInstance,
       getFrameList,
       seedFrame,
       setFrameList,

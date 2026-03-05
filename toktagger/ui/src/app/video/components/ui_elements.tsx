@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Item, Text, Picker } from "@adobe/react-spectrum";
+import StepBackward from "@spectrum-icons/workflow/StepBackward";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -52,11 +53,13 @@ export type Profile = {
   class_id: number;
   class_name: string;
   track_id: string;
+  first_frame?: number | null;
 };
 
 /**
  * Instance list + optional "profile creator" UI.
  * - Selecting an instance calls `onSelect`.
+ * - Jump control calls `onJumpToFirstFrame`.
  * - Right-clicking an instance calls `onRequestBulkDelete`.
  * - The creator UI is gated by `showCreator` and `classItems`.
  */
@@ -64,6 +67,7 @@ export function InstancePanel({
   profiles,
   selectedKey,
   onSelect,
+  onJumpToFirstFrame,
   onCreateProfile,
   onRequestBulkDelete,
   onRequestDeleteAllInstances,
@@ -75,6 +79,7 @@ export function InstancePanel({
   profiles: Profile[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
+  onJumpToFirstFrame?: (profile: Profile) => void;
   onCreateProfile: (className: string, trackId: string) => void;
   onRequestBulkDelete: (profile: Profile) => void;
   onRequestDeleteAllInstances: () => void;
@@ -198,10 +203,14 @@ export function InstancePanel({
 
         {profiles.map((p) => {
           const count = profileCounts?.[p.key] ?? 0;
+          const canJumpToFirstFrame = Boolean(
+            onJumpToFirstFrame && p.first_frame != null,
+          );
 
           return (
             <button
               key={p.key}
+              type="button"
               onClick={() => onSelect(p.key)}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -212,11 +221,11 @@ export function InstancePanel({
                   ? "bg-gray-900 border-gray-600 ring-1 ring-orange-400/60"
                   : "bg-black hover:bg-gray-900 border-gray-800"
               } text-white`}
-              title={`Select: ${p.class_name} (${p.track_id}). Right-click to bulk delete this instance.`}
+              title={`Select: ${p.class_name} (${p.track_id}). Use the rewind button to jump to first frame. Right-click to bulk delete.`}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-white">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-white truncate">
                     #{p.track_id}
                   </div>
                   <div className="text-[11px] text-gray-300 mt-0">
@@ -224,12 +233,74 @@ export function InstancePanel({
                   </div>
                 </div>
 
-                <span
-                  className="ml-2 shrink-0 inline-block text-[10px] px-1.5 py-0.5 rounded-full border border-gray-700 bg-gray-900 text-gray-200"
-                  title="Total annotations for this instance across all frames"
-                >
-                  {count}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className="inline-block text-[10px] px-1.5 py-0.5 rounded-full border border-gray-700 bg-gray-900 text-gray-200"
+                    title="Total annotations for this instance across all frames"
+                  >
+                    {count}
+                  </span>
+
+                  <div className="w-14 flex flex-col items-stretch gap-1 shrink-0">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRequestBulkDelete(p);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onRequestBulkDelete(p);
+                        }
+                      }}
+                      className="w-full rounded-md px-2 py-1 text-[10px] border border-red-400/60 text-red-200 hover:bg-red-500/15 cursor-pointer select-none text-center"
+                      title="Delete this instance across all frames"
+                      aria-label={`Delete ${p.class_name} ${p.track_id}`}
+                    >
+                      Delete
+                    </span>
+
+                    <span
+                      role="button"
+                      tabIndex={canJumpToFirstFrame ? 0 : -1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!canJumpToFirstFrame) return;
+                        onJumpToFirstFrame?.(p);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!canJumpToFirstFrame) return;
+                          onJumpToFirstFrame?.(p);
+                        }
+                      }}
+                      className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${
+                        canJumpToFirstFrame
+                          ? "border-gray-400/60 text-gray-100 hover:bg-gray-500/15 cursor-pointer"
+                          : "border-gray-800 text-white/30 cursor-not-allowed"
+                      }`}
+                      title={
+                        canJumpToFirstFrame
+                          ? "Jump to the first frame where this instance appears"
+                          : "No known first frame for this instance"
+                      }
+                      aria-label={
+                        canJumpToFirstFrame
+                          ? `Jump to first frame for ${p.class_name} ${p.track_id}`
+                          : `No first frame available for ${p.class_name} ${p.track_id}`
+                      }
+                    >
+                      <StepBackward aria-hidden="true" size="XS" />
+                    </span>
+                  </div>
+                </div>
               </div>
             </button>
           );
