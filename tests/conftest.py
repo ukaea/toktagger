@@ -4,7 +4,7 @@ from toktagger.api.main import Server
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.models.base import ModelRegistry, WorkerModelRegistry
+from toktagger.api.models.base import ModelRegistry, WorkerModelRegistry, TaskRegistry
 from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
@@ -87,6 +87,7 @@ async def api_client(mongo_container):
     app = server.app
     lifespan_ctx = app.router.lifespan_context(app)
     await lifespan_ctx.__aenter__()
+    app.state.task_registry = TaskRegistry(max_actors=5)
     app.state.task_registry.tasks = {"abc123": "Ray Task Object"}
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

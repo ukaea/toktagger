@@ -495,6 +495,8 @@ def test_create_samples_shot_data_file(server_setup, page: Page):
         # Write data to the CSV file
         writer.writerows(data)
         file.flush()
+        # Make sure file is written
+        time.sleep(0.5)
 
         # Import annotation
         with page.expect_file_chooser() as fc_info:
@@ -748,7 +750,8 @@ def test_samples_page_import_annotations(sample_id: bool, server_setup, page: Pa
 
         json.dump(annotations_1 + annotations_2, file)
         file.flush()
-
+        # Make sure file is written
+        time.sleep(0.5)
         # Import annotation
         with page.expect_file_chooser() as fc_info:
             page.get_by_role("button", name="Import Annotations").click()
