@@ -94,7 +94,9 @@ function VideoFrameAnnotator(props: {
     <div className="flex flex-col items-center gap-4 w-full">
       <div className="flex flex-col items-center gap-2">
         <div className="w-60 text-center">
-          <div className="text-[13px] text-gray-200 mb-1">Jump to Frame</div>
+          <div className="text-[13px] text-gray-700 dark:text-gray-200 mb-1">
+            Jump to Frame
+          </div>
           <FrameSearch onJump={handleJump} />
         </div>
 
