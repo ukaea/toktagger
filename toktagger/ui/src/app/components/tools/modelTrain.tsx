@@ -49,7 +49,6 @@ export function ModelTrainModal({ project }: { project: Project }) {
         setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
         setTrainDisabled(true);
       }
-
     })();
   }, [modalOpen, project._id]);
 
@@ -75,7 +74,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
 
   return (
     <Provider theme={defaultTheme}>
-      <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)} >
+      <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
         <ActionButton UNSAFE_style={buttonStyle} aria-label="Train ML Model">
           <WorkflowAdd />
         </ActionButton>
@@ -109,7 +108,11 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <Button variant="secondary" onPress={close}>
                 Close
               </Button>
-              <Button variant="accent" onPress={submitTrainJob} isDisabled={trainDisabled}>
+              <Button
+                variant="accent"
+                onPress={submitTrainJob}
+                isDisabled={trainDisabled}
+              >
                 Train
               </Button>
             </ButtonGroup>
