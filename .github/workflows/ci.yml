@@ -105,7 +105,7 @@ jobs:
         run: pip install uv
 
       - name: Install dependencies (with dev extras)
-        run: uv sync
+        run: uv sync --all-extras
 
       - name: Install playwright
         run: uv run python -m playwright install --with-deps
