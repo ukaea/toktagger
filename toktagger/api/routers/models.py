@@ -1,20 +1,43 @@
-from fastapi import APIRouter, Request, Path, Query, HTTPException
+from fastapi import APIRouter, Request, Depends, Path, Query, HTTPException
 from fastapi.responses import JSONResponse
 import pathlib
 import os
 import random
 from bson.objectid import ObjectId
-import ray
 import itertools
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
-from toktagger.api.worker import train_model, get_predictions
+from toktagger.api.models import models_dependencies_installed
+
+# Only import large packages if models dependencies installed
+if models_dependencies_installed():
+    from toktagger.api.worker import train_model, get_predictions
+    import ray
 
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/projects/{project_id}", tags=["Models"])
+
+# Check models are enabled whenever an endpoint is called
+
+
+def check_models_enabled():
+    if not models_dependencies_installed():
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "ML model features are disabled (optional dependencies missing)",
+                "hint": "Install extras in your environment: pip install toktagger[models]",
+            },
+        )
+
+
+router = APIRouter(
+    prefix="/projects/{project_id}",
+    tags=["Models"],
+    dependencies=[Depends(check_models_enabled)],
+)
 
 
 @router.get("/models")
