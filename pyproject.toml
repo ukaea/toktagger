@@ -28,7 +28,7 @@ dependencies = [
   "pillow",
   "uda",
   "sal",
-  "ruptures @ git+https://github.com/deepcharles/ruptures.git@e88da13b5f625f37321abd07c5d14b91701c6655",
+  "ruptures>=1.1.10",
   "torch",
   "platformdirs",
   "mongita>=1.2.0",
