@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Provider,
   defaultTheme,
@@ -20,9 +20,11 @@ import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
-import { startTraining } from "@/app/core";
+import { startTraining, getModels } from "@/app/core";
 
 export function ModelTrainModal({ project }: { project: Project }) {
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [trainDisabled, setTrainDisabled] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageColour, setMessageColour] = useState<string>("primary");
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
@@ -33,6 +35,23 @@ export function ModelTrainModal({ project }: { project: Project }) {
     right: 50,
     zIndex: 1000,
   };
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    (async () => {
+      const response = await getModels(project._id);
+
+      if (!response.ok) {
+        const errorMessage = await response.json();
+        setMessage(errorMessage.detail);
+        setMessageColour("negative");
+        setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+        setTrainDisabled(true);
+      }
+
+    })();
+  }, [modalOpen, project._id]);
 
   const submitTrainJob = async () => {
     if (selectedModel == null) {
@@ -56,7 +75,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
 
   return (
     <Provider theme={defaultTheme}>
-      <DialogTrigger>
+      <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)} >
         <ActionButton UNSAFE_style={buttonStyle} aria-label="Train ML Model">
           <WorkflowAdd />
         </ActionButton>
@@ -90,7 +109,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <Button variant="secondary" onPress={close}>
                 Close
               </Button>
-              <Button variant="accent" onPress={submitTrainJob}>
+              <Button variant="accent" onPress={submitTrainJob} isDisabled={trainDisabled}>
                 Train
               </Button>
             </ButtonGroup>
