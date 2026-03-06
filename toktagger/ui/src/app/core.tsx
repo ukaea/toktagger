@@ -383,11 +383,9 @@ export const getSamplePredictions = async (
   return response;
 };
 
-export const getModels = async (project_id: string): Promise<Model[]> => {
+export const getModels = async (project_id: string): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models`,
   );
-  const data = await response.json();
-  const models = data as Model[];
-  return models;
+  return response;
 };

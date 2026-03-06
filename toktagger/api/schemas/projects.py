@@ -5,7 +5,6 @@ from enum import Enum
 
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas import ConfiguredModel
-from toktagger.api.models.base import models_dependencies_installed
 
 
 class Task(str, Enum):
@@ -115,6 +114,8 @@ class ProjectIn(ConfiguredModel):
     @computed_field
     @property
     def model_types(self) -> List[str]:
+        from toktagger.api.models import models_dependencies_installed
+
         if not models_dependencies_installed():
             return []
         from toktagger.api.models.base import ModelRegistry

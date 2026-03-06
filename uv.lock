@@ -4357,8 +4357,6 @@ dependencies = [
     { name = "pymongo" },
     { name = "pyspark", version = "4.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pyspark", version = "4.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "ray", version = "2.53.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "ray", version = "2.54.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "requests" },
     { name = "ruptures" },
     { name = "s3fs", version = "2025.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -4371,8 +4369,6 @@ dependencies = [
     { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "uda" },
     { name = "uda-xarray" },
     { name = "uvicorn", version = "0.39.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -4383,6 +4379,14 @@ dependencies = [
     { name = "zarr", version = "2.18.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "zarr", version = "2.18.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "zarr", version = "3.1.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+
+[package.optional-dependencies]
+models = [
+    { name = "ray", version = "2.53.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "ray", version = "2.54.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
 
 [package.dev-dependencies]
@@ -4419,8 +4423,7 @@ requires-dist = [
     { name = "pyarrow", specifier = "<21" },
     { name = "pymongo" },
     { name = "pyspark", specifier = ">=4.0.0" },
-    { name = "ray", specifier = ">=2.49.1" },
-    { name = "ray", specifier = ">=2.51.1" },
+    { name = "ray", marker = "extra == 'models'", specifier = ">=2.49.1" },
     { name = "requests" },
     { name = "ruptures", git = "https://github.com/deepcharles/ruptures.git?rev=e88da13b5f625f37321abd07c5d14b91701c6655" },
     { name = "s3fs" },
@@ -4428,13 +4431,14 @@ requires-dist = [
     { name = "sal-xarray", specifier = ">=0.2.1" },
     { name = "scikit-learn" },
     { name = "scipy" },
-    { name = "torch" },
+    { name = "torch", marker = "extra == 'models'" },
     { name = "uda" },
     { name = "uda-xarray", specifier = ">=0.2.1" },
     { name = "uvicorn" },
     { name = "xarray" },
     { name = "zarr" },
 ]
+provides-extras = ["models"]
 
 [package.metadata.requires-dev]
 dev = [

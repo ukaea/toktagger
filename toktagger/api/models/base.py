@@ -7,7 +7,6 @@ import typing
 import math
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
-import ray
 import importlib.util
 import uuid
 import logging

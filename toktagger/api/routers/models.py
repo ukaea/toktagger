@@ -26,10 +26,7 @@ def check_models_enabled():
     if not models_dependencies_installed():
         raise HTTPException(
             status_code=503,
-            detail={
-                "error": "ML model features are disabled (optional dependencies missing)",
-                "hint": "Install extras in your environment: pip install toktagger[models]",
-            },
+            detail="ML model features are disabled (optional dependencies missing)",
         )
 
 
