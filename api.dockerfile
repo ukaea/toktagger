@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy the application code
 COPY ../../toktagger ./toktagger
 COPY pyproject.toml README.md ./
-RUN pip install .
+RUN pip install .[models]
 
 
 # Run FastAPI with Uvicorn
