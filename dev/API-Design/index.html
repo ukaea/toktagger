@@ -1,0 +1,1432 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../building-the-docs/">
+      
+      
+        <link rel="next" href="../System-Architecture/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>API Design - TokTagger</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-endpoints" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="TokTagger" class="md-header__button md-logo" aria-label="TokTagger" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TokTagger
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="TokTagger" class="md-nav__button md-logo" aria-label="TokTagger" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    TokTagger
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../creating_projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating Projects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../time_series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Series Labelling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../annotators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../data_loaders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Loaders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../custom_dataloaders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Data Loaders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../custom_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Documentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Documentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unit Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../building-the-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building the Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Design
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplesnext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/next
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplessample_iddataparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/{sample_id}/data?{params}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idannotationsfilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/annotations?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplessample_idannotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/{sample_id}/annotations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idannotator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/annotator/
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplessample_idannotatorannotator_idparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/{sample_id}/annotator/{annotator_id}?{params}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/{model_type}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_typetrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}//models/{model_type}/train
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_typepredictfilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/{model_type}/predict?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsampelssample_idmodelsmodel_typepredictfilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/sampels/{sample_id}/models/{model_type}/predict?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_typeevaluatefilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/{model_type}/evaluate?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../System-Architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_6" id="__nav_7_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Interface
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Interface
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../User-Interface-Overall-Design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overall Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../User-Interface-Planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../User-Interface-Details/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Details
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Context-Menu-Provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context Menu
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplesnext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/next
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplessample_iddataparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/{sample_id}/data?{params}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idannotationsfilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/annotations?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplessample_idannotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/{sample_id}/annotations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idannotator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/annotator/
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsamplessample_idannotatorannotator_idparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/samples/{sample_id}/annotator/{annotator_id}?{params}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/{model_type}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_typetrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}//models/{model_type}/train
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_typepredictfilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/{model_type}/predict?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idsampelssample_idmodelsmodel_typepredictfilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/sampels/{sample_id}/models/{model_type}/predict?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projectsproject_idmodelsmodel_typeevaluatefilters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /projects/{project_id}/models/{model_type}/evaluate?{filters}
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="api-endpoints">API Endpoints</h1>
+<p>Below is a brief outline of the design of the backend API and what each endpoint does. For full documentation of these endpoints, launch the application and go to <code>http://localhost:8002/docs</code>.</p>
+<h2 id="projects"><code>/projects</code></h2>
+<ul>
+<li><strong>GET</strong>: Get a list of all available projects</li>
+<li><strong>POST</strong>: Create a new project</li>
+</ul>
+<h2 id="projectsproject_id"><code>/projects/{project_id}</code></h2>
+<ul>
+<li><strong>GET</strong>: Get a single project using its ID</li>
+<li><strong>PUT</strong>: Update a project using its ID</li>
+<li><strong>DELETE</strong>: Delete a project using its ID</li>
+</ul>
+<h2 id="projectsproject_idsamples"><code>/projects/{project_id}/samples</code></h2>
+<ul>
+<li><strong>GET</strong>: Get info about which samples are being investigated in this project (which pulses etc)</li>
+<li><strong>PUT</strong>: Add extra samples to this project</li>
+<li><strong>DELETE</strong>: Remove samples from this project</li>
+</ul>
+<h2 id="projectsproject_idsamplesnext"><code>/projects/{project_id}/samples/next</code></h2>
+<ul>
+<li><strong>GET</strong>: Get the next shot which needs annotations, ie the one which is most uncertain from the model or fallback predictions</li>
+</ul>
+<h2 id="projectsproject_idsamplessample_iddataparams"><code>/projects/{project_id}/samples/{sample_id}/data?{params}</code></h2>
+<p><strong>GET</strong>: Get data required for visualising this task for this shot (params could be eg frame number, or channel, etc)
+<strong>PUT</strong>: Add data for this sample (not implemented)
+<strong>DELETE</strong>: Delete data for this sample (not implemented)</p>
+<h2 id="projectsproject_idannotationsfilters"><code>/projects/{project_id}/annotations?{filters}</code></h2>
+<ul>
+<li><strong>GET</strong>: Tell me information about annotations available for this project</li>
+<li><strong>DELETE</strong>: Delete ALL annotations for ALL samples for this project</li>
+</ul>
+<h2 id="projectsproject_idsamplessample_idannotations"><code>/projects/{project_id}/samples/{sample_id}/annotations</code></h2>
+<ul>
+<li><strong>GET</strong>: Tell me the annotations already stored for this sample</li>
+<li><strong>PUT</strong>: Add human annotations for this sample</li>
+<li><strong>DELETE</strong>: Delete annotations for this sample</li>
+</ul>
+<h2 id="projectsproject_idannotator"><code>/projects/{project_id}/annotator/</code></h2>
+<ul>
+<li><strong>GET</strong>: Get a list of all annotators available for this task (not implemented)</li>
+</ul>
+<h2 id="projectsproject_idsamplessample_idannotatorannotator_idparams"><code>/projects/{project_id}/samples/{sample_id}/annotator/{annotator_id}?{params}</code></h2>
+<ul>
+<li><strong>GET</strong>: Get suggested annotations for this sample (doesn't get put into DB)</li>
+</ul>
+<h2 id="projectsproject_idmodels"><code>/projects/{project_id}/models/</code></h2>
+<ul>
+<li><strong>GET</strong>: Get a list of models trained for this project</li>
+</ul>
+<h2 id="projectsproject_idmodelsmodel_type"><code>/projects/{project_id}/models/{model_type}</code></h2>
+<ul>
+<li><strong>GET</strong>: Get information about a specific model (eg accuracy, path to saved weights, etc)</li>
+<li><strong>DELETE</strong>: Delete this model</li>
+</ul>
+<h2 id="projectsproject_idmodelsmodel_typetrain"><code>/projects/{project_id}//models/{model_type}/train</code></h2>
+<ul>
+<li><strong>GET</strong>: Current status of training for this model</li>
+<li><strong>PUT</strong>: Retrain model with new data</li>
+<li><strong>DELETE</strong>: Cancel training (not implemented)</li>
+</ul>
+<h2 id="projectsproject_idmodelsmodel_typepredictfilters"><code>/projects/{project_id}/models/{model_type}/predict?{filters}</code></h2>
+<p>(filters here might be a single shot ID, a range of shots, or a number of shots to sample at random...)</p>
+<ul>
+<li><strong>POST</strong>: Create predictions using specified model on shots specified by filters</li>
+<li><strong>DELETE</strong>: Delete predictions using specified model on shots specified by filters</li>
+</ul>
+<h2 id="projectsproject_idsampelssample_idmodelsmodel_typepredictfilters"><code>/projects/{project_id}/sampels/{sample_id}/models/{model_type}/predict?{filters}</code></h2>
+<ul>
+<li><strong>POST</strong>: Get modle predictions for this sample - blocking endpoint</li>
+</ul>
+<h2 id="projectsproject_idmodelsmodel_typeevaluatefilters"><code>/projects/{project_id}/models/{model_type}/evaluate?{filters}</code></h2>
+<ul>
+<li><strong>GET</strong>: Returns statistics about how the predictions from the model compare to the human annotations for the shot(s) specified by filters (not implemented)</li>
+</ul>
+<h1 id="database">Database</h1>
+<p>The rest API connects to a MongoDB database on the backend to store results. There are four collections:</p>
+<div class="highlight"><pre><span></span><code>  * Projects
+  * Samples
+  * Annotations
+  * Models
+</code></pre></div>
+<p>When an endpoint is called which creates a new entry in any of these collections, a new JSON document is added according to a Pydantic schema which defines the expected fields. These documents are linked by storing the relevant IDs to other documents in the other collections - eg if a new Sample is added to a certain project, the Sample document will be given a <code>"project_id": ObjectID(...)</code> which links it back tot he correct document in the Projects collection.
+```</p>
+<h1 id="program-flow">Program flow:</h1>
+<ol>
+<li>User loads webpage, UI queries <code>/projects</code> endpoint, displays clickable list of projects</li>
+<li>User selects a project, UI queries <code>/projects{project_id}/samples</code> and displays a list of clickable samples</li>
+<li>User selects a sample to load, UI queries:<ul>
+<li><code>/projects{project_id}/samples/{sample_id}/data</code> to get the data to display to the user</li>
+<li><code>/projects/{project_id}/samples/{sample_id}/annotations</code> to get any annotations from the DB to plot over the data</li>
+</ul>
+</li>
+<li>If the user wishes to use an annotator or model to make automated predictions, UI queries <code>/projects/{project_id}/samples/{sample_id}/annotators/{annotator_type}</code> and/or <code>/projects/{project_id}/samples/{sample_id}/models/{model_type}</code> and gets back predictions to also plot over the data</li>
+<li>User changes predictions if required and presses save, UI PUTs to <code>/projects/{project_id}/samples/{sample_id}/annotations</code>endpoint with that sample ID</li>
+<li>User presses Next, UI queries <code>/projects/{project_id}/samples/{next</code> which uses the Query Strategy for the project (random, uncertainty, sequential etc) to pick the next sample to annotate. This returns a sample, the UI loops back to step 3.</li>
+<li>After a few labels, user (or UI automatically?) triggers retraining, PUTs to <code>/projects/{project_id}/model/{model_type}/train</code>.</li>
+<li>Once trained, the model can be used to make batch predictions on unannotated samples by doing a POST to <code>/projects/{project_id}/model/{model_type}/predict</code></li>
+</ol>
+<p>The following are unimplemented currently, but are potential future work:</p>
+<ol>
+<li>
+<p>The user might want to designate an evaluation set of images? ie they could go through a set of however many random pulses and the UI does GETs to <code>/projects/}{project_id}/annotations?{shot_id}</code> and <code>/projects/{project_id}/data?{shot_id}</code> for each. If they tick a ‘evalauation set’ tickbox on the UI,then when it does a PUT to <code>/projects/{project_id}/annotations?{shot_id}</code> it passes in a ‘evaluation=True’ parameter in the request body. This is then saved in the database and these pulses arent used in the training set. </p>
+</li>
+<li>
+<p>User could then do <code>/projects/{project_id}/model/evaluate</code>  to compare predictions against this pulse using the model with human annotations and get statistics from it</p>
+</li>
+<li>
+<p>User could also want to see predictions vs human annotations and statistics about a specific pulse or group of pulses. So would do…</p>
+<ol>
+<li><code>/annotions?{shot_id}</code> to add ‘unbiased’ human annotations</li>
+<li><code>/predictions?{shot_id}</code> to get model predictions</li>
+<li><code>/evaluate?{shot_id}</code> to compare the above and get statistics</li>
+</ol>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

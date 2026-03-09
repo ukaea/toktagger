@@ -1,0 +1,1795 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../data_loaders/">
+      
+      
+        <link rel="next" href="../custom_models/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Custom Data Loaders - TokTagger</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#custom-data-loaders" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="TokTagger" class="md-header__button md-logo" aria-label="TokTagger" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TokTagger
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Custom Data Loaders
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="TokTagger" class="md-nav__button md-logo" aria-label="TokTagger" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    TokTagger
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating_projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating Projects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time_series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Series Labelling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../annotators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_loaders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Loaders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Data Loaders
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Data Loaders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-custom-data-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a Custom Data Loader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating a Custom Data Loader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-import-required-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Import Required Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-define-your-data-loader-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Define Your Data Loader Class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-register-the-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Register the Loader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-run-server-with-custom-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Run Server with Custom Loader
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-types-and-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Types and Schemas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Types and Schemas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sample-data-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample Data Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sample Data Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shotdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ShotData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filedata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FileData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeseriesfiledata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeSeriesFileData
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#return-data-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Return Data Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Return Data Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#imagedata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ImageData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeseriesdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeSeriesData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multivariatetimeseriesdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MultiVariateTimeSeriesData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spectrogramdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpectrogramData
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-csv-time-series-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: CSV Time Series Loader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Example: CSV Time Series Loader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-the-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-database-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Database Loader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Docker
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Documentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Documentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/developer-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unit Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/building-the-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building the Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/API-Design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/System-Architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_6" id="__nav_7_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Interface
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Interface
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/User-Interface-Overall-Design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overall Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/User-Interface-Planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/User-Interface-Details/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Details
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/Providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/Context-Menu-Provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context Menu
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-custom-data-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a Custom Data Loader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating a Custom Data Loader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-import-required-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Import Required Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-define-your-data-loader-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Define Your Data Loader Class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-register-the-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Register the Loader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-run-server-with-custom-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Run Server with Custom Loader
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-types-and-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Types and Schemas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Types and Schemas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sample-data-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample Data Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sample Data Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shotdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ShotData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filedata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FileData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeseriesfiledata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeSeriesFileData
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#return-data-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Return Data Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Return Data Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#imagedata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ImageData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeseriesdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeSeriesData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multivariatetimeseriesdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MultiVariateTimeSeriesData
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spectrogramdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpectrogramData
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-csv-time-series-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example: CSV Time Series Loader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Example: CSV Time Series Loader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-the-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-database-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Database Loader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Docker
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="custom-data-loaders">Custom Data Loaders</h1>
+<p>Data loaders are the bridge between your data sources and TokTagger's annotation interface. They define how to retrieve and format data for visualization and annotation. TokTagger comes with built-in loaders for common formats (images, Parquet files, UDA), but you can easily create custom loaders for your specific data sources.</p>
+<h2 id="overview">Overview</h2>
+<p>A data loader is responsible for:</p>
+<ol>
+<li><strong>Defining the expected sample data format</strong> (e.g., shot IDs with signal names, file paths)</li>
+<li><strong>Retrieving the actual data</strong> from your data source</li>
+<li><strong>Converting the data</strong> into TokTagger's standardized format for visualization</li>
+</ol>
+<h2 id="creating-a-custom-data-loader">Creating a Custom Data Loader</h2>
+<h3 id="step-1-import-required-components">Step 1: Import Required Components</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.core.data_loaders</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataLoader</span><span class="p">,</span> <span class="n">LoaderRegistry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Data</span><span class="p">,</span> <span class="n">MultiVariateTimeSeriesData</span><span class="p">,</span> <span class="n">TimeSeriesData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.samples</span><span class="w"> </span><span class="kn">import</span> <span class="n">ShotData</span><span class="p">,</span> <span class="n">FileData</span><span class="p">,</span> <span class="n">TimeSeriesFileData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pydantic</span>
+</code></pre></div>
+<h3 id="step-2-define-your-data-loader-class">Step 2: Define Your Data Loader Class</h3>
+<p>Create a class that inherits from <code>DataLoader</code> and implement the required methods:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@LoaderRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;my_custom_loader&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MyCustomLoader</span><span class="p">(</span><span class="n">DataLoader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;DataLoader for retrieving data from my custom data source&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+        <span class="c1"># Initialize your data source connection here</span>
+        <span class="c1"># For example: database connection, API client, etc.</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_data_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Type</span><span class="p">[</span><span class="n">ShotData</span> <span class="o">|</span> <span class="n">FileData</span> <span class="o">|</span> <span class="n">TimeSeriesFileData</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Define what type of sample data this loader expects&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">ShotData</span>  <span class="c1"># or FileData, or TimeSeriesFileData</span>
+
+    <span class="nd">@pydantic</span><span class="o">.</span><span class="n">validate_call</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shot_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sample_data</span><span class="p">:</span> <span class="n">ShotData</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Data</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieve and return data for a specific sample.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            shot_id: Unique identifier for the sample</span>
+<span class="sd">            sample_data: Sample-specific configuration (signal names, file paths, etc.)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Data object in TokTagger format</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Your implementation here</span>
+        <span class="k">pass</span>
+</code></pre></div>
+<h3 id="step-3-register-the-loader">Step 3: Register the Loader</h3>
+<p>The <code>@LoaderRegistry.register("my_custom_loader")</code> decorator automatically registers your loader with TokTagger. The name you provide becomes the identifier used in project configurations.</p>
+<h3 id="step-4-run-server-with-custom-loader">Step 4: Run Server with Custom Loader</h3>
+<p>If you have added your own data loaders, you must make sure they have been loaded before the server is run. You can run the server from within a Python script by initializing the <code>Server</code> class, and running <code>server.run()</code>. For example, your script for adding a data loader and running the server may look like this:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataLoader</span><span class="p">,</span> <span class="n">LoaderRegistry</span><span class="p">,</span> <span class="n">Server</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.samples</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sample</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeSeriesData</span>
+
+<span class="c1"># Say we have a python module which can load data from our Tokamak&#39;s data backend:</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">my_tokamak_data_backend</span>
+
+<span class="c1"># Decorate your class using the Loader Registry, </span>
+<span class="c1"># providing a string which you want to refer to your data loader as:</span>
+<span class="nd">@LoaderRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;my_tokamak&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MyDataLoader</span><span class="p">(</span><span class="n">DataLoader</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">:</span> <span class="n">Sample</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeSeriesData</span><span class="p">:</span>
+        <span class="c1"># Here you add the logic for how to obtain the data for your given sample</span>
+        <span class="n">loaded</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">my_tokamak_data_backend</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">shot_id</span> <span class="o">=</span> <span class="n">sample</span><span class="o">.</span><span class="n">shot_id</span><span class="p">,</span> 
+            <span class="n">signal_name</span> <span class="o">=</span> <span class="n">sample</span><span class="o">.</span><span class="n">signal_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Format it into the Data schema which you want to use</span>
+        <span class="c1"># For example, if we are loading time series data:</span>
+        <span class="k">return</span> <span class="n">TimeSeriesData</span><span class="p">(</span>
+            <span class="n">time</span><span class="o">=</span><span class="n">loaded</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> 
+            <span class="n">values</span><span class="o">=</span><span class="n">loaded</span><span class="p">[</span><span class="s2">&quot;values&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+
+<span class="c1"># Create and run a server in the same file, </span>
+<span class="c1"># so that your data loader is correctly added to the registry:</span>
+<span class="n">server</span> <span class="o">=</span> <span class="n">Server</span><span class="p">()</span>
+<span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<h2 id="data-types-and-schemas">Data Types and Schemas</h2>
+<h3 id="sample-data-types">Sample Data Types</h3>
+<p>Choose the appropriate sample data type for your loader:</p>
+<h4 id="shotdata"><code>ShotData</code></h4>
+<p>For shot-based data sources (like UDA, databases):</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ShotData</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">protocol</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;uda&quot;</span><span class="p">,</span> <span class="s2">&quot;sal&quot;</span><span class="p">]</span>
+    <span class="n">signal_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>  <span class="c1"># List of signals to retrieve</span>
+</code></pre></div>
+<p><strong>Use when</strong>: Data is identified by shot number and signal names.</p>
+<h4 id="filedata"><code>FileData</code></h4>
+<p>For file-based data sources (images, videos):</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FileData</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">file_name</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># Path to file or directory</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="n">FileType</span>  <span class="c1"># e.g., &quot;png&quot;, &quot;jpeg&quot;, &quot;mp4&quot;</span>
+    <span class="n">protocol</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;s3&quot;</span><span class="p">]</span>  <span class="c1"># &quot;file&quot; or &quot;s3&quot;</span>
+</code></pre></div>
+<p><strong>Use when</strong>: Data is stored in individual files with different types.</p>
+<h4 id="timeseriesfiledata"><code>TimeSeriesFileData</code></h4>
+<p>For time series files (Parquet, CSV, NetCDF):</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TimeSeriesFileData</span><span class="p">(</span><span class="n">FileData</span><span class="p">):</span>
+    <span class="n">signal_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Optional signal filter</span>
+</code></pre></div>
+<p><strong>Use when</strong>: Files contain time series data with multiple signals.</p>
+<h3 id="return-data-types">Return Data Types</h3>
+<p>Your <code>get_sample()</code> method should return one of these data types:</p>
+<h4 id="imagedata"><code>ImageData</code></h4>
+<p>For image-based visualization:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ImageData</span><span class="p">(</span><span class="n">Data</span><span class="p">):</span>
+    <span class="n">frame</span><span class="p">:</span> <span class="nb">int</span>  <span class="c1"># Frame number or identifier</span>
+    <span class="n">values</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># Base64-encoded image string</span>
+</code></pre></div>
+<h4 id="timeseriesdata"><code>TimeSeriesData</code></h4>
+<p>For single signal time series:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TimeSeriesData</span><span class="p">(</span><span class="n">Data</span><span class="p">):</span>
+    <span class="n">time</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>  <span class="c1"># Time values</span>
+    <span class="n">values</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>  <span class="c1"># Signal values</span>
+</code></pre></div>
+<h4 id="multivariatetimeseriesdata"><code>MultiVariateTimeSeriesData</code></h4>
+<p>For multiple signals (most common for fusion diagnostics):</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MultiVariateTimeSeriesData</span><span class="p">(</span><span class="n">Data</span><span class="p">):</span>
+    <span class="n">values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TimeSeriesData</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span>  <span class="c1"># Signal name -&gt; data</span>
+</code></pre></div>
+<h4 id="spectrogramdata"><code>SpectrogramData</code></h4>
+<p>For frequency-time representations:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SpectrogramData</span><span class="p">(</span><span class="n">Data</span><span class="p">):</span>
+    <span class="n">time</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">frequency</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">amplitude</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span>  <span class="c1"># 2D array</span>
+</code></pre></div>
+<h2 id="complete-example-csv-time-series-loader">Complete Example: CSV Time Series Loader</h2>
+<p>Here's a complete example of a custom loader for CSV time series files:</p>
+<div class="highlight"><span class="filename">loader.py</span><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pydantic</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.core.data_loaders</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataLoader</span><span class="p">,</span> <span class="n">LoaderRegistry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiVariateTimeSeriesData</span><span class="p">,</span> <span class="n">TimeSeriesData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.samples</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeSeriesFileData</span>
+
+
+<span class="nd">@LoaderRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;csv_timeseries&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CSVTimeSeriesLoader</span><span class="p">(</span><span class="n">DataLoader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;DataLoader for retrieving time series data from CSV files&quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_data_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Type</span><span class="p">[</span><span class="n">TimeSeriesFileData</span><span class="p">]:</span>
+        <span class="c1"># This loader expects file paths with optional signal names</span>
+        <span class="k">return</span> <span class="n">TimeSeriesFileData</span>
+
+    <span class="nd">@pydantic</span><span class="o">.</span><span class="n">validate_call</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_sample</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> 
+        <span class="n">shot_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+        <span class="n">sample_data</span><span class="p">:</span> <span class="n">TimeSeriesFileData</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MultiVariateTimeSeriesData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load time series data from a CSV file.</span>
+
+<span class="sd">        Expected CSV format:</span>
+<span class="sd">        - First column: time values</span>
+<span class="sd">        - Remaining columns: signal values with column headers</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Verify file exists</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">sample_data</span><span class="o">.</span><span class="n">file_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Could not find CSV file at &#39;</span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Read CSV file</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># First column is time</span>
+
+        <span class="c1"># Filter to requested signals if specified</span>
+        <span class="k">if</span> <span class="n">sample_data</span><span class="o">.</span><span class="n">signal_names</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">sample_data</span><span class="o">.</span><span class="n">signal_names</span><span class="p">]</span>
+
+        <span class="c1"># Handle missing values</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># Extract time values from index</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+        <span class="c1"># Convert each column to TimeSeriesData format</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">column_name</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">results</span><span class="p">[</span><span class="n">column_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">TimeSeriesData</span><span class="p">(</span>
+                <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
+                <span class="n">values</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="n">column_name</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">MultiVariateTimeSeriesData</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">results</span><span class="p">)</span>
+</code></pre></div>
+<p>This examples assumes the CSV file has the following format:</p>
+<ul>
+<li>First column: time values</li>
+<li>Remaining columns: signal values with column headers</li>
+</ul>
+<p>The file should be called <code>{shot_id}.csv</code>.</p>
+<p>For example:</p>
+<div class="highlight"><span class="filename">1.csv</span><pre><span></span><code>time,signal1,signal2
+0.0,1.0,2.0
+0.1,1.5,2.5
+0.2,2.0,3.0
+</code></pre></div>
+<h3 id="running-the-example">Running the Example</h3>
+<p>To run the example above and create a custom CSV dataloader:</p>
+<ul>
+<li>Copy the code above into a file called <code>loader.py</code></li>
+<li>Make a file to run the server called <code>run.py</code>, which does:</li>
+</ul>
+<div class="highlight"><span class="filename">run.py</span><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">loader</span><span class="w"> </span><span class="kn">import</span> <span class="n">CSVTimeSeriesLoader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.main</span><span class="w"> </span><span class="kn">import</span> <span class="n">Server</span>
+
+<span class="n">server</span> <span class="o">=</span> <span class="n">Server</span><span class="p">()</span>
+<span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<ul>
+<li>Create a directory which will contain your data called <code>data</code>, and then copy the CSV above into a file named <code>1.csv</code> within the new directory</li>
+<li>Run <code>python run.py</code></li>
+<li>Open the UI in your browser at <code>localhost:8002/ui/projects</code></li>
+<li>Click the <code>Create</code> button on the UI, and click the <code>Data Loader</code> dropdown. You should see your new data loader listed there, called <code>csv_timeseries</code>.</li>
+<li>After selecting the custom data loader, set the file path as <code>data</code> - the UI should tell you that a file has been found within that directory. Fill in the other information, including project name and task as shown below, and press <code>Create</code>:</li>
+</ul>
+<p><img alt="image" src="../assets/dataloaders/create_project_ui.png" /></p>
+<ul>
+<li>You should now be able to open the sample which we have created, corresponding to our CSV file. You should see two time series plots containing the data from our CSV file:</li>
+</ul>
+<p><img alt="image" src="../assets/dataloaders/csv_dataloader_sample.png" /></p>
+<h2 id="example-database-loader">Example: Database Loader</h2>
+<p>Here's an example of loading data from a SQL database:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pydantic</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.core.data_loaders</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataLoader</span><span class="p">,</span> <span class="n">LoaderRegistry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiVariateTimeSeriesData</span><span class="p">,</span> <span class="n">TimeSeriesData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">toktagger.api.schemas.samples</span><span class="w"> </span><span class="kn">import</span> <span class="n">ShotData</span>
+
+
+<span class="nd">@LoaderRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;sql_database&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SQLDatabaseLoader</span><span class="p">(</span><span class="n">DataLoader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;DataLoader for retrieving data from a SQL database&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+        <span class="c1"># Initialize database connection</span>
+        <span class="c1"># Connection string should be in environment variable</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+        <span class="n">connection_string</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;DATABASE_URL&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">sa</span><span class="o">.</span><span class="n">create_engine</span><span class="p">(</span><span class="n">connection_string</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_data_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Type</span><span class="p">[</span><span class="n">ShotData</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">ShotData</span>
+
+    <span class="nd">@pydantic</span><span class="o">.</span><span class="n">validate_call</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_sample</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> 
+        <span class="n">shot_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+        <span class="n">sample_data</span><span class="p">:</span> <span class="n">ShotData</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MultiVariateTimeSeriesData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load time series data from database&quot;&quot;&quot;</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">signal_name</span> <span class="ow">in</span> <span class="n">sample_data</span><span class="o">.</span><span class="n">signal_names</span><span class="p">:</span>
+                <span class="c1"># Query time series data for this shot and signal</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="n">sa</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    SELECT time, value </span>
+<span class="s2">                    FROM timeseries_data </span>
+<span class="s2">                    WHERE shot_id = :shot_id AND signal_name = :signal_name</span>
+<span class="s2">                    ORDER BY time</span>
+<span class="s2">                &quot;&quot;&quot;</span><span class="p">)</span>
+
+                <span class="n">result</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                    <span class="n">query</span><span class="p">,</span> 
+                    <span class="p">{</span><span class="s2">&quot;shot_id&quot;</span><span class="p">:</span> <span class="n">shot_id</span><span class="p">,</span> <span class="s2">&quot;signal_name&quot;</span><span class="p">:</span> <span class="n">signal_name</span><span class="p">}</span>
+                <span class="p">)</span>
+                <span class="n">rows</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="n">rows</span><span class="p">:</span>
+                    <span class="n">time</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span>
+                    <span class="n">values</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span>
+                    <span class="n">results</span><span class="p">[</span><span class="n">signal_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">TimeSeriesData</span><span class="p">(</span><span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="n">values</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">results</span><span class="p">[</span><span class="n">signal_name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">MultiVariateTimeSeriesData</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">results</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="using-docker">Using Docker</h2>
+<p>If you are using the docker compose option to run the server, you can provide a custom script similar to the one above to add your own data loaders. To do this, create a file similar to the one above, but making sure to pass the following arguments into <code>server.run()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span>
+    <span class="n">port</span><span class="o">=</span><span class="mi">8002</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>You can then provide the path to your script when running docker compose. For example, say we have the above script in a file called <code>custom_toktagger.py</code> - We simply need to add <code>CUSTOM_SCRIPT=./custom_toktagger.py</code> before the docker compose command!</p>
+<div class="highlight"><pre><span></span><code><span class="nv">CUSTOM_SCRIPT</span><span class="o">=</span>./custom_toktagger.py<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>.env.dev<span class="w"> </span>-f<span class="w"> </span>docker-compose.dev.yml<span class="w"> </span>up<span class="w"> </span>--build
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Make sure you provide the <strong>path</strong> to your script, and not a string. </p>
+<p>e.g, provide <code>CUSTOM_SCRIPT=./custom_toktagger.py</code>, and <strong>not</strong> <code>CUSTOM_SCRIPT=custom_toktagger.py</code>.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
