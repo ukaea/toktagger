@@ -48,12 +48,14 @@ const SampleDataBreadCrumbs = ({
 };
 
 const SampleView = () => {
-  const { project, error } = useSample();
+  const { project, error, isLoading, data } = useSample();
   if (!project) return null;
   if (error) return <ErrorView message={error} />;
 
-  if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
-  if (project.task === TaskType.Video) return <VideoView />;
+  if (project.task === TaskType.TimeSeries)
+    return isLoading ? <LoadingView /> : <TimeSeriesView />;
+  if (project.task === TaskType.Video)
+    return isLoading && !data ? <LoadingView /> : <VideoView />;
   // if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
   return null;
 };
@@ -69,7 +71,7 @@ function SampleTaskProviders({ children }: { children: React.ReactNode }) {
 }
 
 function SamplePageContent(props: { sampleId: string }) {
-  const { project, sample, data, isLoading, error } = useSample();
+  const { project, sample, isLoading, error } = useSample();
 
   // Early returns AFTER all hooks
   if (error) return <ErrorView message={error} />;
@@ -94,11 +96,6 @@ function SamplePageContent(props: { sampleId: string }) {
   if (sample._id !== props.sampleId) {
     return <LoadingView />;
   }
-
-  // Hard-block on loading for all tasks.
-  if (isLoading && !data) return <LoadingView />;
-
-  if (!data) return null;
 
   return (
     <div>
