@@ -25,19 +25,19 @@ dependencies = [
   "requests",
   "numpy<2",
   "scikit-learn",
+  "pandas<=2.2.3",
   "pillow",
   "uda",
   "sal",
   "ruptures>=1.1.10",
-  "platformdirs",
+  "psutil>=7.0.0",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
-  "psutil>=7.0.0",
-  "pyspark>=4.0.0",
   "hmmlearn>=0.3.3",
   "uda-xarray>=0.2.1",
   "sal-xarray>=0.2.1",
   "bump-my-version>=1.2.7",
+  "platformdirs>=4.4.0",
 ]
 [project.optional-dependencies]
 models = [
