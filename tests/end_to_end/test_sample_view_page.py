@@ -11,6 +11,7 @@ import tempfile
 import json
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 import requests
+import time
 
 
 def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False):
@@ -297,6 +298,8 @@ def test_import_annotations(server_setup, page: Page):
 
         json.dump(annotations, file)
         file.flush()
+        # Make sure file is written
+        time.sleep(0.5)
 
         # Expand Import Annotations group
         expect(page.get_by_role("button", name="Import Annotations")).to_be_visible()

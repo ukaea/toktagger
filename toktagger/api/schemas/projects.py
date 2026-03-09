@@ -114,6 +114,10 @@ class ProjectIn(ConfiguredModel):
     @computed_field
     @property
     def model_types(self) -> List[str]:
+        from toktagger.api.models import models_dependencies_installed
+
+        if not models_dependencies_installed():
+            return []
         from toktagger.api.models.base import ModelRegistry
 
         return ModelRegistry.names(Task(self.task))

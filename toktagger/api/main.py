@@ -3,6 +3,8 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import uvicorn
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.data import router as data_router
@@ -14,80 +16,16 @@ from toktagger.api.routers.paths import router as paths_router
 from toktagger.api.routers.meta import router as meta_router
 
 from toktagger.api.crud.db import MongoDBClient
-from toktagger.api.models.base import ModelRegistry, WorkerModelRegistry
-from contextlib import asynccontextmanager
-import uvicorn
-import ray
-import uuid
+from toktagger.api.models import models_dependencies_installed
 
-
-class TaskRegistry:
-    """Registry to keep track of Ray actors, and the task they are associated with."""
-
-    def __init__(self, max_actors: int):
-        """Create task registry
-
-        Parameters
-        ----------
-        max_actors : int
-            Maximum number of actors to keep alive simultaneously
-        """
-        self.max_actors = max_actors
-        self.tasks = {}
-        self.actors = []
-
-    def register(self, task_ref: ray.ObjectRef) -> str:
-        """Store a Ray task reference in the registry and associate with a UUID.
-
-        Parameters
-        ----------
-        task_ref : ray.ObjectRef
-            The reference to the Ray task
-
-        Returns
-        -------
-        str
-            A unique identifier for this task
-        """
-        task_id = str(uuid.uuid4())
-        self.tasks[task_id] = task_ref
-        return task_id
-
-    def get(self, task_id: str) -> ray.ObjectRef | None:
-        """Convert a task ID back into the Ray task reference
-
-        Parameters
-        ----------
-        task_id : str
-            The unique identifier for this task
-
-        Returns
-        -------
-        ray.ObjectRef | None
-            The Ray task reference, if it exists in the Registry
-        """
-        return self.tasks.get(task_id)
-
-    def update_actors(self, actor_name: str) -> None:
-        """Record that a Ray Actor has been accessed, and kill any stale Actors.
-
-        Parameters
-        ----------
-        actor_name : str
-            The name of the Ray Actor
-        """
-        if actor_name in self.actors:
-            self.actors.remove(actor_name)
-
-        self.actors.append(actor_name)
-
-        if len(self.actors) > self.max_actors:
-            stale_actor = self.actors.pop(0)
-            try:
-                actor = ray.get_actor(stale_actor)
-                ray.kill(actor)
-            except ValueError:
-                return
+# Only import large packages if models dependencies installed
+if models_dependencies_installed():
+    from toktagger.api.models.base import (
+        ModelRegistry,
+        WorkerModelRegistry,
+        ActorRegistry,
+    )
+    import ray
 
 
 @asynccontextmanager
@@ -97,23 +35,9 @@ async def lifespan(app: FastAPI):
 
     app.state.db_client = MongoDBClient(mongo_url, db_name)
     app.state.project = None
-    app.state.task_registry = TaskRegistry(max_actors=5)
-
     yield
 
     await app.state.db_client.client.close()
-
-
-def setup_worker(registry, tasks):
-    print("HIIIIIIIIIIIIIIIIIIIIIIII")
-    registry_hex = os.environ.get("registry")
-    tasks_hex = os.environ.get("tasks")
-    if registry_hex and tasks_hex:
-        registry_data = ray.get(ray.ObjectRef.from_hex(registry_hex))
-        tasks_data = ray.get(ray.ObjectRef.from_hex(tasks_hex))
-
-    # Restore the state in the worker's memory space
-    ModelRegistry.restore_state(registry_data, tasks_data)
 
 
 class Server:
@@ -130,6 +54,10 @@ class Server:
                     }
                 }
             )
+        # Create a task registry
+        self.app.state.task_registry = ActorRegistry(
+            max_actors=os.environ.get("MAX_ACTORS", 5)
+        )
 
         # Create a ray actor for use as a model registry
         WorkerModelRegistry.options(
@@ -176,5 +104,6 @@ class Server:
         port: int = 8002,
     ):
         self._setup_app()
-        self._setup_ray(f"http://{host}:{port}", os.environ.get("MODEL_STORAGE"))
+        if models_dependencies_installed():
+            self._setup_ray(f"http://{host}:{port}", os.environ.get("MODEL_STORAGE"))
         uvicorn.run(self.app, host=host, port=port)
