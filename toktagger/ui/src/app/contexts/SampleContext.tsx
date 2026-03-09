@@ -137,6 +137,7 @@ export function SampleProvider({
   const [dataParams, setDataParams] = useState<DataParams>({
     name: "identity",
   });
+  const [prevSampleId, setPrevSampleId] = useState(sampleId);
 
   const [plotProps, setPlotProps] = useState<PlotProps>({
     colorMap: "Cividis",
@@ -154,9 +155,17 @@ export function SampleProvider({
 
   // Video: remember the last successfully loaded frame so missing frames become navigation bounds.
   const lastGoodVideoFrameRef = useRef<number | null>(null);
+  // Video: track which sample has already had its first-frame bootstrap request.
+  const bootstrappedVideoSampleIdRef = useRef<string | null>(null);
+
+  if (prevSampleId !== sampleId) {
+    setPrevSampleId(sampleId);
+    setDataParams({ name: "identity" });
+  }
 
   useEffect(() => {
     setVideoFrameBounds({ min: null, max: null });
+    lastGoodVideoFrameRef.current = null;
   }, [sampleId]);
 
   function extractDetail(payload: unknown): string {
@@ -225,10 +234,12 @@ export function SampleProvider({
         let effectiveDataParams: DataParams = dataParams;
 
         if (projectData.task === TaskType.Video) {
+          const isFirstRequestForSample =
+            bootstrappedVideoSampleIdRef.current !== sampleId;
           effectiveDataParams = {
             ...dataParams,
             name: "image",
-            frame: dataParams.frame ?? null,
+            frame: isFirstRequestForSample ? null : (dataParams.frame ?? null),
           };
         }
 
@@ -308,6 +319,7 @@ export function SampleProvider({
         if (projectData.task === TaskType.Video) {
           const frame = (viewData as { frame?: unknown }).frame;
           if (typeof frame === "number" && Number.isFinite(frame)) {
+            bootstrappedVideoSampleIdRef.current = sampleId;
             lastGoodVideoFrameRef.current = frame;
             setVideoFrameBounds((prev) => ({
               ...prev,

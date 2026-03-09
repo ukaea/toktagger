@@ -38,7 +38,6 @@ import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
-import { VideoNavigationBar } from "@/app/video/components/video-navigation-bar";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -321,15 +320,7 @@ export default function ToolBar() {
             <Header height="size-300" marginBottom="size-100">
               <span style={{ fontSize: "1.2rem" }}>Controls</span>
             </Header>
-            {project.task === TaskType.Video ? (
-              <VideoNavigationBar
-                project_id={project_id}
-                sample_id={sample_id}
-                onSaved={refreshAnnotations}
-              />
-            ) : (
-              <NavigationBar project_id={project_id} sample_id={sample_id} />
-            )}
+            <NavigationBar project_id={project_id} sample_id={sample_id} />
             <Accordion allowsMultipleExpanded={true} width="100%">
               <Disclosure>
                 <DisclosureTitle>
