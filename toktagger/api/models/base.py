@@ -7,19 +7,12 @@ import typing
 import math
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
-import importlib.util
+from toktagger.api.models import models_dependencies_installed
+
 import uuid
 import logging
 
 logger = logging.getLogger("ray")
-
-
-def models_dependencies_installed() -> bool:
-    return (
-        importlib.util.find_spec("torch") is not None
-        and importlib.util.find_spec("ray") is not None
-    )
-
 
 if models_dependencies_installed():
     import ray
@@ -203,7 +196,7 @@ class WorkerModelRegistry:
         return ray.remote(model_class)
 
 
-class TaskRegistry:
+class ActorRegistry:
     """Registry to keep track of Ray actors, and the task they are associated with."""
 
     def __init__(self, max_actors: int):

@@ -23,7 +23,7 @@ if models_dependencies_installed():
     from toktagger.api.models.base import (
         ModelRegistry,
         WorkerModelRegistry,
-        TaskRegistry,
+        ActorRegistry,
     )
     import ray
 
@@ -55,7 +55,9 @@ class Server:
                 }
             )
         # Create a task registry
-        self.app.state.task_registry = TaskRegistry(max_actors=5)
+        self.app.state.task_registry = ActorRegistry(
+            max_actors=os.environ.get("MAX_ACTORS", 5)
+        )
 
         # Create a ray actor for use as a model registry
         WorkerModelRegistry.options(
