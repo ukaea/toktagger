@@ -204,7 +204,6 @@ export const TimeSeries = ({
         return; // Ignore relayout events triggered by our own tool updates
       }
       if (rescaleOnZoom) {
-        console.log("Relayout event data:", eventData); // Debug log to inspect event data
         // This makes use of the first graph displayed but this should be fine
         if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
           // for zoom and pan events

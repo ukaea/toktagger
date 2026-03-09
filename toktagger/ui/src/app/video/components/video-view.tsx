@@ -13,6 +13,7 @@ import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host"
 import { useSample } from "@/app/contexts/SampleContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
 import { useParams } from "react-router-dom";
+import LoadingView from "@/app/views/loading";
 
 /**
  * Small "jump to frame" input with validation. Delegates the actual navigation
@@ -62,7 +63,7 @@ function VideoFrameAnnotator(props: {
   goToFrame: (n: number) => void;
 }) {
   const session = useVideoSession();
-  const { videoFrameBounds } = useSample();
+  const { videoFrameBounds, isLoading } = useSample();
 
   const prevDisabled =
     session.frame <= 0 ||
@@ -126,6 +127,7 @@ function VideoFrameAnnotator(props: {
       </div>
 
       {/* Frame annotator canvas (image + Annotorious overlay). */}
+      {isLoading && <LoadingView />}
       <div className="w-full flex flex-col items-center gap-3">
         <FrameAnnotatorHost imageBase64={props.imageBase64} />
       </div>

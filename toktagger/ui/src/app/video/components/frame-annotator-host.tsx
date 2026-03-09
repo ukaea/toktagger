@@ -11,6 +11,8 @@ import "@annotorious/react/annotorious-react.css";
 import { useVideoSession } from "@/app/video/components/video-session";
 import { getLabelTrack, readRectGeometry } from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
+import { useSample } from "@/app/contexts/SampleContext";
+import LoadingView from "@/app/views/loading";
 
 /**
  * Top-level host that provides the Annotorious context and renders the annotator.
@@ -109,12 +111,17 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   const drawingEnabled = !!selection.className;
   const label = frame;
+  const { isLoading } = useSample();
 
   return (
     // This keeps centering approach:
     // - outer flex justify-center centers the inline-block content
     // - inner inline-block shrink-wraps to the image width we set
-    <div ref={containerRef} className="w-full flex justify-center">
+    <div
+      ref={containerRef}
+      className="w-full flex justify-center"
+      style={{ display: isLoading ? "none" : undefined }}
+    >
       <div className="relative inline-block max-w-full">
         <ImageAnnotator
           tool="rectangle"
