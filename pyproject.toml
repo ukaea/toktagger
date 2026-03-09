@@ -37,6 +37,7 @@ dependencies = [
   "hmmlearn>=0.3.3",
   "uda-xarray>=0.2.1",
   "sal-xarray>=0.2.1",
+  "bump-my-version>=1.2.7",
 ]
 [project.optional-dependencies]
 models = [
