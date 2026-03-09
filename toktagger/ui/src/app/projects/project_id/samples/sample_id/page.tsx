@@ -11,7 +11,7 @@ import {
 } from "@adobe/react-spectrum";
 import { Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
-import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
+// import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import ToolBar from "@/app/components/tools/toolbar";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
@@ -53,8 +53,8 @@ const SampleView = () => {
   if (error) return <ErrorView message={error} />;
 
   if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
-  if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
   if (project.task === TaskType.Video) return <VideoView />;
+  // if (project.task === TaskType.Spectrogram) return <SpectrogramView />;
   return null;
 };
 
@@ -95,10 +95,6 @@ function SamplePageContent(props: { sampleId: string }) {
     return <LoadingView />;
   }
 
-  if (isVideo && !data) {
-    return <LoadingView />;
-  }
-
   return (
     <div>
       <Provider theme={defaultTheme}>
@@ -109,7 +105,7 @@ function SamplePageContent(props: { sampleId: string }) {
         <Flex>
           <SampleTaskProviders>
             <ToolBar />
-            <SampleView />
+            {isLoading ? <LoadingView /> : <SampleView />}
           </SampleTaskProviders>
         </Flex>
       </Provider>

@@ -140,13 +140,13 @@ export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export enum TaskType {
   TimeSeries = "time-series",
-  Spectrogram = "spectrogram",
+  // Spectrogram = "spectrogram",
   Video = "video",
 }
 
 export const TaskSchema = z.enum([
   TaskType.TimeSeries,
-  TaskType.Spectrogram,
+  // TaskType.Spectrogram,
   TaskType.Video,
 ]);
 

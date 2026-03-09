@@ -95,20 +95,20 @@ async function parseData(
       throw new Error("Invalid data for time series view");
     }
     return result.data;
-  } else if (task == TaskType.Spectrogram) {
-    const result = CompositeDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for spectrogram view");
-    }
+    // } else if (task == TaskType.Spectrogram) {
+    //   const result = CompositeDataSchema.safeParse(data);
+    //   if (!result.success) {
+    //     throw new Error("Invalid data for spectrogram view");
+    //   }
 
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"],
-    );
-    if (!mhdData.success) {
-      throw new Error("Invalid data for spectrogram view");
-    }
+    //   const mhdData = SpectrogramDataSchema.safeParse(
+    //     result.data.values["mirnov"],
+    //   );
+    //   if (!mhdData.success) {
+    //     throw new Error("Invalid data for spectrogram view");
+    //   }
 
-    return mhdData.data;
+    //   return mhdData.data;
   } else if (task == TaskType.Video) {
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
@@ -218,13 +218,13 @@ export function SampleProvider({
         setIsValidated(sampleData.validated_annotations);
 
         let params = viewParams;
-        if (projectData.task === TaskType.Spectrogram) {
-          params = {
-            ...params,
-            name: "spectrogram",
-            nperseg: 256,
-          } as SpectrogramViewParams;
-        }
+        // if (projectData.task === TaskType.Spectrogram) {
+        //   params = {
+        //     ...params,
+        //     name: "spectrogram",
+        //     nperseg: 256,
+        //   } as SpectrogramViewParams;
+        // }
 
         // ------------------------------------------------------------
         // video projects must request image data parameters.
