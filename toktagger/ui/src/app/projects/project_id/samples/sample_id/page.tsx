@@ -95,10 +95,9 @@ function SamplePageContent(props: { sampleId: string }) {
     return <LoadingView />;
   }
 
-  // Hard-block on loading for all tasks.
-  if (isLoading && !data) return <LoadingView />;
-
-  if (!data) return null;
+  if (isVideo && !data) {
+    return <LoadingView />;
+  }
 
   return (
     <div>
