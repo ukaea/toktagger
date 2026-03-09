@@ -7,7 +7,7 @@ To run the tests, you need to install the development environment with `uv`:
 ```
 uv venv --python 3.12.6
 source .venv/bin/activate
-uv sync
+uv sync --all-extras
 python -m playwright install --with-deps
 pytest
 ```

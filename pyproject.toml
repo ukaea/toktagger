@@ -28,19 +28,22 @@ dependencies = [
   "pillow",
   "uda",
   "sal",
-  "ruptures>=1.1.10",
-  "torch",
+  "ruptures @ git+https://github.com/deepcharles/ruptures.git@e88da13b5f625f37321abd07c5d14b91701c6655",
   "platformdirs",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
   "psutil>=7.0.0",
-  "ray>=2.49.1",
   "pyspark>=4.0.0",
   "hmmlearn>=0.3.3",
-  "ray>=2.51.1",
   "uda-xarray>=0.2.1",
   "sal-xarray>=0.2.1",
 ]
+[project.optional-dependencies]
+models = [
+  "torch",
+  "ray>=2.49.1",
+]
+
 
 [tool.setuptools.packages.find]
 where = ["."]
