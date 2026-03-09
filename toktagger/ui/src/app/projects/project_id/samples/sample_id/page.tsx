@@ -95,6 +95,11 @@ function SamplePageContent(props: { sampleId: string }) {
     return <LoadingView />;
   }
 
+  // Hard-block on loading for all tasks.
+  if (isLoading && !data) return <LoadingView />;
+
+  if (!data) return null;
+
   return (
     <div>
       <Provider theme={defaultTheme}>
@@ -105,7 +110,7 @@ function SamplePageContent(props: { sampleId: string }) {
         <Flex>
           <SampleTaskProviders>
             <ToolBar />
-            {isLoading ? <LoadingView /> : <SampleView />}
+            <SampleView />
           </SampleTaskProviders>
         </Flex>
       </Provider>
