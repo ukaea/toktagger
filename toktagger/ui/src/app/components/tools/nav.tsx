@@ -124,8 +124,6 @@ function NextButton({
     );
     if (saveOnNavigate) {
       navAdapter?.afterSave?.();
-    }
-    if (saveOnNavigate) {
       setIsValidated(true);
     }
     await navigateToNextSample(
@@ -221,8 +219,6 @@ function PreviousButton({
     );
     if (saveOnNavigate) {
       navAdapter?.afterSave?.();
-    }
-    if (saveOnNavigate) {
       setIsValidated(true);
     }
 
