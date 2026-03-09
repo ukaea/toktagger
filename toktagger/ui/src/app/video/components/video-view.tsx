@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Annotorious } from "@annotorious/react";
+import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
 import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
 import {
@@ -64,7 +65,8 @@ function VideoFrameAnnotator(props: {
   const { videoFrameBounds } = useSample();
 
   const prevDisabled =
-    videoFrameBounds.min !== null && session.frame <= videoFrameBounds.min;
+    session.frame <= 0 ||
+    (videoFrameBounds.min !== null && session.frame <= videoFrameBounds.min);
   const nextDisabled =
     videoFrameBounds.max !== null && session.frame >= videoFrameBounds.max;
 
@@ -160,7 +162,7 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
  * This component assumes it is already inside a VideoSessionProvider.
  */
 export function VideoView() {
-  const { data, dataParams, setDataParams } = useSample();
+  const { data, setDataParams } = useSample();
 
   if (!data) return null;
 
@@ -180,11 +182,14 @@ export function VideoView() {
     if (!Number.isFinite(n)) return;
     const target = Math.max(0, Math.trunc(n));
 
-    setDataParams({
-      ...dataParams,
-      name: "image",
-      frame: target,
-    });
+    setDataParams(
+      (prev) =>
+        ({
+          ...(prev as Record<string, unknown>),
+          name: "image",
+          frame: target,
+        }) as DataParams,
+    );
   };
 
   return (
