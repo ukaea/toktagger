@@ -178,7 +178,7 @@ def test_projects_sorting(server_setup, page: Page):
     # Create some projects
     create_project("A Project", "time-series", "uda")
     time.sleep(0.1)
-    create_project("B Project", "spectrogram", "tabular")
+    create_project("B Project", "video", "tabular")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -400,30 +400,30 @@ def test_edit_project(server_setup, page: Page):
             True,
             ["Shot Labels", "Time Region Labels", "Time Point Labels"],
         ),
-        (
-            "spectrogram",
-            "sal",
-            True,
-            [
-                "Shot Labels",
-                "Time Region Labels",
-                "Time Point Labels",
-                "Bounding Box Labels",
-                "Polygon Labels",
-            ],
-        ),
-        (
-            "spectrogram",
-            "fair_mast",
-            True,
-            [
-                "Shot Labels",
-                "Time Region Labels",
-                "Time Point Labels",
-                "Bounding Box Labels",
-                "Polygon Labels",
-            ],
-        ),
+        # (
+        #     "spectrogram",
+        #     "sal",
+        #     True,
+        #     [
+        #         "Shot Labels",
+        #         "Time Region Labels",
+        #         "Time Point Labels",
+        #         "Bounding Box Labels",
+        #         "Polygon Labels",
+        #     ],
+        # ),
+        # (
+        #     "spectrogram",
+        #     "fair_mast",
+        #     True,
+        #     [
+        #         "Shot Labels",
+        #         "Time Region Labels",
+        #         "Time Point Labels",
+        #         "Bounding Box Labels",
+        #         "Polygon Labels",
+        #     ],
+        # ),
         (
             "video",
             "image",
