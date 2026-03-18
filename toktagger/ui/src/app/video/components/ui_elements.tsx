@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Item, Text, Picker } from "@adobe/react-spectrum";
+import { Item, Text, Picker, View } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 
 /**
@@ -26,10 +26,10 @@ export function ClassPanel({
   setSelectedClassName: (v: string | null) => void;
 }) {
   return (
-    <div className="mx-auto w-48 rounded-xl border border-gray-200 bg-white p-3 text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-      <Text UNSAFE_className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
-        Annotation Label
-      </Text>
+    <View marginX="auto" width="12rem">
+      <View marginBottom="size-100">
+        <Text>Class Label</Text>
+      </View>
 
       <Picker
         aria-label="Class"
@@ -43,7 +43,7 @@ export function ClassPanel({
       >
         {(item) => <Item key={item.name}>{item.name}</Item>}
       </Picker>
-    </div>
+    </View>
   );
 }
 

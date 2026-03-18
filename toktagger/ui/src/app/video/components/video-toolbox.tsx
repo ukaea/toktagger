@@ -236,9 +236,6 @@ export function VideoToolbox() {
         */}
 
         <div className="px-4 py-4">
-          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Class
-          </div>
           <VideoClassPanel
             items={classItems}
             selectedClassName={session.selection.className}
