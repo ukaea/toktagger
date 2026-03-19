@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Item, Text, Picker, View } from "@adobe/react-spectrum";
+import { ComboBox, Item, View } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 
 /**
@@ -27,22 +27,17 @@ export function ClassPanel({
 }) {
   return (
     <View marginX="auto" width="12rem">
-      <View marginBottom="size-100">
-        <Text>Class Label</Text>
-      </View>
-
-      <Picker
-        aria-label="Class"
+      <ComboBox
+        label="Class Label"
         items={items}
         selectedKey={selectedClassName}
         onSelectionChange={(key) =>
           setSelectedClassName((key as string) || null)
         }
-        placeholder="— Select class —"
         width="100%"
       >
         {(item) => <Item key={item.name}>{item.name}</Item>}
-      </Picker>
+      </ComboBox>
     </View>
   );
 }
