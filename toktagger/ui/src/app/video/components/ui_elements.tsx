@@ -95,7 +95,7 @@ export function InstancePanel({
   const creatorEnabled = Boolean(classItems && classItems.length > 0);
 
   return (
-    <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
+    <div className="w-48 shrink-0 mx-auto">
       {showCreator && (
         <div className="mb-3">
           <button
