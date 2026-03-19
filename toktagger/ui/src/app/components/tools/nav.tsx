@@ -1,5 +1,5 @@
 "use client";
-import { Annotation, Project } from "@/types";
+import { Annotation, Project, type NavAdapter } from "@/types";
 import {
   Flex,
   Button,
@@ -30,7 +30,6 @@ import { getNextSample } from "@/app/core";
 import type { SortDescriptor, SortDirection, Key } from "@react-types/shared";
 import {
   useNavAdapterOptional,
-  type NavAdapter,
 } from "@/app/video/components/video-nav-adapter";
 
 const TOAST_TIMEOUT = 5000;

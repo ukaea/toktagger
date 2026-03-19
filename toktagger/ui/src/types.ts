@@ -59,6 +59,12 @@ export const AnnotationSchema = z.union([
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
+export type NavAdapter = {
+  getAnnotations: () => Annotation[];
+  clear: () => void;
+  afterSave?: () => void;
+};
+
 export const AnnotationsSchema = z.array(AnnotationSchema);
 export type Annotations = z.infer<typeof AnnotationsSchema>;
 

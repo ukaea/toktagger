@@ -2,14 +2,8 @@
 
 import React, { createContext, useContext } from "react";
 import { useSample } from "@/app/contexts/SampleContext";
-import type { Annotation } from "@/types";
+import type { Annotation, NavAdapter } from "@/types";
 import { useVideoSession } from "./video-session";
-
-export type NavAdapter = {
-  getAnnotations: () => Annotation[];
-  clear: () => void;
-  afterSave?: () => void;
-};
 
 const NavAdapterContext = createContext<NavAdapter | null>(null);
 
