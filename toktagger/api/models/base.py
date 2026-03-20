@@ -1,6 +1,7 @@
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.core.data_loaders import DataLoader
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
 import typing
@@ -185,15 +186,15 @@ class ModelRegistry:
 
 
 @ray.remote
-class WorkerModelRegistry:
+class WorkerRegistry:
     def __init__(self, registry):
-        self._registry: dict[str, Model] = registry
+        self._registry: dict[str, Model | DataLoader] = registry
 
     def get(self, name):
-        model_class: Model | None = self._registry.get(name)
-        if not model_class:
-            raise ValueError(f"No Model class called '{name}' found in registry!")
-        return ray.remote(model_class)
+        registered: Model | DataLoader | None = self._registry.get(name)
+        if not registered:
+            raise ValueError(f"No class called '{name}' found in registry!")
+        return ray.remote(registered)
 
 
 class ActorRegistry:
