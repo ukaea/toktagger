@@ -29,8 +29,11 @@ class Model(ABC):
         self.project = project
         self.model = self.define_model()
         self.type = ModelRegistry.get_name(self.__class__)
-        loader_registry = ray.get_actor("WorkerLoaderRegistry")
-        self.data_loader = loader_registry.get(project.data_loader)()
+        loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
+        data_loader: DataLoader = ray.get(
+            loader_registry.get.remote(project.data_loader)
+        )
+        self.data_loader = data_loader()
 
     def log_progress(
         self,
@@ -196,7 +199,7 @@ class WorkerRegistry:
         registered: Model | DataLoader | None = self._registry.get(name)
         if not registered:
             raise ValueError(f"No class called '{name}' found in registry!")
-        return ray.remote(registered)
+        return registered
 
 
 class ActorRegistry:

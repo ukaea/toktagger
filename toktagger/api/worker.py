@@ -43,9 +43,13 @@ def get_actor(project, model):
         model_registry = ray.get_actor("WorkerModelRegistry")
         model_type = ray.get(model_registry.get.remote(model.type))
 
-        ml_model = model_type.options(name=model.id, lifetime="detached").remote(
-            model_id=str(model.id),
-            project=project,
+        ml_model = (
+            ray.remote(model_type)
+            .options(name=model.id, lifetime="detached")
+            .remote(
+                model_id=str(model.id),
+                project=project,
+            )
         )
 
         model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
