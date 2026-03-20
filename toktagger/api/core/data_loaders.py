@@ -298,9 +298,6 @@ class UDADataLoader(DataLoader):
 class UDACameraDataLoader(DataLoader):
     """DataLoader for retrieving camera image data using the UDA access layer"""
 
-    def __init__(self, params: DataParamTypes):
-        super().__init__(params)
-
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
