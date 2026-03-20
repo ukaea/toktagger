@@ -29,6 +29,8 @@ class Model(ABC):
         self.project = project
         self.model = self.define_model()
         self.type = ModelRegistry.get_name(self.__class__)
+        loader_registry = ray.get_actor("WorkerLoaderRegistry")
+        self.data_loader = loader_registry.get(project.data_loader)()
 
     def log_progress(
         self,
