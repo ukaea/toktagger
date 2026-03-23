@@ -2,7 +2,18 @@ site_name: TokTagger
 theme:
   name: material
   palette:
-    scheme: default
+    - scheme: default
+      primary: blue
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
   features:
     - content.code.copy
 markdown_extensions: 
