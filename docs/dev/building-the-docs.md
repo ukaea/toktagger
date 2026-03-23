@@ -5,7 +5,7 @@ We use [MKDocs](https://www.mkdocs.org/) for our documentation. To build and vie
 1. Check you've installed the relevant dependancies:
 
 ```sh
-uv pip install -r requirements.txt
+uv sync --group dev
 ```
 
 2. Run the `mkdocs` command
