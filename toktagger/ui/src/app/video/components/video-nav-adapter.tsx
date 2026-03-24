@@ -29,6 +29,22 @@ export function useNavAdapterOptional(): NavAdapter | null {
   return useContext(NavAdapterContext);
 }
 
+export function useNavAdapter(): NavAdapter {
+  const navAdapter = useNavAdapterOptional();
+  const { annotations, setAnnotations } = useSample();
+
+  if (navAdapter) {
+    return navAdapter;
+  }
+
+  return {
+    getAnnotations: () => annotations,
+    clear: () => {
+      setAnnotations(() => []);
+    },
+  };
+}
+
 export function VideoNavAdapterBridge({
   children,
 }: {
