@@ -2,7 +2,11 @@
 
 import React, { createContext, useContext } from "react";
 import { useSample } from "@/app/contexts/SampleContext";
-import type { Annotation, NavAdapter } from "@/types";
+import {
+  type Annotation,
+  type NavAdapter,
+  VideoBoundingBoxSchema,
+} from "@/types";
 import { useVideoSession } from "./video-session";
 
 const NavAdapterContext = createContext<NavAdapter | null>(null);
@@ -39,7 +43,17 @@ export function VideoNavAdapterBridge({
         (annotation): annotation is Annotation =>
           annotation.type === "class_label",
       );
-      const videoBoxes = session.collectAllVideoBBoxes() as Annotation[];
+      const videoBoxes = session.collectAllVideoBBoxes().map((box) => {
+        const parsedBox = VideoBoundingBoxSchema.parse(box);
+        const sanitizedBox = (({
+          timestamp: _timestamp,
+          time_min: _timeMin,
+          time_max: _timeMax,
+          ...rest
+        }) => rest)(parsedBox);
+
+        return sanitizedBox as Annotation;
+      });
 
       return [...shotLabels, ...videoBoxes];
     },
