@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ComboBox, Item, View } from "@adobe/react-spectrum";
+import { Button, ComboBox, Item, View } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 
 /**
@@ -98,21 +98,20 @@ export function InstancePanel({
     <div className="w-48 shrink-0 mx-auto">
       {showCreator && (
         <div className="mb-3">
-          <button
-            onClick={() => {
+          <Button
+            onPress={() => {
               setOpen((prev) => {
                 const next = !prev;
                 if (next) setTrackId(makeAutoTrackId());
                 return next;
               });
             }}
-            className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-left text-gray-900 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-900"
-            title="Create a new class/track profile"
-            disabled={!creatorEnabled}
+            isDisabled={!creatorEnabled}
+            width="100%"
+            variant="secondary"
           >
-            <span className="font-medium text-sm">Add Profile</span>
-            <span className="text-lg leading-none">+</span>
-          </button>
+            Add Profile
+          </Button>
 
           {!creatorEnabled && (
             <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
