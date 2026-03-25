@@ -28,7 +28,7 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import { getNextSample } from "@/app/core";
 import type { SortDescriptor, SortDirection, Key } from "@react-types/shared";
-import { useNavAdapter } from "@/app/video/components/video-nav-adapter";
+import { useNavAdapter } from "@/app/contexts/NavAdapterContext";
 
 const TOAST_TIMEOUT = 5000;
 
