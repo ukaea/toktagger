@@ -3,7 +3,11 @@
 import React from "react";
 import { useSample } from "@/app/contexts/SampleContext";
 import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
-import { type Annotation, type NavAdapter, VideoBoundingBoxSchema } from "@/types";
+import {
+  type Annotation,
+  type NavAdapter,
+  VideoBoundingBoxSchema,
+} from "@/types";
 import { useVideoSession } from "./video-session";
 
 export function VideoNavAdapterBridge({
