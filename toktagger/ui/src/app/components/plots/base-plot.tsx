@@ -28,6 +28,9 @@ const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
   responsive: true,
 };
 
+// The typing for plotly's selection relayout is not great - this avoids errors and ensures the correct object is used
+const EMPTY_PLOTLY_SELECTION = { selections: [] } as Partial<Layout>
+
 interface PlotConfiguration {
   data: Partial<PlotData>[];
   layout: Partial<Layout>;
@@ -242,27 +245,19 @@ export const BaseTimeSeriesPlot = ({
     }
 
     const onSelection = (eventData: PlotSelectionEvent) => {
-      if (!eventData?.range) {
-        findSelectedAnnotations(null);
-        return;
-      }
-
-      findSelectedAnnotations({
-        low: eventData.range.x[0],
-        high: eventData.range.x[1],
-      });
-    };
-
-    const onDeselect = () => {
-      findSelectedAnnotations(null);
+      if (eventData?.range) {
+        findSelectedAnnotations({
+          low: eventData.range.x[0],
+          high: eventData.range.x[1],
+        });
+      }      
+      relayout(plot, EMPTY_PLOTLY_SELECTION); // Immediately remove selection indicator
     };
 
     plot.on("plotly_selected", onSelection);
-    plot.on("plotly_deselect", onDeselect);
 
     return () => {
       plot.removeAllListeners("plotly_selected");
-      plot.removeAllListeners("plotly_deselect");
     };
   }, [findSelectedAnnotations, plotId, plotReady]);
 
@@ -344,6 +339,11 @@ export const BaseTimeSeriesPlot = ({
       event.preventDefault();
     };
 
+    const handleCancelSelection = (_event: MouseEvent) => {
+      findSelectedAnnotations(null);
+      relayout(plot, EMPTY_PLOTLY_SELECTION);
+    }
+
     const startAnnotationCreation = (event: MouseEvent) => {
       if (activeAnnotationTool && event.ctrlKey) {
         setOngoingAction(true);
@@ -377,6 +377,7 @@ export const BaseTimeSeriesPlot = ({
 
     draggableElements.forEach((element) => {
       element.addEventListener("contextmenu", handleContextMenu);
+      element.addEventListener("mousedown", handleCancelSelection);
     });
 
     if (!editMode) return;
@@ -390,21 +391,13 @@ export const BaseTimeSeriesPlot = ({
     return () => {
       draggableElements.forEach((element) => {
         element.removeEventListener("contextmenu", handleContextMenu);
+        element.removeEventListener("mousedown", handleCancelSelection)
         element.removeEventListener("mousedown", startAnnotationCreation);
         element.removeEventListener("mousemove", updateAnnotation);
         element.removeEventListener("mouseup", finishAnnotationCreation);
       });
     };
-  }, [
-    activeAnnotationTool,
-    addAnnotation,
-    createAnnotation,
-    editMode,
-    plotId,
-    plotReady,
-    setOngoingAction,
-    toolingCallbacks,
-  ]);
+  }, [activeAnnotationTool, addAnnotation, createAnnotation, editMode, findSelectedAnnotations, plotId, plotReady, setOngoingAction, toolingCallbacks]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">

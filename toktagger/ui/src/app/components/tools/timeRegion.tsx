@@ -23,6 +23,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
     addAnnotation,
     updateAnnotation,
     setOngoingAction,
+    selectAnnotations,
   } = useTimeSeriesActions();
   const { annotations, forceUpdate, isDrawing, categories, editMode } =
     useTimeSeriesState();
@@ -132,7 +133,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
       const minWidth = (xMax - xMin) * MIN_WIDTH_FRACTION;
 
       const graphGroup = d3.select(overplot);
-      graphGroup.selectAll(".zone").remove(); // All VSpans are removed each render cycle
+      graphGroup.selectAll(".time-region").remove(); // All VSpans are removed each render cycle
 
       // Prevents a little bit of repetition by auto-configuring the resize handler
       const getBoundaryHandler = (isLeft: boolean) => {
@@ -212,6 +213,13 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           setOngoingAction(false);
         });
 
+      function handleClick(
+        event: MouseEvent,
+        annotation: TimeSeriesAnnotation,
+      ) {
+        selectAnnotations([annotation.id])
+      }
+
       function handleContextMenu(
         event: MouseEvent,
         annotation: TimeSeriesAnnotation,
@@ -263,7 +271,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         graphGroup
           .append("rect")
           .attr("aria-label", "zone")
-          .attr("class", "zone span cursor-grab disable-on-modifier")
+          .attr("class", "annotation time-region span cursor-grab disable-on-modifier")
           .attr("x", spanLeft)
           .attr("y", upperLimit)
           .attr("width", spanWidth)
@@ -277,6 +285,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           .style("cursor", "move")
           .attr("stroke-width", 1)
           .datum(zone)
+          .on("mousedown", handleClick)
           .call(translateHandler)
           .on("contextmenu", handleContextMenu);
 
@@ -285,7 +294,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         graphGroup
           .append("rect")
           .attr("aria-label", "zone.leftHandle")
-          .attr("class", "zone leftHandle disable-on-modifier")
+          .attr("class", "annotation time-region leftHandle disable-on-modifier")
           .attr("x", x0HandleX)
           .attr("y", upperLimit)
           .attr("width", totalHandleWidth)
@@ -294,6 +303,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "w-resize")
           .datum(zone)
+          .on("mousedown", handleClick)
           .call(getBoundaryHandler(true))
           .on("contextmenu", handleContextMenu);
 
@@ -302,7 +312,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         graphGroup
           .append("rect")
           .attr("aria-label", "zone.rightHandle")
-          .attr("class", "zone rightHandle disable-on-modifier")
+          .attr("class", "time-region rightHandle disable-on-modifier")
           .attr("x", x1HandleX)
           .attr("y", upperLimit)
           .attr("width", totalHandleWidth)
@@ -311,22 +321,12 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "e-resize")
           .datum(zone)
+          //.on("mousedown", handleClick)
           .call(getBoundaryHandler(false))
           .on("contextmenu", handleContextMenu);
       }
     });
-  }, [
-    annotations,
-    isDrawing,
-    plotId,
-    plotReady,
-    forceUpdate,
-    updateAnnotation,
-    categories,
-    show,
-    editMode,
-    setOngoingAction,
-  ]); // forceUpdate is required here to keep tooling correctly positioned
+  }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, categories, show, editMode, setOngoingAction, selectAnnotations]); // forceUpdate is required here to keep tooling correctly positioned
 
   return <div />;
 };

@@ -42,6 +42,7 @@ type TimeSeriesActions = {
     callbacks: ToolingCallbacks,
   ) => void;
   triggerUpdate: () => void;
+  selectAnnotations: (ids: string[]) => void;
   findSelectedAnnotations: (
     range: { low: number; high: number } | null,
   ) => void;
@@ -278,7 +279,7 @@ export const TimeSeriesProvider = ({
       syncTimeoutRef.current = setTimeout(triggerSync, 100);
 
       setAnnotations((prev) =>
-        prev.map((item) => (item.id === annotation.id ? annotation : item)),
+        prev.map((item) => (item.id === annotation.id ? {...annotation, selected: item.selected} : item)),
       );
     },
     [triggerSync],
@@ -287,6 +288,21 @@ export const TimeSeriesProvider = ({
   const triggerUpdate = useCallback(() => {
     setUpdateCounter((prev) => (prev + 1) % 100);
   }, []);
+
+  const selectAnnotations = useCallback((ids: string[]) => {
+    if (!editMode) return;
+
+    const updated_state: TimeSeriesAnnotation[] = annotations.map(
+      (annotation) => {
+        if (ids.includes(annotation.id)) {
+          return { ...annotation, selected: true };
+        }
+        return { ...annotation, selected: false };
+      },
+    );
+
+    setAnnotations(updated_state);
+  }, [annotations, editMode])
 
   const findSelectedAnnotations = useCallback(
     (range: { low: number; high: number } | null) => {
@@ -340,21 +356,12 @@ export const TimeSeriesProvider = ({
       updateAnnotation,
       getAnnotation,
       triggerUpdate,
+      selectAnnotations,
       findSelectedAnnotations,
       setEditMode,
       setOngoingAction,
     }),
-    [
-      createAnnotation,
-      addAnnotation,
-      removeAnnotation,
-      setAnnotationTool,
-      registerTooling,
-      updateAnnotation,
-      getAnnotation,
-      triggerUpdate,
-      findSelectedAnnotations,
-    ],
+    [createAnnotation, addAnnotation, removeAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, triggerUpdate, selectAnnotations, findSelectedAnnotations],
   );
 
   const stateValue: TimeSeriesState = useMemo(

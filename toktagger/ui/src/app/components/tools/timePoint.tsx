@@ -23,6 +23,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
     addAnnotation,
     updateAnnotation,
     setOngoingAction,
+    selectAnnotations
   } = useTimeSeriesActions();
   const { annotations, forceUpdate, isDrawing, categories, editMode } =
     useTimeSeriesState();
@@ -89,6 +90,13 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
       [...el.classList].find((cls) => cls !== "subplot"),
     );
 
+    function handleClick(
+        event: MouseEvent,
+        annotation: TimeSeriesAnnotation,
+      ) {
+        selectAnnotations([annotation.id])
+      }
+
     function handleContextMenu(
       event: MouseEvent,
       annotation: TimeSeriesAnnotation,
@@ -138,7 +146,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
       const xaxis = plot._fullLayout.xaxis;
 
       const graphGroup = d3.select(overplot);
-      graphGroup.selectAll(".vspan").remove(); // All VSpans are removed each render cycle
+      graphGroup.selectAll(".time-point").remove(); // All VSpans are removed each render cycle
 
       // Create a line and a transparent drag handle for each VSpan
       for (const vspan of annotations) {
@@ -169,7 +177,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
         const pointerEvent = isDrawing || !editMode ? "none" : "all";
         graphGroup
           .append("line")
-          .attr("class", "vspan disable-on-modifier")
+          .attr("class", "annotation time-point disable-on-modifier")
           .attr("x1", x)
           .attr("x2", x)
           .attr("y1", upperLimit)
@@ -182,7 +190,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
 
         graphGroup
           .append("rect")
-          .attr("class", "vspan disable-on-modifier")
+          .attr("class", "annotation time-point disable-on-modifier")
           .attr("x", x - 10)
           .attr("y", upperLimit)
           .attr("width", 20)
@@ -191,22 +199,12 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "move")
           .datum(vspan)
+          .on("mousedown", handleClick)
           .call(drag)
           .on("contextmenu", handleContextMenu);
       }
     });
-  }, [
-    annotations,
-    isDrawing,
-    plotId,
-    plotReady,
-    forceUpdate,
-    updateAnnotation,
-    categories,
-    show,
-    editMode,
-    setOngoingAction,
-  ]); // forceUpdate is required here to keep tooling correctly positioned
+  }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, categories, show, editMode, setOngoingAction, selectAnnotations]); // forceUpdate is required here to keep tooling correctly positioned
 
   return <div />;
 };
