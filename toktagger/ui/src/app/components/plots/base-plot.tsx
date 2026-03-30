@@ -339,9 +339,10 @@ export const BaseTimeSeriesPlot = ({
       event.preventDefault();
     };
 
-    const handleCancelSelection = (_event: MouseEvent) => {
-      findSelectedAnnotations(null);
-      relayout(plot, EMPTY_PLOTLY_SELECTION);
+    const handleCancelSelection = (event: MouseEvent) => {
+      if (!event.ctrlKey) {
+        findSelectedAnnotations(null);
+      }
     };
 
     const startAnnotationCreation = (event: MouseEvent) => {
