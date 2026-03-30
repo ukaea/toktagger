@@ -140,6 +140,9 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         // Handles the dragging of the boundaries of the zone
         const resize = d3
           .drag<SVGRectElement, TimeSeriesAnnotation>()
+          .on("start", function (event, d) {
+            selectAnnotations([d.id])
+          })
           .on("drag", function (event, d) {
             // Convert pointer X (pixels) → data units; allow wrap while dragging (no clamp here)
             const x = xaxis.p2d(event.x);
@@ -191,6 +194,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
       const translateHandler = d3
         .drag<SVGRectElement, TimeSeriesAnnotation>()
         .on("start", function (event, d) {
+          selectAnnotations([d.id])
           const leftBoundary = Math.min(d.points[0].x, d.points[1].x);
           dragOffset.current = xaxis.d2p(leftBoundary) - event.x;
         })
@@ -212,13 +216,6 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         .on("end", function (_event, _d) {
           setOngoingAction(false);
         });
-
-      function handleClick(
-        event: MouseEvent,
-        annotation: TimeSeriesAnnotation,
-      ) {
-        selectAnnotations([annotation.id]);
-      }
 
       function handleContextMenu(
         event: MouseEvent,
@@ -288,7 +285,6 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           .style("cursor", "move")
           .attr("stroke-width", 1)
           .datum(zone)
-          .on("mousedown", handleClick)
           .call(translateHandler)
           .on("contextmenu", handleContextMenu);
 
@@ -309,7 +305,6 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "w-resize")
           .datum(zone)
-          .on("mousedown", handleClick)
           .call(getBoundaryHandler(true))
           .on("contextmenu", handleContextMenu);
 
@@ -327,7 +322,6 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           .attr("style", `pointer-events: ${pointerEvent}`)
           .style("cursor", "e-resize")
           .datum(zone)
-          //.on("mousedown", handleClick)
           .call(getBoundaryHandler(false))
           .on("contextmenu", handleContextMenu);
       }
