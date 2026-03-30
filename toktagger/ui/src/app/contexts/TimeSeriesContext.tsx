@@ -279,7 +279,11 @@ export const TimeSeriesProvider = ({
       syncTimeoutRef.current = setTimeout(triggerSync, 100);
 
       setAnnotations((prev) =>
-        prev.map((item) => (item.id === annotation.id ? {...annotation, selected: item.selected} : item)),
+        prev.map((item) =>
+          item.id === annotation.id
+            ? { ...annotation, selected: item.selected }
+            : item,
+        ),
       );
     },
     [triggerSync],
@@ -289,20 +293,23 @@ export const TimeSeriesProvider = ({
     setUpdateCounter((prev) => (prev + 1) % 100);
   }, []);
 
-  const selectAnnotations = useCallback((ids: string[]) => {
-    if (!editMode) return;
+  const selectAnnotations = useCallback(
+    (ids: string[]) => {
+      if (!editMode) return;
 
-    const updated_state: TimeSeriesAnnotation[] = annotations.map(
-      (annotation) => {
-        if (ids.includes(annotation.id)) {
-          return { ...annotation, selected: true };
-        }
-        return { ...annotation, selected: false };
-      },
-    );
+      const updated_state: TimeSeriesAnnotation[] = annotations.map(
+        (annotation) => {
+          if (ids.includes(annotation.id)) {
+            return { ...annotation, selected: true };
+          }
+          return { ...annotation, selected: false };
+        },
+      );
 
-    setAnnotations(updated_state);
-  }, [annotations, editMode])
+      setAnnotations(updated_state);
+    },
+    [annotations, editMode],
+  );
 
   const findSelectedAnnotations = useCallback(
     (range: { low: number; high: number } | null) => {
@@ -361,7 +368,18 @@ export const TimeSeriesProvider = ({
       setEditMode,
       setOngoingAction,
     }),
-    [createAnnotation, addAnnotation, removeAnnotation, setAnnotationTool, registerTooling, updateAnnotation, getAnnotation, triggerUpdate, selectAnnotations, findSelectedAnnotations],
+    [
+      createAnnotation,
+      addAnnotation,
+      removeAnnotation,
+      setAnnotationTool,
+      registerTooling,
+      updateAnnotation,
+      getAnnotation,
+      triggerUpdate,
+      selectAnnotations,
+      findSelectedAnnotations,
+    ],
   );
 
   const stateValue: TimeSeriesState = useMemo(

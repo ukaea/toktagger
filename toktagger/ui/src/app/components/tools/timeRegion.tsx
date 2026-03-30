@@ -217,7 +217,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         event: MouseEvent,
         annotation: TimeSeriesAnnotation,
       ) {
-        selectAnnotations([annotation.id])
+        selectAnnotations([annotation.id]);
       }
 
       function handleContextMenu(
@@ -271,7 +271,10 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         graphGroup
           .append("rect")
           .attr("aria-label", "zone")
-          .attr("class", "annotation time-region span cursor-grab disable-on-modifier")
+          .attr(
+            "class",
+            "annotation time-region span cursor-grab disable-on-modifier",
+          )
           .attr("x", spanLeft)
           .attr("y", upperLimit)
           .attr("width", spanWidth)
@@ -294,7 +297,10 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         graphGroup
           .append("rect")
           .attr("aria-label", "zone.leftHandle")
-          .attr("class", "annotation time-region leftHandle disable-on-modifier")
+          .attr(
+            "class",
+            "annotation time-region leftHandle disable-on-modifier",
+          )
           .attr("x", x0HandleX)
           .attr("y", upperLimit)
           .attr("width", totalHandleWidth)
@@ -326,7 +332,19 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
           .on("contextmenu", handleContextMenu);
       }
     });
-  }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, categories, show, editMode, setOngoingAction, selectAnnotations]); // forceUpdate is required here to keep tooling correctly positioned
+  }, [
+    annotations,
+    isDrawing,
+    plotId,
+    plotReady,
+    forceUpdate,
+    updateAnnotation,
+    categories,
+    show,
+    editMode,
+    setOngoingAction,
+    selectAnnotations,
+  ]); // forceUpdate is required here to keep tooling correctly positioned
 
   return <div />;
 };

@@ -23,7 +23,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
     addAnnotation,
     updateAnnotation,
     setOngoingAction,
-    selectAnnotations
+    selectAnnotations,
   } = useTimeSeriesActions();
   const { annotations, forceUpdate, isDrawing, categories, editMode } =
     useTimeSeriesState();
@@ -90,12 +90,9 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
       [...el.classList].find((cls) => cls !== "subplot"),
     );
 
-    function handleClick(
-        event: MouseEvent,
-        annotation: TimeSeriesAnnotation,
-      ) {
-        selectAnnotations([annotation.id])
-      }
+    function handleClick(event: MouseEvent, annotation: TimeSeriesAnnotation) {
+      selectAnnotations([annotation.id]);
+    }
 
     function handleContextMenu(
       event: MouseEvent,
@@ -204,7 +201,19 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
           .on("contextmenu", handleContextMenu);
       }
     });
-  }, [annotations, isDrawing, plotId, plotReady, forceUpdate, updateAnnotation, categories, show, editMode, setOngoingAction, selectAnnotations]); // forceUpdate is required here to keep tooling correctly positioned
+  }, [
+    annotations,
+    isDrawing,
+    plotId,
+    plotReady,
+    forceUpdate,
+    updateAnnotation,
+    categories,
+    show,
+    editMode,
+    setOngoingAction,
+    selectAnnotations,
+  ]); // forceUpdate is required here to keep tooling correctly positioned
 
   return <div />;
 };

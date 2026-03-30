@@ -29,7 +29,7 @@ const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
 };
 
 // The typing for plotly's selection relayout is not great - this avoids errors and ensures the correct object is used
-const EMPTY_PLOTLY_SELECTION = { selections: [] } as Partial<Layout>
+const EMPTY_PLOTLY_SELECTION = { selections: [] } as Partial<Layout>;
 
 interface PlotConfiguration {
   data: Partial<PlotData>[];
@@ -250,7 +250,7 @@ export const BaseTimeSeriesPlot = ({
           low: eventData.range.x[0],
           high: eventData.range.x[1],
         });
-      }      
+      }
       relayout(plot, EMPTY_PLOTLY_SELECTION); // Immediately remove selection indicator
     };
 
@@ -342,7 +342,7 @@ export const BaseTimeSeriesPlot = ({
     const handleCancelSelection = (_event: MouseEvent) => {
       findSelectedAnnotations(null);
       relayout(plot, EMPTY_PLOTLY_SELECTION);
-    }
+    };
 
     const startAnnotationCreation = (event: MouseEvent) => {
       if (activeAnnotationTool && event.ctrlKey) {
@@ -391,13 +391,23 @@ export const BaseTimeSeriesPlot = ({
     return () => {
       draggableElements.forEach((element) => {
         element.removeEventListener("contextmenu", handleContextMenu);
-        element.removeEventListener("mousedown", handleCancelSelection)
+        element.removeEventListener("mousedown", handleCancelSelection);
         element.removeEventListener("mousedown", startAnnotationCreation);
         element.removeEventListener("mousemove", updateAnnotation);
         element.removeEventListener("mouseup", finishAnnotationCreation);
       });
     };
-  }, [activeAnnotationTool, addAnnotation, createAnnotation, editMode, findSelectedAnnotations, plotId, plotReady, setOngoingAction, toolingCallbacks]);
+  }, [
+    activeAnnotationTool,
+    addAnnotation,
+    createAnnotation,
+    editMode,
+    findSelectedAnnotations,
+    plotId,
+    plotReady,
+    setOngoingAction,
+    toolingCallbacks,
+  ]);
 
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">
