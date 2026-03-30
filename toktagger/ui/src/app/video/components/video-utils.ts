@@ -1,6 +1,8 @@
 "use client";
 
 import type { ImageAnnotation } from "@annotorious/react";
+import type { Annotation } from "@/types";
+import { VideoBoundingBoxSchema } from "@/types";
 import type {
   ByFrameMap,
   FrameIndex,
@@ -172,6 +174,47 @@ export function existingTrackIdsForClass(
   return out;
 }
 
+/**
+ * Build the current per-class numeric track-id counters from seeded annotations.
+ * The returned map stores the highest numeric id seen for each class.
+ */
+export function buildNextTrackIdState(
+  annotations: Annotation[],
+): Map<string, number> {
+  const nextTrackNums = new Map<string, number>();
+
+  for (const annotation of annotations) {
+    const parsed = VideoBoundingBoxSchema.safeParse(annotation);
+    if (!parsed.success) continue;
+
+    const className = (parsed.data.label || "").trim();
+    const numericTrackId = Number.parseInt(parsed.data.track_id || "", 10);
+
+    if (!className || !Number.isFinite(numericTrackId)) continue;
+
+    const prev = nextTrackNums.get(className) ?? 0;
+    if (numericTrackId > prev) {
+      nextTrackNums.set(className, numericTrackId);
+    }
+  }
+
+  return nextTrackNums;
+}
+
+/**
+ * Advance the numeric track-id counter for a class and return the allocated id.
+ * The map is mutated intentionally because the owning session keeps the state.
+ */
+export function allocateNextTrackId(
+  nextTrackNums: Map<string, number>,
+  className: string,
+): string {
+  const key = (className || "").trim();
+  const next = (nextTrackNums.get(key) ?? 0) + 1;
+  nextTrackNums.set(key, next);
+  return String(next);
+}
+
 /** Immutable update: set a frame's overlay list. */
 export function mapSetFrame(
   prev: ByFrameMap,
@@ -320,33 +363,4 @@ export function forwardPropagateIfEmpty(
   const next = new Map(byFrame);
   next.set(nextFrame, seeded);
   return next;
-}
-
-/**
- * Allocate the next numeric track id for a class by scanning existing instances.
- * This is used when we want strictly increasing numeric ids (legacy-style).
- */
-export function nextTrackIdForClass(
-  byFrame: ByFrameMap,
-  className: string,
-  getLabelTrack: (a: ImageAnnotation) => {
-    className?: string | null;
-    trackId?: string | null;
-  },
-): string {
-  const key = className.trim();
-  if (!key) return "1";
-
-  let max = 0;
-  for (const list of byFrame.values()) {
-    for (const a of list) {
-      const got = getLabelTrack(a);
-      if ((got.className || "").trim() !== key) continue;
-      const t = ensureTrackId(got.trackId || "");
-      const n = Number(t);
-      if (Number.isFinite(n)) max = Math.max(max, n);
-    }
-  }
-
-  return String(max + 1);
 }

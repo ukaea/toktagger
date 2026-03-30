@@ -2,6 +2,12 @@
 
 Models in TokTagger are machine learning components that can be trained on annotated data to make predictions on new samples. They integrate with the annotation workflow to provide automated labeling capabilities. TokTagger comes with built-in models for common tasks, but you can easily create custom models for your specific use cases.
 
+!!! tip
+    Note that you will need to install extra dependencies into your environment to enable the ML Models functionality:
+    ```
+    pip install toktagger[models]
+    ```
+
 ## Overview
 
 A model is responsible for:

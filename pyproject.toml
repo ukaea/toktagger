@@ -1,6 +1,6 @@
 [project]
 name = "toktagger"
-version = "2025.0.0"
+version = "0.1.0"
 requires-python = ">=3.9,<3.14"
 authors = [
 ]
@@ -25,21 +25,26 @@ dependencies = [
   "requests",
   "numpy<2",
   "scikit-learn",
+  "pandas<=2.2.3",
   "pillow",
   "uda",
   "sal",
-  "ruptures @ git+https://github.com/deepcharles/ruptures.git@e88da13b5f625f37321abd07c5d14b91701c6655",
-  "torch",
+  "ruptures>=1.1.10",
+  "psutil>=7.0.0",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
-  "psutil>=7.0.0",
-  "ray>=2.49.1",
-  "pyspark>=4.0.0",
   "hmmlearn>=0.3.3",
-  "ray>=2.51.1",
   "uda-xarray>=0.2.1",
   "sal-xarray>=0.2.1",
+  "bump-my-version>=1.2.7",
+  "platformdirs>=4.4.0",
 ]
+[project.optional-dependencies]
+models = [
+  "torch",
+  "ray>=2.49.1",
+]
+
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -62,6 +67,7 @@ dev = [
     "testcontainers>=4.12.0",
     "ruff>=0.12.9",
     "pre-commit>=4.3.0",
+    "pytest-playwright>=0.7.1",
 ]
 
 [project.scripts]

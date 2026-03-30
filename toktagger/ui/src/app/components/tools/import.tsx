@@ -54,7 +54,7 @@ export function ImportButton({
         <Flex justifyContent="center" alignItems="end">
           <Button variant="primary">
             <Import />
-            <Text>Import Annotations</Text>
+            <Text>{sample ? "Import" : "Import Annotations"}</Text>
           </Button>
         </Flex>
       </FileTrigger>

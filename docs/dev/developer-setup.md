@@ -8,7 +8,7 @@
 ```sh
 uv venv --python 3.12.6 
 source .venv/bin/activate
-uv pip install -e .
+uv pip install -e .[models]
 ```
 3. Install and setup `Node.js`: https://nodejs.org/en/download
 4. Install the UI dependencies

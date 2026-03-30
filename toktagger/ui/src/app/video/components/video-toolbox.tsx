@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DialogContainer, AlertDialog } from "@adobe/react-spectrum";
+import { DialogContainer, AlertDialog, Divider } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
@@ -236,18 +236,16 @@ export function VideoToolbox() {
         */}
 
         <div className="px-4 py-4">
-          <div className="text-gray-200 text-sm font-medium mb-2">Class</div>
           <VideoClassPanel
             items={classItems}
             selectedClassName={session.selection.className}
             setSelectedClassName={onSelectClassName}
           />
         </div>
-
-        <div className="border-t border-gray-800 mx-4" />
+        <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
-          <div className="text-gray-200 text-sm font-medium mb-2">
+          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Instances
           </div>
           <VideoInstancePanel

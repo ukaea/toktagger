@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Item, Text, Picker } from "@adobe/react-spectrum";
+import { Button, ComboBox, Item, View } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 
 /**
@@ -26,24 +26,19 @@ export function ClassPanel({
   setSelectedClassName: (v: string | null) => void;
 }) {
   return (
-    <div className="rounded-xl border border-gray-700 bg-black shadow-sm p-3 w-48 mx-auto">
-      <Text UNSAFE_className="text-sm font-medium mb-2 block text-white">
-        Annotation Label
-      </Text>
-
-      <Picker
-        aria-label="Class"
+    <View marginX="auto" width="12rem">
+      <ComboBox
+        label="Class Label"
         items={items}
         selectedKey={selectedClassName}
         onSelectionChange={(key) =>
           setSelectedClassName((key as string) || null)
         }
-        placeholder="— Select class —"
         width="100%"
       >
         {(item) => <Item key={item.name}>{item.name}</Item>}
-      </Picker>
-    </div>
+      </ComboBox>
+    </View>
   );
 }
 
@@ -100,27 +95,26 @@ export function InstancePanel({
   const creatorEnabled = Boolean(classItems && classItems.length > 0);
 
   return (
-    <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
+    <div className="w-48 shrink-0 mx-auto">
       {showCreator && (
         <div className="mb-3">
-          <button
-            onClick={() => {
+          <Button
+            onPress={() => {
               setOpen((prev) => {
                 const next = !prev;
                 if (next) setTrackId(makeAutoTrackId());
                 return next;
               });
             }}
-            className="w-full rounded-lg border shadow-sm px-2.5 py-1.5 text-left bg-black text-white border-gray-600 hover:bg-gray-800 flex items-center justify-between"
-            title="Create a new class/track profile"
-            disabled={!creatorEnabled}
+            isDisabled={!creatorEnabled}
+            width="100%"
+            variant="secondary"
           >
-            <span className="font-medium text-sm">Add Profile</span>
-            <span className="text-lg leading-none">+</span>
-          </button>
+            Add Profile
+          </Button>
 
           {!creatorEnabled && (
-            <div className="text-[11px] text-white/60 mt-1">
+            <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
               Creator disabled (no class items provided).
             </div>
           )}
@@ -132,8 +126,8 @@ export function InstancePanel({
         disabled={profiles.length === 0}
         className={`mb-2 w-full rounded-lg px-2.5 py-1.5 text-left border shadow-sm ${
           profiles.length
-            ? "bg-black text-red-400 border-red-400 hover:text-red-300 hover:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-400/40"
-            : "bg-black/40 text-white/40 border-gray-700 cursor-not-allowed"
+            ? "border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400/30 dark:border-red-500/70 dark:bg-gray-950 dark:text-red-300 dark:hover:border-red-400 dark:hover:bg-red-950/40"
+            : "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-500"
         }`}
         title="Delete all instances and their annotations across all frames"
       >
@@ -141,13 +135,15 @@ export function InstancePanel({
       </button>
 
       {showCreator && open && (
-        <div className="mt-2 rounded-lg border shadow-sm bg-black text-white border-gray-700 p-2 space-y-2">
+        <div className="mt-2 space-y-2 rounded-lg border border-gray-200 bg-white p-2 text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
           <div>
-            <label className="text-xs text-gray-300">Class Label</label>
+            <label className="text-xs text-gray-600 dark:text-gray-300">
+              Class Label
+            </label>
             <select
               value={className}
               onChange={(e) => setClassName(e.target.value)}
-              className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none bg-gray-900 text-white border-gray-700"
+              className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400/40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
               {(classItems ?? []).map((c) => (
                 <option key={c.name} value={c.name}>
@@ -158,12 +154,14 @@ export function InstancePanel({
           </div>
 
           <div>
-            <label className="text-xs text-gray-300">Track ID</label>
+            <label className="text-xs text-gray-600 dark:text-gray-300">
+              Track ID
+            </label>
             <input
               type="text"
               value={trackId}
               readOnly
-              className="mt-1 w-full border rounded px-2 py-1 text-sm bg-gray-900 text-white border-gray-700 cursor-not-allowed select-all"
+              className="mt-1 w-full cursor-not-allowed select-all rounded border border-gray-300 bg-gray-100 px-2 py-1 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
               title="Auto-generated; not editable"
             />
           </div>
@@ -184,7 +182,7 @@ export function InstancePanel({
             </button>
             <button
               onClick={() => setOpen(false)}
-              className="rounded-md border border-gray-700 text-white bg-black hover:bg-gray-800 px-2.5 py-1.5 text-xs"
+              className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-900"
             >
               Cancel
             </button>
@@ -192,9 +190,9 @@ export function InstancePanel({
         </div>
       )}
 
-      <div className="rounded-lg border bg-black/60 border-gray-700 shadow-sm max-h-[45vh] overflow-y-auto mt-2">
+      <div className="mt-2 max-h-[45vh] overflow-y-auto rounded-lg border border-gray-200 bg-white/90 shadow-sm dark:border-gray-700 dark:bg-gray-950/70">
         {profiles.length === 0 && (
-          <div className="p-3 text-sm text-gray-200">
+          <div className="p-3 text-sm text-gray-600 dark:text-gray-300">
             {showCreator
               ? "No profiles yet. Click “Add Profile”."
               : "No instances yet. Pick a class above, then draw to create one."}
@@ -218,24 +216,24 @@ export function InstancePanel({
               }}
               className={`w-full text-left px-2 py-1.5 border-b last:border-b-0 transition leading-snug ${
                 selectedKey === p.key
-                  ? "bg-gray-900 border-gray-600 ring-1 ring-orange-400/60"
-                  : "bg-black hover:bg-gray-900 border-gray-800"
-              } text-white`}
+                  ? "border-orange-200 bg-orange-50 ring-1 ring-orange-400/40 dark:border-gray-600 dark:bg-gray-900 dark:ring-orange-400/60"
+                  : "border-gray-200 bg-transparent hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+              } text-gray-900 dark:text-gray-100`}
               title={`Select: ${p.class_name} (${p.track_id}). Use the rewind button to jump to first frame. Right-click to bulk delete.`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-white truncate">
+                  <div className="truncate text-xs font-semibold text-gray-900 dark:text-gray-100">
                     #{p.track_id}
                   </div>
-                  <div className="text-[11px] text-gray-300 mt-0">
+                  <div className="mt-0 text-[11px] text-gray-600 dark:text-gray-300">
                     Class: {p.class_name}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className="inline-block text-[10px] px-1.5 py-0.5 rounded-full border border-gray-700 bg-gray-900 text-gray-200"
+                    className="inline-block rounded-full border border-gray-200 bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                     title="Total annotations for this instance across all frames"
                   >
                     {count}
@@ -257,7 +255,7 @@ export function InstancePanel({
                           onRequestBulkDelete(p);
                         }
                       }}
-                      className="w-full rounded-md px-2 py-1 text-[10px] border border-red-400/60 text-red-200 hover:bg-red-500/15 cursor-pointer select-none text-center"
+                      className="w-full cursor-pointer select-none rounded-md border border-red-300 px-2 py-1 text-center text-[10px] text-red-700 hover:bg-red-50 dark:border-red-400/60 dark:text-red-200 dark:hover:bg-red-500/15"
                       title="Delete this instance across all frames"
                       aria-label={`Delete ${p.class_name} ${p.track_id}`}
                     >
@@ -283,8 +281,8 @@ export function InstancePanel({
                       }}
                       className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${
                         canJumpToFirstFrame
-                          ? "border-gray-400/60 text-gray-100 hover:bg-gray-500/15 cursor-pointer"
-                          : "border-gray-800 text-white/30 cursor-not-allowed"
+                          ? "cursor-pointer border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-400/60 dark:text-gray-100 dark:hover:bg-gray-500/15"
+                          : "cursor-not-allowed border-gray-200 text-gray-300 dark:border-gray-800 dark:text-white/30"
                       }`}
                       title={
                         canJumpToFirstFrame
@@ -336,21 +334,25 @@ export function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl border">
-        <div className="px-4 py-3 border-b">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white text-gray-900 shadow-xl dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+        <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
           <h2 className="text-base font-semibold">{title}</h2>
         </div>
 
         <div className="px-4 py-3 space-y-2">
-          <p className="text-sm text-gray-800">{message}</p>
-          {details && <div className="text-xs text-gray-600">{details}</div>}
+          <p className="text-sm text-gray-700 dark:text-gray-200">{message}</p>
+          {details && (
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {details}
+            </div>
+          )}
         </div>
 
-        <div className="px-4 py-3 border-t flex gap-2 justify-end">
+        <div className="flex justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 rounded-md border text-sm"
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
           >
             {cancelLabel}
           </button>

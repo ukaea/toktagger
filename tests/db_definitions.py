@@ -10,6 +10,7 @@ from toktagger.api.schemas.samples import (
 )
 from toktagger.api.schemas.annotations import (
     TimePoint,
+    TimeRegion,
     TimeRegionBatch,
     TimePointBatch,
 )
@@ -39,12 +40,69 @@ class MockDisruptionCNN(Model):
                     validated=False,
                     uncertainty=random.random(),
                     label=self.id,
-                    time=random.randint(80, 120),
+                    time=random.randint(80, 100),
                     created_by=self.type,
                 )
             ]
             for i in range(len(samples))
         ]
+
+    def save(self, file_path: str):
+        pathlib.Path(file_path).touch()
+
+    def load(self, project, file_path):
+        pass
+
+
+@ray.remote
+@ModelRegistry.register("mock_timeseries_cnn", ["time-series"])
+class MockTimeSeriesCNN(Model):
+    def define_model(self):
+        return None
+
+    def train(self, samples, annotations, *args, **kwargs):
+        self.log_progress(
+            training_status="started",
+            progress=50,
+            score=20,
+        )
+        return 60
+
+    def predict(self, samples, *args, **kwargs):
+        anns = []
+        for i in range(len(samples)):
+            ramp_up_start = random.randint(0, 20)
+            ramp_up_end = ramp_up_start + random.randint(10, 30)
+            flat_top_end = ramp_up_end + random.randint(10, 30)
+
+            anns.append(
+                [
+                    TimeRegion(
+                        validated=False,
+                        uncertainty=random.random(),
+                        label="Ramp Up",
+                        time_min=ramp_up_start,
+                        time_max=ramp_up_end,
+                        created_by=self.type,
+                    ),
+                    TimeRegion(
+                        validated=False,
+                        uncertainty=random.random(),
+                        label="Flat Top",
+                        time_min=ramp_up_end,
+                        time_max=flat_top_end,
+                        created_by=self.type,
+                    ),
+                    TimePoint(
+                        validated=False,
+                        uncertainty=random.random(),
+                        label="Disruption",
+                        time=flat_top_end + 1,
+                        created_by=self.type,
+                    ),
+                ]
+            )
+        return anns
 
     def save(self, file_path: str):
         pathlib.Path(file_path).touch()
@@ -97,8 +155,10 @@ SAMPLE_3 = SampleIn(
 SAMPLE_4 = SampleIn(
     shot_id=4,
     data=TimeSeriesFileData(
-        file_name=str(pathlib.Path(__file__).parent.joinpath("test.csv").absolute()),
-        type="csv",
+        file_name=str(
+            pathlib.Path(__file__).parent.joinpath("10000.parquet").absolute()
+        ),
+        type="parquet",
         protocol="file",
         signal_names=["Ip"],
     ),

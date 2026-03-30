@@ -10,7 +10,7 @@ class FileData(BaseModel):
 
 
 class ImageFileData(FileData):
-    type: Literal["png", "jpg"]
+    type: Literal["png", "jpeg"]
 
 
 class TimeSeriesFileData(FileData):

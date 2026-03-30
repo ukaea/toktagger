@@ -178,7 +178,11 @@ export const ZoneProvider = ({
           {`Add ${categories[0].name}`}
         </Item>
       ) : (
-        <Submenu key="zone-submenu" label="Add Time Region">
+        <Submenu
+          key="zone-submenu"
+          data-testid="zone-submenu"
+          label="Add Time Region"
+        >
           {addZoneItems}
         </Submenu>
       );
