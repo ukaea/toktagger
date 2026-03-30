@@ -149,7 +149,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
         const drag = d3
           .drag<SVGRectElement, TimeSeriesAnnotation>()
           .on("start", function (event, d) {
-            selectAnnotations([d.id])
+            selectAnnotations([d.id]);
             dragOffset.current = xaxis.d2p(d.points[0].x) - event.x;
             setOngoingAction(true);
           })

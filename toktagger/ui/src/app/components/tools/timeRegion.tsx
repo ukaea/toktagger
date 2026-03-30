@@ -141,7 +141,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
         const resize = d3
           .drag<SVGRectElement, TimeSeriesAnnotation>()
           .on("start", function (event, d) {
-            selectAnnotations([d.id])
+            selectAnnotations([d.id]);
           })
           .on("drag", function (event, d) {
             // Convert pointer X (pixels) → data units; allow wrap while dragging (no clamp here)
@@ -194,7 +194,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
       const translateHandler = d3
         .drag<SVGRectElement, TimeSeriesAnnotation>()
         .on("start", function (event, d) {
-          selectAnnotations([d.id])
+          selectAnnotations([d.id]);
           const leftBoundary = Math.min(d.points[0].x, d.points[1].x);
           dragOffset.current = xaxis.d2p(leftBoundary) - event.x;
         })
