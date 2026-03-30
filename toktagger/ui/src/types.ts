@@ -69,6 +69,12 @@ export const AnnotationSchema = z.union([
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
+export type NavAdapter = {
+  getAnnotations: () => Annotation[];
+  clear: () => void;
+  afterSave?: () => void;
+};
+
 export const AnnotationsSchema = z.array(AnnotationSchema);
 export type Annotations = z.infer<typeof AnnotationsSchema>;
 
@@ -150,13 +156,13 @@ export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export enum TaskType {
   TimeSeries = "time-series",
-  Spectrogram = "spectrogram",
+  // Spectrogram = "spectrogram",
   Video = "video",
 }
 
 export const TaskSchema = z.enum([
   TaskType.TimeSeries,
-  TaskType.Spectrogram,
+  // TaskType.Spectrogram,
   TaskType.Video,
 ]);
 
@@ -188,7 +194,7 @@ export const FileDataSchema = z.object({
 export type FileData = z.infer<typeof FileDataSchema>;
 
 export const TimeSeriesFileDataSchema = FileDataSchema.extend({
-  column_names: z.array(z.string()),
+  signal_names: z.array(z.string()),
 });
 export type TimeSeriesFileData = z.infer<typeof TimeSeriesFileDataSchema>;
 

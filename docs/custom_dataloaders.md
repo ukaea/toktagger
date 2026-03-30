@@ -121,7 +121,7 @@ For file-based data sources (images, videos):
 ```python
 class FileData(BaseModel):
     file_name: str  # Path to file or directory
-    type: FileType  # e.g., "png", "jpg", "mp4"
+    type: FileType  # e.g., "png", "jpeg", "mp4"
     protocol: Literal["file", "s3"]  # "file" or "s3"
 ```
 

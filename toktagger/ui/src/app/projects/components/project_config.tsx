@@ -271,7 +271,10 @@ export function ProjectConfigEditor({
 
   return (
     <DialogTrigger>
-      <Button variant={isEditing ? "accent" : "primary"}>
+      <Button
+        aria-label={isEditing ? "Edit" : buttonText}
+        variant={isEditing ? "accent" : "primary"}
+      >
         {icon}
         {!isEditing ? <Text>{buttonText}</Text> : <></>}
       </Button>
@@ -400,7 +403,7 @@ export function ProjectConfigEditor({
                       />
                     </>
                   )}
-                  {task === TaskType.Spectrogram ? (
+                  {/* {task === TaskType.Spectrogram ? (
                     <>
                       <LabelsForm
                         label="Bounding Box Labels"
@@ -413,7 +416,7 @@ export function ProjectConfigEditor({
                         setLabels={setPolygonLabels}
                       />
                     </>
-                  ) : null}
+                  ) : null} */}
                   {task === TaskType.Video && (
                     <LabelsForm
                       label="Video Bounding Box Labels"

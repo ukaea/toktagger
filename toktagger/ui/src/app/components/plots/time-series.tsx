@@ -200,7 +200,11 @@ export const TimeSeries = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
+      if ("selections" in eventData || "dragmode" in eventData) {
+        return; // Ignore relayout events triggered by our own tool updates
+      }
       if (rescaleOnZoom) {
+        console.log("Relayout event data:", eventData); // Debug log to inspect event data
         // This makes use of the first graph displayed but this should be fine
         if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
           // for zoom and pan events
@@ -477,7 +481,7 @@ export const TimeSeries = ({
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">
       {/* Div where plot is inserted */}
-      <div id={plotId} className="" />
+      <div id={plotId} className="" aria-label="time-series" />
       <>
         {React.Children.map(children, (child) => {
           return React.isValidElement(child)

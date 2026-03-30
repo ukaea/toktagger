@@ -75,7 +75,7 @@ Time points are vertical line annotations marking specific moments in time. They
 **To create a time point:**
 
 1. Right-click anywhere on the plot to open the context menu
-2. Select "Add Time Point" and choose a category (e.g., "Disruption", "Thermal Quench")
+2. Select "Add Time Region" and choose a category (e.g., "Disruption", "Thermal Quench")
 
 **Visual appearance:** Time points appear as vertical colored lines extending through all subplots.
 

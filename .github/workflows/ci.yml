@@ -105,10 +105,17 @@ jobs:
         run: pip install uv
 
       - name: Install dependencies (with dev extras)
-        run: uv sync
+        run: uv sync --all-extras
 
-      - name: Run tests
-        run: uv run pytest
+      - name: Install playwright
+        run: uv run python -m playwright install --with-deps
+
+      - name: Run unit tests
+        run: uv run --all-extras pytest tests/api
+
+      - name: Run end to end tests
+        run: uv run --all-extras pytest tests/end_to_end
+        
   build:
     runs-on: ubuntu-latest
     steps:

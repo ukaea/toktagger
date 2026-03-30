@@ -15,12 +15,9 @@ import {
   Annotation,
   ViewParams,
   PlotProps,
-  SpectrogramViewParams,
   MultiVariateTimeSeriesData,
   SpectrogramData,
   MultiVariateTimeSeriesDataSchema,
-  CompositeDataSchema,
-  SpectrogramDataSchema,
   ImageData,
   ImageDataSchema,
   TaskType,
@@ -95,20 +92,20 @@ async function parseData(
       throw new Error("Invalid data for time series view");
     }
     return result.data;
-  } else if (task == TaskType.Spectrogram) {
-    const result = CompositeDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for spectrogram view");
-    }
+    // } else if (task == TaskType.Spectrogram) {
+    //   const result = CompositeDataSchema.safeParse(data);
+    //   if (!result.success) {
+    //     throw new Error("Invalid data for spectrogram view");
+    //   }
 
-    const mhdData = SpectrogramDataSchema.safeParse(
-      result.data.values["mirnov"],
-    );
-    if (!mhdData.success) {
-      throw new Error("Invalid data for spectrogram view");
-    }
+    //   const mhdData = SpectrogramDataSchema.safeParse(
+    //     result.data.values["mirnov"],
+    //   );
+    //   if (!mhdData.success) {
+    //     throw new Error("Invalid data for spectrogram view");
+    //   }
 
-    return mhdData.data;
+    //   return mhdData.data;
   } else if (task == TaskType.Video) {
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
@@ -137,6 +134,7 @@ export function SampleProvider({
   const [dataParams, setDataParams] = useState<DataParams>({
     name: "identity",
   });
+  const [prevSampleId, setPrevSampleId] = useState(sampleId);
 
   const [plotProps, setPlotProps] = useState<PlotProps>({
     colorMap: "Cividis",
@@ -154,9 +152,17 @@ export function SampleProvider({
 
   // Video: remember the last successfully loaded frame so missing frames become navigation bounds.
   const lastGoodVideoFrameRef = useRef<number | null>(null);
+  // Video: track which sample has already had its first-frame bootstrap request.
+  const bootstrappedVideoSampleIdRef = useRef<string | null>(null);
+
+  if (prevSampleId !== sampleId) {
+    setPrevSampleId(sampleId);
+    setDataParams({ name: "identity" });
+  }
 
   useEffect(() => {
     setVideoFrameBounds({ min: null, max: null });
+    lastGoodVideoFrameRef.current = null;
   }, [sampleId]);
 
   function extractDetail(payload: unknown): string {
@@ -209,13 +215,13 @@ export function SampleProvider({
         setIsValidated(sampleData.validated_annotations);
 
         let params = viewParams;
-        if (projectData.task === TaskType.Spectrogram) {
-          params = {
-            ...params,
-            name: "spectrogram",
-            nperseg: 256,
-          } as SpectrogramViewParams;
-        }
+        // if (projectData.task === TaskType.Spectrogram) {
+        //   params = {
+        //     ...params,
+        //     name: "spectrogram",
+        //     nperseg: 256,
+        //   } as SpectrogramViewParams;
+        // }
 
         // ------------------------------------------------------------
         // video projects must request image data parameters.
@@ -225,10 +231,12 @@ export function SampleProvider({
         let effectiveDataParams: DataParams = dataParams;
 
         if (projectData.task === TaskType.Video) {
+          const isFirstRequestForSample =
+            bootstrappedVideoSampleIdRef.current !== sampleId;
           effectiveDataParams = {
             ...dataParams,
             name: "image",
-            frame: dataParams.frame ?? null,
+            frame: isFirstRequestForSample ? null : (dataParams.frame ?? null),
           };
         }
 
@@ -308,6 +316,7 @@ export function SampleProvider({
         if (projectData.task === TaskType.Video) {
           const frame = (viewData as { frame?: unknown }).frame;
           if (typeof frame === "number" && Number.isFinite(frame)) {
+            bootstrappedVideoSampleIdRef.current = sampleId;
             lastGoodVideoFrameRef.current = frame;
             setVideoFrameBounds((prev) => ({
               ...prev,

@@ -43,8 +43,16 @@ export function ModelPredictModal({ project }: { project: Project }) {
 
   useEffect(() => {
     const fetchModels = async () => {
-      const models = await getModels(project._id);
-      setModels(models);
+      const response = await getModels(project._id);
+      if (response.ok) {
+        const data = await response.json();
+        const models = data as Model[];
+        setModels(models);
+      } else {
+        const errorMessage = await response.json();
+        setMessage(errorMessage.detail);
+        setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+      }
     };
 
     let poll: ReturnType<typeof setInterval>;

@@ -142,13 +142,6 @@ type FocusRequest = {
   targetFrame: FrameIndex | null;
 };
 
-type AnnotatorWithSetSelected = Annotator<ImageAnnotation, ImageAnnotation> & {
-  setSelected?: {
-    (): void;
-    (id: string, editable?: boolean): void;
-  };
-};
-
 export function useVideoSession(): VideoSessionCtx {
   const v = useContext(Ctx);
   if (!v)
@@ -573,29 +566,17 @@ export function VideoSessionProvider(props: {
   const selectAnnotationById = useCallback(
     (id: string) => {
       if (!id) return false;
+      if (!api) return false;
 
-      const maybeApi = api as AnnotatorWithSetSelected | undefined;
-      const setSelected = maybeApi?.setSelected;
-      if (!setSelected) return false;
-
-      try {
-        setSelected(id, true);
-        return true;
-      } catch {
-        try {
-          setSelected(id);
-          return true;
-        } catch {
-          return false;
-        }
-      }
+      api.setSelected(id, true);
+      return true;
     },
     [api],
   );
 
   const tryFocusPending = useCallback(
     (rawOverride?: ImageAnnotation[]) => {
-      if (!api?.getAnnotations) return false;
+      if (!api) return false;
 
       const pending = pendingFocusRef.current;
       if (!pending) return false;
@@ -634,7 +615,7 @@ export function VideoSessionProvider(props: {
       pendingFocusRef.current = null;
       return true;
     },
-    [api, desiredOverlay, overlayHasInstance, selectAnnotationById],
+    [api, desiredOverlay, frame, overlayHasInstance, selectAnnotationById],
   );
 
   const requestFocusInstance = useCallback(
@@ -666,12 +647,14 @@ export function VideoSessionProvider(props: {
     [],
   );
 
+  // Required integration boundary: Annotorious keeps its own internal overlay
+  // state, so we must push session state on frame/overlay changes.
   useEffect(() => {
-    if (!api?.setAnnotations || !api?.getAnnotations) return;
+    if (!api) return;
     if (!imageNatural?.w || !imageNatural?.h) return;
 
     let rafId: number | null = null;
-    const cur = api.getAnnotations!();
+    const cur = api.getAnnotations();
     if (sameOverlay(cur, desiredOverlay)) {
       rafId = requestAnimationFrame(() => {
         tryFocusPending();
@@ -684,9 +667,9 @@ export function VideoSessionProvider(props: {
     isProgrammaticAnnoSyncRef.current = true;
     try {
       // Clear selection so popup closes when switching frames / overlays
-      api.setSelected?.();
-      api.clearAnnotations?.();
-      api.setAnnotations?.(desiredOverlay);
+      api.setSelected();
+      api.clearAnnotations();
+      api.setAnnotations(desiredOverlay);
       rafId = requestAnimationFrame(() => {
         tryFocusPending();
       });

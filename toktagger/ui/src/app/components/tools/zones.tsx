@@ -227,6 +227,7 @@ export const Zones = ({
         // Span (center drag target)
         graphGroup
           .append("rect")
+          .attr("aria-label", "zone")
           .attr("class", "zone span cursor-grab disable-on-modifier")
           .attr("x", spanLeft)
           .attr("y", upperLimit)
@@ -248,6 +249,7 @@ export const Zones = ({
         const x0HandleX = x0IsLeft ? px0 - OUTER_HANDLE_PX : px0 - inner;
         graphGroup
           .append("rect")
+          .attr("aria-label", "zone.leftHandle")
           .attr("class", "zone leftHandle disable-on-modifier")
           .attr("x", x0HandleX)
           .attr("y", upperLimit)
@@ -264,6 +266,7 @@ export const Zones = ({
         const x1HandleX = x0IsLeft ? px1 - inner : px1 - OUTER_HANDLE_PX;
         graphGroup
           .append("rect")
+          .attr("aria-label", "zone.rightHandle")
           .attr("class", "zone rightHandle disable-on-modifier")
           .attr("x", x1HandleX)
           .attr("y", upperLimit)

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Item, Text, Picker } from "@adobe/react-spectrum";
+import { Button, ComboBox, Item, View } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 
 /**
@@ -26,24 +26,19 @@ export function ClassPanel({
   setSelectedClassName: (v: string | null) => void;
 }) {
   return (
-    <div className="mx-auto w-48 rounded-xl border border-gray-200 bg-white p-3 text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-      <Text UNSAFE_className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
-        Annotation Label
-      </Text>
-
-      <Picker
-        aria-label="Class"
+    <View marginX="auto" width="12rem">
+      <ComboBox
+        label="Class Label"
         items={items}
         selectedKey={selectedClassName}
         onSelectionChange={(key) =>
           setSelectedClassName((key as string) || null)
         }
-        placeholder="— Select class —"
         width="100%"
       >
         {(item) => <Item key={item.name}>{item.name}</Item>}
-      </Picker>
-    </div>
+      </ComboBox>
+    </View>
   );
 }
 
@@ -59,6 +54,7 @@ export type Profile = {
 /**
  * Instance list + optional "profile creator" UI.
  * - Selecting an instance calls `onSelect`.
+ * - Jump control calls `onJumpToFirstFrame`.
  * - Right-clicking an instance calls `onRequestBulkDelete`.
  * - The creator UI is gated by `showCreator` and `classItems`.
  */
@@ -66,7 +62,7 @@ export function InstancePanel({
   profiles,
   selectedKey,
   onSelect,
-  onActivate,
+  onJumpToFirstFrame,
   onCreateProfile,
   onRequestBulkDelete,
   onRequestDeleteAllInstances,
@@ -78,7 +74,7 @@ export function InstancePanel({
   profiles: Profile[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
-  onActivate?: (profile: Profile) => void;
+  onJumpToFirstFrame?: (profile: Profile) => void;
   onCreateProfile: (className: string, trackId: string) => void;
   onRequestBulkDelete: (profile: Profile) => void;
   onRequestDeleteAllInstances: () => void;
@@ -99,24 +95,23 @@ export function InstancePanel({
   const creatorEnabled = Boolean(classItems && classItems.length > 0);
 
   return (
-    <div className="w-full lg:w-48 shrink-0 lg:pl-2 mx-auto">
+    <div className="w-48 shrink-0 mx-auto">
       {showCreator && (
         <div className="mb-3">
-          <button
-            onClick={() => {
+          <Button
+            onPress={() => {
               setOpen((prev) => {
                 const next = !prev;
                 if (next) setTrackId(makeAutoTrackId());
                 return next;
               });
             }}
-            className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-left text-gray-900 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-900"
-            title="Create a new class/track profile"
-            disabled={!creatorEnabled}
+            isDisabled={!creatorEnabled}
+            width="100%"
+            variant="secondary"
           >
-            <span className="font-medium text-sm">Add Profile</span>
-            <span className="text-lg leading-none">+</span>
-          </button>
+            Add Profile
+          </Button>
 
           {!creatorEnabled && (
             <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -206,8 +201,8 @@ export function InstancePanel({
 
         {profiles.map((p) => {
           const count = profileCounts?.[p.key] ?? 0;
-          const canActivate = Boolean(
-            onActivate && typeof p.first_frame === "number",
+          const canJumpToFirstFrame = Boolean(
+            onJumpToFirstFrame && p.first_frame != null,
           );
 
           return (
@@ -269,33 +264,33 @@ export function InstancePanel({
 
                     <span
                       role="button"
-                      tabIndex={canActivate ? 0 : -1}
+                      tabIndex={canJumpToFirstFrame ? 0 : -1}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!canActivate) return;
-                        onActivate?.(p);
+                        if (!canJumpToFirstFrame) return;
+                        onJumpToFirstFrame?.(p);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (!canActivate) return;
-                          onActivate?.(p);
+                          if (!canJumpToFirstFrame) return;
+                          onJumpToFirstFrame?.(p);
                         }
                       }}
                       className={`w-full rounded-md px-1.5 py-0.5 text-[10px] border inline-flex items-center justify-center select-none ${
-                        canActivate
+                        canJumpToFirstFrame
                           ? "cursor-pointer border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-400/60 dark:text-gray-100 dark:hover:bg-gray-500/15"
                           : "cursor-not-allowed border-gray-200 text-gray-300 dark:border-gray-800 dark:text-white/30"
                       }`}
                       title={
-                        canActivate
+                        canJumpToFirstFrame
                           ? "Jump to the first frame where this instance appears"
                           : "No known first frame for this instance"
                       }
                       aria-label={
-                        canActivate
+                        canJumpToFirstFrame
                           ? `Jump to first frame for ${p.class_name} ${p.track_id}`
                           : `No first frame available for ${p.class_name} ${p.track_id}`
                       }

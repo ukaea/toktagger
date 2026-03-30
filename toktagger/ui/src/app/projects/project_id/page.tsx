@@ -106,7 +106,7 @@ const SamplesTable = ({
                 <Cell>
                   <Flex direction="row" gap="size-100">
                     <DialogTrigger>
-                      <Button variant="negative">
+                      <Button aria-label="Delete" variant="negative">
                         <Delete />
                       </Button>
                       {(close) => (

@@ -13,7 +13,6 @@ from toktagger.api.schemas.annotations import (
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import FileData, Sample, SampleUpdate, SampleSummary
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
-from toktagger.api.models.base import ModelRegistry
 
 
 async def get_projects(
@@ -127,11 +126,6 @@ async def get_models(
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id}
     if model_type:
-        if model_type not in (model_types := ModelRegistry.names()):
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid model type! Available model types are {model_types}.",
-            )
         filters["type"] = model_type
     if status:
         filters["training_status"] = status
@@ -160,11 +154,6 @@ async def get_model(
     ] = None,
 ) -> Model:
     project_obj_id = convert_to_objectid(project_id, "projects")
-    if model_type not in (model_types := ModelRegistry.names()):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid model type! Available model types are {model_types}.",
-        )
     filters = {"project_id": project_obj_id, "type": model_type}
     if version:
         filters["version"] = version

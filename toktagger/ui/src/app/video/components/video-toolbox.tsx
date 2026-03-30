@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DialogContainer, AlertDialog, Switch } from "@adobe/react-spectrum";
+import { useEffect, useMemo, useState } from "react";
+import { DialogContainer, AlertDialog, Divider } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
@@ -48,40 +50,6 @@ function instanceKey(args: { class_name: string; track_id: string }) {
   return `${cls}:${tid}`;
 }
 
-function parseTrackIdNumber(trackId: string): number | null {
-  const s = (trackId || "").trim();
-  if (!s) return null;
-  if (/^\d+$/.test(s)) return Number(s);
-  const m = s.match(/(\d+)(?!.*\d)/);
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? n : null;
-}
-
-function compareProfiles(
-  a: { class_name: string; track_id: string },
-  b: { class_name: string; track_id: string },
-) {
-  // Sort by class then by track id (numeric if possible, otherwise lexicographic).
-  const ac = (a.class_name || "").toLowerCase();
-  const bc = (b.class_name || "").toLowerCase();
-  if (ac < bc) return -1;
-  if (ac > bc) return 1;
-
-  const an = parseTrackIdNumber(a.track_id);
-  const bn = parseTrackIdNumber(b.track_id);
-
-  if (an != null && bn != null) return an - bn;
-  if (an != null && bn == null) return -1;
-  if (an == null && bn != null) return 1;
-
-  const at = canonicalizeTrackId(a.track_id);
-  const bt = canonicalizeTrackId(b.track_id);
-  if (at < bt) return -1;
-  if (at > bt) return 1;
-  return 0;
-}
-
 export function VideoToolbox() {
   const session = useVideoSession();
   const { annotationLabels, dataParams, setDataParams } = useSample();
@@ -102,8 +70,7 @@ export function VideoToolbox() {
     if (last && !session.selection.className) {
       session.setSelection({ className: last, trackId: null, source: null });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     const panel = rootRef.current?.closest<HTMLElement>("[aria-labelledby]");
@@ -130,16 +97,13 @@ export function VideoToolbox() {
   }, [labels]);
 
   const profiles = useMemo(() => {
-    const arr = session.instances.map((inst) => ({
+    return session.instances.map((inst) => ({
       key: instanceKey({ class_name: inst.className, track_id: inst.trackId }),
       class_id: classIdByName.get(inst.className) ?? inst.classId ?? -1,
       class_name: inst.className,
       track_id: canonicalizeTrackId(inst.trackId),
       first_frame: inst.frames[0] ?? null,
     }));
-
-    arr.sort((a, b) => compareProfiles(a, b));
-    return arr;
   }, [session.instances, classIdByName]);
 
   const profileCounts = useMemo(() => {
@@ -206,7 +170,7 @@ export function VideoToolbox() {
     saveLastClassName(hit.class_name);
   };
 
-  const onActivateProfile = (profile: {
+  const onJumpToFirstFrame = (profile: {
     class_name?: string;
     track_id?: string;
     first_frame?: number | null;
@@ -313,17 +277,13 @@ export function VideoToolbox() {
         <div className="border-t border-gray-800 mx-4" />
 
         <div className="px-4 py-4">
-          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Class
-          </div>
           <VideoClassPanel
             items={classItems}
             selectedClassName={session.selection.className}
             setSelectedClassName={onSelectClassName}
           />
         </div>
-
-        <div className="mx-4 border-t border-gray-200 dark:border-gray-800" />
+        <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
           <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -333,7 +293,7 @@ export function VideoToolbox() {
             profiles={profiles}
             selectedKey={selectedKey}
             onSelect={onSelectInstance}
-            onActivate={onActivateProfile}
+            onJumpToFirstFrame={onJumpToFirstFrame}
             onCreateProfile={() => {
               // Instances are derived from annotations; creation happens via drawing.
             }}
