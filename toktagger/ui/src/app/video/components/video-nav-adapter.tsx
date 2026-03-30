@@ -36,7 +36,7 @@ export function VideoNavAdapterBridge({
         return sanitizedBox as Annotation;
       });
 
-      return [...shotLabels, ...videoAnnotations];
+      return [...shotLabels, ...videoBoxes];
     },
     clear: () => {
       session.clearCurrentFrame();

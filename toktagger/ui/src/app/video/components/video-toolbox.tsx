@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DialogContainer, AlertDialog, Switch } from "@adobe/react-spectrum";
-import { useEffect, useMemo, useState } from "react";
-import { DialogContainer, AlertDialog, Divider } from "@adobe/react-spectrum";
+import {
+  DialogContainer,
+  AlertDialog,
+  Switch,
+  Divider,
+} from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
