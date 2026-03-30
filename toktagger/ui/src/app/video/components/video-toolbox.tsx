@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DialogContainer,
   AlertDialog,
+  Button,
   Switch,
   Divider,
 } from "@adobe/react-spectrum";
@@ -240,44 +241,35 @@ export function VideoToolbox() {
     <>
       <div ref={rootRef} className="w-full">
         <div className="px-4 pb-4">
-          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Frame Tools
           </div>
-          <div className="mx-auto mb-2 flex w-fit max-w-[16rem] rounded-full border border-gray-200 bg-gray-100 p-1 shadow-sm dark:border-gray-800 dark:bg-gray-950/90 dark:shadow-inner">
-            <button
-              type="button"
-              onClick={() => session.setDrawingTool("rectangle")}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                tool === "rectangle"
-                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100"
-                  : "text-gray-500 hover:bg-white hover:text-gray-700 dark:text-gray-500 dark:hover:bg-gray-900 dark:hover:text-gray-200"
-              }`}
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <Button
+              variant={tool === "rectangle" ? "primary" : "secondary"}
+              onPress={() => session.setDrawingTool("rectangle")}
+              UNSAFE_style={{ width: "100%" }}
             >
               Rectangle
-            </button>
-            <button
-              type="button"
-              onClick={() => session.setDrawingTool("polygon")}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                tool === "polygon"
-                  ? "bg-orange-500 text-white shadow-sm"
-                  : "text-gray-500 hover:bg-white hover:text-gray-700 dark:text-gray-500 dark:hover:bg-gray-900 dark:hover:text-gray-200"
-              }`}
+            </Button>
+            <Button
+              variant={tool === "polygon" ? "primary" : "secondary"}
+              onPress={() => session.setDrawingTool("polygon")}
+              UNSAFE_style={{ width: "100%" }}
             >
               Polygon
-            </button>
+            </Button>
           </div>
           <div className="flex items-center justify-center">
             <Switch
               isSelected={session.propagate}
               onChange={session.setPropagate}
             >
-              Forward Propagation
+              Propagation
             </Switch>
           </div>
         </div>
-
-        <div className="border-t border-gray-800 mx-4" />
+        <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
           <VideoClassPanel
@@ -289,7 +281,7 @@ export function VideoToolbox() {
         <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
-          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Instances
           </div>
           <VideoInstancePanel
