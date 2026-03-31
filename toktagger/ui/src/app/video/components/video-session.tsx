@@ -127,6 +127,7 @@ type VideoSessionCtx = {
 
   // conversion helpers for backend save
   collectAllNative: () => ImageAnnotation[];
+  collectAllVideoBBoxes: () => VideoBoundingBox[];
   collectAllVideoAnnotations: () => VideoAnnotationShape[];
 
   // seeding from db annotations (one-shot helper)
@@ -356,6 +357,19 @@ export function VideoSessionProvider(props: {
   const collectAllNative = useCallback(() => {
     const out: ImageAnnotation[] = [];
     for (const list of byFrame.values()) out.push(...(list ?? []));
+    return out;
+  }, [byFrame]);
+
+
+  /** Convert the session overlays into backend video bounding boxes. */
+  const collectAllVideoBBoxes = useCallback(() => {
+    const out: VideoBoundingBox[] = [];
+    for (const [f, list] of byFrame.entries()) {
+      for (const a of list ?? []) {
+        const shape = annoToVideoAnnotation(a, f);
+        if (shape?.type === "video_bounding_box") out.push(shape);
+      }
+    }
     return out;
   }, [byFrame]);
 
@@ -835,6 +849,7 @@ export function VideoSessionProvider(props: {
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
       collectAllNative,
+      collectAllVideoBBoxes,
       collectAllVideoAnnotations,
       seedFromDbIfEmpty,
     }),
@@ -869,6 +884,7 @@ export function VideoSessionProvider(props: {
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
       collectAllNative,
+      collectAllVideoBBoxes,
       collectAllVideoAnnotations,
       seedFromDbIfEmpty,
     ],
