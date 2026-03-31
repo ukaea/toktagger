@@ -43,9 +43,7 @@ export function AnnotationPopup(props: {
             </div>
 
             {detailText && (
-              <div className="mt-1 text-[11px] text-white/60">
-                {detailText}
-              </div>
+              <div className="mt-1 text-[11px] text-white/60">{detailText}</div>
             )}
           </div>
 

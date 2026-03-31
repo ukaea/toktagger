@@ -3,7 +3,12 @@
 import React from "react";
 import { useSample } from "@/app/contexts/SampleContext";
 import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
-import { type Annotation, type NavAdapter } from "@/types";
+import {
+  type Annotation,
+  type NavAdapter,
+  VideoBoundingBoxSchema,
+  VideoPolygonSchema,
+} from "@/types";
 import { useVideoSession } from "./video-session";
 
 export function VideoNavAdapterBridge({
@@ -20,8 +25,24 @@ export function VideoNavAdapterBridge({
         (annotation): annotation is Annotation =>
           annotation.type === "class_label",
       );
-      const videoAnnotations =
-        session.collectAllVideoAnnotations() as Annotation[];
+      const nowIso = new Date().toISOString();
+      const videoAnnotations = session
+        .collectAllVideoAnnotations()
+        .map((annotation): Annotation => {
+          if (annotation.type === "video_bounding_box") {
+            const parsed = VideoBoundingBoxSchema.parse(annotation);
+            return {
+              ...parsed,
+              timestamp: parsed.timestamp ?? nowIso,
+            };
+          }
+
+          const parsed = VideoPolygonSchema.parse(annotation);
+          return {
+            ...parsed,
+            timestamp: parsed.timestamp ?? nowIso,
+          };
+        });
 
       return [...shotLabels, ...videoAnnotations];
     },
