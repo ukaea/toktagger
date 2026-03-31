@@ -5,6 +5,8 @@ import type { ImageAnnotation } from "@annotorious/react";
 /** Frame number within a video (0-based). */
 export type FrameIndex = number;
 
+export type DrawingTool = "rectangle" | "polygon";
+
 /**
  * Stable identifier for a tracked instance in the UI/session.
  * Format: "<className>::<trackId>"
@@ -58,6 +60,19 @@ export type VideoBoundingBox = {
   timestamp?: string;
   class_id?: number;
 };
+
+export type VideoPolygon = {
+  type: "video_polygon";
+  frame: number;
+  track_id: string;
+  label: string;
+  segmentation: number[];
+  created_by?: string;
+  timestamp?: string;
+  class_id?: number;
+};
+
+export type VideoAnnotationShape = VideoBoundingBox | VideoPolygon;
 
 /**
  * Supported label set for this UI.

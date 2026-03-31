@@ -50,12 +50,22 @@ export const VideoBoundingBoxSchema = BoundingBoxSchema.extend({
 
 export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;
 
+export const VideoPolygonSchema = BaseAnnotationSchema.extend({
+  type: z.literal("video_polygon"),
+  frame: z.number().int(),
+  track_id: z.string(),
+  segmentation: z.array(z.number().int()).min(6),
+});
+
+export type VideoPolygon = z.infer<typeof VideoPolygonSchema>;
+
 export const AnnotationSchema = z.union([
   TimePointSchema,
   TimeRegionSchema,
   ClassLabelSchema,
   BoundingBoxSchema,
   VideoBoundingBoxSchema,
+  VideoPolygonSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
