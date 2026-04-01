@@ -1,4 +1,4 @@
-import type { ImageAnnotation } from "@annotorious/react";
+import { boundsFromPoints, type ImageAnnotation } from "@annotorious/react";
 import {
   getLabelTrack,
   isRectangleAnno,
@@ -110,7 +110,7 @@ function withRectGeometry(
 }
 
 function clampPoint(
-  point: Array<number>,
+  point: ReadonlyArray<number>,
   nw: number,
   nh: number,
 ): [number, number] {
@@ -118,11 +118,14 @@ function clampPoint(
   return [Math.max(0, Math.min(nw, x)), Math.max(0, Math.min(nh, y))];
 }
 
-function samePoint(a: Array<number>, b: Array<number>): boolean {
+function samePoint(
+  a: ReadonlyArray<number>,
+  b: ReadonlyArray<number>,
+): boolean {
   return a[0] === b[0] && a[1] === b[1];
 }
 
-function polygonArea(points: Array<Array<number>>): number {
+function polygonArea(points: Array<ReadonlyArray<number>>): number {
   let area = 0;
 
   for (let i = 0; i < points.length; i += 1) {
@@ -138,9 +141,9 @@ function clampPolygonToImage(
   points: Array<Array<number>>,
   nw: number,
   nh: number,
-): Array<Array<number>> | null {
+): [number, number][] | null {
   const clamped = points.map((point) => clampPoint(point, nw, nh));
-  const deduped: Array<Array<number>> = [];
+  const deduped: [number, number][] = [];
 
   for (const point of clamped) {
     if (
@@ -167,20 +170,8 @@ function clampPolygonToImage(
 
 function withPolygonGeometry(
   a: ImageAnnotation,
-  points: Array<Array<number>>,
+  points: [number, number][],
 ): ImageAnnotation {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  for (const [x, y] of points) {
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-  }
-
   const geom = a.target.selector.geometry as unknown;
   const base =
     geom && typeof geom === "object"
@@ -190,7 +181,7 @@ function withPolygonGeometry(
   const nextGeom = {
     ...base,
     points,
-    bounds: { minX, minY, maxX, maxY },
+    bounds: boundsFromPoints(points),
   } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
 
   return {
