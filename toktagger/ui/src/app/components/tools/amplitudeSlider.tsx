@@ -1,6 +1,6 @@
 import { useSample } from "@/app/contexts/SampleContext";
-import { Profile2DViewParams } from "@/types";
 import { DataRangeSlider } from "./dataRangeSlider";
+import { Profile2DViewParamsSchema } from "@/types";
 
 export function AmplitudeSlider() {
   const { data, viewParams, setViewParams, plotProps } = useSample();

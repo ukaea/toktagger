@@ -269,36 +269,6 @@ export function SampleProvider({
     lastGoodVideoFrameRef.current = null;
   }, [sampleId]);
 
-  function extractDetail(payload: unknown): string {
-    if (!payload) return "Unknown error";
-    if (typeof payload === "string") return payload;
-    if (typeof payload === "object") {
-      const d = (payload as { detail?: unknown }).detail;
-      if (typeof d === "string" && d.trim()) return d;
-      if (Array.isArray(d)) {
-        const first = d.find((x) => typeof x === "string" && x.trim());
-        if (typeof first === "string") return first;
-      }
-    }
-    try {
-      return JSON.stringify(payload);
-    } catch {
-      return "Unknown error";
-    }
-  }
-
-  function isMissingFrameError(status: number, detail: string): boolean {
-    // Treat 404 + common "missing frame" phrasing as "navigation boundary" rather than fatal.
-    if (status === 404) return true;
-    const msg = (detail || "").toLowerCase();
-    return (
-      msg.includes("could not find image") ||
-      msg.includes("file not found") ||
-      msg.includes("no such file") ||
-      msg.includes("frame index")
-    );
-  }
-
   // Consolidated data fetching - fetch everything together
   useEffect(() => {
     const refreshData = async () => {
