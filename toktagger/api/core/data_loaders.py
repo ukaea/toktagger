@@ -60,7 +60,7 @@ class DataLoader(ABC):
     def get_sample(
         self,
         sample: Sample,
-        params: DataParamTypes = DataParams,
+        params: DataParamTypes = DataParams(),
         **kwargs,
     ) -> Data:
         pass
