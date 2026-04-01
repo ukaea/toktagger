@@ -7,6 +7,8 @@ import {
   Button,
   Switch,
   Divider,
+  Grid,
+  Flex,
 } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
@@ -229,30 +231,30 @@ export function VideoToolbox() {
           <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Frame Tools
           </div>
-          <div className="mb-2 grid grid-cols-2 gap-2">
+          <Grid columns={["1fr", "1fr"]} gap="size-100" marginBottom="size-100">
             <Button
               variant={tool === "rectangle" ? "primary" : "secondary"}
               onPress={() => session.setDrawingTool("rectangle")}
-              UNSAFE_style={{ width: "100%" }}
+              width="100%"
             >
               Rectangle
             </Button>
             <Button
               variant={tool === "polygon" ? "primary" : "secondary"}
               onPress={() => session.setDrawingTool("polygon")}
-              UNSAFE_style={{ width: "100%" }}
+              width="100%"
             >
               Polygon
             </Button>
-          </div>
-          <div className="flex items-center justify-center">
+          </Grid>
+          <Flex alignItems="center" justifyContent="center">
             <Switch
               isSelected={session.propagate}
               onChange={session.setPropagate}
             >
               Propagation
             </Switch>
-          </div>
+          </Flex>
         </div>
         <Divider size="S" marginX="size-200" />
 
