@@ -4,6 +4,10 @@ import {
   ShapeType,
   type AnnotationBody,
   type ImageAnnotation,
+  type Polygon,
+  type PolygonGeometry,
+  type Rectangle,
+  type RectangleGeometry,
 } from "@annotorious/react";
 import type {
   VideoAnnotationShape,
@@ -28,6 +32,18 @@ type UnknownRecord = Record<string, unknown>;
 export type VideoImageAnnotation = ImageAnnotation & {
   target: ImageAnnotation["target"] & {
     source?: string;
+  };
+};
+
+export type RectangleAnnotation = ImageAnnotation & {
+  target: ImageAnnotation["target"] & {
+    selector: Rectangle;
+  };
+};
+
+export type PolygonAnnotation = ImageAnnotation & {
+  target: ImageAnnotation["target"] & {
+    selector: Polygon;
   };
 };
 
@@ -141,14 +157,14 @@ function newBodyId(): string {
 }
 
 /** True if the annotation target is a rectangle selector. */
-export function isRectangleAnno(a: ImageAnnotation): boolean {
+export function isRectangleAnno(a: ImageAnnotation): a is RectangleAnnotation {
   // ShapeType.RECTANGLE is already the string literal "RECTANGLE",
   // so we don't need a separate check for the string form.
   return a.target.selector.type === ShapeType.RECTANGLE;
 }
 
 /** True if the annotation target is a polygon selector. */
-export function isPolygonAnno(a: ImageAnnotation): boolean {
+export function isPolygonAnno(a: ImageAnnotation): a is PolygonAnnotation {
   return a.target.selector.type === ShapeType.POLYGON;
 }
 
@@ -156,34 +172,12 @@ function isFiniteNumber(v: unknown): v is number {
   return Number.isFinite(v);
 }
 
-/** Rectangle geometry shape we rely on at runtime. */
-type RectGeometry = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-};
-
-type PolygonGeometry = {
-  points: [number, number][];
-};
-
 /** Read rectangle geometry (returns null if missing/invalid). */
 export function readRectGeometry(
-  a: ImageAnnotation,
-): { x: number; y: number; w: number; h: number } | null {
-  // Make this function self-contained: only rectangles have x/y/w/h.
-  if (!isRectangleAnno(a)) return null;
-
+  a: RectangleAnnotation,
+): RectangleGeometry | null {
   const g = a.target.selector.geometry;
-  if (!g || typeof g !== "object") return null;
-
-  const rg = g as Partial<RectGeometry>;
-
-  const x = rg.x;
-  const y = rg.y;
-  const w = rg.w;
-  const h = rg.h;
+  const { x, y, w, h } = g;
 
   // TS now narrows x/y/w/h to number after these checks.
   if (
@@ -196,33 +190,25 @@ export function readRectGeometry(
 
   if (w <= 0 || h <= 0) return null;
 
-  return { x, y, w, h };
+  return g;
 }
 
 /** Read polygon geometry (returns null if missing/invalid). */
 export function readPolygonGeometry(
-  a: ImageAnnotation,
-): { points: [number, number][] } | null {
-  if (!isPolygonAnno(a)) return null;
-
+  a: PolygonAnnotation,
+): PolygonGeometry | null {
   const g = a.target.selector.geometry;
-  if (!g || typeof g !== "object") return null;
-
-  const pg = g as Partial<PolygonGeometry>;
-  const points = pg.points;
+  const { points } = g;
   if (!Array.isArray(points) || points.length < 3) return null;
 
-  const out: [number, number][] = [];
   for (const point of points) {
     if (!Array.isArray(point) || point.length !== 2) return null;
 
     const [x, y] = point;
     if (!isFiniteNumber(x) || !isFiniteNumber(y)) return null;
-
-    out.push([x, y]);
   }
 
-  return { points: out };
+  return g;
 }
 
 /**
@@ -290,10 +276,9 @@ export function normalizeOverlay(
 
 /** Convert a normalized ImageAnnotation -> backend VideoBoundingBox. */
 export function annoToVideoBBox(
-  a: ImageAnnotation,
+  a: RectangleAnnotation,
   frame: number,
 ): VideoBoundingBox | null {
-  if (!isRectangleAnno(a)) return null;
   const g = readRectGeometry(a);
   if (!g) return null;
 
@@ -316,10 +301,9 @@ export function annoToVideoBBox(
 
 /** Convert a normalized ImageAnnotation -> backend VideoPolygon. */
 export function annoToVideoPolygon(
-  a: ImageAnnotation,
+  a: PolygonAnnotation,
   frame: number,
 ): VideoPolygon | null {
-  if (!isPolygonAnno(a)) return null;
   const g = readPolygonGeometry(a);
   if (!g) return null;
 
@@ -369,19 +353,19 @@ export function videoBBoxToAnno(
     `anno-${Math.random().toString(36).slice(2)}`;
 
   // Annotorious Geometry type only guarantees `bounds`, but rectangle geometry
-  // includes x/y/w/h at runtime. We keep those fields without using `any`.
-  const geometry = {
+  // includes x/y/w/h at runtime. Use the concrete RectangleGeometry type.
+  const geometry: RectangleGeometry = {
     x,
     y,
     w,
     h,
     bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h },
-  } as ImageAnnotation["target"]["selector"]["geometry"];
+  };
 
-  const selector = {
+  const selector: Rectangle = {
     type: ShapeType.RECTANGLE,
     geometry,
-  } as ImageAnnotation["target"]["selector"];
+  };
 
   const anno: VideoImageAnnotation = {
     id,
@@ -427,15 +411,15 @@ export function videoPolygonToAnno(
     if (y > maxY) maxY = y;
   }
 
-  const geometry = {
+  const geometry: PolygonGeometry = {
     points,
     bounds: { minX, minY, maxX, maxY },
-  } as ImageAnnotation["target"]["selector"]["geometry"];
+  };
 
-  const selector = {
+  const selector: Polygon = {
     type: ShapeType.POLYGON,
     geometry,
-  } as ImageAnnotation["target"]["selector"];
+  };
 
   const anno: VideoImageAnnotation = {
     id,

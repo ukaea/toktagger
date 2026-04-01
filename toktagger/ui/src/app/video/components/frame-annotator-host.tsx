@@ -11,6 +11,8 @@ import "@annotorious/react/annotorious-react.css";
 import { useVideoSession } from "@/app/video/components/video-session";
 import {
   getLabelTrack,
+  isPolygonAnno,
+  isRectangleAnno,
   readPolygonGeometry,
   readRectGeometry,
 } from "./anno-utils";
@@ -121,11 +123,14 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const label = frame;
 
   const formatDetails = (annotation: ImageAnnotation) => {
-    const rect = readRectGeometry(annotation);
-    if (rect) {
+    if (isRectangleAnno(annotation)) {
+      const rect = readRectGeometry(annotation);
+      if (!rect) return null;
+
       return `x=${Math.round(rect.x)}, y=${Math.round(rect.y)}, w=${Math.round(rect.w)}, h=${Math.round(rect.h)}`;
     }
 
+    if (!isPolygonAnno(annotation)) return null;
     const polygon = readPolygonGeometry(annotation);
     if (!polygon) return null;
 
@@ -184,7 +189,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             const annotation = props.annotation as ImageAnnotation;
 
             const { className, trackId } = getLabelTrack(annotation);
-            const geometry = readRectGeometry(annotation);
+            const geometry = isRectangleAnno(annotation)
+              ? readRectGeometry(annotation)
+              : null;
             const details = formatDetails(annotation);
 
             return (

@@ -1,6 +1,7 @@
 import type { ImageAnnotation } from "@annotorious/react";
 import {
   getLabelTrack,
+  isRectangleAnno,
   isPolygonAnno,
   readPolygonGeometry,
   readRectGeometry,
@@ -20,8 +21,8 @@ function getTargetSource(a: ImageAnnotation): string {
 function annoSig(a: ImageAnnotation): string {
   const sel = a.target.selector;
   const source = getTargetSource(a);
-  const rect = readRectGeometry(a);
-  const poly = readPolygonGeometry(a);
+  const rect = isRectangleAnno(a) ? readRectGeometry(a) : null;
+  const poly = isPolygonAnno(a) ? readPolygonGeometry(a) : null;
   const { className, trackId } = getLabelTrack(a);
   const polySig = poly
     ? poly.points.map(([x, y]) => `${x},${y}`).join(";")
@@ -109,7 +110,7 @@ function withRectGeometry(
 }
 
 function clampPoint(
-  point: [number, number],
+  point: Array<number>,
   nw: number,
   nh: number,
 ): [number, number] {
@@ -117,11 +118,11 @@ function clampPoint(
   return [Math.max(0, Math.min(nw, x)), Math.max(0, Math.min(nh, y))];
 }
 
-function samePoint(a: [number, number], b: [number, number]): boolean {
+function samePoint(a: Array<number>, b: Array<number>): boolean {
   return a[0] === b[0] && a[1] === b[1];
 }
 
-function polygonArea(points: [number, number][]): number {
+function polygonArea(points: Array<Array<number>>): number {
   let area = 0;
 
   for (let i = 0; i < points.length; i += 1) {
@@ -134,12 +135,12 @@ function polygonArea(points: [number, number][]): number {
 }
 
 function clampPolygonToImage(
-  points: [number, number][],
+  points: Array<Array<number>>,
   nw: number,
   nh: number,
-): [number, number][] | null {
+): Array<Array<number>> | null {
   const clamped = points.map((point) => clampPoint(point, nw, nh));
-  const deduped: [number, number][] = [];
+  const deduped: Array<Array<number>> = [];
 
   for (const point of clamped) {
     if (
@@ -166,7 +167,7 @@ function clampPolygonToImage(
 
 function withPolygonGeometry(
   a: ImageAnnotation,
-  points: [number, number][],
+  points: Array<Array<number>>,
 ): ImageAnnotation {
   let minX = Infinity;
   let minY = Infinity;
@@ -214,8 +215,13 @@ export function clampOverlayToNaturalImage(
   const out: ImageAnnotation[] = [];
 
   for (const a of list) {
-    const g = readRectGeometry(a);
-    if (g) {
+    if (isRectangleAnno(a)) {
+      const g = readRectGeometry(a);
+      if (!g) {
+        out.push(a);
+        continue;
+      }
+
       const clamped = clampRectToImage(g, natural.w, natural.h);
       if (!clamped) {
         changed = true;
@@ -236,8 +242,13 @@ export function clampOverlayToNaturalImage(
       continue;
     }
 
+    if (!isPolygonAnno(a)) {
+      out.push(a);
+      continue;
+    }
+
     const polygon = readPolygonGeometry(a);
-    if (!polygon || !isPolygonAnno(a)) {
+    if (!polygon) {
       out.push(a);
       continue;
     }
