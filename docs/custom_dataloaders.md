@@ -206,7 +206,7 @@ class CSVTimeSeriesLoader(DataLoader):
     def get_sample(
         self, 
         sample: Sample,
-        params: DataParams,
+        params: DataParams = DataParams(),
     ) -> MultiVariateTimeSeriesData:
         """
         Load time series data from a CSV file.
@@ -323,7 +323,7 @@ class SQLDatabaseLoader(DataLoader):
     def get_sample(
         self, 
         sample: Sample,
-        params: DataParams, 
+        params: DataParams = DataParams(), 
     ) -> MultiVariateTimeSeriesData:
         """Load time series data from database"""
         results = {}
