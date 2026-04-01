@@ -30,7 +30,7 @@ nav:
   - Home: index.md
   - Creating Projects: creating_projects.md
   - Time Series Labelling: time_series.md
-  - 2D Profile Labelling: profile2d.md
+  - 2D Profile Labelling: profile_2d.md
   - Annotators: annotators.md
   - Data Loaders: data_loaders.md
   - Advanced:
