@@ -27,7 +27,6 @@ import { useVSpanContext } from "../providers/vpsan-provider";
 import { useZoneContext } from "../providers/zone-provider";
 import { useBoundingBoxContext } from "../providers/bounding-box-provider";
 import { usePolygonContext } from "../providers/polygon-provider";
-import { ca } from "zod/v4/locales";
 
 type InjectedProps = {
   plotId: string;
