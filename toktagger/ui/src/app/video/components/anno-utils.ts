@@ -8,6 +8,8 @@ import {
   type PolygonGeometry,
   type Rectangle,
   type RectangleGeometry,
+  type ImageAnnotationTarget,
+  type Shape,
 } from "@annotorious/react";
 import type {
   VideoAnnotationShape,
@@ -30,22 +32,22 @@ type UnknownRecord = Record<string, unknown>;
 
 // Our app stores a frame key on target.source (not present in upstream Annotorious types).
 export type VideoImageAnnotation = ImageAnnotation & {
-  target: ImageAnnotation["target"] & {
+  target: ImageAnnotationTarget & {
     source?: string;
   };
 };
 
-export type RectangleAnnotation = ImageAnnotation & {
-  target: ImageAnnotation["target"] & {
-    selector: Rectangle;
+export type ImageAnnotationWithSelector<TSelector extends Shape> = Omit<
+  ImageAnnotation,
+  "target"
+> & {
+  target: Omit<ImageAnnotationTarget, "selector"> & {
+    selector: TSelector;
   };
 };
 
-export type PolygonAnnotation = ImageAnnotation & {
-  target: ImageAnnotation["target"] & {
-    selector: Polygon;
-  };
-};
+export type RectangleAnnotation = ImageAnnotationWithSelector<Rectangle>;
+export type PolygonAnnotation = ImageAnnotationWithSelector<Polygon>;
 
 function withTargetSource(
   a: ImageAnnotation,
