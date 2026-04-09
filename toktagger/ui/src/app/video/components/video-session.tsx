@@ -149,6 +149,14 @@ type FocusRequest = {
   targetFrame: FrameIndex | null;
 };
 
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
 export function useVideoSession(): VideoSessionCtx {
   const v = useContext(Ctx);
   if (!v)
@@ -185,6 +193,8 @@ export function VideoSessionProvider(props: {
   const commitFromAnnotoriousRef = useRef<
     (rawOverride?: ImageAnnotation[]) => void
   >(() => {});
+  const shiftPanActiveRef = useRef(false);
+  const panModeBeforeShiftRef = useRef(false);
   const pendingFocusRef = useRef<FocusRequest | null>(null);
   const nextTrackNumsRef = useRef<Map<string, number>>(
     buildNextTrackIdState(props.dbAnnotations),
@@ -334,6 +344,51 @@ export function VideoSessionProvider(props: {
   const setPropagate = useCallback((v: boolean) => {
     setPropagateState(v);
   }, []);
+
+  useEffect(() => {
+    const releaseShiftPan = () => {
+      if (!shiftPanActiveRef.current) return;
+      shiftPanActiveRef.current = false;
+      setPanMode(panModeBeforeShiftRef.current);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Shift") return;
+      if (event.repeat) return;
+      if (shiftPanActiveRef.current) return;
+      if (isEditableEventTarget(event.target)) return;
+
+      panModeBeforeShiftRef.current = panMode;
+      shiftPanActiveRef.current = true;
+      setPanMode(true);
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== "Shift") return;
+      releaseShiftPan();
+    };
+
+    const onWindowBlur = () => {
+      releaseShiftPan();
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) return;
+      releaseShiftPan();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onWindowBlur);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onWindowBlur);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [panMode, setPanMode]);
 
   const applyAnnotatorInteractionMode = useCallback(() => {
     if (!api) return;
