@@ -3,12 +3,12 @@ import {
   getLabelTrack,
   isRectangleAnno,
   isPolygonAnno,
+  type PolygonAnnotation,
+  type RectangleAnnotation,
   readPolygonGeometry,
   readRectGeometry,
   VideoImageAnnotation,
 } from "./anno-utils";
-
-type UnknownRecord = Record<string, unknown>;
 
 function getTargetSource(a: ImageAnnotation): string {
   return (a as VideoImageAnnotation).target.source ?? "";
@@ -79,23 +79,17 @@ export function clampRectToImage(
 }
 
 function withRectGeometry(
-  a: ImageAnnotation,
+  a: RectangleAnnotation,
   g: { x: number; y: number; w: number; h: number },
-): ImageAnnotation {
-  const geom = a.target.selector.geometry as unknown;
-  const base =
-    geom && typeof geom === "object"
-      ? (geom as UnknownRecord)
-      : ({} as UnknownRecord);
-
+): RectangleAnnotation {
   const nextGeom = {
-    ...base,
+    ...a.target.selector.geometry,
     x: g.x,
     y: g.y,
     w: g.w,
     h: g.h,
     bounds: { minX: g.x, minY: g.y, maxX: g.x + g.w, maxY: g.y + g.h },
-  } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
+  };
 
   return {
     ...a,
@@ -169,20 +163,14 @@ function clampPolygonToImage(
 }
 
 function withPolygonGeometry(
-  a: ImageAnnotation,
+  a: PolygonAnnotation,
   points: [number, number][],
-): ImageAnnotation {
-  const geom = a.target.selector.geometry as unknown;
-  const base =
-    geom && typeof geom === "object"
-      ? (geom as UnknownRecord)
-      : ({} as UnknownRecord);
-
+): PolygonAnnotation {
   const nextGeom = {
-    ...base,
+    ...a.target.selector.geometry,
     points,
     bounds: boundsFromPoints(points),
-  } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
+  };
 
   return {
     ...a,
