@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DialogContainer, AlertDialog, Divider } from "@adobe/react-spectrum";
+import {
+  DialogContainer,
+  AlertDialog,
+  Button,
+  Switch,
+  Divider,
+  Grid,
+  Flex,
+} from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
@@ -52,6 +60,7 @@ export function VideoToolbox() {
   const session = useVideoSession();
   const { annotationLabels, dataParams, setDataParams } = useSample();
   const labels = annotationLabels;
+  const tool = session.drawingTool;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
 
@@ -218,22 +227,36 @@ export function VideoToolbox() {
   return (
     <>
       <div className="w-full">
-        {/* Frame Tools section — commented out until more shapes are added
         <div className="px-4 pb-4">
-          <div className="text-gray-200 text-sm font-medium mb-2">
+          <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Frame Tools
           </div>
-          <div className="max-w-[16rem] mx-auto mb-2">
-            <Flex gap="size-100" alignItems="center" wrap>
-              <Button variant="secondary" style="fill" isDisabled>
-                Rectangle
-              </Button>
-            </Flex>
-          </div>
+          <Grid columns={["1fr", "1fr"]} gap="size-100" marginBottom="size-100">
+            <Button
+              variant={tool === "rectangle" ? "primary" : "secondary"}
+              onPress={() => session.setDrawingTool("rectangle")}
+              width="100%"
+            >
+              Rectangle
+            </Button>
+            <Button
+              variant={tool === "polygon" ? "primary" : "secondary"}
+              onPress={() => session.setDrawingTool("polygon")}
+              width="100%"
+            >
+              Polygon
+            </Button>
+          </Grid>
+          <Flex alignItems="center" justifyContent="center">
+            <Switch
+              isSelected={session.propagate}
+              onChange={session.setPropagate}
+            >
+              Propagation
+            </Switch>
+          </Flex>
         </div>
-
-        <div className="border-t border-gray-800 mx-4" />
-        */}
+        <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
           <VideoClassPanel
@@ -245,7 +268,7 @@ export function VideoToolbox() {
         <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
-          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Instances
           </div>
           <VideoInstancePanel

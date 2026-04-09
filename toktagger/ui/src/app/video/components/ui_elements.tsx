@@ -28,7 +28,11 @@ export function ClassPanel({
   return (
     <View marginX="auto" width="12rem">
       <ComboBox
-        label="Class Label"
+        label={
+          <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+            Class Label
+          </span>
+        }
         items={items}
         selectedKey={selectedClassName}
         onSelectionChange={(key) =>
