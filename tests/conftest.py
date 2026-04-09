@@ -4,7 +4,8 @@ from toktagger.api.main import Server
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.models.base import ModelRegistry, WorkerModelRegistry, ActorRegistry
+from toktagger.api.models.base import ModelRegistry, WorkerRegistry, ActorRegistry
+from toktagger.api.core.data_loaders import LoaderRegistry
 from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
@@ -52,9 +53,13 @@ def ray_session():
             ignore_reinit_error=True, local_mode=True, runtime_env={"working_dir": None}
         )
         # Create a ray actor for use as a model registry
-        WorkerModelRegistry.options(
-            name="WorkerModelRegistry", lifetime="detached"
-        ).remote(ModelRegistry._registry)
+        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
+            ModelRegistry._registry
+        )
+        # And one for use as a dataloader registry
+        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
+            LoaderRegistry._registry
+        )
         yield
         ray.shutdown()
 

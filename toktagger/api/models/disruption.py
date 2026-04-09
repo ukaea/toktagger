@@ -8,7 +8,6 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from toktagger.api.schemas.annotations import Annotation
 import typing
-from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.models.base import Model, ModelRegistry
 import logging
 
@@ -21,8 +20,9 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         project: Project,
         samples: list[Sample],
         annotations: list[list[Annotation]],
+        data_loader: DataLoader,
     ):
-        self.data_loader = LoaderRegistry.get(project.data_loader)(DataParams())
+        self.data_loader = data_loader
         self.samples = samples
         self.annotations = annotations
         self.current_scaling = []
@@ -32,9 +32,9 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> tuple[torch.tensor, int]:
-        data: TimeSeriesData = self.data_loader.get_sample(self.samples[idx]).values[
-            "ip"
-        ]
+        data: TimeSeriesData = self.data_loader.get_sample(
+            self.samples[idx], DataParams()
+        ).values["ip"]
         # Scale data to be between 0 and 1...
         plasma_current = torch.tensor(data.values, dtype=torch.float32)
         self.current_scaling.append(plasma_current.max())
@@ -85,15 +85,19 @@ class DisruptionCNN(Model):
         )
 
         self.train_dataset = DisruptionDataset(
-            self.project, self.train_samples, self.train_annotations
+            self.project, self.train_samples, self.train_annotations, self.data_loader
         )
         self.val_dataset = (
-            DisruptionDataset(self.project, self.val_samples, self.val_annotations)
+            DisruptionDataset(
+                self.project, self.val_samples, self.val_annotations, self.data_loader
+            )
             if self.val_samples
             else None
         )
         self.test_dataset = (
-            DisruptionDataset(self.project, self.test_samples, self.test_annotations)
+            DisruptionDataset(
+                self.project, self.test_samples, self.test_annotations, self.data_loader
+            )
             if self.test_samples
             else None
         )
@@ -255,7 +259,9 @@ class DisruptionCNN(Model):
         self, samples: list[Sample], batch_size: int = 32, device="cpu"
     ) -> list[list[TimePoint]]:
         num_mc_samples = 20  # Should let user choose num mc samples? TODO
-        dataset = DisruptionDataset(self.project, samples, annotations=None)
+        dataset = DisruptionDataset(
+            self.project, samples, annotations=None, data_loader=self.data_loader
+        )
 
         self.model.train()  # Using dropout so has to be in train mode
         all_predictions: list[list[torch.tensor]] = []
