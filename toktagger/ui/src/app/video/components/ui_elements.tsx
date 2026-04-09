@@ -1,8 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button, ComboBox, Item, View } from "@adobe/react-spectrum";
+import {
+  ActionButton,
+  Button,
+  ComboBox,
+  Flex,
+  Item,
+  Text,
+  View,
+} from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
+import FullScreenExit from "@spectrum-icons/workflow/FullScreenExit";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -55,13 +64,23 @@ export function ResetViewButton({ onPress }: { onPress: () => void }) {
       zIndex={20}
       UNSAFE_style={{ transform: "translateX(calc(100% + 6px))" }}
     >
-      <Button
-        variant="secondary"
-        onPress={onPress}
-        aria-label="Reset zoom and re-center frame"
-      >
-        Reset View
-      </Button>
+      <Flex direction="column" alignItems="center" gap="size-25">
+        <Text
+          UNSAFE_style={{
+            fontSize: "11px",
+            lineHeight: "1",
+            fontWeight: 600,
+          }}
+        >
+          Reset
+        </Text>
+        <ActionButton
+          onPress={onPress}
+          aria-label="Reset zoom and re-center frame"
+        >
+          <FullScreenExit />
+        </ActionButton>
+      </Flex>
     </View>
   );
 }
