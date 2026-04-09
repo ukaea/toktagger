@@ -21,6 +21,7 @@ import {
   readRectGeometry,
 } from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
+import { ResetViewButton } from "./ui_elements";
 
 function findAnnotationOverlay(viewerElement: HTMLElement | null) {
   if (!viewerElement) return null;
@@ -227,9 +228,20 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     return `pts=${polygon.points.length}, x=${Math.round(minX)}, y=${Math.round(minY)}, w=${Math.round(width)}, h=${Math.round(height)}`;
   };
 
+  const resetView = () => {
+    const viewer = api?.viewer;
+    const viewport = viewer?.viewport;
+    if (!viewport) return;
+
+    viewport.goHome(true);
+    viewport.applyConstraints();
+  };
+
   return (
     <div className="w-full flex justify-center">
       <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
+        <ResetViewButton onPress={resetView} />
+
         <OpenSeadragonAnnotator
           tool={drawingTool}
           drawingEnabled={drawingEnabled}

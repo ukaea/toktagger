@@ -46,6 +46,20 @@ export function ClassPanel({
   );
 }
 
+export function ResetViewButton({ onPress }: { onPress: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      className="absolute right-2 top-2 z-20 rounded-md border border-white/30 bg-black/60 px-2 py-1 text-[11px] font-medium text-white hover:bg-black/75"
+      title="Reset zoom and re-center frame"
+      aria-label="Reset zoom and re-center frame"
+    >
+      Reset View
+    </button>
+  );
+}
+
 /** Minimal shape used to render/select a tracked instance in the sidebar list. */
 export type Profile = {
   key: string;
