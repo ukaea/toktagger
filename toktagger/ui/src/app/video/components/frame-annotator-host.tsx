@@ -1,9 +1,13 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
-  ImageAnnotator,
-  ImageAnnotationPopup,
+  OpenSeadragonAnnotator,
+  OpenSeadragonAnnotationPopup,
+  OpenSeadragonViewer,
+  UserSelectAction,
+  useAnnotator,
+  type AnnotoriousOpenSeadragonAnnotator,
   type ImageAnnotation,
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
@@ -18,6 +22,23 @@ import {
 } from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
 
+function findAnnotationOverlay(viewerElement: HTMLElement | null) {
+  if (!viewerElement) return null;
+
+  const scopes = [
+    viewerElement,
+    viewerElement.parentElement,
+    viewerElement.parentElement?.parentElement,
+  ].filter(Boolean) as HTMLElement[];
+
+  for (const scope of scopes) {
+    const hit = scope.querySelector<HTMLElement>(".a9s-annotationlayer");
+    if (hit) return hit;
+  }
+
+  return null;
+}
+
 /**
  * Top-level host that provides the Annotorious context and renders the annotator.
  */
@@ -27,7 +48,7 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
 
 /**
  * View-only annotator host:
- * - renders the Annotorious ImageAnnotator + popup UI for the current frame
+ * - renders the Annotorious OpenSeadragon annotator + popup UI for the current frame
  * - reports the image’s natural size to the session (used for bounds clamping)
  *
  * Note: all Annotorious integration (create/update/delete/selectionChanged),
@@ -41,100 +62,164 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     setImageNatural,
     selection,
     drawingTool,
+    panMode,
     deleteAnnotation,
     closePopup,
   } = useVideoSession();
-
-  // --- Responsive upscale measurement state ---
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
-  const [containerW, setContainerW] = useState<number>(0);
+  const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
   useEffect(() => {
-    setNatural(null);
     setImageNatural(null);
   }, [frame, setImageNatural]);
 
-  useEffect(() => {
-    const img = imgRef.current;
-    if (!img) return;
+  const dataUrl = useMemo(
+    () => `data:image/png;base64,${imageBase64}`,
+    [imageBase64],
+  );
 
-    const onLoad = () => {
-      const next = { w: img.naturalWidth, h: img.naturalHeight };
-      if (next.w > 0 && next.h > 0) {
-        setNatural(next);
-        setImageNatural(next);
+  useEffect(() => {
+    if (!api?.viewer) return;
+
+    const onOpen = () => {
+      const item = api.viewer.world.getItemAt(0);
+      if (!item) return;
+
+      const size = item.getContentSize();
+      const w = Math.round(Number(size?.x ?? 0));
+      const h = Math.round(Number(size?.y ?? 0));
+      if (w > 0 && h > 0) {
+        setImageNatural({ w, h });
       }
     };
 
-    // Handle cached images that may already be complete before listener registration.
-    if (img.complete && img.naturalWidth > 0) onLoad();
+    api.viewer.addHandler("open", onOpen);
+    onOpen();
 
-    img.addEventListener("load", onLoad);
-    return () => img.removeEventListener("load", onLoad);
-  }, [imageBase64, setImageNatural]);
+    return () => {
+      api.viewer.removeHandler("open", onOpen);
+    };
+  }, [api, dataUrl, setImageNatural]);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    if (!api?.viewer) return;
 
-    // Seed once immediately (important: avoids "0 width" if RO fires late)
-    const seed = () => {
-      const w = el.getBoundingClientRect().width;
-      if (w) setContainerW(w);
+    const navEnabled = panMode;
+
+    api.viewer.gestureSettingsMouse.dragToPan = navEnabled;
+    api.viewer.gestureSettingsMouse.scrollToZoom = navEnabled;
+    api.viewer.gestureSettingsMouse.clickToZoom = false;
+    api.viewer.gestureSettingsMouse.dblClickToZoom = false;
+
+    api.viewer.gestureSettingsTouch.dragToPan = navEnabled;
+    api.viewer.gestureSettingsTouch.pinchToZoom = navEnabled;
+
+    api.viewer.gestureSettingsPen.dragToPan = navEnabled;
+
+    api.viewer.gestureSettingsUnknown.dragToPan = navEnabled;
+    api.viewer.gestureSettingsUnknown.scrollToZoom = navEnabled;
+    api.viewer.gestureSettingsUnknown.clickToZoom = false;
+    api.viewer.gestureSettingsUnknown.dblClickToZoom = false;
+
+    // Critical fix for pan mode: let OSD receive drag/wheel events through the SVG layer.
+    const overlay = findAnnotationOverlay(api.viewer.element as HTMLElement);
+    if (overlay) {
+      overlay.style.pointerEvents = navEnabled ? "none" : "auto";
+    }
+
+    return () => {
+      const nextOverlay = findAnnotationOverlay(
+        api.viewer.element as HTMLElement,
+      );
+      if (nextOverlay) {
+        nextOverlay.style.pointerEvents = "auto";
+      }
     };
-    seed();
+  }, [api, panMode]);
 
-    const ro = new ResizeObserver((entries) => {
-      const cr = entries[0]?.contentRect;
-      if (!cr) return;
-      setContainerW(cr.width);
-    });
+  useEffect(() => {
+    if (!api) return;
 
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    api.setUserSelectAction(
+      panMode ? UserSelectAction.NONE : UserSelectAction.EDIT,
+    );
 
-  const displayWidth = useMemo(() => {
-    if (!containerW) return undefined;
+    if (panMode) {
+      api.setSelected?.();
+    }
+  }, [api, panMode]);
 
-    // Tune these three values as needed
-    const TARGET = 900; // "comfortable" tagging width
-    const MAX = 1100; // don't exceed this even on huge screens
-    const MAX_SCALE = 3; // don't upscale more than 3× natural
+  const drawingEnabled = !!selection.className && !panMode;
 
-    const maxAvailable = Math.min(containerW, MAX);
+  useEffect(() => {
+    if (!api) return;
 
-    // Before image loads, just take the available width nicely
-    if (!natural?.w) return maxAvailable;
+    api.setDrawingTool(drawingTool);
+    api.setDrawingEnabled(drawingEnabled);
 
-    const maxScaled = natural.w * MAX_SCALE;
+    if (!drawingEnabled) {
+      api.cancelDrawing?.();
+    }
+  }, [api, drawingEnabled, drawingTool]);
 
-    // Upscale small images towards TARGET, but:
-    // - never exceed container/max
-    // - never exceed MAX_SCALE × natural
-    // - never go below natural unless container is smaller (then fit)
-    const desired = Math.max(natural.w, Math.min(TARGET, maxAvailable));
-    return Math.min(maxAvailable, maxScaled, desired);
-  }, [containerW, natural]);
-
-  const drawingEnabled = !!selection.className;
-  const label = frame;
+  const viewerOptions = useMemo(
+    () => ({
+      tileSources: {
+        type: "image",
+        url: dataUrl,
+      },
+      minZoomImageRatio: 0.8,
+      maxZoomPixelRatio: 10,
+      visibilityRatio: 0.5,
+      constrainDuringPan: true,
+      animationTime: 0.3,
+      showNavigationControl: false,
+      gestureSettingsMouse: {
+        scrollToZoom: false,
+        dragToPan: false,
+        clickToZoom: false,
+        dblClickToZoom: false,
+      },
+      gestureSettingsTouch: {
+        pinchToZoom: false,
+        dragToPan: false,
+      },
+      gestureSettingsPen: {
+        dragToPan: false,
+      },
+      gestureSettingsUnknown: {
+        dragToPan: false,
+        scrollToZoom: false,
+        clickToZoom: false,
+        dblClickToZoom: false,
+      },
+    }),
+    [dataUrl],
+  );
 
   const formatDetails = (annotation: ImageAnnotation) => {
-    if (isRectangleAnno(annotation)) {
-      const rect = readRectGeometry(annotation);
-      if (!rect) return null;
-
+    const rect = isRectangleAnno(annotation)
+      ? readRectGeometry(annotation)
+      : null;
+    if (rect) {
       return `x=${Math.round(rect.x)}, y=${Math.round(rect.y)}, w=${Math.round(rect.w)}, h=${Math.round(rect.h)}`;
     }
 
-    if (!isPolygonAnno(annotation)) return null;
-    const polygon = readPolygonGeometry(annotation);
+    const polygon = isPolygonAnno(annotation)
+      ? readPolygonGeometry(annotation)
+      : null;
     if (!polygon) return null;
 
-    const { minX, minY, maxX, maxY } = polygon.bounds;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const [x, y] of polygon.points) {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
 
     const width = maxX - minX;
     const height = maxY - minY;
@@ -143,65 +228,55 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   };
 
   return (
-    // This keeps centering approach:
-    // - outer flex justify-center centers the inline-block content
-    // - inner inline-block shrink-wraps to the image width we set
-    <div ref={containerRef} className="w-full flex justify-center">
-      <div className="relative inline-block max-w-full">
-        <ImageAnnotator
+    <div className="w-full flex justify-center">
+      <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
+        <OpenSeadragonAnnotator
           tool={drawingTool}
           drawingEnabled={drawingEnabled}
+          drawingMode="drag"
           autoSave
-          style={(_annotation, state) => ({
+          style={(
+            _annotation,
+            state?: { selected?: boolean; hovered?: boolean },
+          ) => ({
             strokeWidth: state?.selected ? 3 : state?.hovered ? 3 : 2,
           })}
         >
-          <img
-            ref={imgRef}
-            src={`data:image/png;base64,${imageBase64}`}
-            alt={`Frame ${label}`}
-            draggable={false}
-            className="block mx-auto h-auto object-contain select-none"
-            // Key change: explicitly set width on the IMG so Annotorious can't shrink-wrap it away.
-            style={{
-              imageRendering: "pixelated",
-              width: displayWidth ? `${displayWidth}px` : undefined,
-              maxWidth: "100%",
-              height: "auto",
-              maxHeight: "calc(100dvh - 240px)",
+          <OpenSeadragonViewer
+            className="h-full w-full select-none"
+            options={viewerOptions}
+          />
+
+          {/* Built-in Annotorious popup positioning for zoom/pan viewers */}
+          <OpenSeadragonAnnotationPopup
+            popup={(props) => {
+              const annotation = props.annotation as ImageAnnotation;
+
+              const { className, trackId } = getLabelTrack(annotation);
+              const geometry = isRectangleAnno(annotation)
+                ? readRectGeometry(annotation)
+                : null;
+              const details = formatDetails(annotation);
+
+              return (
+                <AnnotationPopup
+                  className={className}
+                  trackId={trackId}
+                  geometry={geometry}
+                  details={details}
+                  onDeleteBox={() => {
+                    const id = annotation?.id;
+                    if (!id) return;
+                    deleteAnnotation(id);
+                  }}
+                  onClose={() => {
+                    closePopup();
+                  }}
+                />
+              );
             }}
           />
-        </ImageAnnotator>
-
-        {/* Built-in Annotorious popup positioning (no manual geometry->pixel mapping) */}
-        <ImageAnnotationPopup
-          popup={(props) => {
-            const annotation = props.annotation as ImageAnnotation;
-
-            const { className, trackId } = getLabelTrack(annotation);
-            const geometry = isRectangleAnno(annotation)
-              ? readRectGeometry(annotation)
-              : null;
-            const details = formatDetails(annotation);
-
-            return (
-              <AnnotationPopup
-                className={className}
-                trackId={trackId}
-                geometry={geometry}
-                details={details}
-                onDeleteBox={() => {
-                  const id = annotation?.id;
-                  if (!id) return;
-                  deleteAnnotation(id);
-                }}
-                onClose={() => {
-                  closePopup();
-                }}
-              />
-            );
-          }}
-        />
+        </OpenSeadragonAnnotator>
       </div>
     </div>
   );
