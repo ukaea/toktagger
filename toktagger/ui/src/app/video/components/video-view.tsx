@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Annotorious } from "@annotorious/react";
 import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
-import { TextField, Button, Flex, Text } from "@adobe/react-spectrum";
+import { Button } from "@adobe/react-spectrum";
 import {
   VideoSessionProvider,
   useVideoSession,
@@ -16,69 +16,107 @@ import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter"
 import { useParams } from "react-router-dom";
 
 /**
- * Editable center control for frame navigation.
- * Keeps the current frame visible and supports Enter-to-jump with validation.
+ * Center frame control:
+ * - Default state: "Frame X" button
+ * - Edit state: inline numeric input in the same pill footprint
  */
 export function FrameJumpField(props: {
   frame: number;
   onJump: (n: number) => void;
 }) {
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState<string>(String(props.frame));
+  const [pillWidth, setPillWidth] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const displayPillRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setDraftValue(String(props.frame));
-    setErrorMessage("");
-  }, [props.frame]);
+    if (!isEditing) {
+      setDraftValue(String(props.frame));
+    }
+  }, [props.frame, isEditing]);
 
-  const onSubmit = () => {
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const rafId = requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      input.select();
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isEditing]);
+
+  const startEdit = () => {
+    const width = displayPillRef.current?.offsetWidth ?? null;
+    setPillWidth(width);
+    setDraftValue(String(props.frame));
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setDraftValue(String(props.frame));
+    setIsEditing(false);
+  };
+
+  const commitEdit = () => {
     const trimmed = draftValue.trim();
     if (trimmed === "") {
-      setDraftValue(String(props.frame));
-      setErrorMessage("");
+      cancelEdit();
       return;
     }
 
     const parsed = Number(trimmed);
     if (Number.isInteger(parsed) && parsed >= 0) {
-      setErrorMessage("");
+      setIsEditing(false);
       props.onJump(Math.trunc(parsed));
-      return;
     }
-
-    setErrorMessage("Please enter a number.");
   };
 
+  if (!isEditing) {
+    return (
+      <div ref={displayPillRef} className="inline-flex">
+        <Button variant="primary" onPress={startEdit}>
+          Frame {props.frame}
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <Flex direction="column" alignItems="center" gap="size-50">
-      <Flex alignItems="center" gap="size-100">
-        <Text>Frame</Text>
-        <TextField
-          aria-label="Frame number"
-          isQuiet
-          value={draftValue}
-          onChange={(value) => {
-            setDraftValue(value);
-            if (errorMessage) setErrorMessage("");
-          }}
-          onFocus={(event) => {
-            if (event.target instanceof HTMLInputElement) {
-              event.target.select();
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") onSubmit();
-          }}
-          onBlur={() => {
-            setDraftValue(String(props.frame));
-            setErrorMessage("");
-          }}
-          validationState={errorMessage ? "invalid" : undefined}
-          errorMessage={errorMessage || undefined}
-          width="size-600"
-        />
-      </Flex>
-    </Flex>
+    <div
+      className="inline-flex h-8 items-center justify-center rounded-full border border-white bg-transparent px-3 focus-within:ring-2 focus-within:ring-white/70"
+      role="presentation"
+      style={pillWidth !== null ? { width: `${pillWidth}px` } : undefined}
+    >
+      <input
+        ref={inputRef}
+        aria-label="Frame number"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={draftValue}
+        onChange={(event) => {
+          const next = event.target.value.replace(/\D+/g, "");
+          setDraftValue(next);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitEdit();
+            return;
+          }
+
+          if (event.key === "Escape") {
+            event.preventDefault();
+            cancelEdit();
+          }
+        }}
+        onBlur={cancelEdit}
+        className="w-full border-0 bg-transparent p-0 text-center text-sm font-semibold text-white outline-none"
+      />
+    </div>
   );
 }
 
