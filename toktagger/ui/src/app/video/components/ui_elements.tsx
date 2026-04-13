@@ -2,12 +2,11 @@
 
 import React, { useState } from "react";
 import {
-  ActionButton,
   Button,
   ComboBox,
-  Flex,
   Item,
-  Text,
+  Tooltip,
+  TooltipTrigger,
   View,
 } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
@@ -55,32 +54,141 @@ export function ClassPanel({
   );
 }
 
-export function ResetViewButton({ onPress }: { onPress: () => void }) {
+function DragZoomIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 4v16M4 12h16" />
+      <path d="M12 4l-2 2M12 4l2 2M12 20l-2-2M12 20l2-2" />
+      <path d="M4 12l2-2M4 12l2 2M20 12l-2-2M20 12l-2 2" />
+    </svg>
+  );
+}
+
+function RectangleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="4.5" y="6.5" width="15" height="11" rx="1.5" />
+    </svg>
+  );
+}
+
+function PolygonIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M7 5.5L18 8.5L15.5 18.5L5.5 17L4.5 9.5Z" />
+      <circle cx="7" cy="5.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="8.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="18.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="5.5" cy="17" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="9.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function CanvasToolButton(props: {
+  label: string;
+  isActive: boolean;
+  isSecondary?: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  const tone = props.isSecondary
+    ? "border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-300 dark:hover:bg-gray-800"
+    : props.isActive
+      ? "border-orange-400 bg-orange-500 text-white shadow-[0_0_0_2px_rgba(251,146,60,0.35)]"
+      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800";
+
+  return (
+    <TooltipTrigger delay={350} placement="left">
+      <button
+        type="button"
+        onClick={props.onPress}
+        aria-label={props.label}
+        aria-pressed={props.isSecondary ? undefined : props.isActive}
+        className={`h-10 w-10 rounded-lg border transition-colors duration-150 flex items-center justify-center ${tone}`}
+      >
+        {props.children}
+      </button>
+      <Tooltip>{props.label}</Tooltip>
+    </TooltipTrigger>
+  );
+}
+
+export function CanvasModeToolbar(props: {
+  panMode: boolean;
+  drawingTool: "rectangle" | "polygon";
+  onTogglePanMode: () => void;
+  onSelectRectangle: () => void;
+  onSelectPolygon: () => void;
+  onResetView: () => void;
+}) {
   return (
     <View
       position="absolute"
-      top={0}
+      top="size-100"
       right={0}
       zIndex={20}
-      UNSAFE_style={{ transform: "translateX(calc(100% + 6px))" }}
+      UNSAFE_style={{ transform: "translateX(calc(100% + 12px))" }}
     >
-      <Flex direction="column" alignItems="center" gap="size-25">
-        <Text
-          UNSAFE_style={{
-            fontSize: "11px",
-            lineHeight: "1",
-            fontWeight: 600,
-          }}
+      <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-300/80 bg-white/90 p-2 shadow-md backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/80">
+        <CanvasToolButton
+          label="Drag / Zoom"
+          isActive={props.panMode}
+          onPress={props.onTogglePanMode}
         >
-          Reset
-        </Text>
-        <ActionButton
-          onPress={onPress}
-          aria-label="Reset zoom and re-center frame"
+          <DragZoomIcon />
+        </CanvasToolButton>
+        <CanvasToolButton
+          label="Rectangle"
+          isActive={!props.panMode && props.drawingTool === "rectangle"}
+          onPress={props.onSelectRectangle}
         >
-          <FullScreenExit />
-        </ActionButton>
-      </Flex>
+          <RectangleIcon />
+        </CanvasToolButton>
+        <CanvasToolButton
+          label="Polygon"
+          isActive={!props.panMode && props.drawingTool === "polygon"}
+          onPress={props.onSelectPolygon}
+        >
+          <PolygonIcon />
+        </CanvasToolButton>
+        <div className="my-0.5 h-px w-full bg-gray-300 dark:bg-gray-700" />
+        <CanvasToolButton
+          label="Reset view"
+          isActive={false}
+          isSecondary
+          onPress={props.onResetView}
+        >
+          <FullScreenExit aria-hidden="true" size="S" />
+        </CanvasToolButton>
+      </div>
     </View>
   );
 }

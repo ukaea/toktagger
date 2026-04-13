@@ -21,7 +21,7 @@ import {
   readRectGeometry,
 } from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
-import { ResetViewButton } from "./ui_elements";
+import { CanvasModeToolbar } from "./ui_elements";
 
 function findAnnotationOverlay(viewerElement: HTMLElement | null) {
   if (!viewerElement) return null;
@@ -63,7 +63,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     setImageNatural,
     selection,
     drawingTool,
+    setDrawingTool,
     panMode,
+    setPanMode,
     hideAnnotations,
     deleteAnnotation,
   } = useVideoSession();
@@ -283,7 +285,20 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   return (
     <div className="w-full flex justify-center">
       <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
-        <ResetViewButton onPress={resetView} />
+        <CanvasModeToolbar
+          panMode={panMode}
+          drawingTool={drawingTool}
+          onTogglePanMode={() => setPanMode(!panMode)}
+          onSelectRectangle={() => {
+            setPanMode(false);
+            setDrawingTool("rectangle");
+          }}
+          onSelectPolygon={() => {
+            setPanMode(false);
+            setDrawingTool("polygon");
+          }}
+          onResetView={resetView}
+        />
 
         <OpenSeadragonAnnotator
           tool={drawingTool}

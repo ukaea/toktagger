@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DialogContainer,
   AlertDialog,
-  Button,
   Switch,
   Divider,
-  Grid,
   Flex,
 } from "@adobe/react-spectrum";
 
@@ -60,7 +58,6 @@ export function VideoToolbox() {
   const session = useVideoSession();
   const { annotationLabels, dataParams, setDataParams } = useSample();
   const labels = annotationLabels;
-  const tool = session.drawingTool;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
 
@@ -227,50 +224,11 @@ export function VideoToolbox() {
   return (
     <>
       <div className="w-full">
-        <div className="px-4 pb-4">
+        <Divider size="S" marginX="size-200" />
+        <div className="px-4 py-4">
           <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Frame Tools
           </div>
-          <Grid columns={["1fr", "1fr"]} gap="size-100" marginBottom="size-100">
-            <Button
-              variant={
-                !session.panMode && tool === "rectangle"
-                  ? "primary"
-                  : "secondary"
-              }
-              onPress={() => {
-                session.setPanMode(false);
-                session.setDrawingTool("rectangle");
-              }}
-              width="100%"
-            >
-              Rectangle
-            </Button>
-            <Button
-              variant={
-                !session.panMode && tool === "polygon" ? "primary" : "secondary"
-              }
-              onPress={() => {
-                session.setPanMode(false);
-                session.setDrawingTool("polygon");
-              }}
-              width="100%"
-            >
-              Polygon
-            </Button>
-          </Grid>
-          <Flex
-            alignItems="center"
-            justifyContent="center"
-            marginBottom="size-100"
-          >
-            <Button
-              variant={session.panMode ? "primary" : "secondary"}
-              onPress={() => session.setPanMode(!session.panMode)}
-            >
-              Drag / Zoom
-            </Button>
-          </Flex>
           <Flex
             alignItems="center"
             justifyContent="center"
