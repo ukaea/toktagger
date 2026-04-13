@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Annotorious } from "@annotorious/react";
 import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
-import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
+import { TextField, Button, Flex, Text } from "@adobe/react-spectrum";
 import {
   VideoSessionProvider,
   useVideoSession,
@@ -16,23 +16,33 @@ import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter"
 import { useParams } from "react-router-dom";
 
 /**
- * Small "jump to frame" input with validation. Delegates the actual navigation
- * to the parent via `onJump`.
+ * Editable center control for frame navigation.
+ * Keeps the current frame visible and supports Enter-to-jump with validation.
  */
-export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
+export function FrameJumpField(props: {
+  frame: number;
+  onJump: (n: number) => void;
+}) {
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [draftValue, setDraftValue] = useState<string>(String(props.frame));
 
-  const onSearchSubmit = (newValue: string) => {
-    if (newValue === "") {
+  useEffect(() => {
+    setDraftValue(String(props.frame));
+    setErrorMessage("");
+  }, [props.frame]);
+
+  const onSubmit = () => {
+    const trimmed = draftValue.trim();
+    if (trimmed === "") {
+      setDraftValue(String(props.frame));
       setErrorMessage("");
       return;
     }
 
-    const n = Number(newValue);
-
-    if (Number.isInteger(n) && n >= 0) {
+    const parsed = Number(trimmed);
+    if (Number.isInteger(parsed) && parsed >= 0) {
       setErrorMessage("");
-      onJump(n);
+      props.onJump(Math.trunc(parsed));
       return;
     }
 
@@ -40,12 +50,35 @@ export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
   };
 
   return (
-    <SearchField
-      aria-label="Jump to Frame"
-      onSubmit={onSearchSubmit}
-      validationState={errorMessage ? "invalid" : undefined}
-      errorMessage={errorMessage}
-    />
+    <Flex direction="column" alignItems="center" gap="size-50">
+      <Flex alignItems="center" gap="size-100">
+        <Text>Frame</Text>
+        <TextField
+          aria-label="Frame number"
+          isQuiet
+          value={draftValue}
+          onChange={(value) => {
+            setDraftValue(value);
+            if (errorMessage) setErrorMessage("");
+          }}
+          onFocus={(event) => {
+            if (event.target instanceof HTMLInputElement) {
+              event.target.select();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") onSubmit();
+          }}
+          onBlur={() => {
+            setDraftValue(String(props.frame));
+            setErrorMessage("");
+          }}
+          validationState={errorMessage ? "invalid" : undefined}
+          errorMessage={errorMessage || undefined}
+          width="size-600"
+        />
+      </Flex>
+    </Flex>
   );
 }
 
@@ -96,15 +129,8 @@ function VideoFrameAnnotator(props: {
   return (
     <div className="flex flex-col items-center gap-4 w-full">
       <div className="flex flex-col items-center gap-2">
-        <div className="w-60 text-center">
-          <div className="text-[13px] text-gray-700 dark:text-gray-200 mb-1">
-            Jump to Frame
-          </div>
-          <FrameSearch onJump={handleJump} />
-        </div>
-
         <div className="flex justify-center">
-          <ButtonGroup>
+          <div className="flex items-start gap-2">
             <Button
               variant="primary"
               onPress={handlePrev}
@@ -112,9 +138,7 @@ function VideoFrameAnnotator(props: {
             >
               Prev
             </Button>
-            <Button variant="primary" isDisabled>
-              Frame {session.frame}
-            </Button>
+            <FrameJumpField frame={session.frame} onJump={handleJump} />
             <Button
               variant="primary"
               onPress={handleNext}
@@ -122,7 +146,7 @@ function VideoFrameAnnotator(props: {
             >
               Next
             </Button>
-          </ButtonGroup>
+          </div>
         </div>
       </div>
 
