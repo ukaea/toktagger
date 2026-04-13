@@ -271,13 +271,28 @@ export function VideoToolbox() {
               Drag / Zoom
             </Button>
           </Flex>
-          <Flex alignItems="center" justifyContent="center">
-            <Switch
-              isSelected={session.propagate}
-              onChange={session.setPropagate}
-            >
-              Propagation
-            </Switch>
+          <Flex
+            alignItems="center"
+            justifyContent="center"
+            direction="column"
+            gap="size-100"
+          >
+            <div className="w-[170px] flex justify-start">
+              <Switch
+                isSelected={session.propagate}
+                onChange={session.setPropagate}
+              >
+                Propagation
+              </Switch>
+            </div>
+            <div className="w-[170px] flex justify-start">
+              <Switch
+                isSelected={session.hideAnnotations}
+                onChange={session.setHideAnnotations}
+              >
+                <span className="whitespace-nowrap">Hide Annotations</span>
+              </Switch>
+            </div>
           </Flex>
         </div>
         <Divider size="S" marginX="size-200" />

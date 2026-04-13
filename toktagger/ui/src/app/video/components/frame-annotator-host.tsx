@@ -64,6 +64,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     selection,
     drawingTool,
     panMode,
+    hideAnnotations,
     deleteAnnotation,
     closePopup,
   } = useVideoSession();
@@ -105,6 +106,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     if (!api?.viewer) return;
 
     const navEnabled = panMode;
+    const overlayInteractionDisabled = panMode || hideAnnotations;
 
     api.viewer.gestureSettingsMouse.dragToPan = navEnabled;
     api.viewer.gestureSettingsMouse.scrollToZoom = navEnabled;
@@ -124,7 +126,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     // Critical fix for pan mode: let OSD receive drag/wheel events through the SVG layer.
     const overlay = findAnnotationOverlay(api.viewer.element as HTMLElement);
     if (overlay) {
-      overlay.style.pointerEvents = navEnabled ? "none" : "auto";
+      overlay.style.pointerEvents = overlayInteractionDisabled
+        ? "none"
+        : "auto";
+      overlay.style.opacity = hideAnnotations ? "0" : "1";
     }
 
     return () => {
@@ -133,23 +138,26 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       );
       if (nextOverlay) {
         nextOverlay.style.pointerEvents = "auto";
+        nextOverlay.style.opacity = "1";
       }
     };
-  }, [api, panMode]);
+  }, [api, hideAnnotations, panMode]);
 
   useEffect(() => {
     if (!api) return;
 
     api.setUserSelectAction(
-      panMode ? UserSelectAction.NONE : UserSelectAction.EDIT,
+      panMode || hideAnnotations
+        ? UserSelectAction.NONE
+        : UserSelectAction.EDIT,
     );
 
-    if (panMode) {
+    if (panMode || hideAnnotations) {
       api.setSelected?.();
     }
-  }, [api, panMode]);
+  }, [api, hideAnnotations, panMode]);
 
-  const drawingEnabled = !!selection.className && !panMode;
+  const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
 
   useEffect(() => {
     if (!api) return;

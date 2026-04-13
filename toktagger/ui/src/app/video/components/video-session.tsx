@@ -88,6 +88,8 @@ type VideoSessionCtx = {
   setPanMode: (v: boolean) => void;
   propagate: boolean;
   setPropagate: (v: boolean) => void;
+  hideAnnotations: boolean;
+  setHideAnnotations: (v: boolean) => void;
 
   /** Natural image dimensions for the currently loaded frame (used for clamping). */
   imageNatural: { w: number; h: number } | null;
@@ -248,6 +250,7 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
   const [panMode, setPanModeState] = useState(false);
+  const [hideAnnotations, setHideAnnotations] = useState(false);
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -690,10 +693,10 @@ export function VideoSessionProvider(props: {
    *  - the session overlay for the active frame changes,
    * we push the session overlay into Annotorious.
    */
-  const desiredOverlay = useMemo(
-    () => byFrame.get(frame) ?? [],
-    [byFrame, frame],
-  );
+  const desiredOverlay = useMemo(() => {
+    if (hideAnnotations) return [];
+    return byFrame.get(frame) ?? [];
+  }, [byFrame, frame, hideAnnotations]);
 
   const overlayHasInstance = useCallback(
     (list: ImageAnnotation[], req: FocusRequest) => {
@@ -1040,6 +1043,8 @@ export function VideoSessionProvider(props: {
       setPanMode,
       propagate,
       setPropagate,
+      hideAnnotations,
+      setHideAnnotations,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
@@ -1077,6 +1082,8 @@ export function VideoSessionProvider(props: {
       setPanMode,
       propagate,
       setPropagate,
+      hideAnnotations,
+      setHideAnnotations,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
