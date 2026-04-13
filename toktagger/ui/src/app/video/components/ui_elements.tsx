@@ -177,8 +177,9 @@ export function CanvasModeToolbar(props: {
         borderRadius="large"
         padding="size-100"
         UNSAFE_style={{
-          borderColor: "rgba(148, 163, 184, 0.45)",
-          background: "rgba(15, 23, 42, 0.72)",
+          borderColor: "rgba(212, 212, 216, 0.35)",
+          background:
+            "linear-gradient(180deg, rgba(82, 82, 91, 0.82) 0%, rgba(39, 39, 42, 0.88) 100%)",
           backdropFilter: "blur(6px)",
         }}
       >
