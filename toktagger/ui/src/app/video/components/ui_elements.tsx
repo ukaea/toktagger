@@ -2,11 +2,15 @@
 
 import React, { useState } from "react";
 import {
+  ActionButton,
   Button,
   ComboBox,
+  Divider,
+  Flex,
   Item,
   Tooltip,
   TooltipTrigger,
+  ToggleButton,
   View,
 } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
@@ -112,30 +116,41 @@ function PolygonIcon() {
   );
 }
 
-function CanvasToolButton(props: {
+function CanvasModeToggle(props: {
   label: string;
-  isActive: boolean;
-  isSecondary?: boolean;
+  isSelected: boolean;
   onPress: () => void;
   children: React.ReactNode;
 }) {
-  const tone = props.isSecondary
-    ? "border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-300 dark:hover:bg-gray-800"
-    : props.isActive
-      ? "border-orange-400 bg-orange-500 text-white shadow-[0_0_0_2px_rgba(251,146,60,0.35)]"
-      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800";
-
   return (
     <TooltipTrigger delay={350} placement="left">
-      <button
-        type="button"
-        onClick={props.onPress}
+      <ToggleButton
+        isSelected={props.isSelected}
+        onPress={props.onPress}
         aria-label={props.label}
-        aria-pressed={props.isSecondary ? undefined : props.isActive}
-        className={`h-10 w-10 rounded-lg border transition-colors duration-150 flex items-center justify-center ${tone}`}
+        UNSAFE_style={{ width: 40, minWidth: 40, height: 40, padding: 0 }}
       >
         {props.children}
-      </button>
+      </ToggleButton>
+      <Tooltip>{props.label}</Tooltip>
+    </TooltipTrigger>
+  );
+}
+
+function CanvasActionButton(props: {
+  label: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <TooltipTrigger delay={350} placement="left">
+      <ActionButton
+        onPress={props.onPress}
+        aria-label={props.label}
+        UNSAFE_style={{ width: 40, minWidth: 40, height: 40, padding: 0 }}
+      >
+        {props.children}
+      </ActionButton>
       <Tooltip>{props.label}</Tooltip>
     </TooltipTrigger>
   );
@@ -157,38 +172,44 @@ export function CanvasModeToolbar(props: {
       zIndex={20}
       UNSAFE_style={{ transform: "translateX(calc(100% + 12px))" }}
     >
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-300/80 bg-white/90 p-2 shadow-md backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/80">
-        <CanvasToolButton
-          label="Drag / Zoom"
-          isActive={props.panMode}
-          onPress={props.onTogglePanMode}
-        >
-          <DragZoomIcon />
-        </CanvasToolButton>
-        <CanvasToolButton
-          label="Rectangle"
-          isActive={!props.panMode && props.drawingTool === "rectangle"}
-          onPress={props.onSelectRectangle}
-        >
-          <RectangleIcon />
-        </CanvasToolButton>
-        <CanvasToolButton
-          label="Polygon"
-          isActive={!props.panMode && props.drawingTool === "polygon"}
-          onPress={props.onSelectPolygon}
-        >
-          <PolygonIcon />
-        </CanvasToolButton>
-        <div className="my-0.5 h-px w-full bg-gray-300 dark:bg-gray-700" />
-        <CanvasToolButton
-          label="Reset view"
-          isActive={false}
-          isSecondary
-          onPress={props.onResetView}
-        >
-          <FullScreenExit aria-hidden="true" size="S" />
-        </CanvasToolButton>
-      </div>
+      <View
+        borderWidth="thin"
+        borderRadius="large"
+        padding="size-100"
+        UNSAFE_style={{
+          borderColor: "rgba(148, 163, 184, 0.45)",
+          background: "rgba(15, 23, 42, 0.72)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        <Flex direction="column" alignItems="center" gap="size-100">
+          <CanvasModeToggle
+            label="Drag / Zoom"
+            isSelected={props.panMode}
+            onPress={props.onTogglePanMode}
+          >
+            <DragZoomIcon />
+          </CanvasModeToggle>
+          <CanvasModeToggle
+            label="Rectangle"
+            isSelected={!props.panMode && props.drawingTool === "rectangle"}
+            onPress={props.onSelectRectangle}
+          >
+            <RectangleIcon />
+          </CanvasModeToggle>
+          <CanvasModeToggle
+            label="Polygon"
+            isSelected={!props.panMode && props.drawingTool === "polygon"}
+            onPress={props.onSelectPolygon}
+          >
+            <PolygonIcon />
+          </CanvasModeToggle>
+          <Divider size="S" width="100%" />
+          <CanvasActionButton label="Reset view" onPress={props.onResetView}>
+            <FullScreenExit aria-hidden="true" size="S" />
+          </CanvasActionButton>
+        </Flex>
+      </View>
     </View>
   );
 }
