@@ -895,6 +895,16 @@ export function VideoSessionProvider(props: {
       }
 
       if (arr.length === 0) {
+        // Deselect can be triggered programmatically when hiding annotations;
+        // do not treat that as a content mutation commit.
+        if (hideAnnotations) {
+          setSelectionState((prev) =>
+            prev.trackId ? { ...prev, trackId: null } : prev,
+          );
+          applyAnnotatorInteractionMode();
+          return;
+        }
+
         commitFromAnnotorious();
         setSelectionState((prev) =>
           prev.trackId ? { ...prev, trackId: null } : prev,
@@ -988,6 +998,7 @@ export function VideoSessionProvider(props: {
     byFrame,
     commitFromAnnotorious,
     frameKey,
+    hideAnnotations,
     panMode,
     selection.className,
     selection.trackId,
