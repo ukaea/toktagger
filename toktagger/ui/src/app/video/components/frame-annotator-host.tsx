@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   OpenSeadragonAnnotator,
   OpenSeadragonAnnotationPopup,
@@ -66,9 +66,44 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     panMode,
     hideAnnotations,
     deleteAnnotation,
-    closePopup,
   } = useVideoSession();
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
+  const [dismissedPopupAnnotationId, setDismissedPopupAnnotationId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (!api?.on || !api?.off) return;
+
+    const onSelectionChanged = (arr: ImageAnnotation[]) => {
+      if (arr.length === 0) {
+        setDismissedPopupAnnotationId(null);
+        return;
+      }
+
+      const selectedId =
+        typeof arr[0]?.id === "string" ? String(arr[0].id) : null;
+      if (!selectedId) {
+        setDismissedPopupAnnotationId(null);
+        return;
+      }
+
+      // Keep popup dismissed only for the same currently selected annotation.
+      setDismissedPopupAnnotationId((prev) =>
+        prev && prev !== selectedId ? null : prev,
+      );
+    };
+
+    api.on("selectionChanged", onSelectionChanged);
+
+    return () => {
+      api.off("selectionChanged", onSelectionChanged);
+    };
+  }, [api]);
+
+  useEffect(() => {
+    setDismissedPopupAnnotationId(null);
+  }, [frame]);
 
   useEffect(() => {
     setImageNatural(null);
@@ -271,6 +306,14 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           <OpenSeadragonAnnotationPopup
             popup={(props) => {
               const annotation = props.annotation as ImageAnnotation;
+              const annotationId =
+                typeof annotation?.id === "string"
+                  ? String(annotation.id)
+                  : null;
+
+              if (annotationId && annotationId === dismissedPopupAnnotationId) {
+                return null;
+              }
 
               const { className, trackId } = getLabelTrack(annotation);
               const geometry = isRectangleAnno(annotation)
@@ -290,7 +333,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                     deleteAnnotation(id);
                   }}
                   onClose={() => {
-                    closePopup();
+                    if (!annotationId) return;
+                    setDismissedPopupAnnotationId(annotationId);
                   }}
                 />
               );
