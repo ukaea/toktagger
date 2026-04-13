@@ -157,6 +157,32 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
+const PROPAGATE_STORAGE_PREFIX = "ufo::video::propagate";
+
+function propagateStorageKey(projectId: string): string {
+  return `${PROPAGATE_STORAGE_PREFIX}:${projectId}`;
+}
+
+function loadPropagatePreference(projectId: string): boolean {
+  try {
+    const key = propagateStorageKey(projectId);
+    const raw = globalThis.sessionStorage?.getItem(key);
+    if (raw == null) return true;
+    return raw !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function savePropagatePreference(projectId: string, value: boolean) {
+  try {
+    const key = propagateStorageKey(projectId);
+    globalThis.sessionStorage?.setItem(key, String(value));
+  } catch {
+    // ignore persistence failures
+  }
+}
+
 export function useVideoSession(): VideoSessionCtx {
   const v = useContext(Ctx);
   if (!v)
@@ -246,7 +272,9 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
   const [panMode, setPanModeState] = useState(false);
-  const [propagate, setPropagateState] = useState(true);
+  const [propagate, setPropagateState] = useState<boolean>(() =>
+    loadPropagatePreference(projectId),
+  );
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -343,7 +371,8 @@ export function VideoSessionProvider(props: {
 
   const setPropagate = useCallback((v: boolean) => {
     setPropagateState(v);
-  }, []);
+    savePropagatePreference(projectId, v);
+  }, [projectId]);
 
   useEffect(() => {
     const releaseShiftPan = () => {
