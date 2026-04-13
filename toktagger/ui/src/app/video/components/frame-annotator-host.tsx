@@ -288,6 +288,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         <CanvasModeToolbar
           panMode={panMode}
           drawingTool={drawingTool}
+          hideAnnotations={hideAnnotations}
           onTogglePanMode={() => setPanMode(!panMode)}
           onSelectRectangle={() => {
             setPanMode(false);

@@ -62,7 +62,7 @@ function DragZoomIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-4 w-4"
+      className="h-5 w-5"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
@@ -81,7 +81,7 @@ function RectangleIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-4 w-4"
+      className="h-6 w-6"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
@@ -98,7 +98,7 @@ function PolygonIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-4 w-4"
+      className="h-6 w-6"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
@@ -119,6 +119,7 @@ function PolygonIcon() {
 function CanvasModeToggle(props: {
   label: string;
   isSelected: boolean;
+  isDisabled?: boolean;
   onPress: () => void;
   children: React.ReactNode;
 }) {
@@ -126,6 +127,7 @@ function CanvasModeToggle(props: {
     <TooltipTrigger delay={350} placement="left">
       <ToggleButton
         isSelected={props.isSelected}
+        isDisabled={props.isDisabled}
         onPress={props.onPress}
         aria-label={props.label}
         UNSAFE_style={{ width: 40, minWidth: 40, height: 40, padding: 0 }}
@@ -159,6 +161,7 @@ function CanvasActionButton(props: {
 export function CanvasModeToolbar(props: {
   panMode: boolean;
   drawingTool: "rectangle" | "polygon";
+  hideAnnotations: boolean;
   onTogglePanMode: () => void;
   onSelectRectangle: () => void;
   onSelectPolygon: () => void;
@@ -194,6 +197,7 @@ export function CanvasModeToolbar(props: {
           <CanvasModeToggle
             label="Rectangle"
             isSelected={!props.panMode && props.drawingTool === "rectangle"}
+            isDisabled={props.hideAnnotations}
             onPress={props.onSelectRectangle}
           >
             <RectangleIcon />
@@ -201,6 +205,7 @@ export function CanvasModeToolbar(props: {
           <CanvasModeToggle
             label="Polygon"
             isSelected={!props.panMode && props.drawingTool === "polygon"}
+            isDisabled={props.hideAnnotations}
             onPress={props.onSelectPolygon}
           >
             <PolygonIcon />
