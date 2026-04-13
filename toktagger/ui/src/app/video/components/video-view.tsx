@@ -11,6 +11,7 @@ import {
 } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
 import { useParams } from "react-router-dom";
 
@@ -136,6 +137,7 @@ function VideoFrameAnnotator(props: {
 export function VideoProviders({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
   const { data, annotations, dataParams } = useSample();
+  const { videoPropagate, setVideoPropagate } = useSampleHistory();
 
   if (!project_id || !sample_id || !data) {
     return <>{children}</>;
@@ -150,6 +152,8 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
         data={data}
         dataParams={dataParams}
         dbAnnotations={annotations ?? []}
+        propagate={videoPropagate}
+        setPropagate={setVideoPropagate}
       >
         <VideoNavAdapterBridge>{children}</VideoNavAdapterBridge>
       </VideoSessionProvider>
