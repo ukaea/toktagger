@@ -9,6 +9,8 @@ from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
+from toktagger.api.schemas.data import DataParamTypes
+from typing import Optional
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
@@ -309,6 +311,7 @@ async def predict(
         None,
         description="A list of specific sample IDs to make predictions for, leave blank for random selection.",
     ),
+    data_params: Optional[DataParamTypes] = None,
 ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -360,7 +363,11 @@ async def predict(
     BATCH_SIZE = 32  # TODO again where to define this?
 
     get_predictions.remote(
-        project=project, model=model, samples=samples, batch_size=BATCH_SIZE
+        project=project,
+        model=model,
+        samples=samples,
+        data_params=data_params,
+        batch_size=BATCH_SIZE,
     )
     task_registry.update_actors(model.id)
 
@@ -404,6 +411,7 @@ async def create_sample_predictions(
         description="The ID of the sample to make model predictions for."
     ),
     model_type: str = Path(description="The type of model to make predictions from."),
+    data_params: Optional[DataParamTypes] = None,
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -423,7 +431,11 @@ async def create_sample_predictions(
 
     BATCH_SIZE = 32  # TODO again where to define this?
     task = get_predictions.remote(
-        project=project, model=model, samples=[sample], batch_size=BATCH_SIZE
+        project=project,
+        model=model,
+        samples=[sample],
+        data_params=data_params,
+        batch_size=BATCH_SIZE,
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)

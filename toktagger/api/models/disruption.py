@@ -256,7 +256,11 @@ class DisruptionCNN(Model):
         return final_accuracy
 
     def predict(
-        self, samples: list[Sample], batch_size: int = 32, device="cpu"
+        self,
+        samples: list[Sample],
+        data_params: DataParams | None = None,
+        batch_size: int = 32,
+        device="cpu",
     ) -> list[list[TimePoint]]:
         num_mc_samples = 20  # Should let user choose num mc samples? TODO
         dataset = DisruptionDataset(
