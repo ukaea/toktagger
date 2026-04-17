@@ -53,10 +53,10 @@ def get_actor(project, model):
             )
         )
 
-        model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
-            f"{str(model.id)}.model"
+        model_path = next(
+            pathlib.Path(os.environ["MODEL_STORAGE"]).glob(f"{str(model.id)}*"), None
         )
-        if model_path.exists():
+        if model_path:
             ml_model.load.remote(model_path)
         else:
             logger.debug("No saved weights found, initializing blank model")

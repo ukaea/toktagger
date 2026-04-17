@@ -137,11 +137,11 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def save(self, file_path: str):
+    def save(self, file_stem: str):
         pass
 
     @abstractmethod
-    def load(cls, project: Project, file_path: str):
+    def load(cls, project: Project, file_stem: str):
         pass
 
 
@@ -165,7 +165,6 @@ class ModelRegistry:
 
     @classmethod
     def get(cls, name: str):
-        print(cls._registry)
         model_class: Model | None = cls._registry.get(name)
         if not model_class:
             raise ValueError(f"No Model class called '{name}' found in registry!")

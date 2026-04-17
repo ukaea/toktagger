@@ -416,8 +416,6 @@ async def create_sample_predictions(
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
-    print("DATA PARAMS", data_params)
-
     project = await utils.get_project(db_client, project_id)
 
     if model_type not in project.model_types:

@@ -301,8 +301,8 @@ class DisruptionCNN(Model):
             for i in range(len(samples))
         ]
 
-    def save(self, file_path: str):
-        torch.save(self.model.state_dict(), file_path)
+    def save(self, file_stem: str):
+        torch.save(self.model.state_dict(), f"{file_stem}.model")
 
-    def load(self, file_path: str):
-        self.model.load_state_dict(torch.load(file_path))
+    def load(self, file_stem: str):
+        self.model.load_state_dict(torch.load(f"{file_stem}.model"))
