@@ -360,14 +360,11 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
 
-    BATCH_SIZE = 32  # TODO again where to define this?
-
     get_predictions.remote(
         project=project,
         model=model,
         samples=samples,
         data_params=data_params,
-        batch_size=BATCH_SIZE,
     )
     task_registry.update_actors(model.id)
 
@@ -429,13 +426,11 @@ async def create_sample_predictions(
 
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    BATCH_SIZE = 32  # TODO again where to define this?
     task = get_predictions.remote(
         project=project,
         model=model,
         samples=[sample],
         data_params=data_params,
-        batch_size=BATCH_SIZE,
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)
