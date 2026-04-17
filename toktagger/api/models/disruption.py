@@ -259,7 +259,6 @@ class DisruptionCNN(Model):
         self,
         samples: list[Sample],
         data_params: DataParams | None = None,
-        batch_size: int = 32,
         device="cpu",
     ) -> list[list[TimePoint]]:
         num_mc_samples = 20  # Should let user choose num mc samples? TODO
@@ -269,7 +268,7 @@ class DisruptionCNN(Model):
 
         self.model.train()  # Using dropout so has to be in train mode
         all_predictions: list[list[torch.tensor]] = []
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=32, shuffle=False)
 
         for i in range(num_mc_samples):
             predictions: list[torch.tensor] = []

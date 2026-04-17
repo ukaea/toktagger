@@ -117,7 +117,6 @@ def get_predictions(
     model: Model,
     samples: list[Sample],
     data_params: DataParamTypes,
-    batch_size: int = 32,
 ):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
@@ -128,7 +127,7 @@ def get_predictions(
     model_actor = get_actor(project=project, model=model)
 
     predictions_task = model_actor._wrapped_predict.remote(
-        samples, data_params=data_params, batch_size=batch_size
+        samples, data_params=data_params
     )
     predictions = ray.get(predictions_task)
 
