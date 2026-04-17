@@ -35,6 +35,7 @@ class Model(ABC):
             loader_registry.get.remote(project.data_loader)
         )
         self.data_loader = data_loader()
+        self.trained = False
 
     def log_progress(
         self,
@@ -111,6 +112,38 @@ class Model(ABC):
                 val_test_annotations,
                 test_size=test_fraction / (val_fraction + test_fraction),
             )
+
+    def _wrapped_train(
+        self,
+        samples: list[Sample],
+        annotations: list[list[Annotation]],
+        train_val_test_split: typing.Tuple[float, float, float],
+        num_epochs: int = 100,
+    ):
+        score = self.train(
+            samples=samples,
+            annotations=annotations,
+            train_val_test_split=train_val_test_split,
+            num_epochs=num_epochs,
+        )
+        self.trained = True
+        return score
+
+    def _wrapped_predict(
+        self, samples: list[Sample], data_params: DataParamTypes | None
+    ) -> list[list[AnnotationBase]]:
+        if not self.trained:
+            raise RuntimeError("Cannot make predictions using an untrained model!")
+        return self.predict(samples=samples, data_params=data_params)
+
+    def _wrapped_save(self, file_stem: str):
+        if not self.trained:
+            raise RuntimeError("Cannot save a model before it has been trained!")
+        self.save(file_stem=file_stem)
+
+    def _wrapped_load(self, project: Project, file_stem: str):
+        self.load(project=project, file_stem=file_stem)
+        self.trained = True
 
     @abstractmethod
     def define_model(self):
