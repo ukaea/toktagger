@@ -337,9 +337,9 @@ export function SampleProvider({
   const annotationLabels =
     project?.task === TaskType.Video
       ? (project.video_bounding_box_labels || []).map((name, i) => ({
-          id: i + 1,
-          name,
-        }))
+        id: i + 1,
+        name,
+      }))
       : [];
 
   const value: SampleContextType = {

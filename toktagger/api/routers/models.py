@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Path, Query, HTTPException
+from fastapi import APIRouter, Request, Depends, Path, Query, HTTPException, Body
 from fastapi.responses import JSONResponse
 import pathlib
 import os
@@ -9,7 +9,7 @@ from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
-from toktagger.api.schemas.data import DataParamTypes
+from toktagger.api.schemas.data import DataParamTypes, DataParams
 from typing import Optional
 
 # Only import large packages if models dependencies installed
@@ -149,6 +149,32 @@ async def start_model_training(request: Request, project_id: str, model_type: st
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
+    # Get annotations and samples
+    annotations = await utils.get_annotations(db_client, project.id, validated=True)
+    samples = await utils.get_samples(db_client, project.id, validated=True)
+
+    # Get all validated samples and annotations for this project
+    logger.info(f"Collected {len(annotations)} annotations.")
+    logger.info(f"Collected {len(samples)} samples.")
+
+    if len(samples) == 0:
+        raise HTTPException(
+            status_code=404, detail="No validated samples found to train a model on!"
+        )
+    if len(annotations) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="No validated annotations found to train a model on!",
+        )
+
+    # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
+    annotations_2d = [
+        [ann for ann in group]
+        for _, group in itertools.groupby(
+            annotations, key=lambda annotation: annotation.sample_id
+        )
+    ]
+
     # Create model
     # Try to get model for this project from database if it exists
     db_models = await utils.get_models(db_client, project_id, model_type)
@@ -185,32 +211,6 @@ async def start_model_training(request: Request, project_id: str, model_type: st
     model_id = await utils.add_model(
         db_client=db_client, project_id=project.id, model=model_in
     )
-
-    # Get annotations and samples
-    annotations = await utils.get_annotations(db_client, project.id, validated=True)
-    samples = await utils.get_samples(db_client, project.id, validated=True)
-
-    # Get all validated samples and annotations for this project
-    logger.info(f"Collected {len(annotations)} annotations.")
-    logger.info(f"Collected {len(samples)} samples.")
-
-    if len(samples) == 0:
-        raise HTTPException(
-            status_code=404, detail="No validated samples found to train a model on!"
-        )
-    if len(annotations) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="No validated annotations found to train a model on!",
-        )
-
-    # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
-    annotations_2d = [
-        [ann for ann in group]
-        for _, group in itertools.groupby(
-            annotations, key=lambda annotation: annotation.sample_id
-        )
-    ]
 
     NUM_EPOCHS = 10  # TODO where to define this? User selected? In model?
     BATCH_SIZE = 32
@@ -311,7 +311,7 @@ async def predict(
         None,
         description="A list of specific sample IDs to make predictions for, leave blank for random selection.",
     ),
-    data_params: Optional[DataParamTypes] = None,
+    data_params: Optional[DataParamTypes] = Body(DataParams(), embed=True),
 ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -411,10 +411,12 @@ async def create_sample_predictions(
         description="The ID of the sample to make model predictions for."
     ),
     model_type: str = Path(description="The type of model to make predictions from."),
-    data_params: Optional[DataParamTypes] = None,
+    data_params: Optional[DataParamTypes] = Body(DataParams(), embed=True),
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
+
+    print("DATA PARAMS", data_params)
 
     project = await utils.get_project(db_client, project_id)
 

@@ -116,7 +116,7 @@ def get_predictions(
     project: Project,
     model: Model,
     samples: list[Sample],
-    data_params: DataParamTypes | None,
+    data_params: DataParamTypes,
     batch_size: int = 32,
 ):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions

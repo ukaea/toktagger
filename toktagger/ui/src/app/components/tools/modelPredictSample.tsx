@@ -7,8 +7,9 @@ import {
   Flex,
   ProgressCircle,
   Switch,
+  Checkbox
 } from "@adobe/react-spectrum";
-import { Annotations, Annotation } from "@/types";
+import { Annotations, Annotation, TaskType, DataParams } from "@/types";
 import { startSamplePredictions, getSamplePredictions } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
 
@@ -18,7 +19,7 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { annotations, project, setAnnotations } = useSample();
+  const { annotations, project, setAnnotations, dataParams, data } = useSample();
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
@@ -28,10 +29,11 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [frameOnly, setFrameOnly] = useState<boolean>(true);
 
   useEffect(() => {
     const scheduleTask = async () => {
-      if (!selectedModel) {
+      if (!project || !data || !selectedModel) {
         return;
       }
       if (!isEnabled) {
@@ -45,11 +47,21 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         });
         return;
       }
+      let effectiveDataParams: DataParams = dataParams;
+
+      if (project.task === TaskType.Video) {
+        effectiveDataParams = {
+          ...dataParams,
+          name: "image",
+          frame: frameOnly ? data.frame : null,
+        };
+      }
 
       const response = await startSamplePredictions(
         project_id,
         sample_id,
         selectedModel,
+        effectiveDataParams,
       );
       const payload = await response.json();
 
@@ -62,7 +74,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       }
     };
     scheduleTask();
-  }, [project_id, sample_id, selectedModel, isEnabled, setAnnotations]);
+  }, [project_id, sample_id, selectedModel, isEnabled, setAnnotations, frameOnly]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -98,8 +110,6 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
               (annotation: Annotation) =>
                 annotation.created_by !== selectedModel,
             );
-            console.log("payload being set", payload);
-            console.log("concatted", otherAnnotations.concat(payload));
             return otherAnnotations.concat(payload);
           });
           clearInterval(interval);
@@ -137,6 +147,9 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
               <Item key={model_type}>{model_type}</Item>
             ))}
           </ComboBox>
+          {project.task === TaskType.Video && (
+            <Checkbox isDisabled={!isEnabled} isSelected={frameOnly} onChange={setFrameOnly}> Current Frame Only</Checkbox>
+          )}
           <br />
           {isLoading ? (
             <ProgressCircle aria-label="Loading…" isIndeterminate />

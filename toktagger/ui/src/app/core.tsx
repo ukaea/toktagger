@@ -1,6 +1,6 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import type { Project, Sample, SamplesSummary, Annotation } from "@/types";
+import type { Project, Sample, SamplesSummary, Annotation, DataParams } from "@/types";
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -346,6 +346,7 @@ export const startSamplePredictions = async (
   project_id: string,
   sample_id: string,
   selected_model: string,
+  data_params: DataParams,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
@@ -354,6 +355,7 @@ export const startSamplePredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ "data_params": data_params })
     },
   );
   return response;
