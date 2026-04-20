@@ -277,6 +277,10 @@ async def setup_model_db(setup_model_samples, db_client):
         "models", db_definitions.MODEL_2, ids={"project_id": ObjectId(project_id)}
     )
 
+    # Create temp files for each
+    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_1}.model").touch()
+    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_2}.model").touch()
+
     yield {
         "project_id": project_id,
         "sample_ids": sample_ids,

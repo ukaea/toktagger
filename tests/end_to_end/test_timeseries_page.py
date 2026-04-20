@@ -622,6 +622,7 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
         "button", name="Show suggestions Select Model Type"
     ).click()
     page.get_by_role("option", name="mock_timeseries_cnn").click()
+    page.get_by_role("button", name="Predict", exact=True).click()
 
     # Should generate a new set of predictions after a short time
     expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
