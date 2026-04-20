@@ -90,7 +90,7 @@ def train_model(
 
         model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
         model_dir.mkdir(exist_ok=True)  # Do i need to do this every time?
-        model_actor._wrapped_save.remote(model_dir.joinpath(f"{model.id}.model"))
+        model_actor._wrapped_save.remote(model_dir.joinpath(str(model.id)))
 
         send_model_updates(
             project_id=project.id,

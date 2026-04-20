@@ -7,7 +7,8 @@ import {
   Flex,
   ProgressCircle,
   Switch,
-  Checkbox
+  Checkbox,
+  Button
 } from "@adobe/react-spectrum";
 import { Annotations, Annotation, TaskType, DataParams } from "@/types";
 import { startSamplePredictions, getSamplePredictions } from "@/app/core";
@@ -31,50 +32,55 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [frameOnly, setFrameOnly] = useState<boolean>(true);
 
-  useEffect(() => {
-    const scheduleTask = async () => {
-      if (!project || !data || !selectedModel) {
-        return;
-      }
-      if (!isEnabled) {
-        // Remove previous annotations from this model
-        setAnnotations((previousAnnotations: Annotations) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== selectedModel || annotation.validated,
-          );
-          return otherAnnotations;
-        });
-        return;
-      }
-      let effectiveDataParams: DataParams = dataParams;
+  const disableTool = (isSelected: boolean) => {
+    setIsEnabled(isSelected)
+    if (!selectedModel) {
+      return;
+    }
+    if (!isSelected) {
+      // Remove previous annotations from this model
+      setAnnotations((previousAnnotations: Annotations) => {
+        const otherAnnotations = previousAnnotations.filter(
+          (annotation: Annotation) =>
+            annotation.created_by !== selectedModel || annotation.validated,
+        );
+        return otherAnnotations;
+      });
+    }
+  }
 
-      if (project.task === TaskType.Video) {
-        effectiveDataParams = {
-          ...dataParams,
-          name: "image",
-          frame: frameOnly ? data.frame : null,
-        };
-      }
+  const scheduleTask = async () => {
+    if (!project || !data || !selectedModel || !isEnabled) {
+      return;
+    }
 
-      const response = await startSamplePredictions(
-        project_id,
-        sample_id,
-        selectedModel,
-        effectiveDataParams,
-      );
-      const payload = await response.json();
+    let effectiveDataParams: DataParams = dataParams;
 
-      if (response.ok) {
-        setIsLoading(true);
-        setTaskId(payload.task_id);
-        setErrorMessage(null);
-      } else {
-        setErrorMessage(payload.detail);
-      }
-    };
-    scheduleTask();
-  }, [project_id, sample_id, selectedModel, isEnabled, setAnnotations, frameOnly]);
+    if (project.task === TaskType.Video) {
+
+      effectiveDataParams = {
+        ...dataParams,
+        name: "image",
+        frame: frameOnly && "frame" in data ? data.frame : null,
+      };
+    }
+
+    const response = await startSamplePredictions(
+      project_id,
+      sample_id,
+      selectedModel,
+      effectiveDataParams,
+    );
+    const payload = await response.json();
+
+    if (response.ok) {
+      setIsLoading(true);
+      setTaskId(payload.task_id);
+      setErrorMessage(null);
+    } else {
+      setErrorMessage(payload.detail);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -99,8 +105,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         if (response.status === 202) {
           // Predictions queued but not done yet, so continue to poll
           pollCounter += 1;
-          if (pollCounter > 20) {
-            setErrorMessage("Failed to retrieve predictions result.");
+          if (pollCounter > 30) {
+            setErrorMessage("Predictions in progress...");
             clearInterval(interval);
             setIsLoading(false);
           }
@@ -132,8 +138,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   return (
     <Provider theme={defaultTheme}>
       <div className="m-4">
-        <Flex direction="column">
-          <Switch isSelected={isEnabled} onChange={setIsEnabled}>
+        <Flex direction="column" gap="size-200">
+          <Switch isSelected={isEnabled} onChange={disableTool}>
             Enable Tool
           </Switch>
           <ComboBox
@@ -150,6 +156,9 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           {project.task === TaskType.Video && (
             <Checkbox isDisabled={!isEnabled} isSelected={frameOnly} onChange={setFrameOnly}> Current Frame Only</Checkbox>
           )}
+          <Button variant="primary" onPress={scheduleTask} isDisabled={!isEnabled}>
+            Predict
+          </Button>
           <br />
           {isLoading ? (
             <ProgressCircle aria-label="Loading…" isIndeterminate />

@@ -141,8 +141,8 @@ class Model(ABC):
             raise RuntimeError("Cannot save a model before it has been trained!")
         self.save(file_stem=file_stem)
 
-    def _wrapped_load(self, file_stem: str):
-        self.load(file_stem=file_stem)
+    def _wrapped_load(self, file_path: str):
+        self.load(file_path=file_path)
         self.trained = True
 
     @abstractmethod
@@ -174,7 +174,7 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def load(self, file_stem: str):
+    def load(self, file_path: str):
         pass
 
 
