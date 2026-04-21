@@ -10,8 +10,18 @@ from toktagger.api.schemas.annotations import Annotation
 import typing
 from toktagger.api.models.base import Model, ModelRegistry
 import logging
+import pydantic
 
 logger = logging.getLogger("ray")
+
+
+class DisruptionCNNParams(pydantic.BaseModel):
+    train_val_test_split: typing.Tuple[float, float, float]
+    num_epochs: int = 100
+    batch_size: int = 32
+    patience: int = 20
+    threshold: float = 1e-4
+    device: str = "cpu"
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
@@ -48,7 +58,7 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         return plasma_current, disruption_time / data.time[-1]
 
 
-@ModelRegistry.register("disruption_cnn", ["time-series"])
+@ModelRegistry.register("disruption_cnn", ["time-series"], DisruptionCNNParams)
 class DisruptionCNN(Model):
     def define_model(self):
         return nn.Sequential(
@@ -68,20 +78,14 @@ class DisruptionCNN(Model):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
-        # TODO extra kwargs, eg batch size?
-        batch_size=32,
-        patience=20,
-        threshold=1e-4,
-        device="cpu",
+        params: DisruptionCNNParams,
     ) -> float:
         self.log_progress(training_status="started")
 
         self.split_data(
             samples=samples,
             annotations=annotations,
-            train_val_test_split=train_val_test_split,
+            train_val_test_split=params.train_val_test_split,
         )
 
         self.train_dataset = DisruptionDataset(
@@ -102,15 +106,15 @@ class DisruptionCNN(Model):
             else None
         )
         train_loader = DataLoader(
-            self.train_dataset, batch_size=batch_size, shuffle=False
+            self.train_dataset, batch_size=params.batch_size, shuffle=False
         )
         val_loader = (
-            DataLoader(self.val_dataset, batch_size=batch_size, shuffle=False)
+            DataLoader(self.val_dataset, batch_size=params.batch_size, shuffle=False)
             if self.val_dataset
             else None
         )
         test_loader = (
-            DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False)
+            DataLoader(self.test_dataset, batch_size=params.batch_size, shuffle=False)
             if self.test_dataset
             else None
         )
@@ -122,13 +126,13 @@ class DisruptionCNN(Model):
 
         loss_history = {"train": [], "val": []}
         best_val_loss = float("inf")
-        print_per_epoch = max(1, num_epochs // 50)  # print 50 times
+        print_per_epoch = max(1, params.num_epochs // 50)  # print 50 times
 
         train_accuracy = None
         val_accuracy = None
         test_accuracy = None
 
-        for epoch in range(num_epochs):
+        for epoch in range(params.num_epochs):
             self.model.train()
             total_train_loss = 0
             sum_correct = 0
@@ -137,8 +141,8 @@ class DisruptionCNN(Model):
 
             for batch_samples, batch_annotations in train_loader:
                 batch_samples = batch_samples.unsqueeze(1)
-                batch_samples = batch_samples.to(device)
-                batch_annotations = batch_annotations.float().to(device)
+                batch_samples = batch_samples.to(params.device)
+                batch_annotations = batch_annotations.float().to(params.device)
 
                 outputs = self.model(batch_samples).squeeze(1)
                 loss = criterion(outputs, batch_annotations)
@@ -172,8 +176,8 @@ class DisruptionCNN(Model):
                 with torch.no_grad():
                     for batch_samples, batch_annotations in val_loader:
                         batch_samples = batch_samples.unsqueeze(1)
-                        batch_samples = batch_samples.to(device)
-                        batch_annotations = batch_annotations.float().to(device)
+                        batch_samples = batch_samples.to(params.device)
+                        batch_annotations = batch_annotations.float().to(params.device)
 
                         outputs = self.model(batch_samples).squeeze(1)
                         loss = criterion(outputs, batch_annotations)
@@ -196,11 +200,11 @@ class DisruptionCNN(Model):
                 loss_history["val"].append(val_loss_avg)
 
                 self.log_progress(
-                    progress=int((epoch / num_epochs) * 100), score=val_accuracy
+                    progress=int((epoch / params.num_epochs) * 100), score=val_accuracy
                 )
 
                 if epoch % print_per_epoch == 0:
-                    logger.debug(f"Epoch [{epoch + 1}/{num_epochs}]")
+                    logger.debug(f"Epoch [{epoch + 1}/{params.num_epochs}]")
                     logger.debug(
                         f"  Train Loss: {train_loss_avg:.4f}, MAE: {train_mae:.4f}, RMSE: {train_rmse:.4f}"
                     )
@@ -209,15 +213,15 @@ class DisruptionCNN(Model):
                     )
 
             # --- Early stopping ---
-            if val_loss_avg < best_val_loss - threshold:
+            if val_loss_avg < best_val_loss - params.threshold:
                 best_val_loss = val_loss_avg
                 epochs_since_improvement = 0
                 self.best_model = self.model
             else:
                 epochs_since_improvement += 1
-                if epochs_since_improvement >= patience:
+                if epochs_since_improvement >= params.patience:
                     logger.debug(
-                        f"No validation improvement for {patience} epochs. Stopping early."
+                        f"No validation improvement for {params.patience} epochs. Stopping early."
                     )
                     self.model = self.best_model
                     break
@@ -231,8 +235,8 @@ class DisruptionCNN(Model):
             with torch.no_grad():
                 for batch_samples, batch_annotations in test_loader:
                     batch_samples = batch_samples.unsqueeze(1)
-                    batch_samples = batch_samples.to(device)
-                    batch_annotations = batch_annotations.float().to(device)
+                    batch_samples = batch_samples.to(params.device)
+                    batch_annotations = batch_annotations.float().to(params.device)
 
                     outputs = self.model(batch_samples).squeeze(1)
 
@@ -249,7 +253,7 @@ class DisruptionCNN(Model):
 
         self.log_progress(
             training_status="completed",
-            progress=int((epoch / num_epochs) * 100),
+            progress=int((epoch / params.num_epochs) * 100),
             score=final_accuracy,
         )
 

@@ -9,7 +9,7 @@ import math
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models import models_dependencies_installed
-
+import pydantic
 import uuid
 import logging
 
@@ -120,8 +120,7 @@ class Model(ABC):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
+        params: pydantic.BaseModel | None = None,
     ) -> float:
         # pass in list of samples and list of annotations
         # return some measure of accuracy
@@ -143,18 +142,28 @@ class Model(ABC):
 
 
 class ModelRegistry:
-    _registry: dict[str, Model] = {}
+    _registry: dict[str, typing.Type[Model]] = {}
     _tasks: dict[str, list[Task]] = {}
+    _params: dict[str, typing.Type[pydantic.BaseModel]] = {}
 
     @classmethod
-    def register(cls, name: str, tasks: list[Task | str]):
+    def register(
+        cls,
+        name: str,
+        tasks: list[Task | str],
+        params: typing.Type[pydantic.BaseModel] | None = None,
+    ):
         def decorator(model_class: Model):
             if not issubclass(model_class, Model):
                 raise ValueError(
                     f"Loader '{name}' does not inherit from Model base class."
                 )
+            if params and not issubclass(params, pydantic.BaseModel):
+                raise ValueError("Must provide params as a Pydantic BaseModel.")
+
             cls._registry[name] = model_class
             cls._tasks[name] = [Task(_task) for _task in tasks]
+            cls._params[name] = params
 
             return model_class
 
@@ -169,7 +178,7 @@ class ModelRegistry:
         return ray.remote(model_class)
 
     @classmethod
-    def get_name(cls, model_class: Model):
+    def get_name(cls, model_class: Model) -> str:
         return next(
             name
             for name, model in cls._registry.items()
@@ -177,17 +186,25 @@ class ModelRegistry:
         )
 
     @classmethod
-    def names(cls, task: Task | None = None):
+    def names(cls, task: Task | None = None) -> list[str]:
         if not task:
             return list(cls._registry.keys())
         return [name for name, tasks in cls._tasks.items() if task in tasks]
 
     @classmethod
-    def tasks(cls, name: str):
+    def tasks(cls, name: str) -> list[Task]:
         tasks: list[Task] | None = cls._tasks.get(name)
         if not tasks:
             raise ValueError(f"No tasks associated with model '{name}'!")
         return tasks
+
+    @classmethod
+    def get_params_schema(cls, name: str) -> typing.Type[pydantic.BaseModel] | None:
+        params: typing.Type[pydantic.BaseModel] | None = cls._params.get(name, False)
+        if params is False:
+            raise ValueError(f"No Model class called '{name}' found in registry!")
+
+        return params.model_json_schema() if params else None
 
 
 @ray.remote
