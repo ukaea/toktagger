@@ -19,6 +19,46 @@ if models_dependencies_installed():
     import ray
 
 
+# Recursively walk through schema, finding things which need to be changed
+def _update_schema(schema: dict) -> None:
+    """Mutates schema in place and returns draft-7 compliant version."""
+    # Convert $defs to definitions
+    if "$defs" in schema:
+        defs = schema.pop("$defs")
+        if "definitions" in schema:
+            schema["definitions"].update(defs)
+        else:
+            schema["definitions"] = defs
+
+    # Convert prefixItems to items, items to additionalItems
+    if "prefixItems" in schema:
+        additional_items = schema.pop("items", None)
+        schema["items"] = schema.pop("prefixItems")
+        if additional_items is not None:
+            schema["additionalItems"] = additional_items
+
+    # Remove unevaluatedProperties or unevaluatedItems
+    schema.pop("unevaluatedProperties", None)
+    schema.pop("unevaluatedItems", None)
+
+    return schema
+
+
+def walk_schema(schema):
+    """Walk through a JSON Schema and update relevant items."""
+    if isinstance(schema, list):
+        schema = [walk_schema(item) for item in schema]
+
+    if isinstance(schema, dict):
+        for key, value in list(schema.items()):
+            if isinstance(value, (dict, list)):
+                schema[key] = walk_schema(value)
+
+        _update_schema(schema)
+
+    return schema
+
+
 class Model(ABC):
     def __init__(
         self,
@@ -199,12 +239,36 @@ class ModelRegistry:
         return tasks
 
     @classmethod
-    def get_params_schema(cls, name: str) -> typing.Type[pydantic.BaseModel] | None:
+    def get_params_schema(cls, name: str, return_draft_07: bool = False) -> dict | None:
+        """
+        Return a schema of the parameters required when training the specified model.
+
+        Parameters
+        ----------
+        name : str
+            The name of the model to return a schema for
+        return_draft_07 : bool, optional
+            Whether to convert the schema to JSONSchema draft-07, by default False
+
+        Returns
+        -------
+        schema : dict | None
+            The JSONSchema of the params model, if required.
+        """
+
         params: typing.Type[pydantic.BaseModel] | None = cls._params.get(name, False)
+
         if params is False:
             raise ValueError(f"No Model class called '{name}' found in registry!")
+        if not params:
+            return None
 
-        return params.model_json_schema() if params else None
+        schema = params.model_json_schema()
+
+        if not return_draft_07:
+            return schema
+
+        return walk_schema(schema)
 
 
 @ray.remote

@@ -20,4 +20,4 @@ async def get_data_schema(loader: str) -> dict:
 @router.get("/models/{model}")
 async def get_model_schema(model: str) -> dict | None:
     """Get params required for training this model."""
-    return ModelRegistry.get_params_schema(model)
+    return ModelRegistry.get_params_schema(model, return_draft_07=True)
