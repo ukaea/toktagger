@@ -294,6 +294,7 @@ export const deleteSamples = async (project_id: string) => {
 export const startTraining = async (
   project_id: string,
   selected_model: string,
+  params: Record<string, any>
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train`,
@@ -302,6 +303,7 @@ export const startTraining = async (
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ "params": params })
     },
   );
   return response;

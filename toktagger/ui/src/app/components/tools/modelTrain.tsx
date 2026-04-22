@@ -21,6 +21,7 @@ import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
 import { startTraining, getModels } from "@/app/core";
+import ModelForm from "@/app/components/ui/schemaForm";
 
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -52,7 +53,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
     })();
   }, [modalOpen, project._id]);
 
-  const submitTrainJob = async () => {
+  const submitTrainJob = async (params: Record<string, any>) => {
     if (selectedModel == null) {
       return;
     }
@@ -96,6 +97,13 @@ export function ModelTrainModal({ project }: { project: Project }) {
                   <Item key={model_type}>{model_type}</Item>
                 ))}
               </ComboBox>
+              {selectedModel && (
+                <ModelForm
+                  modelName={selectedModel}
+                  onSubmit={submitTrainJob}
+                />
+              )
+              }
             </Content>
             <Footer>
               {message && (
@@ -108,13 +116,13 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <Button variant="secondary" onPress={close}>
                 Close
               </Button>
-              <Button
+              {/* <Button
                 variant="accent"
                 onPress={submitTrainJob}
                 isDisabled={trainDisabled}
               >
                 Train
-              </Button>
+              </Button> */}
             </ButtonGroup>
           </Dialog>
         )}

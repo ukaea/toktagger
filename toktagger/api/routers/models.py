@@ -277,7 +277,7 @@ async def stop_model_training(
         if model.task_id:
             task = task_registry.get(model.task_id)
             if task is not None:
-                ray.kill(task)
+                ray.cancel(task)
             try:
                 actor = ray.get_actor(model.id)
                 ray.kill(actor)

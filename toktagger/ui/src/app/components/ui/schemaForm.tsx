@@ -7,7 +7,7 @@ import { BACKEND_API_URL } from "@/app/core";
 import { useState, useEffect } from "react";
 import { TextField, NumberField, Checkbox, CheckboxGroup, ComboBox, Item, RadioGroup, Radio, TextArea, DatePicker, FileTrigger, Text, Slider, Button, Provider, defaultTheme, View, Heading, InlineAlert, Content, Footer } from "@adobe/react-spectrum";
 import { WidgetProps, FieldTemplateProps, ArrayFieldTemplateProps, ArrayFieldDescriptionProps, ArrayFieldItemTemplateProps, ObjectFieldTemplateProps, TitleFieldProps, DescriptionFieldProps, SubmitButtonProps, ErrorListProps, RJSFValidationError } from "@rjsf/utils";
-import { getDefaultRegistry } from "@rjsf/core";
+import { getDefaultRegistry, IChangeEvent } from "@rjsf/core";
 import { getSchemaType } from "@rjsf/utils"
 import { schemaHasRules } from 'ajv/dist/compile/util';
 
@@ -395,8 +395,12 @@ export const getModelSchema = async (
     return schema
 }
 
-export default function ModelForm() {
-    const [modelName, setModelName] = useState<string>("disruption_cnn");
+type ModelFormProps = {
+    modelName: string;
+    onSubmit: (data: Record<string, unknown>) => void;
+};
+
+export default function ModelForm({ modelName, onSubmit }: ModelFormProps) {
     const [schema, setSchema] = useState<RJSFSchema | null>(null);
     const registry = getDefaultRegistry();
     const widgets = {
@@ -429,31 +433,33 @@ export default function ModelForm() {
         updateSchema()
     }, [modelName])
 
+    if (!schema) return
+
     return (
         <div>
             <Provider theme={defaultTheme}>
-                <TextField label="Model Name" value={modelName} onChange={setModelName} />
-                {schema &&
-                    <Form
-                        schema={schema}
-                        validator={validator}
-                        widgets={widgets}
-                        uiSchema={{
-                            "ui:options": {
-                                label: false
-                            }
-                        }}
-                        templates={{
-                            FieldTemplate: SpectrumFieldTemplate,
-                            Label: NoLabelTemplate,
-                            TitleFieldTemplate: TitleTemplate,
-                            ArrayFieldTemplate: SpectrumArrayFieldTemplate,
-                            ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
-                            ButtonTemplates: { SubmitButton: SpectrumSubmitButton },
-                            ErrorListTemplate: SpectrumErrorTemplate
-                        }}
-                    />
-                }
+                <Form
+                    schema={schema}
+                    validator={validator}
+                    widgets={widgets}
+                    onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
+                        onSubmit(e.formData ?? {});
+                    }}
+                    uiSchema={{
+                        "ui:options": {
+                            label: false
+                        }
+                    }}
+                    templates={{
+                        FieldTemplate: SpectrumFieldTemplate,
+                        Label: NoLabelTemplate,
+                        TitleFieldTemplate: TitleTemplate,
+                        ArrayFieldTemplate: SpectrumArrayFieldTemplate,
+                        ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
+                        ButtonTemplates: { SubmitButton: SpectrumSubmitButton },
+                        ErrorListTemplate: SpectrumErrorTemplate
+                    }}
+                />
             </Provider>
         </div>
     );
