@@ -16,12 +16,27 @@ logger = logging.getLogger("ray")
 
 
 class DisruptionCNNParams(pydantic.BaseModel):
-    train_val_test_split: typing.Tuple[float, float, float]
-    num_epochs: int = 100
-    batch_size: int = 32
-    patience: int = 20
-    threshold: float = 1e-4
-    device: str = "cpu"
+    train_val_test_split: list[float] = pydantic.Field(
+        min_length=3,
+        max_length=3,
+        gt=0,
+        lt=1,
+        description="Fraction of the total annotations to use in the training / validation / test sets. Fractions should sum to 1.",
+    )
+
+    num_epochs: int = pydantic.Field(gt=0, default=100)
+    batch_size: int = pydantic.Field(gt=0, default=32)
+    patience: int = pydantic.Field(
+        gt=0,
+        default=20,
+        description="If no improvement in accuracy is seen after this number of epochs, training will be stopped early.",
+    )
+    threshold: float = pydantic.Field(
+        gt=0,
+        default=1e-4,
+        description="Threshold over which a new epoch is considered to have improved in accuracy.",
+    )
+    device: typing.Literal["cpu", "gpu"] = "cpu"
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
