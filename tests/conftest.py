@@ -49,11 +49,7 @@ def mongo_container():
 def ray_session():
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
         os.environ["MODEL_STORAGE"] = tempd
-        ray.init(
-            ignore_reinit_error=True,
-            local_mode=True,
-            # runtime_env={"working_dir": None}
-        )
+        ray.init(ignore_reinit_error=True, runtime_env={"MODEL_STORAGE": tempd})
         # Create a ray actor for use as a model registry
         WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
             ModelRegistry._registry
@@ -100,6 +96,7 @@ async def api_client(mongo_container):
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         os.environ["API_URL"] = ""
+        client.app = app
         yield client
     await lifespan_ctx.__aexit__(None, None, None)
 
