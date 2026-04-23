@@ -50,7 +50,9 @@ def ray_session():
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
         os.environ["MODEL_STORAGE"] = tempd
         ray.init(
-            ignore_reinit_error=True, local_mode=True, runtime_env={"working_dir": None}
+            ignore_reinit_error=True,
+            local_mode=True,
+            # runtime_env={"working_dir": None}
         )
         # Create a ray actor for use as a model registry
         WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
