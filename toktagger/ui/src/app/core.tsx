@@ -1,6 +1,12 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import type { Project, Sample, SamplesSummary, SampleUpdate, Annotation } from "@/types";
+import type {
+  Project,
+  Sample,
+  SamplesSummary,
+  SampleUpdate,
+  Annotation,
+} from "@/types";
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -285,11 +291,10 @@ export const deleteSample = async (project_id: string, sample_id: string) => {
   );
 };
 
-
 export const updateSample = async (
   project_id: string,
   sample_id: string,
-  updates: SampleUpdate
+  updates: SampleUpdate,
 ) => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples`,
@@ -301,10 +306,10 @@ export const updateSample = async (
       body: JSON.stringify([
         {
           _id: sample_id,
-          updates: updates
-        }
-      ])
-    }
+          updates: updates,
+        },
+      ]),
+    },
   );
   const data = await response.json();
   const sample = data as Sample;

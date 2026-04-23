@@ -1,5 +1,5 @@
 "use client";
-import { Project, SampleUpdate, type NavAdapter } from "@/types";
+import { Project, type NavAdapter } from "@/types";
 import {
   Flex,
   Button,
@@ -86,7 +86,7 @@ type ButtonInfo = {
 
 type SaveButtonInfo = ButtonInfo & {
   saveOnNavigate?: boolean;
-}
+};
 
 type NextButtonInfo = ButtonInfo & {
   saveOnNavigate?: boolean;
@@ -310,8 +310,8 @@ function ClearButton({
   const handleClick = () => {
     navAdapter.clear();
     // Mark as unvalidated annotations
-    updateSample(project_id, sample_id, { validated_annotations: false })
-    setIsValidated(false)
+    updateSample(project_id, sample_id, { validated_annotations: false });
+    setIsValidated(false);
   };
 
   return (
