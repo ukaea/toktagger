@@ -11,7 +11,7 @@ def send_updates(
     url: str,
     updates: ModelUpdate
     | list[typing.Union[SampleUpdateBatchItem, AnnotationBatchTypes]],
-) -> None:
+) -> requests.Response:
     """Send a single item or batch of items from worker node to a provided URL.
 
     Parameters
@@ -22,11 +22,6 @@ def send_updates(
         The URL to send the items to
     updates : ModelUpdates | list[typing.Union[SampleUpdateBatchItem, AnnotationBatchInputTypes]]
         Updates to be sent to the server - parameters which are unset or None will be ignored
-
-    Raises
-    ------
-    RuntimeError
-        Raised if the server returns an error when updating the model
     """
     if isinstance(updates, list):
         payload = [model.model_dump(mode="json") for model in updates]
@@ -34,14 +29,13 @@ def send_updates(
         payload = updates.model_dump(mode="json")
 
     response = requests.put(url=url, json=payload)
-    if response.status_code != 200:
-        # TODO what to do here?
-        raise RuntimeError(
-            f"Failed to write updates for {object_type} with status {response.status_code}"
-        )
+
+    return response
 
 
-def send_model_updates(project_id: str, model_id: str, updates: ModelUpdate) -> None:
+def send_model_updates(
+    project_id: str, model_id: str, updates: ModelUpdate
+) -> requests.Response | None:
     """Send updates about model training status from worker node to server via API.
 
     Parameters
@@ -52,17 +46,16 @@ def send_model_updates(project_id: str, model_id: str, updates: ModelUpdate) -> 
         The ID of the model to update
     updates : ModelUpdate
         Updates about the model to be sent - parameters which are unset or None will be ignored
-
-    Raises
-    ------
-    RuntimeError
-        Raised if the server returns an error when updating the model
     """
-    url = f"{os.environ['API_URL']}/projects/{project_id}/models/{model_id}"
-    send_updates("model", url, updates=updates)
+    if (api_url := os.environ.get("API_URL")) is not None:
+        url = f"{api_url}/projects/{project_id}/models/{model_id}"
+
+        return send_updates("model", url, updates=updates)
 
 
-def send_batch_samples(project_id: str, samples: list[SampleUpdateBatchItem]) -> None:
+def send_batch_samples(
+    project_id: str, samples: list[SampleUpdateBatchItem]
+) -> requests.Response | None:
     """Send a batch of sample updates from worker node to server via API.
 
     Parameters
@@ -72,13 +65,14 @@ def send_batch_samples(project_id: str, samples: list[SampleUpdateBatchItem]) ->
     samples : list[SampleUpdateBatchItem]
         Updates to be sent to the server - parameters which are unset or None will be ignored
     """
-    url = f"{os.environ['API_URL']}/projects/{project_id}/samples"
-    send_updates("samples", url, samples)
+    if (api_url := os.environ.get("API_URL")) is not None:
+        url = f"{api_url}/projects/{project_id}/samples"
+        return send_updates("samples", url, samples)
 
 
 def send_batch_annotations(
     project_id: str, annotations: list[AnnotationBatchTypes]
-) -> None:
+) -> requests.Response | None:
     """Send a batch of new annotations from worker node to server via API.
 
     Parameters
@@ -88,5 +82,6 @@ def send_batch_annotations(
     annotations : list[AnnotationBatchInputTypes]
         Annotations to be sent to the server
     """
-    url = f"{os.environ['API_URL']}/projects/{project_id}/annotations"
-    send_updates("annotations", url, annotations)
+    if (api_url := os.environ.get("API_URL")) is not None:
+        url = f"{api_url}/projects/{project_id}/annotations"
+        return send_updates("annotations", url, annotations)

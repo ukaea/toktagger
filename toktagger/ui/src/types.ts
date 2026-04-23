@@ -217,6 +217,11 @@ export const SampleSchema = z.object({
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
+export const SampleUpdateSchema = z.object({
+  validated_annotations: z.boolean(),
+});
+export type SampleUpdate = z.infer<typeof SampleUpdateSchema>;
+
 export const ModelSchema = z.object({
   _id: z.string(),
   timestamp: z.string(),

@@ -31,7 +31,7 @@ def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False
             created_by="peak_detection",
             time_min=10,
             time_max=20,
-            validateD=False,
+            validated=False,
             uncertainty=0.9,
         )
         response = requests.put(
@@ -516,10 +516,15 @@ def test_save_on_navigate(
 def test_clear_button(server_setup, page: Page):
     page, project_id, sample_ids = setup_annotations(page, 2)
     sample_id = sample_ids[0]
+    # Click save to commit annotations to db
+    page.get_by_role("button", name="Save").click()
 
     # Check both annotations visible
     expect(page.get_by_label("vspan").first).to_be_visible()
     expect(page.get_by_label("zone").first).to_be_visible()
+
+    # Check sample shows as validated
+    expect(page.get_by_text("Annotations Validated")).to_be_visible()
 
     # Press Clear
     page.get_by_role("button", name="Clear").click()
@@ -527,6 +532,9 @@ def test_clear_button(server_setup, page: Page):
     # Check no annotations visible
     expect(page.get_by_label("vspan").first).to_be_hidden()
     expect(page.get_by_label("zone").first).to_be_hidden()
+
+    # Check sample now shows as not validated
+    expect(page.get_by_text("Annotations Not Validated")).to_be_visible()
 
     # Press save, check no annotations in db
     page.get_by_role("button", name="Save").click()
