@@ -97,6 +97,8 @@ def train_model(
             updates=ModelUpdate(training_status="completed", progress=100, score=score),
         )
 
+        return {"project_id": project.id, "model_id": model.id, "score": score}
+
     except Exception as e:
         # If anything goes wrong, update model to failed status
         # This is important as if this does not happen, your model will be stuck in 'training' forever,
@@ -155,6 +157,6 @@ def get_predictions(
     return {
         "project_id": project.id,
         "model_type": model.type,
-        "sample_ids": [sample.id for sample in samples],
-        "annotations": annotations_batch,
+        "samples_batch": samples_batch,
+        "annotations_batch": annotations_batch,
     }

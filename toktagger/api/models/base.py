@@ -347,6 +347,7 @@ class ActorRegistry:
             stale_actor = self.actors.pop(0)
             try:
                 actor = ray.get_actor(stale_actor)
-                ray.kill(actor)
+                # Queue a kill job, letting any other in progress tasks finish first
+                actor.__ray_terminate__.remote()
             except ValueError:
                 return
