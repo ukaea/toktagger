@@ -4,7 +4,7 @@ import Form from '@rjsf/core';
 import { RJSFSchema } from '@rjsf/utils';
 import validator from '@rjsf/validator-ajv8';
 import { BACKEND_API_URL } from "@/app/core";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef } from "react";
 import { TextField, NumberField, Checkbox, CheckboxGroup, ComboBox, Item, RadioGroup, Radio, TextArea, DatePicker, FileTrigger, Text, Slider, Button, Provider, defaultTheme, View, Heading, InlineAlert, Content, Footer } from "@adobe/react-spectrum";
 import { WidgetProps, FieldTemplateProps, ArrayFieldTemplateProps, ArrayFieldDescriptionProps, ArrayFieldItemTemplateProps, ObjectFieldTemplateProps, TitleFieldProps, DescriptionFieldProps, SubmitButtonProps, ErrorListProps, RJSFValidationError } from "@rjsf/utils";
 import { getDefaultRegistry, IChangeEvent } from "@rjsf/core";
@@ -271,33 +271,6 @@ export function SpectrumRangeWidget(props: WidgetProps) {
 }
 
 
-export function SpectrumSubmitButton(props: SubmitButtonProps) {
-    const {
-        uiSchema,
-    } = props;
-
-    const submitUiOptions =
-        uiSchema?.["ui:submitButtonOptions"] ?? {};
-
-    const {
-        submitText = "Submit",
-        norender = false
-    } = submitUiOptions;
-
-    if (norender) {
-        return null;
-    }
-
-    return (
-        <Button
-            type="submit"
-            variant="primary"
-        >
-            {submitText}
-        </Button>
-    );
-}
-
 export function SpectrumFieldTemplate(props: FieldTemplateProps) {
     const { children, hidden } = props;
     if (hidden) return null;
@@ -389,71 +362,75 @@ const SpectrumArrayFieldItemTemplate = ({
     )
 };
 
+
 type ModelFormProps = {
     schema: RJSFSchema;
     onSubmit: (data: Record<string, unknown>) => void;
 };
+const ModelForm = forwardRef<any, ModelFormProps>(
+    ({ schema, onSubmit }, ref) => {
+        const registry = getDefaultRegistry();
+        const widgets = {
+            ...registry.widgets,
+            TextWidget: SpectrumBaseWidget,
+            CheckboxWidget: SpectrumCheckboxWidget,
+            CheckboxesWidget: SpectrumCheckboxesWidget,
+            // ColorWidget
+            DateWidget: SpectrumDateWidget,
+            DateTimeWidget: SpectrumDatetimeWidget,
+            EmailWidget: SpectrumBaseWidget,
+            FileWidget: SpectrumFileWidget,
+            // HiddenWidget
+            // PasswordWidget
+            RadioWidget: SpectrumRadioWidget,
+            RangeWidget: SpectrumRangeWidget,
+            // RatingWidget
+            SelectWidget: SpectrumSelectWidget,
+            TextareaWidget: SpectrumTextareaWidget,
+            TimeWidget: SpectrumDatetimeWidget,
+            URLWidget: SpectrumBaseWidget,
+            UpDownWidget: SpectrumBaseWidget
+        };
 
-export default function ModelForm({ schema, onSubmit }: ModelFormProps) {
-    const registry = getDefaultRegistry();
-    const widgets = {
-        ...registry.widgets,
-        TextWidget: SpectrumBaseWidget,
-        CheckboxWidget: SpectrumCheckboxWidget,
-        CheckboxesWidget: SpectrumCheckboxesWidget,
-        // ColorWidget
-        DateWidget: SpectrumDateWidget,
-        DateTimeWidget: SpectrumDatetimeWidget,
-        EmailWidget: SpectrumBaseWidget,
-        FileWidget: SpectrumFileWidget,
-        // HiddenWidget
-        // PasswordWidget
-        RadioWidget: SpectrumRadioWidget,
-        RangeWidget: SpectrumRangeWidget,
-        // RatingWidget
-        SelectWidget: SpectrumSelectWidget,
-        TextareaWidget: SpectrumTextareaWidget,
-        TimeWidget: SpectrumDatetimeWidget,
-        URLWidget: SpectrumBaseWidget,
-        UpDownWidget: SpectrumBaseWidget
-    };
+        return (
+            <div>
+                <Provider theme={defaultTheme}>
+                    <View
+                        marginTop="size-200"
+                        padding="size-250"
+                        borderWidth="thin"
+                        borderColor="dark"
+                        borderRadius="medium"
+                        backgroundColor="gray-75"
+                    >
+                        <Heading level={1}> <strong>Model Parameters</strong> </Heading>
+                        <Form
+                            ref={ref}
+                            schema={schema}
+                            validator={validator}
+                            widgets={widgets}
+                            onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
+                                onSubmit(e.formData ?? {});
+                            }}
+                            uiSchema={{
+                                "ui:options": {
+                                    label: false
+                                }
+                            }}
+                            templates={{
+                                FieldTemplate: SpectrumFieldTemplate,
+                                Label: NoLabelTemplate,
+                                TitleFieldTemplate: TitleTemplate,
+                                ArrayFieldTemplate: SpectrumArrayFieldTemplate,
+                                ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
+                                ButtonTemplates: { SubmitButton: () => null },
+                                ErrorListTemplate: SpectrumErrorTemplate
+                            }}
+                        />
+                    </View>
+                </Provider>
+            </div>
+        );
+    })
 
-    return (
-        <div>
-            <Provider theme={defaultTheme}>
-                <View
-                    marginTop="size-200"
-                    padding="size-250"
-                    borderWidth="thin"
-                    borderColor="dark"
-                    borderRadius="medium"
-                    backgroundColor="gray-75"
-                >
-                    <Heading level={1}> <strong>Model Parameters</strong> </Heading>
-                    <Form
-                        schema={schema}
-                        validator={validator}
-                        widgets={widgets}
-                        onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
-                            onSubmit(e.formData ?? {});
-                        }}
-                        uiSchema={{
-                            "ui:options": {
-                                label: false
-                            }
-                        }}
-                        templates={{
-                            FieldTemplate: SpectrumFieldTemplate,
-                            Label: NoLabelTemplate,
-                            TitleFieldTemplate: TitleTemplate,
-                            ArrayFieldTemplate: SpectrumArrayFieldTemplate,
-                            ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
-                            ButtonTemplates: { SubmitButton: SpectrumSubmitButton },
-                            ErrorListTemplate: SpectrumErrorTemplate
-                        }}
-                    />
-                </View>
-            </Provider>
-        </div>
-    );
-}
+export default ModelForm

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Provider,
   defaultTheme,
@@ -23,6 +23,7 @@ import { Project } from "@/types";
 import { startTraining, getModels, getModelSchema } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from '@rjsf/utils';
+import Form from '@rjsf/core';
 
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -31,6 +32,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
+  const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
     top: 10,
@@ -61,6 +63,14 @@ export function ModelTrainModal({ project }: { project: Project }) {
     }
     updateSchema()
   }, [selectedModel])
+
+  const pressSubmit = () => {
+    if (schema) {
+      formRef.current?.submit()
+    } else {
+      submitTrainJob({})
+    }
+  }
 
   const submitTrainJob = async (params: Record<string, any>) => {
     if (selectedModel == null) {
@@ -106,6 +116,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
               </ComboBox>
               {schema && (
                 <ModelForm
+                  ref={formRef}
                   schema={schema}
                   onSubmit={submitTrainJob}
                 />
@@ -123,13 +134,13 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <Button variant="secondary" onPress={close}>
                 Close
               </Button>
-              {/* <Button
+              <Button
                 variant="accent"
-                onPress={submitTrainJob}
+                onPress={pressSubmit}
                 isDisabled={trainDisabled}
               >
                 Train
-              </Button> */}
+              </Button>
             </ButtonGroup>
           </Dialog>
         )}
