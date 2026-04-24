@@ -42,13 +42,14 @@ export function ModelTrainModal({ project }: { project: Project }) {
   };
 
   useEffect(() => {
-    if (!modalOpen) {
+    if (!modalOpen || !project._id) {
       setTrainDisabled(true);
       return;
     };
+    const project_id: string = project._id;
 
     (async () => {
-      const response = await getModels(project._id);
+      const response = await getModels(project_id);
 
       if (!response.ok) {
         const errorMessage = await response.json();
@@ -82,7 +83,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
   }
 
   const submitTrainJob = async (params: Record<string, any>) => {
-    if (selectedModel == null) {
+    if (!selectedModel || !project._id) {
       return;
     }
     const response = await startTraining(project._id, selectedModel, params);

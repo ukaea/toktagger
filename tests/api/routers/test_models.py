@@ -346,7 +346,7 @@ async def test_model_delete_type_version(api_client, db_client, setup_db):
 
 
 @pytest.mark.asyncio
-@patch("ray.kill")
+@patch("ray.cancel")
 async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
     response = await api_client.delete(
         f"/projects/{setup_db['project_id_1']}/models/disruption_cnn/train"
@@ -373,7 +373,7 @@ async def test_model_stop_training_not_in_progress(
 ):
     response = await api_client.delete(
         f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn/train?version=1"
-    )
+    )  # Version 1 model is 'completed' so nothing to do
     assert response.status_code == 409
     assert (
         response.json()["detail"] == "Model training is not in progress for this model!"
