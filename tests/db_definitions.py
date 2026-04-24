@@ -1,6 +1,7 @@
 import pathlib
 import random
 import ray
+import pydantic
 from toktagger.api.schemas.annotators import AnnotatorTypes
 from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
 from toktagger.api.schemas.samples import (
@@ -16,6 +17,7 @@ from toktagger.api.schemas.annotations import (
 )
 from toktagger.api.schemas.models import ModelIn
 from toktagger.api.models.base import Model, ModelRegistry
+import typing
 
 
 # Create a mock model for use in our model definitions
@@ -54,9 +56,7 @@ class MockDisruptionCNN(Model):
         pass
 
 
-@ray.remote
-@ModelRegistry.register("mock_timeseries_cnn", ["time-series"])
-class MockTimeSeriesCNN(Model):
+class TimeSeriesCNN(Model):
     def define_model(self):
         return None
 
@@ -109,6 +109,33 @@ class MockTimeSeriesCNN(Model):
 
     def load(self, project, file_path):
         pass
+
+
+@ray.remote
+@ModelRegistry.register("mock_timeseries_cnn", ["time-series"])
+class MockTimeSeriesCNN(TimeSeriesCNN):
+    pass
+
+
+class TimeSeriesCNNParams(pydantic.BaseModel):
+    final_score: int = pydantic.Field(ge=50, lt=100)
+    test_string: str
+    test_bool: bool = True
+    test_selection: typing.Literal["selection_1", "selection_2"]
+
+
+@ray.remote
+@ModelRegistry.register(
+    "mock_params_timeseries_cnn", ["time-series"], TimeSeriesCNNParams
+)
+class MockParamsTimeSeriesCNN(TimeSeriesCNN):
+    def train(self, samples, annotations, params: TimeSeriesCNNParams):
+        self.log_progress(
+            training_status="started",
+            progress=50,
+            score=20,
+        )
+        return params.final_score
 
 
 # Define some common things to add to db
