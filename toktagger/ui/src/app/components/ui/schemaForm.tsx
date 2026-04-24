@@ -4,7 +4,7 @@ import Form from '@rjsf/core';
 import { RJSFSchema } from '@rjsf/utils';
 import validator from '@rjsf/validator-ajv8';
 import { BACKEND_API_URL } from "@/app/core";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TextField, NumberField, Checkbox, CheckboxGroup, ComboBox, Item, RadioGroup, Radio, TextArea, DatePicker, FileTrigger, Text, Slider, Button, Provider, defaultTheme, View, Heading, InlineAlert, Content, Footer } from "@adobe/react-spectrum";
 import { WidgetProps, FieldTemplateProps, ArrayFieldTemplateProps, ArrayFieldDescriptionProps, ArrayFieldItemTemplateProps, ObjectFieldTemplateProps, TitleFieldProps, DescriptionFieldProps, SubmitButtonProps, ErrorListProps, RJSFValidationError } from "@rjsf/utils";
 import { getDefaultRegistry, IChangeEvent } from "@rjsf/core";
@@ -303,7 +303,7 @@ export function SpectrumFieldTemplate(props: FieldTemplateProps) {
     if (hidden) return null;
 
     return (
-        <View marginBottom="size-200">
+        <View marginBottom="size-100">
             {children}
         </View>
     );
@@ -311,18 +311,30 @@ export function SpectrumFieldTemplate(props: FieldTemplateProps) {
 
 export function SpectrumErrorTemplate(props: ErrorListProps) {
     const errors: RJSFValidationError[] = props.errors
+    const alertRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (errors.length) {
+            alertRef.current?.focus();
+        }
+    }, [errors]);
 
     if (!errors.length) return;
 
     return (
-        <InlineAlert variant="negative">
-            <Heading>There are problems with your submission:</Heading>
-            <Content>
-                {errors.map((error, i) => (
-                    <li key={i}> {error.stack} </li>
-                ))}
-            </Content>
-        </InlineAlert>
+        <div
+            ref={alertRef}
+            tabIndex={-1}
+        >
+            <InlineAlert variant="negative" marginTop="size-200">
+                <Heading>There are problems with your submission:</Heading>
+                <Content marginX="size-200">
+                    {errors.map((error, i) => (
+                        <li key={i}> {error.stack} </li>
+                    ))}
+                </Content>
+            </InlineAlert>
+        </div>
     )
 }
 
