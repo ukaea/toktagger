@@ -104,6 +104,12 @@ class DisruptionCNN(Model):
     ) -> float:
         self.log_progress(training_status="started")
 
+        # Remove any samples which don't have annotations
+        for i, anns in enumerate(annotations):
+            if not len(anns):
+                samples.pop(i)
+                annotations.pop(i)
+
         self.split_data(
             samples=samples,
             annotations=annotations,

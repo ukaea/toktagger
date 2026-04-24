@@ -27,7 +27,7 @@ import Form from '@rjsf/core';
 
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [trainDisabled, setTrainDisabled] = useState<boolean>(false);
+  const [trainDisabled, setTrainDisabled] = useState<boolean>(true);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
@@ -41,7 +41,12 @@ export function ModelTrainModal({ project }: { project: Project }) {
   };
 
   useEffect(() => {
-    if (!modalOpen) return;
+    if (!modalOpen) {
+      setSelectedModel(null);
+      setTrainDisabled(true);
+      setSchema(null);
+      return;
+    };
 
     (async () => {
       const response = await getModels(project._id);
@@ -61,6 +66,11 @@ export function ModelTrainModal({ project }: { project: Project }) {
       const newSchema: RJSFSchema = await getModelSchema(selectedModel);
       setSchema(newSchema)
     }
+    if (!selectedModel) {
+      setTrainDisabled(true)
+      return
+    }
+    setTrainDisabled(false)
     updateSchema()
   }, [selectedModel])
 
@@ -107,7 +117,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
             <Content>
               <ComboBox
                 label="Select Model Type"
-                onSelectionChange={setSelectedModel}
+                onSelectionChange={(key) => setSelectedModel(key !== null ? String(key) : null)}
               >
                 {project.model_types.map((model_type) => (
                   <Item key={model_type}>{model_type}</Item>

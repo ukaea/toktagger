@@ -4,13 +4,13 @@ import pathlib
 import os
 import random
 from bson.objectid import ObjectId
-import itertools
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
 from toktagger.api.models.base import ModelRegistry
 from pydantic import ValidationError
+from collections import defaultdict
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
@@ -222,12 +222,10 @@ async def start_model_training(
         )
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
-    annotations_2d = [
-        [ann for ann in group]
-        for _, group in itertools.groupby(
-            annotations, key=lambda annotation: annotation.sample_id
-        )
-    ]
+    sample_annotations_mapping = defaultdict(list)
+    for annotation in annotations:
+        sample_annotations_mapping[annotation.sample_id].append(annotation)
+    annotations_2d = [sample_annotations_mapping[sample.id] for sample in samples]
 
     model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
 

@@ -167,7 +167,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   isDisabled={
                     selectedKeys.size === 0 ||
                     !models ||
-                    !["training", "queued"].includes(
+                    !["started", "queued"].includes(
                       models.find(
                         (model) =>
                           model._id === selectedKeys.values().next().value,

@@ -46,6 +46,7 @@ export function SpectrumBaseWidget(props: WidgetProps) {
                 validationState={rawErrors?.length ? "invalid" : "valid"}
                 errorMessage={rawErrors?.[0]}
                 onChange={onChange}
+                width={"100%"}
             />
         );
     }
@@ -64,6 +65,7 @@ export function SpectrumBaseWidget(props: WidgetProps) {
             onChange={onChange}
             onBlur={() => onBlur?.(id, value)}
             onFocus={() => onFocus?.(id, value)}
+            width={"100%"}
         />
     );
 }
@@ -85,6 +87,7 @@ export function SpectrumCheckboxWidget(props: WidgetProps) {
             isSelected={!!value}
             isDisabled={disabled || readonly}
             onChange={onChange}
+            width={"100%"}
         >
             {label}
             {schema.description}
@@ -104,6 +107,7 @@ export function SpectrumCheckboxesWidget(props: WidgetProps) {
             value={value}
             isDisabled={disabled || readonly}
             onChange={onChange}
+            width={"100%"}
         >
             {(options.enumOptions ?? []).map(opt => (
                 <Checkbox key={opt.value} value={opt.value}>
@@ -142,6 +146,7 @@ export function SpectrumSelectWidget(props: WidgetProps) {
             validationState={isInvalid ? "invalid" : "valid"}
             errorMessage={rawErrors?.[0]}
             onSelectionChange={onChange}
+            width={"100%"}
         >
             {(options.enumOptions ?? []).map(opt => (
                 <Item key={opt.value}>{opt.label}</Item>
@@ -172,6 +177,7 @@ export function SpectrumRadioWidget(props: WidgetProps) {
             isRequired={required}
             isDisabled={disabled || readonly}
             onChange={onChange}
+            width={"100%"}
         >
             {(options.enumOptions ?? []).map(opt => (
                 <Radio key={opt.value} value={opt.value}>
@@ -210,6 +216,7 @@ export function SpectrumTextareaWidget(props: WidgetProps) {
             validationState={isInvalid ? "invalid" : "valid"}
             errorMessage={rawErrors?.[0]}
             onChange={onChange}
+            width={"100%"}
         />
     );
 }
@@ -229,6 +236,7 @@ export function SpectrumDatetimeWidget(props: WidgetProps, time: boolean = true)
             validationState={rawErrors && rawErrors.length > 0 ? "invalid" : "valid"}
             errorMessage={rawErrors?.[0]}
             onChange={onChange}
+            width={"100%"}
         />
     );
 }
@@ -265,6 +273,7 @@ export function SpectrumRangeWidget(props: WidgetProps) {
             isDisabled={disabled || readonly}
             onChange={onChange}
             contextualHelp={schema.description}
+            width={"100%"}
         />
     );
 }
@@ -298,9 +307,9 @@ export function SpectrumErrorTemplate(props: ErrorListProps) {
             ref={alertRef}
             tabIndex={-1}
         >
-            <InlineAlert variant="negative" marginTop="size-200">
+            <InlineAlert variant="negative" marginTop="size-200" width={"100%"}>
                 <Heading>There are problems with your submission:</Heading>
-                <Content marginX="size-200">
+                <Content marginX="size-400">
                     {errors.map((error, i) => (
                         <li key={i}> {error.stack} </li>
                     ))}
