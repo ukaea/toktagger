@@ -7,6 +7,7 @@ import type {
   SampleUpdate,
   Annotation,
 } from "@/types";
+import { RJSFSchema } from '@rjsf/utils';
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -416,3 +417,19 @@ export const getModels = async (project_id: string): Promise<Response> => {
   );
   return response;
 };
+
+export const getModelSchema = async (
+  modelName: string
+): Promise<RJSFSchema> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/meta/models/${modelName}`
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch model schema!`
+    );
+  }
+  const data = await response.json();
+  const schema: RJSFSchema = data as RJSFSchema;
+  return schema
+}

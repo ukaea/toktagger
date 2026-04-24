@@ -389,29 +389,12 @@ const SpectrumArrayFieldItemTemplate = ({
     )
 };
 
-export const getModelSchema = async (
-    modelName: string
-): Promise<RJSFSchema> => {
-    const response = await fetch(
-        `${BACKEND_API_URL}/meta/models/${modelName}`
-    );
-    if (!response.ok) {
-        throw new Error(
-            `Failed to fetch model schema!`
-        );
-    }
-    const data = await response.json();
-    const schema: RJSFSchema = data as RJSFSchema;
-    return schema
-}
-
 type ModelFormProps = {
-    modelName: string;
+    schema: RJSFSchema;
     onSubmit: (data: Record<string, unknown>) => void;
 };
 
-export default function ModelForm({ modelName, onSubmit }: ModelFormProps) {
-    const [schema, setSchema] = useState<RJSFSchema | null>(null);
+export default function ModelForm({ schema, onSubmit }: ModelFormProps) {
     const registry = getDefaultRegistry();
     const widgets = {
         ...registry.widgets,
@@ -434,16 +417,6 @@ export default function ModelForm({ modelName, onSubmit }: ModelFormProps) {
         URLWidget: SpectrumBaseWidget,
         UpDownWidget: SpectrumBaseWidget
     };
-
-    useEffect(() => {
-        const updateSchema = async () => {
-            const newSchema: RJSFSchema = await getModelSchema(modelName);
-            setSchema(newSchema)
-        }
-        updateSchema()
-    }, [modelName])
-
-    if (!schema) return
 
     return (
         <div>

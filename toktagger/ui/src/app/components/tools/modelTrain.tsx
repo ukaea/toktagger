@@ -20,16 +20,17 @@ import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
-import { startTraining, getModels } from "@/app/core";
+import { startTraining, getModels, getModelSchema } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
+import { RJSFSchema } from '@rjsf/utils';
 
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [trainDisabled, setTrainDisabled] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageColour, setMessageColour] = useState<string>("primary");
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const buttonStyle = {
     position: "fixed",
     top: 10,
@@ -46,12 +47,20 @@ export function ModelTrainModal({ project }: { project: Project }) {
       if (!response.ok) {
         const errorMessage = await response.json();
         setMessage(errorMessage.detail);
-        setMessageColour("negative");
         setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
         setTrainDisabled(true);
       }
     })();
   }, [modalOpen, project._id]);
+
+  useEffect(() => {
+    const updateSchema = async () => {
+      if (!selectedModel) return;
+      const newSchema: RJSFSchema = await getModelSchema(selectedModel);
+      setSchema(newSchema)
+    }
+    updateSchema()
+  }, [selectedModel])
 
   const submitTrainJob = async (params: Record<string, any>) => {
     if (selectedModel == null) {
@@ -61,14 +70,12 @@ export function ModelTrainModal({ project }: { project: Project }) {
 
     if (response.ok) {
       setMessage("Model training added to job queue!");
-      setMessageColour("positive");
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
-      setMessageColour("negative");
       setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
     }
   };
@@ -97,9 +104,9 @@ export function ModelTrainModal({ project }: { project: Project }) {
                   <Item key={model_type}>{model_type}</Item>
                 ))}
               </ComboBox>
-              {selectedModel && (
+              {schema && (
                 <ModelForm
-                  modelName={selectedModel}
+                  schema={schema}
                   onSubmit={submitTrainJob}
                 />
               )
