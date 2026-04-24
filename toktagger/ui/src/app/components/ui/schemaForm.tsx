@@ -345,8 +345,6 @@ export function NoLabelTemplate() {
 }
 
 export function TitleTemplate({ title }: TitleFieldProps) {
-    console.log("HIU")
-    console.log(title)
     return (
         <View marginTop="size=200" marginBottom="size-200">
             <Heading>{title}</Heading>
@@ -369,7 +367,7 @@ const SpectrumArrayFieldTemplate = ({
             borderWidth="thin"
             borderColor="dark"
             borderRadius="medium"
-            backgroundColor="gray-75"
+            backgroundColor="gray-50"
         >
             <Heading level={2} marginBottom="size-200"> {title} </Heading>
             {items.map(item => item)}
@@ -450,28 +448,38 @@ export default function ModelForm({ modelName, onSubmit }: ModelFormProps) {
     return (
         <div>
             <Provider theme={defaultTheme}>
-                <Form
-                    schema={schema}
-                    validator={validator}
-                    widgets={widgets}
-                    onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
-                        onSubmit(e.formData ?? {});
-                    }}
-                    uiSchema={{
-                        "ui:options": {
-                            label: false
-                        }
-                    }}
-                    templates={{
-                        FieldTemplate: SpectrumFieldTemplate,
-                        Label: NoLabelTemplate,
-                        TitleFieldTemplate: TitleTemplate,
-                        ArrayFieldTemplate: SpectrumArrayFieldTemplate,
-                        ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
-                        ButtonTemplates: { SubmitButton: SpectrumSubmitButton },
-                        ErrorListTemplate: SpectrumErrorTemplate
-                    }}
-                />
+                <View
+                    marginTop="size-200"
+                    padding="size-250"
+                    borderWidth="thin"
+                    borderColor="dark"
+                    borderRadius="medium"
+                    backgroundColor="gray-75"
+                >
+                    <Heading level={1}> <strong>Model Parameters</strong> </Heading>
+                    <Form
+                        schema={schema}
+                        validator={validator}
+                        widgets={widgets}
+                        onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
+                            onSubmit(e.formData ?? {});
+                        }}
+                        uiSchema={{
+                            "ui:options": {
+                                label: false
+                            }
+                        }}
+                        templates={{
+                            FieldTemplate: SpectrumFieldTemplate,
+                            Label: NoLabelTemplate,
+                            TitleFieldTemplate: TitleTemplate,
+                            ArrayFieldTemplate: SpectrumArrayFieldTemplate,
+                            ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
+                            ButtonTemplates: { SubmitButton: SpectrumSubmitButton },
+                            ErrorListTemplate: SpectrumErrorTemplate
+                        }}
+                    />
+                </View>
             </Provider>
         </div>
     );
