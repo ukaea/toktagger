@@ -32,6 +32,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
+  const [unvalidatedFormData, setUnvalidatedFormData] = useState<Record<string, any>>({});
   const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
@@ -42,9 +43,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
 
   useEffect(() => {
     if (!modalOpen) {
-      setSelectedModel(null);
       setTrainDisabled(true);
-      setSchema(null);
       return;
     };
 
@@ -70,8 +69,8 @@ export function ModelTrainModal({ project }: { project: Project }) {
       setTrainDisabled(true)
       return
     }
-    setTrainDisabled(false)
     updateSchema()
+    setTrainDisabled(false)
   }, [selectedModel])
 
   const pressSubmit = () => {
@@ -117,6 +116,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
             <Content>
               <ComboBox
                 label="Select Model Type"
+                selectedKey={selectedModel}
                 onSelectionChange={(key) => setSelectedModel(key !== null ? String(key) : null)}
               >
                 {project.model_types.map((model_type) => (
@@ -128,6 +128,8 @@ export function ModelTrainModal({ project }: { project: Project }) {
                   ref={formRef}
                   schema={schema}
                   onSubmit={submitTrainJob}
+                  formData={unvalidatedFormData}
+                  setFormData={setUnvalidatedFormData}
                 />
               )
               }
