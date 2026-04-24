@@ -76,8 +76,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
     if (selectedModel == null) {
       return;
     }
-    const response = await startTraining(project._id, selectedModel);
-
+    const response = await startTraining(project._id, selectedModel, params);
     if (response.ok) {
       setMessage("Model training added to job queue!");
       setMessageIcon(
@@ -125,7 +124,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
             </Content>
             <Footer>
               {message && (
-                <Text color={messageColour}>
+                <Text>
                   {messageIcon} {message}
                 </Text>
               )}

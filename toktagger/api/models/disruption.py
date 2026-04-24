@@ -16,12 +16,12 @@ logger = logging.getLogger("ray")
 
 
 class DisruptionCNNParams(pydantic.BaseModel):
-    train_val_test_split: list[float] = pydantic.Field(
-        min_length=3,
-        max_length=3,
-        gt=0,
-        lt=1,
-        description="Fraction of the total annotations to use in the training / validation / test sets. Fractions should sum to 1.",
+    train_val_test_split: list[typing.Annotated[float, pydantic.Field(gt=0, lt=1)]] = (
+        pydantic.Field(
+            min_length=3,
+            max_length=3,
+            description="Fraction of the total annotations to use in the training / validation / test sets. Fractions should sum to 1.",
+        )
     )
 
     num_epochs: int = pydantic.Field(gt=0, default=100)
@@ -37,6 +37,13 @@ class DisruptionCNNParams(pydantic.BaseModel):
         description="Threshold over which a new epoch is considered to have improved in accuracy.",
     )
     device: typing.Literal["cpu", "gpu"] = "cpu"
+
+    @pydantic.field_validator("train_val_test_split", mode="after")
+    @classmethod
+    def validate_sum_to_one(cls, value: list):
+        if sum(value) != 1:
+            raise ValueError("Train / Val / Test fractions must sum to 1!")
+        return value
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset

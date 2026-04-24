@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Path, Query, HTTPException
+from fastapi import APIRouter, Request, Depends, Path, Query, Body, HTTPException
 from fastapi.responses import JSONResponse
 import pathlib
 import os
@@ -9,6 +9,8 @@ from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
+from toktagger.api.models.base import ModelRegistry
+from pydantic import ValidationError
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
@@ -136,7 +138,14 @@ async def get_training_info(
 
 
 @router.put("/models/{model_type}/train")
-async def start_model_training(request: Request, project_id: str, model_type: str):
+async def start_model_training(
+    request: Request,
+    project_id: str,
+    model_type: str,
+    params: dict = Body(
+        {}, description="Optional parameters for training the model", embed=True
+    ),
+):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
     project = await utils.get_project(db_client, project_id)
@@ -145,6 +154,16 @@ async def start_model_training(request: Request, project_id: str, model_type: st
         raise HTTPException(
             status_code=422,
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
+        )
+
+    # Get model params model from registry and validate
+    params_model = ModelRegistry.get_params(model_type)
+    try:
+        params_validated = params_model.model_validate(params) if params_model else None
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=str(e),
         )
 
     # Create model
@@ -210,9 +229,6 @@ async def start_model_training(request: Request, project_id: str, model_type: st
         )
     ]
 
-    NUM_EPOCHS = 10  # TODO where to define this? User selected? In model?
-    BATCH_SIZE = 32
-
     model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
 
     train_task = train_model.remote(
@@ -220,9 +236,7 @@ async def start_model_training(request: Request, project_id: str, model_type: st
         project=project,
         samples=samples,
         annotations=annotations_2d,
-        train_val_test_split=(0.7, 0.2, 0.1),
-        num_epochs=NUM_EPOCHS,
-        batch_size=BATCH_SIZE,
+        params=params_validated,
     )
 
     task_id = task_registry.register(train_task)

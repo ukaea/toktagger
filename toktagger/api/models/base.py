@@ -239,6 +239,13 @@ class ModelRegistry:
         return tasks
 
     @classmethod
+    def get_params(cls, name: str) -> typing.Type[pydantic.BaseModel] | None:
+        params: typing.Type[pydantic.BaseModel] | None = cls._params.get(name, False)
+        if params is False:
+            raise ValueError(f"No Model class called '{name}' found in registry!")
+        return params
+
+    @classmethod
     def get_params_schema(cls, name: str, return_draft_07: bool = False) -> dict | None:
         """
         Return a schema of the parameters required when training the specified model.
@@ -256,10 +263,7 @@ class ModelRegistry:
             The JSONSchema of the params model, if required.
         """
 
-        params: typing.Type[pydantic.BaseModel] | None = cls._params.get(name, False)
-
-        if params is False:
-            raise ValueError(f"No Model class called '{name}' found in registry!")
+        params: typing.Type[pydantic.BaseModel] | None = cls.get_params(name)
         if not params:
             return None
 

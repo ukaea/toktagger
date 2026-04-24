@@ -29,7 +29,6 @@ export function SpectrumBaseWidget(props: WidgetProps) {
     } = props;
 
     const type = getSchemaType(schema);
-    console.log(schema)
 
     if (type && type === "number" || type === "integer") {
         return (
@@ -331,8 +330,6 @@ const SpectrumArrayFieldTemplate = ({
     schema,
 }: ArrayFieldTemplateProps) => {
 
-    console.log("Inside object")
-    console.log(items)
     return (
         <View
             marginTop="size-200"
@@ -367,7 +364,7 @@ type ModelFormProps = {
     schema: RJSFSchema;
     onSubmit: (data: Record<string, unknown>) => void;
 };
-const ModelForm = forwardRef<any, ModelFormProps>(
+const ModelForm = forwardRef<Form, ModelFormProps>(
     ({ schema, onSubmit }, ref) => {
         const registry = getDefaultRegistry();
         const widgets = {
