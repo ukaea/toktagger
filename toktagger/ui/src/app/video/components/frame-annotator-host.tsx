@@ -204,7 +204,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           drawingMode="drag"
           autoSave
           style={(
-            _annotation,
+            _annotation: ImageAnnotation,
             state?: { selected?: boolean; hovered?: boolean },
           ) => ({
             strokeWidth: state?.selected ? 3 : state?.hovered ? 3 : 2,
