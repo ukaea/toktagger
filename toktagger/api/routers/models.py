@@ -257,7 +257,6 @@ async def stop_model_training(
         None, description="Version of model to use, leave blank for latest version"
     ),
 ):
-    print("JHEEELL")
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
