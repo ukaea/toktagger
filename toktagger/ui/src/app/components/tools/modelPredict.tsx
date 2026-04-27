@@ -20,6 +20,7 @@ import {
   Footer,
   Heading,
   Text,
+  Selection
 } from "@adobe/react-spectrum";
 import Workflow from "@spectrum-icons/workflow/Workflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
@@ -29,7 +30,8 @@ import { startPredictions, getModels, stopTraining } from "@/app/core";
 
 export function ModelPredictModal({ project }: { project: Project }) {
   const [models, setModels] = useState<Model[] | null>(null);
-  const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
+  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(undefined);
+  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [numPredictions, setNumPredictions] = useState<string>("20");
   const [message, setMessage] = useState<string | null>(null);
@@ -40,6 +42,38 @@ export function ModelPredictModal({ project }: { project: Project }) {
     right: 10,
     zIndex: 1000,
   };
+  const onSelectModel = (keys: Selection) => {
+    setSelectedKeys(keys);
+
+    if (!keys) {
+      setSelectedModel(null)
+      return
+    }
+
+    if (keys === 'all') {
+      // Won't happen in single mode
+      return;
+    }
+    // Single select mode, so only ever one key
+    const [key] = keys as Set<string>;
+
+    if (!models) {
+      return;
+    }
+
+    const model = models.find(
+      (model) => model._id === key
+    );
+
+    if (!model) {
+      setMessage("Selected model could not be found!");
+      setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+      return
+    }
+
+    setSelectedModel(model);
+    return;
+  }
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -60,7 +94,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       fetchModels();
       setMessage(null);
       setMessageIcon(null);
-      setSelectedKeys(new Set([]));
+      setSelectedModelId(null);
 
       poll = setInterval(() => {
         fetchModels();
@@ -76,12 +110,17 @@ export function ModelPredictModal({ project }: { project: Project }) {
   }
 
   const submitPredictJob = async () => {
-    if (selectedKeys.size === 0 || !models) {
+    if (!models || !selectedModelId) {
       return;
     }
     const selectedModel = models.find(
-      (model) => model._id === selectedKeys.values().next().value,
+      (model) => model._id === selectedModelId
     );
+    if (!selectedModel) {
+      setMessage("Selected model could not be found!");
+      setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+      return
+    }
 
     const response = await startPredictions(
       project._id,
@@ -95,7 +134,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
-      setSelectedKeys(new Set());
+      setSelectedModelId(null);
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
@@ -104,12 +143,17 @@ export function ModelPredictModal({ project }: { project: Project }) {
   };
 
   const stopTrainingJob = async () => {
-    if (selectedKeys.size === 0 || !models) {
+    if (!models || !selectedModelId) {
       return;
     }
     const selectedModel = models.find(
-      (model) => model._id === selectedKeys.values().next().value,
+      (model) => model._id === selectedModelId,
     );
+    if (!selectedModel) {
+      setMessage("Selected model could not be found!");
+      setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+      return
+    }
 
     const response = await stopTraining(
       project._id,
@@ -122,7 +166,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
-      setSelectedKeys(new Set());
+      setSelectedModelId(null);
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
@@ -165,12 +209,12 @@ export function ModelPredictModal({ project }: { project: Project }) {
                 <Button
                   variant="negative"
                   isDisabled={
-                    selectedKeys.size === 0 ||
+                    !selectedModelId ||
                     !models ||
                     !["started", "queued"].includes(
                       models.find(
                         (model) =>
-                          model._id === selectedKeys.values().next().value,
+                          model._id === selectedModelId,
                       ).training_status,
                     )
                   }
@@ -184,7 +228,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   flex
                   selectionMode="single"
                   selectedKeys={selectedKeys}
-                  onSelectionChange={setSelectedKeys}
+                  onSelectionChange={onSelectModel}
                 >
                   <TableHeader>
                     <Column>Model Type</Column>
