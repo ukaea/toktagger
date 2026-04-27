@@ -7,7 +7,7 @@ import type {
   SampleUpdate,
   Annotation,
 } from "@/types";
-import { RJSFSchema } from '@rjsf/utils';
+import { RJSFSchema } from "@rjsf/utils";
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -326,7 +326,7 @@ export const deleteSamples = async (project_id: string) => {
 export const startTraining = async (
   project_id: string,
   selected_model: string,
-  params: Record<string, any>
+  params: Record<string, unknown>,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train`,
@@ -335,7 +335,7 @@ export const startTraining = async (
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ "params": params })
+      body: JSON.stringify({ params: params }),
     },
   );
   return response;
@@ -419,17 +419,13 @@ export const getModels = async (project_id: string): Promise<Response> => {
 };
 
 export const getModelSchema = async (
-  modelName: string
+  modelName: string,
 ): Promise<RJSFSchema> => {
-  const response = await fetch(
-    `${BACKEND_API_URL}/meta/models/${modelName}`
-  );
+  const response = await fetch(`${BACKEND_API_URL}/meta/models/${modelName}`);
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch model schema!`
-    );
+    throw new Error(`Failed to fetch model schema!`);
   }
   const data = await response.json();
   const schema: RJSFSchema = data as RJSFSchema;
-  return schema
-}
+  return schema;
+};

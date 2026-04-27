@@ -22,8 +22,8 @@ import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
 import { startTraining, getModels, getModelSchema } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
-import { RJSFSchema } from '@rjsf/utils';
-import Form from '@rjsf/core';
+import { RJSFSchema } from "@rjsf/utils";
+import Form from "@rjsf/core";
 
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -32,7 +32,9 @@ export function ModelTrainModal({ project }: { project: Project }) {
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
-  const [unvalidatedFormData, setUnvalidatedFormData] = useState<Record<string, any>>({});
+  const [unvalidatedFormData, setUnvalidatedFormData] = useState<
+    Record<string, unknown>
+  >({});
   const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
@@ -45,7 +47,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
     if (!modalOpen || !project._id) {
       setTrainDisabled(true);
       return;
-    };
+    }
     const project_id: string = project._id;
 
     (async () => {
@@ -64,25 +66,25 @@ export function ModelTrainModal({ project }: { project: Project }) {
     const updateSchema = async () => {
       if (!selectedModel) return;
       const newSchema: RJSFSchema = await getModelSchema(selectedModel);
-      setSchema(newSchema)
-    }
+      setSchema(newSchema);
+    };
     if (!selectedModel) {
-      setTrainDisabled(true)
-      return
+      setTrainDisabled(true);
+      return;
     }
-    updateSchema()
-    setTrainDisabled(false)
-  }, [selectedModel])
+    updateSchema();
+    setTrainDisabled(false);
+  }, [selectedModel]);
 
   const pressSubmit = () => {
     if (schema) {
-      formRef.current?.submit()
+      formRef.current?.submit();
     } else {
-      submitTrainJob({})
+      submitTrainJob({});
     }
-  }
+  };
 
-  const submitTrainJob = async (params: Record<string, any>) => {
+  const submitTrainJob = async (params: Record<string, unknown>) => {
     if (!selectedModel || !project._id) {
       return;
     }
@@ -118,7 +120,9 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <ComboBox
                 label="Select Model Type"
                 selectedKey={selectedModel}
-                onSelectionChange={(key) => setSelectedModel(key !== null ? String(key) : null)}
+                onSelectionChange={(key) =>
+                  setSelectedModel(key !== null ? String(key) : null)
+                }
               >
                 {project.model_types.map((model_type) => (
                   <Item key={model_type}>{model_type}</Item>
@@ -132,8 +136,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
                   formData={unvalidatedFormData}
                   setFormData={setUnvalidatedFormData}
                 />
-              )
-              }
+              )}
             </Content>
             <Footer>
               {message && (
