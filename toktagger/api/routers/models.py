@@ -158,12 +158,23 @@ async def start_model_training(
 
     # Get model params model from registry and validate
     params_model = ModelRegistry.get_params(model_type)
+    if params_model and not params:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Model training parameters are missing! Requires '{params_model.__name__}' parameters.",
+        )
     try:
         params_validated = params_model.model_validate(params) if params_model else None
     except ValidationError as e:
+        error_str = ""
+        for error in e.errors():
+            loc = error.get("loc", [])
+            msg = error.get("msg", "Invalid Field!")
+            error_str += f"'{loc[0] if len(loc) == 1 else loc}': {msg} \n"
+
         raise HTTPException(
             status_code=422,
-            detail=str(e),
+            detail=error_str,
         )
 
     # Create model

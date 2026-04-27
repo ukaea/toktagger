@@ -53,13 +53,15 @@ def ray_session():
         # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
         # Cannot explicitly pass a None, it requires a str:str dict in env_vars
         # So will pop the env varvalue, init ray, then restore it
-        api_url = os.environ.pop("API_URL")
+        if (api_url := os.environ.get("API_URL")) is not None:
+            api_url = os.environ.pop("API_URL")
         ray.init(
             ignore_reinit_error=True,
             include_dashboard=False,
             runtime_env={"env_vars": {"MODEL_STORAGE": tempd}},
         )
-        os.environ["API_URL"] = api_url
+        if api_url is not None:
+            os.environ["API_URL"] = api_url
 
         # Create a ray actor for use as a model registry
         WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(

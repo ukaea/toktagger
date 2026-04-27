@@ -254,7 +254,7 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
-async def test_model_start_training(api_client, db_client, setup_model_db):
+async def test_model_start_training_no_params(api_client, db_client, setup_model_db):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
     )
@@ -270,6 +270,74 @@ async def test_model_start_training(api_client, db_client, setup_model_db):
     assert model["training_status"] == "completed"
     assert model["progress"] == 100
     assert model["score"] == 60  # value returned by train method
+
+    # Check model has been saved after completion
+    assert (
+        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id}.model").exists()
+    )
+
+
+@pytest.mark.asyncio
+async def test_model_start_training_wrong_params(api_client, db_client, setup_model_db):
+    response = await api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
+        json={
+            "params": {
+                "final_score": 20,
+                "test_bool": 5,
+                "test_selection": "wrong_selection",
+            }
+        },
+    )
+
+    assert response.status_code == 422
+    error = response.json()["detail"]
+    assert "'final_score': Input should be greater than or equal to 50" in error
+    assert "'test_string': Field required" in error
+    assert "'test_bool': Input should be a valid boolean" in error
+    assert "'test_selection': Input should be 'selection_1' or 'selection_2'" in error
+
+
+@pytest.mark.asyncio
+async def test_model_start_training_missing_params(
+    api_client, db_client, setup_model_db
+):
+    response = await api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
+    )
+
+    assert response.status_code == 422
+    assert (
+        "Model training parameters are missing! Requires 'TimeSeriesCNNParams' parameters."
+        in response.json()["detail"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_model_start_training_params(api_client, db_client, setup_model_db):
+    response = await api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
+        json={
+            "params": {
+                "final_score": 50,
+                "test_string": "testing",
+                "test_bool": True,
+                "test_selection": "selection_1",
+            }
+        },
+    )
+
+    await collect_train_results(api_client, response.json()["task_id"])
+    model_id = response.json()["model_id"]
+
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(model_id)
+    )
+
+    # Check model has been set to completed, with 100% completion
+    assert model["training_status"] == "completed"
+    assert model["progress"] == 100
+    assert model["score"] == 50  # value returned from params
 
     # Check model has been saved after completion
     assert (
