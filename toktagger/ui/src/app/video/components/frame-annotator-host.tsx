@@ -85,28 +85,26 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   }, [api, dataUrl, setImageNatural]);
 
   useEffect(() => {
-    if (!api?.viewer) return;
+    if (!api) return;
 
     const navEnabled = panMode;
 
-    api.viewer.gestureSettingsMouse.dragToPan = navEnabled;
-    api.viewer.gestureSettingsMouse.scrollToZoom = navEnabled;
-    api.viewer.gestureSettingsMouse.clickToZoom = false;
-    api.viewer.gestureSettingsMouse.dblClickToZoom = false;
+    if (api.viewer) {
+      api.viewer.gestureSettingsMouse.dragToPan = navEnabled;
+      api.viewer.gestureSettingsMouse.scrollToZoom = navEnabled;
+      api.viewer.gestureSettingsMouse.clickToZoom = false;
+      api.viewer.gestureSettingsMouse.dblClickToZoom = false;
 
-    api.viewer.gestureSettingsTouch.dragToPan = navEnabled;
-    api.viewer.gestureSettingsTouch.pinchToZoom = navEnabled;
+      api.viewer.gestureSettingsTouch.dragToPan = navEnabled;
+      api.viewer.gestureSettingsTouch.pinchToZoom = navEnabled;
 
-    api.viewer.gestureSettingsPen.dragToPan = navEnabled;
+      api.viewer.gestureSettingsPen.dragToPan = navEnabled;
 
-    api.viewer.gestureSettingsUnknown.dragToPan = navEnabled;
-    api.viewer.gestureSettingsUnknown.scrollToZoom = navEnabled;
-    api.viewer.gestureSettingsUnknown.clickToZoom = false;
-    api.viewer.gestureSettingsUnknown.dblClickToZoom = false;
-  }, [api, panMode]);
-
-  useEffect(() => {
-    if (!api) return;
+      api.viewer.gestureSettingsUnknown.dragToPan = navEnabled;
+      api.viewer.gestureSettingsUnknown.scrollToZoom = navEnabled;
+      api.viewer.gestureSettingsUnknown.clickToZoom = false;
+      api.viewer.gestureSettingsUnknown.dblClickToZoom = false;
+    }
 
     api.setUserSelectAction(
       panMode ? UserSelectAction.NONE : UserSelectAction.EDIT,
