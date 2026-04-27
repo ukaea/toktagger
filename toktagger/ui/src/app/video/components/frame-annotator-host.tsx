@@ -176,17 +176,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       : null;
     if (!polygon) return null;
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    for (const [x, y] of polygon.points) {
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    }
+    const { minX, minY, maxX, maxY } = polygon.bounds;
 
     const width = maxX - minX;
     const height = maxY - minY;
