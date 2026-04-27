@@ -23,23 +23,6 @@ import {
 import { AnnotationPopup } from "./annotation-popup";
 import { ResetViewButton } from "./ui_elements";
 
-function findAnnotationOverlay(viewerElement: HTMLElement | null) {
-  if (!viewerElement) return null;
-
-  const scopes = [
-    viewerElement,
-    viewerElement.parentElement,
-    viewerElement.parentElement?.parentElement,
-  ].filter(Boolean) as HTMLElement[];
-
-  for (const scope of scopes) {
-    const hit = scope.querySelector<HTMLElement>(".a9s-annotationlayer");
-    if (hit) return hit;
-  }
-
-  return null;
-}
-
 /**
  * Top-level host that provides the Annotorious context and renders the annotator.
  */
@@ -120,21 +103,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     api.viewer.gestureSettingsUnknown.scrollToZoom = navEnabled;
     api.viewer.gestureSettingsUnknown.clickToZoom = false;
     api.viewer.gestureSettingsUnknown.dblClickToZoom = false;
-
-    // Critical fix for pan mode: let OSD receive drag/wheel events through the SVG layer.
-    const overlay = findAnnotationOverlay(api.viewer.element as HTMLElement);
-    if (overlay) {
-      overlay.style.pointerEvents = navEnabled ? "none" : "auto";
-    }
-
-    return () => {
-      const nextOverlay = findAnnotationOverlay(
-        api.viewer.element as HTMLElement,
-      );
-      if (nextOverlay) {
-        nextOverlay.style.pointerEvents = "auto";
-      }
-    };
   }, [api, panMode]);
 
   useEffect(() => {
