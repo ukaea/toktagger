@@ -352,6 +352,33 @@ export const TimeSeriesProvider = ({
     [annotations, editMode],
   );
 
+  const batchUpdateLabels = useCallback(
+    (category: TimeSeriesCategory) => {
+      const updated_state: TimeSeriesAnnotation[] = annotations.map(
+        (annotation) => {
+          // Label should only be changed if it is the annotation is the correct type and selected
+          if (annotation.type === category.type && annotation.selected) {
+            return { ...annotation, label: category.label };
+          }
+          return annotation;
+        },
+      );
+
+      setAnnotations(updated_state);
+    },
+    [annotations],
+  );
+
+  const batchDeleteAnnotations = useCallback(
+    () => {
+      const updatedState = annotations.filter(
+          (annotation) => !annotation.selected,
+        );
+        setRawAnnotations((_prev) => parseTimeSeriesAnnotations(updatedState));
+    },
+    [annotations, parseTimeSeriesAnnotations, setRawAnnotations],
+  );
+
   const actionsValue: TimeSeriesActions = useMemo(
     () => ({
       setAnnotations,
@@ -408,10 +435,7 @@ export const TimeSeriesProvider = ({
 
     const deleteSelection = (event: KeyboardEvent) => {
       if (event.key === "Delete" || event.key === "Backspace") {
-        const updatedState = annotations.filter(
-          (annotation) => !annotation.selected,
-        );
-        setRawAnnotations((_prev) => parseTimeSeriesAnnotations(updatedState));
+        batchDeleteAnnotations()
       }
     };
 
@@ -420,7 +444,7 @@ export const TimeSeriesProvider = ({
     return () => {
       document.removeEventListener("keydown", deleteSelection);
     };
-  }, [annotations, editMode, parseTimeSeriesAnnotations, setRawAnnotations]);
+  }, [annotations, batchDeleteAnnotations, editMode, parseTimeSeriesAnnotations, setRawAnnotations]);
 
   useEffect(() => {
     const keyDownHandler = (event: KeyboardEvent) => {
@@ -456,11 +480,20 @@ export const TimeSeriesProvider = ({
           id={`update${index}`}
           hidden={({ props }) => props.annotation.type !== category.type}
           onClick={({ props }) => {
+            const annotation = props.annotation as TimeSeriesAnnotation
+            // If this annotation is selected, batch update all selected annotation
+            if (annotation.selected) {
+              batchUpdateLabels(category)
+              return
+            }
+
+            // If the annotation is not selected, only update this one 
             const newAnnotation: TimeSeriesAnnotation = {
               ...props.annotation,
               label: category.label,
             };
             updateAnnotation(newAnnotation);
+            
           }}
         >
           {category.label}
@@ -477,6 +510,14 @@ export const TimeSeriesProvider = ({
           <Item
             id="delete"
             onClick={({ props }: ItemParams) => {
+              const annotation = props.annotation as TimeSeriesAnnotation
+              // If this annotation is selected, batch delete all selected annotation
+              if (annotation.selected) {
+                batchDeleteAnnotations()
+                return
+              }
+
+              // If the annotation is not selected, only delete this one 
               removeAnnotation(props.annotation.id);
             }}
           >
