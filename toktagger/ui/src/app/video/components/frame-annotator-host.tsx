@@ -9,7 +9,13 @@ import {
 import "@annotorious/react/annotorious-react.css";
 
 import { useVideoSession } from "@/app/video/components/video-session";
-import { getLabelTrack, readRectGeometry } from "./anno-utils";
+import {
+  getLabelTrack,
+  isPolygonAnno,
+  isRectangleAnno,
+  readPolygonGeometry,
+  readRectGeometry,
+} from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
 
 /**
@@ -30,8 +36,14 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  * to the session store directly.
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
-  const { frame, setImageNatural, selection, deleteAnnotation, closePopup } =
-    useVideoSession();
+  const {
+    frame,
+    setImageNatural,
+    selection,
+    drawingTool,
+    deleteAnnotation,
+    closePopup,
+  } = useVideoSession();
 
   // --- Responsive upscale measurement state ---
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -110,6 +122,26 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const drawingEnabled = !!selection.className;
   const label = frame;
 
+  const formatDetails = (annotation: ImageAnnotation) => {
+    if (isRectangleAnno(annotation)) {
+      const rect = readRectGeometry(annotation);
+      if (!rect) return null;
+
+      return `x=${Math.round(rect.x)}, y=${Math.round(rect.y)}, w=${Math.round(rect.w)}, h=${Math.round(rect.h)}`;
+    }
+
+    if (!isPolygonAnno(annotation)) return null;
+    const polygon = readPolygonGeometry(annotation);
+    if (!polygon) return null;
+
+    const { minX, minY, maxX, maxY } = polygon.bounds;
+
+    const width = maxX - minX;
+    const height = maxY - minY;
+
+    return `pts=${polygon.points.length}, x=${Math.round(minX)}, y=${Math.round(minY)}, w=${Math.round(width)}, h=${Math.round(height)}`;
+  };
+
   return (
     // This keeps centering approach:
     // - outer flex justify-center centers the inline-block content
@@ -117,7 +149,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     <div ref={containerRef} className="w-full flex justify-center">
       <div className="relative inline-block max-w-full">
         <ImageAnnotator
-          tool="rectangle"
+          tool={drawingTool}
           drawingEnabled={drawingEnabled}
           autoSave
           style={(_annotation, state) => ({
@@ -147,13 +179,17 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             const annotation = props.annotation as ImageAnnotation;
 
             const { className, trackId } = getLabelTrack(annotation);
-            const geometry = readRectGeometry(annotation);
+            const geometry = isRectangleAnno(annotation)
+              ? readRectGeometry(annotation)
+              : null;
+            const details = formatDetails(annotation);
 
             return (
               <AnnotationPopup
                 className={className}
                 trackId={trackId}
                 geometry={geometry}
+                details={details}
                 onDeleteBox={() => {
                   const id = annotation?.id;
                   if (!id) return;

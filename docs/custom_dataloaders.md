@@ -190,7 +190,7 @@ import pydantic
 
 from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
-from toktagger.api.schemas.samples import TimeSeriesFileData
+from toktagger.api.schemas.samples import Sample, TimeSeriesFileData
 
 
 @LoaderRegistry.register("csv_timeseries")
@@ -205,8 +205,8 @@ class CSVTimeSeriesLoader(DataLoader):
     @pydantic.validate_call
     def get_sample(
         self, 
-        shot_id: int, 
-        sample_data: TimeSeriesFileData
+        sample: Sample,
+        params: DataParams = DataParams(),
     ) -> MultiVariateTimeSeriesData:
         """
         Load time series data from a CSV file.
@@ -216,7 +216,7 @@ class CSVTimeSeriesLoader(DataLoader):
         - Remaining columns: signal values with column headers
         """
         # Verify file exists
-        file_path = pathlib.Path(sample_data.file_name)
+        file_path = pathlib.Path(sample.data.file_name)
         if not file_path.exists():
             raise FileNotFoundError(
                 f"Could not find CSV file at '{file_path}'"
@@ -226,7 +226,7 @@ class CSVTimeSeriesLoader(DataLoader):
         df = pd.read_csv(file_path, index_col=0)  # First column is time
         
         # Filter to requested signals if specified
-        if sample_data.signal_names:
+        if sample.data.signal_names:
             df = df[sample_data.signal_names]
         
         # Handle missing values
@@ -300,7 +300,7 @@ from typing import Type
 import pydantic
 
 from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
-from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData, DataParams
 from toktagger.api.schemas.samples import ShotData
 
 
@@ -308,13 +308,12 @@ from toktagger.api.schemas.samples import ShotData
 class SQLDatabaseLoader(DataLoader):
     """DataLoader for retrieving data from a SQL database"""
     
-    def __init__(self, params):
+    def __init__(self):
         # Initialize database connection
         # Connection string should be in environment variable
         import os
         connection_string = os.environ.get("DATABASE_URL")
         self.engine = sa.create_engine(connection_string)
-        super().__init__(params)
     
     @classmethod
     def sample_data_type(cls) -> Type[ShotData]:
@@ -323,14 +322,14 @@ class SQLDatabaseLoader(DataLoader):
     @pydantic.validate_call
     def get_sample(
         self, 
-        shot_id: int, 
-        sample_data: ShotData
+        sample: Sample,
+        params: DataParams = DataParams(), 
     ) -> MultiVariateTimeSeriesData:
         """Load time series data from database"""
         results = {}
-        
+
         with self.engine.connect() as conn:
-            for signal_name in sample_data.signal_names:
+            for signal_name in sample.data.signal_names:
                 # Query time series data for this shot and signal
                 query = sa.text("""
                     SELECT time, value 
@@ -341,7 +340,7 @@ class SQLDatabaseLoader(DataLoader):
                 
                 result = conn.execute(
                     query, 
-                    {"shot_id": shot_id, "signal_name": signal_name}
+                    {"shot_id": sample.shot_id, "signal_name": signal_name}
                 )
                 rows = result.fetchall()
                 

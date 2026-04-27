@@ -35,10 +35,10 @@ def test_image_file_loader_jpeg():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ImageDataLoader(
-        params=ImageParams(name="image", frame=1)
+    data_loader = data_loaders.ImageDataLoader()
+    image_data = data_loader.get_sample(
+        sample, params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -61,10 +61,10 @@ def test_image_file_loader_png():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ImageDataLoader(
-        params=ImageParams(name="image", frame=1)
+    data_loader = data_loaders.ImageDataLoader()
+    image_data = data_loader.get_sample(
+        sample, params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -88,8 +88,8 @@ def test_parquet_file_loader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.TabularDataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.TabularDataLoader()
+    data = data_loader.get_sample(sample, params=DataParams(name="identity"))
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -121,8 +121,8 @@ def test_uda_loader(uda_test):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.UDADataLoader()
+    data = data_loader.get_sample(sample, params=DataParams(name="identity"))
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -153,10 +153,8 @@ def test_uda_camera_loader(uda_env_vars):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDACameraDataLoader(
-        params=ImageParams(name="image", frame=0)
-    )
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.UDACameraDataLoader()
+    data = data_loader.get_sample(sample, params=ImageParams(name="image", frame=0))
     assert isinstance(data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(data.values, str)
@@ -182,10 +180,10 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
+    data_loader = data_loaders.UDADataLoader()
 
     try:
-        data_loader.get_sample(sample)
+        data_loader.get_sample(sample, params=DataParams(name="identity"))
         pytest.fail("Expected DataLoaderError not raised")
     except data_loaders.DataLoaderError:
         pass
@@ -209,8 +207,8 @@ def test_sal_loader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.SALDataLoader(DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.SALDataLoader()
+    data = data_loader.get_sample(sample, DataParams(name="identity"))
 
     ip_values = numpy.array(data.values.get("ppf/signal/jetppf/magn/ipla").values)
     assert numpy.min(ip_values) == -1837277.75
@@ -230,8 +228,8 @@ def test_fair_mast_dataloader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.FAIRMASTDataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.FAIRMASTDataLoader()
+    data = data_loader.get_sample(sample, params=DataParams(name="identity"))
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -263,7 +261,7 @@ async def test_custom_data_loader(api_client):
         def sample_data_type(self) -> Type[ShotData]:
             return ShotData
 
-        def get_sample(self, sample: Sample, **kwargs):
+        def get_sample(self, sample: Sample, params: DataParams, **kwargs):
             shot_id = sample.shot_id
             # Return some data, use something from sample to check it is passed in correctly
             return MultiVariateTimeSeriesData(

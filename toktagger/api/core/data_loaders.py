@@ -16,6 +16,8 @@ from PIL import Image
 from toktagger.api.schemas.data import (
     Data,
     DataParamTypes,
+    ImageParams,
+    DataParams,
     ImageData,
     MultiVariateTimeSeriesData,
     TimeSeriesData,
@@ -46,9 +48,6 @@ class DataLoaderError(Exception):
 
 
 class DataLoader(ABC):
-    def __init__(self, params: DataParamTypes):
-        self.params = params
-
     @classmethod
     @abstractmethod
     def sample_data_type(
@@ -61,6 +60,7 @@ class DataLoader(ABC):
     def get_sample(
         self,
         sample: Sample,
+        params: DataParamTypes = DataParams(),
         **kwargs,
     ) -> Data:
         pass
@@ -113,15 +113,12 @@ class LoaderRegistry:
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
-    def __init__(self, params: DataParamTypes):
-        super().__init__(params)
-
     @classmethod
     def sample_data_type(cls) -> Type[ImageFileData]:
         return ImageFileData
 
     @pydantic.validate_call
-    def get_sample(self, sample: Sample, **kwargs) -> ImageData:
+    def get_sample(self, sample: Sample, params: ImageParams, **kwargs) -> ImageData:
         if not isinstance(sample.data, ImageFileData):
             raise TypeError(
                 f"Expected sample data of type 'ImageFileData' but got '{type(sample.data)}'"
@@ -136,15 +133,15 @@ class ImageDataLoader(DataLoader):
                 f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
             )
         # Open image which represents frame selected
-        if self.params.name != "image":
+        if params.name != "image":
             raise ValueError("Must provide image data parameters!")
-        elif self.params.frame is None:
+        elif params.frame is None:
             files = sorted(dir_path.iterdir())
             if len(files) == 0:
                 raise FileNotFoundError("No files exist in specified directory!")
             file_path = files[0]
         else:
-            file_path = dir_path.joinpath(f"{self.params.frame}.{sample_data.type}")
+            file_path = dir_path.joinpath(f"{params.frame}.{sample_data.type}")
         if not file_path.exists():
             raise FileNotFoundError(
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
@@ -172,6 +169,7 @@ class TabularDataLoader(DataLoader):
     def get_sample(
         self,
         sample: Sample,
+        params: DataParams,
         time_min: Optional[float] = None,
         time_max: Optional[float] = None,
         min_time_step: Optional[float] = None,
@@ -242,6 +240,7 @@ class UDADataLoader(DataLoader):
     def get_sample(
         self,
         sample: Sample,
+        params: DataParams,
         time_min: Optional[float] = None,
         time_max: Optional[float] = None,
         min_time_step: Optional[float] = None,
@@ -251,6 +250,8 @@ class UDADataLoader(DataLoader):
             raise TypeError(
                 f"Expected sample data of type 'ShotData' but got '{type(sample.data)}'"
             )
+        if not params.name == "identity":
+            raise TypeError(f"Expected blank parameters, but got '{params.name}'")
 
         sample_data: ShotData = sample.data
 
@@ -297,9 +298,6 @@ class UDADataLoader(DataLoader):
 class UDACameraDataLoader(DataLoader):
     """DataLoader for retrieving camera image data using the UDA access layer"""
 
-    def __init__(self, params: DataParamTypes):
-        super().__init__(params)
-
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData
@@ -307,6 +305,7 @@ class UDACameraDataLoader(DataLoader):
     def get_sample(
         self,
         sample: Sample,
+        params: ImageParams,
         **kwargs,
     ) -> ImageData:
         if not isinstance(sample.data, ShotData):
@@ -321,13 +320,13 @@ class UDACameraDataLoader(DataLoader):
 
         signal_name = sample_data.signal_names[0]
         try:
-            if self.params.frame is None:
-                self.params.frame = 0  # Default to first frame if not specified
+            if params.frame is None:
+                params.frame = 0  # Default to first frame if not specified
 
             signal = xr.open_dataset(
                 f"uda://{signal_name}:{sample.shot_id}",
                 engine="uda",
-                frame_number=self.params.frame,
+                frame_number=params.frame,
             )
 
             image_array = signal["data"].values
@@ -339,7 +338,7 @@ class UDACameraDataLoader(DataLoader):
             buffer.seek(0)
 
             return ImageData(
-                frame=str(self.params.frame),
+                frame=str(params.frame),
                 values=base64.b64encode(buffer.getvalue()).decode(),
             )
         except Exception as e:
@@ -359,6 +358,7 @@ class SALDataLoader(DataLoader):
     def get_sample(
         self,
         sample: Sample,
+        params: DataParams,
         time_min: Optional[float] = None,
         time_max: Optional[float] = None,
         min_time_step: Optional[float] = None,
@@ -366,6 +366,9 @@ class SALDataLoader(DataLoader):
     ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
+
+        if not params.name == "identity":
+            raise TypeError(f"Expected blank parameters, but got '{params.name}'")
 
         has_user_credentials = Path("~/.sal/credentials").expanduser().exists()
         if not has_user_credentials:
@@ -424,6 +427,7 @@ class FAIRMASTDataLoader(DataLoader):
     def get_sample(
         self,
         sample: Sample,
+        params: DataParams,
         time_min: Optional[float] = None,
         time_max: Optional[float] = None,
         min_time_step: Optional[float] = None,
@@ -431,6 +435,9 @@ class FAIRMASTDataLoader(DataLoader):
     ) -> MultiVariateTimeSeriesData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
+
+        if not params.name == "identity":
+            raise TypeError(f"Expected blank parameters, but got '{params.name}'")
 
         endpoint = "https://s3.echo.stfc.ac.uk/mast/level2/shots"
         file_path = f"{endpoint}/{sample.shot_id}.zarr"

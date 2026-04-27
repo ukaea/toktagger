@@ -14,7 +14,7 @@ from toktagger.api.routers.samples import router as samples_router
 from toktagger.api.routers.base import router as base_router
 from toktagger.api.routers.paths import router as paths_router
 from toktagger.api.routers.meta import router as meta_router
-
+from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.models import models_dependencies_installed
 
@@ -22,7 +22,7 @@ from toktagger.api.models import models_dependencies_installed
 if models_dependencies_installed():
     from toktagger.api.models.base import (
         ModelRegistry,
-        WorkerModelRegistry,
+        WorkerRegistry,
         ActorRegistry,
     )
     import ray
@@ -60,9 +60,13 @@ class Server:
         )
 
         # Create a ray actor for use as a model registry
-        WorkerModelRegistry.options(
-            name="WorkerModelRegistry", lifetime="detached"
-        ).remote(ModelRegistry._registry)
+        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
+            ModelRegistry._registry
+        )
+        # And one for use as a dataloader registry
+        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
+            LoaderRegistry._registry
+        )
 
     def _setup_app(self):
         self.app = FastAPI(lifespan=lifespan)

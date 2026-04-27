@@ -1,6 +1,7 @@
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.core.data_loaders import DataLoader
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
 import typing
@@ -28,6 +29,11 @@ class Model(ABC):
         self.project = project
         self.model = self.define_model()
         self.type = ModelRegistry.get_name(self.__class__)
+        loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
+        data_loader: DataLoader = ray.get(
+            loader_registry.get.remote(project.data_loader)
+        )
+        self.data_loader = data_loader()
 
     def log_progress(
         self,
@@ -185,15 +191,15 @@ class ModelRegistry:
 
 
 @ray.remote
-class WorkerModelRegistry:
+class WorkerRegistry:
     def __init__(self, registry):
-        self._registry: dict[str, Model] = registry
+        self._registry: dict[str, Model | DataLoader] = registry
 
     def get(self, name):
-        model_class: Model | None = self._registry.get(name)
-        if not model_class:
-            raise ValueError(f"No Model class called '{name}' found in registry!")
-        return ray.remote(model_class)
+        registered: Model | DataLoader | None = self._registry.get(name)
+        if not registered:
+            raise ValueError(f"No class called '{name}' found in registry!")
+        return registered
 
 
 class ActorRegistry:
@@ -260,6 +266,7 @@ class ActorRegistry:
             stale_actor = self.actors.pop(0)
             try:
                 actor = ray.get_actor(stale_actor)
-                ray.kill(actor)
+                # Queue a kill job, letting any other in progress tasks finish first
+                actor.__ray_terminate__.remote()
             except ValueError:
                 return

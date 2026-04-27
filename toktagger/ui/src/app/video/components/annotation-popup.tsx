@@ -12,13 +12,21 @@ export function AnnotationPopup(props: {
   className: string | null;
   trackId: string | null;
   geometry?: { x: number; y: number; w: number; h: number } | null;
+  details?: string | null;
   onDeleteBox: () => void;
   onClose: () => void;
 }) {
-  const { className, trackId, geometry } = props;
+  const { className, trackId, geometry, details } = props;
 
   const label = className ?? "—";
   const tid = trackId ?? "—";
+  const detailText =
+    details ??
+    (geometry
+      ? `x=${Math.round(geometry.x)}, y=${Math.round(geometry.y)}, w=${Math.round(
+          geometry.w,
+        )}, h=${Math.round(geometry.h)}`
+      : null);
 
   return (
     <div
@@ -34,12 +42,8 @@ export function AnnotationPopup(props: {
               {label} <span className="text-white/70">/</span> {tid}
             </div>
 
-            {/* Geometry is optional; when provided we show a quick debug readout. */}
-            {geometry && (
-              <div className="mt-1 text-[11px] text-white/60">
-                x={Math.round(geometry.x)}, y={Math.round(geometry.y)}, w=
-                {Math.round(geometry.w)}, h={Math.round(geometry.h)}
-              </div>
+            {detailText && (
+              <div className="mt-1 text-[11px] text-white/60">{detailText}</div>
             )}
           </div>
 

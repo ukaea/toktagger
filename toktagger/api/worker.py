@@ -43,9 +43,13 @@ def get_actor(project, model):
         model_registry = ray.get_actor("WorkerModelRegistry")
         model_type = ray.get(model_registry.get.remote(model.type))
 
-        ml_model = model_type.options(name=model.id, lifetime="detached").remote(
-            model_id=str(model.id),
-            project=project,
+        ml_model = (
+            ray.remote(model_type)
+            .options(name=model.id, lifetime="detached")
+            .remote(
+                model_id=str(model.id),
+                project=project,
+            )
         )
 
         model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
@@ -92,6 +96,8 @@ def train_model(
             model_id=model.id,
             updates=ModelUpdate(training_status="completed", progress=100, score=score),
         )
+
+        return {"project_id": project.id, "model_id": model.id, "score": score}
 
     except Exception as e:
         # If anything goes wrong, update model to failed status
@@ -151,6 +157,6 @@ def get_predictions(
     return {
         "project_id": project.id,
         "model_type": model.type,
-        "sample_ids": [sample.id for sample in samples],
-        "annotations": annotations_batch,
+        "samples_batch": samples_batch,
+        "annotations_batch": annotations_batch,
     }

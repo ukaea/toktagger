@@ -4,7 +4,8 @@ from toktagger.api.main import Server
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.models.base import ModelRegistry, WorkerModelRegistry, ActorRegistry
+from toktagger.api.models.base import ModelRegistry, WorkerRegistry, ActorRegistry
+from toktagger.api.core.data_loaders import LoaderRegistry
 from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
@@ -48,19 +49,32 @@ def mongo_container():
 def ray_session():
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
         os.environ["MODEL_STORAGE"] = tempd
+        # Ray copies the value of the API_URL env var if already set in this local env
+        # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
+        # Cannot explicitly pass a None, it requires a str:str dict in env_vars
+        # So will pop the env varvalue, init ray, then restore it
+        api_url = os.environ.pop("API_URL")
         ray.init(
-            ignore_reinit_error=True, local_mode=True, runtime_env={"working_dir": None}
+            ignore_reinit_error=True,
+            include_dashboard=False,
+            runtime_env={"env_vars": {"MODEL_STORAGE": tempd}},
         )
+        os.environ["API_URL"] = api_url
+
         # Create a ray actor for use as a model registry
-        WorkerModelRegistry.options(
-            name="WorkerModelRegistry", lifetime="detached"
-        ).remote(ModelRegistry._registry)
+        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
+            ModelRegistry._registry
+        )
+        # And one for use as a dataloader registry
+        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
+            LoaderRegistry._registry
+        )
         yield
         ray.shutdown()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_client(ray_session, mongo_container):
+async def db_client(mongo_container):
     db_client = MongoDBClient(mongo_container, "annotate_db")
 
     yield db_client
@@ -72,8 +86,14 @@ async def db_client(ray_session, mongo_container):
     await db_client.client.close()
 
 
+# Need to use one task registry throughout so that it doesnt spin up a new Actor for all model tests.
+@pytest_asyncio.fixture(scope="session")
+async def task_actor():
+    yield ActorRegistry(max_actors=1)
+
+
 @pytest_asyncio.fixture(scope="function")
-async def api_client(mongo_container):
+async def api_client(task_actor, mongo_container):
     os.environ["MONGO_URL"] = mongo_container
     # Have hit various issues getting this setup
     # Using fastAPI TestClient() doesn't play well with async pymongo as it tries to do stuff in different event loops
@@ -87,12 +107,13 @@ async def api_client(mongo_container):
     app = server.app
     lifespan_ctx = app.router.lifespan_context(app)
     await lifespan_ctx.__aenter__()
-    app.state.task_registry = ActorRegistry(max_actors=os.environ.get("MAX_ACTORS", 5))
-    app.state.task_registry.tasks = {"abc123": "Ray Task Object"}
+    app.state.task_registry = task_actor
+    app.state.task_registry.tasks["abc123"] = "Ray Task Object"
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         os.environ["API_URL"] = ""
+        client.app = app
         yield client
     await lifespan_ctx.__aexit__(None, None, None)
 
@@ -245,7 +266,7 @@ def setup_model_samples():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def setup_model_db(setup_model_samples, db_client):
+async def setup_model_db(setup_model_samples, ray_session, db_client):
     project_id = await db_client.insert("projects", db_definitions.PROJECT_2)
     sample_ids = []
     for sample in setup_model_samples:
@@ -283,10 +304,8 @@ async def setup_model_db(setup_model_samples, db_client):
 def run_server():
     # Import to register mock model
 
-    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
-        os.environ["MODEL_STORAGE"] = tempd
-        server = Server()
-        server.run()
+    server = Server()
+    server.run()
 
 
 @pytest.fixture(scope="package")

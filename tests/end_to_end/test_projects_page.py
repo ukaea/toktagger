@@ -176,9 +176,9 @@ def test_projects_sorting(server_setup, page: Page):
         expect(page.get_by_role("row").nth(2)).to_contain_text(expected_first)
 
     # Create some projects
-    create_project("A Project", "time-series", "uda")
+    create_project("A Project", "video", "uda")
     time.sleep(0.1)
-    create_project("B Project", "video", "tabular")
+    create_project("B Project", "time-series", "tabular")
 
     # Navigate to page
     page.goto("http://localhost:8002")
@@ -189,7 +189,7 @@ def test_projects_sorting(server_setup, page: Page):
     # Sort by Name: A should be first, then B
     sort(page, "Name", "A Project", "B Project")
 
-    # Sort by Task, b should be first (spectrogram), then A (time-series)
+    # Sort by Task, B should be first (time-series), then A (video)
     sort(page, "Task", "B Project", "A Project")
 
     # Sort by Timestamp, A should be first (oldest - so lowest timestamp), then B (newest - highest timestamp)

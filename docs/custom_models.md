@@ -161,10 +161,10 @@ from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas.data import DataParams
 
 # Initialize data loader
-data_loader = LoaderRegistry.get(self.project.data_loader)(DataParams(...))
+data_loader = LoaderRegistry.get(self.project.data_loader)()
 
 # Get data for a sample
-data = data_loader.get_sample(sample.shot_id, sample.data)
+data = data_loader.get_sample(sample, DataParams())
 ```
 
 ## Progress Tracking
@@ -227,13 +227,13 @@ class RandomForestModel(Model):
     
     def _extract_features(self, samples: list[Sample]) -> np.ndarray:
         """Extract statistical features from time series"""
-        data_loader = LoaderRegistry.get(self.project.data_loader)(DataParams())
+        data_loader = LoaderRegistry.get(self.project.data_loader)()
         features = []
         
         for sample in samples:
             data: TimeSeriesData = data_loader.get_sample(
-                sample.shot_id, 
-                sample.data
+                sample,
+                DataParams(),
             ).values["signal"]
             
             # Extract features: mean, std, min, max, etc.
@@ -322,8 +322,8 @@ class RandomForestModel(Model):
             uncertainty = 1.0 - np.max(probabilities[i])
             
             # Get time range for the sample
-            data_loader = LoaderRegistry.get(self.project.data_loader)(DataParams())
-            data = data_loader.get_sample(samples[i].shot_id, samples[i].data)
+            data_loader = LoaderRegistry.get(self.project.data_loader)()
+            data = data_loader.get_sample(samples[i], DataParams())
             time_values = list(data.values.values())[0].time
             
             annotation = TimeInterval(
