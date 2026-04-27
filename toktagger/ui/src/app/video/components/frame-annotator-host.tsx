@@ -7,6 +7,7 @@ import {
   OpenSeadragonViewer,
   UserSelectAction,
   useAnnotator,
+  type AnnotationState,
   type AnnotoriousOpenSeadragonAnnotator,
   type ImageAnnotation,
 } from "@annotorious/react";
@@ -205,7 +206,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           autoSave
           style={(
             _annotation: ImageAnnotation,
-            state?: { selected?: boolean; hovered?: boolean },
+            state: AnnotationState,
           ) => ({
             strokeWidth: state?.selected ? 3 : state?.hovered ? 3 : 2,
           })}
