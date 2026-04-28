@@ -20,13 +20,18 @@ import {
   Footer,
   Heading,
   Text,
-  Selection
+  Selection,
 } from "@adobe/react-spectrum";
 import Workflow from "@spectrum-icons/workflow/Workflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project, Model } from "@/types";
-import { startPredictions, getModels, stopTraining, getModelPredictSchema } from "@/app/core";
+import {
+  startPredictions,
+  getModels,
+  stopTraining,
+  getModelPredictSchema,
+} from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
 
 import { RJSFSchema } from "@rjsf/utils";
@@ -35,7 +40,9 @@ import Form from "@rjsf/core";
 export function ModelPredictModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
+  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
+    null,
+  );
   const [models, setModels] = useState<Model[] | null>(null);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
@@ -49,21 +56,23 @@ export function ModelPredictModal({ project }: { project: Project }) {
     right: 10,
     zIndex: 1000,
   };
-  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(undefined);
+  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(
+    undefined,
+  );
   const [numPredictions, setNumPredictions] = useState<number>(20);
 
   const onSelectModel = (keys: Selection) => {
     setSelectedKeys(keys);
 
-    if (keys === 'all') {
+    if (keys === "all") {
       // Won't happen in single mode
       return;
     }
 
     if (!keys || keys.size === 0) {
-      setSelectedModel(null)
-      setSchema(null)
-      return
+      setSelectedModel(null);
+      setSchema(null);
+      return;
     }
 
     // Single select mode, so only ever one key
@@ -73,27 +82,27 @@ export function ModelPredictModal({ project }: { project: Project }) {
       return;
     }
 
-    const model = models.find(
-      (model) => model._id === key
-    );
+    const model = models.find((model) => model._id === key);
 
     if (!model) {
       setMessage("Selected model could not be found!");
       setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
-      return
+      return;
     }
 
     setSelectedModel(model);
     return;
-  }
+  };
 
   useEffect(() => {
     const updateSchema = async () => {
       if (!selectedModel || selectedModel.training_status != "completed") {
-        setSchema(null)
+        setSchema(null);
         return;
       }
-      const newSchema: RJSFSchema = await getModelPredictSchema(selectedModel.type);
+      const newSchema: RJSFSchema = await getModelPredictSchema(
+        selectedModel.type,
+      );
       setSchema(newSchema);
     };
     updateSchema();
@@ -149,7 +158,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       selectedModel.type,
       selectedModel.version,
       numPredictions,
-      params
+      params,
     );
 
     if (response.ok) {

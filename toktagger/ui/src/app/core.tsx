@@ -424,9 +424,11 @@ export const getModels = async (project_id: string): Promise<Response> => {
 
 export const getModelSchema = async (
   modelName: string,
-  schemaType: string
+  schemaType: string,
 ): Promise<RJSFSchema> => {
-  const response = await fetch(`${BACKEND_API_URL}/meta/models/${modelName}/${schemaType}`);
+  const response = await fetch(
+    `${BACKEND_API_URL}/meta/models/${modelName}/${schemaType}`,
+  );
   if (!response.ok) {
     throw new Error(`Failed to fetch model schema!`);
   }
@@ -436,23 +438,21 @@ export const getModelSchema = async (
 };
 
 export const getModelTrainSchema = async (
-  modelName: string
+  modelName: string,
 ): Promise<RJSFSchema> => {
-  return getModelSchema(modelName, "train")
-}
+  return getModelSchema(modelName, "train");
+};
 
 export const getModelPredictSchema = async (
-  modelName: string
+  modelName: string,
 ): Promise<RJSFSchema> => {
-  return getModelSchema(modelName, "predict")
-}
+  return getModelSchema(modelName, "predict");
+};
 
-export const getModelTypes = async (
-  task: string,
-): Promise<Response> => {
+export const getModelTypes = async (task: string): Promise<Response> => {
   const response = await fetch(`${BACKEND_API_URL}/meta/models?task=${task}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch model types!`);
   }
-  return response
+  return response;
 };

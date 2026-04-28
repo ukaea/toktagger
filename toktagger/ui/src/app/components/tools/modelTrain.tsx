@@ -28,9 +28,13 @@ import Form from "@rjsf/core";
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
+  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
+    null,
+  );
   const [modelNames, setModelNames] = useState<string[] | null>(null);
-  const [selectedModelName, setSelectedModelName] = useState<string | null>(null);
+  const [selectedModelName, setSelectedModelName] = useState<string | null>(
+    null,
+  );
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
     Record<string, unknown>
@@ -54,9 +58,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
         const data = await response.json();
         const modelTypes = data as string[];
         setModelNames(modelTypes);
-      }
-
-      else {
+      } else {
         const errorMessage = await response.json();
         setMessage(errorMessage.detail);
         setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
@@ -67,10 +69,11 @@ export function ModelTrainModal({ project }: { project: Project }) {
   useEffect(() => {
     const updateSchema = async () => {
       if (!selectedModelName) {
-        setSchema(null)
+        setSchema(null);
         return;
       }
-      const newSchema: RJSFSchema = await getModelTrainSchema(selectedModelName);
+      const newSchema: RJSFSchema =
+        await getModelTrainSchema(selectedModelName);
       setSchema(newSchema);
     };
     updateSchema();
@@ -88,7 +91,11 @@ export function ModelTrainModal({ project }: { project: Project }) {
     if (!selectedModelName || !project._id) {
       return;
     }
-    const response = await startTraining(project._id, selectedModelName, params);
+    const response = await startTraining(
+      project._id,
+      selectedModelName,
+      params,
+    );
     if (response.ok) {
       setMessage("Model training added to job queue!");
       setMessageIcon(
@@ -124,9 +131,11 @@ export function ModelTrainModal({ project }: { project: Project }) {
                   setSelectedModelName(key !== null ? String(key) : null)
                 }
               >
-                {modelNames ? modelNames.map((model_name) => (
-                  <Item key={model_name}>{model_name}</Item>
-                )) : null}
+                {modelNames
+                  ? modelNames.map((model_name) => (
+                      <Item key={model_name}>{model_name}</Item>
+                    ))
+                  : null}
               </ComboBox>
               {schema && (
                 <ModelForm
@@ -152,10 +161,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <Button
                 variant="accent"
                 onPress={pressSubmit}
-                isDisabled={
-                  !modelNames ||
-                  !selectedModelName
-                }
+                isDisabled={!modelNames || !selectedModelName}
               >
                 Train
               </Button>

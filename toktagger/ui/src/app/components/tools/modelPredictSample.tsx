@@ -7,10 +7,15 @@ import {
   Flex,
   ProgressCircle,
   Switch,
-  Button
+  Button,
 } from "@adobe/react-spectrum";
 import { Annotations, Annotation } from "@/types";
-import { getModelTypes, getModelPredictSchema, startSamplePredictions, getSamplePredictions } from "@/app/core";
+import {
+  getModelTypes,
+  getModelPredictSchema,
+  startSamplePredictions,
+  getSamplePredictions,
+} from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
@@ -32,7 +37,9 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [modelNames, setModelNames] = useState<string[] | null>(null);
-  const [selectedModelName, setSelectedModelName] = useState<string | null>(null);
+  const [selectedModelName, setSelectedModelName] = useState<string | null>(
+    null,
+  );
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
     Record<string, unknown>
@@ -50,9 +57,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         const data = await response.json();
         const modelTypes = data as string[];
         setModelNames(modelTypes);
-      }
-
-      else {
+      } else {
         const errorMessage = await response.json();
         setMessage(errorMessage.detail);
       }
@@ -62,17 +67,18 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   useEffect(() => {
     const updateSchema = async () => {
       if (!selectedModelName) {
-        setSchema(null)
+        setSchema(null);
         return;
       }
-      const newSchema: RJSFSchema = await getModelPredictSchema(selectedModelName);
+      const newSchema: RJSFSchema =
+        await getModelPredictSchema(selectedModelName);
       setSchema(newSchema);
     };
     updateSchema();
   }, [selectedModelName]);
 
   const onEnable = (newIsEnabled: boolean) => {
-    setIsEnabled(newIsEnabled)
+    setIsEnabled(newIsEnabled);
     if (!newIsEnabled) {
       // Remove previous annotations from this model
       setAnnotations((previousAnnotations: Annotations) => {
@@ -84,7 +90,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       });
     }
     return;
-  }
+  };
 
   const pressSubmit = () => {
     if (schema) {
@@ -103,7 +109,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       project_id,
       sample_id,
       selectedModelName,
-      params
+      params,
     );
     const payload = await response.json();
 
@@ -163,7 +169,14 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       }, 1000);
     };
     fetchData();
-  }, [project_id, sample_id, selectedModelName, taskId, setAnnotations, isEnabled]);
+  }, [
+    project_id,
+    sample_id,
+    selectedModelName,
+    taskId,
+    setAnnotations,
+    isEnabled,
+  ]);
 
   if (!project) {
     return;
@@ -186,9 +199,11 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
               setSelectedModelName(key !== null ? String(key) : null)
             }
           >
-            {modelNames ? modelNames.map((model_name) => (
-              <Item key={model_name}>{model_name}</Item>
-            )) : null}
+            {modelNames
+              ? modelNames.map((model_name) => (
+                  <Item key={model_name}>{model_name}</Item>
+                ))
+              : null}
           </ComboBox>
           {schema && (
             <ModelForm
@@ -201,12 +216,10 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
             />
           )}
           <Flex marginTop="size-200" marginBottom="size-200">
-            <Button marginEnd="size-400"
+            <Button
+              marginEnd="size-400"
               variant="accent"
-              isDisabled={
-                !isEnabled ||
-                !selectedModelName
-              }
+              isDisabled={!isEnabled || !selectedModelName}
               onPress={pressSubmit}
             >
               Predict
