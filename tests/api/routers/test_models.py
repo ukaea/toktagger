@@ -72,6 +72,38 @@ async def test_model_batch_predict_num_predictions(
 
 
 @pytest.mark.asyncio
+async def test_model_batch_predict_num_predictions_params(
+    api_client, db_client, setup_model_db
+):
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/predict?num_predictions=5",
+        json={
+            "params": {
+                "final_score": 50,
+                "test_string": "testing",
+                "test_bool": True,
+                "test_selection": "selection_1",
+            }
+        },
+    )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
+
+    # Get annotations from the database, there should be 5 x 3 non validated ones
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+
+    assert len(annotations) == 15
+
+    # Check latest version of model has been used by default (annotation label set to model ID in Mock)
+    assert all(ann["label"] == setup_model_db["model_id_2"] for ann in annotations)
+
+    # Check disruption annotations have used params correctly to give time = params.final_score + 1
+    assert all(ann["time"] == 51 for ann in annotations if ann["label"] == "disruption")
+
+
+@pytest.mark.asyncio
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
     query_string = "&".join(
         f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
@@ -278,9 +310,15 @@ async def test_model_start_training_no_params(api_client, db_client, setup_model
 
 
 @pytest.mark.asyncio
-async def test_model_start_training_wrong_params(api_client, db_client, setup_model_db):
+@pytest.mark.parametrize("method", ["train", "predict", "sample"])
+async def test_model_wrong_params(api_client, db_client, setup_model_db, method):
+    if method == "sample":
+        url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_params_timeseries_cnn/predict"
+    else:
+        url = f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/{method}"
+
     response = await api_client.put(
-        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
+        url,
         json={
             "params": {
                 "final_score": 20,
@@ -299,11 +337,15 @@ async def test_model_start_training_wrong_params(api_client, db_client, setup_mo
 
 
 @pytest.mark.asyncio
-async def test_model_start_training_missing_params(
-    api_client, db_client, setup_model_db
-):
+@pytest.mark.parametrize("method", ["train", "predict", "sample"])
+async def test_model_missing_params(api_client, db_client, setup_model_db, method):
+    if method == "sample":
+        url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_params_timeseries_cnn/predict"
+    else:
+        url = f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/{method}"
+
     response = await api_client.put(
-        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
+        url,
     )
 
     assert response.status_code == 422

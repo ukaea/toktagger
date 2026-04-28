@@ -92,7 +92,6 @@ export function ModelPredictModal({ project }: { project: Project }) {
     const updateSchema = async () => {
       if (!selectedModel || selectedModel.training_status != "completed") {
         setSchema(null)
-        setPredictDisabled(true)
         return;
       }
       const newSchema: RJSFSchema = await getModelPredictSchema(selectedModel.type);

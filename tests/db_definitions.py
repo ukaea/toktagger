@@ -60,7 +60,7 @@ class TimeSeriesCNN(Model):
     def define_model(self):
         return None
 
-    def train(self, samples, annotations, *args, **kwargs):
+    def train(self, samples, annotations, params=None):
         self.log_progress(
             training_status="started",
             progress=50,
@@ -68,7 +68,7 @@ class TimeSeriesCNN(Model):
         )
         return 60
 
-    def predict(self, samples, *args, **kwargs):
+    def predict(self, samples, params=None):
         anns = []
         for i in range(len(samples)):
             ramp_up_start = random.randint(0, 20)
@@ -126,7 +126,10 @@ class TimeSeriesCNNParams(pydantic.BaseModel):
 
 @ray.remote
 @ModelRegistry.register(
-    "mock_params_timeseries_cnn", ["time-series"], TimeSeriesCNNParams
+    "mock_params_timeseries_cnn",
+    ["time-series"],
+    TimeSeriesCNNParams,
+    TimeSeriesCNNParams,
 )
 class MockParamsTimeSeriesCNN(TimeSeriesCNN):
     def train(self, samples, annotations, params: TimeSeriesCNNParams):
@@ -136,6 +139,42 @@ class MockParamsTimeSeriesCNN(TimeSeriesCNN):
             score=20,
         )
         return params.final_score
+
+    def predict(self, samples, params: TimeSeriesCNNParams):
+        anns = []
+        for i in range(len(samples)):
+            ramp_up_start = random.randint(0, 20)
+            ramp_up_end = ramp_up_start + random.randint(10, 30)
+            flat_top_end = params.final_score
+
+            anns.append(
+                [
+                    TimeRegion(
+                        validated=False,
+                        uncertainty=random.random(),
+                        label="Ramp Up",
+                        time_min=ramp_up_start,
+                        time_max=ramp_up_end,
+                        created_by=self.type,
+                    ),
+                    TimeRegion(
+                        validated=False,
+                        uncertainty=random.random(),
+                        label="Flat Top",
+                        time_min=ramp_up_end,
+                        time_max=flat_top_end,
+                        created_by=self.type,
+                    ),
+                    TimePoint(
+                        validated=False,
+                        uncertainty=random.random(),
+                        label="Disruption",
+                        time=flat_top_end + 1,
+                        created_by=self.type,
+                    ),
+                ]
+            )
+        return anns
 
 
 # Define some common things to add to db
