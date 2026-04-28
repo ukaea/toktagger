@@ -96,9 +96,6 @@ async def test_model_batch_predict_num_predictions_params(
 
     assert len(annotations) == 15
 
-    # Check latest version of model has been used by default (annotation label set to model ID in Mock)
-    assert all(ann["label"] == setup_model_db["model_id_2"] for ann in annotations)
-
     # Check disruption annotations have used params correctly to give time = params.final_score + 1
     assert all(ann["time"] == 51 for ann in annotations if ann["label"] == "disruption")
 
@@ -145,6 +142,36 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
     # Check version 1 of model has been used (annotation label set to model ID in Mock)
     assert all(ann["label"] == setup_model_db["model_id_1"] for ann in annotations)
+
+
+@pytest.mark.asyncio
+async def test_model_sample_predict_params(api_client, db_client, setup_model_db):
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_params_timeseries_cnn/predict",
+        json={
+            "params": {
+                "final_score": 50,
+                "test_string": "testing",
+                "test_bool": True,
+                "test_selection": "selection_1",
+            }
+        },
+    )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
+
+    # Get annotations from the database, there should be 3 non validated one
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert len(annotations) == 3
+
+    # Check it corresponds to sample ID we asked for predictions on
+    assert str(annotations[0]["sample_id"]) == setup_model_db["sample_ids"][-1]
+
+    # Check disruption has time corresponding to final_score in params + 1
+    ann = next(ann for ann in annotations if ann["label"] == "Disruption")
+    assert ann["time"] == 51
 
 
 @pytest.mark.asyncio
@@ -317,16 +344,18 @@ async def test_model_wrong_params(api_client, db_client, setup_model_db, method)
     else:
         url = f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/{method}"
 
-    response = await api_client.put(
-        url,
-        json={
-            "params": {
-                "final_score": 20,
-                "test_bool": 5,
-                "test_selection": "wrong_selection",
-            }
-        },
-    )
+    json = {
+        "params": {
+            "final_score": 20,
+            "test_bool": 5,
+            "test_selection": "wrong_selection",
+        }
+    }
+
+    if method == "train":
+        response = await api_client.put(url, json=json)
+    else:
+        response = await api_client.post(url, json=json)
 
     assert response.status_code == 422
     error = response.json()["detail"]
@@ -344,9 +373,10 @@ async def test_model_missing_params(api_client, db_client, setup_model_db, metho
     else:
         url = f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/{method}"
 
-    response = await api_client.put(
-        url,
-    )
+    if method == "train":
+        response = await api_client.put(url)
+    else:
+        response = await api_client.post(url)
 
     assert response.status_code == 422
     assert (

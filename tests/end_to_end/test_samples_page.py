@@ -867,39 +867,7 @@ def test_samples_page_export_annotations(server_setup, page: Page):
     "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
 )
 def test_model_train_predict(server_setup, setup_model_samples, page: Page, model_name):
-    project_id, sample_ids = create_model_samples(setup_model_samples)
-
-    # Navigate to projects page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
-
-    # Check basic structure of page is correct
-    check_base_page(page)
-
-    # Click on model train modal
-    page.get_by_role("button", name="Train ML Model").click()
-
-    # Check modal has opened
-    expect(page.get_by_role("heading", name="Train ML Model")).to_be_visible()
-    expect(page.get_by_role("combobox", name="Select Model Type")).to_be_visible()
-    expect(page.get_by_role("button", name="Close")).to_be_visible()
-    expect(page.get_by_role("button", name="Train", exact=True)).to_be_visible()
-
-    # Click on dropdown box, check models are shown
-    page.get_by_role("button", name="Select Model Type").click()
-    expect(
-        page.get_by_role("option", name="disruption_cnn", exact=True)
-    ).to_be_visible()
-    expect(
-        page.get_by_role("option", name="mock_timeseries_cnn", exact=True)
-    ).to_be_visible()
-    expect(
-        page.get_by_role("option", name="mock_params_timeseries_cnn", exact=True)
-    ).to_be_visible()
-
-    page.get_by_role("option", name=model_name, exact=True).click()
-
-    # If params model chosen, new form should open
-    if model_name == "mock_params_timeseries_cnn":
+    def form_check(page: Page, submit_button_name):
         expect(page.get_by_text("Model Parameters")).to_be_visible()
         # Check form has correct number, string, boolean, literal input types
         expect(page.get_by_role("textbox", name="Final Score")).to_be_visible()
@@ -935,6 +903,7 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
         expect(page.get_by_role("checkbox", name="Test Bool")).to_be_checked()
 
         # Combobox should have two possible options
+        page.get_by_role("button", name="Test Selection").scroll_into_view_if_needed()
         page.get_by_role("button", name="Test Selection").click()
         expect(
             page.get_by_role("option", name="selection_1", exact=True)
@@ -945,7 +914,7 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
         page.get_by_role("option", name="selection_1").click()
 
         # Try pressing submit
-        page.get_by_role("button", name="Train", exact=True).click()
+        page.get_by_role("button", name=submit_button_name, exact=True).click()
 
         # Should give validation error for missing string
         expect(
@@ -953,6 +922,41 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
         ).to_be_visible()
 
         page.get_by_role("textbox", name="Test String").fill("Entered")
+
+    project_id, sample_ids = create_model_samples(setup_model_samples)
+
+    # Navigate to projects page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Click on model train modal
+    page.get_by_role("button", name="Train ML Model").click()
+
+    # Check modal has opened
+    expect(page.get_by_role("heading", name="Train ML Model")).to_be_visible()
+    expect(page.get_by_role("combobox", name="Select Model Type")).to_be_visible()
+    expect(page.get_by_role("button", name="Close")).to_be_visible()
+    expect(page.get_by_role("button", name="Train", exact=True)).to_be_visible()
+
+    # Click on dropdown box, check models are shown
+    page.get_by_role("button", name="Select Model Type").click()
+    expect(
+        page.get_by_role("option", name="disruption_cnn", exact=True)
+    ).to_be_visible()
+    expect(
+        page.get_by_role("option", name="mock_timeseries_cnn", exact=True)
+    ).to_be_visible()
+    expect(
+        page.get_by_role("option", name="mock_params_timeseries_cnn", exact=True)
+    ).to_be_visible()
+
+    page.get_by_role("option", name=model_name, exact=True).click()
+
+    # If params model chosen, new form should open
+    if model_name == "mock_params_timeseries_cnn":
+        form_check(page, "Train")
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
@@ -1003,6 +1007,10 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
     # Select our model from the list
     modal.get_by_role("checkbox", name=f"Select {model_name}").click()
 
+    # If params model chosen, new form should open
+    if model_name == "mock_params_timeseries_cnn":
+        form_check(page, "Predict")
+
     # Check Predict button has been enabled, click it
     expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_enabled()
     modal.get_by_role("button", name="Predict", exact=True).click()
@@ -1024,4 +1032,16 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
         f"http://localhost:8002/projects/{project_id}/annotations?validated=False",
     )
     assert response.status_code == 200
-    assert len(response.json()) == 30
+    annotations = response.json()
+    assert len(annotations) == 30
+
+    if model_name == "mock_params_timeseries_cnn":
+        # Check disruptions have the value of params.final_score + 1
+        assert all(
+            ann["time"] == 51 for ann in annotations if ann["label"] == "Disruption"
+        )
+    else:
+        # Hardcoded time to 60+1 inside mock model
+        assert all(
+            ann["time"] == 61 for ann in annotations if ann["label"] == "Disruption"
+        )

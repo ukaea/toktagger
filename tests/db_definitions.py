@@ -73,7 +73,7 @@ class TimeSeriesCNN(Model):
         for i in range(len(samples)):
             ramp_up_start = random.randint(0, 20)
             ramp_up_end = ramp_up_start + random.randint(10, 30)
-            flat_top_end = ramp_up_end + random.randint(10, 30)
+            flat_top_end = 60
 
             anns.append(
                 [
@@ -294,4 +294,11 @@ MODEL_3 = ModelIn(
     progress=50,
     score=60,
     task_id="abc123",
+)
+MODEL_4 = ModelIn(
+    type="mock_params_timeseries_cnn",
+    version=1,
+    training_status="completed",
+    progress=100,
+    score=80,
 )

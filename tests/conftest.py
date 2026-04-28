@@ -295,6 +295,10 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
         "models", db_definitions.MODEL_2, ids={"project_id": ObjectId(project_id)}
     )
 
+    await db_client.insert(
+        "models", db_definitions.MODEL_4, ids={"project_id": ObjectId(project_id)}
+    )
+
     yield {
         "project_id": project_id,
         "sample_ids": sample_ids,

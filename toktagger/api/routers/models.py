@@ -48,7 +48,10 @@ def validate_model_params(model_type: str, schema_type: str, params: dict):
             loc = error.get("loc", [])
             msg = error.get("msg", "Invalid Field!")
             error_str += f"'{loc[0] if len(loc) == 1 else loc}': {msg} \n"
-
+        raise HTTPException(
+            status_code=422,
+            detail=error_str,
+        )
     return params_validated
 
 
