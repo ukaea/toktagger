@@ -34,7 +34,6 @@ import Form from "@rjsf/core";
 
 export function ModelPredictModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [predictDisabled, setPredictDisabled] = useState<boolean>(true);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
   const [models, setModels] = useState<Model[] | null>(null);

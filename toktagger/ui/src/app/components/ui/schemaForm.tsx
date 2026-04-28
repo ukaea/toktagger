@@ -397,13 +397,14 @@ const SpectrumArrayFieldItemTemplate = ({
 type ModelFormProps = {
   schema: RJSFSchema;
   onSubmit: (data: Record<string, unknown>) => void;
+  disabled?: boolean;
   // To operate the RJSF form in 'controlled' mode, where the data can be persisted
   // outside of form closure, specify the parameters below. Leave blank for 'uncontrolled' mode.
   formData?: Record<string, unknown>;
   setFormData?: (formData: Record<string, unknown>) => void;
 };
 const ModelForm = forwardRef<Form, ModelFormProps>(
-  ({ schema, onSubmit, formData, setFormData }, ref) => {
+  ({ schema, disabled, onSubmit, formData, setFormData }, ref) => {
     const registry = getDefaultRegistry();
     const widgets = {
       ...registry.widgets,
@@ -448,6 +449,7 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
               schema={schema}
               validator={validator}
               widgets={widgets}
+              disabled={disabled}
               onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
                 onSubmit(e.formData ?? {});
               }}
