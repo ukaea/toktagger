@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo } from "react";
+import OpenSeadragon from "openseadragon";
 import {
   OpenSeadragonAnnotator,
   OpenSeadragonAnnotationPopup,
@@ -22,6 +23,7 @@ import {
   readRectGeometry,
 } from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
+import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
 import { ResetViewButton } from "./ui_elements";
 
 /**
@@ -129,6 +131,42 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     }
   }, [api, drawingEnabled, drawingTool]);
 
+  useEffect(() => {
+    if (!api?.viewer || !drawingEnabled || panMode) return;
+
+    const viewer = api.viewer;
+    const viewerElement = viewer.element as HTMLElement;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const viewerBounds = viewerElement.getBoundingClientRect();
+      const viewerPoint = new OpenSeadragon.Point(
+        event.clientX - viewerBounds.left,
+        event.clientY - viewerBounds.top,
+      );
+      const imagePoint =
+        viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+
+      const isOverAnnotation = api
+        .getAnnotations()
+        .some((annotation) => annotationContainsPoint(annotation, imagePoint));
+
+      setViewerCursor(viewerElement, isOverAnnotation ? "pointer" : "");
+    };
+
+    const clearCursor = () => {
+      setViewerCursor(viewerElement, "");
+    };
+
+    viewerElement.addEventListener("mousemove", handleMouseMove);
+    viewerElement.addEventListener("mouseleave", clearCursor);
+
+    return () => {
+      viewerElement.removeEventListener("mousemove", handleMouseMove);
+      viewerElement.removeEventListener("mouseleave", clearCursor);
+      clearCursor();
+    };
+  }, [api, drawingEnabled, panMode]);
+
   const viewerOptions = useMemo(
     () => ({
       tileSources: {
@@ -204,11 +242,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           drawingEnabled={drawingEnabled}
           drawingMode="drag"
           autoSave
-          style={(
-            _annotation: ImageAnnotation,
-            state: AnnotationState,
-          ) => ({
-            strokeWidth: state?.selected ? 3 : state?.hovered ? 3 : 2,
+          style={(_annotation: ImageAnnotation, state?: AnnotationState) => ({
+            strokeWidth: state?.selected ? 3 : 2,
           })}
         >
           <OpenSeadragonViewer
