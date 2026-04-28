@@ -15,7 +15,7 @@ import pydantic
 logger = logging.getLogger("ray")
 
 
-class DisruptionCNNParams(pydantic.BaseModel):
+class DisruptionCNNTrainParams(pydantic.BaseModel):
     train_val_test_split: list[typing.Annotated[float, pydantic.Field(gt=0, lt=1)]] = (
         pydantic.Field(
             min_length=3,
@@ -44,6 +44,11 @@ class DisruptionCNNParams(pydantic.BaseModel):
         if sum(value) != 1:
             raise ValueError("Train / Val / Test fractions must sum to 1!")
         return value
+
+
+class DisruptionCNNPredictParams(pydantic.BaseModel):
+    batch_size: int = pydantic.Field(gt=0, default=32)
+    device: typing.Literal["cpu", "gpu"] = "cpu"
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
@@ -80,7 +85,12 @@ class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
         return plasma_current, disruption_time / data.time[-1]
 
 
-@ModelRegistry.register("disruption_cnn", ["time-series"], DisruptionCNNParams)
+@ModelRegistry.register(
+    "disruption_cnn",
+    ["time-series"],
+    DisruptionCNNTrainParams,
+    DisruptionCNNPredictParams,
+)
 class DisruptionCNN(Model):
     def define_model(self):
         return nn.Sequential(
@@ -100,7 +110,7 @@ class DisruptionCNN(Model):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        params: DisruptionCNNParams,
+        params: DisruptionCNNTrainParams,
     ) -> float:
         self.log_progress(training_status="started")
 
@@ -288,7 +298,7 @@ class DisruptionCNN(Model):
         return final_accuracy
 
     def predict(
-        self, samples: list[Sample], batch_size: int = 32, device="cpu"
+        self, samples: list[Sample], params: DisruptionCNNPredictParams
     ) -> list[list[TimePoint]]:
         num_mc_samples = 20  # Should let user choose num mc samples? TODO
         dataset = DisruptionDataset(
@@ -297,14 +307,14 @@ class DisruptionCNN(Model):
 
         self.model.train()  # Using dropout so has to be in train mode
         all_predictions: list[list[torch.tensor]] = []
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=params.batch_size, shuffle=False)
 
         for i in range(num_mc_samples):
             predictions: list[torch.tensor] = []
             with torch.no_grad():
                 for batch_samples in dataloader:
                     batch_samples = batch_samples.unsqueeze(1)
-                    batch_samples = batch_samples.to(device)
+                    batch_samples = batch_samples.to(params.device)
                     predictions.append(self.model(batch_samples))
 
             all_predictions.append(torch.cat(predictions, dim=0))

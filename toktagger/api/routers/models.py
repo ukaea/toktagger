@@ -32,6 +32,26 @@ def check_models_enabled():
         )
 
 
+def validate_model_params(model_type: str, schema_type: str, params: dict):
+    # Get model params model from registry and validate
+    params_model = ModelRegistry.get_params(model_type, schema_type)
+    if params_model and not params:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Model training parameters are missing! Requires '{params_model.__name__}' parameters.",
+        )
+    try:
+        params_validated = params_model.model_validate(params) if params_model else None
+    except ValidationError as e:
+        error_str = ""
+        for error in e.errors():
+            loc = error.get("loc", [])
+            msg = error.get("msg", "Invalid Field!")
+            error_str += f"'{loc[0] if len(loc) == 1 else loc}': {msg} \n"
+
+    return params_validated
+
+
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Models"],
@@ -157,25 +177,7 @@ async def start_model_training(
         )
 
     # Get model params model from registry and validate
-    params_model = ModelRegistry.get_params(model_type)
-    if params_model and not params:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Model training parameters are missing! Requires '{params_model.__name__}' parameters.",
-        )
-    try:
-        params_validated = params_model.model_validate(params) if params_model else None
-    except ValidationError as e:
-        error_str = ""
-        for error in e.errors():
-            loc = error.get("loc", [])
-            msg = error.get("msg", "Invalid Field!")
-            error_str += f"'{loc[0] if len(loc) == 1 else loc}': {msg} \n"
-
-        raise HTTPException(
-            status_code=422,
-            detail=error_str,
-        )
+    params_validated = validate_model_params(model_type, "training", params)
 
     # Create model
     # Try to get model for this project from database if it exists
@@ -335,6 +337,9 @@ async def predict(
         None,
         description="A list of specific sample IDs to make predictions for, leave blank for random selection.",
     ),
+    params: dict = Body(
+        {}, description="Optional parameters for training the model", embed=True
+    ),
 ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -356,6 +361,9 @@ async def predict(
             status_code=409,
             detail="Cannot make predictions using a model version which has not successfully finished training.",
         )
+
+    # Get model params model from registry and validate
+    params_validated = validate_model_params(model_type, "prediction", params)
 
     # Create predictions using the given model for this project
     # Predict on samples as specified by filters
@@ -383,10 +391,8 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
 
-    BATCH_SIZE = 32  # TODO again where to define this?
-
     predict_task = get_predictions.remote(
-        project=project, model=model, samples=samples, batch_size=BATCH_SIZE
+        project=project, model=model, samples=samples, params=params_validated
     )
     task_id = task_registry.register(predict_task)
     task_registry.update_actors(model.id)
@@ -433,6 +439,9 @@ async def create_sample_predictions(
         description="The ID of the sample to make model predictions for."
     ),
     model_type: str = Path(description="The type of model to make predictions from."),
+    params: dict = Body(
+        {}, description="Optional parameters for training the model", embed=True
+    ),
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -448,11 +457,13 @@ async def create_sample_predictions(
     # Find the latest created model for this project
     model = await utils.get_model(db_client, project.id, model_type, status="completed")
 
+    # Get model params model from registry and validate
+    params_validated = validate_model_params(model_type, "prediction", params)
+
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    BATCH_SIZE = 32  # TODO again where to define this?
     task = get_predictions.remote(
-        project=project, model=model, samples=[sample], batch_size=BATCH_SIZE
+        project=project, model=model, samples=[sample], params=params_validated
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)

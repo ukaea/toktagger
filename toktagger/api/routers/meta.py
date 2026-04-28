@@ -17,7 +17,17 @@ async def get_data_schema(loader: str) -> dict:
     return LoaderRegistry.get_data_schema(loader)
 
 
-@router.get("/models/{model}")
-async def get_model_schema(model: str) -> dict | None:
+@router.get("/models/{model}/train")
+async def get_model_training_schema(model: str) -> dict | None:
     """Get params required for training this model."""
-    return ModelRegistry.get_params_schema(model, return_draft_07=True)
+    return ModelRegistry.get_params_schema(
+        model, schema_type="training", return_draft_07=True
+    )
+
+
+@router.get("/models/{model}/predict")
+async def get_model_prediction_schema(model: str) -> dict | None:
+    """Get params required for predicting with this model."""
+    return ModelRegistry.get_params_schema(
+        model, schema_type="prediction", return_draft_07=True
+    )

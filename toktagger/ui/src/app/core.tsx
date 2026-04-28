@@ -363,6 +363,7 @@ export const startPredictions = async (
   selected_model: string,
   version: number,
   num_predictions: number,
+  params: Record<string, unknown>,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}`,
@@ -371,6 +372,7 @@ export const startPredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ params: params }),
     },
   );
   return response;
@@ -420,8 +422,9 @@ export const getModels = async (project_id: string): Promise<Response> => {
 
 export const getModelSchema = async (
   modelName: string,
+  schemaType: string
 ): Promise<RJSFSchema> => {
-  const response = await fetch(`${BACKEND_API_URL}/meta/models/${modelName}`);
+  const response = await fetch(`${BACKEND_API_URL}/meta/models/${modelName}/${schemaType}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch model schema!`);
   }
@@ -429,3 +432,15 @@ export const getModelSchema = async (
   const schema: RJSFSchema = data as RJSFSchema;
   return schema;
 };
+
+export const getModelTrainSchema = async (
+  modelName: string
+): Promise<RJSFSchema> => {
+  return getModelSchema(modelName, "train")
+}
+
+export const getModelPredictSchema = async (
+  modelName: string
+): Promise<RJSFSchema> => {
+  return getModelSchema(modelName, "predict")
+}

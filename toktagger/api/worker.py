@@ -108,7 +108,7 @@ def train_model(
 
 @ray.remote
 def get_predictions(
-    project: Project, model: Model, samples: list[Sample], batch_size: int = 32
+    project: Project, model: Model, samples: list[Sample], params: pydantic.BaseModel
 ):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
@@ -118,7 +118,7 @@ def get_predictions(
     )
     model_actor = get_actor(project=project, model=model)
 
-    predictions_task = model_actor.predict.remote(samples, batch_size=batch_size)
+    predictions_task = model_actor.predict.remote(samples, params)
     predictions = ray.get(predictions_task)
 
     samples_batch = [

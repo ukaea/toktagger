@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Provider,
   defaultTheme,
@@ -26,7 +26,11 @@ import Workflow from "@spectrum-icons/workflow/Workflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project, Model } from "@/types";
-import { startPredictions, getModels, stopTraining } from "@/app/core";
+import { startPredictions, getModels, stopTraining, getModelPredictSchema } from "@/app/core";
+import ModelForm from "@/app/components/ui/schemaForm";
+
+import { RJSFSchema } from "@rjsf/utils";
+import Form from "@rjsf/core";
 
 export function ModelPredictModal({ project }: { project: Project }) {
   const [models, setModels] = useState<Model[] | null>(null);
@@ -36,6 +40,11 @@ export function ModelPredictModal({ project }: { project: Project }) {
   const [numPredictions, setNumPredictions] = useState<number>(20);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
+  const [schema, setSchema] = useState<RJSFSchema | null>(null);
+  const [unvalidatedFormData, setUnvalidatedFormData] = useState<
+    Record<string, unknown>
+  >({});
+  const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
     top: 10,
@@ -52,6 +61,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
 
     if (!keys || keys.size === 0) {
       setSelectedModel(null)
+      setSchema(null)
       return
     }
 
@@ -75,6 +85,15 @@ export function ModelPredictModal({ project }: { project: Project }) {
     setSelectedModel(model);
     return;
   }
+
+  useEffect(() => {
+    const updateSchema = async () => {
+      if (!selectedModel) return;
+      const newSchema: RJSFSchema = await getModelPredictSchema(selectedModel.type);
+      setSchema(newSchema);
+    };
+    updateSchema();
+  }, [selectedModel]);
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -108,8 +127,15 @@ export function ModelPredictModal({ project }: { project: Project }) {
     };
   }, [project._id, modalOpen]);
 
+  const pressSubmit = () => {
+    if (schema) {
+      formRef.current?.submit();
+    } else {
+      submitPredictJob({});
+    }
+  };
 
-  const submitPredictJob = async () => {
+  const submitPredictJob = async (params: Record<string, unknown>) => {
     if (!project._id || !models || !selectedKeys || !selectedModel) {
       return;
     }
@@ -119,6 +145,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       selectedModel.type,
       selectedModel.version,
       numPredictions,
+      params
     );
 
     if (response.ok) {
@@ -235,6 +262,15 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   </TableBody>
                 </TableView>
               )}
+              {schema && (
+                <ModelForm
+                  ref={formRef}
+                  schema={schema}
+                  onSubmit={submitPredictJob}
+                  formData={unvalidatedFormData}
+                  setFormData={setUnvalidatedFormData}
+                />
+              )}
             </Content>
             <Footer>
               {message && (
@@ -255,7 +291,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   !selectedModel ||
                   selectedModel.training_status != "completed"
                 }
-                onPress={submitPredictJob}
+                onPress={pressSubmit}
               >
                 Predict
               </Button>

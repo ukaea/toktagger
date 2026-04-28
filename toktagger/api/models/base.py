@@ -167,8 +167,12 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def predict(self, samples: list[Sample]) -> list[list[AnnotationBase]]:
-        # pass in list of samples and list of annotations (could be size 1)
+    def predict(
+        self,
+        samples: list[Sample],
+        params: pydantic.BaseModel | None = None,
+    ) -> list[list[AnnotationBase]]:
+        # pass in list of samples and params required
         # returns list / array / tensor of predictions and uncertainties
         pass
 
@@ -184,26 +188,37 @@ class Model(ABC):
 class ModelRegistry:
     _registry: dict[str, typing.Type[Model]] = {}
     _tasks: dict[str, list[Task]] = {}
-    _params: dict[str, typing.Type[pydantic.BaseModel]] = {}
+    _training_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
+    _prediction_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
 
     @classmethod
     def register(
         cls,
         name: str,
         tasks: list[Task | str],
-        params: typing.Type[pydantic.BaseModel] | None = None,
+        training_params: typing.Type[pydantic.BaseModel] | None = None,
+        prediction_params: typing.Type[pydantic.BaseModel] | None = None,
     ):
         def decorator(model_class: Model):
             if not issubclass(model_class, Model):
                 raise ValueError(
                     f"Loader '{name}' does not inherit from Model base class."
                 )
-            if params and not issubclass(params, pydantic.BaseModel):
-                raise ValueError("Must provide params as a Pydantic BaseModel.")
+            if training_params and not issubclass(training_params, pydantic.BaseModel):
+                raise ValueError(
+                    "Must provide training params as a Pydantic BaseModel."
+                )
+            if prediction_params and not issubclass(
+                prediction_params, pydantic.BaseModel
+            ):
+                raise ValueError(
+                    "Must provide prediction params as a Pydantic BaseModel."
+                )
 
             cls._registry[name] = model_class
             cls._tasks[name] = [Task(_task) for _task in tasks]
-            cls._params[name] = params
+            cls._training_params[name] = training_params
+            cls._prediction_params[name] = prediction_params
 
             return model_class
 
@@ -239,14 +254,31 @@ class ModelRegistry:
         return tasks
 
     @classmethod
-    def get_params(cls, name: str) -> typing.Type[pydantic.BaseModel] | None:
-        params: typing.Type[pydantic.BaseModel] | None = cls._params.get(name, False)
+    def get_params(
+        cls, name: str, schema_type: typing.Literal["training", "prediction"]
+    ) -> typing.Type[pydantic.BaseModel] | None:
+        if schema_type == "training":
+            params: typing.Type[pydantic.BaseModel] | None = cls._training_params.get(
+                name, False
+            )
+        elif schema_type == "prediction":
+            params = cls._prediction_params.get(name, False)
+        else:
+            raise ValueError(
+                "Unexpected type of params - should be training or prediction."
+            )
+
         if params is False:
             raise ValueError(f"No Model class called '{name}' found in registry!")
         return params
 
     @classmethod
-    def get_params_schema(cls, name: str, return_draft_07: bool = False) -> dict | None:
+    def get_params_schema(
+        cls,
+        name: str,
+        schema_type: typing.Literal["training", "prediction"],
+        return_draft_07: bool = False,
+    ) -> dict | None:
         """
         Return a schema of the parameters required when training the specified model.
 
@@ -254,6 +286,8 @@ class ModelRegistry:
         ----------
         name : str
             The name of the model to return a schema for
+        type : Literal["training", "prediction"]
+            The type of parameters to get a schema for
         return_draft_07 : bool, optional
             Whether to convert the schema to JSONSchema draft-07, by default False
 
@@ -263,7 +297,9 @@ class ModelRegistry:
             The JSONSchema of the params model, if required.
         """
 
-        params: typing.Type[pydantic.BaseModel] | None = cls.get_params(name)
+        params: typing.Type[pydantic.BaseModel] | None = cls.get_params(
+            name, schema_type
+        )
         if not params:
             return None
 
