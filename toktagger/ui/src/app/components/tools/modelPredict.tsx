@@ -33,17 +33,18 @@ import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
 
 export function ModelPredictModal({ project }: { project: Project }) {
-  const [models, setModels] = useState<Model[] | null>(null);
-  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(undefined);
-  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [numPredictions, setNumPredictions] = useState<number>(20);
+  const [predictDisabled, setPredictDisabled] = useState<boolean>(true);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
+  const [models, setModels] = useState<Model[] | null>(null);
+  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(undefined);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
     Record<string, unknown>
   >({});
+  const [numPredictions, setNumPredictions] = useState<number>(20);
   const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",

@@ -19,8 +19,8 @@ import {
 import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
-import { Project } from "@/types";
-import { startTraining, getModels, getModelSchema } from "@/app/core";
+import { Project, Model } from "@/types";
+import { startTraining, getModels, getModelTrainSchema } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
@@ -29,7 +29,8 @@ export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [trainDisabled, setTrainDisabled] = useState<boolean>(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
+  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
+  const [models, setModels] = useState<Model[] | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
@@ -65,7 +66,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
   useEffect(() => {
     const updateSchema = async () => {
       if (!selectedModel) return;
-      const newSchema: RJSFSchema = await getModelSchema(selectedModel);
+      const newSchema: RJSFSchema = await getModelTrainSchema(selectedModel);
       setSchema(newSchema);
     };
     if (!selectedModel) {
