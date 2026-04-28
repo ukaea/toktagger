@@ -132,7 +132,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   }, [api, drawingEnabled, drawingTool]);
 
   useEffect(() => {
-    if (!api?.viewer || !drawingEnabled || panMode) return;
+    if (!api?.viewer || (!drawingEnabled && !panMode)) return;
 
     const viewer = api.viewer;
     const viewerElement = viewer.element as HTMLElement;
@@ -150,7 +150,15 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         .getAnnotations()
         .some((annotation) => annotationContainsPoint(annotation, imagePoint));
 
-      setViewerCursor(viewerElement, isOverAnnotation ? "pointer" : "");
+      const cursor = panMode
+        ? isOverAnnotation
+          ? "default"
+          : ""
+        : isOverAnnotation
+          ? "pointer"
+          : "";
+
+      setViewerCursor(viewerElement, cursor);
     };
 
     const clearCursor = () => {

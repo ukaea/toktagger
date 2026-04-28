@@ -62,14 +62,34 @@ export function annotationContainsPoint(
 }
 
 export function setViewerCursor(viewerElement: HTMLElement, cursor: string) {
-  viewerElement.style.cursor = cursor;
+  const applyCursor = (target: HTMLElement | SVGElement) => {
+    if (cursor) {
+      target.style.setProperty("cursor", cursor, "important");
+    } else {
+      target.style.removeProperty("cursor");
+    }
+  };
 
-  const overlayTargets = viewerElement.querySelectorAll<
-    HTMLElement | SVGElement
-  >(".a9s-gl-canvas, .a9s-annotationlayer");
+  const scopes = [
+    viewerElement,
+    viewerElement.parentElement,
+    viewerElement.parentElement?.parentElement,
+  ].filter(Boolean) as HTMLElement[];
 
-  overlayTargets.forEach((target) => {
-    target.style.cursor = cursor;
+  applyCursor(viewerElement);
+
+  const selector = [
+    ".a9s-gl-canvas",
+    ".a9s-annotationlayer",
+    ".a9s-annotationlayer *",
+    ".a9s-annotation",
+    ".a9s-annotation *",
+  ].join(", ");
+
+  scopes.forEach((scope) => {
+    scope.querySelectorAll<HTMLElement | SVGElement>(selector).forEach(
+      applyCursor,
+    );
   });
 }
 
