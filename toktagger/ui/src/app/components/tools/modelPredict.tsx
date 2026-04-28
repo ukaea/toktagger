@@ -39,12 +39,10 @@ export function ModelPredictModal({ project }: { project: Project }) {
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
   const [models, setModels] = useState<Model[] | null>(null);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
-  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(undefined);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
     Record<string, unknown>
   >({});
-  const [numPredictions, setNumPredictions] = useState<number>(20);
   const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
@@ -52,6 +50,9 @@ export function ModelPredictModal({ project }: { project: Project }) {
     right: 10,
     zIndex: 1000,
   };
+  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(undefined);
+  const [numPredictions, setNumPredictions] = useState<number>(20);
+
   const onSelectModel = (keys: Selection) => {
     setSelectedKeys(keys);
 
@@ -89,7 +90,11 @@ export function ModelPredictModal({ project }: { project: Project }) {
 
   useEffect(() => {
     const updateSchema = async () => {
-      if (!selectedModel) return;
+      if (!selectedModel || selectedModel.training_status != "completed") {
+        setSchema(null)
+        setPredictDisabled(true)
+        return;
+      }
       const newSchema: RJSFSchema = await getModelPredictSchema(selectedModel.type);
       setSchema(newSchema);
     };

@@ -19,15 +19,14 @@ import {
 import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
-import { Project, Model } from "@/types";
-import { startTraining, getModels, getModelTypes, getModelTrainSchema } from "@/app/core";
+import { Project } from "@/types";
+import { startTraining, getModelTypes, getModelTrainSchema } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
 
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [trainDisabled, setTrainDisabled] = useState<boolean>(true);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
   const [modelNames, setModelNames] = useState<string[] | null>(null);
@@ -61,23 +60,20 @@ export function ModelTrainModal({ project }: { project: Project }) {
         const errorMessage = await response.json();
         setMessage(errorMessage.detail);
         setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
-        setTrainDisabled(true);
       }
     })();
   }, [modalOpen, project.task]);
 
   useEffect(() => {
     const updateSchema = async () => {
-      if (!selectedModelName) return;
+      if (!selectedModelName) {
+        setSchema(null)
+        return;
+      }
       const newSchema: RJSFSchema = await getModelTrainSchema(selectedModelName);
       setSchema(newSchema);
     };
-    if (!selectedModelName) {
-      setTrainDisabled(true);
-      return;
-    }
     updateSchema();
-    setTrainDisabled(false);
   }, [selectedModelName]);
 
   const pressSubmit = () => {
@@ -156,7 +152,10 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <Button
                 variant="accent"
                 onPress={pressSubmit}
-                isDisabled={trainDisabled}
+                isDisabled={
+                  !modelNames ||
+                  !selectedModelName
+                }
               >
                 Train
               </Button>
