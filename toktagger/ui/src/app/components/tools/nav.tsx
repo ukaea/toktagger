@@ -18,7 +18,7 @@ import StepForward from "@spectrum-icons/workflow/StepForward";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import SaveFloppy from "@spectrum-icons/workflow/SaveFloppy";
 import Delete from "@spectrum-icons/workflow/Delete";
-import { getShotSample, saveSampleAnnotations } from "@/app/core";
+import { getShotSample, saveSampleAnnotations, updateSample } from "@/app/core";
 import {
   useNavigate,
   NavigateFunction,
@@ -81,16 +81,21 @@ type ButtonInfo = {
   project_id: string;
   sample_id: string;
   setIsValidated: (validated: boolean) => void;
-  saveOnNavigate?: boolean;
   navAdapter: NavAdapter;
 };
 
+type SaveButtonInfo = ButtonInfo & {
+  saveOnNavigate?: boolean;
+};
+
 type NextButtonInfo = ButtonInfo & {
+  saveOnNavigate?: boolean;
   visitedSampleIds: string[];
   sortDescriptor: SortDescriptor | null;
 };
 
 type PreviousButtonInfo = ButtonInfo & {
+  saveOnNavigate?: boolean;
   isDisabled: boolean;
   sortDescriptor: SortDescriptor | null;
   popVisitedSampleId: () => string | null;
@@ -263,7 +268,7 @@ function SaveButton({
   setIsValidated,
   saveOnNavigate: _saveOnNavigate,
   navAdapter,
-}: ButtonInfo) {
+}: SaveButtonInfo) {
   const handleClick = async () => {
     try {
       const annotationsToSave = navAdapter.getAnnotations();
@@ -296,9 +301,17 @@ function SaveButton({
   );
 }
 
-function ClearButton({ navAdapter }: { navAdapter: NavAdapter }) {
+function ClearButton({
+  project_id,
+  sample_id,
+  setIsValidated,
+  navAdapter,
+}: ButtonInfo) {
   const handleClick = () => {
     navAdapter.clear();
+    // Mark as unvalidated annotations
+    updateSample(project_id, sample_id, { validated_annotations: false });
+    setIsValidated(false);
   };
 
   return (
@@ -428,7 +441,12 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           sortDescriptor={sortDescriptor}
           navAdapter={navAdapter}
         />
-        <ClearButton navAdapter={navAdapter} />
+        <ClearButton
+          project_id={project_id}
+          sample_id={sample_id}
+          setIsValidated={setIsValidated}
+          navAdapter={navAdapter}
+        />
       </ButtonGroup>
       <TooltipTrigger delay={1000} placement="bottom">
         <Checkbox isSelected={SaveOnNavigate} onChange={setSaveOnNavigate}>
