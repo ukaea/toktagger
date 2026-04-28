@@ -228,10 +228,12 @@ async def start_model_training(request: Request, project_id: str, model_type: st
     task_id = task_registry.register(train_task)
     task_registry.update_actors(model.id)
 
-    # Associate the Celery task ID with the model in the database
+    # Associate the task ID with the model in the database
     await utils.update_model(
         db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
     )
+
+    return {"task_id": task_id, "model_id": model_id}
 
 
 @router.delete("/models/{model_type}/train")
@@ -359,10 +361,13 @@ async def predict(
 
     BATCH_SIZE = 32  # TODO again where to define this?
 
-    get_predictions.remote(
+    predict_task = get_predictions.remote(
         project=project, model=model, samples=samples, batch_size=BATCH_SIZE
     )
+    task_id = task_registry.register(predict_task)
     task_registry.update_actors(model.id)
+
+    return {"task_id": task_id}
 
 
 @router.delete("/models/{model_type}/predict")
@@ -490,7 +495,7 @@ async def get_sample_predictions(
                 detail="Model used for this task does not match!", status_code=422
             )
 
-        prediction_annotations = result.get("annotations")
+        prediction_annotations = result.get("annotations_batch")
 
         # Check that annotations contain results for this sample ID
         if not any(ann.sample_id == sample_id for ann in prediction_annotations):
