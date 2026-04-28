@@ -11,6 +11,12 @@ async def get_dataloaders(request: Request) -> list[str]:
     return LoaderRegistry.names()
 
 
+@router.get("/models")
+async def get_model_types(task: str) -> list[str]:
+    """Get list of available models for a given task."""
+    return ModelRegistry.names(task)
+
+
 @router.get("/dataloader/{loader}")
 async def get_data_schema(loader: str) -> dict:
     """Get schema which is required for getting data with this dataloader"""

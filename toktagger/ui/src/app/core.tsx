@@ -444,3 +444,13 @@ export const getModelPredictSchema = async (
 ): Promise<RJSFSchema> => {
   return getModelSchema(modelName, "predict")
 }
+
+export const getModelTypes = async (
+  task: string,
+): Promise<Response> => {
+  const response = await fetch(`${BACKEND_API_URL}/meta/models?task=${task}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch model types!`);
+  }
+  return response
+};

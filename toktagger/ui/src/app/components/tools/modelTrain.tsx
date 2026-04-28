@@ -20,7 +20,7 @@ import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project, Model } from "@/types";
-import { startTraining, getModels, getModelTrainSchema } from "@/app/core";
+import { startTraining, getModels, getModelTypes, getModelTrainSchema } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
@@ -30,8 +30,8 @@ export function ModelTrainModal({ project }: { project: Project }) {
   const [trainDisabled, setTrainDisabled] = useState<boolean>(true);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
-  const [models, setModels] = useState<Model[] | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [modelNames, setModelNames] = useState<string[] | null>(null);
+  const [selectedModelName, setSelectedModelName] = useState<string | null>(null);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
     Record<string, unknown>
@@ -45,37 +45,40 @@ export function ModelTrainModal({ project }: { project: Project }) {
   };
 
   useEffect(() => {
-    if (!modalOpen || !project._id) {
-      setTrainDisabled(true);
+    if (!modalOpen) {
       return;
     }
-    const project_id: string = project._id;
-
     (async () => {
-      const response = await getModels(project_id);
+      const response = await getModelTypes(project.task);
 
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json();
+        const modelTypes = data as string[];
+        setModelNames(modelTypes);
+      }
+
+      else {
         const errorMessage = await response.json();
         setMessage(errorMessage.detail);
         setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
         setTrainDisabled(true);
       }
     })();
-  }, [modalOpen, project._id]);
+  }, [modalOpen, project.task]);
 
   useEffect(() => {
     const updateSchema = async () => {
-      if (!selectedModel) return;
-      const newSchema: RJSFSchema = await getModelTrainSchema(selectedModel);
+      if (!selectedModelName) return;
+      const newSchema: RJSFSchema = await getModelTrainSchema(selectedModelName);
       setSchema(newSchema);
     };
-    if (!selectedModel) {
+    if (!selectedModelName) {
       setTrainDisabled(true);
       return;
     }
     updateSchema();
     setTrainDisabled(false);
-  }, [selectedModel]);
+  }, [selectedModelName]);
 
   const pressSubmit = () => {
     if (schema) {
@@ -86,10 +89,10 @@ export function ModelTrainModal({ project }: { project: Project }) {
   };
 
   const submitTrainJob = async (params: Record<string, unknown>) => {
-    if (!selectedModel || !project._id) {
+    if (!selectedModelName || !project._id) {
       return;
     }
-    const response = await startTraining(project._id, selectedModel, params);
+    const response = await startTraining(project._id, selectedModelName, params);
     if (response.ok) {
       setMessage("Model training added to job queue!");
       setMessageIcon(
@@ -120,14 +123,14 @@ export function ModelTrainModal({ project }: { project: Project }) {
             <Content>
               <ComboBox
                 label="Select Model Type"
-                selectedKey={selectedModel}
+                selectedKey={selectedModelName}
                 onSelectionChange={(key) =>
-                  setSelectedModel(key !== null ? String(key) : null)
+                  setSelectedModelName(key !== null ? String(key) : null)
                 }
               >
-                {project.model_types.map((model_type) => (
-                  <Item key={model_type}>{model_type}</Item>
-                ))}
+                {modelNames ? modelNames.map((model_name) => (
+                  <Item key={model_name}>{model_name}</Item>
+                )) : null}
               </ComboBox>
               {schema && (
                 <ModelForm
