@@ -87,9 +87,9 @@ export function setViewerCursor(viewerElement: HTMLElement, cursor: string) {
   ].join(", ");
 
   scopes.forEach((scope) => {
-    scope.querySelectorAll<HTMLElement | SVGElement>(selector).forEach(
-      applyCursor,
-    );
+    scope
+      .querySelectorAll<HTMLElement | SVGElement>(selector)
+      .forEach(applyCursor);
   });
 }
 
