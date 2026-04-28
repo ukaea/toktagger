@@ -33,7 +33,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
   const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(undefined);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [numPredictions, setNumPredictions] = useState<string>("20");
+  const [numPredictions, setNumPredictions] = useState<number>(20);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
   const buttonStyle = {
@@ -77,7 +77,9 @@ export function ModelPredictModal({ project }: { project: Project }) {
 
   useEffect(() => {
     const fetchModels = async () => {
+      if (!project._id) return;
       const response = await getModels(project._id);
+
       if (response.ok) {
         const data = await response.json();
         const models = data as Model[];
@@ -94,7 +96,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       fetchModels();
       setMessage(null);
       setMessageIcon(null);
-      setSelectedModelId(null);
+      setSelectedModel(null);
 
       poll = setInterval(() => {
         fetchModels();
@@ -105,28 +107,17 @@ export function ModelPredictModal({ project }: { project: Project }) {
     };
   }, [project._id, modalOpen]);
 
-  if (!project) {
-    return;
-  }
 
   const submitPredictJob = async () => {
-    if (!models || !selectedModelId) {
+    if (!project._id || !models || !selectedKeys || !selectedModel) {
       return;
-    }
-    const selectedModel = models.find(
-      (model) => model._id === selectedModelId
-    );
-    if (!selectedModel) {
-      setMessage("Selected model could not be found!");
-      setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
-      return
     }
 
     const response = await startPredictions(
       project._id,
       selectedModel.type,
       selectedModel.version,
-      Number(numPredictions),
+      numPredictions,
     );
 
     if (response.ok) {
@@ -134,7 +125,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
-      setSelectedModelId(null);
+      setSelectedKeys(undefined);
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
@@ -143,16 +134,8 @@ export function ModelPredictModal({ project }: { project: Project }) {
   };
 
   const stopTrainingJob = async () => {
-    if (!models || !selectedModelId) {
+    if (!project._id || !models || !selectedKeys || !selectedModel) {
       return;
-    }
-    const selectedModel = models.find(
-      (model) => model._id === selectedModelId,
-    );
-    if (!selectedModel) {
-      setMessage("Selected model could not be found!");
-      setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
-      return
     }
 
     const response = await stopTraining(
@@ -166,7 +149,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
-      setSelectedModelId(null);
+      setSelectedKeys(undefined);
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
@@ -209,13 +192,11 @@ export function ModelPredictModal({ project }: { project: Project }) {
                 <Button
                   variant="negative"
                   isDisabled={
-                    !selectedModelId ||
+                    !selectedKeys ||
                     !models ||
+                    !selectedModel ||
                     !["started", "queued"].includes(
-                      models.find(
-                        (model) =>
-                          model._id === selectedModelId,
-                      ).training_status,
+                      selectedModel.training_status,
                     )
                   }
                   onPress={stopTrainingJob}
@@ -267,11 +248,10 @@ export function ModelPredictModal({ project }: { project: Project }) {
               <Button
                 variant="accent"
                 isDisabled={
-                  selectedKeys.size === 0 ||
+                  !selectedKeys ||
                   !models ||
-                  models.find(
-                    (model) => model._id === selectedKeys.values().next().value,
-                  ).training_status != "completed"
+                  !selectedModel ||
+                  selectedModel.training_status != "completed"
                 }
                 onPress={submitPredictJob}
               >
