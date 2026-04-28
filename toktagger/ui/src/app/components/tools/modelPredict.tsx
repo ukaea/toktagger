@@ -35,7 +35,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [numPredictions, setNumPredictions] = useState<number>(20);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
+  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(null);
   const buttonStyle = {
     position: "fixed",
     top: 10,
@@ -45,15 +45,16 @@ export function ModelPredictModal({ project }: { project: Project }) {
   const onSelectModel = (keys: Selection) => {
     setSelectedKeys(keys);
 
-    if (!keys) {
-      setSelectedModel(null)
-      return
-    }
-
     if (keys === 'all') {
       // Won't happen in single mode
       return;
     }
+
+    if (!keys || keys.size === 0) {
+      setSelectedModel(null)
+      return
+    }
+
     // Single select mode, so only ever one key
     const [key] = keys as Set<string>;
 
@@ -179,7 +180,6 @@ export function ModelPredictModal({ project }: { project: Project }) {
               <Flex
                 justifyContent="space-between"
                 alignItems="center"
-                className="pb-4"
                 marginBottom="size-200"
               >
                 <NumberField
@@ -210,6 +210,8 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   selectionMode="single"
                   selectedKeys={selectedKeys}
                   onSelectionChange={onSelectModel}
+                  height="size-3000"
+                  aria-label="Model Prediction Table"
                 >
                   <TableHeader>
                     <Column>Model Type</Column>
