@@ -11,6 +11,7 @@ import {
   type AnnotationState,
   type AnnotoriousOpenSeadragonAnnotator,
   type ImageAnnotation,
+  type PopupProps,
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
 
@@ -163,7 +164,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
       const isOverAnnotation = api
         .getAnnotations()
-        .some((annotation) => annotationContainsPoint(annotation, imagePoint));
+        .some((annotation: ImageAnnotation) =>
+          annotationContainsPoint(annotation, imagePoint),
+        );
 
       const cursor = panMode
         ? isOverAnnotation
@@ -258,7 +261,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
           {/* Built-in Annotorious popup positioning for zoom/pan viewers */}
           <OpenSeadragonAnnotationPopup
-            popup={(props) => {
+            popup={(props: PopupProps) => {
               const annotation = props.annotation as ImageAnnotation;
 
               const { className, trackId } = getLabelTrack(annotation);
