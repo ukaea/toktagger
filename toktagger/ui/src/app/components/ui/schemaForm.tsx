@@ -25,6 +25,7 @@ import {
   Heading,
   InlineAlert,
   Content,
+  Flex
 } from "@adobe/react-spectrum";
 import {
   WidgetProps,
@@ -110,15 +111,15 @@ export function SpectrumCheckboxWidget(props: WidgetProps) {
       {label}
 
       {schema.description && (
-        <Text
-          slot="description"
-          UNSAFE_style={{
-            whiteSpace: "normal",
-            wordBreak: "break-word",
-          }}
-        >
-          <em>{schema.description}</em>
-        </Text>
+        // For some reason anything other than hard coding a size here
+        // means the container width grows to accomodate the text
+        <Flex maxWidth={"size-2000"} marginTop={"size-50"}>
+          <span style={{ fontSize: '12px' }}>
+            <Text slot="description">
+              <em>{schema.description}</em>
+            </Text>
+          </span>
+        </Flex>
       )}
     </Checkbox>
   );
