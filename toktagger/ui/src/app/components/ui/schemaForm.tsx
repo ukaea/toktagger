@@ -30,6 +30,7 @@ import {
   WidgetProps,
   FieldTemplateProps,
   ArrayFieldTemplateProps,
+  ArrayFieldItemTemplateProps,
   TitleFieldProps,
   ErrorListProps,
   RJSFValidationError,
@@ -104,14 +105,24 @@ export function SpectrumCheckboxWidget(props: WidgetProps) {
       isSelected={!!value}
       isDisabled={disabled || readonly}
       onChange={onChange}
-      width={"100%"}
+      width="100%"
     >
       {label}
-      {schema.description}
+
+      {schema.description && (
+        <Text
+          slot="description"
+          UNSAFE_style={{
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+          }}
+        >
+          <em>{schema.description}</em>
+        </Text>
+      )}
     </Checkbox>
   );
 }
-
 export function SpectrumCheckboxesWidget(props: WidgetProps) {
   const {
     id,
