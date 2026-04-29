@@ -391,10 +391,15 @@ const SpectrumArrayFieldTemplate = ({
       </Heading>
       {items.map((item) => item)}
       {schema.description && (
-        <Text>
-          {" "}
-          <em>{schema.description}</em>{" "}
-        </Text>
+        // For some reason anything other than hard coding a size here
+        // means the container width grows to accomodate the text
+        <Flex maxWidth={"size-2000"} marginTop={"size-50"}>
+          <span style={{ fontSize: '12px' }}>
+            <Text slot="description">
+              <em>{schema.description}</em>
+            </Text>
+          </span>
+        </Flex>
       )}
     </View>
   );
