@@ -6,6 +6,7 @@ import type {
   SamplesSummary,
   SampleUpdate,
   Annotation,
+  DataParams,
 } from "@/types";
 import { RJSFSchema } from "@rjsf/utils";
 
@@ -383,6 +384,7 @@ export const startSamplePredictions = async (
   sample_id: string,
   selected_model: string,
   params: Record<string, unknown>,
+  data_params: DataParams
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
@@ -391,7 +393,7 @@ export const startSamplePredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ params: params }),
+      body: JSON.stringify({ params: params, data_params: data_params }),
     },
   );
   return response;

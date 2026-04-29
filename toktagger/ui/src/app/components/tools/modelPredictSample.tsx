@@ -27,7 +27,7 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { annotations, project, setAnnotations } = useSample();
+  const { annotations, project, dataParams, setAnnotations } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) => project?.model_types.includes(ann.created_by) || false,
@@ -110,6 +110,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       sample_id,
       selectedModelName,
       params,
+      dataParams,
     );
     const payload = await response.json();
 
@@ -201,8 +202,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           >
             {modelNames
               ? modelNames.map((model_name) => (
-                  <Item key={model_name}>{model_name}</Item>
-                ))
+                <Item key={model_name}>{model_name}</Item>
+              ))
               : null}
           </ComboBox>
           {schema && (
