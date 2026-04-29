@@ -6,6 +6,7 @@ import random
 from bson.objectid import ObjectId
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
+from toktagger.api.schemas.data import DataParamTypes, DataParams
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
 from toktagger.api.models.base import ModelRegistry
@@ -444,6 +445,9 @@ async def create_sample_predictions(
     model_type: str = Path(description="The type of model to make predictions from."),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
+    ),
+    data_params: DataParamTypes = Body(
+        DataParams(), description="Data parameters fort this sample", embed=True
     ),
 ) -> dict[str, str]:
     db_client = request.app.state.db_client

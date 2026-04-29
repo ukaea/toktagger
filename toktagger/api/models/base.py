@@ -1,6 +1,7 @@
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.schemas.data import DataParamTypes
 from toktagger.api.core.data_loaders import DataLoader
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
@@ -87,11 +88,14 @@ class Model(ABC):
         return score
 
     def _wrapped_predict(
-        self, samples: list[Sample], params: pydantic.BaseModel | None
+        self,
+        samples: list[Sample],
+        params: pydantic.BaseModel | None,
+        data_params: DataParamTypes | None,
     ) -> list[list[AnnotationBase]]:
         if not self._trained:
             raise RuntimeError("Cannot make predictions using an untrained model!")
-        return self.predict(samples=samples, params=params)
+        return self.predict(samples=samples, params=params, data_params=data_params)
 
     def _wrapped_save(self, file_stem: str):
         if not self._trained:
@@ -198,6 +202,7 @@ class Model(ABC):
         self,
         samples: list[Sample],
         params: pydantic.BaseModel | None = None,
+        data_params: DataParamTypes | None = None,
     ) -> list[list[AnnotationBase]]:
         # pass in list of samples and params required
         # returns list / array / tensor of predictions and uncertainties

@@ -298,7 +298,10 @@ class DisruptionCNN(Model):
         return final_accuracy
 
     def predict(
-        self, samples: list[Sample], params: DisruptionCNNPredictParams
+        self,
+        samples: list[Sample],
+        params: DisruptionCNNPredictParams,
+        data_params: DataParams | None = None,
     ) -> list[list[TimePoint]]:
         num_mc_samples = 20  # Should let user choose num mc samples? TODO
         dataset = DisruptionDataset(
