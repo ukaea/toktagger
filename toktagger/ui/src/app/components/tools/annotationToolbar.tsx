@@ -31,6 +31,9 @@ export const AnnotationToolbar = () => {
     Map<TimeSeriesAnnotationType, string>
   >(new Map());
 
+  const [firstTimeEdit, setFirstTimeEdit] = useState(true);
+  const [contextHelpManualOpen, setContextHelpManualOpen] = useState<boolean | undefined>(undefined);
+
   const modeVariant: "accent" | "primary" = editMode ? "accent" : "primary";
   const modeText = editMode ? "Edit Mode" : "View Mode";
 
@@ -53,6 +56,9 @@ export const AnnotationToolbar = () => {
             onPress={() => {
               setAnnotationTool(null);
               setEditMode(!editMode);
+              if (firstTimeEdit) {
+                setContextHelpManualOpen(true);
+              }
             }}
           >
             {modeText}
@@ -123,7 +129,12 @@ export const AnnotationToolbar = () => {
         </Flex>
       </Flex>
       <Flex direction="row" justifyContent="end" marginEnd="size-100">
-        <ContextualHelp>
+        <ContextualHelp
+          isOpen={firstTimeEdit ? contextHelpManualOpen : undefined}
+          onOpenChange={() => {
+            setFirstTimeEdit(false);
+          }}
+        >
           <Heading>Annotation Toolbar</Heading>
           <Content>
             <Text>

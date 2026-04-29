@@ -17,6 +17,7 @@ import {
 import { ExtendedPlotlyHTMLElement, TimeSeriesAnnotationPoint } from "@/types";
 import React from "react";
 import { arrayMax, arrayMin } from "@/app/utils";
+import { ToastQueue } from "@adobe/react-spectrum";
 
 const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
   modeBarButtons: [
@@ -248,6 +249,9 @@ export const BaseTimeSeriesPlot = ({
 
     const onSelection = (eventData: PlotSelectionEvent) => {
       if (eventData?.range) {
+        if (!editMode) {
+          ToastQueue.info("Change to Edit Mode to select annotations", {timeout: 5000})
+        }
         findSelectedAnnotations({
           low: eventData.range.x[0],
           high: eventData.range.x[1],
@@ -261,7 +265,7 @@ export const BaseTimeSeriesPlot = ({
     return () => {
       plot.removeAllListeners("plotly_selected");
     };
-  }, [findSelectedAnnotations, plotId, plotReady]);
+  }, [editMode, findSelectedAnnotations, plotId, plotReady]);
 
   useEffect(() => {
     if (!plotReady) {
@@ -348,14 +352,18 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const startAnnotationCreation = (event: MouseEvent) => {
-      if (activeAnnotationTool && event.ctrlKey) {
-        setOngoingAction(true);
-        isDraggingRef.current = true;
-        const clickLocation = getClickData(event, plot);
-        toolingCallbacks
-          .get(activeAnnotationTool.type)
-          ?.start(clickLocation.x, clickLocation.y, activeAnnotationTool.label);
-      }
+      if (event.ctrlKey) {
+        if (activeAnnotationTool) {
+          setOngoingAction(true);
+          isDraggingRef.current = true;
+          const clickLocation = getClickData(event, plot);
+          toolingCallbacks
+            .get(activeAnnotationTool.type)
+            ?.start(clickLocation.x, clickLocation.y, activeAnnotationTool.label);
+        } else {
+          ToastQueue.info("Select a tool to draw annotation", {timeout: 5000})
+        }
+      } 
     };
 
     const updateAnnotation = (event: MouseEvent) => {
