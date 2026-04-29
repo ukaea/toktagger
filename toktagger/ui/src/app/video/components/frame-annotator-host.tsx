@@ -26,6 +26,35 @@ import { AnnotationPopup } from "./annotation-popup";
 import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
 import { ResetViewButton } from "./ui_elements";
 
+function setGestureNavigation(
+  viewer: OpenSeadragon.Viewer,
+  navEnabled: boolean,
+) {
+  const mouse = viewer.gestureSettingsByDeviceType("mouse");
+  mouse.dragToPan = navEnabled;
+  mouse.scrollToZoom = navEnabled;
+  mouse.clickToZoom = false;
+  mouse.dblClickToZoom = false;
+
+  const touch = viewer.gestureSettingsByDeviceType("touch");
+  touch.dragToPan = navEnabled;
+  touch.pinchToZoom = navEnabled;
+  touch.clickToZoom = false;
+  touch.dblClickToZoom = false;
+
+  const pen = viewer.gestureSettingsByDeviceType("pen");
+  pen.dragToPan = navEnabled;
+  pen.scrollToZoom = false;
+  pen.clickToZoom = false;
+  pen.dblClickToZoom = false;
+
+  const unknown = viewer.gestureSettingsByDeviceType("unknown");
+  unknown.dragToPan = navEnabled;
+  unknown.scrollToZoom = navEnabled;
+  unknown.clickToZoom = false;
+  unknown.dblClickToZoom = false;
+}
+
 /**
  * Top-level host that provides the Annotorious context and renders the annotator.
  */
@@ -90,23 +119,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   useEffect(() => {
     if (!api) return;
 
-    const navEnabled = panMode;
-
     if (api.viewer) {
-      api.viewer.gestureSettingsMouse.dragToPan = navEnabled;
-      api.viewer.gestureSettingsMouse.scrollToZoom = navEnabled;
-      api.viewer.gestureSettingsMouse.clickToZoom = false;
-      api.viewer.gestureSettingsMouse.dblClickToZoom = false;
-
-      api.viewer.gestureSettingsTouch.dragToPan = navEnabled;
-      api.viewer.gestureSettingsTouch.pinchToZoom = navEnabled;
-
-      api.viewer.gestureSettingsPen.dragToPan = navEnabled;
-
-      api.viewer.gestureSettingsUnknown.dragToPan = navEnabled;
-      api.viewer.gestureSettingsUnknown.scrollToZoom = navEnabled;
-      api.viewer.gestureSettingsUnknown.clickToZoom = false;
-      api.viewer.gestureSettingsUnknown.dblClickToZoom = false;
+      api.viewer.setMouseNavEnabled(panMode);
+      setGestureNavigation(api.viewer, panMode);
     }
 
     api.setUserSelectAction(
@@ -175,7 +190,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     };
   }, [api, drawingEnabled, panMode]);
 
-  const viewerOptions = useMemo(
+  const viewerOptions = useMemo<OpenSeadragon.Options>(
     () => ({
       tileSources: {
         type: "image",
@@ -187,25 +202,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       constrainDuringPan: true,
       animationTime: 0.3,
       showNavigationControl: false,
-      gestureSettingsMouse: {
-        scrollToZoom: false,
-        dragToPan: false,
-        clickToZoom: false,
-        dblClickToZoom: false,
-      },
-      gestureSettingsTouch: {
-        pinchToZoom: false,
-        dragToPan: false,
-      },
-      gestureSettingsPen: {
-        dragToPan: false,
-      },
-      gestureSettingsUnknown: {
-        dragToPan: false,
-        scrollToZoom: false,
-        clickToZoom: false,
-        dblClickToZoom: false,
-      },
+      mouseNavEnabled: false,
     }),
     [dataUrl],
   );
