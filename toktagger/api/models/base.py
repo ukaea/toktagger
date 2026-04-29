@@ -71,10 +71,10 @@ class Model(ABC):
         self.model = self.define_model()
         self.type = ModelRegistry.get_name(self.__class__)
         loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
-        data_loader: DataLoader = ray.get(
+        data_loader: typing.Type[DataLoader] = ray.get(
             loader_registry.get.remote(project.data_loader)
         )
-        self.data_loader = data_loader()
+        self.data_loader: DataLoader = data_loader()
         self._trained = False
 
     def _wrapped_train(
