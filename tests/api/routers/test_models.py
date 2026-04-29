@@ -145,6 +145,20 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+async def test_model_predict_missing_weights(api_client, db_client, setup_model_db):
+    # Delete weights
+    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+        f"{setup_model_db['model_id_1']}.model"
+    ).unlink()
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
+    )
+    with pytest.raises(RuntimeError) as e:
+        wait_for_results(api_client.app.state.task_registry, response.json()["task_id"])
+        assert "Cannot make predictions using an untrained model!" in str(e)
+
+
+@pytest.mark.asyncio
 async def test_model_sample_predict_params(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_params_timeseries_cnn/predict",
