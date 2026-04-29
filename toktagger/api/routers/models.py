@@ -470,7 +470,11 @@ async def create_sample_predictions(
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
     task = get_predictions.remote(
-        project=project, model=model, samples=[sample], params=params_validated
+        project=project,
+        model=model,
+        samples=[sample],
+        params=params_validated,
+        data_params=data_params,
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)

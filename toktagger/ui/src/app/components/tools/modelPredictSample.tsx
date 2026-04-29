@@ -9,7 +9,7 @@ import {
   Switch,
   Button,
 } from "@adobe/react-spectrum";
-import { Annotations, Annotation } from "@/types";
+import { Annotations, Annotation, TaskType, DataParams } from "@/types";
 import {
   getModelTypes,
   getModelPredictSchema,
@@ -27,7 +27,8 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { annotations, project, dataParams, setAnnotations } = useSample();
+  // TODO shouldn't need to get data here, see below comment about effectiveDataParams
+  const { annotations, project, dataParams, setAnnotations, data } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) => project?.model_types.includes(ann.created_by) || false,
@@ -101,16 +102,34 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   };
 
   const submitPredictJob = async (params: Record<string, unknown>) => {
-    if (!selectedModelName) {
+    if (!selectedModelName || !project) {
       return;
     }
+
+    // TODO: I would prefer to not have to do this if possible
+    // and for the sample context dataParams be the source of truth
+    let effectiveDataParams = dataParams;
+
+    console.log("HERE 1")
+
+    if (project.task === TaskType.Video) {
+      console.log("HERE 2")
+
+      effectiveDataParams = {
+        ...dataParams,
+        name: "image",
+        frame: data && "frame" in data ? data.frame : null,
+      };
+    }
+
+    console.log(effectiveDataParams)
 
     const response = await startSamplePredictions(
       project_id,
       sample_id,
       selectedModelName,
       params,
-      dataParams,
+      effectiveDataParams,
     );
     const payload = await response.json();
 
