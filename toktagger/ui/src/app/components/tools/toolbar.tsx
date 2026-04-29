@@ -291,6 +291,15 @@ export default function ToolBar() {
       name: "Video Tools",
       component: <VideoToolbox />,
     });
+    tools.push({
+      name: "Model Prediction",
+      component: (
+        <ModelPredictTool
+          project_id={project_id}
+          sample_id={sample_id}
+        ></ModelPredictTool>
+      ),
+    });
   }
 
   const refreshAnnotations = async () => {
