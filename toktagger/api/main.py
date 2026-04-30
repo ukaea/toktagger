@@ -44,13 +44,15 @@ class Server:
     def __init__(self):
         self.frontend_path = pathlib.Path(__file__).parent / "static"
 
-    def _setup_ray(self, api_url: str, model_storage_path: str | None = None):
+    def _setup_ray(self):
+        if not (api_url := os.environ.get("API_URL")):
+            raise ValueError("API URL must be set!")
         if not ray.is_initialized():
             ray.init(
                 runtime_env={
                     "env_vars": {
                         "API_URL": api_url,
-                        "MODEL_STORAGE": model_storage_path,
+                        "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
                     }
                 }
             )
@@ -84,6 +86,10 @@ class Server:
             allow_headers=["*"],
         )
 
+        # Setup ray if required
+        if models_dependencies_installed():
+            self._setup_ray()
+
         # Static front end files
         self.app.state.index_file = self.frontend_path / "index.html"
         self.app.mount(
@@ -108,6 +114,4 @@ class Server:
         port: int = 8002,
     ):
         self._setup_app()
-        if models_dependencies_installed():
-            self._setup_ray(f"http://{host}:{port}", os.environ.get("MODEL_STORAGE"))
         uvicorn.run(self.app, host=host, port=port)
