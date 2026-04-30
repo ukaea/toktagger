@@ -8,6 +8,7 @@ if __name__ == "__main__":
         toktagger.api.cli.server._setup_ray(
             "http://0.0.0.0:8002", os.environ.get("MODEL_STORAGE")
         )
+    # Can't just use server.Run with reload=True since it must point to a module level import
     uvicorn.run(
         "toktagger.api.cli:app",
         host="0.0.0.0",
