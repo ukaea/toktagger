@@ -176,9 +176,11 @@ export function VideoSessionProvider(props: {
   data: unknown;
   dataParams: DataParams;
   dbAnnotations: Annotation[];
+  propagate: boolean;
+  setPropagate: (v: boolean) => void;
   children: React.ReactNode;
 }) {
-  const { projectId, sampleId, children } = props;
+  const { projectId, sampleId, propagate, setPropagate, children } = props;
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -246,7 +248,6 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
   const [panMode, setPanModeState] = useState(false);
-  const [propagate, setPropagateState] = useState(true);
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -340,10 +341,6 @@ export function VideoSessionProvider(props: {
       isProgrammaticAnnoSyncRef.current = false;
     }
   }, [api, flushPendingOverlay]);
-
-  const setPropagate = useCallback((v: boolean) => {
-    setPropagateState(v);
-  }, []);
 
   useEffect(() => {
     const releaseShiftPan = () => {
