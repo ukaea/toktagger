@@ -250,7 +250,7 @@ export const BaseTimeSeriesPlot = ({
     const onSelection = (eventData: PlotSelectionEvent) => {
       if (eventData?.range) {
         if (!editMode) {
-          ToastQueue.info("Change to Edit Mode to select annotations", {timeout: 5000})
+          ToastQueue.info("Change to Edit Mode to select annotations - see help popup in annotation toolbar for more info", {timeout: 5000})
         }
         findSelectedAnnotations({
           low: eventData.range.x[0],
@@ -353,6 +353,11 @@ export const BaseTimeSeriesPlot = ({
 
     const startAnnotationCreation = (event: MouseEvent) => {
       if (event.ctrlKey) {
+        console.log(editMode)
+        if (!editMode) {
+          ToastQueue.info("Change to Edit Mode to draw annotations - see help popup in annotation toolbar for more info", {timeout: 5000});
+          return;
+        }
         if (activeAnnotationTool) {
           setOngoingAction(true);
           isDraggingRef.current = true;
@@ -361,7 +366,7 @@ export const BaseTimeSeriesPlot = ({
             .get(activeAnnotationTool.type)
             ?.start(clickLocation.x, clickLocation.y, activeAnnotationTool.label);
         } else {
-          ToastQueue.info("Select a tool to draw annotation", {timeout: 5000})
+          ToastQueue.info("Select a tool to draw annotation - see help popup in annotation toolbar for more info", {timeout: 5000})
         }
       } 
     };
@@ -389,14 +394,12 @@ export const BaseTimeSeriesPlot = ({
     draggableElements.forEach((element) => {
       element.addEventListener("contextmenu", handleContextMenu);
       element.addEventListener("mousedown", handleCancelSelection);
-    });
-
-    if (!editMode) return;
-
-    draggableElements.forEach((element) => {
       element.addEventListener("mousedown", startAnnotationCreation);
-      element.addEventListener("mousemove", updateAnnotation);
-      element.addEventListener("mouseup", finishAnnotationCreation);
+
+      if (editMode) {
+        element.addEventListener("mousemove", updateAnnotation);
+        element.addEventListener("mouseup", finishAnnotationCreation);
+      }
     });
 
     return () => {

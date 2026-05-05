@@ -49,7 +49,7 @@ export const AnnotationToolbar = () => {
     <View width="size-3000" flexShrink={0} marginTop="size-200">
       <Flex direction="column" alignItems="center" gap="size-150">
         <h1 className="text-2xl font-bold">Annotation Toolbar</h1>
-        <TooltipTrigger>
+        <TooltipTrigger placement="left">
           <Button
             width="size-1600"
             variant={modeVariant}
@@ -82,7 +82,7 @@ export const AnnotationToolbar = () => {
                 alignItems="center"
                 gap="size-100"
               >
-                <TooltipTrigger>
+                <TooltipTrigger placement="left">
                   <ToggleButton
                     width="size-1600"
                     isDisabled={!editMode}
