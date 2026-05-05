@@ -10,8 +10,87 @@ import {
   VideoImageAnnotation,
 } from "./anno-utils";
 
+export type ImagePoint = { x: number; y: number };
+
 function getTargetSource(a: ImageAnnotation): string {
   return (a as VideoImageAnnotation).target.source ?? "";
+}
+
+function polygonContainsPoint(points: [number, number][], point: ImagePoint) {
+  let inside = false;
+
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i];
+    const [xj, yj] = points[j];
+    const intersects =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+
+    if (intersects) inside = !inside;
+  }
+
+  return inside;
+}
+
+export function annotationContainsPoint(
+  annotation: ImageAnnotation,
+  point: ImagePoint,
+) {
+  const rect = isRectangleAnno(annotation)
+    ? readRectGeometry(annotation)
+    : null;
+  if (rect) {
+    return (
+      point.x >= rect.x &&
+      point.x <= rect.x + rect.w &&
+      point.y >= rect.y &&
+      point.y <= rect.y + rect.h
+    );
+  }
+
+  const polygon = isPolygonAnno(annotation)
+    ? readPolygonGeometry(annotation)
+    : null;
+  if (!polygon) return false;
+
+  const { minX, minY, maxX, maxY } = polygon.bounds;
+  if (point.x < minX || point.x > maxX || point.y < minY || point.y > maxY) {
+    return false;
+  }
+
+  return polygonContainsPoint(polygon.points, point);
+}
+
+export function setViewerCursor(viewerElement: HTMLElement, cursor: string) {
+  const applyCursor = (target: HTMLElement | SVGElement) => {
+    if (cursor) {
+      target.style.setProperty("cursor", cursor, "important");
+    } else {
+      target.style.removeProperty("cursor");
+    }
+  };
+
+  const scopes = [
+    viewerElement,
+    viewerElement.parentElement,
+    viewerElement.parentElement?.parentElement,
+  ].filter(Boolean) as HTMLElement[];
+
+  applyCursor(viewerElement);
+
+  const selector = [
+    ".a9s-gl-canvas",
+    ".a9s-annotationlayer",
+    ".a9s-annotationlayer *",
+    ".a9s-annotation",
+    ".a9s-annotation *",
+  ].join(", ");
+
+  scopes.forEach((scope) => {
+    scope
+      .querySelectorAll<HTMLElement | SVGElement>(selector)
+      .forEach(applyCursor);
+  });
 }
 
 /**
