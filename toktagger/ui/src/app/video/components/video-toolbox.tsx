@@ -272,12 +272,24 @@ export function VideoToolbox() {
             </Button>
           </Flex>
           <Flex alignItems="center" justifyContent="center">
-            <Switch
-              isSelected={session.propagate}
-              onChange={session.setPropagate}
-            >
-              Propagation
-            </Switch>
+            <div className="w-40 flex justify-start">
+              <Switch
+                isSelected={session.propagate}
+                onChange={session.setPropagate}
+              >
+                Propagation
+              </Switch>
+            </div>
+          </Flex>
+          <Flex alignItems="center" justifyContent="center">
+            <div className="w-40 flex justify-start">
+              <Switch
+                isSelected={session.hideAnnotations}
+                onChange={session.setHideAnnotations}
+              >
+                <span className="whitespace-nowrap">Hide Annotations</span>
+              </Switch>
+            </div>
           </Flex>
         </div>
         <Divider size="S" marginX="size-200" />

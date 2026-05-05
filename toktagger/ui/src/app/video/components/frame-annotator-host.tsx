@@ -80,6 +80,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     selection,
     drawingTool,
     panMode,
+    hideAnnotations,
     deleteAnnotation,
     closePopup,
   } = useVideoSession();
@@ -126,15 +127,17 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     }
 
     api.setUserSelectAction(
-      panMode ? UserSelectAction.NONE : UserSelectAction.EDIT,
+      panMode || hideAnnotations
+        ? UserSelectAction.NONE
+        : UserSelectAction.EDIT,
     );
 
-    if (panMode) {
+    if (panMode || hideAnnotations) {
       api.setSelected?.();
     }
-  }, [api, panMode]);
+  }, [api, hideAnnotations, panMode]);
 
-  const drawingEnabled = !!selection.className && !panMode;
+  const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
 
   useEffect(() => {
     if (!api) return;
@@ -148,7 +151,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   }, [api, drawingEnabled, drawingTool]);
 
   useEffect(() => {
-    if (!api?.viewer || (!drawingEnabled && !panMode)) return;
+    if (!api?.viewer || hideAnnotations || (!drawingEnabled && !panMode)) {
+      return;
+    }
 
     const viewer = api.viewer;
     const viewerElement = viewer.element as HTMLElement;
@@ -191,7 +196,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       viewerElement.removeEventListener("mouseleave", clearCursor);
       clearCursor();
     };
-  }, [api, drawingEnabled, panMode]);
+  }, [api, drawingEnabled, hideAnnotations, panMode]);
 
   const viewerOptions = useMemo<OpenSeadragon.Options>(
     () => ({

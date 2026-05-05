@@ -88,6 +88,8 @@ type VideoSessionCtx = {
   setPanMode: (v: boolean) => void;
   propagate: boolean;
   setPropagate: (v: boolean) => void;
+  hideAnnotations: boolean;
+  setHideAnnotations: (v: boolean) => void;
 
   /** Natural image dimensions for the currently loaded frame (used for clamping). */
   imageNatural: { w: number; h: number } | null;
@@ -176,9 +178,11 @@ export function VideoSessionProvider(props: {
   data: unknown;
   dataParams: DataParams;
   dbAnnotations: Annotation[];
+  propagate: boolean;
+  setPropagate: (v: boolean) => void;
   children: React.ReactNode;
 }) {
-  const { projectId, sampleId, children } = props;
+  const { projectId, sampleId, propagate, setPropagate, children } = props;
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -246,7 +250,7 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
   const [panMode, setPanModeState] = useState(false);
-  const [propagate, setPropagateState] = useState(true);
+  const [hideAnnotations, setHideAnnotations] = useState(false);
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -341,10 +345,6 @@ export function VideoSessionProvider(props: {
     }
   }, [api, flushPendingOverlay]);
 
-  const setPropagate = useCallback((v: boolean) => {
-    setPropagateState(v);
-  }, []);
-
   useEffect(() => {
     const releaseShiftPan = () => {
       if (!shiftPanActiveRef.current) return;
@@ -394,14 +394,18 @@ export function VideoSessionProvider(props: {
     if (!api) return;
 
     const hasSelected = (api.getSelected?.() ?? []).length > 0;
-    const canDraw = !panMode && Boolean(selection.className) && !hasSelected;
+    const canDraw =
+      !panMode &&
+      !hideAnnotations &&
+      Boolean(selection.className) &&
+      !hasSelected;
     api.setDrawingTool(drawingTool);
     api.setDrawingEnabled(canDraw);
 
     if (!canDraw) {
       api.cancelDrawing?.();
     }
-  }, [api, drawingTool, panMode, selection.className]);
+  }, [api, drawingTool, hideAnnotations, panMode, selection.className]);
 
   const createNewInstanceForClass = useCallback((className: string) => {
     const cname = (className || "").trim();
@@ -693,10 +697,10 @@ export function VideoSessionProvider(props: {
    *  - the session overlay for the active frame changes,
    * we push the session overlay into Annotorious.
    */
-  const desiredOverlay = useMemo(
-    () => byFrame.get(frame) ?? [],
-    [byFrame, frame],
-  );
+  const desiredOverlay = useMemo(() => {
+    if (hideAnnotations) return [];
+    return byFrame.get(frame) ?? [];
+  }, [byFrame, frame, hideAnnotations]);
 
   const overlayHasInstance = useCallback(
     (list: ImageAnnotation[], req: FocusRequest) => {
@@ -846,7 +850,7 @@ export function VideoSessionProvider(props: {
       _originalEvent: PointerEvent,
     ) => {
       if (isProgrammaticAnnoSyncRef.current) return;
-      if (panMode) return;
+      if (panMode || hideAnnotations) return;
 
       const id = clicked?.id;
       if (id) {
@@ -873,7 +877,7 @@ export function VideoSessionProvider(props: {
       if (isProgrammaticAnnoSyncRef.current) return;
 
       if (arr.length > 0) {
-        if (!panMode) {
+        if (!panMode && !hideAnnotations) {
           const selected = arr[0];
           const got = getLabelTrack(selected);
           const className = (got.className ?? "").trim();
@@ -895,6 +899,14 @@ export function VideoSessionProvider(props: {
       }
 
       if (arr.length === 0) {
+        if (hideAnnotations) {
+          setSelectionState((prev) =>
+            prev.trackId ? { ...prev, trackId: null } : prev,
+          );
+          applyAnnotatorInteractionMode();
+          return;
+        }
+
         commitFromAnnotorious();
         setSelectionState((prev) =>
           prev.trackId ? { ...prev, trackId: null } : prev,
@@ -988,6 +1000,7 @@ export function VideoSessionProvider(props: {
     byFrame,
     commitFromAnnotorious,
     frameKey,
+    hideAnnotations,
     panMode,
     selection.className,
     selection.trackId,
@@ -1043,6 +1056,8 @@ export function VideoSessionProvider(props: {
       setPanMode,
       propagate,
       setPropagate,
+      hideAnnotations,
+      setHideAnnotations,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
@@ -1080,6 +1095,8 @@ export function VideoSessionProvider(props: {
       setPanMode,
       propagate,
       setPropagate,
+      hideAnnotations,
+      setHideAnnotations,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
