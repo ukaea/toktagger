@@ -32,7 +32,9 @@ export const AnnotationToolbar = () => {
   >(new Map());
 
   const [firstTimeEdit, setFirstTimeEdit] = useState(true);
-  const [contextHelpManualOpen, setContextHelpManualOpen] = useState<boolean | undefined>(undefined);
+  const [contextHelpManualOpen, setContextHelpManualOpen] = useState<
+    boolean | undefined
+  >(undefined);
 
   const modeVariant: "accent" | "primary" = editMode ? "accent" : "primary";
   const modeText = editMode ? "Edit Mode" : "View Mode";

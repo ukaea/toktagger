@@ -250,7 +250,10 @@ export const BaseTimeSeriesPlot = ({
     const onSelection = (eventData: PlotSelectionEvent) => {
       if (eventData?.range) {
         if (!editMode) {
-          ToastQueue.info("Change to Edit Mode to select annotations - see help popup in annotation toolbar for more info", {timeout: 5000})
+          ToastQueue.info(
+            "Change to Edit Mode to select annotations - see help popup in annotation toolbar for more info",
+            { timeout: 5000 },
+          );
         }
         findSelectedAnnotations({
           low: eventData.range.x[0],
@@ -353,9 +356,12 @@ export const BaseTimeSeriesPlot = ({
 
     const startAnnotationCreation = (event: MouseEvent) => {
       if (event.ctrlKey) {
-        console.log(editMode)
+        console.log(editMode);
         if (!editMode) {
-          ToastQueue.info("Change to Edit Mode to draw annotations - see help popup in annotation toolbar for more info", {timeout: 5000});
+          ToastQueue.info(
+            "Change to Edit Mode to draw annotations - see help popup in annotation toolbar for more info",
+            { timeout: 5000 },
+          );
           return;
         }
         if (activeAnnotationTool) {
@@ -364,11 +370,18 @@ export const BaseTimeSeriesPlot = ({
           const clickLocation = getClickData(event, plot);
           toolingCallbacks
             .get(activeAnnotationTool.type)
-            ?.start(clickLocation.x, clickLocation.y, activeAnnotationTool.label);
+            ?.start(
+              clickLocation.x,
+              clickLocation.y,
+              activeAnnotationTool.label,
+            );
         } else {
-          ToastQueue.info("Select a tool to draw annotation - see help popup in annotation toolbar for more info", {timeout: 5000})
+          ToastQueue.info(
+            "Select a tool to draw annotation - see help popup in annotation toolbar for more info",
+            { timeout: 5000 },
+          );
         }
-      } 
+      }
     };
 
     const updateAnnotation = (event: MouseEvent) => {
