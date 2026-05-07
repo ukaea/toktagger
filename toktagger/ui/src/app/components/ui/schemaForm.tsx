@@ -30,6 +30,7 @@ import {
   WidgetProps,
   FieldTemplateProps,
   ArrayFieldTemplateProps,
+  ArrayFieldItemTemplateProps,
   TitleFieldProps,
   ErrorListProps,
   RJSFValidationError,
