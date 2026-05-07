@@ -113,5 +113,6 @@ class Server:
         host: str = "localhost",
         port: int = 8002,
     ):
+        os.environ["API_URL"] = f"http://{host}:{port}"
         self._setup_app()
         uvicorn.run(self.app, host=host, port=port)
