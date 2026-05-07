@@ -48,7 +48,7 @@ class DisruptionCNNTrainParams(pydantic.BaseModel):
 
 class DisruptionCNNPredictParams(pydantic.BaseModel):
     batch_size: int = pydantic.Field(gt=0, default=32)
-    device: typing.Literal["cpu", "gpu"] = "cpu"
+    device: typing.Literal["cpu", "cuda", "mps", "xpu"] = "cpu"
 
 
 class DisruptionDataset(Dataset):  # Inherit from torch.utils.dataset
