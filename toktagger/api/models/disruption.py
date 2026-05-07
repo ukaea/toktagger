@@ -36,7 +36,7 @@ class DisruptionCNNTrainParams(pydantic.BaseModel):
         default=1e-4,
         description="Threshold over which a new epoch is considered to have improved in accuracy.",
     )
-    device: typing.Literal["cpu", "gpu"] = "cpu"
+    device: typing.Literal["cpu", "cuda", "mps", "xpu"] = "cpu"
 
     @pydantic.field_validator("train_val_test_split", mode="after")
     @classmethod
