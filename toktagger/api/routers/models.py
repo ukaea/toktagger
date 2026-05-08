@@ -310,7 +310,6 @@ async def stop_model_training(
                 ray.cancel(task)
             try:
                 actor = ray.get_actor(model.id)
-                print(actor)
                 ray.kill(actor)
             except ValueError:
                 pass
