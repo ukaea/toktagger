@@ -40,7 +40,7 @@ class DisruptionCNNTrainParams(pydantic.BaseModel):
 
     @pydantic.field_validator("train_val_test_split", mode="after")
     @classmethod
-    def validate_sum_to_one(cls, value: list):
+    def validate_sum_to_one(cls, value: list[float]) -> list[float]:
         if sum(value) != 1:
             raise ValueError("Train / Val / Test fractions must sum to 1!")
         return value
@@ -115,10 +115,16 @@ class DisruptionCNN(Model):
         self.log_progress(training_status="started")
 
         # Remove any samples which don't have annotations
-        for i, anns in enumerate(annotations):
-            if not len(anns):
-                samples.pop(i)
-                annotations.pop(i)
+        new_samples = []
+        new_annotations = []
+
+        for sample, annotation in zip(samples, annotations):
+            if annotation:
+                new_samples.append(sample)
+                new_annotations.append(annotation)
+
+        samples = new_samples
+        annotations = new_annotations
 
         self.split_data(
             samples=samples,
