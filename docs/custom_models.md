@@ -160,7 +160,7 @@ class TrainingParameters(pydantic.BaseModel):
 
     @pydantic.field_validator("train_val_test_split", mode="after")
     @classmethod
-    def validate_sum_to_one(cls, value: list):
+    def validate_sum_to_one(cls, value: list[float]) -> list[float]:
         if sum(value) != 1:
             raise ValueError("Train / Val / Test fractions must sum to 1!")
         return value
@@ -254,7 +254,7 @@ class TrainingParameters(pydantic.BaseModel):
 
     @pydantic.field_validator("train_val_test_split", mode="after")
     @classmethod
-    def validate_sum_to_one(cls, value: list):
+    def validate_sum_to_one(cls, value: list[float]) -> list[float]:
         if sum(value) != 1:
             raise ValueError("Train / Val / Test fractions must sum to 1!")
         return value

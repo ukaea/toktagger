@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.models.base import ModelRegistry
+import typing
 
 router = APIRouter(prefix="/meta", tags=["Metadata"])
 
@@ -18,13 +19,13 @@ async def get_model_types(task: str) -> list[str]:
 
 
 @router.get("/dataloader/{loader}")
-async def get_data_schema(loader: str) -> dict:
+async def get_data_schema(loader: str) -> dict[str, typing.Any]:
     """Get schema which is required for getting data with this dataloader"""
     return LoaderRegistry.get_data_schema(loader)
 
 
 @router.get("/models/{model}/train")
-async def get_model_training_schema(model: str) -> dict | None:
+async def get_model_training_schema(model: str) -> dict[str, typing.Any] | None:
     """Get params required for training this model."""
     return ModelRegistry.get_params_schema(
         model, schema_type="training", return_draft_07=True
@@ -32,7 +33,7 @@ async def get_model_training_schema(model: str) -> dict | None:
 
 
 @router.get("/models/{model}/predict")
-async def get_model_prediction_schema(model: str) -> dict | None:
+async def get_model_prediction_schema(model: str) -> dict[str, typing.Any] | None:
     """Get params required for predicting with this model."""
     return ModelRegistry.get_params_schema(
         model, schema_type="prediction", return_draft_07=True

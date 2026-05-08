@@ -21,7 +21,7 @@ if models_dependencies_installed():
 
 
 # Recursively walk through schema, finding things which need to be changed
-def _update_schema(schema: dict) -> None:
+def _update_schema(schema: dict) -> dict:
     """Mutates schema in place and returns draft-7 compliant version."""
     # Convert $defs to definitions
     if "$defs" in schema:
@@ -45,17 +45,17 @@ def _update_schema(schema: dict) -> None:
     return schema
 
 
-def walk_schema(schema):
+def walk_schema(schema: dict | list) -> dict | list:
     """Walk through a JSON Schema and update relevant items."""
     if isinstance(schema, list):
         schema = [walk_schema(item) for item in schema]
 
-    if isinstance(schema, dict):
+    elif isinstance(schema, dict):
         for key, value in list(schema.items()):
             if isinstance(value, (dict, list)):
                 schema[key] = walk_schema(value)
 
-        _update_schema(schema)
+        schema = _update_schema(schema)
 
     return schema
 
