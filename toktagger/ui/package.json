@@ -39,6 +39,7 @@
     "@eslint/plugin-kit": ">=0.3.4",
     "@types/d3": "^7.4.3",
     "@types/node": "^20",
+    "@types/openseadragon": "^5.0.2",
     "@types/plotly.js": "^3.0.3",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19",

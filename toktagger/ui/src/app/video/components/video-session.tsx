@@ -10,8 +10,11 @@ import React, {
   useLayoutEffect,
   useRef,
 } from "react";
-import { useAnnotator, type ImageAnnotation } from "@annotorious/react";
-import type { Annotator } from "@annotorious/annotorious";
+import {
+  useAnnotator,
+  type AnnotoriousOpenSeadragonAnnotator,
+  type ImageAnnotation,
+} from "@annotorious/react";
 
 import type { Annotation, DataParams } from "@/types";
 import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
@@ -80,8 +83,13 @@ type VideoSessionCtx = {
 
   drawingTool: DrawingTool;
   setDrawingTool: (tool: DrawingTool) => void;
+  /** When true, drawing is disabled and frame drag/pan is enabled. */
+  panMode: boolean;
+  setPanMode: (v: boolean) => void;
   propagate: boolean;
   setPropagate: (v: boolean) => void;
+  hideAnnotations: boolean;
+  setHideAnnotations: (v: boolean) => void;
 
   /** Natural image dimensions for the currently loaded frame (used for clamping). */
   imageNatural: { w: number; h: number } | null;
@@ -143,6 +151,14 @@ type FocusRequest = {
   targetFrame: FrameIndex | null;
 };
 
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
 export function useVideoSession(): VideoSessionCtx {
   const v = useContext(Ctx);
   if (!v)
@@ -162,11 +178,13 @@ export function VideoSessionProvider(props: {
   data: unknown;
   dataParams: DataParams;
   dbAnnotations: Annotation[];
+  propagate: boolean;
+  setPropagate: (v: boolean) => void;
   children: React.ReactNode;
 }) {
-  const { projectId, sampleId, children } = props;
+  const { projectId, sampleId, propagate, setPropagate, children } = props;
 
-  const api = useAnnotator<Annotator<ImageAnnotation, ImageAnnotation>>();
+  const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
   /**
    * Annotorious emits create/update/delete events even when annotations are set
@@ -176,6 +194,11 @@ export function VideoSessionProvider(props: {
    * Session state (`byFrame`) remains the source of truth; Annotorious is the interactive editor.
    */
   const isProgrammaticAnnoSyncRef = useRef(false);
+  const commitFromAnnotoriousRef = useRef<
+    (rawOverride?: ImageAnnotation[]) => void
+  >(() => {});
+  const shiftPanActiveRef = useRef(false);
+  const panModeBeforeShiftRef = useRef(false);
   const pendingFocusRef = useRef<FocusRequest | null>(null);
   const nextTrackNumsRef = useRef<Map<string, number>>(
     buildNextTrackIdState(props.dbAnnotations),
@@ -226,7 +249,8 @@ export function VideoSessionProvider(props: {
     source: null,
   });
   const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
-  const [propagate, setPropagateState] = useState(true);
+  const [panMode, setPanModeState] = useState(false);
+  const [hideAnnotations, setHideAnnotations] = useState(false);
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -254,33 +278,134 @@ export function VideoSessionProvider(props: {
     setDirty(true);
   }, []);
 
-  const clearCurrentFrame = useCallback(() => {
-    setByFrame((prev) => mapClearFrame(prev, frame));
-    setDirty(true);
-  }, [frame]);
-
-  const clearAllFrames = useCallback(() => {
-    setByFrame((prev) => mapClearAll(prev));
-    setDirty(true);
-  }, []);
-
   const markSaved = useCallback(() => setDirty(false), []);
 
   const setSelection = useCallback((next: Selection) => {
     setSelectionState(next);
   }, []);
 
+  const flushPendingOverlay = useCallback(() => {
+    if (isProgrammaticAnnoSyncRef.current) return;
+    const raw = api?.getAnnotations?.();
+    if (!raw) return;
+    commitFromAnnotoriousRef.current(raw);
+  }, [api]);
+
   const setDrawingTool = useCallback(
     (tool: DrawingTool) => {
-      setDrawingToolState(tool);
       api?.setSelected?.();
+      flushPendingOverlay();
+      setDrawingToolState(tool);
     },
-    [api],
+    [api, flushPendingOverlay],
   );
 
-  const setPropagate = useCallback((v: boolean) => {
-    setPropagateState(v);
-  }, []);
+  const setPanMode = useCallback(
+    (v: boolean) => {
+      api?.setSelected?.();
+      flushPendingOverlay();
+      setPanModeState(v);
+    },
+    [api, flushPendingOverlay],
+  );
+
+  const clearCurrentFrame = useCallback(() => {
+    api?.setSelected?.();
+    flushPendingOverlay();
+    pendingFocusRef.current = null;
+
+    setByFrame((prev) => mapClearFrame(prev, frame));
+    setDirty(true);
+
+    isProgrammaticAnnoSyncRef.current = true;
+    try {
+      api?.cancelDrawing?.();
+      api?.setSelected?.();
+      api?.setAnnotations?.([], true);
+    } finally {
+      isProgrammaticAnnoSyncRef.current = false;
+    }
+  }, [api, flushPendingOverlay, frame]);
+
+  const clearAllFrames = useCallback(() => {
+    api?.setSelected?.();
+    flushPendingOverlay();
+    pendingFocusRef.current = null;
+
+    setByFrame((prev) => mapClearAll(prev));
+    setDirty(true);
+
+    isProgrammaticAnnoSyncRef.current = true;
+    try {
+      api?.cancelDrawing?.();
+      api?.setSelected?.();
+      api?.setAnnotations?.([], true);
+    } finally {
+      isProgrammaticAnnoSyncRef.current = false;
+    }
+  }, [api, flushPendingOverlay]);
+
+  useEffect(() => {
+    const releaseShiftPan = () => {
+      if (!shiftPanActiveRef.current) return;
+      shiftPanActiveRef.current = false;
+      setPanMode(panModeBeforeShiftRef.current);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Shift") return;
+      if (event.repeat) return;
+      if (shiftPanActiveRef.current) return;
+      if (isEditableEventTarget(event.target)) return;
+
+      panModeBeforeShiftRef.current = panMode;
+      shiftPanActiveRef.current = true;
+      setPanMode(true);
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== "Shift") return;
+      releaseShiftPan();
+    };
+
+    const onWindowBlur = () => {
+      releaseShiftPan();
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) return;
+      releaseShiftPan();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onWindowBlur);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onWindowBlur);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [panMode, setPanMode]);
+
+  const applyAnnotatorInteractionMode = useCallback(() => {
+    if (!api) return;
+
+    const hasSelected = (api.getSelected?.() ?? []).length > 0;
+    const canDraw =
+      !panMode &&
+      !hideAnnotations &&
+      Boolean(selection.className) &&
+      !hasSelected;
+    api.setDrawingTool(drawingTool);
+    api.setDrawingEnabled(canDraw);
+
+    if (!canDraw) {
+      api.cancelDrawing?.();
+    }
+  }, [api, drawingTool, hideAnnotations, panMode, selection.className]);
 
   const createNewInstanceForClass = useCallback((className: string) => {
     const cname = (className || "").trim();
@@ -465,7 +590,19 @@ export function VideoSessionProvider(props: {
       const raw = rawOverride ?? api.getAnnotations();
 
       // Enforce image bounds so shapes can't persist outside the frame.
-      const clamped = clampOverlayToNaturalImage(raw, imageNatural);
+      // In OSD mode, imageNatural can occasionally lag; fall back to viewer content size.
+      const viewerNatural = (() => {
+        const item = api.viewer?.world?.getItemAt?.(0);
+        if (!item) return null;
+        const size = item.getContentSize?.();
+        const w = Math.round(Number(size?.x ?? 0));
+        const h = Math.round(Number(size?.y ?? 0));
+        if (!(w > 0 && h > 0)) return null;
+        return { w, h };
+      })();
+
+      const clampNatural = imageNatural ?? viewerNatural;
+      const clamped = clampOverlayToNaturalImage(raw, clampNatural);
 
       const firstClassFrom = (list: ImageAnnotation[]) => {
         for (const a of list ?? []) {
@@ -516,8 +653,9 @@ export function VideoSessionProvider(props: {
       if (!sameOverlay(raw, normalized)) {
         isProgrammaticAnnoSyncRef.current = true;
         try {
-          api.clearAnnotations?.();
-          api.setAnnotations?.(normalized);
+          api.setSelected?.();
+          api.setAnnotations?.(normalized, true);
+          applyAnnotatorInteractionMode();
         } finally {
           isProgrammaticAnnoSyncRef.current = false;
         }
@@ -538,9 +676,14 @@ export function VideoSessionProvider(props: {
       imageNatural,
       selection.className,
       selection.trackId,
+      applyAnnotatorInteractionMode,
       setFrameList,
     ],
   );
+
+  useEffect(() => {
+    commitFromAnnotoriousRef.current = commitFromAnnotorious;
+  }, [commitFromAnnotorious]);
 
   /**
    * Keep the Annotorious overlay in sync with the session source-of-truth.
@@ -554,10 +697,10 @@ export function VideoSessionProvider(props: {
    *  - the session overlay for the active frame changes,
    * we push the session overlay into Annotorious.
    */
-  const desiredOverlay = useMemo(
-    () => byFrame.get(frame) ?? [],
-    [byFrame, frame],
-  );
+  const desiredOverlay = useMemo(() => {
+    if (hideAnnotations) return [];
+    return byFrame.get(frame) ?? [];
+  }, [byFrame, frame, hideAnnotations]);
 
   const overlayHasInstance = useCallback(
     (list: ImageAnnotation[], req: FocusRequest) => {
@@ -664,11 +807,11 @@ export function VideoSessionProvider(props: {
   // state, so we must push session state on frame/overlay changes.
   useEffect(() => {
     if (!api) return;
-    if (!imageNatural?.w || !imageNatural?.h) return;
 
     let rafId: number | null = null;
     const cur = api.getAnnotations();
     if (sameOverlay(cur, desiredOverlay)) {
+      applyAnnotatorInteractionMode();
       rafId = requestAnimationFrame(() => {
         tryFocusPending();
       });
@@ -681,8 +824,8 @@ export function VideoSessionProvider(props: {
     try {
       // Clear selection so popup closes when switching frames / overlays
       api.setSelected();
-      api.clearAnnotations();
-      api.setAnnotations(desiredOverlay);
+      api.setAnnotations(desiredOverlay, true);
+      applyAnnotatorInteractionMode();
       rafId = requestAnimationFrame(() => {
         tryFocusPending();
       });
@@ -692,7 +835,7 @@ export function VideoSessionProvider(props: {
     return () => {
       if (rafId != null) cancelAnimationFrame(rafId);
     };
-  }, [api, desiredOverlay, imageNatural?.h, imageNatural?.w, tryFocusPending]);
+  }, [api, applyAnnotatorInteractionMode, desiredOverlay, tryFocusPending]);
 
   /**
    * Event wiring:
@@ -702,14 +845,73 @@ export function VideoSessionProvider(props: {
   useEffect(() => {
     if (!api?.on || !api?.off || !api?.getAnnotations) return;
 
+    const onClickAnnotation = (
+      clicked: ImageAnnotation,
+      _originalEvent: PointerEvent,
+    ) => {
+      if (isProgrammaticAnnoSyncRef.current) return;
+      if (panMode || hideAnnotations) return;
+
+      const id = clicked?.id;
+      if (id) {
+        api.setSelected(id, true);
+      }
+
+      const got = getLabelTrack(clicked);
+      const className = (got.className ?? "").trim();
+      const trackId = canonicalizeTrackId(got.trackId ?? "");
+      if (className) {
+        setSelectionState({
+          className,
+          trackId: trackId || null,
+          source: "explicit",
+        });
+      }
+
+      // While an annotation is selected, prioritize reshape/move over new drawing.
+      api.cancelDrawing?.();
+      api.setDrawingEnabled(false);
+    };
+
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
+      if (isProgrammaticAnnoSyncRef.current) return;
+
+      if (arr.length > 0) {
+        if (!panMode && !hideAnnotations) {
+          const selected = arr[0];
+          const got = getLabelTrack(selected);
+          const className = (got.className ?? "").trim();
+          const trackId = canonicalizeTrackId(got.trackId ?? "");
+
+          if (className) {
+            setSelectionState({
+              className,
+              trackId: trackId || null,
+              source: "explicit",
+            });
+          }
+
+          // While selected, keep drawing off so edit handles work predictably.
+          api.cancelDrawing?.();
+          api.setDrawingEnabled(false);
+        }
+        return;
+      }
+
       if (arr.length === 0) {
-        if (!isProgrammaticAnnoSyncRef.current) {
-          commitFromAnnotorious();
+        if (hideAnnotations) {
           setSelectionState((prev) =>
             prev.trackId ? { ...prev, trackId: null } : prev,
           );
+          applyAnnotatorInteractionMode();
+          return;
         }
+
+        commitFromAnnotorious();
+        setSelectionState((prev) =>
+          prev.trackId ? { ...prev, trackId: null } : prev,
+        );
+        applyAnnotatorInteractionMode();
       }
     };
 
@@ -748,11 +950,23 @@ export function VideoSessionProvider(props: {
         trackId = uniqueReadableTrackId(used);
       }
 
-      const stamped = raw.map((a) =>
-        a?.id === createdId ? stampLabelAndTrack(a, cls, String(trackId)) : a,
-      );
+      // Important: patch only the newly created annotation via updateAnnotation.
+      // Avoid full clear/set rewrite during create, which can break OSD draw state.
+      const patched = normalizeOverlayForSession({
+        raw: [stampLabelAndTrack(created, cls, String(trackId))],
+        frameKey,
+        fallback: { className: cls, trackId: String(trackId) },
+        enforceBothBodies: true,
+        dedupeByInstance: false,
+      })[0];
 
-      commitFromAnnotorious(stamped);
+      if (patched?.id === createdId) {
+        api.updateAnnotation?.(patched);
+      } else {
+        commitFromAnnotorious();
+      }
+      api.setSelected?.();
+      applyAnnotatorInteractionMode();
     };
 
     const onUpdate = (
@@ -760,18 +974,21 @@ export function VideoSessionProvider(props: {
       _previous: ImageAnnotation,
     ) => {
       commitFromAnnotorious();
+      applyAnnotatorInteractionMode();
     };
 
     const onDelete = (_deleted: ImageAnnotation) => {
       commitFromAnnotorious();
     };
 
+    api.on("clickAnnotation", onClickAnnotation);
     api.on("createAnnotation", onCreate);
     api.on("updateAnnotation", onUpdate);
     api.on("deleteAnnotation", onDelete);
     api.on("selectionChanged", onSelectionChanged);
 
     return () => {
+      api.off("clickAnnotation", onClickAnnotation);
       api.off("createAnnotation", onCreate);
       api.off("updateAnnotation", onUpdate);
       api.off("deleteAnnotation", onDelete);
@@ -779,8 +996,12 @@ export function VideoSessionProvider(props: {
     };
   }, [
     api,
+    applyAnnotatorInteractionMode,
     byFrame,
     commitFromAnnotorious,
+    frameKey,
+    hideAnnotations,
+    panMode,
     selection.className,
     selection.trackId,
   ]);
@@ -831,8 +1052,12 @@ export function VideoSessionProvider(props: {
       instances,
       drawingTool,
       setDrawingTool,
+      panMode,
+      setPanMode,
       propagate,
       setPropagate,
+      hideAnnotations,
+      setHideAnnotations,
       imageNatural,
       setImageNatural,
       deleteAnnotation,
@@ -866,8 +1091,12 @@ export function VideoSessionProvider(props: {
       instances,
       drawingTool,
       setDrawingTool,
+      panMode,
+      setPanMode,
       propagate,
       setPropagate,
+      hideAnnotations,
+      setHideAnnotations,
       imageNatural,
       setImageNatural,
       deleteAnnotation,

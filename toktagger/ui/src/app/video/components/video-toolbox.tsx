@@ -233,27 +233,63 @@ export function VideoToolbox() {
           </div>
           <Grid columns={["1fr", "1fr"]} gap="size-100" marginBottom="size-100">
             <Button
-              variant={tool === "rectangle" ? "primary" : "secondary"}
-              onPress={() => session.setDrawingTool("rectangle")}
+              variant={
+                !session.panMode && tool === "rectangle"
+                  ? "primary"
+                  : "secondary"
+              }
+              onPress={() => {
+                session.setPanMode(false);
+                session.setDrawingTool("rectangle");
+              }}
               width="100%"
             >
               Rectangle
             </Button>
             <Button
-              variant={tool === "polygon" ? "primary" : "secondary"}
-              onPress={() => session.setDrawingTool("polygon")}
+              variant={
+                !session.panMode && tool === "polygon" ? "primary" : "secondary"
+              }
+              onPress={() => {
+                session.setPanMode(false);
+                session.setDrawingTool("polygon");
+              }}
               width="100%"
             >
               Polygon
             </Button>
           </Grid>
-          <Flex alignItems="center" justifyContent="center">
-            <Switch
-              isSelected={session.propagate}
-              onChange={session.setPropagate}
+          <Flex
+            alignItems="center"
+            justifyContent="center"
+            marginBottom="size-100"
+          >
+            <Button
+              variant={session.panMode ? "primary" : "secondary"}
+              onPress={() => session.setPanMode(!session.panMode)}
             >
-              Propagation
-            </Switch>
+              Drag / Zoom
+            </Button>
+          </Flex>
+          <Flex alignItems="center" justifyContent="center">
+            <div className="w-40 flex justify-start">
+              <Switch
+                isSelected={session.propagate}
+                onChange={session.setPropagate}
+              >
+                Propagation
+              </Switch>
+            </div>
+          </Flex>
+          <Flex alignItems="center" justifyContent="center">
+            <div className="w-40 flex justify-start">
+              <Switch
+                isSelected={session.hideAnnotations}
+                onChange={session.setHideAnnotations}
+              >
+                <span className="whitespace-nowrap">Hide Annotations</span>
+              </Switch>
+            </div>
           </Flex>
         </div>
         <Divider size="S" marginX="size-200" />

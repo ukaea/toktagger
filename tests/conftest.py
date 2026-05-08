@@ -105,6 +105,7 @@ async def api_client(task_actor, mongo_container):
     # So am just going to leave it open, since the db container will be deleted after anyway
     # Any alternative solution ideas are welcome.....
     server = Server()
+    os.environ["API_URL"] = ""
     server._setup_app()
     app = server.app
     lifespan_ctx = app.router.lifespan_context(app)
@@ -114,7 +115,6 @@ async def api_client(task_actor, mongo_container):
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        os.environ["API_URL"] = ""
         client.app = app
         yield client
     await lifespan_ctx.__aexit__(None, None, None)
