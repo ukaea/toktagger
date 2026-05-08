@@ -225,7 +225,7 @@ class ArrayDataLoader(DataLoader):
         buffer.seek(0)
 
         return ImageData(
-            frame=file_path.name.split(".")[0],
+            frame=params.frame or 0,
             values=base64.b64encode(buffer.getvalue()).decode(),
         )
 
