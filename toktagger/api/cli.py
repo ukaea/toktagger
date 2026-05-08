@@ -1,6 +1,7 @@
 import webbrowser
 import argparse
 from toktagger.api.main import Server
+from toktagger.api.models import models_dependencies_installed
 import uvicorn
 import time
 import threading
@@ -11,6 +12,9 @@ import os
 def create_app():
     server = Server()
     server._setup_app()
+    # Setup ray if required
+    if models_dependencies_installed():
+        server._setup_ray()
     return server.app
 
 

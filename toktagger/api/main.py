@@ -45,7 +45,7 @@ class Server:
         self.frontend_path = pathlib.Path(__file__).parent / "static"
 
     def _setup_ray(self):
-        if not (api_url := os.environ.get("API_URL")):
+        if (api_url := os.environ.get("API_URL")) is None:
             raise ValueError("API URL must be set!")
         if not ray.is_initialized():
             ray.init(
@@ -54,20 +54,20 @@ class Server:
                         "API_URL": api_url,
                         "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
                     }
-                }
+                },
             )
+            # Create a ray actor for use as a model registry
+            WorkerRegistry.options(
+                name="WorkerModelRegistry", lifetime="detached"
+            ).remote(ModelRegistry._registry)
+            # And one for use as a dataloader registry
+            WorkerRegistry.options(
+                name="WorkerLoaderRegistry", lifetime="detached"
+            ).remote(LoaderRegistry._registry)
+
         # Create a task registry
         self.app.state.task_registry = ActorRegistry(
             max_actors=os.environ.get("MAX_ACTORS", 5)
-        )
-
-        # Create a ray actor for use as a model registry
-        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
-            ModelRegistry._registry
-        )
-        # And one for use as a dataloader registry
-        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
-            LoaderRegistry._registry
         )
 
     def _setup_app(self):
@@ -85,10 +85,6 @@ class Server:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-
-        # Setup ray if required
-        if models_dependencies_installed():
-            self._setup_ray()
 
         # Static front end files
         self.app.state.index_file = self.frontend_path / "index.html"
@@ -115,4 +111,7 @@ class Server:
     ):
         os.environ["API_URL"] = f"http://{host}:{port}"
         self._setup_app()
+        # Setup ray if required
+        if models_dependencies_installed():
+            self._setup_ray()
         uvicorn.run(self.app, host=host, port=port)
