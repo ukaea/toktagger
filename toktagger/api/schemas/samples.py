@@ -13,6 +13,11 @@ class ImageFileData(FileData):
     type: Literal["png", "jpeg"]
 
 
+class ImageArrayFileData(FileData):
+    type: Literal["npy", "npz"]
+    signal_name: Optional[str] = None
+
+
 class TimeSeriesFileData(FileData):
     type: Literal["csv", "tsv", "parquet", "feather", "json", "xlsx"]
     signal_names: Optional[list[str]] = None

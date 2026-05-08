@@ -28,6 +28,7 @@ from toktagger.api.schemas.samples import (
     ShotData,
     TimeSeriesFileData,
     ImageFileData,
+    ImageArrayFileData,
 )
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -147,6 +148,78 @@ class ImageDataLoader(DataLoader):
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
             )
         im = Image.open(file_path)
+        buffer = io.BytesIO()
+        im.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        return ImageData(
+            frame=file_path.name.split(".")[0],
+            values=base64.b64encode(buffer.getvalue()).decode(),
+        )
+
+
+@LoaderRegistry.register("image")
+class ArrayDataLoader(DataLoader):
+    """DataLoader for retrieving data using Numpy array files."""
+
+    @classmethod
+    def sample_data_type(cls) -> Type[ImageFileData]:
+        return ImageFileData
+
+    @pydantic.validate_call
+    def get_sample(self, sample: Sample, params: ImageParams, **kwargs) -> ImageData:
+        if not isinstance(sample.data, ImageArrayFileData):
+            raise TypeError(
+                f"Expected sample data of type 'ImageArrayFileData' but got '{type(sample.data)}'"
+            )
+
+        sample_data: ImageArrayFileData = sample.data
+
+        # Find file
+        file_path = pathlib.Path(sample_data.file_name)
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Could not find directory at '{file_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
+            )
+        # Load array
+        with np.load(file_path, allow_pickle=False) as img_data:
+            if sample_data.type == "npz":
+                arr_names = img_data.files
+                if sample_data.signal_name is not None:
+                    if sample_data.signal_name in arr_names:
+                        arr: np.ndarray = img_data[sample_data.signal_name]
+                    else:
+                        raise KeyError(
+                            f"Signal name {sample_data.signal_name} not found in array file! Available keys are: {arr_names}"
+                        )
+                else:
+                    if len(arr_names) == 1:
+                        arr: np.ndarray = img_data[arr_names[0]]
+                    else:
+                        raise ValueError(
+                            f"Signal name not provided, but multiple options found in array file! Available keys are: {arr_names}"
+                        )
+            else:
+                arr: np.ndarray = img_data
+
+        # Check array is 3D, frame x height x width
+        if len(arr.shape) != 3:
+            raise ValueError(
+                f"Expected array to have three dimensions representing (frame, height, width), but found {len(arr.shape)} dimensions!"
+            )
+
+        if params.name != "image":
+            raise ValueError("Must provide image data parameters!")
+        elif params.frame is None:
+            frame_arr = arr[0, ...]
+        elif params.frame >= arr.shape[0]:
+            raise ValueError(
+                f"Frame {params.frame} unavailable! Maximum available frame number is {arr.shape[0] - 1}."
+            )
+        else:
+            frame_arr = arr[params.frame, ...]
+
+        im = Image.fromarray(frame_arr)
         buffer = io.BytesIO()
         im.save(buffer, format="PNG")
         buffer.seek(0)
