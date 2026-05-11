@@ -198,6 +198,11 @@ export const TimeSeriesFileDataSchema = FileDataSchema.extend({
 });
 export type TimeSeriesFileData = z.infer<typeof TimeSeriesFileDataSchema>;
 
+export const ImageArrayFileDataSchema = FileDataSchema.extend({
+  signal_name: z.string().optional(),
+});
+export type ImageArrayFileData = z.infer<typeof ImageArrayFileDataSchema>;
+
 export const ShotDataSchema = z.object({
   protocol: z.string(),
   signal_names: z.array(z.string()),

@@ -28,7 +28,9 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 
-DataTypes = Union[TimeSeriesFileData, ImageFileData, ImageArrayFileData, ShotData]
+DataTypes = Union[
+    FileData, TimeSeriesFileData, ImageFileData, ImageArrayFileData, ShotData
+]
 
 
 class SampleBase(ConfiguredModel):

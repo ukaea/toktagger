@@ -29,6 +29,7 @@ from toktagger.api.schemas.samples import (
     TimeSeriesFileData,
     ImageFileData,
     ImageArrayFileData,
+    DataTypes,
 )
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -53,7 +54,7 @@ class DataLoader(ABC):
     @abstractmethod
     def sample_data_type(
         cls,
-    ) -> Type[ShotData | ImageFileData | FileData | TimeSeriesFileData]:
+    ) -> Type[DataTypes]:
         # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
         pass
 
@@ -81,6 +82,7 @@ class LoaderRegistry:
                 ShotData,
                 FileData,
                 ImageFileData,
+                ImageArrayFileData,
                 TimeSeriesFileData,
             ):
                 raise ValueError(
@@ -158,13 +160,13 @@ class ImageDataLoader(DataLoader):
         )
 
 
-@LoaderRegistry.register("image")
+@LoaderRegistry.register("image-array")
 class ArrayDataLoader(DataLoader):
     """DataLoader for retrieving data using Numpy array files."""
 
     @classmethod
-    def sample_data_type(cls) -> Type[ImageFileData]:
-        return ImageFileData
+    def sample_data_type(cls) -> Type[ImageArrayFileData]:
+        return ImageArrayFileData
 
     @pydantic.validate_call
     def get_sample(self, sample: Sample, params: ImageParams, **kwargs) -> ImageData:
@@ -189,14 +191,14 @@ class ArrayDataLoader(DataLoader):
                     if sample_data.signal_name in arr_names:
                         arr: np.ndarray = img_data[sample_data.signal_name]
                     else:
-                        raise KeyError(
+                        raise DataLoaderError(
                             f"Signal name {sample_data.signal_name} not found in array file! Available keys are: {arr_names}"
                         )
                 else:
                     if len(arr_names) == 1:
                         arr: np.ndarray = img_data[arr_names[0]]
                     else:
-                        raise ValueError(
+                        raise DataLoaderError(
                             f"Signal name not provided, but multiple options found in array file! Available keys are: {arr_names}"
                         )
         else:
@@ -204,20 +206,24 @@ class ArrayDataLoader(DataLoader):
 
         # Check array is 3D, frame x height x width
         if len(arr.shape) != 3:
-            raise ValueError(
+            raise DataLoaderError(
                 f"Expected array to have three dimensions representing (frame, height, width), but found {len(arr.shape)} dimensions!"
             )
 
+        # Scale arr to be 1-255
+        scaled = (arr - arr.min()) / (arr.max() - arr.min())
+        scaled = (scaled * 255).astype(np.uint8)
+
         if params.name != "image":
-            raise ValueError("Must provide image data parameters!")
+            raise DataLoaderError("Must provide image data parameters!")
         elif params.frame is None:
-            frame_arr = arr[0, ...]
+            frame_arr = scaled[0, ...]
         elif params.frame > arr.shape[0]:
-            raise ValueError(
+            raise DataLoaderError(
                 f"Frame {params.frame} unavailable! Maximum available frame number is {arr.shape[0]}."
             )
         else:
-            frame_arr = arr[params.frame - 1, ...]
+            frame_arr = scaled[params.frame - 1, ...]
 
         im = Image.fromarray(frame_arr)
         buffer = io.BytesIO()
