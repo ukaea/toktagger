@@ -248,7 +248,7 @@ export function VideoToolbox() {
                 isSelected={session.hideAnnotations}
                 onChange={session.setHideAnnotations}
               >
-                <span className="whitespace-nowrap">Hide Annotations</span>
+                <span className="whitespace-nowrap">Hide annotations</span>
               </Switch>
             </div>
           </Flex>
