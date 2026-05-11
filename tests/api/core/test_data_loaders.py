@@ -243,7 +243,13 @@ def test_fair_mast_dataloader():
 
 
 @pytest.mark.parametrize(
-    "file_name", ["multiple_arrs.npz", "single_arr.npz", "single_arr.npy"]
+    "file_name",
+    [
+        "multiple_arrs.npz",
+        "single_arr.npz",
+        "single_arr.npy",
+        "rgb_arr.npz",
+    ],
 )
 @pytest.mark.parametrize("frame", [None, 2])
 def test_image_array_file_loader(file_name: str, frame: int | None):
@@ -275,11 +281,21 @@ def test_image_array_file_loader(file_name: str, frame: int | None):
     frame_arr = numpy.array(im)
 
     # Check it is 10x10
-    assert frame_arr.shape == (10, 10)
+    if file_name == "rgb_arr.npz":
+        # With RGB channels
+        assert frame_arr.shape == (10, 10, 3)
+    else:
+        # Greyscale
+        assert frame_arr.shape == (10, 10)
 
     # Check it has correct values
     # If frame not specified, first frame
     # Data is constructed from a range reshaped, so...
+    if file_name == "rgb_arr.npz":
+        # Check second and third channels are ones
+        assert numpy.allclose(frame_arr[..., 1].flatten(), numpy.ones(100))
+        assert numpy.allclose(frame_arr[..., 2].flatten(), numpy.ones(100))
+        frame_arr = frame_arr[..., 0]
     if frame:
         assert numpy.allclose(frame_arr.flatten(), numpy.arange(100, 200))
     else:

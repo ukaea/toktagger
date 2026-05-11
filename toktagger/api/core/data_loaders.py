@@ -204,26 +204,29 @@ class ArrayDataLoader(DataLoader):
         else:
             arr: np.ndarray = np.load(file_path, allow_pickle=False)
 
-        # Check array is 3D, frame x height x width
-        if len(arr.shape) != 3:
+        # Check array is 3D, frame x height x width, or 4D, frame x height x width x rgb
+        if len(arr.shape) != 3 and not (len(arr.shape) == 4 and arr.shape[-1] == 3):
             raise DataLoaderError(
-                f"Expected array to have three dimensions representing (frame, height, width), but found {len(arr.shape)} dimensions!"
+                f"""Expected array to have three dimensions representing (frame, height, width),
+                or 4 dimensions representing (frame, height, width, RGB),
+                but found {len(arr.shape)} dimensions!"""
             )
 
-        # Scale arr to be 1-255
-        scaled = (arr - arr.min()) / (arr.max() - arr.min())
-        scaled = (scaled * 255).astype(np.uint8)
+        # If any values > 255, scale arr to be 1-255
+        if np.any(arr > 255):
+            arr = (arr - arr.min()) / (arr.max() - arr.min())
+            arr = (arr * 255).astype(np.uint8)
 
         if params.name != "image":
             raise DataLoaderError("Must provide image data parameters!")
         elif params.frame is None:
-            frame_arr = scaled[0, ...]
+            frame_arr = arr[0, ...]
         elif params.frame > arr.shape[0]:
             raise DataLoaderError(
                 f"Frame {params.frame} unavailable! Maximum available frame number is {arr.shape[0]}."
             )
         else:
-            frame_arr = scaled[params.frame - 1, ...]
+            frame_arr = arr[params.frame - 1, ...]
 
         im = Image.fromarray(frame_arr)
         buffer = io.BytesIO()
