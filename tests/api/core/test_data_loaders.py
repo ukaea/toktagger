@@ -7,6 +7,7 @@ from toktagger.api.schemas.samples import (
     TimeSeriesFileData,
     ShotData,
     ImageFileData,
+    ImageArrayFileData,
 )
 from toktagger.api.schemas.data import (
     TimeSeriesData,
@@ -239,6 +240,50 @@ def test_fair_mast_dataloader():
     ip_values = numpy.array(data.values.get("magnetics/ip").values)
     assert numpy.min(ip_values) == -40806.55078125
     assert numpy.max(ip_values) == 649008.875
+
+
+@pytest.mark.parametrize(
+    "file_name", ["multiple_arrs.npz", "single_arr.npz", "single_arr.npy"]
+)
+@pytest.mark.parametrize("frame", [None, 2])
+def test_image_array_file_loader(file_name: str, frame: int | None):
+    # Data in numpy arrays has shape (2, 10, 10) for (num_frames, x, y)
+    arr_file = ImageArrayFileData(
+        file_name=str(pathlib.Path(__file__).parents[2].joinpath(file_name)),
+        type=file_name.split(".")[1],
+        protocol="file",
+        signal_name="y" if file_name == "multiple_arrs.npz" else None,
+    )
+    sample = Sample(
+        shot_id=10000,
+        data=arr_file,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data_loader = data_loaders.ArrayDataLoader()
+    data = data_loader.get_sample(sample, params=ImageParams(name="image", frame=frame))
+    assert isinstance(data, ImageData)
+
+    # Decode base64 back to raw PNG bytes
+    png_bytes = base64.b64decode(data.values)
+
+    # Load image from bytes
+    im = Image.open(io.BytesIO(png_bytes))
+
+    # Convert to NumPy array
+    frame_arr = numpy.array(im)
+
+    # Check it is 10x10
+    assert frame_arr.shape == (10, 10)
+
+    # Check it has correct values
+    # If frame not specified, first frame
+    # Data is constructed from a range reshaped, so...
+    if frame:
+        assert numpy.allclose(frame_arr.flatten(), numpy.arange(100, 200))
+    else:
+        assert numpy.allclose(frame_arr.flatten(), numpy.arange(0, 100))
 
 
 @pytest.mark.asyncio

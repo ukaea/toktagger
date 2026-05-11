@@ -182,8 +182,8 @@ class ArrayDataLoader(DataLoader):
                 f"Could not find directory at '{file_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
             )
         # Load array
-        with np.load(file_path, allow_pickle=False) as img_data:
-            if sample_data.type == "npz":
+        if sample_data.type == "npz":
+            with np.load(file_path, allow_pickle=False) as img_data:
                 arr_names = img_data.files
                 if sample_data.signal_name is not None:
                     if sample_data.signal_name in arr_names:
@@ -199,8 +199,8 @@ class ArrayDataLoader(DataLoader):
                         raise ValueError(
                             f"Signal name not provided, but multiple options found in array file! Available keys are: {arr_names}"
                         )
-            else:
-                arr: np.ndarray = img_data
+        else:
+            arr: np.ndarray = np.load(file_path, allow_pickle=False)
 
         # Check array is 3D, frame x height x width
         if len(arr.shape) != 3:
@@ -212,12 +212,12 @@ class ArrayDataLoader(DataLoader):
             raise ValueError("Must provide image data parameters!")
         elif params.frame is None:
             frame_arr = arr[0, ...]
-        elif params.frame >= arr.shape[0]:
+        elif params.frame > arr.shape[0]:
             raise ValueError(
-                f"Frame {params.frame} unavailable! Maximum available frame number is {arr.shape[0] - 1}."
+                f"Frame {params.frame} unavailable! Maximum available frame number is {arr.shape[0]}."
             )
         else:
-            frame_arr = arr[params.frame, ...]
+            frame_arr = arr[params.frame - 1, ...]
 
         im = Image.fromarray(frame_arr)
         buffer = io.BytesIO()
