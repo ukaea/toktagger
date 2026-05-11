@@ -17,7 +17,14 @@ import {
   RadioGroup,
   Radio,
 } from "@adobe/react-spectrum";
-import { Project, Sample, ShotData, FileData, TimeSeriesFileData, ImageArrayFileData } from "@/types";
+import {
+  Project,
+  Sample,
+  ShotData,
+  FileData,
+  TimeSeriesFileData,
+  ImageArrayFileData,
+} from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
@@ -246,17 +253,26 @@ export const AddSamplesEditor = ({
               .map((s) => s.trim())
               .filter((s) => s.length > 0);
 
-            if (dataSchema?.title === "TimeSeriesFileData" && columns.length > 0) {
+            if (
+              dataSchema?.title === "TimeSeriesFileData" &&
+              columns.length > 0
+            ) {
               fileData.signal_names = columns;
               return {
                 ...baseSample,
                 data: fileData as TimeSeriesFileData,
               };
-            }
-            else if (dataSchema?.title === "ImageArrayFileData" && columns.length > 1) {
-              throw new Error("Only one signal name allowed for image array data!");
-            }
-            else if (dataSchema?.title === "ImageArrayFileData" && columns.length == 1) {
+            } else if (
+              dataSchema?.title === "ImageArrayFileData" &&
+              columns.length > 1
+            ) {
+              throw new Error(
+                "Only one signal name allowed for image array data!",
+              );
+            } else if (
+              dataSchema?.title === "ImageArrayFileData" &&
+              columns.length == 1
+            ) {
               fileData.signal_name = columns[0];
               return {
                 ...baseSample,
@@ -394,40 +410,40 @@ export const AddSamplesEditor = ({
             {(dataSchema?.title === "ImageFileData" ||
               dataSchema?.title === "ImageArrayFileData" ||
               dataSchema?.title === "TimeSeriesFileData") && (
-                <Form maxWidth="size-6000">
-                  <ComboBox
-                    label="File Type"
-                    items={fileTypes}
-                    isRequired
-                    selectedKey={fileType}
-                    onSelectionChange={(key) =>
-                      setFileType(key ? String(key) : "parquet")
-                    }
-                    description="File extension to filter for. For directory paths, only files with this extension will be included."
-                  >
-                    {(item: Record<string, string>) => (
-                      <Item key={item.key}>{item.value}</Item>
-                    )}
-                  </ComboBox>
+              <Form maxWidth="size-6000">
+                <ComboBox
+                  label="File Type"
+                  items={fileTypes}
+                  isRequired
+                  selectedKey={fileType}
+                  onSelectionChange={(key) =>
+                    setFileType(key ? String(key) : "parquet")
+                  }
+                  description="File extension to filter for. For directory paths, only files with this extension will be included."
+                >
+                  {(item: Record<string, string>) => (
+                    <Item key={item.key}>{item.value}</Item>
+                  )}
+                </ComboBox>
 
-                  <Flex direction="row" gap="size-200" alignItems="end">
-                    <TextField
-                      label={"Directory Path"}
-                      isRequired
-                      flex={1}
-                      value={dirPath}
-                      onChange={setDirPath}
-                      description={"Path to directory containing data files"}
-                    />
-                  </Flex>
-                </Form>
-              )}
+                <Flex direction="row" gap="size-200" alignItems="end">
+                  <TextField
+                    label={"Directory Path"}
+                    isRequired
+                    flex={1}
+                    value={dirPath}
+                    onChange={setDirPath}
+                    description={"Path to directory containing data files"}
+                  />
+                </Flex>
+              </Form>
+            )}
 
             {/* Display found shot IDs */}
             {(dataSchema?.title === "ImageFileData" ||
               dataSchema?.title === "ImageArrayFileData" ||
               dataSchema?.title === "TimeSeriesFileData") &&
-              shotIds.length > 0 ? (
+            shotIds.length > 0 ? (
               <Text>
                 Found <strong>{shotIds.length}</strong>{" "}
                 {useDirectories ? "directories" : "files"} with shot IDs:{" "}
