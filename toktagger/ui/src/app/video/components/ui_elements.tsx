@@ -219,13 +219,6 @@ export function CanvasModeToolbar(props: {
       >
         <Flex direction="column" alignItems="center" gap="size-100">
           <CanvasModeToggle
-            label="Drag / Zoom"
-            isSelected={props.panMode}
-            onPress={props.onTogglePanMode}
-          >
-            <DragZoomIcon />
-          </CanvasModeToggle>
-          <CanvasModeToggle
             label="Rectangle"
             isSelected={!props.panMode && props.drawingTool === "rectangle"}
             isDisabled={props.hideAnnotations}
@@ -242,6 +235,13 @@ export function CanvasModeToolbar(props: {
             <PolygonIcon />
           </CanvasModeToggle>
           <Divider size="S" width="100%" />
+          <CanvasModeToggle
+            label="Drag / Zoom"
+            isSelected={props.panMode}
+            onPress={props.onTogglePanMode}
+          >
+            <DragZoomIcon />
+          </CanvasModeToggle>
           <CanvasActionButton label="Reset view" onPress={props.onResetView}>
             <FullScreenExit aria-hidden="true" size="S" />
           </CanvasActionButton>
