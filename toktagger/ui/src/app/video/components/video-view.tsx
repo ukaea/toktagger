@@ -87,7 +87,7 @@ export function FrameJumpField(props: {
 
   return (
     <div
-      className="inline-flex h-8 items-center justify-center rounded-full border border-white bg-transparent px-3 focus-within:ring-2 focus-within:ring-white/70"
+      className="inline-flex h-8 items-center justify-center rounded-full border border-gray-900 bg-white px-3 focus-within:ring-2 focus-within:ring-gray-900/25 dark:border-white dark:bg-transparent dark:focus-within:ring-white/70"
       role="presentation"
       style={pillWidth !== null ? { width: `${pillWidth}px` } : undefined}
     >
@@ -114,7 +114,7 @@ export function FrameJumpField(props: {
           }
         }}
         onBlur={cancelEdit}
-        className="w-full border-0 bg-transparent p-0 text-center text-sm font-semibold text-white outline-none"
+        className="w-full border-0 bg-transparent p-0 text-center text-sm font-semibold text-gray-900 outline-none dark:text-white"
       />
     </div>
   );

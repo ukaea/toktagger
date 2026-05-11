@@ -206,17 +206,7 @@ export function CanvasModeToolbar(props: {
       zIndex={20}
       UNSAFE_style={{ transform: "translateX(calc(100% + 12px))" }}
     >
-      <View
-        borderWidth="thin"
-        borderRadius="large"
-        padding="size-100"
-        UNSAFE_style={{
-          borderColor: "rgba(212, 212, 216, 0.35)",
-          background:
-            "linear-gradient(180deg, rgba(82, 82, 91, 0.82) 0%, rgba(39, 39, 42, 0.88) 100%)",
-          backdropFilter: "blur(6px)",
-        }}
-      >
+      <div className="rounded-xl border border-zinc-400/45 bg-zinc-100/90 p-2 shadow-sm backdrop-blur dark:border-zinc-500/45 dark:bg-gradient-to-b dark:from-zinc-800/85 dark:to-zinc-950/90">
         <Flex direction="column" alignItems="center" gap="size-100">
           <CanvasModeToggle
             label="Rectangle"
@@ -246,7 +236,7 @@ export function CanvasModeToolbar(props: {
             <FullScreenExit aria-hidden="true" size="S" />
           </CanvasActionButton>
         </Flex>
-      </View>
+      </div>
     </View>
   );
 }
