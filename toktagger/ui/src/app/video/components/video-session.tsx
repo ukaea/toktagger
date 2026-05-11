@@ -251,6 +251,11 @@ export function VideoSessionProvider(props: {
   const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
   const [panMode, setPanModeState] = useState(false);
   const [hideAnnotations, setHideAnnotations] = useState(false);
+  const hideAnnotationsRef = useRef(false);
+
+  useEffect(() => {
+    hideAnnotationsRef.current = hideAnnotations;
+  }, [hideAnnotations]);
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -286,10 +291,11 @@ export function VideoSessionProvider(props: {
 
   const flushPendingOverlay = useCallback(() => {
     if (isProgrammaticAnnoSyncRef.current) return;
+    if (hideAnnotations || hideAnnotationsRef.current) return;
     const raw = api?.getAnnotations?.();
     if (!raw) return;
     commitFromAnnotoriousRef.current(raw);
-  }, [api]);
+  }, [api, hideAnnotations]);
 
   const setDrawingTool = useCallback(
     (tool: DrawingTool) => {
@@ -585,6 +591,7 @@ export function VideoSessionProvider(props: {
     (rawOverride?: ImageAnnotation[]) => {
       if (!api?.getAnnotations) return;
       if (isProgrammaticAnnoSyncRef.current) return;
+      if (hideAnnotations) return;
 
       // Some Annotorious events pass a single annotation (not an array).
       const raw = rawOverride ?? api.getAnnotations();
@@ -673,6 +680,7 @@ export function VideoSessionProvider(props: {
       frame,
       frameKey,
       getFrameList,
+      hideAnnotations,
       imageNatural,
       selection.className,
       selection.trackId,
