@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Annotorious } from "@annotorious/react";
 import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
-import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
+import { Button } from "@adobe/react-spectrum";
 import {
   VideoSessionProvider,
   useVideoSession,
@@ -16,36 +16,107 @@ import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter"
 import { useParams } from "react-router-dom";
 
 /**
- * Small "jump to frame" input with validation. Delegates the actual navigation
- * to the parent via `onJump`.
+ * Center frame control:
+ * - Default state: "Frame X" button
+ * - Edit state: inline numeric input in the same pill footprint
  */
-export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
-  const [errorMessage, setErrorMessage] = useState<string>("");
+export function FrameJumpField(props: {
+  frame: number;
+  onJump: (n: number) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftValue, setDraftValue] = useState<string>(String(props.frame));
+  const [pillWidth, setPillWidth] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const displayPillRef = useRef<HTMLDivElement | null>(null);
 
-  const onSearchSubmit = (newValue: string) => {
-    if (newValue === "") {
-      setErrorMessage("");
-      return;
+  useEffect(() => {
+    if (!isEditing) {
+      setDraftValue(String(props.frame));
     }
+  }, [props.frame, isEditing]);
 
-    const n = Number(newValue);
+  useEffect(() => {
+    if (!isEditing) return;
 
-    if (Number.isInteger(n) && n >= 0) {
-      setErrorMessage("");
-      onJump(n);
-      return;
-    }
+    const rafId = requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      input.select();
+    });
 
-    setErrorMessage("Please enter a number.");
+    return () => cancelAnimationFrame(rafId);
+  }, [isEditing]);
+
+  const startEdit = () => {
+    const width = displayPillRef.current?.offsetWidth ?? null;
+    setPillWidth(width);
+    setDraftValue(String(props.frame));
+    setIsEditing(true);
   };
 
+  const cancelEdit = () => {
+    setDraftValue(String(props.frame));
+    setIsEditing(false);
+  };
+
+  const commitEdit = () => {
+    const trimmed = draftValue.trim();
+    if (trimmed === "") {
+      cancelEdit();
+      return;
+    }
+
+    const parsed = Number(trimmed);
+    if (Number.isInteger(parsed) && parsed >= 0) {
+      setIsEditing(false);
+      props.onJump(Math.trunc(parsed));
+    }
+  };
+
+  if (!isEditing) {
+    return (
+      <div ref={displayPillRef} className="inline-flex">
+        <Button variant="primary" onPress={startEdit}>
+          Frame {props.frame}
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <SearchField
-      aria-label="Jump to Frame"
-      onSubmit={onSearchSubmit}
-      validationState={errorMessage ? "invalid" : undefined}
-      errorMessage={errorMessage}
-    />
+    <div
+      className="inline-flex h-8 items-center justify-center rounded-full border border-white bg-transparent px-3 focus-within:ring-2 focus-within:ring-white/70"
+      role="presentation"
+      style={pillWidth !== null ? { width: `${pillWidth}px` } : undefined}
+    >
+      <input
+        ref={inputRef}
+        aria-label="Frame number"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={draftValue}
+        onChange={(event) => {
+          const next = event.target.value.replace(/\D+/g, "");
+          setDraftValue(next);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitEdit();
+            return;
+          }
+
+          if (event.key === "Escape") {
+            event.preventDefault();
+            cancelEdit();
+          }
+        }}
+        onBlur={cancelEdit}
+        className="w-full border-0 bg-transparent p-0 text-center text-sm font-semibold text-white outline-none"
+      />
+    </div>
   );
 }
 
@@ -96,15 +167,8 @@ function VideoFrameAnnotator(props: {
   return (
     <div className="flex flex-col items-center gap-4 w-full">
       <div className="flex flex-col items-center gap-2">
-        <div className="w-60 text-center">
-          <div className="text-[13px] text-gray-700 dark:text-gray-200 mb-1">
-            Jump to Frame
-          </div>
-          <FrameSearch onJump={handleJump} />
-        </div>
-
         <div className="flex justify-center">
-          <ButtonGroup>
+          <div className="flex items-start gap-2">
             <Button
               variant="primary"
               onPress={handlePrev}
@@ -112,9 +176,7 @@ function VideoFrameAnnotator(props: {
             >
               Prev
             </Button>
-            <Button variant="primary" isDisabled>
-              Frame {session.frame}
-            </Button>
+            <FrameJumpField frame={session.frame} onJump={handleJump} />
             <Button
               variant="primary"
               onPress={handleNext}
@@ -122,7 +184,7 @@ function VideoFrameAnnotator(props: {
             >
               Next
             </Button>
-          </ButtonGroup>
+          </div>
         </div>
       </div>
 

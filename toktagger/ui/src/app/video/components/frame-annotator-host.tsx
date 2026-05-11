@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import OpenSeadragon from "openseadragon";
 import {
   OpenSeadragonAnnotator,
@@ -25,7 +25,7 @@ import {
 } from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
 import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
-import { ResetViewButton } from "./ui_elements";
+import { CanvasModeToolbar } from "./ui_elements";
 
 function setGestureNavigation(
   viewer: OpenSeadragon.Viewer,
@@ -56,6 +56,23 @@ function setGestureNavigation(
   unknown.dblClickToZoom = false;
 }
 
+function findAnnotationOverlay(viewerElement: HTMLElement | null) {
+  if (!viewerElement) return null;
+
+  const scopes = [
+    viewerElement,
+    viewerElement.parentElement,
+    viewerElement.parentElement?.parentElement,
+  ].filter(Boolean) as HTMLElement[];
+
+  for (const scope of scopes) {
+    const hit = scope.querySelector<HTMLElement>(".a9s-annotationlayer");
+    if (hit) return hit;
+  }
+
+  return null;
+}
+
 /**
  * Top-level host that provides the Annotorious context and renders the annotator.
  */
@@ -79,12 +96,49 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     setImageNatural,
     selection,
     drawingTool,
+    setDrawingTool,
     panMode,
+    setPanMode,
     hideAnnotations,
     deleteAnnotation,
-    closePopup,
   } = useVideoSession();
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
+  const [dismissedPopupAnnotationId, setDismissedPopupAnnotationId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (!api?.on || !api?.off) return;
+
+    const onSelectionChanged = (arr: ImageAnnotation[]) => {
+      if (arr.length === 0) {
+        setDismissedPopupAnnotationId(null);
+        return;
+      }
+
+      const selectedId =
+        typeof arr[0]?.id === "string" ? String(arr[0].id) : null;
+      if (!selectedId) {
+        setDismissedPopupAnnotationId(null);
+        return;
+      }
+
+      // Keep popup dismissed only for the same currently selected annotation.
+      setDismissedPopupAnnotationId((prev) =>
+        prev && prev !== selectedId ? null : prev,
+      );
+    };
+
+    api.on("selectionChanged", onSelectionChanged);
+
+    return () => {
+      api.off("selectionChanged", onSelectionChanged);
+    };
+  }, [api]);
+
+  useEffect(() => {
+    setDismissedPopupAnnotationId(null);
+  }, [frame]);
 
   useEffect(() => {
     setImageNatural(null);
@@ -124,6 +178,17 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     if (api.viewer) {
       api.viewer.setMouseNavEnabled(panMode);
       setGestureNavigation(api.viewer, panMode);
+
+      const overlayInteractionDisabled = panMode || hideAnnotations;
+      const overlay = findAnnotationOverlay(
+        api.viewer.element as HTMLElement,
+      );
+      if (overlay) {
+        overlay.style.pointerEvents = overlayInteractionDisabled
+          ? "none"
+          : "auto";
+        overlay.style.opacity = hideAnnotations ? "0" : "1";
+      }
     }
 
     api.setUserSelectAction(
@@ -135,6 +200,16 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     if (panMode || hideAnnotations) {
       api.setSelected?.();
     }
+
+    return () => {
+      const overlay = findAnnotationOverlay(
+        api.viewer?.element as HTMLElement | null,
+      );
+      if (overlay) {
+        overlay.style.pointerEvents = "auto";
+        overlay.style.opacity = "1";
+      }
+    };
   }, [api, hideAnnotations, panMode]);
 
   const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
@@ -248,7 +323,21 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   return (
     <div className="w-full flex justify-center">
       <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
-        <ResetViewButton onPress={resetView} />
+        <CanvasModeToolbar
+          panMode={panMode}
+          drawingTool={drawingTool}
+          hideAnnotations={hideAnnotations}
+          onTogglePanMode={() => setPanMode(!panMode)}
+          onSelectRectangle={() => {
+            setPanMode(false);
+            setDrawingTool("rectangle");
+          }}
+          onSelectPolygon={() => {
+            setPanMode(false);
+            setDrawingTool("polygon");
+          }}
+          onResetView={resetView}
+        />
 
         <OpenSeadragonAnnotator
           tool={drawingTool}
@@ -268,6 +357,14 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           <OpenSeadragonAnnotationPopup
             popup={(props: PopupProps) => {
               const annotation = props.annotation as ImageAnnotation;
+              const annotationId =
+                typeof annotation?.id === "string"
+                  ? String(annotation.id)
+                  : null;
+
+              if (annotationId && annotationId === dismissedPopupAnnotationId) {
+                return null;
+              }
 
               const { className, trackId } = getLabelTrack(annotation);
               const geometry = isRectangleAnno(annotation)
@@ -287,7 +384,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                     deleteAnnotation(id);
                   }}
                   onClose={() => {
-                    closePopup();
+                    if (!annotationId) return;
+                    setDismissedPopupAnnotationId(annotationId);
                   }}
                 />
               );
