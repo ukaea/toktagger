@@ -180,9 +180,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       setGestureNavigation(api.viewer, panMode);
 
       const overlayInteractionDisabled = panMode || hideAnnotations;
-      const overlay = findAnnotationOverlay(
-        api.viewer.element as HTMLElement,
-      );
+      const overlay = findAnnotationOverlay(api.viewer.element as HTMLElement);
       if (overlay) {
         overlay.style.pointerEvents = overlayInteractionDisabled
           ? "none"
