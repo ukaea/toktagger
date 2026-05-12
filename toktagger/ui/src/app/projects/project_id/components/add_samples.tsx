@@ -410,40 +410,40 @@ export const AddSamplesEditor = ({
             {(dataSchema?.title === "ImageFileData" ||
               dataSchema?.title === "ImageArrayFileData" ||
               dataSchema?.title === "TimeSeriesFileData") && (
-              <Form maxWidth="size-6000">
-                <ComboBox
-                  label="File Type"
-                  items={fileTypes}
-                  isRequired
-                  selectedKey={fileType}
-                  onSelectionChange={(key) =>
-                    setFileType(key ? String(key) : "parquet")
-                  }
-                  description="File extension to filter for. For directory paths, only files with this extension will be included."
-                >
-                  {(item: Record<string, string>) => (
-                    <Item key={item.key}>{item.value}</Item>
-                  )}
-                </ComboBox>
-
-                <Flex direction="row" gap="size-200" alignItems="end">
-                  <TextField
-                    label={"Directory Path"}
+                <Form maxWidth="size-6000">
+                  <ComboBox
+                    label="File Type"
+                    items={fileTypes}
                     isRequired
-                    flex={1}
-                    value={dirPath}
-                    onChange={setDirPath}
-                    description={"Path to directory containing data files"}
-                  />
-                </Flex>
-              </Form>
-            )}
+                    selectedKey={fileType}
+                    onSelectionChange={(key) =>
+                      setFileType(key ? String(key) : "parquet")
+                    }
+                    description="File extension to filter for. For directory paths, only files with this extension will be included."
+                  >
+                    {(item: Record<string, string>) => (
+                      <Item key={item.key}>{item.value}</Item>
+                    )}
+                  </ComboBox>
+
+                  <Flex direction="row" gap="size-200" alignItems="end">
+                    <TextField
+                      label={"Directory Path"}
+                      isRequired
+                      flex={1}
+                      value={dirPath}
+                      onChange={setDirPath}
+                      description={"Path to directory containing data files"}
+                    />
+                  </Flex>
+                </Form>
+              )}
 
             {/* Display found shot IDs */}
             {(dataSchema?.title === "ImageFileData" ||
               dataSchema?.title === "ImageArrayFileData" ||
               dataSchema?.title === "TimeSeriesFileData") &&
-            shotIds.length > 0 ? (
+              shotIds.length > 0 ? (
               <Text>
                 Found <strong>{shotIds.length}</strong>{" "}
                 {useDirectories ? "directories" : "files"} with shot IDs:{" "}
@@ -456,16 +456,17 @@ export const AddSamplesEditor = ({
               </Text>
             )}
 
-            {dataSchema?.title === "TimeSeriesFileData" && (
-              <Form maxWidth="size-6000">
-                <TextField
-                  label="Column Names (comma-separated)"
-                  value={columnNames}
-                  onChange={setColumnNames}
-                  description="Optional: Specify column names for time series data"
-                />
-              </Form>
-            )}
+            {(dataSchema?.title === "TimeSeriesFileData" ||
+              dataSchema?.title === "ImageArrayFileData") && (
+                <Form maxWidth="size-6000">
+                  <TextField
+                    label={dataSchema?.title === "TimeSeriesFileData" ? "Signal Names (comma-separated)" : "Signal Name"}
+                    value={columnNames}
+                    onChange={setColumnNames}
+                    description="Optional: Specify signal names to load data for."
+                  />
+                </Form>
+              )}
           </Content>
           <ButtonGroup>
             <Button variant="secondary" onPress={close}>
