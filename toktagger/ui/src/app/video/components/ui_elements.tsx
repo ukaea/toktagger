@@ -165,7 +165,10 @@ function CanvasModeToggle(props: {
         isDisabled={props.isDisabled}
         onPress={props.onPress}
         aria-label={props.label}
-        UNSAFE_style={{ width: 40, minWidth: 40, height: 40, padding: 0 }}
+        width={40}
+        minWidth={40}
+        height={40}
+        UNSAFE_style={{ padding: 0 }}
       >
         {props.children}
       </ToggleButton>
@@ -184,7 +187,10 @@ function CanvasActionButton(props: {
       <ActionButton
         onPress={props.onPress}
         aria-label={props.label}
-        UNSAFE_style={{ width: 40, minWidth: 40, height: 40, padding: 0 }}
+        width={40}
+        minWidth={40}
+        height={40}
+        UNSAFE_style={{ padding: 0 }}
       >
         {props.children}
       </ActionButton>
@@ -209,21 +215,19 @@ export function CanvasModeToolbar(props: {
     <View
       position="absolute"
       top="size-100"
-      right={0}
+      left="calc(100% + 12px)"
       zIndex={20}
-      UNSAFE_style={{ transform: "translateX(calc(100% + 12px))" }}
     >
       <View
         borderWidth="thin"
+        borderColor={isDark ? "gray-700" : "gray-400"}
         borderRadius="large"
+        backgroundColor={isDark ? "gray-900" : "gray-100"}
         padding="size-100"
         UNSAFE_style={{
-          borderColor: isDark
-            ? "rgba(113, 113, 122, 0.45)"
-            : "rgba(161, 161, 170, 0.45)",
-          background: isDark
+          backgroundImage: isDark
             ? "linear-gradient(180deg, rgba(39, 39, 42, 0.85) 0%, rgba(9, 9, 11, 0.9) 100%)"
-            : "rgba(244, 244, 245, 0.9)",
+            : undefined,
           backdropFilter: "blur(6px)",
           boxShadow: "0 1px 2px rgba(0, 0, 0, 0.08)",
         }}

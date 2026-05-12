@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Annotorious } from "@annotorious/react";
 import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
-import { Button, useProvider, View } from "@adobe/react-spectrum";
+import { Button, Flex, useProvider, View } from "@adobe/react-spectrum";
 import {
   VideoSessionProvider,
   useVideoSession,
@@ -92,58 +92,58 @@ export function FrameJumpField(props: {
   return (
     <View
       role="presentation"
+      borderWidth="thin"
+      borderColor={isDark ? "static-white" : "gray-900"}
+      backgroundColor={isDark ? "transparent" : "static-white"}
+      height={32}
+      paddingX={12}
+      width={pillWidth !== null ? pillWidth : undefined}
       UNSAFE_style={{
-        alignItems: "center",
-        background: isDark ? "transparent" : "#ffffff",
-        border: `1px solid ${isDark ? "#ffffff" : "#111827"}`,
         borderRadius: "9999px",
         boxShadow: isFocused
           ? `0 0 0 2px ${isDark ? "rgba(255, 255, 255, 0.7)" : "rgba(17, 24, 39, 0.25)"}`
           : undefined,
         display: "inline-flex",
-        height: 32,
-        justifyContent: "center",
-        paddingLeft: 12,
-        paddingRight: 12,
-        width: pillWidth !== null ? pillWidth : undefined,
       }}
     >
-      <input
-        ref={inputRef}
-        aria-label="Frame number"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        value={draftValue}
-        onChange={(event) => {
-          const next = event.target.value.replace(/\D+/g, "");
-          setDraftValue(next);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commitEdit();
-            return;
-          }
+      <Flex alignItems="center" justifyContent="center" width="100%">
+        <input
+          ref={inputRef}
+          aria-label="Frame number"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={draftValue}
+          onChange={(event) => {
+            const next = event.target.value.replace(/\D+/g, "");
+            setDraftValue(next);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitEdit();
+              return;
+            }
 
-          if (event.key === "Escape") {
-            event.preventDefault();
-            cancelEdit();
-          }
-        }}
-        onFocus={() => setIsFocused(true)}
-        onBlur={cancelEdit}
-        style={{
-          background: "transparent",
-          border: 0,
-          color: isDark ? "#ffffff" : "#111827",
-          fontSize: 14,
-          fontWeight: 600,
-          outline: "none",
-          padding: 0,
-          textAlign: "center",
-          width: "100%",
-        }}
-      />
+            if (event.key === "Escape") {
+              event.preventDefault();
+              cancelEdit();
+            }
+          }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={cancelEdit}
+          style={{
+            background: "transparent",
+            border: 0,
+            color: isDark ? "#ffffff" : "#111827",
+            fontSize: 14,
+            fontWeight: 600,
+            outline: "none",
+            padding: 0,
+            textAlign: "center",
+            width: "100%",
+          }}
+        />
+      </Flex>
     </View>
   );
 }
