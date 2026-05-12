@@ -22,7 +22,7 @@ import {
   Divider,
   Content,
   ButtonGroup,
-  Checkbox
+  Checkbox,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
