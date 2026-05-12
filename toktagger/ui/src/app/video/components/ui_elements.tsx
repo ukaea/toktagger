@@ -12,6 +12,7 @@ import {
   Tooltip,
   TooltipTrigger,
   ToggleButton,
+  useProvider,
   View,
 } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
@@ -93,7 +94,8 @@ function DragZoomIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      width={20}
+      height={20}
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
@@ -112,7 +114,8 @@ function RectangleIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-6 w-6"
+      width={24}
+      height={24}
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
@@ -129,7 +132,8 @@ function PolygonIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-6 w-6"
+      width={24}
+      height={24}
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
@@ -198,6 +202,9 @@ export function CanvasModeToolbar(props: {
   onSelectPolygon: () => void;
   onResetView: () => void;
 }) {
+  const { colorScheme } = useProvider();
+  const isDark = colorScheme === "dark";
+
   return (
     <View
       position="absolute"
@@ -206,7 +213,21 @@ export function CanvasModeToolbar(props: {
       zIndex={20}
       UNSAFE_style={{ transform: "translateX(calc(100% + 12px))" }}
     >
-      <div className="rounded-xl border border-zinc-400/45 bg-zinc-100/90 p-2 shadow-sm backdrop-blur dark:border-zinc-500/45 dark:bg-gradient-to-b dark:from-zinc-800/85 dark:to-zinc-950/90">
+      <View
+        borderWidth="thin"
+        borderRadius="large"
+        padding="size-100"
+        UNSAFE_style={{
+          borderColor: isDark
+            ? "rgba(113, 113, 122, 0.45)"
+            : "rgba(161, 161, 170, 0.45)",
+          background: isDark
+            ? "linear-gradient(180deg, rgba(39, 39, 42, 0.85) 0%, rgba(9, 9, 11, 0.9) 100%)"
+            : "rgba(244, 244, 245, 0.9)",
+          backdropFilter: "blur(6px)",
+          boxShadow: "0 1px 2px rgba(0, 0, 0, 0.08)",
+        }}
+      >
         <Flex direction="column" alignItems="center" gap="size-100">
           <CanvasModeToggle
             label="Rectangle"
@@ -236,7 +257,7 @@ export function CanvasModeToolbar(props: {
             <FullScreenExit aria-hidden="true" size="S" />
           </CanvasActionButton>
         </Flex>
-      </div>
+      </View>
     </View>
   );
 }

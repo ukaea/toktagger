@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Annotorious } from "@annotorious/react";
 import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
-import { Button } from "@adobe/react-spectrum";
+import { Button, useProvider, View } from "@adobe/react-spectrum";
 import {
   VideoSessionProvider,
   useVideoSession,
@@ -24,9 +24,12 @@ export function FrameJumpField(props: {
   frame: number;
   onJump: (n: number) => void;
 }) {
+  const { colorScheme } = useProvider();
+  const isDark = colorScheme === "dark";
   const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState<string>(String(props.frame));
   const [pillWidth, setPillWidth] = useState<number | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const displayPillRef = useRef<HTMLDivElement | null>(null);
 
@@ -58,6 +61,7 @@ export function FrameJumpField(props: {
 
   const cancelEdit = () => {
     setDraftValue(String(props.frame));
+    setIsFocused(false);
     setIsEditing(false);
   };
 
@@ -77,7 +81,7 @@ export function FrameJumpField(props: {
 
   if (!isEditing) {
     return (
-      <div ref={displayPillRef} className="inline-flex">
+      <div ref={displayPillRef} style={{ display: "inline-flex" }}>
         <Button variant="primary" onPress={startEdit}>
           Frame {props.frame}
         </Button>
@@ -86,10 +90,23 @@ export function FrameJumpField(props: {
   }
 
   return (
-    <div
-      className="inline-flex h-8 items-center justify-center rounded-full border border-gray-900 bg-white px-3 focus-within:ring-2 focus-within:ring-gray-900/25 dark:border-white dark:bg-transparent dark:focus-within:ring-white/70"
+    <View
       role="presentation"
-      style={pillWidth !== null ? { width: `${pillWidth}px` } : undefined}
+      UNSAFE_style={{
+        alignItems: "center",
+        background: isDark ? "transparent" : "#ffffff",
+        border: `1px solid ${isDark ? "#ffffff" : "#111827"}`,
+        borderRadius: "9999px",
+        boxShadow: isFocused
+          ? `0 0 0 2px ${isDark ? "rgba(255, 255, 255, 0.7)" : "rgba(17, 24, 39, 0.25)"}`
+          : undefined,
+        display: "inline-flex",
+        height: 32,
+        justifyContent: "center",
+        paddingLeft: 12,
+        paddingRight: 12,
+        width: pillWidth !== null ? pillWidth : undefined,
+      }}
     >
       <input
         ref={inputRef}
@@ -113,10 +130,21 @@ export function FrameJumpField(props: {
             cancelEdit();
           }
         }}
+        onFocus={() => setIsFocused(true)}
         onBlur={cancelEdit}
-        className="w-full border-0 bg-transparent p-0 text-center text-sm font-semibold text-gray-900 outline-none dark:text-white"
+        style={{
+          background: "transparent",
+          border: 0,
+          color: isDark ? "#ffffff" : "#111827",
+          fontSize: 14,
+          fontWeight: 600,
+          outline: "none",
+          padding: 0,
+          textAlign: "center",
+          width: "100%",
+        }}
       />
-    </div>
+    </View>
   );
 }
 
