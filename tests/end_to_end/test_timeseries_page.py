@@ -6,6 +6,45 @@ import requests
 import time
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 
+def test_annotation_toolbar(server_setup, page: Page):
+    ## Create Project
+    project_id = create_project("Test Project", "time-series", "tabular")
+    # And a sample for disruption
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+
+    sample_id = ids[0]
+
+    # Navigate to page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    # Check time series plot rendered
+    expect(page.get_by_label("time-series")).to_be_visible()
+
+    # Check toolbar is visible
+    expect(page.get_by_test_id("annotation-toolbar")).to_be_visible()
+
+    # Check view mode
+    expect(page.get_by_role("button", name="View Mode")).to_be_enabled()
+    expect(page.get_by_role("button", name="TIME REGION")).to_be_disabled()
+    expect(page.get_by_role("button", name="TIME POINT")).to_be_disabled()
+
+    # Check edit mode
+    page.get_by_role("button", name="View Mode").click()
+    expect(page.get_by_label("annotation-context-help")).to_be_visible()
+    
+    page.locator("body").click()
+    expect(page.get_by_role("button", name="Edit Mode")).to_be_enabled()
+    expect(page.get_by_role("button", name="TIME REGION")).to_be_enabled()
+    expect(page.get_by_role("button", name="TIME POINT")).to_be_enabled()
+
+    page.get_by_role("button", name="TIME REGION").click()
+    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute("aria-pressed", "true")
+    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute("aria-pressed", "false")
+    page.get_by_role("button", name="TIME POINT").click()
+    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute("aria-pressed", "true")
+    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute("aria-pressed", "false")
 
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
 def test_timeseries_add_zone(zone_type, server_setup, page: Page):
@@ -22,10 +61,10 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
 
     # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
+    expect(page.get_by_label("TimeSeriesView")).to_be_visible()
 
     # Right click on it, check menu renders
-    page.get_by_label("time-series").click(button="right")
+    page.get_by_label("Time").click(button="right")
 
     expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
     expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
