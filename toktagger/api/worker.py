@@ -64,6 +64,15 @@ def get_actor(project, model):
 
 
 @ray.remote
+def load_model(
+    model: Model,
+    project: Project,
+):
+    model_actor = get_actor(project=project, model=model)
+    return model_actor.is_trained.remote()
+
+
+@ray.remote
 def train_model(
     model: Model,
     project: Project,

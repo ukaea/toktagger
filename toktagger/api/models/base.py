@@ -106,6 +106,9 @@ class Model(ABC):
         self.load(file_path=file_path)
         self._trained = True
 
+    def is_trained(self) -> tuple[bool, str]:
+        return self._trained, self.id
+
     def log_progress(
         self,
         training_status: typing.Literal[

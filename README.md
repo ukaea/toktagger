@@ -36,11 +36,11 @@ source .venv/bin/activate
 ```
 To install the package for labelling only (without ML Model functionality):
 ```sh
-GIT_LFS_SKIP_SMUDGE=1 pip install git+ssh://git@github.com/ukaea/toktagger.git
+GIT_LFS_SKIP_SMUDGE=1 pip install toktagger
 ```
 Or to include the ML models:
 ```sh
-GIT_LFS_SKIP_SMUDGE=1 pip install git+ssh://git@github.com/ukaea/toktagger.git#egg=toktagger[models]
+GIT_LFS_SKIP_SMUDGE=1 pip install toktagger[models]
 ```
 If you intend to add custom data loaders or models to your TokTagger instance, this is the recommended route.
 
@@ -48,11 +48,11 @@ If you intend to add custom data loaders or models to your TokTagger instance, t
 Alternatively, it can be installed as a tool using `uv`. To install the package for labelling only (without ML Model functionality):
 
 ```sh
-GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 git+ssh://git@github.com/ukaea/toktagger.git`
+GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 toktagger`
 ```
 Or to include the ML models:
 ```sh
-GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 git+ssh://git@github.com/ukaea/toktagger.git#egg=toktagger[models]`
+GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 toktagger[models]`
 ```
 
 ## Quick Start
@@ -63,3 +63,8 @@ toktagger
 ```
 
 This will start a local instance of the application running at `http://localhost:8002`.
+
+## Settings
+There are some additional settings which can be configured via environment variables:
+
+* **DISABLE_LOCAL_MODEL_LOAD**: This disables support for models to have their pretrained weights loaded locally by moving the weights into a specificed location. This option should be set if setting up a production instance of TokTagger where users only have access to the web UI, and not the server backend.

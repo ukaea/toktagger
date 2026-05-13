@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Request
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.models.base import ModelRegistry
+from toktagger.api.schemas.models import LoadTypes
 import typing
+import os
 
 router = APIRouter(prefix="/meta", tags=["Metadata"])
 
@@ -16,6 +18,12 @@ async def get_dataloaders(request: Request) -> list[str]:
 async def get_model_types(task: str) -> list[str]:
     """Get list of available models for a given task."""
     return ModelRegistry.names(task)
+
+
+@router.get("/models/load")
+async def get_model_load_methods() -> list[str]:
+    """Get list of enabled ways to load pretrained weights into the server."""
+    return [LoadTypes.LOCAL] if not os.environ.get("DISABLE_LOCAL_MODEL_LOAD") else []
 
 
 @router.get("/dataloader/{loader}")
