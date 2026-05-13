@@ -10,39 +10,17 @@ import {
 } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
-import { canonicalizeTrackId } from "@/app/video/components/video-utils";
+import {
+  canonicalizeTrackId,
+  loadLastClassName,
+  saveLastClassName,
+} from "@/app/video/components/video-utils";
 import { useSample } from "@/app/contexts/SampleContext";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
   ConfirmModal,
 } from "@/app/video/components/ui_elements";
-
-/**
- * Persist the last selected class so the annotator can immediately draw
- * when moving between samples (same project).
- */
-const LAST_CLASS_KEY = "ufo::lastClassName";
-
-function loadLastClassName(): string | null {
-  try {
-    const v = globalThis.localStorage?.getItem(LAST_CLASS_KEY);
-    const s = (v ?? "").trim();
-    return s ? s : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLastClassName(name: string) {
-  try {
-    const s = (name ?? "").trim();
-    if (!s) return;
-    globalThis.localStorage?.setItem(LAST_CLASS_KEY, s);
-  } catch {
-    // ignore
-  }
-}
 
 /**
  * Sidebar instance rows are keyed by (class, track_id). We keep a stable string key

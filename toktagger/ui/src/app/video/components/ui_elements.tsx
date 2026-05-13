@@ -5,6 +5,9 @@ import {
   ActionButton,
   Button,
   ComboBox,
+  Content,
+  Dialog,
+  DialogTrigger,
   Divider,
   Flex,
   Item,
@@ -17,6 +20,7 @@ import {
 } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import FullScreenExit from "@spectrum-icons/workflow/FullScreenExit";
+import LabelIcon from "@spectrum-icons/workflow/Label";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -312,6 +316,7 @@ function CanvasModeToggle(props: {
 
 function CanvasActionButton(props: {
   label: string;
+  isDisabled?: boolean;
   onPress: () => void;
   children: React.ReactNode;
 }) {
@@ -320,6 +325,7 @@ function CanvasActionButton(props: {
       <ActionButton
         onPress={props.onPress}
         aria-label={props.label}
+        isDisabled={props.isDisabled}
         width={40}
         minWidth={40}
         height={40}
@@ -332,13 +338,61 @@ function CanvasActionButton(props: {
   );
 }
 
+function CanvasLabelPicker(props: {
+  classItems: ClassCategoryItem[];
+  selectedClassName: string | null;
+  onSelectClassName: (name: string) => void;
+}) {
+  return (
+    <DialogTrigger type="popover" placement="left top" hideArrow>
+      <TooltipTrigger delay={350} placement="left">
+        <ActionButton
+          aria-label="Change class label"
+          isDisabled={props.classItems.length === 0}
+          width={40}
+          minWidth={40}
+          height={40}
+          UNSAFE_style={{ padding: 0 }}
+        >
+          <LabelIcon aria-hidden="true" size="S" />
+        </ActionButton>
+        <Tooltip>Class label</Tooltip>
+      </TooltipTrigger>
+      {(close) => (
+        <Dialog width="size-3000">
+          <Content>
+            <ComboBox
+              label="Class Label"
+              items={props.classItems}
+              selectedKey={props.selectedClassName}
+              onSelectionChange={(key) => {
+                const next = key ? String(key) : "";
+                if (!next) return;
+
+                props.onSelectClassName(next);
+                close();
+              }}
+              width="100%"
+            >
+              {(item) => <Item key={item.name}>{item.name}</Item>}
+            </ComboBox>
+          </Content>
+        </Dialog>
+      )}
+    </DialogTrigger>
+  );
+}
+
 export function CanvasModeToolbar(props: {
   panMode: boolean;
   drawingTool: "rectangle" | "polygon";
   hideAnnotations: boolean;
+  classItems: ClassCategoryItem[];
+  selectedClassName: string | null;
   onTogglePanMode: () => void;
   onSelectRectangle: () => void;
   onSelectPolygon: () => void;
+  onSelectClassName: (name: string) => void;
   onResetView: () => void;
 }) {
   const { colorScheme } = useProvider();
@@ -393,6 +447,12 @@ export function CanvasModeToolbar(props: {
           <CanvasActionButton label="Reset view" onPress={props.onResetView}>
             <FullScreenExit aria-hidden="true" size="S" />
           </CanvasActionButton>
+          <Divider size="S" width="100%" />
+          <CanvasLabelPicker
+            classItems={props.classItems}
+            selectedClassName={props.selectedClassName}
+            onSelectClassName={props.onSelectClassName}
+          />
         </Flex>
       </View>
     </View>

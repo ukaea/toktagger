@@ -13,6 +13,32 @@ import { classIdForName, makeTrackKey, buildSourceKey } from "./types";
 import { getLabelTrack } from "./anno-utils";
 
 /**
+ * Persist the last selected class so the annotator can immediately draw
+ * when moving between samples (same project).
+ */
+const LAST_CLASS_KEY = "ufo::lastClassName";
+
+export function loadLastClassName(): string | null {
+  try {
+    const v = globalThis.localStorage?.getItem(LAST_CLASS_KEY);
+    const s = (v ?? "").trim();
+    return s ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastClassName(name: string) {
+  try {
+    const s = (name ?? "").trim();
+    if (!s) return;
+    globalThis.localStorage?.setItem(LAST_CLASS_KEY, s);
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Simple deep clone for annotation payloads.
  * Annotorious annotations are plain data objects, so JSON cloning is sufficient here.
  */

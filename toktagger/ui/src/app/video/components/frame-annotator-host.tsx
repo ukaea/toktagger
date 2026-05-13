@@ -16,6 +16,7 @@ import {
 import "@annotorious/react/annotorious-react.css";
 
 import { useVideoSession } from "@/app/video/components/video-session";
+import { useSample } from "@/app/contexts/SampleContext";
 import {
   getLabelTrack,
   isPolygonAnno,
@@ -26,6 +27,7 @@ import {
 import { AnnotationPopup } from "./annotation-popup";
 import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
 import { CanvasModeToolbar } from "./ui_elements";
+import { saveLastClassName } from "./video-utils";
 
 function setGestureNavigation(
   viewer: OpenSeadragon.Viewer,
@@ -91,10 +93,12 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  * to the session store directly.
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
+  const { annotationLabels } = useSample();
   const {
     frame,
     setImageNatural,
     selection,
+    setSelection,
     drawingTool,
     setDrawingTool,
     panMode,
@@ -211,6 +215,18 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   }, [api, hideAnnotations, panMode]);
 
   const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
+  const classItems = useMemo(
+    () => annotationLabels.map((label) => ({ name: label.name })),
+    [annotationLabels],
+  );
+
+  const selectClassName = (name: string) => {
+    const cls = (name ?? "").trim();
+    if (!cls) return;
+
+    saveLastClassName(cls);
+    setSelection({ className: cls, trackId: null, source: "explicit" });
+  };
 
   useEffect(() => {
     if (!api) return;
@@ -325,6 +341,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           panMode={panMode}
           drawingTool={drawingTool}
           hideAnnotations={hideAnnotations}
+          classItems={classItems}
+          selectedClassName={selection.className}
           onTogglePanMode={() => setPanMode(!panMode)}
           onSelectRectangle={() => {
             setPanMode(false);
@@ -334,6 +352,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             setPanMode(false);
             setDrawingTool("polygon");
           }}
+          onSelectClassName={selectClassName}
           onResetView={resetView}
         />
 
