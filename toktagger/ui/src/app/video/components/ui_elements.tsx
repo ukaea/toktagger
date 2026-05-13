@@ -16,7 +16,10 @@ import {
   View,
 } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
-import FullScreenExit from "@spectrum-icons/workflow/FullScreenExit";
+import ImageMapPolygon from "@spectrum-icons/workflow/ImageMapPolygon";
+import ImageMapRectangle from "@spectrum-icons/workflow/ImageMapRectangle";
+import Preview from "@spectrum-icons/workflow/Preview";
+import ZoomIn from "@spectrum-icons/workflow/ZoomIn";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -193,95 +196,16 @@ export function FrameJumpField(props: {
   );
 }
 
-export function ResetViewButton({ onPress }: { onPress: () => void }) {
-  return (
-    <View
-      position="absolute"
-      top={0}
-      right={0}
-      zIndex={20}
-      UNSAFE_style={{ transform: "translateX(calc(100% + 6px))" }}
-    >
-      <Flex direction="column" alignItems="center" gap="size-25">
-        <Text
-          UNSAFE_style={{
-            fontSize: "11px",
-            lineHeight: "1",
-            fontWeight: 600,
-          }}
-        >
-          Reset
-        </Text>
-        <ActionButton
-          onPress={onPress}
-          aria-label="Reset zoom and re-center frame"
-        >
-          <FullScreenExit />
-        </ActionButton>
-      </Flex>
-    </View>
-  );
-}
-
 function DragZoomIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={20}
-      height={20}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 4v16M4 12h16" />
-      <path d="M12 4l-2 2M12 4l2 2M12 20l-2-2M12 20l2-2" />
-      <path d="M4 12l2-2M4 12l2 2M20 12l-2-2M20 12l-2 2" />
-    </svg>
-  );
+  return <ZoomIn aria-hidden="true" size="S" />;
 }
 
 function RectangleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={24}
-      height={24}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="4.5" y="6.5" width="15" height="11" rx="1.5" />
-    </svg>
-  );
+  return <ImageMapRectangle aria-hidden="true" size="M" />;
 }
 
 function PolygonIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={24}
-      height={24}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M7 5.5L18 8.5L15.5 18.5L5.5 17L4.5 9.5Z" />
-      <circle cx="7" cy="5.5" r="1" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="8.5" r="1" fill="currentColor" stroke="none" />
-      <circle cx="15.5" cy="18.5" r="1" fill="currentColor" stroke="none" />
-      <circle cx="5.5" cy="17" r="1" fill="currentColor" stroke="none" />
-      <circle cx="4.5" cy="9.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  return <ImageMapPolygon aria-hidden="true" size="M" />;
 }
 
 function CanvasModeToggle(props: {
@@ -393,7 +317,7 @@ export function CanvasModeToolbar(props: {
             <DragZoomIcon />
           </CanvasModeToggle>
           <CanvasActionButton label="Reset view" onPress={props.onResetView}>
-            <FullScreenExit aria-hidden="true" size="S" />
+            <Preview aria-hidden="true" size="S" />
           </CanvasActionButton>
         </Flex>
       </View>
