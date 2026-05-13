@@ -15,9 +15,16 @@ import {
   Footer,
   Heading,
   Text,
+  Tabs,
+  TabList,
+  TabPanels,
+  Key
 } from "@adobe/react-spectrum";
 import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
+import DataAdd from '@spectrum-icons/workflow/DataAdd';
+import DataUpload from '@spectrum-icons/workflow/DataUpload';
+
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
 import { startTraining, getModelTypes, getModelTrainSchema } from "@/app/core";
@@ -31,6 +38,7 @@ export function ModelTrainModal({ project }: { project: Project }) {
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
     null,
   );
+  const [selectedTab, setSelectedTab] = useState<Key>("train");
   const [modelNames, setModelNames] = useState<string[] | null>(null);
   const [selectedModelName, setSelectedModelName] = useState<string | null>(
     null,
@@ -119,33 +127,61 @@ export function ModelTrainModal({ project }: { project: Project }) {
             <Heading>
               <Flex alignItems="center" gap="size-100">
                 <WorkflowAdd size="S" />
-                <Text>Train ML Model</Text>
+                <Text>Create New ML Model</Text>
               </Flex>
             </Heading>
             <Divider />
             <Content>
-              <ComboBox
-                label="Select Model Type"
-                selectedKey={selectedModelName}
-                onSelectionChange={(key) =>
-                  setSelectedModelName(key !== null ? String(key) : null)
-                }
+              <Tabs
+                aria-label="ML Model Tabs"
+                selectedKey={selectedTab}
+                onSelectionChange={setSelectedTab}
               >
-                {modelNames
-                  ? modelNames.map((model_name) => (
-                      <Item key={model_name}>{model_name}</Item>
-                    ))
-                  : null}
-              </ComboBox>
-              {schema && (
-                <ModelForm
-                  ref={formRef}
-                  schema={schema}
-                  onSubmit={submitTrainJob}
-                  formData={unvalidatedFormData}
-                  setFormData={setUnvalidatedFormData}
-                />
-              )}
+                <TabList>
+                  <Item key="train">
+                    <DataAdd />
+                    <Text>Train Model</Text>
+                  </Item>
+                  <Item key="load">
+                    <DataUpload />
+                    <Text>Load Pretrained Weights</Text>
+                  </Item>
+                </TabList>
+                <TabPanels>
+                  <Item key="train">
+                    <Content>
+                      <ComboBox
+                        label="Select Model Type"
+                        selectedKey={selectedModelName}
+                        onSelectionChange={(key) =>
+                          setSelectedModelName(key !== null ? String(key) : null)
+                        }
+                      >
+                        {modelNames
+                          ? modelNames.map((model_name) => (
+                            <Item key={model_name}>{model_name}</Item>
+                          ))
+                          : null}
+                      </ComboBox>
+                      {schema && (
+                        <ModelForm
+                          ref={formRef}
+                          schema={schema}
+                          onSubmit={submitTrainJob}
+                          formData={unvalidatedFormData}
+                          setFormData={setUnvalidatedFormData}
+                        />
+                      )}
+                    </Content>
+                  </Item>
+                  <Item key="load">
+                    Senatus Populusque Romanus.
+                  </Item>
+                  <Item key="Emp">
+                    Alea jacta est.
+                  </Item>
+                </TabPanels>
+              </Tabs>
             </Content>
             <Footer>
               {message && (
@@ -158,13 +194,15 @@ export function ModelTrainModal({ project }: { project: Project }) {
               <Button variant="secondary" onPress={close}>
                 Close
               </Button>
-              <Button
-                variant="accent"
-                onPress={pressSubmit}
-                isDisabled={!modelNames || !selectedModelName}
-              >
-                Train
-              </Button>
+              {selectedTab === "train" && (
+                <Button
+                  variant="accent"
+                  onPress={pressSubmit}
+                  isDisabled={!modelNames || !selectedModelName}
+                >
+                  Train
+                </Button>
+              )}
             </ButtonGroup>
           </Dialog>
         )}
