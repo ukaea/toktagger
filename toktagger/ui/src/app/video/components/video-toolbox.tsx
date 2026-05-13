@@ -10,12 +10,9 @@ import {
 } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
-import {
-  canonicalizeTrackId,
-  loadLastClassName,
-  saveLastClassName,
-} from "@/app/video/components/video-utils";
+import { canonicalizeTrackId } from "@/app/video/components/video-utils";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
@@ -35,6 +32,7 @@ function instanceKey(args: { class_name: string; track_id: string }) {
 export function VideoToolbox() {
   const session = useVideoSession();
   const { annotationLabels, dataParams, setDataParams } = useSample();
+  const { videoLastClassName, setVideoLastClassName } = useSampleHistory();
   const labels = annotationLabels;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
@@ -44,13 +42,30 @@ export function VideoToolbox() {
     trackId: string;
   } | null>(null);
 
-  // Restore the last selected class to reduce clicks between samples.
+  // Restore the last selected class, or default to the first configured label.
   useEffect(() => {
-    const last = loadLastClassName();
-    if (last && !session.selection.className) {
-      session.setSelection({ className: last, trackId: null, source: null });
+    if (session.selection.className) return;
+
+    const firstClassName = labels[0]?.name ?? null;
+    const lastClassName =
+      videoLastClassName &&
+      labels.some((label) => label.name === videoLastClassName)
+        ? videoLastClassName
+        : null;
+    const nextClassName = lastClassName ?? firstClassName;
+
+    if (!nextClassName) return;
+
+    session.setSelection({
+      className: nextClassName,
+      trackId: null,
+      source: null,
+    });
+
+    if (nextClassName !== videoLastClassName) {
+      setVideoLastClassName(nextClassName);
     }
-  }, [session]);
+  }, [labels, session, setVideoLastClassName, videoLastClassName]);
 
   const classItems = useMemo(() => {
     return labels.map((c) => ({ name: c.name }));
@@ -97,7 +112,7 @@ export function VideoToolbox() {
     if (!cls) return;
 
     session.setSelection({ className: cls, trackId: null, source: "explicit" });
-    saveLastClassName(cls);
+    setVideoLastClassName(cls);
   };
 
   const onSelectInstance = (key: string) => {
@@ -120,7 +135,7 @@ export function VideoToolbox() {
         source: "explicit",
       });
       session.closePopup();
-      saveLastClassName(hit.class_name);
+      setVideoLastClassName(hit.class_name);
       return;
     }
 
@@ -133,7 +148,7 @@ export function VideoToolbox() {
       onlyIfOnCurrentFrame: true,
     });
 
-    saveLastClassName(hit.class_name);
+    setVideoLastClassName(hit.class_name);
   };
 
   const onJumpToFirstFrame = (profile: {
@@ -150,7 +165,7 @@ export function VideoToolbox() {
       trackId: tid,
       source: "explicit",
     });
-    saveLastClassName(cls);
+    setVideoLastClassName(cls);
 
     const firstFrame = profile.first_frame;
     if (typeof firstFrame === "number" && Number.isFinite(firstFrame)) {

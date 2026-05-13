@@ -15,6 +15,8 @@ interface SampleHistoryContextType {
   setSaveOnNavigate: (saveOnNavigate: boolean) => void;
   videoPropagate: boolean;
   setVideoPropagate: (value: boolean) => void;
+  videoLastClassName: string | null;
+  setVideoLastClassName: (value: string | null) => void;
 }
 
 const SampleHistoryContext = createContext<
@@ -33,6 +35,9 @@ export function SampleHistoryProvider({
 
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
   const [videoPropagate, setVideoPropagate] = useState(true);
+  const [videoLastClassName, setVideoLastClassName] = useState<string | null>(
+    null,
+  );
 
   const [visitedSampleIds, setVisitedSampleIds] = useState<string[]>(() => {
     const cached: string | null = sessionStorage.getItem(projectId);
@@ -71,6 +76,8 @@ export function SampleHistoryProvider({
     setSaveOnNavigate,
     videoPropagate,
     setVideoPropagate,
+    videoLastClassName,
+    setVideoLastClassName,
   };
 
   return (

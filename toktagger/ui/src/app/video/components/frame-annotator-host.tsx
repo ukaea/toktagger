@@ -17,6 +17,7 @@ import "@annotorious/react/annotorious-react.css";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import {
   getLabelTrack,
   isPolygonAnno,
@@ -27,7 +28,6 @@ import {
 import { AnnotationPopup } from "./annotation-popup";
 import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
 import { CanvasModeToolbar } from "./ui_elements";
-import { saveLastClassName } from "./video-utils";
 
 function setGestureNavigation(
   viewer: OpenSeadragon.Viewer,
@@ -94,6 +94,7 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
   const { annotationLabels } = useSample();
+  const { setVideoLastClassName } = useSampleHistory();
   const {
     frame,
     setImageNatural,
@@ -224,7 +225,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     const cls = (name ?? "").trim();
     if (!cls) return;
 
-    saveLastClassName(cls);
+    setVideoLastClassName(cls);
     setSelection({ className: cls, trackId: null, source: "explicit" });
   };
 
