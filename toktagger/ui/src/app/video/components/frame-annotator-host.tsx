@@ -14,6 +14,8 @@ import {
   type PopupProps,
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
+import "react-contexify/ReactContexify.css";
+import { Item, Menu, Submenu, useContextMenu } from "react-contexify";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -28,6 +30,8 @@ import {
 import { AnnotationPopup } from "./annotation-popup";
 import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
 import { CanvasModeToolbar } from "./ui_elements";
+
+const VIDEO_CANVAS_MENU_ID = "video-canvas-menu";
 
 function setGestureNavigation(
   viewer: OpenSeadragon.Viewer,
@@ -81,8 +85,38 @@ function stopEvent(event: Event) {
   event.stopImmediatePropagation?.();
 }
 
+function stopReactContextMenu(event: React.MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation?.();
+}
+
 function isSecondaryMouseEvent(event: MouseEvent | PointerEvent) {
   return event.button !== 0 || (event.buttons & 2) === 2;
+}
+
+function findAnnotationAtPointer(
+  api: AnnotoriousOpenSeadragonAnnotator,
+  event: MouseEvent,
+): ImageAnnotation | null {
+  const viewer = api.viewer;
+  if (!viewer) return null;
+
+  const viewerElement = viewer.element as HTMLElement;
+  const viewerBounds = viewerElement.getBoundingClientRect();
+  const viewerPoint = new OpenSeadragon.Point(
+    event.clientX - viewerBounds.left,
+    event.clientY - viewerBounds.top,
+  );
+  const imagePoint =
+    viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+
+  return (
+    [...api.getAnnotations()]
+      .reverse()
+      .find((annotation) => annotationContainsPoint(annotation, imagePoint)) ??
+    null
+  );
 }
 
 /**
@@ -118,9 +152,16 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     deleteAnnotation,
   } = useVideoSession();
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
+  const { show: showCanvasMenu } = useContextMenu({
+    id: VIDEO_CANVAS_MENU_ID,
+  });
   const [dismissedPopupAnnotationId, setDismissedPopupAnnotationId] = useState<
     string | null
   >(null);
+  const classItems = useMemo(
+    () => annotationLabels.map((label) => ({ name: label.name })),
+    [annotationLabels],
+  );
 
   useEffect(() => {
     if (!api?.on || !api?.off) return;
@@ -236,8 +277,16 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     );
 
     const blockContextMenu = (event: MouseEvent) => {
+      const annotation = hideAnnotations
+        ? null
+        : findAnnotationAtPointer(api, event);
+
       stopEvent(event);
       api.cancelDrawing?.();
+
+      if (!annotation?.id && classItems.length > 0) {
+        showCanvasMenu({ event });
+      }
     };
 
     const blockSecondaryMouse = (event: MouseEvent | PointerEvent) => {
@@ -268,13 +317,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         target.removeEventListener("auxclick", blockSecondaryMouse, true);
       }
     };
-  }, [api]);
+  }, [api, classItems.length, hideAnnotations, showCanvasMenu]);
 
   const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
-  const classItems = useMemo(
-    () => annotationLabels.map((label) => ({ name: label.name })),
-    [annotationLabels],
-  );
 
   const selectClassName = (name: string) => {
     const cls = (name ?? "").trim();
@@ -282,6 +327,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
     setVideoLastClassName(cls);
     setSelection({ className: cls, trackId: null, source: "explicit" });
+  };
+
+  const selectClassNameFromMenu = (className: string) => {
+    selectClassName(className);
   };
 
   useEffect(() => {
@@ -465,6 +514,24 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             }}
           />
         </OpenSeadragonAnnotator>
+        <Menu
+          id={VIDEO_CANVAS_MENU_ID}
+          onContextMenuCapture={stopReactContextMenu}
+        >
+          {classItems.length > 0 && (
+            <Submenu label="Change class label">
+              {classItems.map((item, index) => (
+                <Item
+                  key={item.name}
+                  id={`select-class-${index}`}
+                  onClick={() => selectClassNameFromMenu(item.name)}
+                >
+                  {item.name}
+                </Item>
+              ))}
+            </Submenu>
+          )}
+        </Menu>
       </div>
     </div>
   );
