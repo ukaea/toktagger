@@ -458,3 +458,62 @@ export const getModelTypes = async (task: string): Promise<Response> => {
   }
   return response;
 };
+
+export const getModelLoadTypes = async (): Promise<Response> => {
+  const response = await fetch(`${BACKEND_API_URL}/meta/models/load`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch model types!`);
+  }
+  return response;
+};
+
+export const getModelWeightsPath = async (
+  project_id: string,
+  selected_model: string,
+  load_method: string
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load?method=${load_method}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  return response;
+};
+
+export const startLoadModelWeights = async (
+  project_id: string,
+  selected_model: string,
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  return response;
+};
+
+
+export const getLoadModelStatus = async (
+  project_id: string,
+  selected_model: string,
+  task_id: string
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/${task_id}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  return response;
+};

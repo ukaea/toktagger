@@ -384,7 +384,7 @@ async def load_model_weights(
             db_client=db_client, project_id=project.id, model=model_in
         )
 
-        return model_id
+        return str(pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(model_id))
     else:
         raise HTTPException(
             status_code=501, detail=f"Loading method {method} not implemented!"
