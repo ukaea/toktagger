@@ -446,8 +446,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           panMode={panMode}
           drawingTool={drawingTool}
           hideAnnotations={hideAnnotations}
-          classItems={classItems}
-          selectedClassName={selection.className}
           onTogglePanMode={() => setPanMode(!panMode)}
           onSelectRectangle={() => {
             setPanMode(false);
@@ -457,7 +455,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             setPanMode(false);
             setDrawingTool("polygon");
           }}
-          onSelectClassName={selectClassName}
           onResetView={resetView}
         />
 
