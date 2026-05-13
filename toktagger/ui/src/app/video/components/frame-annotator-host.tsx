@@ -75,6 +75,16 @@ function findAnnotationOverlay(viewerElement: HTMLElement | null) {
   return null;
 }
 
+function stopEvent(event: Event) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+}
+
+function isSecondaryMouseEvent(event: MouseEvent | PointerEvent) {
+  return event.button !== 0 || (event.buttons & 2) === 2;
+}
+
 /**
  * Top-level host that provides the Annotorious context and renders the annotator.
  */
@@ -214,6 +224,51 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       }
     };
   }, [api, hideAnnotations, panMode]);
+
+  useEffect(() => {
+    if (!api?.viewer) return;
+
+    const viewerElement = api.viewer.element as HTMLElement;
+    const overlay = findAnnotationOverlay(viewerElement);
+    const targets = [viewerElement, overlay].filter(
+      (target, index, list): target is HTMLElement =>
+        !!target && list.indexOf(target) === index,
+    );
+
+    const blockContextMenu = (event: MouseEvent) => {
+      stopEvent(event);
+      api.cancelDrawing?.();
+    };
+
+    const blockSecondaryMouse = (event: MouseEvent | PointerEvent) => {
+      if (!isSecondaryMouseEvent(event)) return;
+
+      stopEvent(event);
+      api.cancelDrawing?.();
+    };
+
+    for (const target of targets) {
+      target.addEventListener("contextmenu", blockContextMenu, true);
+      target.addEventListener("pointerdown", blockSecondaryMouse, true);
+      target.addEventListener("pointerup", blockSecondaryMouse, true);
+      target.addEventListener("mousedown", blockSecondaryMouse, true);
+      target.addEventListener("mouseup", blockSecondaryMouse, true);
+      target.addEventListener("click", blockSecondaryMouse, true);
+      target.addEventListener("auxclick", blockSecondaryMouse, true);
+    }
+
+    return () => {
+      for (const target of targets) {
+        target.removeEventListener("contextmenu", blockContextMenu, true);
+        target.removeEventListener("pointerdown", blockSecondaryMouse, true);
+        target.removeEventListener("pointerup", blockSecondaryMouse, true);
+        target.removeEventListener("mousedown", blockSecondaryMouse, true);
+        target.removeEventListener("mouseup", blockSecondaryMouse, true);
+        target.removeEventListener("click", blockSecondaryMouse, true);
+        target.removeEventListener("auxclick", blockSecondaryMouse, true);
+      }
+    };
+  }, [api]);
 
   const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
   const classItems = useMemo(
