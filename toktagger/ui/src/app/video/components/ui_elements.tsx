@@ -8,7 +8,6 @@ import {
   Divider,
   Flex,
   Item,
-  Text,
   Tooltip,
   TooltipTrigger,
   ToggleButton,
