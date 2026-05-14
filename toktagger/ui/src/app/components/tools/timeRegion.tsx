@@ -262,12 +262,13 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
 
         const x0IsLeft = px0 <= px1;
 
-        const color = categories.get(zone.label)?.color || "black";
+        const categoryId = `${zone.type}_${zone.label}`
+        const color = categories.get(categoryId)?.color || "black";
 
         // Span (center drag target)
         graphGroup
           .append("rect")
-          .attr("aria-label", "zone")
+          .attr("aria-label", "time-zone")
           .attr(
             "class",
             "annotation time-region span cursor-grab disable-on-modifier",

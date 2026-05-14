@@ -106,6 +106,7 @@ export const AnnotationToolbar = () => {
                 </TooltipTrigger>
                 {toolActive && (
                   <Picker
+                    data-testid="select-annotation-label"
                     label="Select label"
                     width="size-2400"
                     isDisabled={!editMode}

@@ -165,7 +165,8 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
             setOngoingAction(false);
           });
 
-        const color = categories.get(vspan.label)?.color || "black";
+        const categoryId = `${vspan.type}_${vspan.label}`
+        const color = categories.get(categoryId)?.color || "black";
 
         const x = xaxis.d2p(vspan.points[0].x);
         const pointerEvent = isDrawing || !editMode ? "none" : "all";
@@ -184,6 +185,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
 
         graphGroup
           .append("rect")
+          .attr("aria-label", "time-point")
           .attr("class", "annotation time-point disable-on-modifier")
           .attr("x", x - 10)
           .attr("y", upperLimit)

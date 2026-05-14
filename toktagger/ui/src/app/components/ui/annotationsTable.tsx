@@ -31,10 +31,11 @@ export const AnnotationsTable = () => {
   const entries = useMemo<TableEntry[]>(() => {
     const entriesBuffer: TableEntry[] = [];
     annotations.forEach((annotation) => {
-      const category = categories.get(annotation.label);
+      const categoryId = `${annotation.type}_${annotation.label}`
+      const category = categories.get(categoryId);
       if (!category) {
         console.error(
-          `Could not locate ${annotation.label} when assigning table entry`,
+          `Could not locate ${categoryId} when assigning table entry`,
         );
         return;
       }

@@ -144,7 +144,8 @@ export const TimeSeriesProvider = ({
     const timeSeriesCategories: Map<string, TimeSeriesCategory> = new Map();
     if (project.time_point_labels) {
       project.time_point_labels.forEach((label, index) => {
-        timeSeriesCategories.set(label, {
+        const category_id = `${TimeSeriesAnnotationType.TIME_POINT}_${label}`
+        timeSeriesCategories.set(category_id, {
           label,
           color: randomColor(index),
           type: TimeSeriesAnnotationType.TIME_POINT,
@@ -153,7 +154,8 @@ export const TimeSeriesProvider = ({
     }
     if (project.time_region_labels) {
       project.time_region_labels.forEach((label, index) => {
-        timeSeriesCategories.set(label, {
+        const category_id = `${TimeSeriesAnnotationType.TIME_REGION}_${label}`
+        timeSeriesCategories.set(category_id, {
           label,
           color: randomColor(index),
           type: TimeSeriesAnnotationType.TIME_REGION,
