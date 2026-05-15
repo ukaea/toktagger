@@ -262,7 +262,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
 
         const x0IsLeft = px0 <= px1;
 
-        const categoryId = `${zone.type}_${zone.label}`
+        const categoryId = `${zone.type}_${zone.label}`;
         const color = categories.get(categoryId)?.color || "black";
 
         // Span (center drag target)

@@ -31,7 +31,7 @@ export const AnnotationsTable = () => {
   const entries = useMemo<TableEntry[]>(() => {
     const entriesBuffer: TableEntry[] = [];
     annotations.forEach((annotation) => {
-      const categoryId = `${annotation.type}_${annotation.label}`
+      const categoryId = `${annotation.type}_${annotation.label}`;
       const category = categories.get(categoryId);
       if (!category) {
         console.error(

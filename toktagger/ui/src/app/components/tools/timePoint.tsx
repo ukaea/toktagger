@@ -165,7 +165,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
             setOngoingAction(false);
           });
 
-        const categoryId = `${vspan.type}_${vspan.label}`
+        const categoryId = `${vspan.type}_${vspan.label}`;
         const color = categories.get(categoryId)?.color || "black";
 
         const x = xaxis.d2p(vspan.points[0].x);

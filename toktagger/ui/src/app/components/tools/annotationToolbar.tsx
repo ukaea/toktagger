@@ -48,7 +48,12 @@ export const AnnotationToolbar = () => {
   }, [categories]);
 
   return (
-    <View width="size-3000" flexShrink={0} marginTop="size-200" data-testid="annotation-toolbar">
+    <View
+      width="size-3000"
+      flexShrink={0}
+      marginTop="size-200"
+      data-testid="annotation-toolbar"
+    >
       <Flex direction="column" alignItems="center" gap="size-150">
         <h1 className="text-2xl font-bold">Annotation Toolbar</h1>
         <TooltipTrigger placement="left">

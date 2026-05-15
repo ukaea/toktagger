@@ -439,7 +439,7 @@ export const BaseTimeSeriesPlot = ({
   return (
     <div className="w-full px-6 py-3 space-y-3 flex-col">
       {/* Div where plot is inserted */}
-      <div id={plotId} className="" aria-label="time-series" >
+      <div id={plotId} className="" aria-label="time-series">
         <>
           {React.Children.map(children, (child) => {
             return React.isValidElement(child)
