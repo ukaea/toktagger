@@ -34,6 +34,7 @@ import {
 import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelLoadModal } from "@/app/components/tools/modelLoad";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
@@ -240,6 +241,7 @@ export default function ProjectView() {
     <div>
       <SampleBreadCrumbs project={project} />
       <ModelTrainModal project={project}></ModelTrainModal>
+      <ModelLoadModal project={project}></ModelLoadModal>
       <ModelPredictModal project={project}></ModelPredictModal>
       <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
