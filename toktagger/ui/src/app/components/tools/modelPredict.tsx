@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Provider,
   defaultTheme,
@@ -20,30 +20,99 @@ import {
   Footer,
   Heading,
   Text,
+  Selection,
 } from "@adobe/react-spectrum";
 import Workflow from "@spectrum-icons/workflow/Workflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project, Model } from "@/types";
-import { startPredictions, getModels, stopTraining } from "@/app/core";
+import {
+  startPredictions,
+  getModels,
+  stopTraining,
+  getModelPredictSchema,
+} from "@/app/core";
+import ModelForm from "@/app/components/ui/schemaForm";
+
+import { RJSFSchema } from "@rjsf/utils";
+import Form from "@rjsf/core";
 
 export function ModelPredictModal({ project }: { project: Project }) {
-  const [models, setModels] = useState<Model[] | null>(null);
-  const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [numPredictions, setNumPredictions] = useState<string>("20");
   const [message, setMessage] = useState<string | null>(null);
-  const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
+  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
+    null,
+  );
+  const [models, setModels] = useState<Model[] | null>(null);
+  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
+  const [schema, setSchema] = useState<RJSFSchema | null>(null);
+  const [unvalidatedFormData, setUnvalidatedFormData] = useState<
+    Record<string, unknown>
+  >({});
+  const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
     top: 10,
     right: 10,
     zIndex: 1000,
   };
+  const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(
+    undefined,
+  );
+  const [numPredictions, setNumPredictions] = useState<number>(20);
+
+  const onSelectModel = (keys: Selection) => {
+    setSelectedKeys(keys);
+
+    if (keys === "all") {
+      // Won't happen in single mode
+      return;
+    }
+
+    if (!keys || keys.size === 0) {
+      setSelectedModel(null);
+      setSchema(null);
+      return;
+    }
+
+    // Single select mode, so only ever one key
+    const [key] = keys as Set<string>;
+
+    if (!models) {
+      return;
+    }
+
+    const model = models.find((model) => model._id === key);
+
+    if (!model) {
+      setMessage("Selected model could not be found!");
+      setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+      return;
+    }
+
+    setSelectedModel(model);
+    return;
+  };
+
+  useEffect(() => {
+    const updateSchema = async () => {
+      if (!selectedModel || selectedModel.training_status != "completed") {
+        setSchema(null);
+        return;
+      }
+      const newSchema: RJSFSchema = await getModelPredictSchema(
+        selectedModel.type,
+      );
+      setSchema(newSchema);
+    };
+    updateSchema();
+  }, [selectedModel]);
 
   useEffect(() => {
     const fetchModels = async () => {
+      if (!project._id) return;
       const response = await getModels(project._id);
+
       if (response.ok) {
         const data = await response.json();
         const models = data as Model[];
@@ -57,10 +126,10 @@ export function ModelPredictModal({ project }: { project: Project }) {
 
     let poll: ReturnType<typeof setInterval>;
     if (modalOpen) {
-      fetchModels();
       setMessage(null);
       setMessageIcon(null);
-      setSelectedKeys(new Set([]));
+      setSelectedModel(null);
+      fetchModels();
 
       poll = setInterval(() => {
         fetchModels();
@@ -71,23 +140,25 @@ export function ModelPredictModal({ project }: { project: Project }) {
     };
   }, [project._id, modalOpen]);
 
-  if (!project) {
-    return;
-  }
+  const pressSubmit = () => {
+    if (schema) {
+      formRef.current?.submit();
+    } else {
+      submitPredictJob({});
+    }
+  };
 
-  const submitPredictJob = async () => {
-    if (selectedKeys.size === 0 || !models) {
+  const submitPredictJob = async (params: Record<string, unknown>) => {
+    if (!project._id || !models || !selectedKeys || !selectedModel) {
       return;
     }
-    const selectedModel = models.find(
-      (model) => model._id === selectedKeys.values().next().value,
-    );
 
     const response = await startPredictions(
       project._id,
       selectedModel.type,
       selectedModel.version,
-      Number(numPredictions),
+      numPredictions,
+      params,
     );
 
     if (response.ok) {
@@ -95,7 +166,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
-      setSelectedKeys(new Set());
+      setSelectedKeys(undefined);
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
@@ -104,12 +175,9 @@ export function ModelPredictModal({ project }: { project: Project }) {
   };
 
   const stopTrainingJob = async () => {
-    if (selectedKeys.size === 0 || !models) {
+    if (!project._id || !models || !selectedKeys || !selectedModel) {
       return;
     }
-    const selectedModel = models.find(
-      (model) => model._id === selectedKeys.values().next().value,
-    );
 
     const response = await stopTraining(
       project._id,
@@ -122,7 +190,7 @@ export function ModelPredictModal({ project }: { project: Project }) {
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
-      setSelectedKeys(new Set());
+      setSelectedKeys(undefined);
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
@@ -152,7 +220,6 @@ export function ModelPredictModal({ project }: { project: Project }) {
               <Flex
                 justifyContent="space-between"
                 alignItems="center"
-                className="pb-4"
                 marginBottom="size-200"
               >
                 <NumberField
@@ -165,13 +232,11 @@ export function ModelPredictModal({ project }: { project: Project }) {
                 <Button
                   variant="negative"
                   isDisabled={
-                    selectedKeys.size === 0 ||
+                    !selectedKeys ||
                     !models ||
-                    !["training", "queued"].includes(
-                      models.find(
-                        (model) =>
-                          model._id === selectedKeys.values().next().value,
-                      ).training_status,
+                    !selectedModel ||
+                    !["started", "queued"].includes(
+                      selectedModel.training_status,
                     )
                   }
                   onPress={stopTrainingJob}
@@ -184,7 +249,9 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   flex
                   selectionMode="single"
                   selectedKeys={selectedKeys}
-                  onSelectionChange={setSelectedKeys}
+                  onSelectionChange={onSelectModel}
+                  height="size-3000"
+                  aria-label="Model Prediction Table"
                 >
                   <TableHeader>
                     <Column>Model Type</Column>
@@ -208,6 +275,15 @@ export function ModelPredictModal({ project }: { project: Project }) {
                   </TableBody>
                 </TableView>
               )}
+              {schema && (
+                <ModelForm
+                  ref={formRef}
+                  schema={schema}
+                  onSubmit={submitPredictJob}
+                  formData={unvalidatedFormData}
+                  setFormData={setUnvalidatedFormData}
+                />
+              )}
             </Content>
             <Footer>
               {message && (
@@ -223,13 +299,12 @@ export function ModelPredictModal({ project }: { project: Project }) {
               <Button
                 variant="accent"
                 isDisabled={
-                  selectedKeys.size === 0 ||
+                  !selectedKeys ||
                   !models ||
-                  models.find(
-                    (model) => model._id === selectedKeys.values().next().value,
-                  ).training_status != "completed"
+                  !selectedModel ||
+                  selectedModel.training_status != "completed"
                 }
-                onPress={submitPredictJob}
+                onPress={pressSubmit}
               >
                 Predict
               </Button>

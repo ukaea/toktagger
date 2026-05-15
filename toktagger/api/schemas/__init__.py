@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException
@@ -18,10 +18,9 @@ class ConfiguredModel(BaseModel):
                 values[key] = str(values.get(key))
         return values
 
-    class Config:
-        use_enum_values = True
-        json_encoders = {ObjectId: str}
-        validate_by_name = True
+    model_config = ConfigDict(
+        use_enum_values=True, json_encoders={ObjectId: str}, validate_by_name=True
+    )
 
 
 def convert_to_objectid(id: str, collection: str):
