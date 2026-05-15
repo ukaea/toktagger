@@ -95,6 +95,14 @@ function isSecondaryMouseEvent(event: MouseEvent | PointerEvent) {
   return event.button !== 0 || (event.buttons & 2) === 2;
 }
 
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
 function findAnnotationAtPointer(
   api: AnnotoriousOpenSeadragonAnnotator,
   event: MouseEvent,
@@ -329,9 +337,29 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     setSelection({ className: cls, trackId: null, source: "explicit" });
   };
 
-  const selectClassNameFromMenu = (className: string) => {
-    selectClassName(className);
-  };
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const key = event.key.toLowerCase();
+      if (key !== "e" && key !== "q") return;
+      if (isEditableEventTarget(event.target)) return;
+      if (hideAnnotations) return;
+
+      if (key === "e") {
+        setPanMode(false);
+        setDrawingTool("rectangle");
+        return;
+      }
+
+      setPanMode(true);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [hideAnnotations, setDrawingTool, setPanMode]);
 
   useEffect(() => {
     if (!api) return;
@@ -521,7 +549,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                 <Item
                   key={item.name}
                   id={`select-class-${index}`}
-                  onClick={() => selectClassNameFromMenu(item.name)}
+                  onClick={() => selectClassName(item.name)}
                 >
                   {item.name}
                 </Item>

@@ -17,8 +17,8 @@ import {
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import ImageMapPolygon from "@spectrum-icons/workflow/ImageMapPolygon";
 import ImageMapRectangle from "@spectrum-icons/workflow/ImageMapRectangle";
+import Move from "@spectrum-icons/workflow/Move";
 import Preview from "@spectrum-icons/workflow/Preview";
-import ZoomIn from "@spectrum-icons/workflow/ZoomIn";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -196,7 +196,7 @@ export function FrameJumpField(props: {
 }
 
 function DragZoomIcon() {
-  return <ZoomIn aria-hidden="true" size="S" />;
+  return <Move aria-hidden="true" size="S" />;
 }
 
 function RectangleIcon() {
@@ -292,6 +292,17 @@ export function CanvasModeToolbar(props: {
       >
         <Flex direction="column" alignItems="center" gap="size-100">
           <CanvasModeToggle
+            label="Drag / Zoom"
+            isSelected={props.panMode}
+            onPress={props.onTogglePanMode}
+          >
+            <DragZoomIcon />
+          </CanvasModeToggle>
+          <CanvasActionButton label="Reset view" onPress={props.onResetView}>
+            <Preview aria-hidden="true" size="S" />
+          </CanvasActionButton>
+          <Divider size="S" width="100%" />
+          <CanvasModeToggle
             label="Rectangle"
             isSelected={!props.panMode && props.drawingTool === "rectangle"}
             isDisabled={props.hideAnnotations}
@@ -307,17 +318,6 @@ export function CanvasModeToolbar(props: {
           >
             <PolygonIcon />
           </CanvasModeToggle>
-          <Divider size="S" width="100%" />
-          <CanvasModeToggle
-            label="Drag / Zoom"
-            isSelected={props.panMode}
-            onPress={props.onTogglePanMode}
-          >
-            <DragZoomIcon />
-          </CanvasModeToggle>
-          <CanvasActionButton label="Reset view" onPress={props.onResetView}>
-            <Preview aria-hidden="true" size="S" />
-          </CanvasActionButton>
         </Flex>
       </View>
     </View>
