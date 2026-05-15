@@ -237,9 +237,10 @@ export const ModelSchema = z.object({
   timestamp: z.string(),
   project_id: z.string(),
   type: z.string(),
+  version: z.int(),
   training_status: z.string(),
   progress: z.number(),
-  accuracy: z.number(),
+  score: z.number(),
   task_id: z.string(),
 });
 

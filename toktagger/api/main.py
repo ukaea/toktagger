@@ -44,28 +44,30 @@ class Server:
     def __init__(self):
         self.frontend_path = pathlib.Path(__file__).parent / "static"
 
-    def _setup_ray(self, api_url: str, model_storage_path: str | None = None):
+    def _setup_ray(self):
+        if (api_url := os.environ.get("API_URL")) is None:
+            raise ValueError("API URL must be set!")
         if not ray.is_initialized():
             ray.init(
                 runtime_env={
                     "env_vars": {
                         "API_URL": api_url,
-                        "MODEL_STORAGE": model_storage_path,
+                        "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
                     }
-                }
+                },
             )
+            # Create a ray actor for use as a model registry
+            WorkerRegistry.options(
+                name="WorkerModelRegistry", lifetime="detached"
+            ).remote(ModelRegistry._registry)
+            # And one for use as a dataloader registry
+            WorkerRegistry.options(
+                name="WorkerLoaderRegistry", lifetime="detached"
+            ).remote(LoaderRegistry._registry)
+
         # Create a task registry
         self.app.state.task_registry = ActorRegistry(
             max_actors=os.environ.get("MAX_ACTORS", 5)
-        )
-
-        # Create a ray actor for use as a model registry
-        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
-            ModelRegistry._registry
-        )
-        # And one for use as a dataloader registry
-        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
-            LoaderRegistry._registry
         )
 
     def _setup_app(self):
@@ -107,7 +109,9 @@ class Server:
         host: str = "localhost",
         port: int = 8002,
     ):
+        os.environ["API_URL"] = f"http://{host}:{port}"
         self._setup_app()
+        # Setup ray if required
         if models_dependencies_installed():
-            self._setup_ray(f"http://{host}:{port}", os.environ.get("MODEL_STORAGE"))
+            self._setup_ray()
         uvicorn.run(self.app, host=host, port=port)
