@@ -44,6 +44,7 @@ async def lifespan(app: FastAPI):
 class Server:
     def __init__(self):
         self.frontend_path = pathlib.Path(__file__).parent / "static"
+        self.testing_mode = False
 
     def _setup_ray(self, api_url: str, model_storage_path: str | None = None):
         if not ray.is_initialized():
@@ -87,6 +88,7 @@ class Server:
 
         # Static front end files
         self.app.state.index_file = self.frontend_path / "index.html"
+        self.app.state.testing_mode = self.testing_mode
         self.app.mount(
             "/assets",
             StaticFiles(directory=self.frontend_path / "assets"),

@@ -94,6 +94,7 @@ async def api_client(task_actor, db_client):
     # So am just going to leave it open, since the db container will be deleted after anyway
     # Any alternative solution ideas are welcome.....
     server = Server()
+    server.testing_mode = True
     server._setup_app()
     app = server.app
     app.state.db_client = db_client
@@ -295,6 +296,7 @@ def run_server():
     # Import to register mock model
 
     server = Server()
+    server.testing_mode = True
     server.run()
 
 
@@ -310,9 +312,24 @@ def start_server():
         for t in range(600):
             try:
                 response = requests.get(
-                    "http://localhost:8002/projects",
+                    "http://localhost:8002/health",
                 )
                 if response.status_code == 200:
+                    status = response.json()
+                    if not status["testing_mode"]:
+                        raise RuntimeError(
+                            "End to End test has connected to a live server!"
+                        )
+                    if not status["db_connected"]:
+                        raise RuntimeError("Database failed to connect.")
+                    if not status["models_enabled"]:
+                        raise RuntimeError(
+                            "Models not enabled! Install model dependencies to run all tests."
+                        )
+                    if not status["name"] == "TokTagger":
+                        raise RuntimeError(
+                            "End to End test has connected to another process running on localhost:8002"
+                        )
                     server_up = True
                     break
                 time.sleep(1)
@@ -330,7 +347,13 @@ def start_server():
 @pytest.fixture(scope="function")
 def server_setup(start_server):
     yield
-    response = requests.delete(
-        "http://localhost:8002/projects",
+    response = requests.get(
+        "http://localhost:8002/health",
     )
-    assert response.status_code == 200
+    if not response.json().get("testing_mode"):
+        raise RuntimeError("End to End test has connected to a live server!")
+    else:
+        response = requests.delete(
+            "http://localhost:8002/projects",
+        )
+        assert response.status_code == 200
