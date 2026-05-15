@@ -251,7 +251,7 @@ def test_fair_mast_dataloader():
         "rgb_arr.npz",
     ],
 )
-@pytest.mark.parametrize("frame", [None, 2])
+@pytest.mark.parametrize("frame", [None, 1])
 def test_image_array_file_loader(file_name: str, frame: int | None):
     # Data in numpy arrays has shape (2, 10, 10) for (num_frames, x, y)
     arr_file = ImageArrayFileData(

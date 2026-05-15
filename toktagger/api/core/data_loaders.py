@@ -214,19 +214,24 @@ class ArrayDataLoader(DataLoader):
 
         # If any values > 255, scale arr to be 1-255
         if np.any(arr > 255):
-            arr = (arr - arr.min()) / (arr.max() - arr.min())
+            val_range = arr.max() - arr.min()
+            arr = arr - arr.min()
+            # Avoid divide by zero in case where image is uniform
+            if val_range:
+                arr /= val_range
             arr = (arr * 255).astype(np.uint8)
 
         if params.name != "image":
             raise DataLoaderError("Must provide image data parameters!")
-        elif params.frame is None:
-            frame_arr = arr[0, ...]
-        elif params.frame > arr.shape[0]:
+
+        frame = params.frame if params.frame is not None else 0
+
+        if frame < 0 or frame >= arr.shape[0]:
             raise DataLoaderError(
-                f"Frame {params.frame} unavailable! Maximum available frame number is {arr.shape[0]}."
+                f"Frame {frame} unavailable! Available frame range is 0 to {arr.shape[0] - 1}."
             )
-        else:
-            frame_arr = arr[params.frame - 1, ...]
+
+        frame_arr = arr[frame, ...]
 
         im = Image.fromarray(frame_arr)
         buffer = io.BytesIO()
@@ -234,7 +239,7 @@ class ArrayDataLoader(DataLoader):
         buffer.seek(0)
 
         return ImageData(
-            frame=params.frame or 1,
+            frame=frame,
             values=base64.b64encode(buffer.getvalue()).decode(),
         )
 

@@ -209,7 +209,12 @@ export const ShotDataSchema = z.object({
 });
 export type ShotData = z.infer<typeof ShotDataSchema>;
 
-export const SampleDataSchema = z.union([FileDataSchema, ShotDataSchema]);
+export const SampleDataSchema = z.union([
+  TimeSeriesFileDataSchema,
+  ImageArrayFileDataSchema,
+  FileDataSchema,
+  ShotDataSchema,
+]);
 export type SampleData = z.infer<typeof SampleDataSchema>;
 
 export const SampleSchema = z.object({
