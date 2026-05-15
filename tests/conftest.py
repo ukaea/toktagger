@@ -6,7 +6,6 @@ from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
 from toktagger.api.models.base import ModelRegistry, WorkerRegistry, ActorRegistry
 from toktagger.api.core.data_loaders import LoaderRegistry
-from testcontainers.mongodb import MongoDbContainer
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
 import asyncio
@@ -15,7 +14,6 @@ import os
 import multiprocessing
 import requests
 import time
-from pymongo import MongoClient
 import tempfile
 import pathlib
 import ray
@@ -37,12 +35,6 @@ def uda_test(uda_env_vars):
         pyuda.Client().get("help::help()")
     except Exception:
         pytest.skip("Could not contact UDA server")
-
-
-@pytest.fixture(scope="session")
-def mongo_container():
-    with MongoDbContainer("mongo:8.0") as mongo:
-        yield mongo.get_connection_url()
 
 
 @pytest.fixture(scope="package")
@@ -74,16 +66,16 @@ def ray_session():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_client(mongo_container):
-    db_client = MongoDBClient(mongo_container, "annotate_db")
+async def db_client():
+    with tempfile.TemporaryDirectory() as tempd:
+        db_client = MongoDBClient("./toktagger_test_db", "annotate_db", tempd)
+        yield db_client
 
-    yield db_client
-
-    await db_client.delete_filtered_documents("projects")
-    await db_client.delete_filtered_documents("samples")
-    await db_client.delete_filtered_documents("annotations")
-    await db_client.delete_filtered_documents("models")
-    await db_client.client.close()
+        await db_client.delete_filtered_documents("projects")
+        await db_client.delete_filtered_documents("samples")
+        await db_client.delete_filtered_documents("annotations")
+        await db_client.delete_filtered_documents("models")
+        await db_client.client.close()
 
 
 # Need to use one task registry throughout so that it doesnt spin up a new Actor for all model tests.
@@ -93,8 +85,7 @@ async def task_actor():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def api_client(task_actor, mongo_container):
-    os.environ["MONGO_URL"] = mongo_container
+async def api_client(task_actor, db_client):
     # Have hit various issues getting this setup
     # Using fastAPI TestClient() doesn't play well with async pymongo as it tries to do stuff in different event loops
     # So have to use this AsyncClient from httpx, but this no longer just accepts an app
@@ -105,8 +96,8 @@ async def api_client(task_actor, mongo_container):
     server = Server()
     server._setup_app()
     app = server.app
-    lifespan_ctx = app.router.lifespan_context(app)
-    await lifespan_ctx.__aenter__()
+    app.state.db_client = db_client
+    app.state.project = None
     app.state.task_registry = task_actor
     app.state.task_registry.tasks["abc123"] = "Ray Task Object"
     async with AsyncClient(
@@ -115,7 +106,6 @@ async def api_client(task_actor, mongo_container):
         os.environ["API_URL"] = ""
         client.app = app
         yield client
-    await lifespan_ctx.__aexit__(None, None, None)
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -309,35 +299,38 @@ def run_server():
 
 
 @pytest.fixture(scope="package")
-def start_server(mongo_container):
-    os.environ["MONGO_URL"] = mongo_container
-    proc = multiprocessing.Process(target=run_server)
-    proc.start()
-    # Wait for server to start
-    server_up = False
-    for t in range(600):
-        try:
-            response = requests.get(
-                "http://localhost:8002/projects",
-            )
-            if response.status_code == 200:
-                server_up = True
-                break
-            time.sleep(1)
-        except requests.exceptions.ConnectionError:
-            time.sleep(1)
+def start_server():
+    os.environ["MONGO_URL"] = "./toktagger_test_db"
+    with tempfile.TemporaryDirectory() as tempd:
+        os.environ["DB_CACHE_DIR"] = tempd
+        proc = multiprocessing.Process(target=run_server)
+        proc.start()
+        # Wait for server to start
+        server_up = False
+        for t in range(600):
+            try:
+                response = requests.get(
+                    "http://localhost:8002/projects",
+                )
+                if response.status_code == 200:
+                    server_up = True
+                    break
+                time.sleep(1)
+            except requests.exceptions.ConnectionError:
+                time.sleep(1)
 
-    if not server_up:
+        if not server_up:
+            proc.terminate()
+            pytest.exit("Server failed to start for End-to-End tests to run!")
+
+        yield
         proc.terminate()
-        pytest.exit("Server failed to start for End-to-End tests to run!")
-
-    yield
-    proc.terminate()
 
 
 @pytest.fixture(scope="function")
 def server_setup(start_server):
     yield
-    client = MongoClient(os.environ["MONGO_URL"])
-    client.drop_database("annotate_db")
-    client.close()
+    response = requests.delete(
+        "http://localhost:8002/projects",
+    )
+    assert response.status_code == 200

@@ -32,8 +32,9 @@ if models_dependencies_installed():
 async def lifespan(app: FastAPI):
     mongo_url = os.environ.get("MONGO_URL", "./toktagger_db")
     db_name = "annotate_db"
+    cache_dir = os.environ.get("DB_CACHE_DIR")
 
-    app.state.db_client = MongoDBClient(mongo_url, db_name)
+    app.state.db_client = MongoDBClient(mongo_url, db_name, cache_dir)
     app.state.project = None
     yield
 

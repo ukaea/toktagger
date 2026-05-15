@@ -233,25 +233,35 @@ async def update_project(
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
 
-async def delete_project(db_client: MongoDBClient, project_id: str) -> None:
-    project_id = convert_to_objectid(project_id, "projects")
+async def delete_projects(
+    db_client: MongoDBClient, project_id: str | None = None
+) -> None:
+    if project_id:
+        project_id = convert_to_objectid(project_id, "projects")
 
     # Clean up all associated samples
     await db_client.delete_filtered_documents(
-        collection="samples", filters={"project_id": project_id}
+        collection="samples", filters={"project_id": project_id} if project_id else {}
     )
 
     # Clean up all associated annotations
     await db_client.delete_filtered_documents(
-        collection="annotations", filters={"project_id": project_id}
+        collection="annotations",
+        filters={"project_id": project_id} if project_id else {},
+    )
+
+    # Clean up all associated models
+    await db_client.delete_filtered_documents(
+        collection="models",
+        filters={"project_id": project_id} if project_id else {},
     )
 
     # Delete this specific project
     result = await db_client.delete_filtered_documents(
-        collection="projects", filters={"_id": project_id}
+        collection="projects", filters={"_id": project_id} if project_id else {}
     )
 
-    if result.deleted_count == 0:
+    if project_id and result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
 
