@@ -218,7 +218,7 @@ class ArrayDataLoader(DataLoader):
             arr = arr - arr.min()
             # Avoid divide by zero in case where image is uniform
             if val_range:
-                arr /= val_range
+                arr = arr / val_range
             arr = (arr * 255).astype(np.uint8)
 
         if params.name != "image":
