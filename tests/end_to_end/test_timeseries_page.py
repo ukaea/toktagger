@@ -5,9 +5,10 @@ import pytest
 import requests
 import time
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
+from typing import Literal, Tuple, Callable
 
-def test_annotation_toolbar(server_setup, page: Page):
-    ## Create Project
+def setup_project(page: Page) -> Tuple[str, str, Callable]:
+    # Create Project
     project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
     ids = create_local_samples(
@@ -21,6 +22,38 @@ def test_annotation_toolbar(server_setup, page: Page):
 
     # Check time series plot rendered
     expect(page.get_by_label("time-series")).to_be_visible()
+
+    reload = lambda project_id = project_id, sample_id = sample_id: page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
+    return (project_id, sample_id, reload)
+
+def add_annotation(page: Page, annotation_type: Literal["TIME REGION", "TIME POINT"], label: str, offset: int = 200):
+    # Begin zone tool
+    page.get_by_role("button", name="View Mode").click()
+    page.locator("body").click()
+    page.get_by_role("button", name=annotation_type).click()
+    page.get_by_test_id("select-annotation-label").click()
+    page.get_by_test_id("popover").get_by_text(label).click()
+
+    # Perform drag
+    graph = page.get_by_label("time-series")
+    box = graph.bounding_box()
+    assert box is not None
+
+    start_x = box["x"] + box["width"] / 2
+    start_y = box["y"] + box["height"] / 2
+
+    page.mouse.move(start_x, start_y)
+    page.keyboard.down("Control")
+    page.mouse.down()
+    page.mouse.move(start_x + offset, start_y, steps=20)
+    page.mouse.up()
+    page.keyboard.up("Control")
+
+    page.get_by_role("button", name="Edit Mode").click()
+
+def test_annotation_toolbar(server_setup, page: Page):
+    setup_project(page)
 
     # Check toolbar is visible
     expect(page.get_by_test_id("annotation-toolbar")).to_be_visible()
@@ -104,48 +137,17 @@ def test_annotation_toolbar(server_setup, page: Page):
 
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
 def test_timeseries_add_time_zone(zone_type, server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+    setup_project(page)
 
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Begin zone tool
-    page.get_by_role("button", name="View Mode").click()
-    page.locator("body").click()
-    page.get_by_role("button", name="TIME REGION").click()
-    page.get_by_test_id("select-annotation-label").click()
-    page.get_by_test_id("popover").get_by_text(zone_type).click()
-
-    # Perform drag
-    body = page.locator("body")
-    box = body.bounding_box()
-    assert box is not None
-
-    start_x = box["x"] + box["width"] / 2
-    start_y = box["y"] + box["height"] / 2
-
-    page.mouse.move(start_x, start_y)
-    page.keyboard.down("Control")
-    page.mouse.down()
-    page.mouse.move(start_x + 200, start_y, steps=20)
-    page.mouse.up()
-    page.keyboard.up("Control")
+    add_annotation(page, "TIME REGION", zone_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=zone_type)).to_be_visible()
 
     # Wait for a bit for Zone to fully render
     page.wait_for_timeout(500)
+
+    page.get_by_role("button", name="View Mode").click()
 
     # Check you can right click to delete it
     page.get_by_label("time-zone").first.click(button="right")
@@ -154,6 +156,8 @@ def test_timeseries_add_time_zone(zone_type, server_setup, page: Page):
 
     # Wait for a bit for Zone to fully delete
     page.wait_for_timeout(500)
+
+    page.get_by_role("button", name="Edit Mode").click()
 
     # Check it no longer exists
     expect(page.get_by_role("gridcell", name=zone_type, exact=True)).to_have_count(0)
@@ -164,47 +168,16 @@ def test_timeseries_add_time_zone(zone_type, server_setup, page: Page):
 @pytest.mark.parametrize("handle", ["leftHandle", "rightHandle"])
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
 def test_timeseries_drag_time_zone(zone_type, handle, drag_to, server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+    setup_project(page)
 
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Begin zone tool
-    page.get_by_role("button", name="View Mode").click()
-    page.locator("body").click()
-    page.get_by_role("button", name="TIME REGION").click()
-    page.get_by_test_id("select-annotation-label").click()
-    page.get_by_test_id("popover").get_by_text(zone_type).click()
-
-    # Perform drag
-    body = page.locator("body")
-    box = body.bounding_box()
-    assert box is not None
-
-    start_x = box["x"] + box["width"] / 2
-    start_y = box["y"] + box["height"] / 2
-
-    page.mouse.move(start_x, start_y)
-    page.keyboard.down("Control")
-    page.mouse.down()
-    page.mouse.move(start_x + 200, start_y, steps=20)
-    page.mouse.up()
-    page.keyboard.up("Control")
+    add_annotation(page, "TIME REGION", zone_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=zone_type)).to_be_visible()
     bounds_text = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     initial_left_position, initial_right_position = map(float, bounds_text.split(" - "))
+
+    page.get_by_role("button", name="View Mode").click()
 
     # Click handle, drag to new position
     page.get_by_label(f"zone.{handle}").drag_to(page.locator(drag_to))
@@ -239,48 +212,17 @@ def test_timeseries_drag_time_zone(zone_type, handle, drag_to, server_setup, pag
     "time_point_type", ["Thermal Quench", "Current Quench", "Locked Mode", "VDE", "Control Loss", "Disruption"]
 )
 def test_timeseries_add_time_point(server_setup, page: Page, time_point_type: str):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+    setup_project(page)
 
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Begin zone tool
-    page.get_by_role("button", name="View Mode").click()
-    page.locator("body").click()
-    page.get_by_role("button", name="TIME POINT").click()
-    page.get_by_test_id("select-annotation-label").click()
-    page.get_by_test_id("popover").get_by_text(time_point_type).click()
-
-    # Perform drag
-    body = page.locator("body")
-    box = body.bounding_box()
-    assert box is not None
-
-    start_x = box["x"] + box["width"] / 2
-    start_y = box["y"] + box["height"] / 2
-
-    page.mouse.move(start_x, start_y)
-    page.keyboard.down("Control")
-    page.mouse.down()
-    page.mouse.move(start_x + 200, start_y, steps=20)
-    page.mouse.up()
-    page.keyboard.up("Control")
+    add_annotation(page, "TIME POINT", time_point_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=time_point_type)).to_be_visible()
 
     # Wait for a bit for Zone to fully render
     page.wait_for_timeout(500)
+
+    page.get_by_role("button", name="View Mode").click()
 
     # Check you can right click to delete it
     page.get_by_label("time-point").first.click(button="right")
@@ -300,49 +242,18 @@ def test_timeseries_add_time_point(server_setup, page: Page, time_point_type: st
 )
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
 def test_timeseries_drag_vspan(drag_to: str, time_point_type: str, server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+    setup_project(page)
 
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Begin zone tool
-    page.get_by_role("button", name="View Mode").click()
-    page.locator("body").click()
-    page.get_by_role("button", name="TIME POINT").click()
-    page.get_by_test_id("select-annotation-label").click()
-    page.get_by_test_id("popover").get_by_text(time_point_type).click()
-
-    # Perform drag
-    body = page.locator("body")
-    box = body.bounding_box()
-    assert box is not None
-
-    start_x = box["x"] + box["width"] / 2
-    start_y = box["y"] + box["height"] / 2
-
-    page.mouse.move(start_x, start_y)
-    page.keyboard.down("Control")
-    page.mouse.down()
-    page.mouse.move(start_x + 200, start_y, steps=20)
-    page.mouse.up()
-    page.keyboard.up("Control")
+    add_annotation(page, "TIME POINT", time_point_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=time_point_type)).to_be_visible()
     initial_position = float(page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text())
 
+    page.get_by_role("button", name="View Mode").click()
+
     # Click handle, drag to new position
-    page.get_by_label(f"time-point").drag_to(page.locator(drag_to))
+    page.get_by_label("time-point").drag_to(page.locator(drag_to))
     time.sleep(0.1)
     # Check values in table correctly updated
     updated_position = float(page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text())
@@ -356,42 +267,9 @@ def test_timeseries_drag_vspan(drag_to: str, time_point_type: str, server_setup,
 
 
 def test_timeseries_save_annotations(server_setup, page: Page):
-   # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+    project_id, sample_id, _reload = setup_project(page)
 
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Begin zone tool
-    page.get_by_role("button", name="View Mode").click()
-    page.locator("body").click()
-    page.get_by_role("button", name="TIME REGION").click()
-    page.get_by_test_id("select-annotation-label").click()
-    page.get_by_test_id("popover").get_by_text("Flat Top").click()
-
-    # Perform drag
-    body = page.locator("body")
-    box = body.bounding_box()
-    assert box is not None
-
-    start_x = box["x"] + box["width"] / 2
-    start_y = box["y"] + box["height"] / 2
-
-    page.mouse.move(start_x, start_y)
-    page.keyboard.down("Control")
-    page.mouse.down()
-    page.mouse.move(start_x + 200, start_y, steps=20)
-    page.mouse.up()
-    page.keyboard.up("Control")
+    add_annotation(page, "TIME REGION", "Flat Top")
 
     # Check added to list
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
@@ -400,24 +278,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     page.wait_for_timeout(500)
 
-    page.get_by_role("button", name="TIME POINT").click()
-    page.get_by_test_id("select-annotation-label").click()
-    page.get_by_test_id("popover").get_by_text("Disruption").click()
-
-    # Perform drag
-    body = page.locator("body")
-    box = body.bounding_box()
-    assert box is not None
-
-    start_x = box["x"] + box["width"] / 2
-    start_y = box["y"] + box["height"] / 2
-
-    page.mouse.move(start_x, start_y)
-    page.keyboard.down("Control")
-    page.mouse.down()
-    page.mouse.move(start_x - 200, start_y, steps=20)
-    page.mouse.up()
-    page.keyboard.up("Control")
+    add_annotation(page, "TIME POINT", "Disruption", -200)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
@@ -456,14 +317,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
 
 def test_timeseries_load_annotations(server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
-
-    sample_id = ids[0]
+    project_id, sample_id, reload = setup_project(page)
 
     # Create annotations of each type
     rampup = TimeRegion(
@@ -486,8 +340,7 @@ def test_timeseries_load_annotations(server_setup, page: Page):
     )
     assert response.status_code == 200
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    reload()
 
     # One vspan and 3 zones visible
     expect(page.get_by_label("time-point").first).to_be_visible()
@@ -525,14 +378,7 @@ def test_timeseries_load_annotations(server_setup, page: Page):
 
 
 def test_timeseries_update_annotations(server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
-
-    sample_id = ids[0]
+    project_id, sample_id, reload = setup_project(page)
 
     # Create annotations of each type
     rampup = TimeRegion(
@@ -549,8 +395,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     )
     assert response.status_code == 200
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    reload()
 
     # One vspan and 2 zones visible
     expect(page.get_by_label("time-point").first).to_be_visible()
@@ -607,17 +452,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
 
 def test_timeseries_annotator(server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
-
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    setup_project(page)
 
     # Expand find peaks annotator
     expect(page.get_by_role("button", name="Peak Detection")).to_be_visible()
@@ -690,7 +525,7 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
-    expect(page.get_by_text("Model training added to job queue!")).to_be_visible()
+    expect(page.get_by_text("Model training added to job queue!")).to_be_visible(timeout=30000)
 
     # Close modal, check it disappears
     page.get_by_role("button", name="Close", exact=True).click()

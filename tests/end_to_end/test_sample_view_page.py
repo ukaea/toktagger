@@ -53,9 +53,12 @@ def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False
 
     # If 2 annotations, add a new annotation via UI
     if num_annotations == 2:
-        page.get_by_label("time-series").click(button="right")
-        page.get_by_role("menuitem", name="Add Time Point").click(force=True)
-        page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
+        page.get_by_role("button", name="View Mode").click()
+        page.locator("body").click()
+        page.get_by_role("button", name="TIME POINT").click()
+        page.get_by_test_id("select-annotation-label").click()
+        page.get_by_test_id("popover").get_by_text("Disruption").click()
+        page.get_by_label("time-series").click(button="left", modifiers=["Control"])
 
     if go_to_next:
         # Go forwards, create new annotations
@@ -63,11 +66,12 @@ def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False
         page.wait_for_timeout(200)
 
         if num_annotations == 2:
-            page.get_by_label("time-series").click(button="right")
-            page.get_by_role("menuitem", name="Add Time Point").click(force=True)
-            page.get_by_role("menuitem", name="Disruption", exact=True).click(
-                force=True
-            )
+            page.get_by_role("button", name="View Mode").click()
+            page.locator("body").click()
+            page.get_by_role("button", name="TIME POINT").click()
+            page.get_by_test_id("select-annotation-label").click()
+            page.get_by_test_id("popover").get_by_text("Disruption").click()
+            page.get_by_label("time-series").click(button="left", modifiers=["Control"])
 
     return page, project_id, sample_ids
 
@@ -147,8 +151,7 @@ def test_timeseries_navigation(data_loader, request, server_setup, page: Page):
     # Check Annotations table rendered
     expect(page.get_by_role("columnheader", name="Category")).to_be_visible()
     expect(page.get_by_role("columnheader", name="Type")).to_be_visible()
-    expect(page.get_by_role("columnheader", name="x0")).to_be_visible()
-    expect(page.get_by_role("columnheader", name="x1")).to_be_visible()
+    expect(page.get_by_role("columnheader", name="Data")).to_be_visible()
 
     # Check Toolbox rendered
     expect(page.get_by_text("Toolbox")).to_be_visible()
@@ -313,11 +316,11 @@ def test_import_annotations(server_setup, page: Page):
             file_chooser.set_files(file.name)
 
         # Check annotations visible
-        expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
-        expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
+        expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
+        expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
 
-        expect(page.get_by_label("zone", exact=True)).to_have_count(1)
-        expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
+        expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
+        expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
 
 
 @pytest.mark.parametrize("all_samples", (True, False))
@@ -504,6 +507,8 @@ def test_save_on_navigate(
     for annotation in annotations:
         assert annotation["validated"] == (True if save_on_navigate else False)
 
+    time.sleep(1)
+
     # Check sample is now marked as validated if saved
     response = requests.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}"
@@ -520,8 +525,8 @@ def test_clear_button(server_setup, page: Page):
     page.get_by_role("button", name="Save").click()
 
     # Check both annotations visible
-    expect(page.get_by_label("vspan").first).to_be_visible()
-    expect(page.get_by_label("zone").first).to_be_visible()
+    expect(page.get_by_label("time-point").first).to_be_visible()
+    expect(page.get_by_label("time-zone").first).to_be_visible()
 
     # Check sample shows as validated
     expect(page.get_by_text("Annotations Validated")).to_be_visible()
@@ -530,8 +535,8 @@ def test_clear_button(server_setup, page: Page):
     page.get_by_role("button", name="Clear").click()
 
     # Check no annotations visible
-    expect(page.get_by_label("vspan").first).to_be_hidden()
-    expect(page.get_by_label("zone").first).to_be_hidden()
+    expect(page.get_by_label("time-point").first).to_be_hidden()
+    expect(page.get_by_label("time-zone").first).to_be_hidden()
 
     # Check sample now shows as not validated
     expect(page.get_by_text("Annotations Not Validated")).to_be_visible()
