@@ -17,7 +17,14 @@ import {
   RadioGroup,
   Radio,
 } from "@adobe/react-spectrum";
-import { Project, Sample, ShotData, FileData } from "@/types";
+import {
+  Project,
+  Sample,
+  ShotData,
+  FileData,
+  TimeSeriesFileData,
+  ImageArrayFileData,
+} from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
@@ -223,6 +230,7 @@ export const AddSamplesEditor = ({
           };
         } else if (
           dataSchema?.title === "ImageFileData" ||
+          dataSchema?.title === "ImageArrayFileData" ||
           dataSchema?.title === "TimeSeriesFileData"
         ) {
           // File Data or Time Series File Data
@@ -239,19 +247,39 @@ export const AddSamplesEditor = ({
           };
 
           // Add column_names for time series file data
-          if (
-            dataSchema?.title === "TimeSeriesFileData" &&
-            columnNames.trim()
-          ) {
+          if (columnNames.trim()) {
             const columns = columnNames
               .split(",")
               .map((s) => s.trim())
               .filter((s) => s.length > 0);
-            if (columns.length > 0) {
+
+            if (
+              dataSchema?.title === "TimeSeriesFileData" &&
+              columns.length > 0
+            ) {
               fileData.signal_names = columns;
+              return {
+                ...baseSample,
+                data: fileData as TimeSeriesFileData,
+              };
+            } else if (
+              dataSchema?.title === "ImageArrayFileData" &&
+              columns.length > 1
+            ) {
+              throw new Error(
+                "Only one signal name allowed for image array data!",
+              );
+            } else if (
+              dataSchema?.title === "ImageArrayFileData" &&
+              columns.length == 1
+            ) {
+              fileData.signal_name = columns[0];
+              return {
+                ...baseSample,
+                data: fileData as ImageArrayFileData,
+              };
             }
           }
-
           return {
             ...baseSample,
             data: fileData as FileData,
@@ -380,6 +408,7 @@ export const AddSamplesEditor = ({
             )}
 
             {(dataSchema?.title === "ImageFileData" ||
+              dataSchema?.title === "ImageArrayFileData" ||
               dataSchema?.title === "TimeSeriesFileData") && (
               <Form maxWidth="size-6000">
                 <ComboBox
@@ -412,6 +441,7 @@ export const AddSamplesEditor = ({
 
             {/* Display found shot IDs */}
             {(dataSchema?.title === "ImageFileData" ||
+              dataSchema?.title === "ImageArrayFileData" ||
               dataSchema?.title === "TimeSeriesFileData") &&
             shotIds.length > 0 ? (
               <Text>
@@ -426,13 +456,18 @@ export const AddSamplesEditor = ({
               </Text>
             )}
 
-            {dataSchema?.title === "TimeSeriesFileData" && (
+            {(dataSchema?.title === "TimeSeriesFileData" ||
+              dataSchema?.title === "ImageArrayFileData") && (
               <Form maxWidth="size-6000">
                 <TextField
-                  label="Column Names (comma-separated)"
+                  label={
+                    dataSchema?.title === "TimeSeriesFileData"
+                      ? "Signal Names (comma-separated)"
+                      : "Signal Name"
+                  }
                   value={columnNames}
                   onChange={setColumnNames}
-                  description="Optional: Specify column names for time series data"
+                  description="Optional: Specify signal names to load data for."
                 />
               </Form>
             )}
