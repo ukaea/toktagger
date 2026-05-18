@@ -1,7 +1,6 @@
 import os
 import ray
 import pathlib
-import typing
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from toktagger.api.schemas.annotations import (
@@ -17,7 +16,7 @@ from toktagger.api.core.sender import (
 )
 import logging
 from platformdirs import user_cache_dir
-
+import pydantic
 
 logger = logging.getLogger("ray")
 logger.setLevel("DEBUG")
@@ -69,19 +68,14 @@ def train_model(
     project: Project,
     samples: list[Sample],
     annotations: list[list[AnnotationOutTypes]],
-    train_val_test_split: typing.Tuple[float, float, float],
-    num_epochs: int = 100,
-    batch_size: int = 32,
+    params: pydantic.BaseModel | None,
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
     model_actor = get_actor(project=project, model=model)
     try:
         logger.info(f"Running model training for project {project.id}")
         model_actor.log_progress.remote(training_status="started", progress=0)
         train_task = model_actor.train.remote(
-            samples=samples,
-            annotations=annotations,
-            train_val_test_split=train_val_test_split,
-            num_epochs=num_epochs,
+            samples=samples, annotations=annotations, params=params
         )
 
         # Wait for train task to complete
@@ -114,7 +108,7 @@ def train_model(
 
 @ray.remote
 def get_predictions(
-    project: Project, model: Model, samples: list[Sample], batch_size: int = 32
+    project: Project, model: Model, samples: list[Sample], params: pydantic.BaseModel
 ):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
@@ -124,7 +118,7 @@ def get_predictions(
     )
     model_actor = get_actor(project=project, model=model)
 
-    predictions_task = model_actor.predict.remote(samples, batch_size=batch_size)
+    predictions_task = model_actor.predict.remote(samples=samples, params=params)
     predictions = ray.get(predictions_task)
 
     samples_batch = [
