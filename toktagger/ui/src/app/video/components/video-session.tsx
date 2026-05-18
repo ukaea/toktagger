@@ -813,11 +813,11 @@ export function VideoSessionProvider(props: {
       _originalEvent: PointerEvent,
     ) => {
       if (isProgrammaticAnnoSyncRef.current) return;
-      if (panMode || hideAnnotations) return;
+      if (hideAnnotations) return;
 
       const id = clicked?.id;
       if (id) {
-        api.setSelected(id, true);
+        api.setSelected(id, !panMode);
       }
 
       const got = getLabelTrack(clicked);
@@ -840,7 +840,7 @@ export function VideoSessionProvider(props: {
       if (isProgrammaticAnnoSyncRef.current) return;
 
       if (arr.length > 0) {
-        if (!panMode && !hideAnnotations) {
+        if (!hideAnnotations) {
           const selected = arr[0];
           const got = getLabelTrack(selected);
           const className = (got.className ?? "").trim();

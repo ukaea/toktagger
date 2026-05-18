@@ -266,8 +266,8 @@ export function CanvasModeToolbar(props: {
   const isDark = colorScheme === "dark";
   const isEditMode = !props.panMode;
   const modeLabel = isEditMode
-    ? "Edit mode"
-    : "View mode. Hold Shift to edit temporarily.";
+    ? "Edit mode. Click to return to view mode."
+    : "View mode. Select annotations or hold Shift to edit temporarily.";
 
   return (
     <View

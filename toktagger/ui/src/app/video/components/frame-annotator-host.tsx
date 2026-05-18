@@ -244,23 +244,22 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       api.viewer.setMouseNavEnabled(panMode);
       setGestureNavigation(api.viewer, panMode);
 
-      const overlayInteractionDisabled = panMode || hideAnnotations;
       const overlay = findAnnotationOverlay(api.viewer.element as HTMLElement);
       if (overlay) {
-        overlay.style.pointerEvents = overlayInteractionDisabled
-          ? "none"
-          : "auto";
+        overlay.style.pointerEvents = hideAnnotations ? "none" : "auto";
         overlay.style.opacity = hideAnnotations ? "0" : "1";
       }
     }
 
     api.setUserSelectAction(
-      panMode || hideAnnotations
+      hideAnnotations
         ? UserSelectAction.NONE
-        : UserSelectAction.EDIT,
+        : panMode
+          ? UserSelectAction.SELECT
+          : UserSelectAction.EDIT,
     );
 
-    if (panMode || hideAnnotations) {
+    if (hideAnnotations) {
       api.setSelected?.();
     }
 
