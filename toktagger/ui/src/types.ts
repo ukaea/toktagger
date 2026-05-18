@@ -198,13 +198,23 @@ export const TimeSeriesFileDataSchema = FileDataSchema.extend({
 });
 export type TimeSeriesFileData = z.infer<typeof TimeSeriesFileDataSchema>;
 
+export const ImageArrayFileDataSchema = FileDataSchema.extend({
+  signal_name: z.string().optional(),
+});
+export type ImageArrayFileData = z.infer<typeof ImageArrayFileDataSchema>;
+
 export const ShotDataSchema = z.object({
   protocol: z.string(),
   signal_names: z.array(z.string()),
 });
 export type ShotData = z.infer<typeof ShotDataSchema>;
 
-export const SampleDataSchema = z.union([FileDataSchema, ShotDataSchema]);
+export const SampleDataSchema = z.union([
+  TimeSeriesFileDataSchema,
+  ImageArrayFileDataSchema,
+  FileDataSchema,
+  ShotDataSchema,
+]);
 export type SampleData = z.infer<typeof SampleDataSchema>;
 
 export const SampleSchema = z.object({
@@ -227,9 +237,10 @@ export const ModelSchema = z.object({
   timestamp: z.string(),
   project_id: z.string(),
   type: z.string(),
+  version: z.int(),
   training_status: z.string(),
   progress: z.number(),
-  accuracy: z.number(),
+  score: z.number(),
   task_id: z.string(),
 });
 
