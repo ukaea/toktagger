@@ -265,7 +265,13 @@ def test_samples_sorting(server_setup, page: Page):
     create_uda_samples(project_id, shot_ids=[20000])
     time.sleep(0.1)
 
-    create_uda_samples(project_id, shot_ids=[10000])
+    sample_ids = create_uda_samples(project_id, shot_ids=[10000])
+
+    # Set 10000 sample to be validated
+    requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples",
+        json=[{"id": sample_ids[0], "updates": {"validated_annotations": True}}],
+    )
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
 
@@ -277,6 +283,9 @@ def test_samples_sorting(server_setup, page: Page):
 
     # Sort by Shot ID, 10000 should be first, then 20000
     sort(page, "Shot ID", "10000", "20000")
+
+    # Sort by validated annotations - ascending, so should be non validated first
+    sort(page, "Validated", "20000", "10000")
 
 
 def test_samples_search(server_setup, page: Page):
