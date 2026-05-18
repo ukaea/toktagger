@@ -1,16 +1,21 @@
 import webbrowser
 import argparse
 from toktagger.api.main import Server
+from toktagger.api.models import models_dependencies_installed
 import uvicorn
 import time
 import threading
 import os
-from toktagger.api.models import models_dependencies_installed
+
 
 # Need to point to app as a module level string if we want reload option
-server = Server()
-server._setup_app()
-app = server.app
+def create_app():
+    server = Server()
+    server._setup_app()
+    # Setup ray if required
+    if models_dependencies_installed():
+        server._setup_ray()
+    return server.app
 
 
 def do_open_browser(host: str, port: int):
@@ -43,12 +48,14 @@ def main():
     if open_browser:
         threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
 
-    if models_dependencies_installed():
-        server._setup_ray(
-            f"http://{args.host}:{args.port}", os.environ.get("MODEL_STORAGE")
-        )
+    os.environ["API_URL"] = f"http://{args.host}:{args.port}"
+
     uvicorn.run(
-        "toktagger.api.cli:app", host=args.host, port=args.port, reload=args.reload
+        "toktagger.api.cli:create_app",
+        factory=True,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
     )
 
 

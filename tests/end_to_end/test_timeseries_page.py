@@ -6,6 +6,7 @@ import requests
 import time
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 from typing import Literal, Tuple, Callable
+from tests.end_to_end import form_check
 
 def setup_project(page: Page) -> Tuple[str, str, Callable]:
     # Create Project
@@ -491,7 +492,12 @@ def test_timeseries_annotator(server_setup, page: Page):
     expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
 
 
-def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page):
+@pytest.mark.parametrize(
+    "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
+)
+def test_timeseries_model_predict(
+    server_setup, setup_model_samples, page: Page, model_name
+):
     # Create Project
     project_id, sample_ids = create_model_samples(setup_model_samples)
 
@@ -521,7 +527,15 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
     expect(
         page.get_by_role("option", name="mock_timeseries_cnn", exact=True)
     ).to_be_visible()
-    page.get_by_role("option", name="mock_timeseries_cnn", exact=True).click()
+    expect(
+        page.get_by_role("option", name="mock_params_timeseries_cnn", exact=True)
+    ).to_be_visible()
+
+    page.get_by_role("option", name=model_name, exact=True).click()
+
+    # If params model chosen, new form should open
+    if model_name == "mock_params_timeseries_cnn":
+        form_check(page, "Train")
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
@@ -552,9 +566,12 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
 
     # Check entry is there for newly trained model, wait for it to complete
     time.sleep(1)
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_timeseries_cnn")
+    expect(modal.get_by_role("row").nth(1)).to_contain_text(model_name)
     expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
+    if model_name == "mock_params_timeseries_cnn":
+        expect(modal.get_by_role("row").nth(1)).to_contain_text("50")
+    else:
+        expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
 
     # Close modal
     modal.get_by_role("button", name="Close", exact=True).click()
@@ -566,14 +583,20 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
     expect(model_predict).to_be_visible()
     model_predict.get_by_role("switch", name="Enable Tool").click()
 
-    # Choose mock_timeseries_cnn
+    # Choose model type
     model_predict.get_by_role(
         "combobox", name="Select Model Type"
     ).scroll_into_view_if_needed()
     model_predict.get_by_role(
         "button", name="Show suggestions Select Model Type"
     ).click()
-    page.get_by_role("option", name="mock_timeseries_cnn").click()
+    page.get_by_role("option", name=model_name, exact=True).click()
+
+    # If params model chosen, new form should open
+    if model_name == "mock_params_timeseries_cnn":
+        form_check(page, "Predict")
+
+    page.get_by_role("button", name="Predict", exact=True).click()
 
     # Should generate a new set of predictions after a short time
     expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
@@ -583,6 +606,16 @@ def test_timeseries_model_predict(server_setup, setup_model_samples, page: Page)
     expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
+
+    row = page.get_by_role("row").filter(
+        has=page.get_by_role("rowheader", name="Disruption")
+    )
+    if model_name == "mock_params_timeseries_cnn":
+        # Check disruption has the value of params.final_score + 1
+        assert float(row.get_by_role("gridcell").nth(1).inner_text()) == 51
+    else:
+        # Hardcoded time to 60+1 inside mock model
+        assert float(row.get_by_role("gridcell").nth(1).inner_text()) == 61
 
     # Disable tool, it should disappear
     model_predict.get_by_role("switch", name="Enable Tool").click()

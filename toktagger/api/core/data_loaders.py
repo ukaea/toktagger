@@ -28,6 +28,8 @@ from toktagger.api.schemas.samples import (
     ShotData,
     TimeSeriesFileData,
     ImageFileData,
+    ImageArrayFileData,
+    DataTypes,
 )
 
 # Set up UDA environment variables with defaults if not already set. This is required for
@@ -52,7 +54,7 @@ class DataLoader(ABC):
     @abstractmethod
     def sample_data_type(
         cls,
-    ) -> Type[ShotData | ImageFileData | FileData | TimeSeriesFileData]:
+    ) -> Type[DataTypes]:
         # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
         pass
 
@@ -80,6 +82,7 @@ class LoaderRegistry:
                 ShotData,
                 FileData,
                 ImageFileData,
+                ImageArrayFileData,
                 TimeSeriesFileData,
             ):
                 raise ValueError(
@@ -153,6 +156,90 @@ class ImageDataLoader(DataLoader):
 
         return ImageData(
             frame=file_path.name.split(".")[0],
+            values=base64.b64encode(buffer.getvalue()).decode(),
+        )
+
+
+@LoaderRegistry.register("image-array")
+class ArrayDataLoader(DataLoader):
+    """DataLoader for retrieving data using Numpy array files."""
+
+    @classmethod
+    def sample_data_type(cls) -> Type[ImageArrayFileData]:
+        return ImageArrayFileData
+
+    @pydantic.validate_call
+    def get_sample(self, sample: Sample, params: ImageParams, **kwargs) -> ImageData:
+        if not isinstance(sample.data, ImageArrayFileData):
+            raise TypeError(
+                f"Expected sample data of type 'ImageArrayFileData' but got '{type(sample.data)}'"
+            )
+
+        sample_data: ImageArrayFileData = sample.data
+
+        # Find file
+        file_path = pathlib.Path(sample_data.file_name)
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Could not find directory at '{file_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
+            )
+        # Load array
+        if sample_data.type == "npz":
+            with np.load(file_path, allow_pickle=False) as img_data:
+                arr_names = img_data.files
+                if sample_data.signal_name is not None:
+                    if sample_data.signal_name in arr_names:
+                        arr: np.ndarray = img_data[sample_data.signal_name]
+                    else:
+                        raise DataLoaderError(
+                            f"Signal name {sample_data.signal_name} not found in array file! Available keys are: {arr_names}"
+                        )
+                else:
+                    if len(arr_names) == 1:
+                        arr: np.ndarray = img_data[arr_names[0]]
+                    else:
+                        raise DataLoaderError(
+                            f"Signal name not provided, but multiple options found in array file! Available keys are: {arr_names}"
+                        )
+        else:
+            arr: np.ndarray = np.load(file_path, allow_pickle=False)
+
+        # Check array is 3D, frame x height x width, or 4D, frame x height x width x rgb
+        if len(arr.shape) != 3 and not (len(arr.shape) == 4 and arr.shape[-1] == 3):
+            raise DataLoaderError(
+                f"""Expected array to have three dimensions representing (frame, height, width),
+                or 4 dimensions representing (frame, height, width, RGB),
+                but found {len(arr.shape)} dimensions!"""
+            )
+
+        # If any values > 255, scale arr to be 1-255
+        if np.any(arr > 255):
+            val_range = arr.max() - arr.min()
+            arr = arr - arr.min()
+            # Avoid divide by zero in case where image is uniform
+            if val_range:
+                arr = arr / val_range
+            arr = (arr * 255).astype(np.uint8)
+
+        if params.name != "image":
+            raise DataLoaderError("Must provide image data parameters!")
+
+        frame = params.frame if params.frame is not None else 0
+
+        if frame < 0 or frame >= arr.shape[0]:
+            raise DataLoaderError(
+                f"Frame {frame} unavailable! Available frame range is 0 to {arr.shape[0] - 1}."
+            )
+
+        frame_arr = arr[frame, ...]
+
+        im = Image.fromarray(frame_arr)
+        buffer = io.BytesIO()
+        im.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        return ImageData(
+            frame=frame,
             values=base64.b64encode(buffer.getvalue()).decode(),
         )
 
