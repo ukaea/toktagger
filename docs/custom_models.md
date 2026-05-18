@@ -52,8 +52,7 @@ class MyCustomModel(Model):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
+        params: pydantic.BaseModel | None = None
     ) -> float:
         """
         Train the model on annotated samples.
@@ -61,8 +60,7 @@ class MyCustomModel(Model):
         Args:
             samples: List of samples to train on
             annotations: List of annotation lists (one list per sample)
-            train_val_test_split: Tuple of (train, val, test) ratios that sum to 1.0
-            num_epochs: Number of training epochs
+            params: An optional user defined Pydantic model containing parameters needed when training
             
         Returns:
             Final model accuracy/score metric
@@ -70,12 +68,17 @@ class MyCustomModel(Model):
         # Your training logic here
         pass
     
-    def predict(self, samples: list[Sample]) -> list[list[AnnotationIn]]:
+    def predict(
+        self, 
+        samples: list[Sample],
+        params: pydantic.BaseModel | None = None
+        ) -> list[list[AnnotationIn]]:
         """
         Make predictions on new samples.
         
         Args:
             samples: List of samples to predict on
+            params: An optional user defined Pydantic model containing parameters needed when predicting
             
         Returns:
             List of annotation lists (predictions for each sample)
@@ -104,11 +107,19 @@ class MyCustomModel(Model):
         pass
 ```
 
+### Step 3: Optionally define required parameters
+When training or predicting using your model, you may need the user to provide some inputs (eg number of epochs, batch size, test/train split, etc). To do this, you can create a [Pydantic BaseModel](https://pydantic.dev/docs/validation/latest/concepts/models/) which contains the parameters, their expected types, default values, and any additional validation rules. These parameters will then be requested from the user via a form in the UI when training / predicting.
+
 ### Step 3: Register the Model
 
-The `@ModelRegistry.register("my_custom_model", ["time-series"])` decorator automatically registers your model with TokTagger. The first argument is the model name identifier, and the second is a list of tasks the model supports.
+The `@ModelRegistry.register()` decorator automatically registers your model with TokTagger. This requires the following parameters:
 
-### Supported Tasks
+* name: The name to give your model (it will be called this within the UI)
+* tasks: A list of tasks which this model is applicable for
+* training_params: A Pydantic `BaseModel` containing required training parameters, optional
+* prediction_params: A Pydantic `BaseModel` containing required prediction parameters, optional
+
+#### Supported Tasks
 
 Models can be registered for one or more of the following tasks:
 
@@ -135,15 +146,35 @@ server.run()
 
 ### Train/Validation/Test Split
 
-Use the `split_data()` method provided by the base `Model` class to automatically split your data:
+Use the `split_data()` method provided by the base `Model` class to automatically split your data. If you wish to use this, you will need to include a parameter in your `BaseModel` similar to the following:
+
+```py
+class TrainingParameters(pydantic.BaseModel):
+    train_val_test_split: list[typing.Annotated[float, pydantic.Field(gt=0, lt=1)]] = (
+        pydantic.Field(
+            min_length=3,
+            max_length=3,
+            description="Fraction of the total annotations to use in the training / validation / test sets. Fractions should sum to 1.",
+        )
+    )
+
+    @pydantic.field_validator("train_val_test_split", mode="after")
+    @classmethod
+    def validate_sum_to_one(cls, value: list[float]) -> list[float]:
+        if sum(value) != 1:
+            raise ValueError("Train / Val / Test fractions must sum to 1!")
+        return value
+```
+
+Then call the `split_data` method within your `train` method, using this parameter:
 
 ```python
-def train(self, samples, annotations, train_val_test_split, num_epochs=100):
+def train(self, samples, annotations, params):
     # Split data into train/val/test sets
     self.split_data(
         samples=samples,
         annotations=annotations,
-        train_val_test_split=train_val_test_split,
+        train_val_test_split=params.train_val_test_split,
     )
     
     # Access the splits
@@ -212,8 +243,23 @@ from toktagger.api.schemas.annotations import Annotation, TimeInterval
 from toktagger.api.schemas.data import TimeSeriesData, DataParams
 from toktagger.api.core.data_loaders import LoaderRegistry
 
+class TrainingParameters(pydantic.BaseModel):
+    train_val_test_split: list[typing.Annotated[float, pydantic.Field(gt=0, lt=1)]] = (
+        pydantic.Field(
+            min_length=3,
+            max_length=3,
+            description="Fraction of the total annotations to use in the training / validation / test sets. Fractions should sum to 1.",
+        )
+    )
 
-@ModelRegistry.register("random_forest_classifier", ["time-series"])
+    @pydantic.field_validator("train_val_test_split", mode="after")
+    @classmethod
+    def validate_sum_to_one(cls, value: list[float]) -> list[float]:
+        if sum(value) != 1:
+            raise ValueError("Train / Val / Test fractions must sum to 1!")
+        return value
+
+@ModelRegistry.register("random_forest_classifier", ["time-series"], TrainingParameters)
 class RandomForestModel(Model):
     """Random Forest classifier for time series classification"""
     
@@ -264,8 +310,7 @@ class RandomForestModel(Model):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
+        params: TrainingParameters
     ) -> float:
         """Train the Random Forest model"""
         
@@ -275,7 +320,7 @@ class RandomForestModel(Model):
         self.split_data(
             samples=samples,
             annotations=annotations,
-            train_val_test_split=train_val_test_split,
+            train_val_test_split=params.train_val_test_split,
         )
         
         # Extract features and labels

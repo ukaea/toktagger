@@ -74,7 +74,7 @@ A sample represents a single unit of data to be labeled—typically a tokamak sh
 - **File Type**: Select the file format (`csv`, `parquet`, `json`, etc.)
 - **Directory Path**: Path to the directory containing files 
     - Files should be named `{shot_id}.{extension}` (e.g., `100.parquet`)
-- **Column Names** (for time-series): Comma-separated column names to load. If not specified, loads all columns present in the file
+- **Signal Names** (for time-series): Comma-separated column names to load. If not specified, loads all columns present in the file
 
 **For Image Data**
 

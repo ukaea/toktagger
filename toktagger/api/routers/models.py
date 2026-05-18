@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Request, Depends, Path, Query, HTTPException
+from fastapi import APIRouter, Request, Depends, Path, Query, Body, HTTPException
 from fastapi.responses import JSONResponse
 import pathlib
 import os
 import random
 from bson.objectid import ObjectId
-import itertools
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
+from toktagger.api.models.base import ModelRegistry
+from pydantic import ValidationError
+from collections import defaultdict
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
@@ -28,6 +30,29 @@ def check_models_enabled():
             status_code=503,
             detail="ML model features are disabled (optional dependencies missing)",
         )
+
+
+def validate_model_params(model_type: str, schema_type: str, params: dict):
+    # Get model params model from registry and validate
+    params_model = ModelRegistry.get_params(model_type, schema_type)
+    if params_model and not params:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Model training parameters are missing! Requires '{params_model.__name__}' parameters.",
+        )
+    try:
+        params_validated = params_model.model_validate(params) if params_model else None
+    except ValidationError as e:
+        error_str = ""
+        for error in e.errors():
+            loc = error.get("loc", [])
+            msg = error.get("msg", "Invalid Field!")
+            error_str += f"'{loc[0] if len(loc) == 1 else loc}': {msg} \n"
+        raise HTTPException(
+            status_code=422,
+            detail=error_str,
+        )
+    return params_validated
 
 
 router = APIRouter(
@@ -136,7 +161,14 @@ async def get_training_info(
 
 
 @router.put("/models/{model_type}/train")
-async def start_model_training(request: Request, project_id: str, model_type: str):
+async def start_model_training(
+    request: Request,
+    project_id: str,
+    model_type: str,
+    params: dict = Body(
+        {}, description="Optional parameters for training the model", embed=True
+    ),
+):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
     project = await utils.get_project(db_client, project_id)
@@ -146,6 +178,9 @@ async def start_model_training(request: Request, project_id: str, model_type: st
             status_code=422,
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
+
+    # Get model params model from registry and validate
+    params_validated = validate_model_params(model_type, "training", params)
 
     # Create model
     # Try to get model for this project from database if it exists
@@ -203,15 +238,10 @@ async def start_model_training(request: Request, project_id: str, model_type: st
         )
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
-    annotations_2d = [
-        [ann for ann in group]
-        for _, group in itertools.groupby(
-            annotations, key=lambda annotation: annotation.sample_id
-        )
-    ]
-
-    NUM_EPOCHS = 10  # TODO where to define this? User selected? In model?
-    BATCH_SIZE = 32
+    sample_annotations_mapping = defaultdict(list)
+    for annotation in annotations:
+        sample_annotations_mapping[annotation.sample_id].append(annotation)
+    annotations_2d = [sample_annotations_mapping[sample.id] for sample in samples]
 
     model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
 
@@ -220,9 +250,7 @@ async def start_model_training(request: Request, project_id: str, model_type: st
         project=project,
         samples=samples,
         annotations=annotations_2d,
-        train_val_test_split=(0.7, 0.2, 0.1),
-        num_epochs=NUM_EPOCHS,
-        batch_size=BATCH_SIZE,
+        params=params_validated,
     )
 
     task_id = task_registry.register(train_task)
@@ -279,7 +307,7 @@ async def stop_model_training(
         if model.task_id:
             task = task_registry.get(model.task_id)
             if task is not None:
-                ray.kill(task)
+                ray.cancel(task)
             try:
                 actor = ray.get_actor(model.id)
                 ray.kill(actor)
@@ -311,6 +339,9 @@ async def predict(
         None,
         description="A list of specific sample IDs to make predictions for, leave blank for random selection.",
     ),
+    params: dict = Body(
+        {}, description="Optional parameters for training the model", embed=True
+    ),
 ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -332,6 +363,9 @@ async def predict(
             status_code=409,
             detail="Cannot make predictions using a model version which has not successfully finished training.",
         )
+
+    # Get model params model from registry and validate
+    params_validated = validate_model_params(model_type, "prediction", params)
 
     # Create predictions using the given model for this project
     # Predict on samples as specified by filters
@@ -359,10 +393,8 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
 
-    BATCH_SIZE = 32  # TODO again where to define this?
-
     predict_task = get_predictions.remote(
-        project=project, model=model, samples=samples, batch_size=BATCH_SIZE
+        project=project, model=model, samples=samples, params=params_validated
     )
     task_id = task_registry.register(predict_task)
     task_registry.update_actors(model.id)
@@ -409,6 +441,9 @@ async def create_sample_predictions(
         description="The ID of the sample to make model predictions for."
     ),
     model_type: str = Path(description="The type of model to make predictions from."),
+    params: dict = Body(
+        {}, description="Optional parameters for training the model", embed=True
+    ),
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -424,11 +459,13 @@ async def create_sample_predictions(
     # Find the latest created model for this project
     model = await utils.get_model(db_client, project.id, model_type, status="completed")
 
+    # Get model params model from registry and validate
+    params_validated = validate_model_params(model_type, "prediction", params)
+
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    BATCH_SIZE = 32  # TODO again where to define this?
     task = get_predictions.remote(
-        project=project, model=model, samples=[sample], batch_size=BATCH_SIZE
+        project=project, model=model, samples=[sample], params=params_validated
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)

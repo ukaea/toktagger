@@ -45,13 +45,15 @@ def ray_session():
         # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
         # Cannot explicitly pass a None, it requires a str:str dict in env_vars
         # So will pop the env varvalue, init ray, then restore it
-        api_url = os.environ.pop("API_URL")
+        if (api_url := os.environ.get("API_URL")) is not None:
+            api_url = os.environ.pop("API_URL")
         ray.init(
             ignore_reinit_error=True,
             include_dashboard=False,
             runtime_env={"env_vars": {"MODEL_STORAGE": tempd}},
         )
-        os.environ["API_URL"] = api_url
+        if api_url is not None:
+            os.environ["API_URL"] = api_url
 
         # Create a ray actor for use as a model registry
         WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
@@ -95,6 +97,7 @@ async def api_client(task_actor, db_client):
     # Any alternative solution ideas are welcome.....
     server = Server()
     server.testing_mode = True
+    os.environ["API_URL"] = ""
     server._setup_app()
     app = server.app
     app.state.db_client = db_client
@@ -104,7 +107,6 @@ async def api_client(task_actor, db_client):
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        os.environ["API_URL"] = ""
         client.app = app
         yield client
 
@@ -283,6 +285,14 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
     model_id_2 = await db_client.insert(
         "models", db_definitions.MODEL_2, ids={"project_id": ObjectId(project_id)}
     )
+
+    model_id_4 = await db_client.insert(
+        "models", db_definitions.MODEL_4, ids={"project_id": ObjectId(project_id)}
+    )
+
+    # Create temp files for each
+    for _id in (model_id_1, model_id_2, model_id_4):
+        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{_id}.model").touch()
 
     yield {
         "project_id": project_id,

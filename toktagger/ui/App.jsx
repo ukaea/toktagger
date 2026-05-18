@@ -4,7 +4,6 @@ import { APISchemaProvider } from "./src/app/contexts/apiSchema";
 import Projects from "./src/app/projects/page";
 import ProjectView from "./src/app/projects/project_id/page";
 import SampleView from "./src/app/projects/project_id/samples/sample_id/page";
-
 function App() {
   return (
     <APISchemaProvider>
