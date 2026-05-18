@@ -608,14 +608,14 @@ def test_timeseries_model_predict(
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="Disruption")
+        has=page.get_by_role("gridcell", name="Disruption")
     )
     if model_name == "mock_params_timeseries_cnn":
         # Check disruption has the value of params.final_score + 1
-        assert float(row.get_by_role("gridcell").nth(1).inner_text()) == 51
+        assert float(row.get_by_role("gridcell").nth(2).inner_text()) == 51
     else:
         # Hardcoded time to 60+1 inside mock model
-        assert float(row.get_by_role("gridcell").nth(1).inner_text()) == 61
+        assert float(row.get_by_role("gridcell").nth(2).inner_text()) == 61
 
     # Disable tool, it should disappear
     model_predict.get_by_role("switch", name="Enable Tool").click()
