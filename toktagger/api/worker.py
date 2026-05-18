@@ -1,6 +1,7 @@
 import os
 import ray
 import pathlib
+import shutil
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from toktagger.api.schemas.data import DataParamTypes
@@ -65,11 +66,61 @@ def get_actor(project, model):
 
 @ray.remote
 def load_model(
-    model: Model,
-    project: Project,
-):
+    model: Model, project: Project, weights_path: pathlib.Path
+) -> tuple[str, str | None]:
+    # Copy weights to temporary location inside cache dir
+    model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
+    model_dir.mkdir(exist_ok=True)
+    temp_weights_path = model_dir.joinpath(weights_path.name)
+
+    # Check worker can see weights file
+    if not weights_path.exists():
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return (
+            model.id,
+            f"Worker node cannot find weights file at location {weights_path}",
+        )
+    try:
+        shutil.copy(weights_path, temp_weights_path)
+    except PermissionError as e:
+        logger.error(e)
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return (
+            model.id,
+            "TokTagger does not have the required permissions to copy the weights file!",
+        )
+
     model_actor = get_actor(project=project, model=model)
-    return model_actor.is_trained.remote()
+    # Try loading actor with weights file, catch and reraise any errors
+    try:
+        load_temp_weights_task = model_actor._wrapped_load.remote(str(weights_path))
+        ray.get(load_temp_weights_task)
+    except Exception as e:
+        logger.error(e)
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return model.id, f"Failed to load weights - {str(e)}"
+
+    # Save the model with the correct file name, delete temporary file
+    save_weights_task = model_actor._wrapped_save.remote(
+        model_dir.joinpath(str(model.id))
+    )
+    ray.get(save_weights_task)
+
+    temp_weights_path.unlink()
+
+    return model.id, None
 
 
 @ray.remote

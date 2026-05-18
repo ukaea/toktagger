@@ -330,7 +330,18 @@ async def load_model_weights(
     project_id: str,
     model_type: str,
     method: LoadTypes,
+    weights_path: str,
 ) -> str:
+    db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
+    # Check file available at weights path
+    weights_path: pathlib.Path = pathlib.Path(weights_path)
+    if not weights_path.exists():
+        raise HTTPException(
+            status_code=422, detail="Weights file not found at specified path!"
+        )
+
     # Check if that load method is enabled
     if method == LoadTypes.LOCAL and os.environ.get("DISABLE_LOCAL_MODEL_LOAD"):
         raise HTTPException(
@@ -339,7 +350,6 @@ async def load_model_weights(
 
     # If local load, create a model db instance and return the model ID
     elif method == LoadTypes.LOCAL:
-        db_client = request.app.state.db_client
         project = await utils.get_project(db_client, project_id)
         # Check that this model type is valid for this project
         if model_type not in project.model_types:
@@ -384,43 +394,22 @@ async def load_model_weights(
             db_client=db_client, project_id=project.id, model=model_in
         )
 
-        return str(pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(model_id))
+        # Find the latest queued model for this project
+        model = await utils.get_model(
+            db_client, project.id, model_type, model_id=model_id
+        )
+
+        task = load_model.remote(
+            project=project, model=model, weights_path=weights_path
+        )
+        task_id = task_registry.register(task)
+        task_registry.update_actors(model.id)
+
+        return {"task_id": task_id}
     else:
         raise HTTPException(
             status_code=501, detail=f"Loading method {method} not implemented!"
         )
-
-
-@router.put("/models/{model_type}/load")
-async def start_load_model_weights(
-    request: Request,
-    project_id: str,
-    model_type: str,
-) -> str:
-    # Check that you can load the model weights without an error being thrown
-    # Should start the check task, then return
-    db_client = request.app.state.db_client
-    task_registry = request.app.state.task_registry
-
-    project = await utils.get_project(db_client, project_id)
-
-    if model_type not in project.model_types:
-        raise HTTPException(
-            status_code=422,
-            detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
-        )
-
-    # Find the latest queued model for this project
-    model = await utils.get_model(db_client, project.id, model_type, status="queued")
-
-    task = load_model.remote(
-        project=project,
-        model=model,
-    )
-    task_id = task_registry.register(task)
-    task_registry.update_actors(model.id)
-
-    return {"task_id": task_id}
 
 
 @router.get("/models/{model_type}/load/{task_id}")
@@ -429,7 +418,7 @@ async def get_load_model_status(
     project_id: str = Path(description="The ID of the project to load a model for."),
     model_type: str = Path(description="The type of model to load."),
     task_id: str = Path(description="The load task to get results from."),
-) -> list[AnnotationBatchTypes]:
+) -> bool:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -453,18 +442,13 @@ async def get_load_model_status(
             content={"message": "Load task in the queue!"}, status_code=202
         )
     elif ready:
-        try:
-            loaded, model_id = ray.get(task)
-        except Exception as e:
-            raise HTTPException(
-                detail=f"Load task failed - model weights were not loaded successfully! Check their location and format matches those expected by {model_type}.",
-                status_code=500,
-            ) from e
+        result: tuple[str, str] = ray.get(task)
+        model_id, error_msg = result
 
         # Check project ID and model type match those expected by user
-        if not loaded:
+        if not error_msg:
             raise HTTPException(
-                detail=f"Load task failed - model weights were not loaded successfully! Check their location and format matches those expected by {model_type}.",
+                detail=f"Load task failed - {error_msg}.",
                 status_code=500,
             )
 
@@ -475,7 +459,7 @@ async def get_load_model_status(
             updates=ModelUpdate(training_status="completed", progress=100),
         )
 
-        return loaded
+        return True
 
     else:
         raise HTTPException(

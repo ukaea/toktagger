@@ -148,6 +148,7 @@ async def get_model(
     db_client: MongoDBClient,
     project_id: str,
     model_type: str,
+    model_id: str = None,
     version: int = None,
     status: Optional[
         Literal["queued", "started", "failed", "completed", "aborted"]
@@ -159,6 +160,9 @@ async def get_model(
         filters["version"] = version
     if status:
         filters["training_status"] = status
+    if model_id:
+        filters["model_id"] = convert_to_objectid(model_id, "models")
+
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
