@@ -384,7 +384,7 @@ export const startSamplePredictions = async (
   sample_id: string,
   selected_model: string,
   params: Record<string, unknown>,
-  data_params: DataParams
+  data_params: DataParams,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
@@ -467,13 +467,14 @@ export const getModelLoadTypes = async (): Promise<Response> => {
   return response;
 };
 
-export const getModelWeightsPath = async (
+export const startLoadModelWeights = async (
   project_id: string,
   selected_model: string,
-  load_method: string
+  load_method: string,
+  weights_path: string,
 ): Promise<Response> => {
   const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load?method=${load_method}`,
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load?method=${load_method}&weights_path=${weights_path}`,
     {
       method: "POST",
       headers: {
@@ -484,27 +485,10 @@ export const getModelWeightsPath = async (
   return response;
 };
 
-export const startLoadModelWeights = async (
-  project_id: string,
-  selected_model: string,
-): Promise<Response> => {
-  const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  );
-  return response;
-};
-
-
 export const getLoadModelStatus = async (
   project_id: string,
   selected_model: string,
-  task_id: string
+  task_id: string,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/${task_id}`,

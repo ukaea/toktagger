@@ -331,7 +331,7 @@ async def load_model_weights(
     model_type: str,
     method: LoadTypes,
     weights_path: str,
-) -> str:
+):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -442,11 +442,22 @@ async def get_load_model_status(
             content={"message": "Load task in the queue!"}, status_code=202
         )
     elif ready:
-        result: tuple[str, str] = ray.get(task)
-        model_id, error_msg = result
+        try:
+            result: tuple[str, str] = ray.get(task)
+            model_id, error_msg = result
+        except Exception as e:
+            await utils.update_model(
+                db_client=db_client,
+                model_id=model_id,
+                updates=ModelUpdate(training_status="failed", progress=0),
+            )
+            raise HTTPException(
+                detail=f"Load task failed unexpectedly - {e}.",
+                status_code=500,
+            )
 
         # Check project ID and model type match those expected by user
-        if not error_msg:
+        if error_msg:
             raise HTTPException(
                 detail=f"Load task failed - {error_msg}.",
                 status_code=500,

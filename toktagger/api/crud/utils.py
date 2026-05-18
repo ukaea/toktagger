@@ -161,7 +161,7 @@ async def get_model(
     if status:
         filters["training_status"] = status
     if model_id:
-        filters["model_id"] = convert_to_objectid(model_id, "models")
+        filters["_id"] = convert_to_objectid(model_id, "models")
 
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
@@ -175,7 +175,7 @@ async def get_model(
     if not models:
         raise HTTPException(
             status_code=404,
-            detail="No trained models found of that type for this project!",
+            detail="No models found of that type for this project!",
         )
 
     return Model(**models[0])
