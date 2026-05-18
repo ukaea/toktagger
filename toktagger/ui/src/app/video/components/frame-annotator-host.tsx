@@ -351,10 +351,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       if (shiftDrawActiveRef.current) return;
       if (isEditableEventTarget(event.target)) return;
       if (hideAnnotations) return;
+      if (!panMode) return;
 
       shiftDrawActiveRef.current = true;
       setPanMode(false);
-      setDrawingTool("rectangle");
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -378,7 +378,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       window.removeEventListener("blur", releaseShiftDraw);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [hideAnnotations, setDrawingTool, setPanMode]);
+  }, [hideAnnotations, panMode, setPanMode]);
 
   useEffect(() => {
     if (!api) return;
@@ -494,14 +494,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           drawingTool={drawingTool}
           hideAnnotations={hideAnnotations}
           onTogglePanMode={() => setPanMode(!panMode)}
-          onSelectRectangle={() => {
-            setPanMode(false);
-            setDrawingTool("rectangle");
-          }}
-          onSelectPolygon={() => {
-            setPanMode(false);
-            setDrawingTool("polygon");
-          }}
+          onSelectRectangle={() => setDrawingTool("rectangle")}
+          onSelectPolygon={() => setDrawingTool("polygon")}
           onResetView={resetView}
         />
 

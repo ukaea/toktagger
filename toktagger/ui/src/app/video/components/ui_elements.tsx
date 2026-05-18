@@ -15,6 +15,7 @@ import {
   View,
 } from "@adobe/react-spectrum";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
+import Draw from "@spectrum-icons/workflow/Draw";
 import ImageMapPolygon from "@spectrum-icons/workflow/ImageMapPolygon";
 import ImageMapRectangle from "@spectrum-icons/workflow/ImageMapRectangle";
 import Move from "@spectrum-icons/workflow/Move";
@@ -195,8 +196,12 @@ export function FrameJumpField(props: {
   );
 }
 
-function DragZoomIcon() {
-  return <Move aria-hidden="true" size="S" />;
+function ViewEditModeIcon({ isEditMode }: { isEditMode: boolean }) {
+  return isEditMode ? (
+    <Draw aria-hidden="true" size="S" />
+  ) : (
+    <Move aria-hidden="true" size="S" />
+  );
 }
 
 function RectangleIcon() {
@@ -268,6 +273,10 @@ export function CanvasModeToolbar(props: {
 }) {
   const { colorScheme } = useProvider();
   const isDark = colorScheme === "dark";
+  const isEditMode = !props.panMode;
+  const modeLabel = isEditMode
+    ? "Edit mode"
+    : "View mode. Hold Shift to edit temporarily.";
 
   return (
     <View
@@ -292,11 +301,11 @@ export function CanvasModeToolbar(props: {
       >
         <Flex direction="column" alignItems="center" gap="size-100">
           <CanvasModeToggle
-            label="Drag / Zoom"
-            isSelected={props.panMode}
+            label={modeLabel}
+            isSelected={isEditMode}
             onPress={props.onTogglePanMode}
           >
-            <DragZoomIcon />
+            <ViewEditModeIcon isEditMode={isEditMode} />
           </CanvasModeToggle>
           <CanvasActionButton label="Reset view" onPress={props.onResetView}>
             <Preview aria-hidden="true" size="S" />
@@ -304,7 +313,7 @@ export function CanvasModeToolbar(props: {
           <Divider size="S" width="100%" />
           <CanvasModeToggle
             label="Rectangle"
-            isSelected={!props.panMode && props.drawingTool === "rectangle"}
+            isSelected={props.drawingTool === "rectangle"}
             isDisabled={props.hideAnnotations}
             onPress={props.onSelectRectangle}
           >
@@ -312,7 +321,7 @@ export function CanvasModeToolbar(props: {
           </CanvasModeToggle>
           <CanvasModeToggle
             label="Polygon"
-            isSelected={!props.panMode && props.drawingTool === "polygon"}
+            isSelected={props.drawingTool === "polygon"}
             isDisabled={props.hideAnnotations}
             onPress={props.onSelectPolygon}
           >
