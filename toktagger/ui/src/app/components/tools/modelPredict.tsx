@@ -126,10 +126,10 @@ export function ModelPredictModal({ project }: { project: Project }) {
 
     let poll: ReturnType<typeof setInterval>;
     if (modalOpen) {
-      fetchModels();
       setMessage(null);
       setMessageIcon(null);
       setSelectedModel(null);
+      fetchModels();
 
       poll = setInterval(() => {
         fetchModels();
