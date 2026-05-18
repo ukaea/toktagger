@@ -132,7 +132,9 @@ def get_predictions(
     )
     model_actor = get_actor(project=project, model=model)
 
-    predictions_task = model_actor._wrapped_predict.remote(samples, params, data_params)
+    predictions_task = model_actor._wrapped_predict.remote(
+        samples=samples, params=params, data_params=data_params
+    )
     predictions = ray.get(predictions_task)
 
     samples_batch = [

@@ -36,7 +36,7 @@ class DataParams(ConfiguredModel):
 
 
 class ImageParams(DataParams):
-    name: Literal["image"]
+    name: Literal["image"] = "image"
     frame: int | None
 
 

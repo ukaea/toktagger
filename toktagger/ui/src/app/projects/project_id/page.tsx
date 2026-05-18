@@ -22,6 +22,7 @@ import {
   Divider,
   Content,
   ButtonGroup,
+  Checkbox,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
@@ -95,6 +96,9 @@ const SamplesTable = ({
             <Column key="_id" allowsSorting>
               Date Created
             </Column>
+            <Column key="validated_annotations" allowsSorting>
+              Validated
+            </Column>
             <Column key="actions">Actions</Column>
           </TableHeader>
           <TableBody items={rows}>
@@ -104,6 +108,12 @@ const SamplesTable = ({
               >
                 <Cell>{item["shot_id"]}</Cell>
                 <Cell>{item["timestamp"]}</Cell>
+                <Cell>
+                  <Checkbox
+                    isSelected={item["validated_annotations"]}
+                    isReadOnly={true}
+                  />
+                </Cell>
                 <Cell>
                   <Flex direction="row" gap="size-100">
                     <DialogTrigger>

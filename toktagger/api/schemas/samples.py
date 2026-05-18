@@ -13,6 +13,11 @@ class ImageFileData(FileData):
     type: Literal["png", "jpeg"]
 
 
+class ImageArrayFileData(FileData):
+    type: Literal["npy", "npz"]
+    signal_name: Optional[str] = None
+
+
 class TimeSeriesFileData(FileData):
     type: Literal["csv", "tsv", "parquet", "feather", "json", "xlsx"]
     signal_names: Optional[list[str]] = None
@@ -23,7 +28,7 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 
-DataTypes = Union[TimeSeriesFileData, ImageFileData, ShotData]
+DataTypes = Union[TimeSeriesFileData, ImageFileData, ImageArrayFileData, ShotData]
 
 
 class SampleBase(ConfiguredModel):
