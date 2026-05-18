@@ -559,10 +559,10 @@ def test_create_samples_file_data(server_setup, page: Page, file_type: str):
         pathlib.Path(tempd).joinpath(f"10000.{file_type.lower()}").touch()
         pathlib.Path(tempd).joinpath(f"10001.{file_type.lower()}").touch()
 
-        # Check we can see File Type, Directory Path, and Column Names input fields
+        # Check we can see File Type, Directory Path, and Signal Names input fields
         expect(modal.get_by_role("combobox", name="File Type")).to_be_visible()
         expect(modal.get_by_role("textbox", name="Directory Path")).to_be_visible()
-        expect(modal.get_by_role("textbox", name="Column Names")).to_be_visible()
+        expect(modal.get_by_role("textbox", name="Signal Names")).to_be_visible()
 
         # Select given file type in dropdown
         modal.get_by_role("button", name="File Type").click()
@@ -575,8 +575,8 @@ def test_create_samples_file_data(server_setup, page: Page, file_type: str):
             modal.get_by_text("Found 2 files with shot IDs: 10000, 10001")
         ).to_be_visible()
 
-        # Add column names
-        modal.get_by_role("textbox", name="Column Names").fill("ip, dalpha")
+        # Add signal names
+        modal.get_by_role("textbox", name="Signal Names").fill("ip, dalpha")
 
         # Create samples
         modal.get_by_role("button", name="Add Samples").click()
