@@ -7,6 +7,7 @@ import React, {
   useEffect,
 } from "react";
 import { useSample } from "@/app/contexts/SampleContext";
+import type { DrawingTool } from "@/app/video/components/types";
 
 interface SampleHistoryContextType {
   visitedSampleIds: string[];
@@ -17,6 +18,10 @@ interface SampleHistoryContextType {
   setVideoPropagate: (value: boolean) => void;
   videoLastClassName: string | null;
   setVideoLastClassName: (value: string | null) => void;
+  videoPanMode: boolean;
+  setVideoPanMode: (value: boolean) => void;
+  videoDrawingTool: DrawingTool;
+  setVideoDrawingTool: (value: DrawingTool) => void;
 }
 
 const SampleHistoryContext = createContext<
@@ -38,6 +43,9 @@ export function SampleHistoryProvider({
   const [videoLastClassName, setVideoLastClassName] = useState<string | null>(
     null,
   );
+  const [videoPanMode, setVideoPanMode] = useState(true);
+  const [videoDrawingTool, setVideoDrawingTool] =
+    useState<DrawingTool>("rectangle");
 
   const [visitedSampleIds, setVisitedSampleIds] = useState<string[]>(() => {
     const cached: string | null = sessionStorage.getItem(projectId);
@@ -78,6 +86,10 @@ export function SampleHistoryProvider({
     setVideoPropagate,
     videoLastClassName,
     setVideoLastClassName,
+    videoPanMode,
+    setVideoPanMode,
+    videoDrawingTool,
+    setVideoDrawingTool,
   };
 
   return (

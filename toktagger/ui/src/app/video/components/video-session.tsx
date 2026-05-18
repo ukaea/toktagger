@@ -17,6 +17,7 @@ import {
 } from "@annotorious/react";
 
 import type { Annotation, DataParams } from "@/types";
+import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
@@ -175,6 +176,12 @@ export function VideoSessionProvider(props: {
   children: React.ReactNode;
 }) {
   const { projectId, sampleId, propagate, setPropagate, children } = props;
+  const {
+    videoPanMode,
+    setVideoPanMode,
+    videoDrawingTool,
+    setVideoDrawingTool,
+  } = useSampleHistory();
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -238,8 +245,9 @@ export function VideoSessionProvider(props: {
     trackId: null,
     source: null,
   });
-  const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
-  const [panMode, setPanModeState] = useState(true);
+  const [drawingTool, setDrawingToolState] =
+    useState<DrawingTool>(videoDrawingTool);
+  const [panMode, setPanModeState] = useState(videoPanMode);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
   const hideAnnotationsRef = useRef(false);
 
@@ -293,8 +301,9 @@ export function VideoSessionProvider(props: {
       api?.setSelected?.();
       flushPendingOverlay();
       setDrawingToolState(tool);
+      setVideoDrawingTool(tool);
     },
-    [api, flushPendingOverlay],
+    [api, flushPendingOverlay, setVideoDrawingTool],
   );
 
   const setPanMode = useCallback(
@@ -302,8 +311,9 @@ export function VideoSessionProvider(props: {
       api?.setSelected?.();
       flushPendingOverlay();
       setPanModeState(v);
+      setVideoPanMode(v);
     },
-    [api, flushPendingOverlay],
+    [api, flushPendingOverlay, setVideoPanMode],
   );
 
   const clearCurrentFrame = useCallback(() => {
