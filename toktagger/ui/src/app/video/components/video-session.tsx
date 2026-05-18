@@ -687,10 +687,10 @@ export function VideoSessionProvider(props: {
       if (!id) return false;
       if (!api) return false;
 
-      api.setSelected(id, true);
+      api.setSelected(id, !panMode);
       return true;
     },
-    [api],
+    [api, panMode],
   );
 
   const tryFocusPending = useCallback(
