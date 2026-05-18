@@ -177,11 +177,11 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def save(self, file_path: str):
+    def save(self, file_stem: str):
         pass
 
     @abstractmethod
-    def load(cls, project: Project, file_path: str):
+    def load(self, file_path: str):
         pass
 
 

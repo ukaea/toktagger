@@ -295,9 +295,13 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
         "models", db_definitions.MODEL_2, ids={"project_id": ObjectId(project_id)}
     )
 
-    await db_client.insert(
+    model_id_4 = await db_client.insert(
         "models", db_definitions.MODEL_4, ids={"project_id": ObjectId(project_id)}
     )
+
+    # Create temp files for each
+    for _id in (model_id_1, model_id_2, model_id_4):
+        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{_id}.model").touch()
 
     yield {
         "project_id": project_id,

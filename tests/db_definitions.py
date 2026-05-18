@@ -49,10 +49,10 @@ class MockDisruptionCNN(Model):
             for i in range(len(samples))
         ]
 
-    def save(self, file_path: str):
-        pathlib.Path(file_path).touch()
+    def save(self, file_stem: str):
+        pathlib.Path(file_stem).with_suffix(".model").touch()
 
-    def load(self, project, file_path):
+    def load(self, file_path):
         pass
 
 
@@ -104,10 +104,10 @@ class TimeSeriesCNN(Model):
             )
         return anns
 
-    def save(self, file_path: str):
-        pathlib.Path(file_path).touch()
+    def save(self, file_stem: str):
+        pathlib.Path(file_stem).with_suffix(".model").touch()
 
-    def load(self, project, file_path):
+    def load(self, file_path):
         pass
 
 
