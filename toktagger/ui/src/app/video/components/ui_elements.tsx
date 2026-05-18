@@ -18,8 +18,7 @@ import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import Draw from "@spectrum-icons/workflow/Draw";
 import ImageMapPolygon from "@spectrum-icons/workflow/ImageMapPolygon";
 import ImageMapRectangle from "@spectrum-icons/workflow/ImageMapRectangle";
-import Move from "@spectrum-icons/workflow/Move";
-import Preview from "@spectrum-icons/workflow/Preview";
+import FullScreenExit from "@spectrum-icons/workflow/FullScreenExit";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -196,14 +195,6 @@ export function FrameJumpField(props: {
   );
 }
 
-function ViewEditModeIcon({ isEditMode }: { isEditMode: boolean }) {
-  return isEditMode ? (
-    <Draw aria-hidden="true" size="S" />
-  ) : (
-    <Move aria-hidden="true" size="S" />
-  );
-}
-
 function RectangleIcon() {
   return <ImageMapRectangle aria-hidden="true" size="M" />;
 }
@@ -305,10 +296,10 @@ export function CanvasModeToolbar(props: {
             isSelected={isEditMode}
             onPress={props.onTogglePanMode}
           >
-            <ViewEditModeIcon isEditMode={isEditMode} />
+            <Draw aria-hidden="true" size="S" />
           </CanvasModeToggle>
           <CanvasActionButton label="Reset view" onPress={props.onResetView}>
-            <Preview aria-hidden="true" size="S" />
+            <FullScreenExit aria-hidden="true" size="S" />
           </CanvasActionButton>
           <Divider size="S" width="100%" />
           <CanvasModeToggle
