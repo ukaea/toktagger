@@ -19,7 +19,7 @@ import { Item, Menu, Submenu, useContextMenu } from "react-contexify";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
+import { useVideoUiState } from "@/app/video/components/video-context";
 import {
   getLabelTrack,
   isPolygonAnno,
@@ -146,7 +146,7 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
   const { annotationLabels } = useSample();
-  const { setVideoLastClassName } = useSampleHistory();
+  const { setVideoLastClassName } = useVideoUiState();
   const {
     frame,
     setImageNatural,

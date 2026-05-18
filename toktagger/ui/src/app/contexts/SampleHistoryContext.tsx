@@ -7,21 +7,12 @@ import React, {
   useEffect,
 } from "react";
 import { useSample } from "@/app/contexts/SampleContext";
-import type { DrawingTool } from "@/app/video/components/types";
 
 interface SampleHistoryContextType {
   visitedSampleIds: string[];
   popVisitedSampleId: () => string | null;
   SaveOnNavigate: boolean;
   setSaveOnNavigate: (saveOnNavigate: boolean) => void;
-  videoPropagate: boolean;
-  setVideoPropagate: (value: boolean) => void;
-  videoLastClassName: string | null;
-  setVideoLastClassName: (value: string | null) => void;
-  videoPanMode: boolean;
-  setVideoPanMode: (value: boolean) => void;
-  videoDrawingTool: DrawingTool;
-  setVideoDrawingTool: (value: DrawingTool) => void;
 }
 
 const SampleHistoryContext = createContext<
@@ -39,13 +30,6 @@ export function SampleHistoryProvider({
   const sampleId = sample?._id ?? null;
 
   const [SaveOnNavigate, setSaveOnNavigate] = useState(true);
-  const [videoPropagate, setVideoPropagate] = useState(true);
-  const [videoLastClassName, setVideoLastClassName] = useState<string | null>(
-    null,
-  );
-  const [videoPanMode, setVideoPanMode] = useState(true);
-  const [videoDrawingTool, setVideoDrawingTool] =
-    useState<DrawingTool>("rectangle");
 
   const [visitedSampleIds, setVisitedSampleIds] = useState<string[]>(() => {
     const cached: string | null = sessionStorage.getItem(projectId);
@@ -82,14 +66,6 @@ export function SampleHistoryProvider({
     popVisitedSampleId,
     SaveOnNavigate,
     setSaveOnNavigate,
-    videoPropagate,
-    setVideoPropagate,
-    videoLastClassName,
-    setVideoLastClassName,
-    videoPanMode,
-    setVideoPanMode,
-    videoDrawingTool,
-    setVideoDrawingTool,
   };
 
   return (

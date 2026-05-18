@@ -12,7 +12,7 @@ import {
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
+import { useVideoUiState } from "@/app/video/components/video-context";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
@@ -32,7 +32,7 @@ function instanceKey(args: { class_name: string; track_id: string }) {
 export function VideoToolbox() {
   const session = useVideoSession();
   const { annotationLabels, dataParams, setDataParams } = useSample();
-  const { videoLastClassName, setVideoLastClassName } = useSampleHistory();
+  const { videoLastClassName, setVideoLastClassName } = useVideoUiState();
   const labels = annotationLabels;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);

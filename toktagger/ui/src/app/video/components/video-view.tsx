@@ -12,8 +12,11 @@ import {
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 import { FrameJumpField } from "@/app/video/components/ui_elements";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
+import {
+  VideoUiStateProvider,
+  useVideoUiState,
+} from "@/app/video/components/video-context";
 import { useParams } from "react-router-dom";
 
 /**
@@ -93,9 +96,17 @@ function VideoFrameAnnotator(props: {
 }
 
 export function VideoProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <VideoUiStateProvider>
+      <VideoProvidersInner>{children}</VideoProvidersInner>
+    </VideoUiStateProvider>
+  );
+}
+
+function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
   const { data, annotations, dataParams } = useSample();
-  const { videoPropagate, setVideoPropagate } = useSampleHistory();
+  const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
     return <>{children}</>;

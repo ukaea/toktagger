@@ -17,7 +17,7 @@ import {
 } from "@annotorious/react";
 
 import type { Annotation, DataParams } from "@/types";
-import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
+import { useVideoUiState } from "@/app/video/components/video-context";
 import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
@@ -181,7 +181,7 @@ export function VideoSessionProvider(props: {
     setVideoPanMode,
     videoDrawingTool,
     setVideoDrawingTool,
-  } = useSampleHistory();
+  } = useVideoUiState();
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
