@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import OpenSeadragon from "openseadragon";
 import {
   OpenSeadragonAnnotator,
@@ -166,6 +166,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const [dismissedPopupAnnotationId, setDismissedPopupAnnotationId] = useState<
     string | null
   >(null);
+  const shiftDrawActiveRef = useRef(false);
   const classItems = useMemo(
     () => annotationLabels.map((label) => ({ name: label.name })),
     [annotationLabels],
@@ -338,26 +339,44 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   };
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return;
-      if (event.altKey || event.ctrlKey || event.metaKey) return;
-      const key = event.key.toLowerCase();
-      if (key !== "e" && key !== "q") return;
-      if (isEditableEventTarget(event.target)) return;
-      if (hideAnnotations) return;
-
-      if (key === "e") {
-        setPanMode(false);
-        setDrawingTool("rectangle");
-        return;
-      }
-
+    const releaseShiftDraw = () => {
+      if (!shiftDrawActiveRef.current) return;
+      shiftDrawActiveRef.current = false;
       setPanMode(true);
     };
 
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Shift") return;
+      if (event.repeat) return;
+      if (shiftDrawActiveRef.current) return;
+      if (isEditableEventTarget(event.target)) return;
+      if (hideAnnotations) return;
+
+      shiftDrawActiveRef.current = true;
+      setPanMode(false);
+      setDrawingTool("rectangle");
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== "Shift") return;
+      releaseShiftDraw();
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) return;
+      releaseShiftDraw();
+    };
+
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", releaseShiftDraw);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", releaseShiftDraw);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [hideAnnotations, setDrawingTool, setPanMode]);
 
