@@ -170,7 +170,11 @@ export default function ToolBar() {
     return null;
   }
 
-  const tools: { name: string; component: React.ReactNode }[] = [];
+  const tools: {
+    name: string;
+    component: React.ReactNode;
+    defaultExpanded?: boolean;
+  }[] = [];
 
   if (data && project.task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
@@ -290,6 +294,7 @@ export default function ToolBar() {
     tools.push({
       name: "Video Tools",
       component: <VideoToolbox />,
+      defaultExpanded: true,
     });
     tools.push({
       name: "Model Prediction",
@@ -361,9 +366,15 @@ export default function ToolBar() {
                 </Header>
               </Flex>
 
-              <Accordion allowsMultipleExpanded={true} width="100%">
-                {tools.map((item, i) => (
-                  <Disclosure key={i}>
+              <Accordion
+                allowsMultipleExpanded={true}
+                defaultExpandedKeys={tools
+                  .filter((item) => item.defaultExpanded)
+                  .map((item) => item.name)}
+                width="100%"
+              >
+                {tools.map((item) => (
+                  <Disclosure key={item.name} id={item.name}>
                     <DisclosureTitle>
                       <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
                     </DisclosureTitle>

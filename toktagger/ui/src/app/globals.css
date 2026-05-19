@@ -24,3 +24,11 @@ body {
 .js-plotly-plot svg {
   display: inline;
 }
+
+.a9s-annotationlayer .a9s-rotation-handle-group,
+.a9s-annotationlayer .a9s-rotation-handle,
+.a9s-annotationlayer .a9s-rotation-handle-line-bg,
+.a9s-annotationlayer .a9s-rotation-handle-line-fg {
+  display: none !important;
+  pointer-events: none !important;
+}
