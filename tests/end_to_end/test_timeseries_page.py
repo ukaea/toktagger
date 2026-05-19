@@ -8,6 +8,7 @@ from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 from typing import Literal, Tuple, Callable
 from tests.end_to_end import form_check
 
+
 def setup_project(page: Page) -> Tuple[str, str, Callable]:
     # Create Project
     project_id = create_project("Test Project", "time-series", "tabular")
@@ -24,11 +25,18 @@ def setup_project(page: Page) -> Tuple[str, str, Callable]:
     # Check time series plot rendered
     expect(page.get_by_label("time-series")).to_be_visible()
 
-    reload = lambda project_id = project_id, sample_id = sample_id: page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    def reload(project_id=project_id, sample_id=sample_id):
+        page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
 
     return (project_id, sample_id, reload)
 
-def add_annotation(page: Page, annotation_type: Literal["TIME REGION", "TIME POINT"], label: str, offset: int = 200):
+
+def add_annotation(
+    page: Page,
+    annotation_type: Literal["TIME REGION", "TIME POINT"],
+    label: str,
+    offset: int = 200,
+):
     # Begin zone tool
     page.get_by_role("button", name="View Mode").click()
     page.locator("body").click()
@@ -53,6 +61,9 @@ def add_annotation(page: Page, annotation_type: Literal["TIME REGION", "TIME POI
 
     page.get_by_role("button", name="Edit Mode").click()
 
+    time.sleep(1)
+
+
 def test_annotation_toolbar(server_setup, page: Page):
     setup_project(page)
 
@@ -67,7 +78,7 @@ def test_annotation_toolbar(server_setup, page: Page):
     # Check edit mode
     page.get_by_role("button", name="View Mode").click()
     expect(page.get_by_label("annotation-context-help")).to_be_visible()
-    
+
     page.locator("body").click()
     expect(page.get_by_role("button", name="Edit Mode")).to_be_enabled()
     expect(page.get_by_role("button", name="TIME REGION")).to_be_enabled()
@@ -77,15 +88,19 @@ def test_annotation_toolbar(server_setup, page: Page):
     expect(page.get_by_test_id("select-annotation-label")).not_to_be_visible()
 
     page.get_by_role("button", name="TIME POINT").click()
-    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute("aria-pressed", "true")
-    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute("aria-pressed", "false")
+    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute(
+        "aria-pressed", "true"
+    )
+    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute(
+        "aria-pressed", "false"
+    )
 
     # Check label selection
     label_selector = page.get_by_test_id("select-annotation-label")
     expect(label_selector).to_be_visible()
     label_selector.click()
 
-    time.sleep(0.1)
+    time.sleep(1)
 
     visible_menu = page.get_by_test_id("popover")
     expect(visible_menu).to_be_visible()
@@ -97,17 +112,19 @@ def test_annotation_toolbar(server_setup, page: Page):
         "Locked Mode",
         "VDE",
         "Control Loss",
-        "Disruption"
+        "Disruption",
     ):
-        expect(
-            visible_menu.get_by_text(item, exact=True)
-        ).to_be_visible()
+        expect(visible_menu.get_by_text(item, exact=True)).to_be_visible()
 
     page.locator("body").click()
 
     page.get_by_role("button", name="TIME REGION").click()
-    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute("aria-pressed", "true")
-    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute("aria-pressed", "false")
+    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute(
+        "aria-pressed", "true"
+    )
+    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute(
+        "aria-pressed", "false"
+    )
 
     # Check label selection
     label_selector = page.get_by_test_id("select-annotation-label")
@@ -132,9 +149,8 @@ def test_annotation_toolbar(server_setup, page: Page):
         "Ramp Up",
         "Ramp Down",
     ):
-        expect(
-            visible_menu.get_by_text(item, exact=True)
-        ).to_be_visible()
+        expect(visible_menu.get_by_text(item, exact=True)).to_be_visible()
+
 
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
 def test_timeseries_add_time_zone(zone_type, server_setup, page: Page):
@@ -168,14 +184,18 @@ def test_timeseries_add_time_zone(zone_type, server_setup, page: Page):
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
 @pytest.mark.parametrize("handle", ["leftHandle", "rightHandle"])
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
-def test_timeseries_drag_time_zone(zone_type, handle, drag_to, server_setup, page: Page):
+def test_timeseries_drag_time_zone(
+    zone_type, handle, drag_to, server_setup, page: Page
+):
     setup_project(page)
 
     add_annotation(page, "TIME REGION", zone_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=zone_type)).to_be_visible()
-    bounds_text = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    bounds_text = (
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    )
     initial_left_position, initial_right_position = map(float, bounds_text.split(" - "))
 
     page.get_by_role("button", name="View Mode").click()
@@ -184,7 +204,9 @@ def test_timeseries_drag_time_zone(zone_type, handle, drag_to, server_setup, pag
     page.get_by_label(f"zone.{handle}").drag_to(page.locator(drag_to))
     time.sleep(0.1)
     # Check values in table correctly updated
-    bounds_text = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    bounds_text = (
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    )
     updated_left_position, updated_right_position = map(float, bounds_text.split(" - "))
 
     if drag_to == ".wdrag":
@@ -210,7 +232,15 @@ def test_timeseries_drag_time_zone(zone_type, handle, drag_to, server_setup, pag
 
 
 @pytest.mark.parametrize(
-    "time_point_type", ["Thermal Quench", "Current Quench", "Locked Mode", "VDE", "Control Loss", "Disruption"]
+    "time_point_type",
+    [
+        "Thermal Quench",
+        "Current Quench",
+        "Locked Mode",
+        "VDE",
+        "Control Loss",
+        "Disruption",
+    ],
 )
 def test_timeseries_add_time_point(server_setup, page: Page, time_point_type: str):
     setup_project(page)
@@ -234,22 +264,36 @@ def test_timeseries_add_time_point(server_setup, page: Page, time_point_type: st
     page.wait_for_timeout(500)
 
     # Check it no longer exists
-    expect(page.get_by_role("gridcell", name=time_point_type, exact=True)).to_have_count(0)
+    expect(
+        page.get_by_role("gridcell", name=time_point_type, exact=True)
+    ).to_have_count(0)
     expect(page.get_by_label("time-point").first).to_have_count(0)
 
 
 @pytest.mark.parametrize(
-    "time_point_type", ["Thermal Quench", "Current Quench", "Locked Mode", "VDE", "Control Loss", "Disruption"]
+    "time_point_type",
+    [
+        "Thermal Quench",
+        "Current Quench",
+        "Locked Mode",
+        "VDE",
+        "Control Loss",
+        "Disruption",
+    ],
 )
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
-def test_timeseries_drag_vspan(drag_to: str, time_point_type: str, server_setup, page: Page):
+def test_timeseries_drag_vspan(
+    drag_to: str, time_point_type: str, server_setup, page: Page
+):
     setup_project(page)
 
     add_annotation(page, "TIME POINT", time_point_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=time_point_type)).to_be_visible()
-    initial_position = float(page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text())
+    initial_position = float(
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    )
 
     page.get_by_role("button", name="View Mode").click()
 
@@ -257,7 +301,9 @@ def test_timeseries_drag_vspan(drag_to: str, time_point_type: str, server_setup,
     page.get_by_label("time-point").drag_to(page.locator(drag_to))
     time.sleep(0.1)
     # Check values in table correctly updated
-    updated_position = float(page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text())
+    updated_position = float(
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    )
 
     if drag_to == ".wdrag":
         # Dragging left, position should have reduced
@@ -274,8 +320,12 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     # Check added to list
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
-    bounds_text = page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
-    time_zone_left_position, time_zone_right_position = map(float, bounds_text.split(" - "))
+    bounds_text = (
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    )
+    time_zone_left_position, time_zone_right_position = map(
+        float, bounds_text.split(" - ")
+    )
 
     page.wait_for_timeout(500)
 
@@ -283,11 +333,15 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     # Check added to list
     expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
-    disruption_position = float(page.get_by_role("row").nth(2).get_by_role("gridcell").nth(2).inner_text())
+    disruption_position = float(
+        page.get_by_role("row").nth(2).get_by_role("gridcell").nth(2).inner_text()
+    )
 
     # Press Save and wait for the PUT request to the server to complete
     with page.expect_response(
-        lambda r: f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
     ):
         page.get_by_role("button", name="Save").click(force=True)
 
@@ -423,7 +477,9 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     # Press Save and wait for the PUT request to the server to complete
     with page.expect_response(
-        lambda r: f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
     ):
         page.get_by_role("button", name="Save").click(force=True)
 
@@ -539,7 +595,9 @@ def test_timeseries_model_predict(
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
-    expect(page.get_by_text("Model training added to job queue!")).to_be_visible(timeout=30000)
+    expect(page.get_by_text("Model training added to job queue!")).to_be_visible(
+        timeout=30000
+    )
 
     # Close modal, check it disappears
     page.get_by_role("button", name="Close", exact=True).click()

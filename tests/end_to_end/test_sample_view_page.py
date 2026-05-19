@@ -48,6 +48,8 @@ def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False
     # Navigate to sample page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}")
 
+    time.sleep(1)
+
     # Check basic structure of page is correct
     check_base_page(page)
 
@@ -72,6 +74,8 @@ def setup_annotations(page: Page, num_annotations: int, go_to_next: bool = False
             page.get_by_test_id("select-annotation-label").click()
             page.get_by_test_id("popover").get_by_text("Disruption").click()
             page.get_by_label("time-series").click(button="left", modifiers=["Control"])
+
+    time.sleep(1)
 
     return page, project_id, sample_ids
 
@@ -432,7 +436,12 @@ def test_save_button(server_setup, page: Page, num_annotations: int):
     sample_id = sample_ids[0]
 
     # Click save
-    page.get_by_role("button", name="Save").click()
+    with page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        page.get_by_role("button", name="Save").click()
 
     # Check 'Saved annotations' text visible
     expect(page.get_by_text(f"Saved {num_annotations} annotations!")).to_be_visible()
@@ -485,10 +494,17 @@ def test_save_on_navigate(
             page.get_by_role("checkbox", name="Save on Navigate")
         ).not_to_be_checked()
 
-    # Go to next/previous sample
-    page.get_by_role("button", name=f"{navigate_direction}").click()
-
-    page.wait_for_timeout(200)
+    # Go to next/previous sample — wait for the save PUT to complete before proceeding
+    if save_on_navigate:
+        with page.expect_response(
+            lambda r: (
+                f"samples/{sample_id}/annotations" in r.url
+                and r.request.method == "PUT"
+            )
+        ):
+            page.get_by_role("button", name=f"{navigate_direction}").click()
+    else:
+        page.get_by_role("button", name=f"{navigate_direction}").click()
 
     # Check if annotations saved
     response = requests.get(
