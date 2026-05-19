@@ -228,7 +228,7 @@ class CSVTimeSeriesLoader(DataLoader):
         
         # Filter to requested signals if specified
         if sample.data.signal_names:
-            df = df[sample_data.signal_names]
+            df = df[sample.data.signal_names]
         
         # Handle missing values
         df = df.fillna(0)
