@@ -66,7 +66,8 @@ The `@LoaderRegistry.register("my_custom_loader")` decorator automatically regis
 If you have added your own data loaders, you must make sure they have been loaded before the server is run. You can run the server from within a Python script by initializing the `Server` class, and running `server.run()`. For example, your script for adding a data loader and running the server may look like this:
 
 ```python
-from toktagger.api.core import DataLoader, LoaderRegistry, Server
+from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
+from toktagger.api.main import Server
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.data import TimeSeriesData
 
