@@ -103,6 +103,12 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
+function isBlockedViewModeKey(event: Event | undefined) {
+  if (!(event instanceof KeyboardEvent)) return false;
+  const key = event.key.toLowerCase();
+  return key === "r" || key === "f";
+}
+
 function findAnnotationAtPointer(
   api: AnnotoriousOpenSeadragonAnnotator,
   event: MouseEvent,
@@ -236,6 +242,22 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       api.viewer.removeHandler("open", onOpen);
     };
   }, [api, dataUrl, setImageNatural]);
+
+  useEffect(() => {
+    if (!api?.viewer || !panMode) return;
+
+    const blockTransformKeys = (event: OpenSeadragon.CanvasKeyEvent) => {
+      if (!isBlockedViewModeKey(event.originalEvent)) return;
+      event.preventDefaultAction = true;
+      event.originalEvent.preventDefault();
+    };
+
+    api.viewer.addHandler("canvas-key", blockTransformKeys);
+
+    return () => {
+      api.viewer.removeHandler("canvas-key", blockTransformKeys);
+    };
+  }, [api, panMode]);
 
   useEffect(() => {
     if (!api) return;
