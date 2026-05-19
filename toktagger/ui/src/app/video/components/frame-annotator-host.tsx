@@ -99,8 +99,13 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
 
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  if (target instanceof HTMLTextAreaElement) return true;
+  if (target instanceof HTMLSelectElement) return true;
+  if (target instanceof HTMLInputElement) {
+    return target.type !== "checkbox" && target.type !== "radio";
+  }
+
+  return false;
 }
 
 function isBlockedViewModeKey(event: Event | undefined) {
