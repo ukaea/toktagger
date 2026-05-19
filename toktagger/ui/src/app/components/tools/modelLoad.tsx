@@ -26,74 +26,15 @@ import {
 import FileWorkflow from "@spectrum-icons/workflow/FileWorkflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import DataAdd from "@spectrum-icons/workflow/DataAdd";
-import DataUpload from "@spectrum-icons/workflow/DataUpload";
-import FullScreenExit from "@spectrum-icons/workflow/FullScreenExit";
 
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
 import {
-  startTraining,
-  getModelWeightsPath,
   startLoadModelWeights,
   getLoadModelStatus,
   getModelTypes,
   getModelLoadTypes,
-  getModelTrainSchema,
 } from "@/app/core";
-import ModelForm from "@/app/components/ui/schemaForm";
-import { RJSFSchema } from "@rjsf/utils";
-import Form from "@rjsf/core";
-
-export function LocalModal({
-  project,
-  selectedModelName,
-}: {
-  project: Project;
-  selectedModelName: string;
-}) {
-  const [loadPath, setLoadPath] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [taskId, setTaskId] = useState<string | null>(null);
-
-  return (
-    <DialogTrigger
-      onOpenChange={(isOpen) => {
-        if (isOpen) {
-          getWeightsPath();
-        }
-      }}
-    >
-      <Button variant="accent">Load</Button>
-
-      {(close) => (
-        <Dialog>
-          <Heading>Import Pretrained Weights File</Heading>
-
-          <Content>
-            <View>
-              <Text>
-                Please move your pretrained weights file to the following
-                location, adding on the correct suffix as expected by your
-                selected model:
-              </Text>
-              <Text marginTop={"size-100"}>
-                <strong>{loadPath}</strong>
-              </Text>
-            </View>
-          </Content>
-          <ButtonGroup>
-            <Button variant="negative" onPress={close}>
-              Cancel
-            </Button>
-            <Button variant="accent" onPress={submitLoadJob}>
-              Verify File
-            </Button>
-          </ButtonGroup>
-        </Dialog>
-      )}
-    </DialogTrigger>
-  );
-}
 
 export function ModelLoadModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -101,23 +42,15 @@ export function ModelLoadModal({ project }: { project: Project }) {
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
     null,
   );
-  const [selectedTab, setSelectedTab] = useState<Key>("train");
+  const [selectedTab, setSelectedTab] = useState<Key | null>(null);
   const [modelNames, setModelNames] = useState<string[] | null>(null);
   const [selectedModelName, setSelectedModelName] = useState<string | null>(
     null,
   );
   const [loadMethods, setLoadMethods] = useState<string[] | null>(null);
-  const [selectedLoadMethod, setSelectedLoadMethod] = useState<string | null>(
-    null,
-  );
   const [weightsPath, setWeightsPath] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [schema, setSchema] = useState<RJSFSchema | null>(null);
-  const [unvalidatedFormData, setUnvalidatedFormData] = useState<
-    Record<string, unknown>
-  >({});
-  const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
     top: 10,
@@ -149,47 +82,53 @@ export function ModelLoadModal({ project }: { project: Project }) {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!taskId || !project._id || !selectedModelName) return;
+    if (!taskId || !project._id || !selectedModelName) return;
 
-      let pollCounter = 0;
-      // Poll for result from GET predictions endpoint
-      const interval = setInterval(async () => {
-        if (selectedModelName == null) {
-          clearInterval(interval);
-          setIsLoading(false);
-          return;
-        }
-        const response = await getLoadModelStatus(
-          project._id,
-          selectedModelName,
-          taskId,
-        );
-        const payload = await response.json();
+    let pollCounter = 0;
+    // Poll for result from GET predictions endpoint
+    const interval = setInterval(async () => {
+      if (selectedModelName == null) {
+        clearInterval(interval);
+        setIsLoading(false);
+        return;
+      }
+      const response = await getLoadModelStatus(
+        project._id,
+        selectedModelName,
+        taskId,
+      );
+      const payload = await response.json();
 
-        if (response.status === 202) {
-          // Load check queued but not done yet, so continue to poll
-          pollCounter += 1;
-        } else if (response.ok && payload === true) {
-          setMessage("Model loaded successfully!");
-          setMessageIcon(
-            <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
-          );
-          clearInterval(interval);
-          setIsLoading(false);
-        } else {
+      if (response.status === 202) {
+        // Load check queued but not done yet, so continue to poll
+        pollCounter += 1;
+        if (pollCounter > 60) {
           setMessage(
-            payload === false ? "Model failed to load!" : payload.detail,
+            "Timed out while loading model - check models tab to see current status.",
           );
           setMessageIcon(
-            <Alert aria-label="Failed" color="negative" size="S" />,
+            <Alert aria-label="Timeout" color="notice" size="S" />,
           );
           clearInterval(interval);
           setIsLoading(false);
         }
-      }, 1000);
-    };
-    fetchData();
+      } else if (response.ok && payload === true) {
+        setMessage("Model loaded successfully!");
+        setMessageIcon(
+          <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
+        );
+        clearInterval(interval);
+        setIsLoading(false);
+      } else {
+        setMessage(
+          payload === false ? "Model failed to load!" : payload.detail,
+        );
+        setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+        clearInterval(interval);
+        setIsLoading(false);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
   }, [project._id, selectedModelName, taskId]);
 
   useEffect(() => {
@@ -212,6 +151,7 @@ export function ModelLoadModal({ project }: { project: Project }) {
         const data = await modelLoadResponse.json();
         const loadMethods = data as string[];
         setLoadMethods(loadMethods);
+        setSelectedTab(loadMethods?.[0] ?? null);
       } else {
         const errorMessage = await modelLoadResponse.json();
         setMessage(errorMessage.detail);
@@ -223,7 +163,7 @@ export function ModelLoadModal({ project }: { project: Project }) {
   return (
     <Provider theme={defaultTheme}>
       <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
-        <ActionButton UNSAFE_style={buttonStyle} aria-label="Create ML Model">
+        <ActionButton UNSAFE_style={buttonStyle} aria-label="Load ML Model">
           <FileWorkflow />
         </ActionButton>
         {(close) => (
@@ -305,8 +245,8 @@ export function ModelLoadModal({ project }: { project: Project }) {
               )}
             </Footer>
             <ButtonGroup>
-              <Button variant="negative" onPress={close}>
-                Cancel
+              <Button variant="secondary" onPress={close}>
+                Close
               </Button>
               <Button
                 variant="accent"

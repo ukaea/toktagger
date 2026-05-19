@@ -28,7 +28,8 @@ type ModelPredictInfo = {
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   // TODO shouldn't need to get data here, see below comment about effectiveDataParams
-  const { annotations, project, dataParams, setAnnotations, data } = useSample();
+  const { annotations, project, dataParams, setAnnotations, data } =
+    useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) => project?.model_types.includes(ann.created_by) || false,
@@ -110,10 +111,10 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
     // and for the sample context dataParams be the source of truth
     let effectiveDataParams = dataParams;
 
-    console.log("HERE 1")
+    console.log("HERE 1");
 
     if (project.task === TaskType.Video) {
-      console.log("HERE 2")
+      console.log("HERE 2");
 
       effectiveDataParams = {
         ...dataParams,
@@ -122,7 +123,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       };
     }
 
-    console.log(effectiveDataParams)
+    console.log(effectiveDataParams);
 
     const response = await startSamplePredictions(
       project_id,
@@ -143,52 +144,50 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!taskId || !selectedModelName || !isEnabled) return;
+    if (!taskId || !selectedModelName || !isEnabled) return;
 
-      let pollCounter = 0;
-      // Poll for result from GET predictions endpoint
-      const interval = setInterval(async () => {
-        if (selectedModelName == null) {
-          clearInterval(interval);
-          setIsLoading(false);
-          return;
-        }
-        const response = await getSamplePredictions(
-          project_id,
-          sample_id,
-          selectedModelName,
-          taskId,
-        );
-        const payload = await response.json();
+    let pollCounter = 0;
+    // Poll for result from GET predictions endpoint
+    const interval = setInterval(async () => {
+      if (selectedModelName == null) {
+        clearInterval(interval);
+        setIsLoading(false);
+        return;
+      }
+      const response = await getSamplePredictions(
+        project_id,
+        sample_id,
+        selectedModelName,
+        taskId,
+      );
+      const payload = await response.json();
 
-        if (response.status === 202) {
-          // Predictions queued but not done yet, so continue to poll
-          pollCounter += 1;
-          if (pollCounter > 30) {
-            setMessage("Failed to retrieve predictions result.");
-            clearInterval(interval);
-            setIsLoading(false);
-          }
-        } else if (response.ok) {
-          setAnnotations((previousAnnotations: Annotations) => {
-            const otherAnnotations = previousAnnotations.filter(
-              (annotation: Annotation) =>
-                annotation.created_by !== selectedModelName,
-            );
-            return otherAnnotations.concat(payload);
-          });
-          clearInterval(interval);
-          setIsLoading(false);
-          setMessage(null);
-        } else {
-          setMessage(payload.detail);
+      if (response.status === 202) {
+        // Predictions queued but not done yet, so continue to poll
+        pollCounter += 1;
+        if (pollCounter > 30) {
+          setMessage("Failed to retrieve predictions result.");
           clearInterval(interval);
           setIsLoading(false);
         }
-      }, 1000);
-    };
-    fetchData();
+      } else if (response.ok) {
+        setAnnotations((previousAnnotations: Annotations) => {
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) =>
+              annotation.created_by !== selectedModelName,
+          );
+          return otherAnnotations.concat(payload);
+        });
+        clearInterval(interval);
+        setIsLoading(false);
+        setMessage(null);
+      } else {
+        setMessage(payload.detail);
+        clearInterval(interval);
+        setIsLoading(false);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
   }, [
     project_id,
     sample_id,
@@ -221,8 +220,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           >
             {modelNames
               ? modelNames.map((model_name) => (
-                <Item key={model_name}>{model_name}</Item>
-              ))
+                  <Item key={model_name}>{model_name}</Item>
+                ))
               : null}
           </ComboBox>
           {schema && (
