@@ -41,7 +41,7 @@ interface SampleContextType {
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
-  setDataParams: (params: DataParams) => void;
+  setDataParams: React.Dispatch<React.SetStateAction<DataParams>>;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
   setIsValidated: (validated: boolean) => void;
@@ -324,6 +324,16 @@ export function SampleProvider({
           if (typeof frame === "number" && Number.isFinite(frame)) {
             bootstrappedVideoSampleIdRef.current = sampleId;
             lastGoodVideoFrameRef.current = frame;
+            setDataParams((prev) => {
+              if (prev.name === "image" && prev.frame === frame) {
+                return prev;
+              }
+              return {
+                ...prev,
+                name: "image",
+                frame,
+              };
+            });
             setVideoFrameBounds((prev) => ({
               ...prev,
               min: prev.min === null ? frame : Math.min(prev.min, frame),
