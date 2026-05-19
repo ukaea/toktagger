@@ -202,8 +202,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           >
             {modelNames
               ? modelNames.map((model_name) => (
-                <Item key={model_name}>{model_name}</Item>
-              ))
+                  <Item key={model_name}>{model_name}</Item>
+                ))
               : null}
           </ComboBox>
           {schema && (
