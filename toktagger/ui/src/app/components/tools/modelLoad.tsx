@@ -19,9 +19,10 @@ import {
   TabList,
   TabPanels,
   Key,
-  View,
   TextField,
   ProgressCircle,
+  TooltipTrigger,
+  Tooltip,
 } from "@adobe/react-spectrum";
 import FileWorkflow from "@spectrum-icons/workflow/FileWorkflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
@@ -51,12 +52,6 @@ export function ModelLoadModal({ project }: { project: Project }) {
   const [weightsPath, setWeightsPath] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const buttonStyle = {
-    position: "fixed",
-    top: 10,
-    right: 50,
-    zIndex: 1000,
-  };
 
   const submitLoadJob = async () => {
     if (!selectedModelName || !selectedTab || !project._id) {
@@ -161,104 +156,105 @@ export function ModelLoadModal({ project }: { project: Project }) {
   }, [modalOpen, project.task]);
 
   return (
-    <Provider theme={defaultTheme}>
-      <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
-        <ActionButton UNSAFE_style={buttonStyle} aria-label="Load ML Model">
+    <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
+      <TooltipTrigger delay={350} placement="bottom">
+        <ActionButton aria-label="Load ML Model">
           <FileWorkflow />
         </ActionButton>
-        {(close) => (
-          <Dialog>
-            <Heading>
-              <Flex alignItems="center" gap="size-100">
-                <FileWorkflow size="S" />
-                <Text>Load Pretrained Model Weights</Text>
-              </Flex>
-            </Heading>
-            <Divider />
-            <Content>
-              <ComboBox
-                label="Select Model Type"
-                selectedKey={selectedModelName}
-                onSelectionChange={(key) =>
-                  setSelectedModelName(key !== null ? String(key) : null)
-                }
+        <Tooltip>{"Load Pretrained Weights"}</Tooltip>
+      </TooltipTrigger>
+      {(close) => (
+        <Dialog>
+          <Heading>
+            <Flex alignItems="center" gap="size-100">
+              <FileWorkflow size="S" />
+              <Text>Load Pretrained Model Weights</Text>
+            </Flex>
+          </Heading>
+          <Divider />
+          <Content>
+            <ComboBox
+              label="Select Model Type"
+              selectedKey={selectedModelName}
+              onSelectionChange={(key) =>
+                setSelectedModelName(key !== null ? String(key) : null)
+              }
+            >
+              {modelNames
+                ? modelNames.map((model_name) => (
+                    <Item key={model_name}>{model_name}</Item>
+                  ))
+                : null}
+            </ComboBox>
+            {loadMethods && (
+              <Tabs
+                aria-label="ML Model Tabs"
+                selectedKey={selectedTab}
+                onSelectionChange={setSelectedTab}
               >
-                {modelNames
-                  ? modelNames.map((model_name) => (
-                      <Item key={model_name}>{model_name}</Item>
-                    ))
-                  : null}
-              </ComboBox>
-              {loadMethods && (
-                <Tabs
-                  aria-label="ML Model Tabs"
-                  selectedKey={selectedTab}
-                  onSelectionChange={setSelectedTab}
-                >
-                  <TabList>
-                    {loadMethods?.includes("local") ? (
-                      <Item key="local">
-                        <DataAdd />
-                        <Text>Use Local File</Text>
-                      </Item>
-                    ) : null}
-                    {loadMethods?.includes("hugging_face") ? (
-                      <Item key="hugging_face">
-                        <DataAdd />
-                        <Text>Download from Hugging Face</Text>
-                      </Item>
-                    ) : null}
-                  </TabList>
-                  <TabPanels>
-                    {loadMethods?.includes("local") ? (
-                      <Item key="local">
-                        <Flex direction="column">
-                          <Text marginTop={"size-100"}>
-                            Specify the path to the weights file to load,
-                            ensuring that the file has the correct permissions
-                            which allow it to be copied.
-                          </Text>
-                          <TextField
-                            marginTop={"size-100"}
-                            width={"100%"}
-                            label="Model Weights Path"
-                            onChange={setWeightsPath}
-                          />
-                        </Flex>
-                      </Item>
-                    ) : null}
-                    {loadMethods?.includes("hugging_face") ? (
-                      <Item key="hugging_face">HI</Item>
-                    ) : null}
-                  </TabPanels>
-                </Tabs>
-              )}
-            </Content>
-            <Footer>
-              {message && (
-                <Text>
-                  {messageIcon} {message}
-                </Text>
-              )}
-              {isLoading && (
-                <ProgressCircle aria-label="Loading…" isIndeterminate />
-              )}
-            </Footer>
-            <ButtonGroup>
-              <Button variant="secondary" onPress={close}>
-                Close
-              </Button>
-              <Button
-                variant="accent"
-                onPress={submitLoadJob}
-                isDisabled={!weightsPath || !selectedModelName}
-              >
-                Submit
-              </Button>
-            </ButtonGroup>
-          </Dialog>
-        )}
-      </DialogTrigger>
-    </Provider>
+                <TabList>
+                  {loadMethods?.includes("local") ? (
+                    <Item key="local">
+                      <DataAdd />
+                      <Text>Use Local File</Text>
+                    </Item>
+                  ) : null}
+                  {loadMethods?.includes("hugging_face") ? (
+                    <Item key="hugging_face">
+                      <DataAdd />
+                      <Text>Download from Hugging Face</Text>
+                    </Item>
+                  ) : null}
+                </TabList>
+                <TabPanels>
+                  {loadMethods?.includes("local") ? (
+                    <Item key="local">
+                      <Flex direction="column">
+                        <Text marginTop={"size-100"}>
+                          Specify the path to the weights file to load, ensuring
+                          that the file has the correct permissions which allow
+                          it to be copied.
+                        </Text>
+                        <TextField
+                          marginTop={"size-100"}
+                          width={"100%"}
+                          label="Model Weights Path"
+                          onChange={setWeightsPath}
+                        />
+                      </Flex>
+                    </Item>
+                  ) : null}
+                  {loadMethods?.includes("hugging_face") ? (
+                    <Item key="hugging_face">HI</Item>
+                  ) : null}
+                </TabPanels>
+              </Tabs>
+            )}
+          </Content>
+          <Footer>
+            {message && (
+              <Text>
+                {messageIcon} {message}
+              </Text>
+            )}
+            {isLoading && (
+              <ProgressCircle aria-label="Loading…" isIndeterminate />
+            )}
+          </Footer>
+          <ButtonGroup>
+            <Button variant="secondary" onPress={close}>
+              Close
+            </Button>
+            <Button
+              variant="accent"
+              onPress={submitLoadJob}
+              isDisabled={!weightsPath || !selectedModelName}
+            >
+              Submit
+            </Button>
+          </ButtonGroup>
+        </Dialog>
+      )}
+    </DialogTrigger>
   );
 }

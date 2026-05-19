@@ -15,6 +15,8 @@ import {
   Footer,
   Heading,
   Text,
+  Tooltip,
+  TooltipTrigger,
 } from "@adobe/react-spectrum";
 import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
@@ -40,12 +42,6 @@ export function ModelTrainModal({ project }: { project: Project }) {
     Record<string, unknown>
   >({});
   const formRef = useRef<Form>(null);
-  const buttonStyle = {
-    position: "fixed",
-    top: 10,
-    right: 90,
-    zIndex: 1000,
-  };
 
   useEffect(() => {
     if (!modalOpen) {
@@ -109,66 +105,67 @@ export function ModelTrainModal({ project }: { project: Project }) {
   };
 
   return (
-    <Provider theme={defaultTheme}>
-      <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
-        <ActionButton UNSAFE_style={buttonStyle} aria-label="Train ML Model">
+    <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
+      <TooltipTrigger delay={350} placement="bottom">
+        <ActionButton aria-label="Train ML Model">
           <WorkflowAdd />
         </ActionButton>
-        {(close) => (
-          <Dialog>
-            <Heading>
-              <Flex alignItems="center" gap="size-100">
-                <WorkflowAdd size="S" />
-                <Text>Train ML Model</Text>
-              </Flex>
-            </Heading>
-            <Divider />
-            <Content>
-              <ComboBox
-                label="Select Model Type"
-                selectedKey={selectedModelName}
-                onSelectionChange={(key) =>
-                  setSelectedModelName(key !== null ? String(key) : null)
-                }
-              >
-                {modelNames
-                  ? modelNames.map((model_name) => (
+        <Tooltip>{"Train Model"}</Tooltip>
+      </TooltipTrigger>
+      {(close) => (
+        <Dialog>
+          <Heading>
+            <Flex alignItems="center" gap="size-100">
+              <WorkflowAdd size="S" />
+              <Text>Train ML Model</Text>
+            </Flex>
+          </Heading>
+          <Divider />
+          <Content>
+            <ComboBox
+              label="Select Model Type"
+              selectedKey={selectedModelName}
+              onSelectionChange={(key) =>
+                setSelectedModelName(key !== null ? String(key) : null)
+              }
+            >
+              {modelNames
+                ? modelNames.map((model_name) => (
                     <Item key={model_name}>{model_name}</Item>
                   ))
-                  : null}
-              </ComboBox>
-              {schema && (
-                <ModelForm
-                  ref={formRef}
-                  schema={schema}
-                  onSubmit={submitTrainJob}
-                  formData={unvalidatedFormData}
-                  setFormData={setUnvalidatedFormData}
-                />
-              )}
-            </Content>
-            <Footer>
-              {message && (
-                <Text>
-                  {messageIcon} {message}
-                </Text>
-              )}
-            </Footer>
-            <ButtonGroup>
-              <Button variant="secondary" onPress={close}>
-                Close
-              </Button>
-              <Button
-                variant="accent"
-                onPress={pressSubmit}
-                isDisabled={!modelNames || !selectedModelName}
-              >
-                Train
-              </Button>
-            </ButtonGroup>
-          </Dialog>
-        )}
-      </DialogTrigger>
-    </Provider>
+                : null}
+            </ComboBox>
+            {schema && (
+              <ModelForm
+                ref={formRef}
+                schema={schema}
+                onSubmit={submitTrainJob}
+                formData={unvalidatedFormData}
+                setFormData={setUnvalidatedFormData}
+              />
+            )}
+          </Content>
+          <Footer>
+            {message && (
+              <Text>
+                {messageIcon} {message}
+              </Text>
+            )}
+          </Footer>
+          <ButtonGroup>
+            <Button variant="secondary" onPress={close}>
+              Close
+            </Button>
+            <Button
+              variant="accent"
+              onPress={pressSubmit}
+              isDisabled={!modelNames || !selectedModelName}
+            >
+              Train
+            </Button>
+          </ButtonGroup>
+        </Dialog>
+      )}
+    </DialogTrigger>
   );
 }

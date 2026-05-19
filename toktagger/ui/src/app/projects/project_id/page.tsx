@@ -23,6 +23,7 @@ import {
   Content,
   ButtonGroup,
   Checkbox,
+  View,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
@@ -34,9 +35,7 @@ import {
 } from "@/app/core";
 import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
-import { ModelTrainModal } from "@/app/components/tools/modelTrain";
-import { ModelLoadModal } from "@/app/components/tools/modelLoad";
-import { ModelPredictModal } from "@/app/components/tools/modelPredict";
+import { ModelToolbar } from "@/app/components/tools/modelToolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
@@ -250,10 +249,10 @@ export default function ProjectView() {
   return (
     <div>
       <SampleBreadCrumbs project={project} />
-      <ModelTrainModal project={project}></ModelTrainModal>
-      <ModelLoadModal project={project}></ModelLoadModal>
-      <ModelPredictModal project={project}></ModelPredictModal>
-      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
+      <div className="relative w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
+        <div className="absolute top-4 right-8">
+          <ModelToolbar project={project} />
+        </div>
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
