@@ -267,7 +267,7 @@ export function CanvasModeToolbar(props: {
   const isEditMode = !props.panMode;
   const modeLabel = isEditMode
     ? "Edit mode. Click to return to view mode."
-    : "View mode. Select annotations or hold Shift to edit temporarily.";
+    : "View mode. Click to enter edit mode, or hold Shift to edit temporarily.";
 
   return (
     <View
@@ -294,6 +294,7 @@ export function CanvasModeToolbar(props: {
           <CanvasModeToggle
             label={modeLabel}
             isSelected={isEditMode}
+            isDisabled={props.hideAnnotations}
             onPress={props.onTogglePanMode}
           >
             <Draw aria-hidden="true" size="S" />
@@ -305,7 +306,6 @@ export function CanvasModeToolbar(props: {
           <CanvasModeToggle
             label="Rectangle"
             isSelected={props.drawingTool === "rectangle"}
-            isDisabled={props.hideAnnotations}
             onPress={props.onSelectRectangle}
           >
             <RectangleIcon />
@@ -313,7 +313,6 @@ export function CanvasModeToolbar(props: {
           <CanvasModeToggle
             label="Polygon"
             isSelected={props.drawingTool === "polygon"}
-            isDisabled={props.hideAnnotations}
             onPress={props.onSelectPolygon}
           >
             <PolygonIcon />

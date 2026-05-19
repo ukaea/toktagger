@@ -251,10 +251,18 @@ export function VideoSessionProvider(props: {
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
   const hideAnnotationsRef = useRef(false);
 
-  const setHideAnnotations = useCallback((v: boolean) => {
-    hideAnnotationsRef.current = v;
-    setHideAnnotationsState(v);
-  }, []);
+  const setHideAnnotations = useCallback(
+    (v: boolean) => {
+      hideAnnotationsRef.current = v;
+      setHideAnnotationsState(v);
+
+      if (v) {
+        setPanModeState(true);
+        setVideoPanMode(true);
+      }
+    },
+    [setVideoPanMode],
+  );
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
