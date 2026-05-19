@@ -25,7 +25,7 @@ import {
   Heading,
   InlineAlert,
   Content,
-  Flex
+  Flex,
 } from "@adobe/react-spectrum";
 import {
   WidgetProps,
@@ -115,7 +115,7 @@ export function SpectrumCheckboxWidget(props: WidgetProps) {
         // means the container width grows to accomodate the text
         // TODO: Need to fix this so it doesnt look weird in predict modal
         <Flex maxWidth={"size-2000"} marginTop={"size-50"}>
-          <span style={{ fontSize: '12px' }}>
+          <span style={{ fontSize: "12px" }}>
             <Text slot="description">
               <em>{schema.description}</em>
             </Text>
@@ -396,7 +396,7 @@ const SpectrumArrayFieldTemplate = ({
         // means the container width grows to accomodate the text
         // TODO: Fix this so it doesnt look weird in predict modal
         <Flex maxWidth={"size-2000"} marginTop={"size-50"}>
-          <span style={{ fontSize: '12px' }}>
+          <span style={{ fontSize: "12px" }}>
             <Text slot="description">
               <em>{schema.description}</em>
             </Text>
