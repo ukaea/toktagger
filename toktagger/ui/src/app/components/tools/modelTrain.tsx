@@ -116,11 +116,7 @@ export function ModelTrainModal({
         <ActionButton isDisabled={!isEnabled} aria-label="Train ML Model">
           <WorkflowAdd />
         </ActionButton>
-        <Tooltip>
-          {isEnabled
-            ? "Train Model"
-            : "Model training disabled - missing server dependencies."}
-        </Tooltip>
+        <Tooltip>"Train Model"</Tooltip>
       </TooltipTrigger>
       {(close) => (
         <Dialog>

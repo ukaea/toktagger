@@ -209,11 +209,7 @@ export function ModelPredictModal({
         >
           <Workflow />
         </ActionButton>
-        <Tooltip>
-          {isEnabled
-            ? "Make Predictions"
-            : "Model predictions disabled: missing server dependencies."}
-        </Tooltip>
+        <Tooltip>"Make Predictions"</Tooltip>
       </TooltipTrigger>
       {(close) => (
         <Dialog>

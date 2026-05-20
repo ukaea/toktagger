@@ -167,11 +167,7 @@ export function ModelLoadModal({
         <ActionButton isDisabled={!isEnabled} aria-label="Load ML Model">
           <FileWorkflow />
         </ActionButton>
-        <Tooltip>
-          {isEnabled
-            ? "Load Pretrained Weights"
-            : "Loading model weights disabled - missing server dependencies."}
-        </Tooltip>
+        <Tooltip>"Load Pretrained Weights"</Tooltip>
       </TooltipTrigger>
       {(close) => (
         <Dialog>

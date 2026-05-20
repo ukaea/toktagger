@@ -24,6 +24,9 @@ import {
   ButtonGroup,
   Checkbox,
   View,
+  ContextualHelp,
+  Footer,
+  Link,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
@@ -279,6 +282,21 @@ function ProjectViewContent() {
                   project={project}
                   isEnabled={modelsEnabled}
                 ></ModelPredictModal>
+                <ContextualHelp placement="bottom end">
+                  <Heading>
+                    {modelsEnabled ? "ML Model Controls" : "ML Models Disabled"}
+                  </Heading>
+                  <Content>
+                    {modelsEnabled
+                      ? "Use these inputs to train / load and make predictions with ML models. You can define custom ML models for your datasets using the TokTagger python module."
+                      : "Model tools are disabled due to missing dependencies on the server."}
+                  </Content>
+                  <Footer>
+                    <Link href="https://ukaea.github.io/toktagger/custom_models/">
+                      Learn more about ML models in TokTagger
+                    </Link>
+                  </Footer>
+                </ContextualHelp>
               </Flex>
             </View>
             <ToastContainer placement="top" />
