@@ -5,11 +5,11 @@ import pytest
 import requests
 import time
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
+from typing import Literal, Tuple, Callable
 from tests.end_to_end import form_check
 
 
-@pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
-def test_timeseries_add_zone(zone_type, server_setup, page: Page):
+def setup_project(page: Page) -> Tuple[str, str, Callable]:
     # Create Project
     project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
@@ -25,17 +25,116 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
     # Check time series plot rendered
     expect(page.get_by_label("time-series")).to_be_visible()
 
-    # Right click on it, check menu renders
-    page.get_by_label("time-series").click(button="right")
+    def reload(project_id=project_id, sample_id=sample_id):
+        page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
 
-    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
-    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
+    return (project_id, sample_id, reload)
 
-    visible_menu = page.locator('[data-testid="zone-submenu"]')
+
+def add_annotation(
+    page: Page,
+    annotation_type: Literal["TIME REGION", "TIME POINT"],
+    label: str,
+    offset: int = 200,
+):
+    # Begin zone tool
+    page.get_by_role("button", name="View Mode").click()
+    page.locator("body").click()
+    page.get_by_role("button", name=annotation_type).click()
+    page.get_by_test_id("select-annotation-label").click()
+    page.get_by_test_id("popover").get_by_text(label).click()
+
+    # Perform drag
+    graph = page.get_by_label("time-series")
+    box = graph.bounding_box()
+    assert box is not None
+
+    start_x = box["x"] + box["width"] / 2
+    start_y = box["y"] + box["height"] / 2
+
+    page.mouse.move(start_x, start_y)
+    page.keyboard.down("Control")
+    page.mouse.down()
+    page.mouse.move(start_x + offset, start_y, steps=20)
+    page.mouse.up()
+    page.keyboard.up("Control")
+
+    page.get_by_role("button", name="Edit Mode").click()
+
+    time.sleep(1)
+
+
+def test_annotation_toolbar(server_setup, page: Page):
+    setup_project(page)
+
+    # Check toolbar is visible
+    expect(page.get_by_test_id("annotation-toolbar")).to_be_visible()
+
+    # Check view mode
+    expect(page.get_by_role("button", name="View Mode")).to_be_enabled()
+    expect(page.get_by_role("button", name="TIME REGION")).to_be_disabled()
+    expect(page.get_by_role("button", name="TIME POINT")).to_be_disabled()
+
+    # Check edit mode
+    page.get_by_role("button", name="View Mode").click()
+    expect(page.get_by_label("annotation-context-help")).to_be_visible()
+
+    page.locator("body").click()
+    expect(page.get_by_role("button", name="Edit Mode")).to_be_enabled()
+    expect(page.get_by_role("button", name="TIME REGION")).to_be_enabled()
+    expect(page.get_by_role("button", name="TIME POINT")).to_be_enabled()
+
+    # Check if label selection is hidden
+    expect(page.get_by_test_id("select-annotation-label")).not_to_be_visible()
+
+    page.get_by_role("button", name="TIME POINT").click()
+    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute(
+        "aria-pressed", "true"
+    )
+    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute(
+        "aria-pressed", "false"
+    )
+
+    # Check label selection
+    label_selector = page.get_by_test_id("select-annotation-label")
+    expect(label_selector).to_be_visible()
+    label_selector.click()
+
+    time.sleep(1)
+
+    visible_menu = page.get_by_test_id("popover")
     expect(visible_menu).to_be_visible()
 
     # Choose Add Time Region, check options load
-    visible_menu.click(force=True)
+    for item in (
+        "Thermal Quench",
+        "Current Quench",
+        "Locked Mode",
+        "VDE",
+        "Control Loss",
+        "Disruption",
+    ):
+        expect(visible_menu.get_by_text(item, exact=True)).to_be_visible()
+
+    page.locator("body").click()
+
+    page.get_by_role("button", name="TIME REGION").click()
+    expect(page.get_by_role("button", name="TIME REGION")).to_have_attribute(
+        "aria-pressed", "true"
+    )
+    expect(page.get_by_role("button", name="TIME POINT")).to_have_attribute(
+        "aria-pressed", "false"
+    )
+
+    # Check label selection
+    label_selector = page.get_by_test_id("select-annotation-label")
+    expect(label_selector).to_be_visible()
+    label_selector.click()
+
+    visible_menu = page.get_by_test_id("popover")
+    expect(visible_menu).to_be_visible()
+
+    # Choose Add Time Region, check options load
     for item in (
         "ELM",
         "L-mode",
@@ -50,84 +149,65 @@ def test_timeseries_add_zone(zone_type, server_setup, page: Page):
         "Ramp Up",
         "Ramp Down",
     ):
-        expect(
-            visible_menu.get_by_role("menuitem", name=item, exact=True)
-        ).to_be_visible()
+        expect(visible_menu.get_by_text(item, exact=True)).to_be_visible()
 
-    # Choose each type, check a new zone is added
-    visible_menu.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
-    expect(page.get_by_label("zone").first).to_be_visible()
+
+@pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
+def test_timeseries_add_time_zone(zone_type, server_setup, page: Page):
+    setup_project(page)
+
+    add_annotation(page, "TIME REGION", zone_type)
 
     # Check added to list
-    expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
+    expect(page.get_by_role("gridcell", name=zone_type)).to_be_visible()
 
     # Wait for a bit for Zone to fully render
     page.wait_for_timeout(500)
 
+    page.get_by_role("button", name="View Mode").click()
+
     # Check you can right click to delete it
-    page.get_by_label("zone").first.click(button="right")
+    page.get_by_label("time-zone").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
     # Wait for a bit for Zone to fully delete
     page.wait_for_timeout(500)
 
+    page.get_by_role("button", name="Edit Mode").click()
+
     # Check it no longer exists
-    expect(page.get_by_role("rowheader", name=zone_type, exact=True)).to_have_count(0)
-    expect(page.get_by_label("zone").first).to_have_count(0)
+    expect(page.get_by_role("gridcell", name=zone_type, exact=True)).to_have_count(0)
+    expect(page.get_by_label("time-zone").first).to_have_count(0)
 
 
 @pytest.mark.parametrize("zone_type", ["Ramp Up", "Flat Top", "Ramp Down"])
 @pytest.mark.parametrize("handle", ["leftHandle", "rightHandle"])
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
-def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+def test_timeseries_drag_time_zone(
+    zone_type, handle, drag_to, server_setup, page: Page
+):
+    setup_project(page)
 
-    sample_id = ids[0]
+    add_annotation(page, "TIME REGION", zone_type)
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Right click on it, check menu renders
-    page.get_by_label("time-series").click(button="right")
-
-    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
-    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
-
-    # Add a new zone
-    page.get_by_role("menuitem", name="Add Time Region").click(force=True)
-
-    # Choose each type, check a new zone is added
-    page.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
-    expect(page.get_by_label("zone").first).to_be_visible()
-
-    # Check added to list, record initial positions
-    expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
-    initial_left_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
-    )
-    initial_right_position = float(
+    # Check added to list
+    expect(page.get_by_role("gridcell", name=zone_type)).to_be_visible()
+    bounds_text = (
         page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
+    initial_left_position, initial_right_position = map(float, bounds_text.split(" - "))
+
+    page.get_by_role("button", name="View Mode").click()
 
     # Click handle, drag to new position
     page.get_by_label(f"zone.{handle}").drag_to(page.locator(drag_to))
     time.sleep(0.1)
     # Check values in table correctly updated
-    updated_left_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
-    )
-    updated_right_position = float(
+    bounds_text = (
         page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
+    updated_left_position, updated_right_position = map(float, bounds_text.split(" - "))
 
     if drag_to == ".wdrag":
         # Dragging left, left position should have reduced
@@ -152,107 +232,77 @@ def test_timeseries_drag_zone(zone_type, handle, drag_to, server_setup, page: Pa
 
 
 @pytest.mark.parametrize(
-    "zone_type", ["Disruption", "Thermal Quench", "Current Quench", "Control Loss"]
+    "time_point_type",
+    [
+        "Thermal Quench",
+        "Current Quench",
+        "Locked Mode",
+        "VDE",
+        "Control Loss",
+        "Disruption",
+    ],
 )
-def test_timeseries_add_vspan(server_setup, page: Page, zone_type: str):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+def test_timeseries_add_time_point(server_setup, page: Page, time_point_type: str):
+    setup_project(page)
 
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Right click on it, check menu renders
-    page.get_by_label("time-series").click(button="right")
-
-    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
-    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
-
-    # Choose Add Time Point
-    page.get_by_role("menuitem", name="Add Time Point").hover(force=True)
-
-    visible_menu = page.locator('[data-testid="vspan-submenu"]')
-    expect(visible_menu).to_be_visible()
-
-    for item in ("Disruption", "Thermal Quench", "Current Quench", "Control Loss"):
-        expect(
-            visible_menu.get_by_role("menuitem", name=item, exact=True)
-        ).to_be_visible()
-
-    # Click each type, check a new Vspan has been added
-    visible_menu.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
-    expect(page.get_by_label("vspan").first).to_be_visible()
+    add_annotation(page, "TIME POINT", time_point_type)
 
     # Check added to list
-    expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
+    expect(page.get_by_role("gridcell", name=time_point_type)).to_be_visible()
 
-    # Wait for a bit for Vspan to fully render
+    # Wait for a bit for Zone to fully render
     page.wait_for_timeout(500)
+
+    page.get_by_role("button", name="View Mode").click()
 
     # Check you can right click to delete it
-    page.get_by_label("vspan").first.click(button="right", force=True)
+    page.get_by_label("time-point").first.click(button="right")
+    expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
-    # Wait for a bit for Vspan to fully delete
+    # Wait for a bit for Zone to fully delete
     page.wait_for_timeout(500)
 
-    # # Check it no longer exists
-    expect(page.get_by_role("rowheader", name=zone_type, exact=True)).to_have_count(0)
-    expect(page.get_by_label("vspan")).to_have_count(0)
+    # Check it no longer exists
+    expect(
+        page.get_by_role("gridcell", name=time_point_type, exact=True)
+    ).to_have_count(0)
+    expect(page.get_by_label("time-point").first).to_have_count(0)
 
 
 @pytest.mark.parametrize(
-    "zone_type", ["Disruption", "Thermal Quench", "Current Quench", "Control Loss"]
+    "time_point_type",
+    [
+        "Thermal Quench",
+        "Current Quench",
+        "Locked Mode",
+        "VDE",
+        "Control Loss",
+        "Disruption",
+    ],
 )
 @pytest.mark.parametrize("drag_to", [".wdrag", ".edrag"])
-def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+def test_timeseries_drag_vspan(
+    drag_to: str, time_point_type: str, server_setup, page: Page
+):
+    setup_project(page)
 
-    sample_id = ids[0]
+    add_annotation(page, "TIME POINT", time_point_type)
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    # Add a new vspan
-    page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Time Point").click(force=True)
-
-    visible_menu = page.locator('[data-testid="vspan-submenu"]')
-    expect(visible_menu).to_be_visible()
-
-    # Click each type, check a new Vspan has been added
-    visible_menu.get_by_role("menuitem", name=zone_type, exact=True).click(force=True)
-    expect(page.get_by_label("vspan").first).to_be_visible()
-
-    # Check added to list, record initial positions
-    expect(page.get_by_role("rowheader", name=zone_type)).to_be_visible()
+    # Check added to list
+    expect(page.get_by_role("gridcell", name=time_point_type)).to_be_visible()
     initial_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
+
+    page.get_by_role("button", name="View Mode").click()
 
     # Click handle, drag to new position
-    page.get_by_label("vspan").drag_to(page.locator(drag_to))
+    page.get_by_label("time-point").drag_to(page.locator(drag_to))
     time.sleep(0.1)
-
     # Check values in table correctly updated
     updated_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
 
     if drag_to == ".wdrag":
@@ -264,69 +314,36 @@ def test_timeseries_drag_vspan(drag_to: str, zone_type: str, server_setup, page:
 
 
 def test_timeseries_save_annotations(server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
+    project_id, sample_id, _reload = setup_project(page)
 
-    sample_id = ids[0]
+    add_annotation(page, "TIME REGION", "Flat Top")
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
-
-    # Check time series plot rendered
-    expect(page.get_by_label("time-series")).to_be_visible()
-
-    page.wait_for_timeout(500)
-
-    # Add a new vspan
-    page.get_by_label("time-series").click(button="right", force=True)
-
-    expect(page.get_by_role("menuitem", name="Add Time Region")).to_be_visible()
-    expect(page.get_by_role("menuitem", name="Add Time Point")).to_be_visible()
-
-    # Choose Add Time Point
-    page.get_by_role("menuitem", name="Add Time Point").hover(force=True)
-
-    expect(page.get_by_role("menuitem", name="Disruption", exact=True)).to_be_visible()
-    page.get_by_role("menuitem", name="Disruption", exact=True).click(force=True)
-
-    expect(page.get_by_label("vspan").first).to_be_visible()
-
-    page.wait_for_timeout(500)
-
-    # Drag to new position on right
-    page.get_by_label("vspan").drag_to(page.locator(".edrag"))
-
-    # Get value of position
-    disruption_position = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
-    )
-
-    # Add a zone
-    page.get_by_label("time-series").click(button="right")
-    page.get_by_role("menuitem", name="Add Time Region").click(force=True)
-    page.get_by_role("menuitem", name="Flat Top", exact=True).click(force=True)
-    expect(page.get_by_label("zone").first).to_be_visible()
-
-    # Click handle, drag to new position
-    page.get_by_label("zone.leftHandle").drag_to(page.locator(".wdrag"))
-
-    # Check added to list, record positions
-    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
-    flattop_left_position = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(1).inner_text()
-    )
-    flattop_right_position = (
+    # Check added to list
+    expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
+    bounds_text = (
         page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
     )
+    time_zone_left_position, time_zone_right_position = map(
+        float, bounds_text.split(" - ")
+    )
 
-    # Press Save
-    page.get_by_role("button", name="Save").click(force=True)
+    page.wait_for_timeout(500)
 
-    time.sleep(1)
+    add_annotation(page, "TIME POINT", "Disruption", -200)
+
+    # Check added to list
+    expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
+    disruption_position = float(
+        page.get_by_role("row").nth(2).get_by_role("gridcell").nth(2).inner_text()
+    )
+
+    # Press Save and wait for the PUT request to the server to complete
+    with page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        page.get_by_role("button", name="Save").click(force=True)
 
     # Check annotation stored in db
     response = requests.get(
@@ -345,24 +362,17 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     disruption_annotation = next(
         ann for ann in annotations if ann["label"] == "Disruption"
     )
-    assert round(disruption_annotation["time"], 6) == float(disruption_position)
+    assert round(disruption_annotation["time"], 4) == float(disruption_position)
     assert disruption_annotation["type"] == "time_point"
 
     flattop_annotation = next(ann for ann in annotations if ann["label"] == "Flat Top")
-    assert round(flattop_annotation["time_min"], 6) == float(flattop_left_position)
-    assert round(flattop_annotation["time_max"], 6) == float(flattop_right_position)
+    assert round(flattop_annotation["time_min"], 4) == float(time_zone_left_position)
+    assert round(flattop_annotation["time_max"], 4) == float(time_zone_right_position)
     assert flattop_annotation["type"] == "time_region"
 
 
 def test_timeseries_load_annotations(server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
-
-    sample_id = ids[0]
+    project_id, sample_id, reload = setup_project(page)
 
     # Create annotations of each type
     rampup = TimeRegion(
@@ -385,47 +395,45 @@ def test_timeseries_load_annotations(server_setup, page: Page):
     )
     assert response.status_code == 200
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    reload()
 
     # One vspan and 3 zones visible
-    expect(page.get_by_label("vspan").first).to_be_visible()
-    expect(page.get_by_label("zone", exact=True)).to_have_count(3)
+    expect(page.get_by_label("time-point").first).to_be_visible()
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(3)
 
     # Check all four entries have correct info in table
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="Disruption")
+        has=page.get_by_role("gridcell", name="Disruption")
     )
-    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == disruption.time
+    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == disruption.time
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="Ramp Up")
+        has=page.get_by_role("gridcell", name="Ramp Up")
     )
-    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == rampup.time_min
-    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == rampup.time_max
+    bounds_text = row.get_by_role("gridcell").nth(2).inner_text()
+    left_position, right_position = map(float, bounds_text.split(" - "))
+    assert float(left_position) == rampup.time_min
+    assert float(right_position) == rampup.time_max
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="Flat Top")
+        has=page.get_by_role("gridcell", name="Flat Top")
     )
-    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == flattop.time_min
-    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == flattop.time_max
+    bounds_text = row.get_by_role("gridcell").nth(2).inner_text()
+    left_position, right_position = map(float, bounds_text.split(" - "))
+    assert float(left_position) == flattop.time_min
+    assert float(right_position) == flattop.time_max
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="Ramp Down")
+        has=page.get_by_role("gridcell", name="Ramp Down")
     )
-    assert float(row.get_by_role("gridcell").nth(1).inner_text()) == rampdown.time_min
-    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == rampdown.time_max
+    bounds_text = row.get_by_role("gridcell").nth(2).inner_text()
+    left_position, right_position = map(float, bounds_text.split(" - "))
+    assert float(left_position) == rampdown.time_min
+    assert float(right_position) == rampdown.time_max
 
 
 def test_timeseries_update_annotations(server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
-
-    sample_id = ids[0]
+    project_id, sample_id, reload = setup_project(page)
 
     # Create annotations of each type
     rampup = TimeRegion(
@@ -442,31 +450,38 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     )
     assert response.status_code == 200
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    reload()
 
     # One vspan and 2 zones visible
-    expect(page.get_by_label("vspan").first).to_be_visible()
-    expect(page.get_by_label("zone", exact=True)).to_have_count(2)
+    expect(page.get_by_label("time-point").first).to_be_visible()
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(2)
+
+    page.get_by_role("button", name="View Mode").click()
+    page.locator("body").click()
 
     # Delete a zone
-    page.get_by_label("zone").first.click(button="right")
+    page.get_by_label("time-zone").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
     # Move the disruption
     # Click handle, drag to new position
-    page.get_by_label("vspan").drag_to(page.locator(".edrag"))
-
-    row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="Disruption")
-    )
-    updated_disruption_time = float(row.get_by_role("gridcell").nth(1).inner_text())
-
-    # Press Save
-    page.get_by_role("button", name="Save").click(force=True)
+    page.get_by_label("time-point").drag_to(page.locator(".edrag"))
 
     time.sleep(1)
+
+    row = page.get_by_role("row").filter(
+        has=page.get_by_role("gridcell", name="Disruption")
+    )
+    updated_disruption_time = float(row.get_by_role("gridcell").nth(2).inner_text())
+
+    # Press Save and wait for the PUT request to the server to complete
+    with page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        page.get_by_role("button", name="Save").click(force=True)
 
     # Check annotation stored in db
     response = requests.get(
@@ -474,6 +489,8 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     )
     assert response.status_code == 200
     annotations = response.json()
+
+    time.sleep(1)
 
     # Check one annotation removed
     assert len(annotations) == 2
@@ -488,21 +505,11 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     disruption_annotation = next(
         ann for ann in annotations if ann["label"] == "Disruption"
     )
-    assert round(disruption_annotation["time"], 6) == updated_disruption_time
+    assert round(disruption_annotation["time"], 4) == updated_disruption_time
 
 
 def test_timeseries_annotator(server_setup, page: Page):
-    # Create Project
-    project_id = create_project("Test Project", "time-series", "tabular")
-    # And a sample for disruption
-    ids = create_local_samples(
-        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
-    )
-
-    sample_id = ids[0]
-
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    setup_project(page)
 
     # Expand find peaks annotator
     expect(page.get_by_role("button", name="Peak Detection")).to_be_visible()
@@ -516,15 +523,15 @@ def test_timeseries_annotator(server_setup, page: Page):
     page.get_by_role("option", name="Ip").click()
 
     # Check that 4 peaks have been identified
-    expect(page.get_by_label("zone", exact=True)).to_have_count(4)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(4)
 
     # Disable tool, these should disappear
     peak_detection.get_by_role("switch", name="Enable Tool").click()
-    expect(page.get_by_label("zone", exact=True)).to_have_count(0)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(0)
 
     # Enable tool, they should reappear
     peak_detection.get_by_role("switch", name="Enable Tool").click()
-    expect(page.get_by_label("zone", exact=True)).to_have_count(4)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(4)
 
     # Change settings in toolbar, check they impact on annotations
     # Here drags min time to 74, so should only have one peak within window
@@ -538,7 +545,7 @@ def test_timeseries_annotator(server_setup, page: Page):
     page.mouse.up()
 
     # Check one annotation present
-    expect(page.get_by_label("zone", exact=True)).to_have_count(1)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
 
 
 @pytest.mark.parametrize(
@@ -588,7 +595,9 @@ def test_timeseries_model_predict(
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
-    expect(page.get_by_text("Model training added to job queue!")).to_be_visible()
+    expect(page.get_by_text("Model training added to job queue!")).to_be_visible(
+        timeout=30000
+    )
 
     # Close modal, check it disappears
     page.get_by_role("button", name="Close", exact=True).click()
@@ -614,6 +623,7 @@ def test_timeseries_model_predict(
     expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
 
     # Check entry is there for newly trained model, wait for it to complete
+    time.sleep(1)
     expect(modal.get_by_role("row").nth(1)).to_contain_text(model_name)
     expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
     if model_name == "mock_params_timeseries_cnn":
@@ -647,38 +657,38 @@ def test_timeseries_model_predict(
     page.get_by_role("button", name="Predict", exact=True).click()
 
     # Should generate a new set of predictions after a short time
-    expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
-    expect(page.get_by_label("zone", exact=True)).to_have_count(2)
+    expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(2)
 
     # Check added to list
-    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
-    expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_visible()
-    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
 
     row = page.get_by_role("row").filter(
-        has=page.get_by_role("rowheader", name="Disruption")
+        has=page.get_by_role("gridcell", name="Disruption")
     )
     if model_name == "mock_params_timeseries_cnn":
         # Check disruption has the value of params.final_score + 1
-        assert float(row.get_by_role("gridcell").nth(1).inner_text()) == 51
+        assert float(row.get_by_role("gridcell").nth(2).inner_text()) == 51
     else:
         # Hardcoded time to 60+1 inside mock model
-        assert float(row.get_by_role("gridcell").nth(1).inner_text()) == 61
+        assert float(row.get_by_role("gridcell").nth(2).inner_text()) == 61
 
     # Disable tool, it should disappear
     model_predict.get_by_role("switch", name="Enable Tool").click()
-    expect(page.get_by_label("vspan", exact=True)).to_have_count(0)
-    expect(page.get_by_label("zone", exact=True)).to_have_count(0)
+    expect(page.get_by_label("time-point", exact=True)).to_have_count(0)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(0)
 
-    expect(page.get_by_role("rowheader", name="Disruption")).to_be_hidden()
-    expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_hidden()
-    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_hidden()
+    expect(page.get_by_role("gridcell", name="Disruption")).to_be_hidden()
+    expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_hidden()
+    expect(page.get_by_role("gridcell", name="Flat Top")).to_be_hidden()
 
     # Enable tool, it should reappear
     model_predict.get_by_role("switch", name="Enable Tool").click()
-    expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
-    expect(page.get_by_label("zone", exact=True)).to_have_count(2)
+    expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(2)
 
-    expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
-    expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_visible()
-    expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
