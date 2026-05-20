@@ -77,17 +77,19 @@ class Model(ABC):
         self.data_loader: DataLoader = data_loader()
         self._trained = False
 
-    def _wrapped_train(
+    @typing.final
+    def wrapped_train(
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
         params: pydantic.BaseModel,
-    ):
+    ) -> float:
         score = self.train(samples=samples, annotations=annotations, params=params)
         self._trained = True
         return score
 
-    def _wrapped_predict(
+    @typing.final
+    def wrapped_predict(
         self,
         samples: list[Sample],
         params: pydantic.BaseModel | None,
@@ -97,12 +99,14 @@ class Model(ABC):
             raise RuntimeError("Cannot make predictions using an untrained model!")
         return self.predict(samples=samples, params=params, data_params=data_params)
 
-    def _wrapped_save(self, file_stem: str):
+    @typing.final
+    def wrapped_save(self, file_stem: str) -> None:
         if not self._trained:
             raise RuntimeError("Cannot save a model before it has been trained!")
         self.save(file_stem=file_stem)
 
-    def _wrapped_load(self, file_path: str):
+    @typing.final
+    def wrapped_load(self, file_path: str) -> None:
         self.load(file_path=file_path)
         self._trained = True
 
@@ -114,7 +118,7 @@ class Model(ABC):
         | None = None,
         progress: float | None = None,
         score: float | None = None,
-    ):
+    ) -> None:
         model_update = ModelUpdate(
             training_status=training_status, progress=progress, score=score
         )
@@ -183,7 +187,7 @@ class Model(ABC):
             )
 
     @abstractmethod
-    def define_model(self):
+    def define_model(self) -> None:
         pass
 
     @abstractmethod
@@ -209,11 +213,11 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def save(self, file_stem: str):
+    def save(self, file_stem: str) -> None:
         pass
 
     @abstractmethod
-    def load(self, file_path: str):
+    def load(self, file_path: str) -> None:
         pass
 
 
