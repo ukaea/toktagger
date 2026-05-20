@@ -36,13 +36,14 @@ import {
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { ModelLoadModal } from "@/app/components/tools/modelLoad";
-
+import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
 import { JumpToNextButton } from "@/app/components/tools/nav";
+import { useServerHealth } from "@/app/contexts/healthContext";
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
   return (
@@ -177,8 +178,8 @@ export default function ProjectView() {
     direction: "ascending",
   });
   const [samples, setSamples] = useState<Sample[]>([]);
-
   const [project, setProject] = useState<Project | null>(null);
+  const { modelsEnabled } = useServerHealth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -263,9 +264,18 @@ export default function ProjectView() {
               zIndex={9999}
             >
               <Flex direction="row" gap={"size-100"}>
-                <ModelTrainModal project={project}></ModelTrainModal>
-                <ModelLoadModal project={project}></ModelLoadModal>
-                <ModelPredictModal project={project}></ModelPredictModal>
+                <ModelTrainModal
+                  project={project}
+                  isEnabled={modelsEnabled}
+                ></ModelTrainModal>
+                <ModelLoadModal
+                  project={project}
+                  isEnabled={modelsEnabled}
+                ></ModelLoadModal>
+                <ModelPredictModal
+                  project={project}
+                  isEnabled={modelsEnabled}
+                ></ModelPredictModal>
               </Flex>
             </View>
             <ToastContainer placement="top" />

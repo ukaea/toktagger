@@ -27,7 +27,13 @@ import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
 
-export function ModelTrainModal({ project }: { project: Project }) {
+export function ModelTrainModal({
+  project,
+  isEnabled,
+}: {
+  project: Project;
+  isEnabled: boolean;
+}) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
@@ -107,10 +113,14 @@ export function ModelTrainModal({ project }: { project: Project }) {
   return (
     <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
       <TooltipTrigger delay={350} placement="bottom">
-        <ActionButton aria-label="Train ML Model">
+        <ActionButton isDisabled={!isEnabled} aria-label="Train ML Model">
           <WorkflowAdd />
         </ActionButton>
-        <Tooltip>{"Train Model"}</Tooltip>
+        <Tooltip>
+          {isEnabled
+            ? "Train Model"
+            : "Model training disabled - missing server dependencies."}
+        </Tooltip>
       </TooltipTrigger>
       {(close) => (
         <Dialog>

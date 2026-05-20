@@ -37,7 +37,13 @@ import {
   getModelLoadTypes,
 } from "@/app/core";
 
-export function ModelLoadModal({ project }: { project: Project }) {
+export function ModelLoadModal({
+  project,
+  isEnabled,
+}: {
+  project: Project;
+  isEnabled: boolean;
+}) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
@@ -158,10 +164,14 @@ export function ModelLoadModal({ project }: { project: Project }) {
   return (
     <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
       <TooltipTrigger delay={350} placement="bottom">
-        <ActionButton aria-label="Load ML Model">
+        <ActionButton isDisabled={!isEnabled} aria-label="Load ML Model">
           <FileWorkflow />
         </ActionButton>
-        <Tooltip>{"Load Pretrained Weights"}</Tooltip>
+        <Tooltip>
+          {isEnabled
+            ? "Load Pretrained Weights"
+            : "Loading model weights disabled - missing server dependencies."}
+        </Tooltip>
       </TooltipTrigger>
       {(close) => (
         <Dialog>
