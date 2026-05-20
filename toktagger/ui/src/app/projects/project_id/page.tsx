@@ -43,7 +43,10 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
 import { JumpToNextButton } from "@/app/components/tools/nav";
-import { useServerHealth } from "@/app/contexts/healthContext";
+import {
+  ServerHealthProvider,
+  useServerHealth,
+} from "@/app/contexts/healthContext";
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
   return (
@@ -165,7 +168,7 @@ const SamplesTable = ({
   );
 };
 
-export default function ProjectView() {
+function ProjectViewContent() {
   const { project_id } = useParams();
   const hasId = project_id !== undefined;
 
@@ -388,5 +391,13 @@ export default function ProjectView() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProjectView() {
+  return (
+    <ServerHealthProvider>
+      <ProjectViewContent />
+    </ServerHealthProvider>
   );
 }

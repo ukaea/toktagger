@@ -9,7 +9,6 @@ from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.data import DataParamTypes, DataParams
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, LoadTypes
 from toktagger.api.models import models_dependencies_installed, check_models_enabled
-from toktagger.api.models.base import ModelRegistry
 from pydantic import ValidationError
 from collections import defaultdict
 
@@ -22,8 +21,6 @@ if models_dependencies_installed():
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Check models are enabled whenever an endpoint is called
 
 
 def validate_model_params(model_type: str, schema_type: str, params: dict):
@@ -52,6 +49,7 @@ def validate_model_params(model_type: str, schema_type: str, params: dict):
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Models"],
+    # Check models are enabled whenever an endpoint is called
     dependencies=[Depends(check_models_enabled)],
 )
 

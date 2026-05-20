@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request, Depends
 from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.models.base import ModelRegistry
 from toktagger.api.schemas.models import LoadTypes
 from toktagger.api.models import models_dependencies_installed, check_models_enabled
 import typing
