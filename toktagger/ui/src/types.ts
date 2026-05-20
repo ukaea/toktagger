@@ -1,15 +1,14 @@
+import { PlotlyHTMLElement } from "plotly.js";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
   project_id: z.string().nullable().default(null),
   sample_id: z.string().nullable().default(null),
-  shot_id: z.number().nullable().default(null),
-  timestamp: z.string().nullable().default(null),
+  shot_id: z.number().optional(),
+  timestamp: z.string().optional(),
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
   created_by: z.string().default("manual"),
-  time_min: z.number().nullable().default(null),
-  time_max: z.number().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -17,12 +16,14 @@ export const BaseAnnotationSchema = z.object({
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 
 export const TimeRegionSchema = BaseAnnotationSchema.extend({
+  type: z.literal("time_region"),
   time_min: z.number(),
   time_max: z.number(),
 });
 export type TimeRegion = z.infer<typeof TimeRegionSchema>;
 
 export const TimePointSchema = BaseAnnotationSchema.extend({
+  type: z.literal("time_point"),
   time: z.number(),
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
@@ -302,9 +303,38 @@ export enum ToolingTypes {
   VSPAN,
 }
 
+export enum TimeSeriesAnnotationType {
+  TIME_POINT = "TIME POINT",
+  TIME_REGION = "TIME REGION",
+}
+
+export type TimeSeriesToolDefinition = {
+  type: TimeSeriesAnnotationType;
+  label: string;
+};
+
+export type TimeSeriesCategory = {
+  label: string;
+  color: string;
+  type: TimeSeriesAnnotationType;
+};
+
+export type TimeSeriesAnnotationPoint = {
+  x: number;
+  y: number;
+};
+
+export type TimeSeriesAnnotation = {
+  id: string;
+  created_by: string;
+  label: string;
+  type: TimeSeriesAnnotationType;
+  points: TimeSeriesAnnotationPoint[];
+  selected: boolean;
+};
+
 export type ToolingCallbacks = {
-  id: ToolingTypes;
-  start: (x: number, y: number) => void;
+  start: (x: number, y: number, label: string) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
 };
@@ -314,3 +344,14 @@ export type PlotProps = {
   numSignificantDigits?: number;
   thresholdActive?: boolean;
 };
+
+type PlotlyAxisTransforms = {
+  p2d: (pixels: number) => number;
+  d2p: (value: number) => number;
+  _tmax: number;
+  _tmin: number;
+  range: [number, number];
+};
+export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
+  _fullLayout: Record<string, PlotlyAxisTransforms>;
+}
