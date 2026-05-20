@@ -13,7 +13,6 @@ import { Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 // import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";
 import ToolBar from "@/app/components/tools/toolbar";
-import { ModelToolbar } from "@/app/components/tools/modelToolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
@@ -101,7 +100,6 @@ function SamplePageContent(props: { sampleId: string }) {
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample} />
-        <ModelToolbar project={project} />
         <Flex>
           <SampleTaskProviders>
             <ToolBar />

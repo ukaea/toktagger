@@ -33,9 +33,12 @@ import {
   deleteSample,
   deleteSamples,
 } from "@/app/core";
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
+import { ModelPredictModal } from "@/app/components/tools/modelPredict";
+import { ModelLoadModal } from "@/app/components/tools/modelLoad";
+
 import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
-import { ModelToolbar } from "@/app/components/tools/modelToolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
@@ -250,10 +253,21 @@ export default function ProjectView() {
     <div>
       <SampleBreadCrumbs project={project} />
       <div className="relative w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
-        <ModelToolbar project={project} />
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
+            <View
+              position="fixed"
+              top="size-100"
+              right="size-100"
+              zIndex={9999}
+            >
+              <Flex direction="row" gap={"size-100"}>
+                <ModelTrainModal project={project}></ModelTrainModal>
+                <ModelLoadModal project={project}></ModelLoadModal>
+                <ModelPredictModal project={project}></ModelPredictModal>
+              </Flex>
+            </View>
             <ToastContainer placement="top" />
             <Flex
               direction="row"
