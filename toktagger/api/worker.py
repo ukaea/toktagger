@@ -55,7 +55,7 @@ def get_actor(project, model):
             pathlib.Path(os.environ["MODEL_STORAGE"]).glob(f"{str(model.id)}*"), None
         )
         if model_path:
-            ml_model._wrapped_load.remote(model_path)
+            ml_model.wrapped_load.remote(model_path)
         else:
             logger.debug("No saved weights found, initializing blank model")
 
@@ -74,7 +74,7 @@ def train_model(
     try:
         logger.info(f"Running model training for project {project.id}")
         model_actor.log_progress.remote(training_status="started", progress=0)
-        train_task = model_actor._wrapped_train.remote(
+        train_task = model_actor.wrapped_train.remote(
             samples=samples, annotations=annotations, params=params
         )
 
@@ -83,7 +83,7 @@ def train_model(
 
         model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
         model_dir.mkdir(exist_ok=True)  # Do i need to do this every time?
-        model_actor._wrapped_save.remote(model_dir.joinpath(str(model.id)))
+        model_actor.wrapped_save.remote(model_dir.joinpath(str(model.id)))
 
         send_model_updates(
             project_id=project.id,
@@ -118,7 +118,7 @@ def get_predictions(
     )
     model_actor = get_actor(project=project, model=model)
 
-    predictions_task = model_actor._wrapped_predict.remote(
+    predictions_task = model_actor.wrapped_predict.remote(
         samples=samples, params=params
     )
     predictions = ray.get(predictions_task)

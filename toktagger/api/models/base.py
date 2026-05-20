@@ -76,7 +76,8 @@ class Model(ABC):
         self.data_loader = data_loader()
         self._trained = False
 
-    def _wrapped_train(
+    @typing.final
+    def wrapped_train(
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
@@ -86,19 +87,22 @@ class Model(ABC):
         self._trained = True
         return score
 
-    def _wrapped_predict(
+    @typing.final
+    def wrapped_predict(
         self, samples: list[Sample], params: pydantic.BaseModel | None
     ) -> list[list[AnnotationBase]]:
         if not self._trained:
             raise RuntimeError("Cannot make predictions using an untrained model!")
         return self.predict(samples=samples, params=params)
 
-    def _wrapped_save(self, file_stem: str):
+    @typing.final
+    def wrapped_save(self, file_stem: str):
         if not self._trained:
             raise RuntimeError("Cannot save a model before it has been trained!")
         self.save(file_stem=file_stem)
 
-    def _wrapped_load(self, file_path: str):
+    @typing.final
+    def wrapped_load(self, file_path: str):
         self.load(file_path=file_path)
         self._trained = True
 
