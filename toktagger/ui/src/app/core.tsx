@@ -384,7 +384,7 @@ export const startSamplePredictions = async (
   sample_id: string,
   selected_model: string,
   params: Record<string, unknown>,
-  data_params: DataParams
+  data_params: DataParams,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,

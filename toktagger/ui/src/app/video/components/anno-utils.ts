@@ -24,11 +24,13 @@ import { classIdForName } from "./types";
  * We store two string bodies on each annotation:
  * - purpose="tagging"     -> class label
  * - purpose="identifying" -> track id
+ * - purpose="creator"     -> backend created_by value
  *
  * These helpers keep the shape consistent and make conversion to/from backend boxes trivial.
  */
 
 type UnknownRecord = Record<string, unknown>;
+const CREATOR_PURPOSE = "creator";
 
 // Our app stores a frame key on target.source (not present in upstream Annotorious types).
 export type VideoImageAnnotation = ImageAnnotation & {
@@ -140,6 +142,28 @@ export function stampLabelAndTrack(
   return { ...a, bodies: bodies2 };
 }
 
+/** Preserve backend creator metadata while annotations pass through Annotorious. */
+export function stampCreator(
+  a: ImageAnnotation,
+  createdBy: string | null | undefined,
+): ImageAnnotation {
+  const creator = createdBy?.trim();
+  if (!creator) return a;
+
+  const bodies = upsertBody(a.bodies, CREATOR_PURPOSE, creator);
+  return { ...a, bodies };
+}
+
+/** Ensure class label, track id, and backend creator bodies exist. */
+function stampLabelTrackAndCreator(
+  a: ImageAnnotation,
+  className: string,
+  trackId: string,
+  createdBy: string | null | undefined,
+): ImageAnnotation {
+  return stampCreator(stampLabelAndTrack(a, className, trackId), createdBy);
+}
+
 /** Read the class label + track id bodies. */
 export function getLabelTrack(a: ImageAnnotation): {
   className: string | null;
@@ -149,6 +173,11 @@ export function getLabelTrack(a: ImageAnnotation): {
     className: getBodyValue(a, "tagging"),
     trackId: getBodyValue(a, "identifying"),
   };
+}
+
+/** Read backend creator metadata, falling back to manual at export time. */
+export function getAnnotationCreator(a: ImageAnnotation): string | null {
+  return getBodyValue(a, CREATOR_PURPOSE);
 }
 
 function newBodyId(): string {
@@ -297,7 +326,7 @@ export function annoToVideoBBox(
     y_min: Math.round(g.y),
     width: Math.round(g.w),
     height: Math.round(g.h),
-    created_by: "manual",
+    created_by: getAnnotationCreator(a) ?? "manual",
   };
 }
 
@@ -326,7 +355,7 @@ export function annoToVideoPolygon(
     label: String(className),
     class_id: classIdForName(className),
     segmentation,
-    created_by: "manual",
+    created_by: getAnnotationCreator(a) ?? "manual",
   };
 }
 
@@ -380,7 +409,12 @@ export function videoBBoxToAnno(
     },
   };
 
-  return stampLabelAndTrack(anno, b.label, String(b.track_id));
+  return stampLabelTrackAndCreator(
+    anno,
+    b.label,
+    String(b.track_id),
+    b.created_by,
+  );
 }
 
 /** Convert backend VideoPolygon -> Annotorious polygon annotation. */
@@ -433,7 +467,12 @@ export function videoPolygonToAnno(
     },
   };
 
-  return stampLabelAndTrack(anno, p.label, String(p.track_id));
+  return stampLabelTrackAndCreator(
+    anno,
+    p.label,
+    String(p.track_id),
+    p.created_by,
+  );
 }
 
 /**
