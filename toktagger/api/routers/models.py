@@ -8,7 +8,7 @@ from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.data import DataParamTypes, DataParams
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, LoadTypes
-from toktagger.api.models import models_dependencies_installed
+from toktagger.api.models import models_dependencies_installed, check_models_enabled
 from toktagger.api.models.base import ModelRegistry
 from pydantic import ValidationError
 from collections import defaultdict
@@ -16,6 +16,7 @@ from collections import defaultdict
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
     from toktagger.api.worker import load_model, train_model, get_predictions
+    from toktagger.api.models.base import ModelRegistry
     import ray
 
 import logging
@@ -23,14 +24,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Check models are enabled whenever an endpoint is called
-
-
-def check_models_enabled():
-    if not models_dependencies_installed():
-        raise HTTPException(
-            status_code=503,
-            detail="ML model features are disabled (optional dependencies missing)",
-        )
 
 
 def validate_model_params(model_type: str, schema_type: str, params: dict):
