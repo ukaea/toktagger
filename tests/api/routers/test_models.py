@@ -617,3 +617,28 @@ async def test_model_load_local(api_client, db_client, setup_model_db):
             .joinpath(tempfile_name)
             .exists()
         )
+
+
+@pytest.mark.asyncio
+async def test_model_load_local_missing_file(api_client, db_client, setup_model_db):
+    # Try loading nonexistent file
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path=non_existant_path.model"
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Weights file not found at specified path!"
+
+
+@pytest.mark.asyncio
+async def test_model_load_local_disabled(api_client, db_client, setup_model_db):
+    # Try loading nonexistent file
+    os.environ["DISABLE_LOCAL_MODEL_LOAD"] = "true"
+    with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:
+        tempf.write("Model Weights")
+        tempf.flush()
+        response = await api_client.post(
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+        )
+    os.environ.pop("DISABLE_LOCAL_MODEL_LOAD")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Loading from local weights is disabled."
