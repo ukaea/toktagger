@@ -286,7 +286,6 @@ export const HealthInfoSchema = z.object({
   version: z.string(),
   db_connected: z.boolean(),
   models_enabled: z.boolean(),
-  testing_mode: z.boolean(),
 });
 export type HealthInfo = z.infer<typeof HealthInfoSchema>;
 

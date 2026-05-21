@@ -6,7 +6,6 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import { useSample } from "@/app/contexts/SampleContext";
 import { BACKEND_API_URL } from "@/app/core";
 import { HealthInfo } from "@/types";
 
