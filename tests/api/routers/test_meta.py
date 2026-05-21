@@ -55,3 +55,30 @@ async def test_get_model_load_methods(api_client, setup_db, local):
         assert data == ["local"]
     else:
         assert data == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
+)
+@pytest.mark.parametrize("method", ["train", "predict"])
+async def test_get_model_schema(api_client, setup_db, model_name, method):
+    response = await api_client.get(f"/meta/models/{model_name}/{method}")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    if model_name == "mock_timeseries_cnn":
+        assert not data
+    else:
+        assert data["title"] == "TimeSeriesCNNParams"
+        assert data["properties"]["final_score"]["type"] == "integer"
+        assert data["properties"]["final_score"]["minimum"] == 50
+        assert data["properties"]["final_score"]["exclusiveMaximum"] == 100
+        assert data["properties"]["test_string"]["type"] == "string"
+        assert data["properties"]["test_bool"]["type"] == "boolean"
+        assert data["properties"]["test_bool"]["default"]  # == True
+        assert data["properties"]["test_selection"]["enum"] == [
+            "selection_1",
+            "selection_2",
+        ]
