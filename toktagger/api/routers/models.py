@@ -449,6 +449,11 @@ async def get_load_model_status(
 
         # Check project ID and model type match those expected by user
         if result["message"]:
+            await utils.update_model(
+                db_client=db_client,
+                model_id=result["model_id"],
+                updates=ModelUpdate(training_status="failed", progress=0),
+            )
             raise HTTPException(
                 detail=f"Load task failed - {result['message']}.",
                 status_code=500,

@@ -589,9 +589,23 @@ async def test_model_load_local(api_client, db_client, setup_model_db):
             f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
         )
         assert response.status_code == 200
-
-        await collect_load_results(api_client, response.json()["task_id"])
         model_id = response.json()["model_id"]
+        task_id = response.json()["task_id"]
+
+        t = 0
+        while t < 30:
+            response = await api_client.get(
+                f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/{task_id}"
+            )
+            if response.status_code == 202:
+                if t >= 30:
+                    raise TimeoutError("Getting load results timed out")
+                time.sleep(1)
+                t += 1
+            elif response.status_code == 200:
+                break
+            else:
+                raise AssertionError(f"Response code {response.status_code} invalid")
 
         model = await db_client.get_document_by_id(
             collection="models", object_id=ObjectId(model_id)
@@ -642,3 +656,60 @@ async def test_model_load_local_disabled(api_client, db_client, setup_model_db):
     os.environ.pop("DISABLE_LOCAL_MODEL_LOAD")
     assert response.status_code == 403
     assert response.json()["detail"] == "Loading from local weights is disabled."
+
+
+@pytest.mark.asyncio
+async def test_model_load_local_failed(api_client, db_client, setup_model_db):
+    # Create tempfile
+    with tempfile.NamedTemporaryFile(suffix=".model") as tempf:
+        # Write invalid bytes which will fail to be read by the model
+        tempf.write(b"\xff")
+        tempf.flush()
+        response = await api_client.post(
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+        )
+        # Successfully submits the load job
+        assert response.status_code == 200
+
+        model_id = response.json()["model_id"]
+        task_id = response.json()["task_id"]
+        # Get results from endpoint polling
+        t = 0
+        while t < 30:
+            response = await api_client.get(
+                f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/{task_id}"
+            )
+            if response.status_code == 202:
+                if t >= 30:
+                    raise TimeoutError("Getting load results timed out")
+                time.sleep(1)
+                t += 1
+            elif response.status_code == 500:
+                break
+            else:
+                raise AssertionError(f"Response code {response.status_code} invalid")
+
+        # Check message is as expected
+        assert "Load task failed - Failed to load weights" in response.json()["detail"]
+
+        model = await db_client.get_document_by_id(
+            collection="models", object_id=ObjectId(model_id)
+        )
+
+        # Check model has been set to failed
+        assert model["training_status"] == "failed"
+
+        # Check model has not been saved after completion
+        assert (
+            not pathlib.Path(os.environ["MODEL_STORAGE"])
+            .joinpath(f"{model_id}.model")
+            .exists()
+        )
+
+        # Check no file remains in the cache with same name as original file
+        tempfile_name = pathlib.Path(tempf.name).name
+        assert (
+            not pathlib.Path(os.environ["MODEL_STORAGE"])
+            .joinpath(tempfile_name)
+            .exists()
+        )

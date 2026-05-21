@@ -112,6 +112,7 @@ def load_model(
             model_id=model.id,
             updates=ModelUpdate(training_status="failed"),
         )
+        temp_weights_path.unlink()
         return {
             "project_id": project.id,
             "model_id": model.id,
