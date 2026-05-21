@@ -50,9 +50,10 @@ class MockDisruptionCNN(Model):
         ]
 
     def save(self, file_stem: str):
-        pathlib.Path(file_stem).with_suffix(".model").touch()
+        pathlib.Path(file_stem).with_suffix(".model").write_text(self.model)
 
     def load(self, file_path):
+        self.model = pathlib.Path(file_path).read_text()
         pass
 
 

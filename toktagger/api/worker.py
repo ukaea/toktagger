@@ -80,10 +80,11 @@ def load_model(
             model_id=model.id,
             updates=ModelUpdate(training_status="failed"),
         )
-        return (
-            model.id,
-            f"Worker node cannot find weights file at location {weights_path}",
-        )
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": f"Worker node cannot find weights file at location {weights_path}",
+        }
     try:
         shutil.copy(weights_path, temp_weights_path)
     except PermissionError as e:
@@ -93,15 +94,16 @@ def load_model(
             model_id=model.id,
             updates=ModelUpdate(training_status="failed"),
         )
-        return (
-            model.id,
-            "TokTagger does not have the required permissions to copy the weights file!",
-        )
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": "TokTagger does not have the required permissions to copy the weights file!",
+        }
 
     model_actor = get_actor(project=project, model=model)
     # Try loading actor with weights file, catch and reraise any errors
     try:
-        load_temp_weights_task = model_actor._wrapped_load.remote(str(weights_path))
+        load_temp_weights_task = model_actor.wrapped_load.remote(str(weights_path))
         ray.get(load_temp_weights_task)
     except Exception as e:
         logger.error(e)
@@ -110,17 +112,21 @@ def load_model(
             model_id=model.id,
             updates=ModelUpdate(training_status="failed"),
         )
-        return model.id, f"Failed to load weights - {str(e)}"
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": f"Failed to load weights - {str(e)}",
+        }
 
     # Save the model with the correct file name, delete temporary file
-    save_weights_task = model_actor._wrapped_save.remote(
+    save_weights_task = model_actor.wrapped_save.remote(
         model_dir.joinpath(str(model.id))
     )
     ray.get(save_weights_task)
 
     temp_weights_path.unlink()
 
-    return model.id, None
+    return {"project_id": project.id, "model_id": model.id, "message": None}
 
 
 @ray.remote

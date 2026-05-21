@@ -12,6 +12,7 @@ from unittest.mock import patch
 from bson import ObjectId
 import os
 import time
+import tempfile
 
 
 def wait_for_results(task_registry: ActorRegistry, task_id: str):
@@ -36,6 +37,16 @@ async def collect_train_results(api_client, task_id):
     update = ModelUpdate(
         training_status="completed", progress=100, score=results["score"]
     )
+    with patch("requests.put", api_client.put):
+        response = await send_model_updates(
+            results["project_id"], results["model_id"], update
+        )
+        assert response.status_code == 200
+
+
+async def collect_load_results(api_client, task_id):
+    results = wait_for_results(api_client.app.state.task_registry, task_id)
+    update = ModelUpdate(training_status="completed", progress=100)
     with patch("requests.put", api_client.put):
         response = await send_model_updates(
             results["project_id"], results["model_id"], update
@@ -566,3 +577,43 @@ async def test_model_delete_no_predictions(api_client, db_client, setup_model_db
     )
     annotations = await db_client.get_all_documents(collection="annotations")
     assert len(annotations) == 10
+
+
+@pytest.mark.asyncio
+async def test_model_load_local(api_client, db_client, setup_model_db):
+    # Create tempfile
+    with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:
+        tempf.write("Model Weights")
+        tempf.flush()
+        response = await api_client.post(
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+        )
+        assert response.status_code == 200
+
+        await collect_load_results(api_client, response.json()["task_id"])
+        model_id = response.json()["model_id"]
+
+        model = await db_client.get_document_by_id(
+            collection="models", object_id=ObjectId(model_id)
+        )
+
+        # Check model has been set to completed, with 100% completion
+        assert model["training_status"] == "completed"
+        assert model["progress"] == 100
+
+        # Check model has been saved after completion
+        model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+            f"{model_id}.model"
+        )
+        assert model_path.exists()
+
+        # Open the file, check contents are there
+        assert model_path.read_text() == "Model Weights"
+
+        # Check no file remains in the cache with same name as original file
+        tempfile_name = pathlib.Path(tempf.name).name
+        assert (
+            not pathlib.Path(os.environ["MODEL_STORAGE"])
+            .joinpath(tempfile_name)
+            .exists()
+        )

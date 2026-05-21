@@ -396,7 +396,7 @@ async def load_model_weights(
         task_id = task_registry.register(task)
         task_registry.update_actors(model.id)
 
-        return {"task_id": task_id}
+        return {"task_id": task_id, "model_id": model.id}
     else:
         raise HTTPException(
             status_code=501, detail=f"Loading method {method} not implemented!"
@@ -434,12 +434,12 @@ async def get_load_model_status(
         )
     elif ready:
         try:
-            result: tuple[str, str] = ray.get(task)
-            model_id, error_msg = result
+            result: dict[str, str | None] = ray.get(task)
+
         except Exception as e:
             await utils.update_model(
                 db_client=db_client,
-                model_id=model_id,
+                model_id=result["model_id"],
                 updates=ModelUpdate(training_status="failed", progress=0),
             )
             raise HTTPException(
@@ -448,16 +448,16 @@ async def get_load_model_status(
             )
 
         # Check project ID and model type match those expected by user
-        if error_msg:
+        if result["message"]:
             raise HTTPException(
-                detail=f"Load task failed - {error_msg}.",
+                detail=f"Load task failed - {result['message']}.",
                 status_code=500,
             )
 
         # Update model to be completed and ready for predictions
         await utils.update_model(
             db_client=db_client,
-            model_id=model_id,
+            model_id=result["model_id"],
             updates=ModelUpdate(training_status="completed", progress=100),
         )
 
