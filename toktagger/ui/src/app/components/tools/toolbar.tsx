@@ -16,6 +16,7 @@ import {
   InlineAlert,
 } from "@adobe/react-spectrum";
 import {
+  ModelSchema,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
   SpectrogramData,
@@ -38,6 +39,7 @@ import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import SpectrogramThresholdTool from "../annotators/thresholding";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
+import { useServerHealth } from "@/app/contexts/healthContext";
 
 type AmplitudeSliderInfo = {
   data: SpectrogramData;
@@ -157,6 +159,8 @@ export default function ToolBar() {
     isValidated,
   } = useSample();
 
+  const { modelsEnabled } = useServerHealth();
+
   if (!project || !sample) {
     console.warn("Project or sample not found in ToolBar");
     return null;
@@ -230,16 +234,6 @@ export default function ToolBar() {
         ></JumpDetectionTool>
       ),
     });
-
-    tools.push({
-      name: "Model Prediction",
-      component: (
-        <ModelPredictTool
-          project_id={project_id}
-          sample_id={sample_id}
-        ></ModelPredictTool>
-      ),
-    });
   } else if (data && project.task == TaskType.Spectrogram) {
     const resultSpec = SpectrogramDataSchema.safeParse(data);
     if (!resultSpec.success) {
@@ -291,6 +285,8 @@ export default function ToolBar() {
       name: "Video Tools",
       component: <VideoToolbox />,
     });
+  }
+  if (modelsEnabled) {
     tools.push({
       name: "Model Prediction",
       component: (

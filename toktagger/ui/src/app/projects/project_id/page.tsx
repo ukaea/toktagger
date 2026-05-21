@@ -39,7 +39,6 @@ import {
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { ModelLoadModal } from "@/app/components/tools/modelLoad";
-import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
 import { useHref, useNavigate, useParams } from "react-router-dom";
@@ -279,13 +278,13 @@ export default function ProjectView() {
                   project={project}
                   isEnabled={modelsEnabled}
                 ></ModelPredictModal>
-                <ContextualHelp placement="bottom end">
+                <ContextualHelp placement="top end">
                   <Heading>
                     {modelsEnabled ? "ML Model Controls" : "ML Models Disabled"}
                   </Heading>
                   <Content>
                     {modelsEnabled
-                      ? "Use these inputs to train / load and make predictions with ML models. You can define custom ML models for your datasets using the TokTagger python module."
+                      ? "Use these inputs to train / load and make predictions with Machine Learning models. You can define custom ML models for your datasets using the TokTagger Python module."
                       : "Model tools are disabled due to missing dependencies on the server."}
                   </Content>
                   <Footer>
