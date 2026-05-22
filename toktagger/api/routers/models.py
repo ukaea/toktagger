@@ -93,7 +93,9 @@ async def get_model(
     ),
 ) -> Model:
     db_client = request.app.state.db_client
-    model = await utils.get_model(db_client, project_id, model_type, version)
+    model = await utils.get_model(
+        db_client, project_id=project_id, model_type=model_type, version=version
+    )
     return model
 
 
@@ -113,7 +115,9 @@ async def delete_models(
 
     if version:
         models_to_delete = [
-            await utils.get_model(db_client, project_id, model_type, version)
+            await utils.get_model(
+                db_client, project_id=project_id, model_type=model_type, version=version
+            )
         ]
     else:
         models_to_delete = await utils.get_models(db_client, project_id, model_type)
@@ -144,7 +148,9 @@ async def get_training_info(
 ) -> Model:
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
-    latest_model = await utils.get_model(db_client, project_id, model_type)
+    latest_model = await utils.get_model(
+        db_client, project_id=project_id, model_type=model_type
+    )
     if latest_model.training_status not in ("queued", "started"):
         raise HTTPException(
             status_code=404, detail=f"No training in progress for {model_type}"
@@ -271,7 +277,7 @@ async def stop_model_training(
     # If version provided, get only that model
     if version:
         model = await utils.get_model(
-            db_client, project_id, model_type, version=version
+            db_client, project_id, model_type=model_type, version=version
         )
         if model.training_status not in ("started", "queued"):
             raise HTTPException(
@@ -387,7 +393,7 @@ async def load_model_weights(
 
         # Find the latest queued model for this project
         model = await utils.get_model(
-            db_client, project.id, model_type, model_id=model_id
+            db_client, project.id, model_type=model_type, model_id=model_id
         )
 
         task = load_model.remote(
@@ -507,7 +513,11 @@ async def predict(
 
     # Find the latest created model for this project
     model = await utils.get_model(
-        db_client, project_id, model_type, status="completed", version=version
+        db_client,
+        project_id,
+        model_type=model_type,
+        status="completed",
+        version=version,
     )
     if model.training_status != "completed":
         raise HTTPException(
@@ -611,7 +621,9 @@ async def create_sample_predictions(
         )
 
     # Find the latest created model for this project
-    model = await utils.get_model(db_client, project.id, model_type, status="completed")
+    model = await utils.get_model(
+        db_client, project_id=project.id, model_type=model_type, status="completed"
+    )
 
     # Get model params model from registry and validate
     params_validated = validate_model_params(model_type, "prediction", params)

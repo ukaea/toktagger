@@ -148,11 +148,11 @@ async def get_model(
     db_client: MongoDBClient,
     project_id: str,
     model_type: str,
-    model_id: str = None,
     version: int = None,
     status: Optional[
         Literal["queued", "started", "failed", "completed", "aborted"]
     ] = None,
+    model_id: str = None,
 ) -> Model:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id, "type": model_type}
