@@ -16,7 +16,6 @@ import {
   InlineAlert,
 } from "@adobe/react-spectrum";
 import {
-  ModelSchema,
   MultiVariateTimeSeriesDataSchema,
   PlotProps,
   SpectrogramData,

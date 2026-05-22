@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Provider,
-  defaultTheme,
   ComboBox,
   Item,
   Flex,
