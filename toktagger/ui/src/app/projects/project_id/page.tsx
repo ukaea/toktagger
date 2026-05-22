@@ -278,7 +278,7 @@ export default function ProjectView() {
                   project={project}
                   isEnabled={modelsEnabled}
                 ></ModelPredictModal>
-                <ContextualHelp placement="top end">
+                <ContextualHelp placement="top end" aria-label="ML Model Help">
                   <Heading>
                     {modelsEnabled ? "ML Model Controls" : "ML Models Disabled"}
                   </Heading>

@@ -696,3 +696,11 @@ def test_timeseries_model_predict(
     expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
+
+
+@pytest.mark.models_disabled
+def test_timeseries_models_disabled(server_setup, page: Page):
+    setup_project(page)
+
+    # Check model prediction tool is not visible
+    expect(page.get_by_role("button", name="Model Prediction")).to_be_hidden()

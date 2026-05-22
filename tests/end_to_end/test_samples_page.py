@@ -44,6 +44,7 @@ def check_base_page(page):
     ).to_be_visible()
     expect(page.get_by_role("button", name="Train ML Model")).to_be_visible()
     expect(page.get_by_role("button", name="Load ML Model")).to_be_visible()
+    expect(page.get_by_role("button", name="ML Model Help")).to_be_visible()
 
     # Expect searchbar visible
     expect(page.get_by_role("searchbox", name="Search By Shot ID")).to_be_visible()
@@ -1157,3 +1158,27 @@ def test_model_load_predict(server_setup, setup_model_samples, page: Page):
         assert all(
             ann["time"] == 51 for ann in annotations if ann["label"] == "Disruption"
         )
+
+
+@pytest.mark.models_disabled
+def test_models_disabled(server_setup, page: Page):
+    project_id = create_project("Test Project", "time-series", "tabular")
+
+    # Navigate to projects page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Check model buttons disabled
+    expect(
+        page.get_by_role("button", name="Create Predictions from ML Model")
+    ).to_be_disabled()
+    expect(page.get_by_role("button", name="Train ML Model")).to_be_disabled()
+    expect(page.get_by_role("button", name="Load ML Model")).to_be_disabled()
+
+    # Open contextual help, check it contains correct info
+    expect(page.get_by_role("button", name="ML Model Help")).to_be_visible()
+    page.get_by_role("button", name="ML Model Help").click()
+
+    expect(page.get_by_text("ML Models Disabled")).to_be_visible()
