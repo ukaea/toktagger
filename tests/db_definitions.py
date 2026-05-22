@@ -14,7 +14,15 @@ from toktagger.api.schemas.annotations import (
 import importlib
 
 if importlib.util.find_spec("ray") is not None:
-    pass
+    from tests.models_definitions import (
+        MockDisruptionCNN as MockDisruptionCNN,
+        MockParamsTimeSeriesCNN as MockParamsTimeSeriesCNN,
+        MockTimeSeriesCNN as MockTimeSeriesCNN,
+        MODEL_1 as MODEL_1,
+        MODEL_2 as MODEL_2,
+        MODEL_3 as MODEL_3,
+        MODEL_4 as MODEL_4,
+    )
 
 
 # Define some common things to add to db

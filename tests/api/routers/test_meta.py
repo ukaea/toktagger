@@ -88,7 +88,7 @@ async def test_get_model_schema(api_client, setup_db, model_name, method):
 
 
 @pytest.mark.asyncio
-@pytest.mark.models_enabled
+@pytest.mark.models_disabled
 @pytest.mark.parametrize("task", ["time-series", "video"])
 async def test_get_model_types_disabled(api_client, setup_db, task):
     response = await api_client.get(f"/meta/models?task={task}")
