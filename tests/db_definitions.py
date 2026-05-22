@@ -25,7 +25,7 @@ import typing
 @ModelRegistry.register("mock_disruption_cnn", ["time-series"])
 class MockDisruptionCNN(Model):
     def define_model(self):
-        return None
+        return "Model Trained"
 
     def train(self, samples, annotations, *args, **kwargs):
         self.log_progress(
@@ -59,7 +59,7 @@ class MockDisruptionCNN(Model):
 
 class TimeSeriesCNN(Model):
     def define_model(self):
-        return None
+        return "Model Trained"
 
     def train(self, samples, annotations, params=None):
         self.log_progress(
