@@ -1,4 +1,7 @@
 import pytest
+
+pytest.importorskip("ray")
+
 import pathlib
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models.base import ActorRegistry
@@ -52,6 +55,7 @@ def kill(*args, **kwargs):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_num_predictions(
     api_client, db_client, setup_model_db
 ):
@@ -73,6 +77,7 @@ async def test_model_batch_predict_num_predictions(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_num_predictions_params(
     api_client, db_client, setup_model_db
 ):
@@ -102,6 +107,7 @@ async def test_model_batch_predict_num_predictions_params(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
     query_string = "&".join(
         f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
@@ -128,6 +134,7 @@ async def test_model_batch_predict_samples(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_version(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
@@ -146,6 +153,7 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_predict_missing_weights(api_client, db_client, setup_model_db):
     # Delete weights
     pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
@@ -160,6 +168,7 @@ async def test_model_predict_missing_weights(api_client, db_client, setup_model_
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_sample_predict_params(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_params_timeseries_cnn/predict",
@@ -190,6 +199,7 @@ async def test_model_sample_predict_params(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_sample_predict(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
@@ -211,6 +221,7 @@ async def test_model_sample_predict(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_get_sample_prediction(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
@@ -240,6 +251,7 @@ async def test_model_get_sample_prediction(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_get_sample_prediction_invalid_task(
     api_client, db_client, setup_model_db
 ):
@@ -254,6 +266,7 @@ async def test_model_get_sample_prediction_invalid_task(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_get_sample_prediction_wrong_sample(
     api_client, db_client, setup_model_db
 ):
@@ -289,6 +302,7 @@ def mock_wait(*args, **kwargs):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @patch("ray.wait", mock_wait)
 async def test_model_get_sample_prediction_in_progress(
     api_client, db_client, setup_model_db
@@ -310,6 +324,7 @@ async def test_model_get_sample_prediction_in_progress(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_update(api_client, db_client, setup_model_db):
     model_updates = ModelUpdate(training_status="started", progress=50, score=20)
     response = await api_client.put(
@@ -328,6 +343,7 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_start_training_no_params(api_client, db_client, setup_model_db):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
@@ -352,6 +368,7 @@ async def test_model_start_training_no_params(api_client, db_client, setup_model
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("method", ["train", "predict", "sample"])
 async def test_model_wrong_params(api_client, db_client, setup_model_db, method):
     if method == "sample":
@@ -381,6 +398,7 @@ async def test_model_wrong_params(api_client, db_client, setup_model_db, method)
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("method", ["train", "predict", "sample"])
 async def test_model_missing_params(api_client, db_client, setup_model_db, method):
     if method == "sample":
@@ -401,6 +419,7 @@ async def test_model_missing_params(api_client, db_client, setup_model_db, metho
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_start_training_params(api_client, db_client, setup_model_db):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
@@ -434,6 +453,7 @@ async def test_model_start_training_params(api_client, db_client, setup_model_db
 
 # Test delete model
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_type(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn"
@@ -472,6 +492,7 @@ async def test_model_delete_type(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
@@ -507,6 +528,7 @@ async def test_model_delete_type_version(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @patch("ray.cancel")
 async def test_model_stop_training(mock_func, api_client, db_client, setup_model_db):
     response = await api_client.delete(
@@ -528,6 +550,7 @@ async def test_model_stop_training(mock_func, api_client, db_client, setup_model
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @patch("ray.kill")
 async def test_model_stop_training_not_in_progress(
     mock_func, api_client, db_client, setup_model_db
@@ -548,6 +571,7 @@ async def test_model_stop_training_not_in_progress(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_predictions(api_client, db_client, setup_model_db):
     await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict"
@@ -560,6 +584,7 @@ async def test_model_delete_predictions(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_no_predictions(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
@@ -576,6 +601,7 @@ async def test_model_delete_no_predictions(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_load_local(api_client, db_client, setup_model_db):
     # Create tempfile
     with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:
@@ -630,6 +656,7 @@ async def test_model_load_local(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_load_local_missing_file(api_client, db_client, setup_model_db):
     # Try loading nonexistent file
     response = await api_client.post(
@@ -655,6 +682,7 @@ async def test_model_load_local_disabled(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_load_local_failed(api_client, db_client, setup_model_db):
     # Create tempfile
     with tempfile.NamedTemporaryFile(suffix=".model") as tempf:

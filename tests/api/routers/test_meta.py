@@ -21,6 +21,7 @@ async def test_get_data_schema(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("task", ["time-series", "video"])
 async def test_get_model_types(api_client, setup_db, task):
     response = await api_client.get(f"/meta/models?task={task}")
@@ -42,6 +43,7 @@ async def test_get_model_types(api_client, setup_db, task):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("local", [True, False])
 async def test_get_model_load_methods(api_client, setup_db, local):
     if not local:
@@ -58,6 +60,7 @@ async def test_get_model_load_methods(api_client, setup_db, local):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize(
     "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
 )

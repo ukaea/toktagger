@@ -875,6 +875,7 @@ def test_samples_page_export_annotations(server_setup, page: Page):
     assert exported_control_loss["sample_id"] == sample_ids[1]
 
 
+@pytest.mark.models_enabled
 @pytest.mark.parametrize(
     "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
 )
@@ -886,6 +887,8 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
 
     # Check basic structure of page is correct
     check_base_page(page)
+
+    # Check contextual help explains models buttons
 
     # Click on model train modal
     page.get_by_role("button", name="Train ML Model").click()
@@ -1003,6 +1006,7 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
         )
 
 
+@pytest.mark.models_enabled
 def test_model_load_predict(server_setup, setup_model_samples, page: Page):
     project_id, sample_ids = create_model_samples(setup_model_samples)
     with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:

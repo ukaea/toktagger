@@ -84,7 +84,7 @@ jobs:
         run: npx prettier --check .
 
   test:
-    name: Pytest
+    name: Pytest (Models Disabled)
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -104,11 +104,38 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Install dependencies (with dev extras)
-        run: uv sync --all-extras
+      - name: Install playwright
+        run: uv run --group dev python -m playwright install --with-deps
+
+      - name: Run unit tests
+        run: uv run --group dev pytest tests/api
+
+      - name: Run end to end tests
+        run: uv run --group dev pytest tests/end_to_end
+
+  test:
+    name: Pytest (Models Enabled)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
 
       - name: Install playwright
-        run: uv run python -m playwright install --with-deps
+        run: uv run --all-extras python -m playwright install --with-deps
 
       - name: Run unit tests
         run: uv run --all-extras pytest tests/api

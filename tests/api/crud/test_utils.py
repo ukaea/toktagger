@@ -346,64 +346,6 @@ async def test_import_annotations_sample_not_found(db_client, setup_db):
 
 
 @pytest.mark.asyncio
-async def test_get_models(db_client, setup_db):
-    models = await utils.get_models(db_client, project_id=setup_db["project_id_1"])
-    # Check three models returned
-    assert len(models) == 3
-    # Check returned in correct order - reverse order of created
-    assert [model.version for model in models] == [3, 2, 1]
-
-
-@pytest.mark.asyncio
-async def test_get_models_by_type(db_client, setup_db):
-    models = await utils.get_models(
-        db_client, project_id=setup_db["project_id_1"], model_type="mock_disruption_cnn"
-    )
-    # Check two models returned
-    assert len(models) == 2
-    # Check returned in correct order - reverse order of created, not version 3
-    assert [model.version for model in models] == [2, 1]
-    assert all(model.type == "mock_disruption_cnn" for model in models)
-
-
-@pytest.mark.asyncio
-async def test_get_models_by_status(db_client, setup_db):
-    models = await utils.get_models(
-        db_client, project_id=setup_db["project_id_1"], status="started"
-    )
-    # Check one model returned
-    assert len(models) == 1
-    # Check this is the correct model
-    assert models[0].version == 3
-    assert models[0].type == "disruption_cnn"
-
-
-@pytest.mark.asyncio
-async def test_get_model(db_client, setup_db):
-    model = await utils.get_model(
-        db_client,
-        project_id=setup_db["project_id_1"],
-        model_type="mock_disruption_cnn",
-        version=2,
-    )
-    assert model.id == setup_db["model_id_2"]
-
-
-@pytest.mark.asyncio
-async def test_get_model_doesnt_exist(db_client, setup_db):
-    with pytest.raises(
-        HTTPException,
-        match="No models found of that type for this project!",
-    ):
-        await utils.get_model(
-            db_client,
-            project_id=setup_db["project_id_1"],
-            model_type="mock_disruption_cnn",
-            version=4,
-        )
-
-
-@pytest.mark.asyncio
 async def test_import_annotations_multiple_samples(db_client, setup_db):
     # Import annotations for multiple samples
     new_annotations = [
@@ -435,14 +377,80 @@ async def test_import_annotations_multiple_samples(db_client, setup_db):
 
 
 @pytest.mark.asyncio
-async def test_update_model(db_client, setup_db):
+@pytest.mark.models_enabled
+async def test_get_models(db_client, setup_model_db):
+    models = await utils.get_models(db_client, project_id=setup_model_db["project_id"])
+    # Check three models returned
+    assert len(models) == 4
+    # Check returned in correct order - reverse order of version
+    assert [model.version for model in models] == [3, 2, 1, 1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_get_models_by_type(db_client, setup_model_db):
+    models = await utils.get_models(
+        db_client,
+        project_id=setup_model_db["project_id"],
+        model_type="mock_disruption_cnn",
+    )
+    # Check two models returned
+    assert len(models) == 2
+    # Check returned in correct order - reverse order of created, not version 3
+    assert [model.version for model in models] == [2, 1]
+    assert all(model.type == "mock_disruption_cnn" for model in models)
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_get_models_by_status(db_client, setup_model_db):
+    models = await utils.get_models(
+        db_client, project_id=setup_model_db["project_id"], status="started"
+    )
+    # Check one model returned
+    assert len(models) == 1
+    # Check this is the correct model
+    assert models[0].version == 3
+    assert models[0].type == "disruption_cnn"
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_get_model(db_client, setup_model_db):
+    model = await utils.get_model(
+        db_client,
+        project_id=setup_model_db["project_id"],
+        model_type="mock_disruption_cnn",
+        version=2,
+    )
+    assert model.id == setup_model_db["model_id_2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_get_model_doesnt_exist(db_client, setup_model_db):
+    with pytest.raises(
+        HTTPException,
+        match="No models found of that type for this project!",
+    ):
+        await utils.get_model(
+            db_client,
+            project_id=setup_model_db["project_id"],
+            model_type="mock_disruption_cnn",
+            version=4,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_update_model(db_client, setup_model_db):
     model_updates = ModelUpdate(training_status="completed", progress=100, score=80)
     await utils.update_model(
-        db_client, model_id=setup_db["model_id_3"], updates=model_updates
+        db_client, model_id=setup_model_db["model_id_3"], updates=model_updates
     )
     # Check model has been updates
     model_updated = await db_client.get_document_by_id(
-        "models", ObjectId(setup_db["model_id_1"])
+        "models", ObjectId(setup_model_db["model_id_1"])
     )
     assert model_updated["training_status"] == "completed"
     assert model_updated["progress"] == 100
@@ -450,7 +458,8 @@ async def test_update_model(db_client, setup_db):
 
 
 @pytest.mark.asyncio
-async def test_add_model(db_client, setup_db):
+@pytest.mark.models_enabled
+async def test_add_model(db_client, setup_model_db):
     model = ModelIn(
         type="mock_disruption_cnn",
         version=3,
@@ -458,17 +467,20 @@ async def test_add_model(db_client, setup_db):
         progress=0,
         score=0,
     )
-    await utils.add_model(db_client, project_id=setup_db["project_id_1"], model=model)
+    await utils.add_model(
+        db_client, project_id=setup_model_db["project_id"], model=model
+    )
     # Check a new model has been added
     models = await db_client.get_all_documents(collection="models")
-    assert len(models) == 4
+    assert len(models) == 5
 
 
 @pytest.mark.asyncio
-async def test_delete_model(db_client, setup_db):
+@pytest.mark.models_enabled
+async def test_delete_model(db_client, setup_model_db):
     await utils.delete_model(
-        db_client, setup_db["project_id_1"], setup_db["model_id_1"]
+        db_client, setup_model_db["project_id"], setup_model_db["model_id_1"]
     )
     models = await db_client.get_filtered_documents("models")
-    assert len(models) == 2
-    assert setup_db["model_id_1"] not in [model["_id"] for model in models]
+    assert len(models) == 3
+    assert setup_model_db["model_id_1"] not in [model["_id"] for model in models]

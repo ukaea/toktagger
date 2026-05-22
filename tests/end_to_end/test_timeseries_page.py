@@ -548,6 +548,7 @@ def test_timeseries_annotator(server_setup, page: Page):
     expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
 
 
+@pytest.mark.models_enabled
 @pytest.mark.parametrize(
     "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
 )
