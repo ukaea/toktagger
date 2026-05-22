@@ -85,3 +85,48 @@ async def test_get_model_schema(api_client, setup_db, model_name, method):
             "selection_1",
             "selection_2",
         ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+@pytest.mark.parametrize("task", ["time-series", "video"])
+async def test_get_model_types_disabled(api_client, setup_db, task):
+    response = await api_client.get(f"/meta/models?task={task}")
+    assert response.status_code == 503
+    data = response.json()
+    assert (
+        "ML model features are disabled (optional dependencies missing)"
+        in data["detail"]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_disabled
+@pytest.mark.parametrize("local", [True, False])
+async def test_get_model_load_methods_disabled(api_client, setup_db, local):
+    if not local:
+        os.environ["DISABLE_LOCAL_MODEL_LOAD"] = "true"
+    response = await api_client.get("/meta/models/load")
+    assert response.status_code == 503
+    data = response.json()
+    assert (
+        "ML model features are disabled (optional dependencies missing)"
+        in data["detail"]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_disabled
+@pytest.mark.parametrize(
+    "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
+)
+@pytest.mark.parametrize("method", ["train", "predict"])
+async def test_get_model_schema_disabled(api_client, setup_db, model_name, method):
+    response = await api_client.get(f"/meta/models/{model_name}/{method}")
+
+    assert response.status_code == 503
+    data = response.json()
+    assert (
+        "ML model features are disabled (optional dependencies missing)"
+        in data["detail"]
+    )
