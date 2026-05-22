@@ -17,6 +17,7 @@ import {
 } from "@annotorious/react";
 
 import type { Annotation, DataParams } from "@/types";
+import { useVideoUiState } from "@/app/video/components/video-context";
 import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
@@ -151,14 +152,6 @@ type FocusRequest = {
   targetFrame: FrameIndex | null;
 };
 
-function isEditableEventTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-}
-
 export function useVideoSession(): VideoSessionCtx {
   const v = useContext(Ctx);
   if (!v)
@@ -183,6 +176,12 @@ export function VideoSessionProvider(props: {
   children: React.ReactNode;
 }) {
   const { projectId, sampleId, propagate, setPropagate, children } = props;
+  const {
+    videoPanMode,
+    setVideoPanMode,
+    videoDrawingTool,
+    setVideoDrawingTool,
+  } = useVideoUiState();
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -197,8 +196,6 @@ export function VideoSessionProvider(props: {
   const commitFromAnnotoriousRef = useRef<
     (rawOverride?: ImageAnnotation[]) => void
   >(() => {});
-  const shiftPanActiveRef = useRef(false);
-  const panModeBeforeShiftRef = useRef(false);
   const pendingFocusRef = useRef<FocusRequest | null>(null);
   const nextTrackNumsRef = useRef<Map<string, number>>(
     buildNextTrackIdState(props.dbAnnotations),
@@ -248,9 +245,24 @@ export function VideoSessionProvider(props: {
     trackId: null,
     source: null,
   });
-  const [drawingTool, setDrawingToolState] = useState<DrawingTool>("rectangle");
-  const [panMode, setPanModeState] = useState(false);
-  const [hideAnnotations, setHideAnnotations] = useState(false);
+  const [drawingTool, setDrawingToolState] =
+    useState<DrawingTool>(videoDrawingTool);
+  const [panMode, setPanModeState] = useState(videoPanMode);
+  const [hideAnnotations, setHideAnnotationsState] = useState(false);
+  const hideAnnotationsRef = useRef(false);
+
+  const setHideAnnotations = useCallback(
+    (v: boolean) => {
+      hideAnnotationsRef.current = v;
+      setHideAnnotationsState(v);
+
+      if (v) {
+        setPanModeState(true);
+        setVideoPanMode(true);
+      }
+    },
+    [setVideoPanMode],
+  );
 
   const frameKey = useMemo(
     () => buildSourceKey({ projectId, sampleId, frame }),
@@ -286,6 +298,7 @@ export function VideoSessionProvider(props: {
 
   const flushPendingOverlay = useCallback(() => {
     if (isProgrammaticAnnoSyncRef.current) return;
+    if (hideAnnotationsRef.current) return;
     const raw = api?.getAnnotations?.();
     if (!raw) return;
     commitFromAnnotoriousRef.current(raw);
@@ -296,8 +309,9 @@ export function VideoSessionProvider(props: {
       api?.setSelected?.();
       flushPendingOverlay();
       setDrawingToolState(tool);
+      setVideoDrawingTool(tool);
     },
-    [api, flushPendingOverlay],
+    [api, flushPendingOverlay, setVideoDrawingTool],
   );
 
   const setPanMode = useCallback(
@@ -305,8 +319,9 @@ export function VideoSessionProvider(props: {
       api?.setSelected?.();
       flushPendingOverlay();
       setPanModeState(v);
+      setVideoPanMode(v);
     },
-    [api, flushPendingOverlay],
+    [api, flushPendingOverlay, setVideoPanMode],
   );
 
   const clearCurrentFrame = useCallback(() => {
@@ -344,51 +359,6 @@ export function VideoSessionProvider(props: {
       isProgrammaticAnnoSyncRef.current = false;
     }
   }, [api, flushPendingOverlay]);
-
-  useEffect(() => {
-    const releaseShiftPan = () => {
-      if (!shiftPanActiveRef.current) return;
-      shiftPanActiveRef.current = false;
-      setPanMode(panModeBeforeShiftRef.current);
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Shift") return;
-      if (event.repeat) return;
-      if (shiftPanActiveRef.current) return;
-      if (isEditableEventTarget(event.target)) return;
-
-      panModeBeforeShiftRef.current = panMode;
-      shiftPanActiveRef.current = true;
-      setPanMode(true);
-    };
-
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key !== "Shift") return;
-      releaseShiftPan();
-    };
-
-    const onWindowBlur = () => {
-      releaseShiftPan();
-    };
-
-    const onVisibilityChange = () => {
-      if (!document.hidden) return;
-      releaseShiftPan();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", onWindowBlur);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", onWindowBlur);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [panMode, setPanMode]);
 
   const applyAnnotatorInteractionMode = useCallback(() => {
     if (!api) return;
@@ -585,6 +555,7 @@ export function VideoSessionProvider(props: {
     (rawOverride?: ImageAnnotation[]) => {
       if (!api?.getAnnotations) return;
       if (isProgrammaticAnnoSyncRef.current) return;
+      if (hideAnnotationsRef.current) return;
 
       // Some Annotorious events pass a single annotation (not an array).
       const raw = rawOverride ?? api.getAnnotations();
@@ -724,10 +695,10 @@ export function VideoSessionProvider(props: {
       if (!id) return false;
       if (!api) return false;
 
-      api.setSelected(id, true);
+      api.setSelected(id, !panMode);
       return true;
     },
-    [api],
+    [api, panMode],
   );
 
   const tryFocusPending = useCallback(
@@ -850,11 +821,11 @@ export function VideoSessionProvider(props: {
       _originalEvent: PointerEvent,
     ) => {
       if (isProgrammaticAnnoSyncRef.current) return;
-      if (panMode || hideAnnotations) return;
+      if (hideAnnotations) return;
 
       const id = clicked?.id;
       if (id) {
-        api.setSelected(id, true);
+        api.setSelected(id, !panMode);
       }
 
       const got = getLabelTrack(clicked);
@@ -877,7 +848,7 @@ export function VideoSessionProvider(props: {
       if (isProgrammaticAnnoSyncRef.current) return;
 
       if (arr.length > 0) {
-        if (!panMode && !hideAnnotations) {
+        if (!hideAnnotations) {
           const selected = arr[0];
           const got = getLabelTrack(selected);
           const className = (got.className ?? "").trim();

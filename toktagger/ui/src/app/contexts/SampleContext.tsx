@@ -278,6 +278,12 @@ export function SampleProvider({
               });
 
               setVideoFrameBounds((prev) => {
+                // Only tighten bounds for adjacent navigation attempts.
+                // Large jump probes (e.g. 0 -> 5000) should not clamp next/prev.
+                if (Math.abs(requestedFrame - lastGood) !== 1) {
+                  return prev;
+                }
+
                 if (requestedFrame < lastGood) {
                   return { ...prev, min: lastGood };
                 }
