@@ -44,16 +44,6 @@ async def collect_train_results(api_client, task_id):
         assert response.status_code == 200
 
 
-async def collect_load_results(api_client, task_id):
-    results = wait_for_results(api_client.app.state.task_registry, task_id)
-    update = ModelUpdate(training_status="completed", progress=100)
-    with patch("requests.put", api_client.put):
-        response = await send_model_updates(
-            results["project_id"], results["model_id"], update
-        )
-        assert response.status_code == 200
-
-
 KILL_COUNT = 0
 
 

@@ -37,11 +37,12 @@ def check_base_page(page):
     expect(page.get_by_role("button", name="Add Samples", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Clear Samples", exact=True)).to_be_visible()
 
-    # Expect Model Train/Predict buttons visible
+    # Expect Model Train/Load/Predict buttons visible
     expect(
         page.get_by_role("button", name="Create Predictions from ML Model")
     ).to_be_visible()
     expect(page.get_by_role("button", name="Train ML Model")).to_be_visible()
+    expect(page.get_by_role("button", name="Load ML Model")).to_be_visible()
 
     # Expect searchbar visible
     expect(page.get_by_role("searchbox", name="Search By Shot ID")).to_be_visible()
