@@ -45,7 +45,7 @@ def mongo_container():
         yield mongo.get_connection_url()
 
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="module")
 def ray_session():
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
         os.environ["MODEL_STORAGE"] = tempd
@@ -179,21 +179,18 @@ async def setup_db(db_client):
         db_definitions.MODEL_1,
         ids={"project_id": ObjectId(project_id_1)},
     )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_1}.model").touch()
     await asyncio.sleep(0.01)
     model_id_2 = await db_client.insert(
         "models",
         db_definitions.MODEL_2,
         ids={"project_id": ObjectId(project_id_1)},
     )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_2}.model").touch()
     await asyncio.sleep(0.01)
     model_id_3 = await db_client.insert(
         "models",
         db_definitions.MODEL_3,
         ids={"project_id": ObjectId(project_id_1)},
     )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_3}.model").touch()
     yield {
         "project_id_1": project_id_1,
         "project_id_2": project_id_2,
@@ -295,12 +292,18 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
         "models", db_definitions.MODEL_2, ids={"project_id": ObjectId(project_id)}
     )
 
+    model_id_3 = await db_client.insert(
+        "models",
+        db_definitions.MODEL_3,
+        ids={"project_id": ObjectId(project_id)},
+    )
+
     model_id_4 = await db_client.insert(
         "models", db_definitions.MODEL_4, ids={"project_id": ObjectId(project_id)}
     )
 
     # Create temp files for each
-    for _id in (model_id_1, model_id_2, model_id_4):
+    for _id in (model_id_1, model_id_2, model_id_3, model_id_4):
         pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{_id}.model").touch()
 
     yield {
@@ -308,6 +311,8 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
         "sample_ids": sample_ids,
         "model_id_1": model_id_1,
         "model_id_2": model_id_2,
+        "model_id_3": model_id_3,
+        "model_id_4": model_id_4,
     }
 
 

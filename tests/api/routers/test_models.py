@@ -434,82 +434,88 @@ async def test_model_start_training_params(api_client, db_client, setup_model_db
 
 # Test delete model
 @pytest.mark.asyncio
-async def test_model_delete_type(api_client, db_client, setup_db):
+async def test_model_delete_type(api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn"
     )
     assert response.status_code == 200
 
-    # Check there is one model left in the database
+    # Check there are two model left in the database
     models = await db_client.get_all_documents("models")
-    assert len(models) == 1
+    assert len(models) == 2
 
-    # Check it is not of type 'mock_disruption_cnn'
-    assert models[0]["type"] != "mock_disruption_cnn"
+    # Check they are not of type 'mock_disruption_cnn'
+    assert all(model["type"] != "mock_disruption_cnn" for model in models)
 
     # Check for models 1 and 2, their file no longer exists
     assert (
         not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_1']}.model")
+        .joinpath(f"{setup_model_db['model_id_1']}.model")
         .exists()
     )
     assert (
         not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_2']}.model")
+        .joinpath(f"{setup_model_db['model_id_2']}.model")
         .exists()
     )
-    # And for model 3 it does still exist
+    # And for model 3 and 4 it does still exist
     assert (
         pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_3']}.model")
+        .joinpath(f"{setup_model_db['model_id_3']}.model")
+        .exists()
+    )
+    assert (
+        pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_model_db['model_id_4']}.model")
         .exists()
     )
 
 
 @pytest.mark.asyncio
-async def test_model_delete_type_version(api_client, db_client, setup_db):
+async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn?version=2"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
     )
     assert response.status_code == 200
 
-    # Check there is one model left in the database
+    # Check there are three models left in the database
     models = await db_client.get_all_documents("models")
-    assert len(models) == 2
+    assert len(models) == 3
     # Check model version 1 of mock_disruption_cnn still exists
-    assert models[0]["type"] == "mock_disruption_cnn" and models[0]["version"] == 1
-    # Check the other one is type 'disruption_cnn'
-    assert models[1]["type"] == "disruption_cnn"
+    # Check the others are not of type 'mock_disruption_cnn'
+    assert all(
+        (model["type"] == "mock_disruption_cnn" and model["version"] == 1)
+        or (model["type"] != "mock_disruption_cnn")
+        for model in models
+    )
 
     # Check for model 2, their file no longer exists
     assert (
         not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_2']}.model")
+        .joinpath(f"{setup_model_db['model_id_2']}.model")
         .exists()
     )
-    # And for models 1 and 3 it does still exist
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_1']}.model")
-        .exists()
-    )
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_3']}.model")
-        .exists()
+    # And for models 1, 3 and 4 it does still exist
+    assert all(
+        (
+            pathlib.Path(os.environ["MODEL_STORAGE"])
+            .joinpath(f"{setup_model_db[model_id]}.model")
+            .exists()
+        )
+        for model_id in ("model_id_1", "model_id_3", "model_id_4")
     )
 
 
 @pytest.mark.asyncio
 @patch("ray.cancel")
-async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
+async def test_model_stop_training(mock_func, api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/disruption_cnn/train"
+        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/train"
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
     deleted_id = response.json()[0]
-    assert deleted_id == setup_db["model_id_3"]
+    assert deleted_id == setup_model_db["model_id_3"]
 
     # Check it is aborted in database
     models = await db_client.get_filtered_documents(
@@ -524,10 +530,10 @@ async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
 @pytest.mark.asyncio
 @patch("ray.kill")
 async def test_model_stop_training_not_in_progress(
-    mock_func, api_client, db_client, setup_db
+    mock_func, api_client, db_client, setup_model_db
 ):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn/train?version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train?version=1"
     )  # Version 1 model is 'completed' so nothing to do
     assert response.status_code == 409
     assert (
