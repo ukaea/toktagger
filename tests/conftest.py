@@ -321,27 +321,29 @@ def run_server():
 @pytest.fixture(scope="package")
 def start_server(mongo_container):
     os.environ["MONGO_URL"] = mongo_container
-    proc = multiprocessing.Process(target=run_server)
-    proc.start()
-    # Wait for server to start
-    server_up = False
-    for t in range(600):
-        try:
-            response = requests.get(
-                "http://localhost:8002/projects",
-            )
-            if response.status_code == 200:
-                server_up = True
-                break
-            time.sleep(1)
-        except requests.exceptions.ConnectionError:
-            time.sleep(1)
+    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
+        os.environ["MODEL_STORAGE"] = tempd
+        proc = multiprocessing.Process(target=run_server)
+        proc.start()
+        # Wait for server to start
+        server_up = False
+        for t in range(600):
+            try:
+                response = requests.get(
+                    "http://localhost:8002/projects",
+                )
+                if response.status_code == 200:
+                    server_up = True
+                    break
+                time.sleep(1)
+            except requests.exceptions.ConnectionError:
+                time.sleep(1)
 
-    if not server_up:
-        proc.terminate()
-        pytest.exit("Server failed to start for End-to-End tests to run!")
+        if not server_up:
+            proc.terminate()
+            pytest.exit("Server failed to start for End-to-End tests to run!")
 
-    yield
+        yield
     proc.terminate()
 
 
