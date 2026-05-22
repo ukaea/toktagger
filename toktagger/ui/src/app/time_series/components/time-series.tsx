@@ -1,118 +1,40 @@
 "use client";
-import {
-  MultiVariateTimeSeriesData,
-  Zone,
-  DisplayAnnotation,
-  ZoneSchema,
-  TimeRegionSchema,
-  Annotation,
-  TimeSeriesData,
-  VSpanSchema,
-  VSpan,
-  TimePointSchema,
-  Category,
-} from "@/types";
-import { ZoneProvider } from "@/app/components/providers/zone-provider";
-import { ContextMenuProvider } from "@/app/components/providers/annotation-provider";
-import { TimeSeries } from "@/app/components/plots/time-series";
-import { Zones } from "@/app/components/tools/zones";
+import { MultiVariateTimeSeriesData, TimeSeriesData } from "@/types";
+import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
+import { TimeSeriesProvider } from "@/app/contexts/TimeSeriesContext";
+import { TimeRegion } from "@/app/components/tools/timeRegion";
 import "react-contexify/ReactContexify.css";
 
-import {
-  arrayMax,
-  arrayMin,
-  createAnnotationToDisplayAnnotationFunc,
-  randomColor,
-  updateAnnotations,
-} from "@/app/utils";
+import { arrayMax, arrayMin } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
-import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
-import { VSpans } from "@/app/components/tools/vspans";
+import { TimePoint } from "@/app/components/tools/timePoint";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
+import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 export const TimeSeriesView = () => {
-  const { project, data, annotations, setAnnotations } = useSample();
+  const { data } = useSample();
 
-  const zoneCategories: Category[] = useMemo(() => {
-    const timeRegionLabels = project?.time_region_labels || [];
-    return timeRegionLabels.map((label, index) => ({
-      name: label,
-      color: randomColor(index),
-    }));
-  }, [project?.time_region_labels]);
-
-  const vspanCategories: Category[] = useMemo(() => {
-    const timePointLabels = project?.time_point_labels || [];
-    return timePointLabels.map((label, index) => ({
-      name: label,
-      color: randomColor(index),
-    }));
-  }, [project?.time_point_labels]);
-
-  const categoryColors = useMemo(
-    () =>
-      zoneCategories
-        .concat(vspanCategories)
-        .reduce<Record<string, string>>((acc, curr) => {
-          acc[curr.name] = curr.color;
-          return acc;
-        }, {}),
-    [zoneCategories, vspanCategories],
-  );
-
-  const [plotData, setPlotData] = useState<Plotly.Data[]>([]);
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [vspans, setVSpans] = useState<VSpan[]>([]);
+  const [plotData, setPlotData] = useState<Partial<Plotly.PlotData>[]>([]);
 
   const viewData = data as MultiVariateTimeSeriesData | null;
-
-  useEffect(() => {
-    if (!annotations || !viewData) return;
-
-    const convertAnnotationToDisplayAnnotation =
-      createAnnotationToDisplayAnnotationFunc(categoryColors);
-
-    const displayAnnotations: DisplayAnnotation[] = annotations
-      .filter((x: Annotation) => x.type !== "class_label")
-      .map(convertAnnotationToDisplayAnnotation);
-
-    const newZones: Zone[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => ZoneSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => ZoneSchema.parse(x));
-
-    const newVSpans: VSpan[] = displayAnnotations
-      .filter((x: DisplayAnnotation) => VSpanSchema.safeParse(x).success)
-      .map((x: DisplayAnnotation) => VSpanSchema.parse(x));
-
-    setZones(newZones);
-    setVSpans(newVSpans);
-  }, [annotations, viewData, categoryColors]);
-
-  const updateVSpans = (newVSpans: Array<VSpan>) => {
-    updateAnnotations(setAnnotations, newVSpans, TimePointSchema);
-  };
-
-  const updateZones = (newZones: Array<Zone>) => {
-    updateAnnotations(setAnnotations, newZones, TimeRegionSchema);
-  };
 
   useEffect(() => {
     if (!viewData) return;
 
     const numRows = Object.keys(viewData.values).length;
 
-    let plotData: Plotly.Data[] = Object.entries(viewData.values).map(
-      ([key, value]: [string, TimeSeriesData]) => {
-        return {
-          name: key,
-          x: value.time,
-          y: value.values,
-          mode: "lines",
-        };
-      },
-    );
+    let plotData: Partial<Plotly.PlotData>[] = Object.entries(
+      viewData.values,
+    ).map(([key, value]: [string, TimeSeriesData]) => {
+      return {
+        name: key,
+        x: value.time,
+        y: value.values,
+        mode: "lines",
+      };
+    });
 
     const yAxesNames = Array.from(
       { length: numRows },
@@ -174,9 +96,9 @@ export const TimeSeriesView = () => {
 
     return {
       uirevision: "true",
-      grid: { rows: 1, columns: 1, pattern: "independent" },
+      //grid: { rows: 1, columns: 1, pattern: "independent" },
       dragmode: "pan",
-      width: window.innerWidth * 0.84,
+      autosize: true,
       height: window.innerHeight * 0.9,
       xaxis: {
         minallowed: minTime,
@@ -205,30 +127,21 @@ export const TimeSeriesView = () => {
   return (
     <View width="100%">
       <Flex justifyContent="center" alignItems="center">
-        <ContextMenuProvider menuId="time-series-menu">
-          <ZoneProvider
-            categories={zoneCategories}
-            initialData={zones}
-            onModifyZone={updateZones}
-          >
-            <VSpanProvider
-              categories={vspanCategories}
-              initialData={vspans}
-              onModifyVSpan={updateVSpans}
-            >
-              <Flex direction="column" gap="size-200">
-                <TimeSeries
-                  plotId="TimesSeriesView"
-                  plotConfig={{ data: plotData, layout: plotLayout }}
-                >
-                  <Zones onUpdate={updateZones} />
-                  <VSpans onUpdate={updateVSpans} />
-                </TimeSeries>
-                <AnnotationsTable />
-              </Flex>
-            </VSpanProvider>
-          </ZoneProvider>
-        </ContextMenuProvider>
+        <TimeSeriesProvider>
+          <Flex direction="row" flex justifyContent="space-between">
+            <Flex direction="column" flex gap="size-200">
+              <BaseTimeSeriesPlot
+                plotId="TimesSeriesView"
+                plotConfig={{ data: plotData, layout: plotLayout }}
+              >
+                <TimeRegion />
+                <TimePoint />
+              </BaseTimeSeriesPlot>
+              <AnnotationsTable />
+            </Flex>
+            <AnnotationToolbar />
+          </Flex>
+        </TimeSeriesProvider>
       </Flex>
     </View>
   );
