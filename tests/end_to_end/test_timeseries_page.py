@@ -563,8 +563,8 @@ def test_timeseries_model_predict(
 
     sample_id = ids[0]
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    # Navigate to samples table page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
 
     # Click on model train modal
     page.get_by_role("button", name="Train ML Model").click()
@@ -633,6 +633,9 @@ def test_timeseries_model_predict(
 
     # Close modal
     modal.get_by_role("button", name="Close", exact=True).click()
+
+    # Navigate to timeseries page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
 
     # Expand Model Predict in toolbar
     expect(page.get_by_role("button", name="Model Prediction")).to_be_visible()

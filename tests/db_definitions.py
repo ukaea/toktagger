@@ -69,7 +69,7 @@ class TimeSeriesCNN(Model):
         )
         return 60
 
-    def predict(self, samples, params=None):
+    def predict(self, samples, params=None, data_params=None):
         anns = []
         for i in range(len(samples)):
             ramp_up_start = random.randint(0, 20)
@@ -142,7 +142,7 @@ class MockParamsTimeSeriesCNN(TimeSeriesCNN):
         )
         return params.final_score
 
-    def predict(self, samples, params: TimeSeriesCNNParams):
+    def predict(self, samples, params: TimeSeriesCNNParams, data_params=None):
         anns = []
         for i in range(len(samples)):
             ramp_up_start = random.randint(0, 20)
