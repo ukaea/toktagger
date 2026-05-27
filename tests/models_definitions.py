@@ -17,7 +17,7 @@ import pydantic
 @ModelRegistry.register("mock_disruption_cnn", ["time-series"])
 class MockDisruptionCNN(Model):
     def define_model(self):
-        return "Model Trained"
+        return None
 
     def train(self, samples, annotations, *args, **kwargs):
         self.log_progress(
@@ -42,16 +42,15 @@ class MockDisruptionCNN(Model):
         ]
 
     def save(self, file_stem: str):
-        pathlib.Path(file_stem).with_suffix(".model").write_text(self.model)
+        pathlib.Path(file_stem).with_suffix(".model").touch()
 
     def load(self, file_path):
-        self.model = pathlib.Path(file_path).read_text()
         pass
 
 
 class TimeSeriesCNN(Model):
     def define_model(self):
-        return "Model Trained"
+        return None
 
     def train(self, samples, annotations, params=None):
         self.log_progress(
@@ -98,10 +97,9 @@ class TimeSeriesCNN(Model):
         return anns
 
     def save(self, file_stem: str):
-        pathlib.Path(file_stem).with_suffix(".model").write_text(self.model)
+        pathlib.Path(file_stem).with_suffix(".model").touch()
 
     def load(self, file_path):
-        self.model = pathlib.Path(file_path).read_text()
         pass
 
 
@@ -134,7 +132,7 @@ class MockParamsTimeSeriesCNN(TimeSeriesCNN):
         )
         return params.final_score
 
-    def predict(self, samples, params: TimeSeriesCNNParams, data_params=None):
+    def predict(self, samples, params: TimeSeriesCNNParams, data_params: None):
         anns = []
         for i in range(len(samples)):
             ramp_up_start = random.randint(0, 20)

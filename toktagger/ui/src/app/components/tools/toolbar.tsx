@@ -309,7 +309,7 @@ export default function ToolBar() {
 
   return (
     <Provider theme={defaultTheme} height="100vh">
-      <View overflow="auto" height="100vh">
+      <View overflow="auto" height="100vh" width="18vw">
         <Flex
           direction="column"
           alignItems="center"
