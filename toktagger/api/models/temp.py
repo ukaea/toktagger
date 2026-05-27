@@ -92,8 +92,8 @@ class VideoCNN(Model):
                 annotations.append(sample_anns)
         return annotations
 
-    def save(self, file_path: str):
-        pathlib.Path(file_path).touch()
+    def save(self, file_stem: str):
+        pathlib.Path(file_stem).suffix(".model").touch()
 
     def load(self, file_path: str):
         self.model = None
