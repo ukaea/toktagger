@@ -93,7 +93,7 @@ class VideoCNN(Model):
         return annotations
 
     def save(self, file_stem: str):
-        pathlib.Path(file_stem).suffix(".model").touch()
+        pathlib.Path(file_stem).with_suffix(".model").touch()
 
     def load(self, file_path: str):
         self.model = None
