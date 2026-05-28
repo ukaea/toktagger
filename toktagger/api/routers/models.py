@@ -402,6 +402,11 @@ async def load_model_weights(
         task_id = task_registry.register(task)
         task_registry.update_actors(model.id)
 
+        # Associate the task ID with the model in the database
+        await utils.update_model(
+            db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
+        )
+
         return {"task_id": task_id, "model_id": model.id}
     else:
         raise HTTPException(
@@ -439,13 +444,22 @@ async def get_load_model_status(
             content={"message": "Load task in the queue!"}, status_code=202
         )
     elif ready:
+        # Get model which has this task ID associated
+        model = await utils.get_model(
+            db_client,
+            project_id,
+            model_type=model_type,
+            task_id=task_id,
+        )
         try:
             result: dict[str, str | None] = ray.get(task)
 
         except Exception as e:
+            # Find model ID of latest in progress model
+
             await utils.update_model(
                 db_client=db_client,
-                model_id=result["model_id"],
+                model_id=model.id,
                 updates=ModelUpdate(training_status="failed", progress=0),
             )
             raise HTTPException(
@@ -453,8 +467,7 @@ async def get_load_model_status(
                 status_code=500,
             )
 
-        # Check project ID and model type match those expected by user
-        if result["message"]:
+        if result.get("message"):
             await utils.update_model(
                 db_client=db_client,
                 model_id=result["model_id"],

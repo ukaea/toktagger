@@ -68,6 +68,13 @@ def get_actor(project, model):
 def load_model(
     model: Model, project: Project, weights_path: pathlib.Path
 ) -> tuple[str, str | None]:
+    # Change status to started
+    send_model_updates(
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(training_status="started"),
+    )
+
     # Copy weights to temporary location inside cache dir
     model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
     model_dir.mkdir(exist_ok=True)
