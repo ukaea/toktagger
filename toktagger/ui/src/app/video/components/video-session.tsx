@@ -153,6 +153,60 @@ function parseVideoAnnotation(annotation: Annotation) {
   return null;
 }
 
+function videoAnnotationDedupeKey(annotation: Annotation): string | null {
+  const parsed = parseVideoAnnotation(annotation);
+  if (!parsed?.success) return null;
+
+  const item = parsed.data;
+  const label = (item.label ?? "").trim();
+  const trackId = canonicalizeTrackId(item.track_id ?? "");
+  if (!label || !trackId) return null;
+
+  return `${item.frame}::${label}::${trackId}`;
+}
+
+function dedupeVideoAnnotations(annotations: Annotation[]): {
+  annotations: Annotation[];
+  duplicates: number;
+} {
+  const nonVideoAnnotations: Annotation[] = [];
+  const videoAnnotationsByKey = new Map<string, Annotation>();
+  const videoKeys: string[] = [];
+  let duplicates = 0;
+
+  for (const annotation of annotations ?? []) {
+    if (!isVideoAnnotationType(annotation)) {
+      nonVideoAnnotations.push(annotation);
+      continue;
+    }
+
+    const key = videoAnnotationDedupeKey(annotation);
+    if (!key) {
+      nonVideoAnnotations.push(annotation);
+      continue;
+    }
+
+    if (!videoAnnotationsByKey.has(key)) {
+      videoKeys.push(key);
+    } else {
+      duplicates += 1;
+    }
+
+    // Last write wins, matching normalizeOverlay's per-frame instance behavior.
+    videoAnnotationsByKey.set(key, annotation);
+  }
+
+  return {
+    annotations: [
+      ...nonVideoAnnotations,
+      ...videoKeys
+        .map((key) => videoAnnotationsByKey.get(key))
+        .filter((annotation): annotation is Annotation => Boolean(annotation)),
+    ],
+    duplicates,
+  };
+}
+
 function videoAnnotationSignature(annotations: Annotation[]): string {
   const entries: string[] = [];
 
@@ -452,6 +506,12 @@ export function VideoSessionProvider(props: {
     setSelectionState(next);
   }, []);
 
+  const finishProgrammaticAnnotationSync = useCallback(() => {
+    requestAnimationFrame(() => {
+      isProgrammaticAnnoSyncRef.current = false;
+    });
+  }, []);
+
   const flushPendingOverlay = useCallback(() => {
     if (isProgrammaticAnnoSyncRef.current) return;
     if (hideAnnotationsRef.current) return;
@@ -498,9 +558,15 @@ export function VideoSessionProvider(props: {
       api?.setSelected?.();
       api?.setAnnotations?.([], true);
     } finally {
-      isProgrammaticAnnoSyncRef.current = false;
+      finishProgrammaticAnnotationSync();
     }
-  }, [api, flushPendingOverlay, frame, updateByFrame]);
+  }, [
+    api,
+    finishProgrammaticAnnotationSync,
+    flushPendingOverlay,
+    frame,
+    updateByFrame,
+  ]);
 
   const clearAllFrames = useCallback(() => {
     api?.setSelected?.();
@@ -515,9 +581,14 @@ export function VideoSessionProvider(props: {
       api?.setSelected?.();
       api?.setAnnotations?.([], true);
     } finally {
-      isProgrammaticAnnoSyncRef.current = false;
+      finishProgrammaticAnnotationSync();
     }
-  }, [api, flushPendingOverlay, updateByFrame]);
+  }, [
+    api,
+    finishProgrammaticAnnotationSync,
+    flushPendingOverlay,
+    updateByFrame,
+  ]);
 
   const applyAnnotatorInteractionMode = useCallback(() => {
     if (!api) return;
@@ -606,7 +677,9 @@ export function VideoSessionProvider(props: {
 
   // Keep the editor cache synchronized with SampleContext.annotations.
   useEffect(() => {
-    const dbAnnotations = props.dbAnnotations ?? [];
+    const { annotations: dbAnnotations, duplicates } = dedupeVideoAnnotations(
+      props.dbAnnotations ?? [],
+    );
     const signature = videoAnnotationSignature(dbAnnotations);
 
     if (signature === lastExternalAnnotationSignatureRef.current) return;
@@ -634,7 +707,13 @@ export function VideoSessionProvider(props: {
     nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
     lastExternalAnnotationSignatureRef.current = signature;
     lastLocalAnnotationSignatureRef.current = null;
-  }, [projectId, props.dbAnnotations, sampleId]);
+    if (duplicates > 0) {
+      console.warn(
+        `[video] external annotation sync: collapsed ${duplicates} duplicate video annotation(s).`,
+      );
+      setSampleAnnotations(() => dbAnnotations);
+    }
+  }, [projectId, props.dbAnnotations, sampleId, setSampleAnnotations]);
 
   /**
    * Single commit point for all Annotorious mutations (create/update/delete).
@@ -720,7 +799,7 @@ export function VideoSessionProvider(props: {
           api.setAnnotations?.(normalized, true);
           applyAnnotatorInteractionMode();
         } finally {
-          isProgrammaticAnnoSyncRef.current = false;
+          finishProgrammaticAnnotationSync();
         }
       }
 
@@ -735,6 +814,7 @@ export function VideoSessionProvider(props: {
     },
     [
       api,
+      finishProgrammaticAnnotationSync,
       frame,
       frameKey,
       getFrameList,
@@ -895,12 +975,18 @@ export function VideoSessionProvider(props: {
         tryFocusPending();
       });
     } finally {
-      isProgrammaticAnnoSyncRef.current = false;
+      finishProgrammaticAnnotationSync();
     }
     return () => {
       if (rafId != null) cancelAnimationFrame(rafId);
     };
-  }, [api, applyAnnotatorInteractionMode, desiredOverlay, tryFocusPending]);
+  }, [
+    api,
+    applyAnnotatorInteractionMode,
+    desiredOverlay,
+    finishProgrammaticAnnotationSync,
+    tryFocusPending,
+  ]);
 
   /**
    * Event wiring:
