@@ -58,8 +58,7 @@ exclude = [".venv", "notebooks"]
 
 [dependency-groups]
 dev = [
-    "mkdocs",
-    "mkdocs-material",
+    "zensical",
     "pooch>=1.8.2",
     "httpx>=0.28.1",
     "pytest>=8.4.1",
