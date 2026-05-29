@@ -613,27 +613,46 @@ export const PlotlyWidget = ({
         }
       }
 
-      // Then check if a specific shape was clicked
+      // Then check if a specific shape was clicked.
+      // Each shape may reference a different subplot (e.g. yref: "y2"). We look up
+      // the drag element for that subplot and use its bounding rect as the pixel
+      // reference for p2d(), which is calibrated relative to the drag layer origin.
       for (let i = 0; i < shapes?.length; i++) {
         const shape = shapes[i];
+
+        const xSuffix = (shape.xref as string | undefined)?.replace("x", "") ?? "";
+        const ySuffix = (shape.yref as string | undefined)?.replace("y", "") ?? "";
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const shapeXaxis = (plot as any)._fullLayout[`xaxis${xSuffix}`] ?? (plot as any)._fullLayout.xaxis;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const shapeYaxis = (plot as any)._fullLayout[`yaxis${ySuffix}`] ?? (plot as any)._fullLayout.yaxis;
+
+        const subplotKey = `x${xSuffix}y${ySuffix}`;
+        const shapeDragEl = (plot as HTMLElement).querySelector(
+          `.drag[data-subplot="${subplotKey}"]`,
+        ) as HTMLElement | null;
+        const shapeBB = shapeDragEl
+          ? shapeDragEl.getBoundingClientRect()
+          : bb; // fall back to whatever the click landed on
+        const sx = shapeXaxis.p2d(event.clientX - shapeBB.left);
+        const sy = shapeYaxis.p2d(event.clientY - shapeBB.top);
+
         if (shape.type === "rect") {
-          // Handle both coordinate orders by using min/max
           const rectXMin = Math.min(shape.x0, shape.x1);
           const rectXMax = Math.max(shape.x0, shape.x1);
           const rectYMin = Math.min(shape.y0, shape.y1);
           const rectYMax = Math.max(shape.y0, shape.y1);
 
           if (
-            x >= rectXMin &&
-            x <= rectXMax &&
-            y >= rectYMin &&
-            y <= rectYMax
+            sx >= rectXMin &&
+            sx <= rectXMax &&
+            sy >= rectYMin &&
+            sy <= rectYMax
           ) {
             shapeIndex = i;
-            break; // found the clicked bounding box
+            break;
           }
         } else if (shape.type === "path" && shape.path) {
-          // Simple bounding box check for path shapes
           const pathCommands = shape.path.match(/[ML][^MLZ]+/g);
           if (pathCommands) {
             const xPoints: number[] = [];
@@ -656,13 +675,13 @@ export const PlotlyWidget = ({
             const polyYMax = Math.max(...yPoints);
 
             if (
-              x >= polyXMin &&
-              x <= polyXMax &&
-              y >= polyYMin &&
-              y <= polyYMax
+              sx >= polyXMin &&
+              sx <= polyXMax &&
+              sy >= polyYMin &&
+              sy <= polyYMax
             ) {
               shapeIndex = i;
-              break; // found the clicked polygon
+              break;
             }
           }
         }
