@@ -177,3 +177,4 @@ package.json
 
 data/jet_images/
 toktagger/ui/.vite/
+*.tsbuildinfo
