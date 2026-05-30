@@ -8,14 +8,16 @@ from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
-from toktagger.api.models.base import ModelRegistry
-from pydantic import ValidationError
-from collections import defaultdict
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
+    from toktagger.api.models.base import ModelRegistry
     from toktagger.api.worker import train_model, get_predictions
     import ray
+else:
+    ModelRegistry = None
+from pydantic import ValidationError
+from collections import defaultdict
 
 import logging
 

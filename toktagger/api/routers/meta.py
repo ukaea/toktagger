@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Request
 from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.models.base import ModelRegistry
+from toktagger.api.models import models_dependencies_installed
 import typing
+
+if models_dependencies_installed():
+    from toktagger.api.models.base import ModelRegistry
+else:
+    ModelRegistry = None
 
 router = APIRouter(prefix="/meta", tags=["Metadata"])
 

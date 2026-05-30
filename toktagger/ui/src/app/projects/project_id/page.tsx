@@ -26,6 +26,7 @@ import {
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
+import { ProjectMembersDialog } from "./components/members";
 import {
   getSamples,
   getProject,
@@ -40,6 +41,7 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
 import { JumpToNextButton } from "@/app/components/tools/nav";
+import { useAuth } from "@/app/contexts/AuthContext";
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
   return (
@@ -163,6 +165,7 @@ const SamplesTable = ({
 
 export default function ProjectView() {
   const { project_id } = useParams();
+  const { user: currentUser } = useAuth();
   const hasId = project_id !== undefined;
 
   const [samplesPerPage, setSamplesPerPage] = useState<number>(10);
@@ -265,6 +268,12 @@ export default function ProjectView() {
             >
               <Flex gap="size-100" alignItems="center" justifyContent="start">
                 <AddSamplesEditor project={project} onModify={refreshSamples} />
+                {project_id && (
+                  <ProjectMembersDialog
+                    projectId={project_id}
+                    isProjectAdmin={currentUser?.global_role === "admin"}
+                  />
+                )}
                 <DialogTrigger>
                   <Button variant="negative">
                     <Delete /> Clear Samples
