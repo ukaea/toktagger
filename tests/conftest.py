@@ -2,12 +2,16 @@ import pytest
 import pytest_asyncio
 from toktagger.api.main import Server
 from toktagger.api.crud.db import MongoDBClient
-from toktagger.api.schemas.annotations import TimePointBatch
-from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.models.base import ModelRegistry, WorkerRegistry, ActorRegistry
 from toktagger.api.core.data_loaders import LoaderRegistry
+
+try:
+    from toktagger.api.schemas.annotations import TimePointBatch
+    from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
+except Exception:
+    TimePointBatch = None
+    SampleIn = None
+    TimeSeriesFileData = None
 from testcontainers.mongodb import MongoDbContainer
-import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
 import asyncio
 from httpx import AsyncClient, ASGITransport
@@ -18,8 +22,20 @@ import time
 from pymongo import MongoClient
 import tempfile
 import pathlib
-import ray
 import random
+
+try:
+    import ray
+    from toktagger.api.models.base import ModelRegistry, WorkerRegistry, ActorRegistry
+    import tests.db_definitions as db_definitions
+    _models_available = True
+except Exception:
+    _models_available = False
+    ModelRegistry = None
+    WorkerRegistry = None
+    ActorRegistry = None
+    db_definitions = None
+    ray = None
 
 
 @pytest.fixture(scope="session")
@@ -47,12 +63,10 @@ def mongo_container():
 
 @pytest.fixture(scope="package")
 def ray_session():
+    if not _models_available:
+        pytest.skip("ray / model dependencies not installed")
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
         os.environ["MODEL_STORAGE"] = tempd
-        # Ray copies the value of the API_URL env var if already set in this local env
-        # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
-        # Cannot explicitly pass a None, it requires a str:str dict in env_vars
-        # So will pop the env varvalue, init ray, then restore it
         if (api_url := os.environ.get("API_URL")) is not None:
             api_url = os.environ.pop("API_URL")
         ray.init(
@@ -63,11 +77,9 @@ def ray_session():
         if api_url is not None:
             os.environ["API_URL"] = api_url
 
-        # Create a ray actor for use as a model registry
         WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
             ModelRegistry._registry
         )
-        # And one for use as a dataloader registry
         WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
             LoaderRegistry._registry
         )
@@ -91,6 +103,8 @@ async def db_client(mongo_container):
 # Need to use one task registry throughout so that it doesnt spin up a new Actor for all model tests.
 @pytest_asyncio.fixture(scope="session")
 async def task_actor():
+    if not _models_available:
+        pytest.skip("ray / model dependencies not installed")
     yield ActorRegistry(max_actors=1)
 
 
@@ -122,6 +136,8 @@ async def api_client(task_actor, mongo_container):
 
 @pytest_asyncio.fixture(scope="function")
 async def setup_db(db_client):
+    if not _models_available:
+        pytest.skip("ray / model dependencies not installed")
     project_id_1 = await db_client.insert("projects", db_definitions.PROJECT_1)
     await asyncio.sleep(0.01)
     project_id_2 = await db_client.insert("projects", db_definitions.PROJECT_2)
@@ -240,6 +256,8 @@ async def setup_db_small(db_client):
 
 @pytest.fixture(scope="package")
 def setup_model_samples():
+    if not _models_available:
+        pytest.skip("ray / model dependencies not installed")
     # Create sample data for training / predicting a Disruption model
     samples = []
     for i in range(9980, 10000):
