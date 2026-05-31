@@ -52,6 +52,7 @@ class Server:
         self.frontend_path = pathlib.Path(__file__).parent / "static"
 
     def _setup_ray(self):
+        from toktagger.api.auth.core import get_internal_token
         if (api_url := os.environ.get("API_URL")) is None:
             raise ValueError("API URL must be set!")
         if not ray.is_initialized():
@@ -60,6 +61,7 @@ class Server:
                     "env_vars": {
                         "API_URL": api_url,
                         "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
+                        "API_TOKEN": get_internal_token(),
                     }
                 },
             )
