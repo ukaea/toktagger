@@ -1,7 +1,6 @@
 import os
 import ray
 import pathlib
-import shutil
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from toktagger.api.schemas.data import DataParamTypes
@@ -75,10 +74,9 @@ def load_model(
         updates=ModelUpdate(training_status="started"),
     )
 
-    # Copy weights to temporary location inside cache dir
+    # Make sure model storage location in cache dir exists
     model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
     model_dir.mkdir(exist_ok=True)
-    temp_weights_path = model_dir.joinpath(weights_path.name)
 
     # Check worker can see weights file
     if not weights_path.exists():
@@ -91,20 +89,6 @@ def load_model(
             "project_id": project.id,
             "model_id": model.id,
             "message": f"Worker node cannot find weights file at location {weights_path}",
-        }
-    try:
-        shutil.copy(weights_path, temp_weights_path)
-    except PermissionError as e:
-        logger.error(e)
-        send_model_updates(
-            project_id=project.id,
-            model_id=model.id,
-            updates=ModelUpdate(training_status="failed"),
-        )
-        return {
-            "project_id": project.id,
-            "model_id": model.id,
-            "message": "TokTagger does not have the required permissions to copy the weights file!",
         }
 
     model_actor = get_actor(project=project, model=model)
@@ -119,7 +103,6 @@ def load_model(
             model_id=model.id,
             updates=ModelUpdate(training_status="failed"),
         )
-        temp_weights_path.unlink()
         return {
             "project_id": project.id,
             "model_id": model.id,
@@ -131,8 +114,6 @@ def load_model(
         model_dir.joinpath(str(model.id))
     )
     ray.get(save_weights_task)
-
-    temp_weights_path.unlink()
 
     return {"project_id": project.id, "model_id": model.id, "message": None}
 
