@@ -152,11 +152,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         }
       } else if (response.ok) {
         setAnnotations((previousAnnotations: Annotations) => {
-          const otherAnnotations = previousAnnotations.filter(
-            (annotation: Annotation) =>
-              annotation.created_by !== selectedModelName,
-          );
-          return otherAnnotations.concat(payload);
+          return previousAnnotations.concat(payload);
         });
         clearInterval(interval);
         setIsLoading(false);
