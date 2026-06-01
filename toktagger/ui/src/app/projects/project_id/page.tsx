@@ -1,8 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import {
-  Provider,
-  defaultTheme,
   Cell,
   Column,
   Row,
@@ -15,7 +13,6 @@ import {
   Button,
   Picker,
   SearchField,
-  ToastContainer,
   DialogTrigger,
   Dialog,
   Heading,
@@ -37,26 +34,18 @@ import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
-import { useHref, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
 import { JumpToNextButton } from "@/app/components/tools/nav";
 import { useAuth } from "@/app/contexts/AuthContext";
-const SampleBreadCrumbs = ({ project }: { project: Project }) => {
-  const navigate = useNavigate();
-  return (
-    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
-      <Breadcrumbs>
-        <Item key="projects" href={`/ui/projects`}>
-          Projects
-        </Item>
-        <Item key="project" href={`/ui/projects/${project._id}`}>
-          Project: {project.name}
-        </Item>
-      </Breadcrumbs>
-    </Provider>
-  );
-};
+
+const SampleBreadCrumbs = ({ project }: { project: Project }) => (
+  <Breadcrumbs>
+    <Item key="projects" href="/ui/projects">Projects</Item>
+    <Item key="project" href={`/ui/projects/${project._id}`}>Project: {project.name}</Item>
+  </Breadcrumbs>
+);
 
 type SamplesTableProps = {
   project_id: string;
@@ -73,93 +62,90 @@ const SamplesTable = ({
   onSortChange,
   onModify,
 }: SamplesTableProps) => {
-  const navigate = useNavigate();
   const rows = samples.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id,
   }));
 
   return (
-    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
-      <Flex height="size-5000" width="100%" direction="column">
-        <TableView
-          flex
-          aria-label="Samples"
-          selectionMode="none"
-          selectionStyle="highlight"
-          sortDescriptor={sortDescriptor}
-          onSortChange={onSortChange}
-        >
-          <TableHeader>
-            <Column key="shot_id" allowsSorting>
-              Shot ID
-            </Column>
-            <Column key="_id" allowsSorting>
-              Date Created
-            </Column>
-            <Column key="validated_annotations" allowsSorting>
-              Validated
-            </Column>
-            <Column key="actions">Actions</Column>
-          </TableHeader>
-          <TableBody items={rows}>
-            {(item) => (
-              <Row
-                href={`/ui/projects/${project_id}/samples/${item["id"]}?sortColumn=${sortDescriptor.column}&sortDirection=${sortDescriptor.direction}`}
-              >
-                <Cell>{item["shot_id"]}</Cell>
-                <Cell>{item["timestamp"]}</Cell>
-                <Cell>
-                  <Checkbox
-                    isSelected={item["validated_annotations"]}
-                    isReadOnly={true}
-                  />
-                </Cell>
-                <Cell>
-                  <Flex direction="row" gap="size-100">
-                    <DialogTrigger>
-                      <Button aria-label="Delete" variant="negative">
-                        <Delete />
-                      </Button>
-                      {(close) => (
-                        <Dialog>
-                          <Heading>Confirm Deletion</Heading>
-                          <Divider />
-                          <Content>
-                            Are you sure you want to delete sample with Shot ID{" "}
-                            <strong>{item["shot_id"]}</strong>? You will also
-                            lose <strong>all annotations</strong> associated
-                            with this sample. This action cannot be undone.
-                          </Content>
-                          <ButtonGroup>
-                            <Button variant="secondary" onPress={close}>
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="negative"
-                              onPress={async () => {
-                                if (item["id"] == null) {
-                                  return;
-                                }
-                                await deleteSample(project_id, item["id"]);
-                                onModify?.();
-                                close();
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          </ButtonGroup>
-                        </Dialog>
-                      )}
-                    </DialogTrigger>
-                  </Flex>
-                </Cell>
-              </Row>
-            )}
-          </TableBody>
-        </TableView>
-      </Flex>
-    </Provider>
+    <Flex height="size-5000" width="100%" direction="column">
+      <TableView
+        flex
+        aria-label="Samples"
+        selectionMode="none"
+        selectionStyle="highlight"
+        sortDescriptor={sortDescriptor}
+        onSortChange={onSortChange}
+      >
+        <TableHeader>
+          <Column key="shot_id" allowsSorting>
+            Shot ID
+          </Column>
+          <Column key="_id" allowsSorting>
+            Date Created
+          </Column>
+          <Column key="validated_annotations" allowsSorting>
+            Validated
+          </Column>
+          <Column key="actions">Actions</Column>
+        </TableHeader>
+        <TableBody items={rows}>
+          {(item) => (
+            <Row
+              href={`/ui/projects/${project_id}/samples/${item["id"]}?sortColumn=${sortDescriptor.column}&sortDirection=${sortDescriptor.direction}`}
+            >
+              <Cell>{item["shot_id"]}</Cell>
+              <Cell>{item["timestamp"]}</Cell>
+              <Cell>
+                <Checkbox
+                  isSelected={item["validated_annotations"]}
+                  isReadOnly={true}
+                />
+              </Cell>
+              <Cell>
+                <Flex direction="row" gap="size-100">
+                  <DialogTrigger>
+                    <Button aria-label="Delete" variant="negative">
+                      <Delete />
+                    </Button>
+                    {(close) => (
+                      <Dialog>
+                        <Heading>Confirm Deletion</Heading>
+                        <Divider />
+                        <Content>
+                          Are you sure you want to delete sample with Shot ID{" "}
+                          <strong>{item["shot_id"]}</strong>? You will also
+                          lose <strong>all annotations</strong> associated
+                          with this sample. This action cannot be undone.
+                        </Content>
+                        <ButtonGroup>
+                          <Button variant="secondary" onPress={close}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="negative"
+                            onPress={async () => {
+                              if (item["id"] == null) {
+                                return;
+                              }
+                              await deleteSample(project_id, item["id"]);
+                              onModify?.();
+                              close();
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </ButtonGroup>
+                      </Dialog>
+                    )}
+                  </DialogTrigger>
+                </Flex>
+              </Cell>
+            </Row>
+          )}
+        </TableBody>
+      </TableView>
+    </Flex>
   );
 };
 
@@ -254,123 +240,117 @@ export default function ProjectView() {
       <SampleBreadCrumbs project={project} />
       <ModelTrainModal project={project}></ModelTrainModal>
       <ModelPredictModal project={project}></ModelPredictModal>
-      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
-        <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
+      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900">
+        <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
-          <Provider theme={defaultTheme}>
-            <ToastContainer placement="top" />
-            <Flex
-              direction="row"
-              margin="size-100"
-              gap="size-100"
-              alignItems="center"
-              justifyContent="space-between"
-            >
-              <Flex gap="size-100" alignItems="center" justifyContent="start">
-                <AddSamplesEditor project={project} onModify={refreshSamples} />
-                {project_id && (
-                  <ProjectMembersDialog
-                    projectId={project_id}
-                    isProjectAdmin={currentUser?.global_role === "admin"}
-                  />
-                )}
-                <DialogTrigger>
-                  <Button variant="negative">
-                    <Delete /> Clear Samples
-                  </Button>
-                  {(close) => (
-                    <Dialog>
-                      <Heading>Confirm Clear All Samples</Heading>
-                      <Divider />
-                      <Content>
-                        Are you sure you want to delete{" "}
-                        <strong>all samples</strong> in this project? You will
-                        lose <strong>all annotations</strong> associated with
-                        the samples as well. This action cannot be undone.
-                      </Content>
-                      <ButtonGroup>
-                        <Button variant="secondary" onPress={close}>
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="negative"
-                          onPress={async () => {
-                            if (!project_id) {
-                              return;
-                            }
-                            await deleteSamples(project_id);
-                            refreshSamples();
-                            close();
-                          }}
-                        >
-                          Clear All
-                        </Button>
-                      </ButtonGroup>
-                    </Dialog>
-                  )}
-                </DialogTrigger>
-              </Flex>
-              <Flex gap="size-100" alignItems="center" justifyContent="end">
-                <Flex gap="size-100" alignItems="center" marginTop="size-200">
-                  <ImportButton project={project} />
-                  <ExportButton project={project} />
-                  <JumpToNextButton
-                    project={project}
-                    sortDescriptor={sortDescriptor}
-                  />
-                </Flex>
-                <SearchField
-                  label="Search By Shot ID"
-                  // SearchField should be able to do validation when provided a 'pattern' inside a Form element
-                  // But I could not for the life of me get that to work, so will do it manually...
-                  onSubmit={onSearchSubmit}
-                  validationState={errorMessage ? "invalid" : undefined}
-                  errorMessage={errorMessage}
+          <Flex
+            direction="row"
+            margin="size-100"
+            gap="size-100"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Flex gap="size-100" alignItems="center" justifyContent="start">
+              <AddSamplesEditor project={project} onModify={refreshSamples} />
+              {project_id && (
+                <ProjectMembersDialog
+                  projectId={project_id}
+                  isProjectAdmin={currentUser?.global_role === "admin"}
                 />
-              </Flex>
+              )}
+              <DialogTrigger>
+                <Button variant="negative">
+                  <Delete /> Clear Samples
+                </Button>
+                {(close) => (
+                  <Dialog>
+                    <Heading>Confirm Clear All Samples</Heading>
+                    <Divider />
+                    <Content>
+                      Are you sure you want to delete{" "}
+                      <strong>all samples</strong> in this project? You will
+                      lose <strong>all annotations</strong> associated with
+                      the samples as well. This action cannot be undone.
+                    </Content>
+                    <ButtonGroup>
+                      <Button variant="secondary" onPress={close}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="negative"
+                        onPress={async () => {
+                          if (!project_id) {
+                            return;
+                          }
+                          await deleteSamples(project_id);
+                          refreshSamples();
+                          close();
+                        }}
+                      >
+                        Clear All
+                      </Button>
+                    </ButtonGroup>
+                  </Dialog>
+                )}
+              </DialogTrigger>
             </Flex>
-            <SamplesTable
-              project_id={project_id}
-              samples={samples}
-              sortDescriptor={sortDescriptor}
-              onSortChange={onSortChange}
-              onModify={refreshSamples}
-            ></SamplesTable>
-            <div className="flex items-center justify-between pl-4 pr-4">
-              <Button
-                variant="primary"
-                onPress={() => setCurrentPage((p) => p - 1)}
-                isDisabled={currentPage === 1}
+            <Flex gap="size-100" alignItems="center" justifyContent="end">
+              <ImportButton project={project} />
+              <ExportButton project={project} />
+              <JumpToNextButton
+                project={project}
+                sortDescriptor={sortDescriptor}
+              />
+              <SearchField
+                aria-label="Search By Shot ID"
+                placeholder="Search by Shot ID"
+                onSubmit={onSearchSubmit}
+                validationState={errorMessage ? "invalid" : undefined}
+                errorMessage={errorMessage}
+              />
+            </Flex>
+          </Flex>
+          <SamplesTable
+            project_id={project_id}
+            samples={samples}
+            sortDescriptor={sortDescriptor}
+            onSortChange={onSortChange}
+            onModify={refreshSamples}
+          />
+          <div className="flex items-center justify-between pl-4 pr-4">
+            <Button
+              variant="primary"
+              onPress={() => setCurrentPage((p) => p - 1)}
+              isDisabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center justify-center gap-8 pb-2">
+              <p> Page: {currentPage} </p>
+              <Picker
+                label="Samples per Page:"
+                onSelectionChange={(selectedKey) => {
+                  if (selectedKey != null) {
+                    setSamplesPerPage(Number(selectedKey) || 10);
+                    setCurrentPage(1);
+                  }
+                }}
+                defaultSelectedKey="10"
               >
-                Previous
-              </Button>
-              <div className="flex items-center justify-center gap-8 pb-2">
-                <p> Page: {currentPage} </p>
-                <Picker
-                  label="Samples per Page:"
-                  onSelectionChange={(selectedKey) => {
-                    if (selectedKey != null) {
-                      setSamplesPerPage(Number(selectedKey) || 10);
-                      setCurrentPage(1);
-                    }
-                  }}
-                  defaultSelectedKey="10"
-                >
-                  <Item key="5">5</Item>
-                  <Item key="10">10</Item>
-                  <Item key="25">25</Item>
-                  <Item key="50">50</Item>
-                </Picker>
-              </div>
-              <Button
-                variant="primary"
-                onPress={() => setCurrentPage((p) => p + 1)}
-                isDisabled={samples.length < samplesPerPage}
-              >
-                Next
-              </Button>
+                <Item key="5">5</Item>
+                <Item key="10">10</Item>
+                <Item key="25">25</Item>
+                <Item key="50">50</Item>
+              </Picker>
             </div>
-          </Provider>
+            <Button
+              variant="primary"
+              onPress={() => setCurrentPage((p) => p + 1)}
+              isDisabled={samples.length < samplesPerPage}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </div>
     </div>

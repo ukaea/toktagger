@@ -1,5 +1,6 @@
 import webbrowser
 import argparse
+import subprocess
 from toktagger.api.main import Server
 from toktagger.api.models import models_dependencies_installed
 import uvicorn
@@ -41,7 +42,11 @@ def main():
         "--no-browser", action="store_true", help="Don't open a browser"
     )
     argparser.add_argument(
-        "--reload", action="store_true", help="Reload the API on changes"
+        "--reload", action="store_true", help="Reload the API on changes (single-worker only)"
+    )
+    argparser.add_argument(
+        "--workers", default=1, type=int,
+        help="Number of worker processes. Use >1 for multi-user/team deployments (requires Gunicorn)"
     )
     args = argparser.parse_args()
     open_browser = not args.no_browser
@@ -50,13 +55,21 @@ def main():
 
     os.environ["API_URL"] = f"http://{args.host}:{args.port}"
 
-    uvicorn.run(
-        "toktagger.api.cli:create_app",
-        factory=True,
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-    )
+    if args.workers > 1:
+        subprocess.run([
+            "gunicorn", "toktagger.api.asgi:app",
+            "--worker-class", "uvicorn.workers.UvicornWorker",
+            "--workers", str(args.workers),
+            "--bind", f"{args.host}:{args.port}",
+        ], check=True)
+    else:
+        uvicorn.run(
+            "toktagger.api.cli:create_app",
+            factory=True,
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+        )
 
 
 if __name__ == "__main__":

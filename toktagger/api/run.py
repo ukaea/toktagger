@@ -1,13 +1,27 @@
+import subprocess
 import uvicorn
 import os
 
 if __name__ == "__main__":
-    os.environ["API_URL"] = "http://0.0.0.0:8002"
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", 8002))
+    workers = int(os.environ.get("WORKERS", 1))
+    reload = os.environ.get("RELOAD", "false").lower() == "true"
 
-    uvicorn.run(
-        "toktagger.api.cli:create_app",
-        factory=True,
-        host="0.0.0.0",
-        port=8002,
-        reload=True if os.environ.get("RELOAD") == "true" else False,
-    )
+    os.environ["API_URL"] = f"http://{host}:{port}"
+
+    if workers > 1:
+        subprocess.run([
+            "gunicorn", "toktagger.api.asgi:app",
+            "--worker-class", "uvicorn.workers.UvicornWorker",
+            "--workers", str(workers),
+            "--bind", f"{host}:{port}",
+        ], check=True)
+    else:
+        uvicorn.run(
+            "toktagger.api.cli:create_app",
+            factory=True,
+            host=host,
+            port=port,
+            reload=reload,
+        )
