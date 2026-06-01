@@ -146,7 +146,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         // Predictions queued but not done yet, so continue to poll
         pollCounter += 1;
         if (pollCounter > 30) {
-          setMessage("Failed to retrieve predictions result.");
+          setMessage("Predictions timed out - try refreshing the page later!");
           clearInterval(interval);
           setIsLoading(false);
         }
