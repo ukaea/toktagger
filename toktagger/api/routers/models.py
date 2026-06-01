@@ -718,7 +718,9 @@ async def get_sample_predictions(
         prediction_annotations = result.get("annotations_batch")
 
         # Check that annotations contain results for this sample ID
-        if not any(ann.sample_id == sample_id for ann in prediction_annotations):
+        if prediction_annotations and not all(
+            ann.sample_id == sample_id for ann in prediction_annotations
+        ):
             raise HTTPException(
                 status_code=404,
                 detail="This task does not have results for the specified sample!",
