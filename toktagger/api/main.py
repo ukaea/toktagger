@@ -67,7 +67,7 @@ class Server:
 
         # Create a task registry
         self.app.state.task_registry = ActorRegistry(
-            max_actors=os.environ.get("MAX_ACTORS", 5)
+            max_cpu_actors=os.environ.get("MAX_ACTORS", None), max_gpu_actors=None
         )
 
     def _setup_app(self):
