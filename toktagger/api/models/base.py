@@ -385,11 +385,13 @@ class ActorRegistry:
         cpus_available = cluster_resources.get("CPU") or os.cpu_count()
 
         if max_gpu_actors is None:
-            self.max_gpu_actors = cluster_resources.get("GPU", 0) - 1
+            max_gpu_actors = cluster_resources.get("GPU", 0) - 1
+        self.max_gpu_actors = max_gpu_actors
         if max_actors is None:
             # Each GPU actor also gets a CPU so subtract these
             # Then subtract one for head node, one for server, one free space
-            self.max_actors = cpus_available - self.max_gpu_actors - 3
+            max_actors = cpus_available - self.max_gpu_actors - 3
+        self.max_actors = max_actors
 
         if self.max_actors < 1:
             raise ValueError(

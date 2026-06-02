@@ -31,16 +31,12 @@ models_dir_default.mkdir(parents=True, exist_ok=True)
 os.environ["MODEL_STORAGE"] = os.environ.get("MODEL_STORAGE", str(models_dir_default))
 
 
-def get_actor(project: Project, model: Model, gpu_required: bool):
+def get_actor(project: Project, model: Model):
     try:
         logger.info(f"Finding actor for model {model.id}")
         ml_model = ray.get_actor(model.id)
         logger.info("Found existing actor!")
 
-        # Check if this actor has correct numbers of GPUs
-        gpu_available: bool = ray.get(ml_model.gpu_available.remote())
-        if gpu_required and not gpu_available:
-            raise ValueError("GPU required but not available!")
     except ValueError:
         # Actor not alive, so load from weights
         logger.info("Actor not found, loading from disk...")
@@ -49,7 +45,9 @@ def get_actor(project: Project, model: Model, gpu_required: bool):
         model_type = ray.get(model_registry.get.remote(model.type))
 
         ml_model = (
-            ray.remote(model_type, num_gpus=1 if gpu_required else 0)
+            ray.remote(
+                model_type, num_gpus=1 if os.environ.get("GPU_ENABLED", None) else 0
+            )
             .options(name=model.id, lifetime="detached")
             .remote(
                 model_id=str(model.id),
@@ -68,7 +66,7 @@ def get_actor(project: Project, model: Model, gpu_required: bool):
     return ml_model
 
 
-@ray.remote
+@ray.remote(num_cpus=0.1)
 def load_model(
     model: Model, project: Project, weights_path: pathlib.Path
 ) -> tuple[str, str | None]:
@@ -123,7 +121,7 @@ def load_model(
     return {"project_id": project.id, "model_id": model.id, "message": None}
 
 
-@ray.remote
+@ray.remote(num_cpus=0.1)
 def train_model(
     model: Model,
     project: Project,
@@ -167,7 +165,7 @@ def train_model(
         raise e
 
 
-@ray.remote
+@ray.remote(num_cpus=0.1)
 def get_predictions(
     project: Project,
     model: Model,
