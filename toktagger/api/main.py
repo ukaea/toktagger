@@ -47,20 +47,12 @@ class Server:
     def _setup_ray(self):
         if (api_url := os.environ.get("API_URL")) is None:
             raise ValueError("API URL must be set!")
-
-        # Create a task registry
-        self.app.state.task_registry = ActorRegistry(
-            max_actors=os.environ.get("MAX_ACTORS", None),
-            max_gpu_actors=os.environ.get("MAX_GPU_ACTORS", None),
-        )
-
         if not ray.is_initialized():
             ray.init(
                 runtime_env={
                     "env_vars": {
                         "API_URL": api_url,
                         "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
-                        "GPU_ENABLED": self.app.state.task_registry.gpu_enabled,
                     }
                 },
             )
@@ -72,6 +64,12 @@ class Server:
             WorkerRegistry.options(
                 name="WorkerLoaderRegistry", lifetime="detached"
             ).remote(LoaderRegistry._registry)
+
+        # Create a task registry
+        self.app.state.task_registry = ActorRegistry(
+            max_actors=os.environ.get("MAX_ACTORS", None),
+            max_gpu_actors=os.environ.get("MAX_GPU_ACTORS", None),
+        )
 
     def _setup_app(self):
         self.app = FastAPI(lifespan=lifespan)

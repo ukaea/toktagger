@@ -249,6 +249,7 @@ async def start_model_training(
         samples=samples,
         annotations=annotations_2d,
         params=params_validated,
+        use_gpu=task_registry.gpu_enabled,
     )
 
     task_id = task_registry.register(train_task)
@@ -397,7 +398,10 @@ async def load_model_weights(
         )
 
         task = load_model.remote(
-            project=project, model=model, weights_path=weights_path
+            project=project,
+            model=model,
+            weights_path=weights_path,
+            use_gpu=task_registry.gpu_enabled,
         )
         task_id = task_registry.register(task)
         task_registry.update_actors(model.id)
@@ -568,7 +572,11 @@ async def predict(
         samples = random.sample(selected_samples, num_predictions)
 
     predict_task = get_predictions.remote(
-        project=project, model=model, samples=samples, params=params_validated
+        project=project,
+        model=model,
+        samples=samples,
+        params=params_validated,
+        use_gpu=task_registry.gpu_enabled,
     )
     task_id = task_registry.register(predict_task)
     task_registry.update_actors(model.id)
@@ -649,6 +657,7 @@ async def create_sample_predictions(
         samples=[sample],
         params=params_validated,
         data_params=data_params,
+        use_gpu=task_registry.gpu_enabled,
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)

@@ -31,11 +31,18 @@ models_dir_default.mkdir(parents=True, exist_ok=True)
 os.environ["MODEL_STORAGE"] = os.environ.get("MODEL_STORAGE", str(models_dir_default))
 
 
-def get_actor(project: Project, model: Model):
+def get_actor(project: Project, model: Model, use_gpu: bool):
     try:
         logger.info(f"Finding actor for model {model.id}")
         ml_model = ray.get_actor(model.id)
         logger.info("Found existing actor!")
+
+        # Check if actor has GPU enabled
+        gpu_available = ray.get(ml_model.gpu_available.remote())
+        if use_gpu and not gpu_available:
+            # Stop existing actor
+            ray.get(ml_model.__ray_terminate__.remote())
+            raise ValueError("Actor has no GPU, but GPU has been requested.")
 
     except ValueError:
         # Actor not alive, so load from weights
@@ -45,9 +52,7 @@ def get_actor(project: Project, model: Model):
         model_type = ray.get(model_registry.get.remote(model.type))
 
         ml_model = (
-            ray.remote(
-                model_type, num_gpus=1 if os.environ.get("GPU_ENABLED", None) else 0
-            )
+            ray.remote(num_gpus=1 if use_gpu else 0)(model_type)
             .options(name=model.id, lifetime="detached")
             .remote(
                 model_id=str(model.id),
@@ -68,7 +73,7 @@ def get_actor(project: Project, model: Model):
 
 @ray.remote(num_cpus=0.1)
 def load_model(
-    model: Model, project: Project, weights_path: pathlib.Path
+    model: Model, project: Project, weights_path: pathlib.Path, use_gpu: bool = False
 ) -> tuple[str, str | None]:
     # Change status to started
     send_model_updates(
@@ -94,7 +99,7 @@ def load_model(
             "message": f"Worker node cannot find weights file at location {weights_path}",
         }
 
-    model_actor = get_actor(project=project, model=model)
+    model_actor = get_actor(project=project, model=model, use_gpu=use_gpu)
     # Try loading actor with weights file, catch and reraise any errors
     try:
         load_temp_weights_task = model_actor.wrapped_load.remote(str(weights_path))
@@ -128,8 +133,9 @@ def train_model(
     samples: list[Sample],
     annotations: list[list[AnnotationOutTypes]],
     params: pydantic.BaseModel | None,
+    use_gpu: bool = False,
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
-    model_actor = get_actor(project=project, model=model)
+    model_actor = get_actor(project=project, model=model, use_gpu=use_gpu)
     try:
         logger.info(f"Running model training for project {project.id}")
         model_actor.log_progress.remote(training_status="started", progress=0)
@@ -172,6 +178,7 @@ def get_predictions(
     samples: list[Sample],
     params: pydantic.BaseModel,
     data_params: DataParamTypes | None = None,
+    use_gpu: bool = False,
 ):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
@@ -179,7 +186,7 @@ def get_predictions(
     logger.info(
         f"Creating predictions for project {project.id} on {len(samples)} samples."
     )
-    model_actor = get_actor(project=project, model=model)
+    model_actor = get_actor(project=project, model=model, use_gpu=use_gpu)
 
     predictions_task = model_actor.wrapped_predict.remote(
         samples=samples, params=params, data_params=data_params
