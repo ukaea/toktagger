@@ -763,7 +763,6 @@ export function VideoSessionProvider(props: {
 
         if (!parsed) continue;
 
-
         if (!parsed.success) {
           invalid += 1;
           continue;
