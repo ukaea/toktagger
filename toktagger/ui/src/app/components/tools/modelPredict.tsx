@@ -21,6 +21,7 @@ import {
   Selection,
   Tooltip,
   TooltipTrigger,
+  Switch,
 } from "@adobe/react-spectrum";
 import Workflow from "@spectrum-icons/workflow/Workflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
@@ -32,6 +33,7 @@ import {
   stopTraining,
   getModelPredictSchema,
 } from "@/app/core";
+import { useServerHealth } from "@/app/contexts/healthContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 
 import { RJSFSchema } from "@rjsf/utils";
@@ -51,6 +53,7 @@ export function ModelPredictModal({
   );
   const [models, setModels] = useState<Model[] | null>(null);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
+  const [useGPU, setUseGPU] = useState<boolean>(false);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
     Record<string, unknown>
@@ -60,7 +63,7 @@ export function ModelPredictModal({
     undefined,
   );
   const [numPredictions, setNumPredictions] = useState<number>(20);
-
+  const { gpuAvailable } = useServerHealth();
   const onSelectModel = (keys: Selection) => {
     setSelectedKeys(keys);
 
@@ -158,6 +161,7 @@ export function ModelPredictModal({
       selectedModel.type,
       selectedModel.version,
       numPredictions,
+      useGPU,
       params,
     );
 
@@ -276,13 +280,23 @@ export function ModelPredictModal({
               </TableView>
             )}
             {schema && (
-              <ModelForm
-                ref={formRef}
-                schema={schema}
-                onSubmit={submitPredictJob}
-                formData={unvalidatedFormData}
-                setFormData={setUnvalidatedFormData}
-              />
+              <Flex direction="column" width="100%">
+                <Switch
+                  marginTop={"size-200"}
+                  isSelected={useGPU}
+                  onChange={setUseGPU}
+                  isDisabled={!gpuAvailable}
+                >
+                  Use GPU
+                </Switch>
+                <ModelForm
+                  ref={formRef}
+                  schema={schema}
+                  onSubmit={submitPredictJob}
+                  formData={unvalidatedFormData}
+                  setFormData={setUnvalidatedFormData}
+                />
+              </Flex>
             )}
           </Content>
           <Footer>
