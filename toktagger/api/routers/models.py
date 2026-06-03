@@ -163,12 +163,21 @@ async def start_model_training(
     request: Request,
     project_id: str,
     model_type: str,
+    use_gpu: bool = Query(False, "Whether to use GPU to train the model"),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
 ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
+
+    # If GPU requested but not available, return error
+    if use_gpu and not task_registry.gpu_enabled:
+        raise HTTPException(
+            status_code=409,
+            detail="GPU was requested but GPU support not enabled on server!",
+        )
+
     project = await utils.get_project(db_client, project_id)
     # Check that this model type is valid for this project
     if model_type not in project.model_types:
@@ -249,7 +258,7 @@ async def start_model_training(
         samples=samples,
         annotations=annotations_2d,
         params=params_validated,
-        use_gpu=task_registry.gpu_enabled,
+        use_gpu=use_gpu,
     )
 
     task_id = task_registry.register(train_task)
@@ -401,7 +410,6 @@ async def load_model_weights(
             project=project,
             model=model,
             weights_path=weights_path,
-            use_gpu=task_registry.gpu_enabled,
         )
         task_id = task_registry.register(task)
         task_registry.update_actors(model.id)
@@ -513,12 +521,20 @@ async def predict(
         None,
         description="A list of specific sample IDs to make predictions for, leave blank for random selection.",
     ),
+    use_gpu: bool = Query(False, "Whether to use GPU to create these predictions"),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
 ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
+
+    # If GPU requested but not available, return error
+    if use_gpu and not task_registry.gpu_enabled:
+        raise HTTPException(
+            status_code=409,
+            detail="GPU was requested but GPU support not enabled on server!",
+        )
 
     project = await utils.get_project(db_client, project_id)
 
@@ -576,7 +592,7 @@ async def predict(
         model=model,
         samples=samples,
         params=params_validated,
-        use_gpu=task_registry.gpu_enabled,
+        use_gpu=use_gpu,
     )
     task_id = task_registry.register(predict_task)
     task_registry.update_actors(model.id)
@@ -623,6 +639,7 @@ async def create_sample_predictions(
         description="The ID of the sample to make model predictions for."
     ),
     model_type: str = Path(description="The type of model to make predictions from."),
+    use_gpu: bool = Query(False, "Whether to use GPU to create these predictions"),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
@@ -632,6 +649,13 @@ async def create_sample_predictions(
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
+
+    # If GPU requested but not available, return error
+    if use_gpu and not task_registry.gpu_enabled:
+        raise HTTPException(
+            status_code=409,
+            detail="GPU was requested but GPU support not enabled on server!",
+        )
 
     project = await utils.get_project(db_client, project_id)
 

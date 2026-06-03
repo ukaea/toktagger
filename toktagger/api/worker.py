@@ -73,7 +73,7 @@ def get_actor(project: Project, model: Model, use_gpu: bool):
 
 @ray.remote(num_cpus=0.1)
 def load_model(
-    model: Model, project: Project, weights_path: pathlib.Path, use_gpu: bool = False
+    model: Model, project: Project, weights_path: pathlib.Path
 ) -> tuple[str, str | None]:
     # Change status to started
     send_model_updates(
@@ -99,7 +99,7 @@ def load_model(
             "message": f"Worker node cannot find weights file at location {weights_path}",
         }
 
-    model_actor = get_actor(project=project, model=model, use_gpu=use_gpu)
+    model_actor = get_actor(project=project, model=model, use_gpu=False)
     # Try loading actor with weights file, catch and reraise any errors
     try:
         load_temp_weights_task = model_actor.wrapped_load.remote(str(weights_path))
