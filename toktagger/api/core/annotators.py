@@ -710,6 +710,14 @@ class Profile2DThresholdAnnotator:
             contours = measure.find_contours(region_mask, 0.5)
 
             for contour in contours:
+                if (
+                    self.params.max_polygon_points
+                    and len(contour) > self.params.max_polygon_points
+                ):
+                    indices = np.round(
+                        np.linspace(0, len(contour) - 1, self.params.max_polygon_points)
+                    ).astype(int)
+                    contour = contour[indices]
                 # Contour coordinates are (row, col), convert to (x, y)
                 contour_coords = [
                     (int(np.round(c[1])), int(np.round(c[0]))) for c in contour
