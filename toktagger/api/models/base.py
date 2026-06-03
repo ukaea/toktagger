@@ -115,7 +115,7 @@ class Model(ABC):
     @typing.final
     def gpu_available(self) -> bool:
         assigned_resources = ray.get_runtime_context().get_assigned_resources()
-        return True if assigned_resources.get("gpu") else False
+        return True if assigned_resources.get("GPU") else False
 
     def log_progress(
         self,
@@ -382,10 +382,12 @@ class ActorRegistry:
             Maximum number of GPU actors to keep alive simultaneously
         """
         cluster_resources = ray.cluster_resources()
-        cpus_available = cluster_resources.get("CPU") or os.cpu_count()
+        cpus_available = int(cluster_resources.get("CPU")) or os.cpu_count()
+        if not cpus_available:
+            raise RuntimeError("Failed to detect any CPUs!")
 
         if max_gpu_actors is None:
-            max_gpu_actors = cluster_resources.get("GPU", 0) - 1
+            max_gpu_actors = int(cluster_resources.get("GPU", 0)) - 1
         self.max_gpu_actors = max_gpu_actors
         if max_actors is None:
             # Each GPU actor also gets a CPU so subtract these

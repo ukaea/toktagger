@@ -489,7 +489,7 @@ async def import_annotations(
 
         # Set shot_id for each annotation
         for annotation in sample_annotations:
-            annotation.sample_id = sample_obj_id
+            annotation.sample_id = sample_id
             annotation.shot_id = shot_id
 
         ids["sample_id"] = sample_obj_id
