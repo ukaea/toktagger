@@ -163,7 +163,7 @@ async def start_model_training(
     request: Request,
     project_id: str,
     model_type: str,
-    use_gpu: bool = Query(False, "Whether to use GPU to train the model"),
+    use_gpu: bool = Query(False, description="Whether to use GPU to train the model"),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
@@ -521,7 +521,9 @@ async def predict(
         None,
         description="A list of specific sample IDs to make predictions for, leave blank for random selection.",
     ),
-    use_gpu: bool = Query(False, "Whether to use GPU to create these predictions"),
+    use_gpu: bool = Query(
+        False, description="Whether to use GPU to create these predictions"
+    ),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
@@ -639,7 +641,9 @@ async def create_sample_predictions(
         description="The ID of the sample to make model predictions for."
     ),
     model_type: str = Path(description="The type of model to make predictions from."),
-    use_gpu: bool = Query(False, "Whether to use GPU to create these predictions"),
+    use_gpu: bool = Query(
+        False, description="Whether to use GPU to create these predictions"
+    ),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
