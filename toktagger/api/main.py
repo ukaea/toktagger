@@ -33,7 +33,7 @@ if models_dependencies_installed():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    mongo_url = os.environ.get("MONGO_URL", "./toktagger_db")
+    mongo_url = os.environ.get("MONGO_URL", "default")
     db_name = "annotate_db"
 
     app.state.db_client = MongoDBClient(mongo_url, db_name)

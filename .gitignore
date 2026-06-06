@@ -178,3 +178,6 @@ package.json
 data/jet_images/
 toktagger/ui/.vite/
 *.tsbuildinfo
+
+# Local Mongita database directory (should live in user cache dir, not the repo)
+toktagger_db/
