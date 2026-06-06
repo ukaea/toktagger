@@ -57,6 +57,11 @@ def uda_test(uda_env_vars):
 
 @pytest.fixture(scope="session")
 def mongo_container():
+    try:
+        import docker
+        docker.from_env().ping()
+    except Exception:
+        pytest.skip("Docker not available — skipping MongoDB container tests")
     with MongoDbContainer("mongo:8.0") as mongo:
         yield mongo.get_connection_url()
 

@@ -1,7 +1,16 @@
 import pathlib
 import random
-import ray
 import pydantic
+from toktagger.api.models import models_dependencies_installed
+
+if models_dependencies_installed():
+    import ray
+else:
+    class _RayStub:
+        @staticmethod
+        def remote(cls):
+            return cls
+    ray = _RayStub()  # type: ignore[assignment]
 from toktagger.api.schemas.annotators import AnnotatorTypes
 from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
 from toktagger.api.schemas.samples import (
@@ -288,7 +297,7 @@ MODEL_2 = ModelIn(
     score=90,
 )
 MODEL_3 = ModelIn(
-    type="disruption_cnn",
+    type="mock_disruption_cnn",
     version=3,
     training_status="started",
     progress=50,

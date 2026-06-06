@@ -1,4 +1,5 @@
 import pytest
+ray = pytest.importorskip("ray")
 import pathlib
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models.base import ActorRegistry
@@ -7,7 +8,6 @@ from toktagger.api.core.sender import (
     send_batch_annotations,
     send_model_updates,
 )
-import ray
 from unittest.mock import patch
 from bson import ObjectId
 import os
