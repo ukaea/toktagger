@@ -1,17 +1,18 @@
 import pytest
+
 ray = pytest.importorskip("ray")
-import pathlib
-from toktagger.api.schemas.models import ModelUpdate
-from toktagger.api.models.base import ActorRegistry
-from toktagger.api.core.sender import (
+import pathlib  # noqa: E402
+from toktagger.api.schemas.models import ModelUpdate  # noqa: E402
+from toktagger.api.models.base import ActorRegistry  # noqa: E402
+from toktagger.api.core.sender import (  # noqa: E402
     send_batch_samples,
     send_batch_annotations,
     send_model_updates,
 )
-from unittest.mock import patch
-from bson import ObjectId
-import os
-import time
+from unittest.mock import patch  # noqa: E402
+from bson import ObjectId  # noqa: E402
+import os  # noqa: E402
+import time  # noqa: E402
 
 
 def wait_for_results(task_registry: ActorRegistry, task_id: str):

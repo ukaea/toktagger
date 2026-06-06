@@ -1,11 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  Breadcrumbs,
-  Item,
-  Flex,
-} from "@adobe/react-spectrum";
+import { Breadcrumbs, Item, Flex } from "@adobe/react-spectrum";
 import { Project, Sample, TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 // import { SpectrogramView } from "@/app/spectrogram/components/spectrogram";

@@ -33,8 +33,9 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) =>
-        project?.model_types.some((t) => ann.created_by === modelCreatedBy(t)) ||
-        false,
+        project?.model_types.some(
+          (t) => ann.created_by === modelCreatedBy(t),
+        ) || false,
     );
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);

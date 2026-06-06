@@ -34,7 +34,7 @@ import Delete from "@spectrum-icons/workflow/Delete";
 import type { Project, Sample } from "@/types";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
 import { JumpToNextButton } from "@/app/components/tools/nav";
@@ -42,8 +42,12 @@ import { useAuth } from "@/app/contexts/AuthContext";
 
 const SampleBreadCrumbs = ({ project }: { project: Project }) => (
   <Breadcrumbs>
-    <Item key="projects" href="/ui/projects">Projects</Item>
-    <Item key="project" href={`/ui/projects/${project._id}`}>Project: {project.name}</Item>
+    <Item key="projects" href="/ui/projects">
+      Projects
+    </Item>
+    <Item key="project" href={`/ui/projects/${project._id}`}>
+      Project: {project.name}
+    </Item>
   </Breadcrumbs>
 );
 
@@ -114,9 +118,9 @@ const SamplesTable = ({
                         <Divider />
                         <Content>
                           Are you sure you want to delete sample with Shot ID{" "}
-                          <strong>{item["shot_id"]}</strong>? You will also
-                          lose <strong>all annotations</strong> associated
-                          with this sample. This action cannot be undone.
+                          <strong>{item["shot_id"]}</strong>? You will also lose{" "}
+                          <strong>all annotations</strong> associated with this
+                          sample. This action cannot be undone.
                         </Content>
                         <ButtonGroup>
                           <Button variant="secondary" onPress={close}>
@@ -269,8 +273,8 @@ export default function ProjectView() {
                     <Content>
                       Are you sure you want to delete{" "}
                       <strong>all samples</strong> in this project? You will
-                      lose <strong>all annotations</strong> associated with
-                      the samples as well. This action cannot be undone.
+                      lose <strong>all annotations</strong> associated with the
+                      samples as well. This action cannot be undone.
                     </Content>
                     <ButtonGroup>
                       <Button variant="secondary" onPress={close}>

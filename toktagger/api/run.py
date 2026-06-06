@@ -11,12 +11,19 @@ if __name__ == "__main__":
     os.environ["API_URL"] = f"http://{host}:{port}"
 
     if workers > 1:
-        subprocess.run([
-            "gunicorn", "toktagger.api.asgi:app",
-            "--worker-class", "uvicorn.workers.UvicornWorker",
-            "--workers", str(workers),
-            "--bind", f"{host}:{port}",
-        ], check=True)
+        subprocess.run(
+            [
+                "gunicorn",
+                "toktagger.api.asgi:app",
+                "--worker-class",
+                "uvicorn.workers.UvicornWorker",
+                "--workers",
+                str(workers),
+                "--bind",
+                f"{host}:{port}",
+            ],
+            check=True,
+        )
     else:
         uvicorn.run(
             "toktagger.api.cli:create_app",

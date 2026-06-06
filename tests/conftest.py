@@ -28,6 +28,7 @@ try:
     import ray
     from toktagger.api.models.base import ModelRegistry, WorkerRegistry, ActorRegistry
     import tests.db_definitions as db_definitions
+
     _models_available = True
 except Exception:
     _models_available = False
@@ -59,6 +60,7 @@ def uda_test(uda_env_vars):
 def mongo_container():
     try:
         import docker
+
         docker.from_env().ping()
     except Exception:
         pytest.skip("Docker not available — skipping MongoDB container tests")

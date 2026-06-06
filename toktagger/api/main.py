@@ -53,6 +53,7 @@ class Server:
 
     def _setup_ray(self):
         from toktagger.api.auth.core import get_internal_token
+
         if (api_url := os.environ.get("API_URL")) is None:
             raise ValueError("API URL must be set!")
         if not ray.is_initialized():

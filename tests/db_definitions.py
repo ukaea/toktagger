@@ -6,10 +6,12 @@ from toktagger.api.models import models_dependencies_installed
 if models_dependencies_installed():
     import ray
 else:
+
     class _RayStub:
         @staticmethod
         def remote(cls):
             return cls
+
     ray = _RayStub()  # type: ignore[assignment]
 from toktagger.api.schemas.annotators import AnnotatorTypes
 from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
