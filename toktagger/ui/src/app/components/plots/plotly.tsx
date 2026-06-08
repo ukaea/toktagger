@@ -624,8 +624,12 @@ export const PlotlyWidget = ({
           (shape.xref as string | undefined)?.replace("x", "") ?? "";
         const ySuffix =
           (shape.yref as string | undefined)?.replace("y", "") ?? "";
-         
-        const fullLayout = (plot as { _fullLayout: Record<string, { p2d: (v: number) => number }> })._fullLayout;
+
+        const fullLayout = (
+          plot as {
+            _fullLayout: Record<string, { p2d: (v: number) => number }>;
+          }
+        )._fullLayout;
         const shapeXaxis = fullLayout[`xaxis${xSuffix}`] ?? fullLayout.xaxis;
         const shapeYaxis = fullLayout[`yaxis${ySuffix}`] ?? fullLayout.yaxis;
 
