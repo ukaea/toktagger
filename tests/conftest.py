@@ -17,9 +17,9 @@ import requests
 import time
 from pymongo import MongoClient
 import tempfile
-import pathlib
 import ray
 import random
+import toktagger.api.config as config
 
 
 @pytest.fixture(scope="session")
@@ -45,34 +45,46 @@ def mongo_container():
         yield mongo.get_connection_url()
 
 
-@pytest.fixture(scope="package")
-def ray_session():
+@pytest.fixture(scope="session")
+def settings(mongo_container):
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
-        os.environ["MODEL_STORAGE"] = tempd
-        # Ray copies the value of the API_URL env var if already set in this local env
-        # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
-        # Cannot explicitly pass a None, it requires a str:str dict in env_vars
-        # So will pop the env varvalue, init ray, then restore it
-        if (api_url := os.environ.get("API_URL")) is not None:
-            api_url = os.environ.pop("API_URL")
-        ray.init(
-            ignore_reinit_error=True,
-            include_dashboard=False,
-            runtime_env={"env_vars": {"MODEL_STORAGE": tempd}},
+        settings = config.Settings(
+            server=config.Server(),
+            models=config.Models(cache_dir=tempd, max_actors=1),
+            database=config.Database(mongo_url=mongo_container),
+            uda=config.UDA(),
+            sal=config.SAL(),
         )
-        if api_url is not None:
-            os.environ["API_URL"] = api_url
+        config.settings = settings
+        yield settings
 
-        # Create a ray actor for use as a model registry
-        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
-            ModelRegistry._registry
-        )
-        # And one for use as a dataloader registry
-        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
-            LoaderRegistry._registry
-        )
-        yield
-        ray.shutdown()
+
+@pytest.fixture(scope="package")
+def ray_session(settings):
+    # Ray copies the value of the API_URL env var if already set in this local env
+    # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
+    # Cannot explicitly pass a None, it requires a str:str dict in env_vars
+    # So will pop the env var value, init ray, then restore it
+    if (api_url := os.environ.get("API_URL")) is not None:
+        os.environ.pop("API_URL")
+    ray.init(
+        ignore_reinit_error=True,
+        include_dashboard=False,
+        runtime_env={"env_vars": {"MODEL_STORAGE": str(settings.models.cache_dir)}},
+    )
+    if api_url is not None:
+        os.environ["API_URL"] = api_url
+
+    # Create a ray actor for use as a model registry
+    WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
+        ModelRegistry._registry
+    )
+    # And one for use as a dataloader registry
+    WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
+        LoaderRegistry._registry
+    )
+    yield
+    ray.shutdown()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -95,8 +107,7 @@ async def task_actor():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def api_client(task_actor, mongo_container):
-    os.environ["MONGO_URL"] = mongo_container
+async def api_client(task_actor, settings):
     # Have hit various issues getting this setup
     # Using fastAPI TestClient() doesn't play well with async pymongo as it tries to do stuff in different event loops
     # So have to use this AsyncClient from httpx, but this no longer just accepts an app
@@ -104,8 +115,8 @@ async def api_client(task_actor, mongo_container):
     # So have to run this manually, however trying to run the close after the yield to close the db connection gives errors
     # So am just going to leave it open, since the db container will be deleted after anyway
     # Any alternative solution ideas are welcome.....
+    os.environ["API_URL"] = "http://test"
     server = Server()
-    os.environ["API_URL"] = ""
     server._setup_app()
     app = server.app
     lifespan_ctx = app.router.lifespan_context(app)
@@ -179,21 +190,21 @@ async def setup_db(db_client):
         db_definitions.MODEL_1,
         ids={"project_id": ObjectId(project_id_1)},
     )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_1}.model").touch()
+    config.settings.models.cache_dir.joinpath(f"{model_id_1}.model").touch()
     await asyncio.sleep(0.01)
     model_id_2 = await db_client.insert(
         "models",
         db_definitions.MODEL_2,
         ids={"project_id": ObjectId(project_id_1)},
     )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_2}.model").touch()
+    config.settings.models.cache_dir.joinpath(f"{model_id_2}.model").touch()
     await asyncio.sleep(0.01)
     model_id_3 = await db_client.insert(
         "models",
         db_definitions.MODEL_3,
         ids={"project_id": ObjectId(project_id_1)},
     )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_3}.model").touch()
+    config.settings.models.cache_dir.joinpath(f"{model_id_3}.model").touch()
     yield {
         "project_id_1": project_id_1,
         "project_id_2": project_id_2,
@@ -301,7 +312,7 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
 
     # Create temp files for each
     for _id in (model_id_1, model_id_2, model_id_4):
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{_id}.model").touch()
+        config.settings.models.cache_dir.joinpath(f"{_id}.model").touch()
 
     yield {
         "project_id": project_id,
@@ -311,17 +322,15 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
     }
 
 
-def run_server():
-    # Import to register mock model
-
+def run_server(settings):
+    config.settings = settings
     server = Server()
     server.run()
 
 
 @pytest.fixture(scope="package")
-def start_server(mongo_container):
-    os.environ["MONGO_URL"] = mongo_container
-    proc = multiprocessing.Process(target=run_server)
+def start_server(settings):
+    proc = multiprocessing.Process(target=run_server, args=(settings,))
     proc.start()
     # Wait for server to start
     server_up = False
@@ -348,6 +357,6 @@ def start_server(mongo_container):
 @pytest.fixture(scope="function")
 def server_setup(start_server):
     yield
-    client = MongoClient(os.environ["MONGO_URL"])
+    client = MongoClient(config.settings.database.mongo_url)
     client.drop_database("annotate_db")
     client.close()

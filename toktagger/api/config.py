@@ -75,14 +75,15 @@ class Models(pydantic.BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        toml_file="toktagger.toml", env_nested_delimiter="_"
-    )
     server: Server = pydantic.Field(default_factory=Server)
     database: Database = pydantic.Field(default_factory=Database)
     uda: UDA = pydantic.Field(default_factory=UDA)
     sal: SAL = pydantic.Field(default_factory=SAL)
     models: Models = pydantic.Field(default_factory=Models)
+
+    model_config = SettingsConfigDict(
+        toml_file="toktagger.toml", env_nested_delimiter="_"
+    )
 
     @classmethod
     def settings_customise_sources(

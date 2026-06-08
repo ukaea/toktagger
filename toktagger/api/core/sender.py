@@ -47,6 +47,7 @@ def send_model_updates(
     updates : ModelUpdate
         Updates about the model to be sent - parameters which are unset or None will be ignored
     """
+    # Note that we use env vars here since it is inside a worker node...
     if (api_url := os.environ.get("API_URL")) is not None:
         url = f"{api_url}/projects/{project_id}/models/{model_id}"
 

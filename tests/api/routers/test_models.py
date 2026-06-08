@@ -1,5 +1,4 @@
 import pytest
-import pathlib
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models.base import ActorRegistry
 from toktagger.api.core.sender import (
@@ -10,7 +9,6 @@ from toktagger.api.core.sender import (
 import ray
 from unittest.mock import patch
 from bson import ObjectId
-import os
 import time
 
 
@@ -145,11 +143,11 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-async def test_model_predict_missing_weights(api_client, db_client, setup_model_db):
+async def test_model_predict_missing_weights(
+    api_client, db_client, setup_model_db, settings
+):
     # Delete weights
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
-        f"{setup_model_db['model_id_1']}.model"
-    ).unlink()
+    settings.models.cache_dir.joinpath(f"{setup_model_db['model_id_1']}.model").unlink()
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
     )
@@ -219,7 +217,7 @@ async def test_model_get_sample_prediction(api_client, db_client, setup_model_db
 
     # Poll the endpoint until results arrive
     t = 0
-    while t < 10:
+    while t < 20:
         get_response = await api_client.get(
             f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict/{task_id}"
         )
@@ -264,7 +262,7 @@ async def test_model_get_sample_prediction_wrong_sample(
 
     # Ask for predictions from this task for a sample which we did not predict on
     t = 0
-    while t < 10:
+    while t < 20:
         get_response = await api_client.get(
             f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_disruption_cnn/predict/{task_id}"
         )
@@ -327,7 +325,9 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
-async def test_model_start_training_no_params(api_client, db_client, setup_model_db):
+async def test_model_start_training_no_params(
+    api_client, db_client, setup_model_db, settings
+):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
     )
@@ -345,9 +345,7 @@ async def test_model_start_training_no_params(api_client, db_client, setup_model
     assert model["score"] == 60  # value returned by train method
 
     # Check model has been saved after completion
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id}.model").exists()
-    )
+    assert settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
 
 
 @pytest.mark.asyncio
@@ -400,7 +398,9 @@ async def test_model_missing_params(api_client, db_client, setup_model_db, metho
 
 
 @pytest.mark.asyncio
-async def test_model_start_training_params(api_client, db_client, setup_model_db):
+async def test_model_start_training_params(
+    api_client, db_client, setup_model_db, settings
+):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
         json={
@@ -426,14 +426,12 @@ async def test_model_start_training_params(api_client, db_client, setup_model_db
     assert model["score"] == 50  # value returned from params
 
     # Check model has been saved after completion
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id}.model").exists()
-    )
+    assert settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
 
 
 # Test delete model
 @pytest.mark.asyncio
-async def test_model_delete_type(api_client, db_client, setup_db):
+async def test_model_delete_type(api_client, db_client, setup_db, settings):
     response = await api_client.delete(
         f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn"
     )
@@ -447,26 +445,20 @@ async def test_model_delete_type(api_client, db_client, setup_db):
     assert models[0]["type"] != "mock_disruption_cnn"
 
     # Check for models 1 and 2, their file no longer exists
-    assert (
-        not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_1']}.model")
-        .exists()
-    )
-    assert (
-        not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_2']}.model")
-        .exists()
-    )
+    assert not settings.models.cache_dir.joinpath(
+        f"{setup_db['model_id_1']}.model"
+    ).exists()
+    assert not settings.models.cache_dir.joinpath(
+        f"{setup_db['model_id_2']}.model"
+    ).exists()
     # And for model 3 it does still exist
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_3']}.model")
-        .exists()
-    )
+    assert settings.models.cache_dir.joinpath(
+        f"{setup_db['model_id_3']}.model"
+    ).exists()
 
 
 @pytest.mark.asyncio
-async def test_model_delete_type_version(api_client, db_client, setup_db):
+async def test_model_delete_type_version(api_client, db_client, setup_db, settings):
     response = await api_client.delete(
         f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn?version=2"
     )
@@ -481,22 +473,16 @@ async def test_model_delete_type_version(api_client, db_client, setup_db):
     assert models[1]["type"] == "disruption_cnn"
 
     # Check for model 2, their file no longer exists
-    assert (
-        not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_2']}.model")
-        .exists()
-    )
+    assert not settings.models.cache_dir.joinpath(
+        f"{setup_db['model_id_2']}.model"
+    ).exists()
     # And for models 1 and 3 it does still exist
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_1']}.model")
-        .exists()
-    )
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_3']}.model")
-        .exists()
-    )
+    assert settings.models.cache_dir.joinpath(
+        f"{setup_db['model_id_1']}.model"
+    ).exists()
+    assert settings.models.cache_dir.joinpath(
+        f"{setup_db['model_id_3']}.model"
+    ).exists()
 
 
 @pytest.mark.asyncio

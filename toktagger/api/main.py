@@ -1,4 +1,3 @@
-import os
 import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +16,7 @@ from toktagger.api.routers.meta import router as meta_router
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.models import models_dependencies_installed
+import toktagger.api.config as config
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
@@ -30,10 +30,11 @@ if models_dependencies_installed():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    mongo_url = os.environ.get("MONGO_URL", "./toktagger_db")
     db_name = "annotate_db"
 
-    app.state.db_client = MongoDBClient(mongo_url, db_name)
+    app.state.db_client = MongoDBClient(
+        str(config.settings.database.mongo_url), db_name
+    )
     app.state.project = None
     yield
 
@@ -42,17 +43,16 @@ async def lifespan(app: FastAPI):
 
 class Server:
     def __init__(self):
+        print(config.settings)
         self.frontend_path = pathlib.Path(__file__).parent / "static"
 
     def _setup_ray(self):
-        if (api_url := os.environ.get("API_URL")) is None:
-            raise ValueError("API URL must be set!")
         if not ray.is_initialized():
             ray.init(
                 runtime_env={
                     "env_vars": {
-                        "API_URL": api_url,
-                        "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
+                        "API_URL": f"http://{config.settings.server.host}:{config.settings.server.port}",
+                        "MODEL_STORAGE": str(config.settings.models.cache_dir),
                     }
                 },
             )
@@ -67,7 +67,7 @@ class Server:
 
         # Create a task registry
         self.app.state.task_registry = ActorRegistry(
-            max_actors=os.environ.get("MAX_ACTORS", 5)
+            max_actors=config.settings.models.max_actors
         )
 
     def _setup_app(self):
@@ -106,12 +106,13 @@ class Server:
 
     def run(
         self,
-        host: str = "localhost",
-        port: int = 8002,
     ):
-        os.environ["API_URL"] = f"http://{host}:{port}"
         self._setup_app()
         # Setup ray if required
         if models_dependencies_installed():
             self._setup_ray()
-        uvicorn.run(self.app, host=host, port=port)
+        uvicorn.run(
+            self.app,
+            host=config.settings.server.host,
+            port=config.settings.server.port,
+        )
