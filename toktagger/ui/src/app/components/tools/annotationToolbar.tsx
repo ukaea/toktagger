@@ -42,7 +42,9 @@ export const AnnotationToolbar = () => {
   useEffect(() => {
     const categoryMap: Map<TimeSeriesAnnotationType, string> = new Map();
     categories.forEach((category) => {
-      categoryMap.getOrInsert(category.type, category.label);
+      if (!categoryMap.has(category.type)) {
+        categoryMap.set(category.type, category.label);
+      }
     });
     setCategoryAllocations(categoryMap);
   }, [categories]);
