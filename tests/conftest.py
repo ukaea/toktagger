@@ -338,8 +338,7 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
 
 
 def run_server():
-    # Import to register mock model
-
+    os.environ["TOKTAGGER_AUTH_REQUIRED"] = "false"
     server = Server()
     server.run()
 
@@ -356,7 +355,7 @@ def start_server(mongo_container):
             response = requests.get(
                 "http://localhost:8002/projects",
             )
-            if response.status_code == 200:
+            if response.status_code in (200, 401):
                 server_up = True
                 break
             time.sleep(1)
