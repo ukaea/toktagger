@@ -15,7 +15,7 @@ T = typing.TypeVar("T", bound=pydantic.BaseModel)
 
 class MongoDBClient:
     def __init__(self, url: str, db_name: str):
-        if db_name.startswith("mongodb://"):
+        if url.startswith("mongodb://"):
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
