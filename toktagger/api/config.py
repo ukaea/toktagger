@@ -98,8 +98,6 @@ class Settings(BaseSettings):
             init_settings,
             env_settings,
             TomlConfigSettingsSource(settings_cls),
-            dotenv_settings,
-            file_secret_settings,
         )
 
 
