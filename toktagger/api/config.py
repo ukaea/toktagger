@@ -1,11 +1,16 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    TomlConfigSettingsSource,
+)
 import pydantic
 import typing
 import pathlib
 from platformdirs import user_cache_dir
 
 
-class UDAConnections(pydantic.BaseModel):
+class UDA(pydantic.BaseModel):
     host: str = pydantic.Field(
         "uda2.mast.l",
         description="Host name for the UDA server to connect to for MAST data loaders.",
@@ -20,21 +25,18 @@ class UDAConnections(pydantic.BaseModel):
     )
 
 
-class SALConnections(pydantic.BaseModel):
+class SAL(pydantic.BaseModel):
     host: str = pydantic.Field(
         "https://sal.jetdata.eu",
         description="URL for the SAL server to connect to for JET data loaders.",
     )
 
 
-class Connections(pydantic.BaseModel):
+class Database(pydantic.BaseModel):
     mongo_url: str = pydantic.Field(
         "./toktagger_db",
         description="URL of the MongoDB server to connect to as a backend. If not set, uses a local mongita client.",
     )
-
-    uda: UDAConnections
-    sal: SALConnections
 
 
 class Server(pydantic.BaseModel):
@@ -73,7 +75,31 @@ class Models(pydantic.BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(toml_file="toktagger.toml")
-    server: Server
-    connections: Connections
-    models: Models
+    model_config = SettingsConfigDict(
+        toml_file="toktagger.toml", env_nested_delimiter="_"
+    )
+    server: Server = pydantic.Field(default_factory=Server)
+    database: Database = pydantic.Field(default_factory=Database)
+    uda: UDA = pydantic.Field(default_factory=UDA)
+    sal: SAL = pydantic.Field(default_factory=SAL)
+    models: Models = pydantic.Field(default_factory=Models)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            TomlConfigSettingsSource(settings_cls),
+            dotenv_settings,
+            file_secret_settings,
+        )
+
+
+settings = Settings()
