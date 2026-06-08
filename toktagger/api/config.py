@@ -45,7 +45,7 @@ class Server(pydantic.BaseModel):
         description="Address of the host to launch TokTagger on.",
     )
     port: int = pydantic.Field(
-        "8002",
+        8002,
         description="The port to use for the TokTagger Rest API.",
     )
     reload: bool = pydantic.Field(
@@ -55,6 +55,7 @@ class Server(pydantic.BaseModel):
     cache_dir: pathlib.Path = pydantic.Field(
         user_cache_dir("toktagger", "ukaea"),
         description="The directory to use for storing entries in the Mongita database, if used.",
+        validate_default=True,
     )
 
 
@@ -62,13 +63,13 @@ class Models(pydantic.BaseModel):
     cache_dir: pathlib.Path = pydantic.Field(
         pathlib.Path(user_cache_dir("toktagger", "ukaea")).joinpath("models"),
         description="The directory to use for storing ML model weights.",
+        validate_default=True,
     )
     max_actors: typing.Annotated[
         int,
         pydantic.Field(
             default=5,
             description="The maximum number of ML models which can be loaded concurrently.",
-            strict=True,
             gt=0,
         ),
     ]
@@ -82,7 +83,9 @@ class Settings(BaseSettings):
     models: Models = pydantic.Field(default_factory=Models)
 
     model_config = SettingsConfigDict(
-        toml_file="toktagger.toml", env_nested_delimiter="_"
+        toml_file="toktagger.toml",
+        env_nested_delimiter="_",
+        env_nested_max_split=1,
     )
 
     @classmethod
