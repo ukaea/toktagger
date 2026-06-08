@@ -18,7 +18,6 @@ from toktagger.api.schemas.data import (
     MultiVariateTimeSeriesData,
     TimeSeriesData,
     ImageData,
-    DataParamTypes,
     DataParams,
     DataResponseType,
     ImageParams,
@@ -52,8 +51,8 @@ class DataLoaderError(Exception):
 
 
 class DataLoader(ABC):
-    def __init__(self, params: DataParamTypes):
-        self.params = params
+    def __init__(self):
+        pass
 
     @classmethod
     @abstractmethod
@@ -121,14 +120,6 @@ class LoaderRegistry:
 @LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
-
-    def __init__(self, params: DataParamTypes):
-        if not isinstance(params, ImageParams):
-            raise TypeError(
-                f"Expected params of type 'ImageParams' but got '{type(params)}'"
-            )
-
-        super().__init__(params)
 
     @classmethod
     def sample_data_type(cls) -> Type[ImageFileData]:

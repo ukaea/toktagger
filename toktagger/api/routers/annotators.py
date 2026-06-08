@@ -50,7 +50,7 @@ async def create_annotations(
 
     sample: Sample = await get_sample(db_client, project_id, sample_id)
 
-    data_loader = LoaderRegistry.get(project.data_loader)(data_params)
+    data_loader = LoaderRegistry.get(project.data_loader)()
     data_item = data_loader.get_sample(
         sample,
         params=data_params,
