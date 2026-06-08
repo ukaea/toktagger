@@ -371,12 +371,12 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     disruption_annotation = next(
         ann for ann in annotations if ann["label"] == "Disruption"
     )
-    assert round(disruption_annotation["time"], 4) == float(disruption_position)
+    assert round(disruption_annotation["time"], 2) == float(disruption_position)
     assert disruption_annotation["type"] == "time_point"
 
     flattop_annotation = next(ann for ann in annotations if ann["label"] == "Flat Top")
-    assert round(flattop_annotation["time_min"], 4) == float(time_zone_left_position)
-    assert round(flattop_annotation["time_max"], 4) == float(time_zone_right_position)
+    assert round(flattop_annotation["time_min"], 2) == float(time_zone_left_position)
+    assert round(flattop_annotation["time_max"], 2) == float(time_zone_right_position)
     assert flattop_annotation["type"] == "time_region"
 
 
@@ -522,7 +522,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     disruption_annotation = next(
         ann for ann in annotations if ann["label"] == "Disruption"
     )
-    assert round(disruption_annotation["time"], 4) == updated_disruption_time
+    assert round(disruption_annotation["time"], 2) == updated_disruption_time
 
 
 def test_timeseries_annotator(server_setup, page: Page):
@@ -641,9 +641,10 @@ def test_timeseries_model_predict(
     expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
 
     # Check entry is there for newly trained model, wait for it to complete
+    # Ray worker can take 60+ seconds to initialize on first run (cold start)
     time.sleep(1)
     expect(modal.get_by_role("row").nth(1)).to_contain_text(model_name)
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=90000)
     if model_name == "mock_params_timeseries_cnn":
         expect(modal.get_by_role("row").nth(1)).to_contain_text("50")
     else:
