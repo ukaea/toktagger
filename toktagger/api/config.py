@@ -1,0 +1,79 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+import pydantic
+import typing
+import pathlib
+from platformdirs import user_cache_dir
+
+
+class UDAConnections(pydantic.BaseModel):
+    host: str = pydantic.Field(
+        "uda2.mast.l",
+        description="Host name for the UDA server to connect to for MAST data loaders.",
+    )
+    meta_pluginname: str = pydantic.Field(
+        "MASTU_DB",
+        description="???",  # TODO whats this?
+    )
+    metanew_pluginname: str = pydantic.Field(
+        "MAST_DB",
+        description="???",  # TODO whats this?
+    )
+
+
+class SALConnections(pydantic.BaseModel):
+    host: str = pydantic.Field(
+        "https://sal.jetdata.eu",
+        description="URL for the SAL server to connect to for JET data loaders.",
+    )
+
+
+class Connections(pydantic.BaseModel):
+    mongo_url: str = pydantic.Field(
+        "./toktagger_db",
+        description="URL of the MongoDB server to connect to as a backend. If not set, uses a local mongita client.",
+    )
+
+    uda: UDAConnections
+    sal: SALConnections
+
+
+class Server(pydantic.BaseModel):
+    host: str = pydantic.Field(
+        "localhost",
+        description="Address of the host to launch TokTagger on.",
+    )
+    port: int = pydantic.Field(
+        "8002",
+        description="The port to use for the TokTagger Rest API.",
+    )
+    reload: bool = pydantic.Field(
+        False,
+        description="Whether to hot reload the TokTagger server on changes to files.",
+    )
+    cache_dir: pathlib.Path = pydantic.Field(
+        user_cache_dir("toktagger", "ukaea"),
+        description="The directory to use for storing entries in the Mongita database, if used.",
+    )
+
+
+class Models(pydantic.BaseModel):
+    cache_dir: pathlib.Path = pydantic.Field(
+        pathlib.Path(user_cache_dir("toktagger", "ukaea")).joinpath("models"),
+        description="The directory to use for storing ML model weights.",
+    )
+    max_actors: typing.Annotated[
+        int,
+        pydantic.Field(
+            default=5,
+            description="The maximum number of ML models which can be loaded concurrently.",
+            strict=True,
+            gt=0,
+        ),
+    ]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(toml_file="toktagger.toml")
+    server: Server
+    connections: Connections
+    models: Models
