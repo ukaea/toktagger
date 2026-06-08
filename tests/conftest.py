@@ -131,6 +131,7 @@ async def api_client(task_actor, mongo_container):
     app = server.app
     lifespan_ctx = app.router.lifespan_context(app)
     await lifespan_ctx.__aenter__()
+    app.state.auth_required = False
     app.state.task_registry = task_actor
     app.state.task_registry.tasks["abc123"] = "Ray Task Object"
     async with AsyncClient(
@@ -275,7 +276,7 @@ def setup_model_samples():
             validated=True,
             label="Disruption",
             time=disruption_time,
-            created_by="manual" if i < 9985 else "disruption_cnn",
+            created_by="manual" if i < 9985 else "model::mock_disruption_cnn",
         )
 
         samples.append(

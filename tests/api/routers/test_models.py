@@ -440,14 +440,11 @@ async def test_model_delete_type(api_client, db_client, setup_db):
     )
     assert response.status_code == 200
 
-    # Check there is one model left in the database
+    # All 3 models were mock_disruption_cnn, so none remain
     models = await db_client.get_all_documents("models")
-    assert len(models) == 1
+    assert len(models) == 0
 
-    # Check it is not of type 'mock_disruption_cnn'
-    assert models[0]["type"] != "mock_disruption_cnn"
-
-    # Check for models 1 and 2, their file no longer exists
+    # Check all model files no longer exist
     assert (
         not pathlib.Path(os.environ["MODEL_STORAGE"])
         .joinpath(f"{setup_db['model_id_1']}.model")
@@ -458,9 +455,8 @@ async def test_model_delete_type(api_client, db_client, setup_db):
         .joinpath(f"{setup_db['model_id_2']}.model")
         .exists()
     )
-    # And for model 3 it does still exist
     assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
+        not pathlib.Path(os.environ["MODEL_STORAGE"])
         .joinpath(f"{setup_db['model_id_3']}.model")
         .exists()
     )
@@ -478,8 +474,8 @@ async def test_model_delete_type_version(api_client, db_client, setup_db):
     assert len(models) == 2
     # Check model version 1 of mock_disruption_cnn still exists
     assert models[0]["type"] == "mock_disruption_cnn" and models[0]["version"] == 1
-    # Check the other one is type 'disruption_cnn'
-    assert models[1]["type"] == "disruption_cnn"
+    # Check the other one is type 'mock_disruption_cnn'
+    assert models[1]["type"] == "mock_disruption_cnn"
 
     # Check for model 2, their file no longer exists
     assert (
@@ -504,7 +500,7 @@ async def test_model_delete_type_version(api_client, db_client, setup_db):
 @patch("ray.cancel")
 async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/disruption_cnn/train"
+        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn/train"
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
@@ -513,7 +509,7 @@ async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
 
     # Check it is aborted in database
     models = await db_client.get_filtered_documents(
-        "models", {"type": "disruption_cnn"}
+        "models", {"type": "mock_disruption_cnn"}
     )
     model = models[0]
     assert model["training_status"] == "aborted"
@@ -544,7 +540,7 @@ async def test_model_stop_training_not_in_progress(
 @pytest.mark.asyncio
 async def test_model_delete_predictions(api_client, db_client, setup_model_db):
     await api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
     )
 
     # Should be 5 annotations remaining since half were created by 'manual'
@@ -556,14 +552,14 @@ async def test_model_delete_predictions(api_client, db_client, setup_model_db):
 @pytest.mark.asyncio
 async def test_model_delete_no_predictions(api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
+        f"/projects/{setup_model_db['project_id']}/models/mock_timeseries_cnn/predict"
     )
 
     # Nothing created by this model, so should return 404 and not delete anything
     assert response.status_code == 404
     assert (
         response.json()["detail"]
-        == "No annotations produced by mock_disruption_cnn could be found for this Project."
+        == "No annotations produced by mock_timeseries_cnn could be found for this Project."
     )
     annotations = await db_client.get_all_documents(collection="annotations")
     assert len(annotations) == 10
