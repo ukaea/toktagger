@@ -352,6 +352,7 @@ def start_server():
 
         yield
         proc.terminate()
+        proc.join()
 
 
 @pytest.fixture(scope="function")
