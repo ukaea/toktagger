@@ -104,27 +104,27 @@ def test_toml_loading(setup_test_settings):
 
     toml_file.write(
         """
-[server]
-host = "127.0.0.1"
-port = 9999
-reload = true
-cache_dir = "/tmp/toktagger-cache"
+        [server]
+        host = "127.0.0.1"
+        port = 9999
+        reload = true
+        cache_dir = "/tmp/toktagger-cache"
 
-[database]
-mongo_url = "mongodb://mongo:27017"
+        [database]
+        mongo_url = "mongodb://mongo:27017"
 
-[uda]
-host = "uda.example.com"
-meta_pluginname = "CUSTOM_META"
-metanew_pluginname = "CUSTOM_METANEW"
+        [uda]
+        host = "uda.example.com"
+        meta_pluginname = "CUSTOM_META"
+        metanew_pluginname = "CUSTOM_METANEW"
 
-[sal]
-host = "https://sal.example.com"
+        [sal]
+        host = "https://sal.example.com"
 
-[models]
-cache_dir = "/tmp/toktagger-models"
-max_actors = 3
-"""
+        [models]
+        cache_dir = "/tmp/toktagger-models"
+        max_actors = 3
+        """
     )
     toml_file.flush()
 
@@ -152,10 +152,10 @@ def test_env_takes_precedence_over_toml(monkeypatch, setup_test_settings):
 
     toml_file.write(
         """
-[server]
-host = "toml-host"
-port = 1111
-"""
+        [server]
+        host = "toml-host"
+        port = 1111
+        """
     )
     toml_file.flush()
 
@@ -173,10 +173,10 @@ def test_env_and_toml_applied(monkeypatch, setup_test_settings):
 
     toml_file.write(
         """
-[server]
-host = "toml-host"
-port = 1111
-"""
+        [server]
+        host = "toml-host"
+        port = 1111
+        """
     )
     toml_file.flush()
 
@@ -195,10 +195,10 @@ def test_init_kwargs_take_precedence_over_env_and_toml(
 
     toml_file.write(
         """
-[server]
-host = "toml-host"
-port = 1111
-"""
+        [server]
+        host = "toml-host"
+        port = 1111
+        """
     )
     toml_file.flush()
 

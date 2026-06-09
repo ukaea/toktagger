@@ -295,20 +295,20 @@ server.run()
 Here's an example of loading data from a SQL database:
 
 ### Update Config Settings
-If your data loader requires configuration inputs from the user, then the `config.Settings` object should be updated to accept this. This takes the form of a [Pydantic Settings object](https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/#usage), where nested `BaseModels` represent sections inside the `toktagger.toml` configuration file. For example, witin `toktagger.api.config.py`,  we can add a new `SQL` section where we need the database URL to connect to with our dataloader:
+If your data loader requires configuration inputs from the user, then the `config.Settings` object should be updated to accept this. This takes the form of a [Pydantic Settings object](https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/#usage), where nested `BaseModels` represent sections inside the `toktagger.toml` configuration file. For example, we can make create a new Settings object which inherits from the one in `toktagger.api.config.py`, and we can add a new `SQL` section where we need the database URL to connect to with our dataloader:
 ```python
+from toktagger.api.config import Settings
+
 class SQL(pydantic.BaseModel):
     url: str | None = pydantic.Field(
         None,
         description="URL of the SQL database to connect to",
     )
-class Settings(BaseSettings):
+class UpdatedSettings(Settings):
     sql: SQL = pydantic.Field(SQL)
-    server: Server = pydantic.Field(default_factory=Server)
-    ...
 ```
 Note that this will load settings from the following sources, in the following order:
-1. Any values which the `Settings` class is initialized with
+1. Any values which the `UpdatedSettings` class is initialized with
 2. Environment variables, case insensitive, named using the nested model names. Eg for the above setting, it would be `SQL_URL`.
 3. Values in the `toktagger.toml` configuration file, with section titles according to nesting. Eg:
 ```toml
@@ -375,6 +375,20 @@ class SQLDatabaseLoader(DataLoader):
                     results[signal_name] = None
         
         return MultiVariateTimeSeriesData(values=results)
+```
+### Launch the Server
+To run the server with our custom Settings object and DataLoader, we should create a run script as follows:
+```python title="run.py"
+from settings import UpdatedSettings
+from loader import CSVTimeSeriesLoader
+from toktagger.api.main import Server
+import toktagger.api.config as config
+
+# Update config.settings to use our new object
+config.settings = UpdatedSettings()
+
+server = Server()
+server.run()
 ```
 
 ## Using Docker
