@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+import warnings
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.data import router as data_router
@@ -43,7 +44,6 @@ async def lifespan(app: FastAPI):
 
 class Server:
     def __init__(self):
-        print(config.settings)
         self.frontend_path = pathlib.Path(__file__).parent / "static"
 
     def _setup_ray(self):
@@ -104,9 +104,35 @@ class Server:
         self.app.include_router(meta_router)
         self.app.include_router(base_router)
 
-    def run(
-        self,
-    ):
+    def run(self, host: str | None = None, port: int | None = None):
+        """
+        Launch the TokTagger server.
+
+        Parameters
+        ----------
+        host : str
+            DEPRECATED - use config file or environment variables instead.
+            The host to launch the server on, by default 'localhost'
+        port : int
+            DEPRECATED - use config file or environment variables instead.
+            The port to launch the server on, by default 8002
+        """
+        # Provide deprecation warning
+        if host or port:
+            warnings.warn(
+                """
+                Specifying host and port within Server.run() is deprecated and will be removed in a future version. 
+                Please provide these arguments via configuration file or environment variable instead. 
+                See https://ukaea.github.io/toktagger/configuration for details.
+                """,
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if host:
+            config.settings.server.host = host
+        if port:
+            config.settings.server.port = port
+
         self._setup_app()
         # Setup ray if required
         if models_dependencies_installed():
