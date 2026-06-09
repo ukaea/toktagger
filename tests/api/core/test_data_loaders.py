@@ -7,6 +7,7 @@ from toktagger.api.schemas.samples import (
     TimeSeriesFileData,
     ShotData,
     ImageFileData,
+    ImageArrayFileData,
 )
 from toktagger.api.schemas.data import (
     TimeSeriesData,
@@ -35,10 +36,10 @@ def test_image_file_loader_jpeg():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ImageDataLoader(
-        params=ImageParams(name="image", frame=1)
+    data_loader = data_loaders.ImageDataLoader()
+    image_data = data_loader.get_sample(
+        sample, params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -61,10 +62,10 @@ def test_image_file_loader_png():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.ImageDataLoader(
-        params=ImageParams(name="image", frame=1)
+    data_loader = data_loaders.ImageDataLoader()
+    image_data = data_loader.get_sample(
+        sample, params=ImageParams(name="image", frame=1)
     )
-    image_data = data_loader.get_sample(sample)
     assert isinstance(image_data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(image_data.values, str)
@@ -88,8 +89,8 @@ def test_parquet_file_loader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.TabularDataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.TabularDataLoader()
+    data = data_loader.get_sample(sample, params=DataParams(name="identity"))
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -121,8 +122,8 @@ def test_uda_loader(uda_test):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.UDADataLoader()
+    data = data_loader.get_sample(sample, params=DataParams(name="identity"))
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -153,10 +154,8 @@ def test_uda_camera_loader(uda_env_vars):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDACameraDataLoader(
-        params=ImageParams(name="image", frame=0)
-    )
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.UDACameraDataLoader()
+    data = data_loader.get_sample(sample, params=ImageParams(name="image", frame=0))
     assert isinstance(data, ImageData)
     # Check we got back base64 encoded string
     assert isinstance(data.values, str)
@@ -182,10 +181,10 @@ def test_uda_loader_data_doesnt_exist(uda_env_vars):
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.UDADataLoader(params=DataParams(name="identity"))
+    data_loader = data_loaders.UDADataLoader()
 
     try:
-        data_loader.get_sample(sample)
+        data_loader.get_sample(sample, params=DataParams(name="identity"))
         pytest.fail("Expected DataLoaderError not raised")
     except data_loaders.DataLoaderError:
         pass
@@ -209,8 +208,8 @@ def test_sal_loader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.SALDataLoader(DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.SALDataLoader()
+    data = data_loader.get_sample(sample, DataParams(name="identity"))
 
     ip_values = numpy.array(data.values.get("ppf/signal/jetppf/magn/ipla").values)
     assert numpy.min(ip_values) == -1837277.75
@@ -230,8 +229,8 @@ def test_fair_mast_dataloader():
         project_id="test",
         validated_annotations=False,
     )
-    data_loader = data_loaders.FAIRMASTDataLoader(params=DataParams(name="identity"))
-    data = data_loader.get_sample(sample)
+    data_loader = data_loaders.FAIRMASTDataLoader()
+    data = data_loader.get_sample(sample, params=DataParams(name="identity"))
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present
@@ -241,6 +240,66 @@ def test_fair_mast_dataloader():
     ip_values = numpy.array(data.values.get("magnetics/ip").values)
     assert numpy.min(ip_values) == -40806.55078125
     assert numpy.max(ip_values) == 649008.875
+
+
+@pytest.mark.parametrize(
+    "file_name",
+    [
+        "multiple_arrs.npz",
+        "single_arr.npz",
+        "single_arr.npy",
+        "rgb_arr.npz",
+    ],
+)
+@pytest.mark.parametrize("frame", [None, 1])
+def test_image_array_file_loader(file_name: str, frame: int | None):
+    # Data in numpy arrays has shape (2, 10, 10) for (num_frames, x, y)
+    arr_file = ImageArrayFileData(
+        file_name=str(pathlib.Path(__file__).parents[2].joinpath(file_name)),
+        type=file_name.split(".")[1],
+        protocol="file",
+        signal_name="y" if file_name == "multiple_arrs.npz" else None,
+    )
+    sample = Sample(
+        shot_id=10000,
+        data=arr_file,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data_loader = data_loaders.ArrayDataLoader()
+    data = data_loader.get_sample(sample, params=ImageParams(name="image", frame=frame))
+    assert isinstance(data, ImageData)
+
+    # Decode base64 back to raw PNG bytes
+    png_bytes = base64.b64decode(data.values)
+
+    # Load image from bytes
+    im = Image.open(io.BytesIO(png_bytes))
+
+    # Convert to NumPy array
+    frame_arr = numpy.array(im)
+
+    # Check it is 10x10
+    if file_name == "rgb_arr.npz":
+        # With RGB channels
+        assert frame_arr.shape == (10, 10, 3)
+    else:
+        # Greyscale
+        assert frame_arr.shape == (10, 10)
+
+    # Check it has correct values
+    # If frame not specified, first frame
+    # Data is constructed from a range reshaped, so...
+    if file_name == "rgb_arr.npz":
+        # Check second and third channels are ones
+        assert numpy.allclose(frame_arr[..., 1].flatten(), numpy.ones(100))
+        assert numpy.allclose(frame_arr[..., 2].flatten(), numpy.ones(100))
+        frame_arr = frame_arr[..., 0]
+    if frame:
+        assert numpy.allclose(frame_arr.flatten(), numpy.arange(100, 200))
+    else:
+        assert numpy.allclose(frame_arr.flatten(), numpy.arange(0, 100))
 
 
 @pytest.mark.asyncio
@@ -263,7 +322,7 @@ async def test_custom_data_loader(api_client):
         def sample_data_type(self) -> Type[ShotData]:
             return ShotData
 
-        def get_sample(self, sample: Sample, **kwargs):
+        def get_sample(self, sample: Sample, params: DataParams, **kwargs):
             shot_id = sample.shot_id
             # Return some data, use something from sample to check it is passed in correctly
             return MultiVariateTimeSeriesData(

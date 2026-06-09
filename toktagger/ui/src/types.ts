@@ -1,15 +1,14 @@
+import { PlotlyHTMLElement } from "plotly.js";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
   project_id: z.string().nullable().default(null),
   sample_id: z.string().nullable().default(null),
-  shot_id: z.number().nullable().default(null),
-  timestamp: z.string().nullable().default(null),
+  shot_id: z.number().optional(),
+  timestamp: z.string().optional(),
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
   created_by: z.string().default("manual"),
-  time_min: z.number().nullable().default(null),
-  time_max: z.number().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -17,12 +16,14 @@ export const BaseAnnotationSchema = z.object({
 export type BaseAnnotation = z.infer<typeof BaseAnnotationSchema>;
 
 export const TimeRegionSchema = BaseAnnotationSchema.extend({
+  type: z.literal("time_region"),
   time_min: z.number(),
   time_max: z.number(),
 });
 export type TimeRegion = z.infer<typeof TimeRegionSchema>;
 
 export const TimePointSchema = BaseAnnotationSchema.extend({
+  type: z.literal("time_point"),
   time: z.number(),
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
@@ -50,12 +51,22 @@ export const VideoBoundingBoxSchema = BoundingBoxSchema.extend({
 
 export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;
 
+export const VideoPolygonSchema = BaseAnnotationSchema.extend({
+  type: z.literal("video_polygon"),
+  frame: z.number().int(),
+  track_id: z.string(),
+  segmentation: z.array(z.number().int()).min(6),
+});
+
+export type VideoPolygon = z.infer<typeof VideoPolygonSchema>;
+
 export const AnnotationSchema = z.union([
   TimePointSchema,
   TimeRegionSchema,
   ClassLabelSchema,
   BoundingBoxSchema,
   VideoBoundingBoxSchema,
+  VideoPolygonSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
@@ -188,13 +199,23 @@ export const TimeSeriesFileDataSchema = FileDataSchema.extend({
 });
 export type TimeSeriesFileData = z.infer<typeof TimeSeriesFileDataSchema>;
 
+export const ImageArrayFileDataSchema = FileDataSchema.extend({
+  signal_name: z.string().optional(),
+});
+export type ImageArrayFileData = z.infer<typeof ImageArrayFileDataSchema>;
+
 export const ShotDataSchema = z.object({
   protocol: z.string(),
   signal_names: z.array(z.string()),
 });
 export type ShotData = z.infer<typeof ShotDataSchema>;
 
-export const SampleDataSchema = z.union([FileDataSchema, ShotDataSchema]);
+export const SampleDataSchema = z.union([
+  TimeSeriesFileDataSchema,
+  ImageArrayFileDataSchema,
+  FileDataSchema,
+  ShotDataSchema,
+]);
 export type SampleData = z.infer<typeof SampleDataSchema>;
 
 export const SampleSchema = z.object({
@@ -207,14 +228,20 @@ export const SampleSchema = z.object({
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
+export const SampleUpdateSchema = z.object({
+  validated_annotations: z.boolean(),
+});
+export type SampleUpdate = z.infer<typeof SampleUpdateSchema>;
+
 export const ModelSchema = z.object({
   _id: z.string(),
   timestamp: z.string(),
   project_id: z.string(),
   type: z.string(),
+  version: z.int(),
   training_status: z.string(),
   progress: z.number(),
-  accuracy: z.number(),
+  score: z.number(),
   task_id: z.string(),
 });
 
@@ -267,9 +294,38 @@ export enum ToolingTypes {
   VSPAN,
 }
 
+export enum TimeSeriesAnnotationType {
+  TIME_POINT = "TIME POINT",
+  TIME_REGION = "TIME REGION",
+}
+
+export type TimeSeriesToolDefinition = {
+  type: TimeSeriesAnnotationType;
+  label: string;
+};
+
+export type TimeSeriesCategory = {
+  label: string;
+  color: string;
+  type: TimeSeriesAnnotationType;
+};
+
+export type TimeSeriesAnnotationPoint = {
+  x: number;
+  y: number;
+};
+
+export type TimeSeriesAnnotation = {
+  id: string;
+  created_by: string;
+  label: string;
+  type: TimeSeriesAnnotationType;
+  points: TimeSeriesAnnotationPoint[];
+  selected: boolean;
+};
+
 export type ToolingCallbacks = {
-  id: ToolingTypes;
-  start: (x: number, y: number) => void;
+  start: (x: number, y: number, label: string) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
 };
@@ -279,3 +335,14 @@ export type PlotProps = {
   numSignificantDigits?: number;
   thresholdActive?: boolean;
 };
+
+type PlotlyAxisTransforms = {
+  p2d: (pixels: number) => number;
+  d2p: (value: number) => number;
+  _tmax: number;
+  _tmin: number;
+  range: [number, number];
+};
+export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
+  _fullLayout: Record<string, PlotlyAxisTransforms>;
+}

@@ -1,6 +1,13 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import type { Project, Sample, SamplesSummary, Annotation } from "@/types";
+import type {
+  Project,
+  Sample,
+  SamplesSummary,
+  SampleUpdate,
+  Annotation,
+} from "@/types";
+import { RJSFSchema } from "@rjsf/utils";
 
 export let BACKEND_API_URL = "http://localhost:8002";
 if (import.meta.env.VITE_DATA_API_URL) {
@@ -285,6 +292,31 @@ export const deleteSample = async (project_id: string, sample_id: string) => {
   );
 };
 
+export const updateSample = async (
+  project_id: string,
+  sample_id: string,
+  updates: SampleUpdate,
+) => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        {
+          _id: sample_id,
+          updates: updates,
+        },
+      ]),
+    },
+  );
+  const data = await response.json();
+  const sample = data as Sample;
+  return sample;
+};
+
 export const deleteSamples = async (project_id: string) => {
   await fetch(`${BACKEND_API_URL}/projects/${project_id}/samples`, {
     method: "DELETE",
@@ -294,6 +326,7 @@ export const deleteSamples = async (project_id: string) => {
 export const startTraining = async (
   project_id: string,
   selected_model: string,
+  params: Record<string, unknown>,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train`,
@@ -302,6 +335,7 @@ export const startTraining = async (
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ params: params }),
     },
   );
   return response;
@@ -329,6 +363,7 @@ export const startPredictions = async (
   selected_model: string,
   version: number,
   num_predictions: number,
+  params: Record<string, unknown>,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}`,
@@ -337,6 +372,7 @@ export const startPredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ params: params }),
     },
   );
   return response;
@@ -346,6 +382,7 @@ export const startSamplePredictions = async (
   project_id: string,
   sample_id: string,
   selected_model: string,
+  params: Record<string, unknown>,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
@@ -354,6 +391,7 @@ export const startSamplePredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ params: params }),
     },
   );
   return response;
@@ -381,5 +419,40 @@ export const getModels = async (project_id: string): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/models`,
   );
+  return response;
+};
+
+export const getModelSchema = async (
+  modelName: string,
+  schemaType: string,
+): Promise<RJSFSchema> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/meta/models/${modelName}/${schemaType}`,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch model schema!`);
+  }
+  const data = await response.json();
+  const schema: RJSFSchema = data as RJSFSchema;
+  return schema;
+};
+
+export const getModelTrainSchema = async (
+  modelName: string,
+): Promise<RJSFSchema> => {
+  return getModelSchema(modelName, "train");
+};
+
+export const getModelPredictSchema = async (
+  modelName: string,
+): Promise<RJSFSchema> => {
+  return getModelSchema(modelName, "predict");
+};
+
+export const getModelTypes = async (task: string): Promise<Response> => {
+  const response = await fetch(`${BACKEND_API_URL}/meta/models?task=${task}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch model types!`);
+  }
   return response;
 };

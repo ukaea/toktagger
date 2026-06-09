@@ -4,8 +4,18 @@ import {
   ShapeType,
   type AnnotationBody,
   type ImageAnnotation,
+  type Polygon,
+  type PolygonGeometry,
+  type Rectangle,
+  type RectangleGeometry,
+  type ImageAnnotationTarget,
+  type Shape,
 } from "@annotorious/react";
-import type { VideoBoundingBox } from "./types";
+import type {
+  VideoAnnotationShape,
+  VideoBoundingBox,
+  VideoPolygon,
+} from "./types";
 import { classIdForName } from "./types";
 
 /**
@@ -22,10 +32,22 @@ type UnknownRecord = Record<string, unknown>;
 
 // Our app stores a frame key on target.source (not present in upstream Annotorious types).
 export type VideoImageAnnotation = ImageAnnotation & {
-  target: ImageAnnotation["target"] & {
+  target: ImageAnnotationTarget & {
     source?: string;
   };
 };
+
+export type ImageAnnotationWithSelector<TSelector extends Shape> = Omit<
+  ImageAnnotation,
+  "target"
+> & {
+  target: Omit<ImageAnnotationTarget, "selector"> & {
+    selector: TSelector;
+  };
+};
+
+export type RectangleAnnotation = ImageAnnotationWithSelector<Rectangle>;
+export type PolygonAnnotation = ImageAnnotationWithSelector<Polygon>;
 
 function withTargetSource(
   a: ImageAnnotation,
@@ -137,40 +159,27 @@ function newBodyId(): string {
 }
 
 /** True if the annotation target is a rectangle selector. */
-export function isRectangleAnno(a: ImageAnnotation): boolean {
+export function isRectangleAnno(a: ImageAnnotation): a is RectangleAnnotation {
   // ShapeType.RECTANGLE is already the string literal "RECTANGLE",
   // so we don't need a separate check for the string form.
   return a.target.selector.type === ShapeType.RECTANGLE;
+}
+
+/** True if the annotation target is a polygon selector. */
+export function isPolygonAnno(a: ImageAnnotation): a is PolygonAnnotation {
+  return a.target.selector.type === ShapeType.POLYGON;
 }
 
 function isFiniteNumber(v: unknown): v is number {
   return Number.isFinite(v);
 }
 
-/** Rectangle geometry shape we rely on at runtime. */
-type RectGeometry = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-};
-
 /** Read rectangle geometry (returns null if missing/invalid). */
 export function readRectGeometry(
-  a: ImageAnnotation,
-): { x: number; y: number; w: number; h: number } | null {
-  // Make this function self-contained: only rectangles have x/y/w/h.
-  if (!isRectangleAnno(a)) return null;
-
+  a: RectangleAnnotation,
+): RectangleGeometry | null {
   const g = a.target.selector.geometry;
-  if (!g || typeof g !== "object") return null;
-
-  const rg = g as Partial<RectGeometry>;
-
-  const x = rg.x;
-  const y = rg.y;
-  const w = rg.w;
-  const h = rg.h;
+  const { x, y, w, h } = g;
 
   // TS now narrows x/y/w/h to number after these checks.
   if (
@@ -183,12 +192,30 @@ export function readRectGeometry(
 
   if (w <= 0 || h <= 0) return null;
 
-  return { x, y, w, h };
+  return g;
+}
+
+/** Read polygon geometry (returns null if missing/invalid). */
+export function readPolygonGeometry(
+  a: PolygonAnnotation,
+): PolygonGeometry | null {
+  const g = a.target.selector.geometry;
+  const { points } = g;
+  if (!Array.isArray(points) || points.length < 3) return null;
+
+  for (const point of points) {
+    if (!Array.isArray(point) || point.length !== 2) return null;
+
+    const [x, y] = point;
+    if (!isFiniteNumber(x) || !isFiniteNumber(y)) return null;
+  }
+
+  return g;
 }
 
 /**
  * Normalize an overlay list into a backend-safe shape:
- * - keep rectangles only
+ * - keep supported video shapes only
  * - stamp target.source with frameKey
  * - ensure class label exists (uses fallback if missing)
  * - ensure track id exists (uses fallback or allocator)
@@ -211,7 +238,7 @@ export function normalizeOverlay(
   const out: ImageAnnotation[] = [];
 
   for (const a of src) {
-    if (!isRectangleAnno(a)) continue;
+    if (!isRectangleAnno(a) && !isPolygonAnno(a)) continue;
 
     const withSource = withTargetSource(a, frameKey);
 
@@ -251,10 +278,9 @@ export function normalizeOverlay(
 
 /** Convert a normalized ImageAnnotation -> backend VideoBoundingBox. */
 export function annoToVideoBBox(
-  a: ImageAnnotation,
+  a: RectangleAnnotation,
   frame: number,
 ): VideoBoundingBox | null {
-  if (!isRectangleAnno(a)) return null;
   const g = readRectGeometry(a);
   if (!g) return null;
 
@@ -275,6 +301,45 @@ export function annoToVideoBBox(
   };
 }
 
+/** Convert a normalized ImageAnnotation -> backend VideoPolygon. */
+export function annoToVideoPolygon(
+  a: PolygonAnnotation,
+  frame: number,
+): VideoPolygon | null {
+  const g = readPolygonGeometry(a);
+  if (!g) return null;
+
+  const { className, trackId } = getLabelTrack(a);
+  if (!className || !trackId) return null;
+
+  const segmentation = g.points.flatMap(([x, y]) => [
+    Math.round(x),
+    Math.round(y),
+  ]);
+
+  if (segmentation.length < 6) return null;
+
+  return {
+    type: "video_polygon",
+    frame,
+    track_id: String(trackId),
+    label: String(className),
+    class_id: classIdForName(className),
+    segmentation,
+    created_by: "manual",
+  };
+}
+
+/** Convert a normalized ImageAnnotation -> backend video annotation shape. */
+export function annoToVideoAnnotation(
+  a: ImageAnnotation,
+  frame: number,
+): VideoAnnotationShape | null {
+  if (isRectangleAnno(a)) return annoToVideoBBox(a, frame);
+  if (isPolygonAnno(a)) return annoToVideoPolygon(a, frame);
+  return null;
+}
+
 /** Convert backend VideoBoundingBox -> Annotorious rectangle annotation. */
 export function videoBBoxToAnno(
   b: VideoBoundingBox,
@@ -290,19 +355,19 @@ export function videoBBoxToAnno(
     `anno-${Math.random().toString(36).slice(2)}`;
 
   // Annotorious Geometry type only guarantees `bounds`, but rectangle geometry
-  // includes x/y/w/h at runtime. We keep those fields without using `any`.
-  const geometry = {
+  // includes x/y/w/h at runtime. Use the concrete RectangleGeometry type.
+  const geometry: RectangleGeometry = {
     x,
     y,
     w,
     h,
     bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h },
-  } as ImageAnnotation["target"]["selector"]["geometry"];
+  };
 
-  const selector = {
+  const selector: Rectangle = {
     type: ShapeType.RECTANGLE,
     geometry,
-  } as ImageAnnotation["target"]["selector"];
+  };
 
   const anno: VideoImageAnnotation = {
     id,
@@ -318,9 +383,62 @@ export function videoBBoxToAnno(
   return stampLabelAndTrack(anno, b.label, String(b.track_id));
 }
 
+/** Convert backend VideoPolygon -> Annotorious polygon annotation. */
+export function videoPolygonToAnno(
+  p: VideoPolygon,
+  frameKey: string,
+): ImageAnnotation {
+  const points: [number, number][] = [];
+
+  for (let i = 0; i < p.segmentation.length - 1; i += 2) {
+    const x = Number(p.segmentation[i]);
+    const y = Number(p.segmentation[i + 1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    points.push([x, y]);
+  }
+
+  const id =
+    globalThis.crypto?.randomUUID?.() ??
+    `anno-${Math.random().toString(36).slice(2)}`;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const [x, y] of points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+
+  const geometry: PolygonGeometry = {
+    points,
+    bounds: { minX, minY, maxX, maxY },
+  };
+
+  const selector: Polygon = {
+    type: ShapeType.POLYGON,
+    geometry,
+  };
+
+  const anno: VideoImageAnnotation = {
+    id,
+    bodies: [],
+    target: {
+      annotation: id,
+      source: frameKey,
+      selector,
+    },
+  };
+
+  return stampLabelAndTrack(anno, p.label, String(p.track_id));
+}
+
 /**
  * Normalizes a raw overlay list into our session invariants:
- * - rectangles only
+ * - supported video shapes only
  * - stamps the frame source key
  * - ensures class/track bodies exist (allocating track ids when needed)
  * - optional per-instance de-duplication within the frame

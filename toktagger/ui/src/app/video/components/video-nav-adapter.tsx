@@ -7,6 +7,7 @@ import {
   type Annotation,
   type NavAdapter,
   VideoBoundingBoxSchema,
+  VideoPolygonSchema,
 } from "@/types";
 import { useVideoSession } from "./video-session";
 
@@ -24,19 +25,26 @@ export function VideoNavAdapterBridge({
         (annotation): annotation is Annotation =>
           annotation.type === "class_label",
       );
-      const videoBoxes = session.collectAllVideoBBoxes().map((box) => {
-        const parsedBox = VideoBoundingBoxSchema.parse(box);
-        const sanitizedBox = (({
-          timestamp: _timestamp,
-          time_min: _timeMin,
-          time_max: _timeMax,
-          ...rest
-        }) => rest)(parsedBox);
+      const nowIso = new Date().toISOString();
+      const videoAnnotations = session
+        .collectAllVideoAnnotations()
+        .map((annotation): Annotation => {
+          if (annotation.type === "video_bounding_box") {
+            const parsed = VideoBoundingBoxSchema.parse(annotation);
+            return {
+              ...parsed,
+              timestamp: parsed.timestamp ?? nowIso,
+            };
+          }
 
-        return sanitizedBox as Annotation;
-      });
+          const parsed = VideoPolygonSchema.parse(annotation);
+          return {
+            ...parsed,
+            timestamp: parsed.timestamp ?? nowIso,
+          };
+        });
 
-      return [...shotLabels, ...videoBoxes];
+      return [...shotLabels, ...videoAnnotations];
     },
     clear: () => {
       session.clearCurrentFrame();

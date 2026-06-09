@@ -1,42 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DialogContainer, AlertDialog, Divider } from "@adobe/react-spectrum";
+import {
+  DialogContainer,
+  AlertDialog,
+  Switch,
+  Divider,
+  Flex,
+} from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useVideoUiState } from "@/app/video/components/video-context";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
   ConfirmModal,
 } from "@/app/video/components/ui_elements";
-
-/**
- * Persist the last selected class so the annotator can immediately draw
- * when moving between samples (same project).
- */
-const LAST_CLASS_KEY = "ufo::lastClassName";
-
-function loadLastClassName(): string | null {
-  try {
-    const v = globalThis.localStorage?.getItem(LAST_CLASS_KEY);
-    const s = (v ?? "").trim();
-    return s ? s : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLastClassName(name: string) {
-  try {
-    const s = (name ?? "").trim();
-    if (!s) return;
-    globalThis.localStorage?.setItem(LAST_CLASS_KEY, s);
-  } catch {
-    // ignore
-  }
-}
 
 /**
  * Sidebar instance rows are keyed by (class, track_id). We keep a stable string key
@@ -51,6 +32,7 @@ function instanceKey(args: { class_name: string; track_id: string }) {
 export function VideoToolbox() {
   const session = useVideoSession();
   const { annotationLabels, dataParams, setDataParams } = useSample();
+  const { videoLastClassName, setVideoLastClassName } = useVideoUiState();
   const labels = annotationLabels;
 
   const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
@@ -60,13 +42,30 @@ export function VideoToolbox() {
     trackId: string;
   } | null>(null);
 
-  // Restore the last selected class to reduce clicks between samples.
+  // Restore the last selected class, or default to the first configured label.
   useEffect(() => {
-    const last = loadLastClassName();
-    if (last && !session.selection.className) {
-      session.setSelection({ className: last, trackId: null, source: null });
+    if (session.selection.className) return;
+
+    const firstClassName = labels[0]?.name ?? null;
+    const lastClassName =
+      videoLastClassName &&
+      labels.some((label) => label.name === videoLastClassName)
+        ? videoLastClassName
+        : null;
+    const nextClassName = lastClassName ?? firstClassName;
+
+    if (!nextClassName) return;
+
+    session.setSelection({
+      className: nextClassName,
+      trackId: null,
+      source: null,
+    });
+
+    if (nextClassName !== videoLastClassName) {
+      setVideoLastClassName(nextClassName);
     }
-  }, [session]);
+  }, [labels, session, setVideoLastClassName, videoLastClassName]);
 
   const classItems = useMemo(() => {
     return labels.map((c) => ({ name: c.name }));
@@ -113,7 +112,7 @@ export function VideoToolbox() {
     if (!cls) return;
 
     session.setSelection({ className: cls, trackId: null, source: "explicit" });
-    saveLastClassName(cls);
+    setVideoLastClassName(cls);
   };
 
   const onSelectInstance = (key: string) => {
@@ -136,7 +135,7 @@ export function VideoToolbox() {
         source: "explicit",
       });
       session.closePopup();
-      saveLastClassName(hit.class_name);
+      setVideoLastClassName(hit.class_name);
       return;
     }
 
@@ -149,7 +148,7 @@ export function VideoToolbox() {
       onlyIfOnCurrentFrame: true,
     });
 
-    saveLastClassName(hit.class_name);
+    setVideoLastClassName(hit.class_name);
   };
 
   const onJumpToFirstFrame = (profile: {
@@ -166,7 +165,7 @@ export function VideoToolbox() {
       trackId: tid,
       source: "explicit",
     });
-    saveLastClassName(cls);
+    setVideoLastClassName(cls);
 
     const firstFrame = profile.first_frame;
     if (typeof firstFrame === "number" && Number.isFinite(firstFrame)) {
@@ -218,22 +217,36 @@ export function VideoToolbox() {
   return (
     <>
       <div className="w-full">
-        {/* Frame Tools section — commented out until more shapes are added
-        <div className="px-4 pb-4">
-          <div className="text-gray-200 text-sm font-medium mb-2">
+        <Divider size="S" marginX="size-200" />
+        <div className="px-4 py-4">
+          <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Frame Tools
           </div>
-          <div className="max-w-[16rem] mx-auto mb-2">
-            <Flex gap="size-100" alignItems="center" wrap>
-              <Button variant="secondary" style="fill" isDisabled>
-                Rectangle
-              </Button>
-            </Flex>
-          </div>
+          <Flex
+            alignItems="center"
+            justifyContent="center"
+            direction="column"
+            gap="size-100"
+          >
+            <div className="w-[170px] flex justify-start">
+              <Switch
+                isSelected={session.propagate}
+                onChange={session.setPropagate}
+              >
+                Propagation
+              </Switch>
+            </div>
+            <div className="w-[170px] flex justify-start">
+              <Switch
+                isSelected={session.hideAnnotations}
+                onChange={session.setHideAnnotations}
+              >
+                <span className="whitespace-nowrap">Hide annotations</span>
+              </Switch>
+            </div>
+          </Flex>
         </div>
-
-        <div className="border-t border-gray-800 mx-4" />
-        */}
+        <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
           <VideoClassPanel
@@ -245,7 +258,7 @@ export function VideoToolbox() {
         <Divider size="S" marginX="size-200" />
 
         <div className="px-4 py-4">
-          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
             Instances
           </div>
           <VideoInstancePanel

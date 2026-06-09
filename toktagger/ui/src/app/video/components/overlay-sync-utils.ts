@@ -1,14 +1,96 @@
-import type { ImageAnnotation } from "@annotorious/react";
+import { boundsFromPoints, type ImageAnnotation } from "@annotorious/react";
 import {
   getLabelTrack,
+  isRectangleAnno,
+  isPolygonAnno,
+  type PolygonAnnotation,
+  type RectangleAnnotation,
+  readPolygonGeometry,
   readRectGeometry,
   VideoImageAnnotation,
 } from "./anno-utils";
 
-type UnknownRecord = Record<string, unknown>;
+export type ImagePoint = { x: number; y: number };
 
 function getTargetSource(a: ImageAnnotation): string {
   return (a as VideoImageAnnotation).target.source ?? "";
+}
+
+function polygonContainsPoint(points: [number, number][], point: ImagePoint) {
+  let inside = false;
+
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i];
+    const [xj, yj] = points[j];
+    const intersects =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+
+    if (intersects) inside = !inside;
+  }
+
+  return inside;
+}
+
+export function annotationContainsPoint(
+  annotation: ImageAnnotation,
+  point: ImagePoint,
+) {
+  const rect = isRectangleAnno(annotation)
+    ? readRectGeometry(annotation)
+    : null;
+  if (rect) {
+    return (
+      point.x >= rect.x &&
+      point.x <= rect.x + rect.w &&
+      point.y >= rect.y &&
+      point.y <= rect.y + rect.h
+    );
+  }
+
+  const polygon = isPolygonAnno(annotation)
+    ? readPolygonGeometry(annotation)
+    : null;
+  if (!polygon) return false;
+
+  const { minX, minY, maxX, maxY } = polygon.bounds;
+  if (point.x < minX || point.x > maxX || point.y < minY || point.y > maxY) {
+    return false;
+  }
+
+  return polygonContainsPoint(polygon.points, point);
+}
+
+export function setViewerCursor(viewerElement: HTMLElement, cursor: string) {
+  const applyCursor = (target: HTMLElement | SVGElement) => {
+    if (cursor) {
+      target.style.setProperty("cursor", cursor, "important");
+    } else {
+      target.style.removeProperty("cursor");
+    }
+  };
+
+  const scopes = [
+    viewerElement,
+    viewerElement.parentElement,
+    viewerElement.parentElement?.parentElement,
+  ].filter(Boolean) as HTMLElement[];
+
+  applyCursor(viewerElement);
+
+  const selector = [
+    ".a9s-gl-canvas",
+    ".a9s-annotationlayer",
+    ".a9s-annotationlayer *",
+    ".a9s-annotation",
+    ".a9s-annotation *",
+  ].join(", ");
+
+  scopes.forEach((scope) => {
+    scope
+      .querySelectorAll<HTMLElement | SVGElement>(selector)
+      .forEach(applyCursor);
+  });
 }
 
 /**
@@ -18,17 +100,22 @@ function getTargetSource(a: ImageAnnotation): string {
 function annoSig(a: ImageAnnotation): string {
   const sel = a.target.selector;
   const source = getTargetSource(a);
-  const g = readRectGeometry(a);
+  const rect = isRectangleAnno(a) ? readRectGeometry(a) : null;
+  const poly = isPolygonAnno(a) ? readPolygonGeometry(a) : null;
   const { className, trackId } = getLabelTrack(a);
+  const polySig = poly
+    ? poly.points.map(([x, y]) => `${x},${y}`).join(";")
+    : "";
 
   return [
     a.id ?? "",
     sel?.type ?? "",
     source,
-    g?.x ?? "",
-    g?.y ?? "",
-    g?.w ?? "",
-    g?.h ?? "",
+    rect?.x ?? "",
+    rect?.y ?? "",
+    rect?.w ?? "",
+    rect?.h ?? "",
+    polySig,
     className ?? "",
     trackId ?? "",
   ].join("|");
@@ -71,23 +158,98 @@ export function clampRectToImage(
 }
 
 function withRectGeometry(
-  a: ImageAnnotation,
+  a: RectangleAnnotation,
   g: { x: number; y: number; w: number; h: number },
-): ImageAnnotation {
-  const geom = a.target.selector.geometry as unknown;
-  const base =
-    geom && typeof geom === "object"
-      ? (geom as UnknownRecord)
-      : ({} as UnknownRecord);
-
+): RectangleAnnotation {
   const nextGeom = {
-    ...base,
+    ...a.target.selector.geometry,
     x: g.x,
     y: g.y,
     w: g.w,
     h: g.h,
     bounds: { minX: g.x, minY: g.y, maxX: g.x + g.w, maxY: g.y + g.h },
-  } as unknown as ImageAnnotation["target"]["selector"]["geometry"];
+  };
+
+  return {
+    ...a,
+    target: {
+      ...a.target,
+      selector: {
+        ...a.target.selector,
+        geometry: nextGeom,
+      },
+    },
+  };
+}
+
+function clampPoint(
+  point: ReadonlyArray<number>,
+  nw: number,
+  nh: number,
+): [number, number] {
+  const [x, y] = point;
+  return [Math.max(0, Math.min(nw, x)), Math.max(0, Math.min(nh, y))];
+}
+
+function samePoint(
+  a: ReadonlyArray<number>,
+  b: ReadonlyArray<number>,
+): boolean {
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+function polygonArea(points: Array<ReadonlyArray<number>>): number {
+  let area = 0;
+
+  for (let i = 0; i < points.length; i += 1) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    area += x1 * y2 - x2 * y1;
+  }
+
+  return Math.abs(area) / 2;
+}
+
+function clampPolygonToImage(
+  points: Array<Array<number>>,
+  nw: number,
+  nh: number,
+): [number, number][] | null {
+  const clamped = points.map((point) => clampPoint(point, nw, nh));
+  const deduped: [number, number][] = [];
+
+  for (const point of clamped) {
+    if (
+      deduped.length === 0 ||
+      !samePoint(deduped[deduped.length - 1], point)
+    ) {
+      deduped.push(point);
+    }
+  }
+
+  if (
+    deduped.length > 1 &&
+    samePoint(deduped[0], deduped[deduped.length - 1])
+  ) {
+    deduped.pop();
+  }
+
+  const unique = new Set(deduped.map(([x, y]) => `${x},${y}`));
+  if (unique.size < 3) return null;
+  if (polygonArea(deduped) <= 0) return null;
+
+  return deduped;
+}
+
+function withPolygonGeometry(
+  a: PolygonAnnotation,
+  points: [number, number][],
+): PolygonAnnotation {
+  const nextGeom = {
+    ...a.target.selector.geometry,
+    points,
+    bounds: boundsFromPoints(points),
+  };
 
   return {
     ...a,
@@ -111,28 +273,61 @@ export function clampOverlayToNaturalImage(
   const out: ImageAnnotation[] = [];
 
   for (const a of list) {
-    const g = readRectGeometry(a);
-    if (!g) {
+    if (isRectangleAnno(a)) {
+      const g = readRectGeometry(a);
+      if (!g) {
+        out.push(a);
+        continue;
+      }
+
+      const clamped = clampRectToImage(g, natural.w, natural.h);
+      if (!clamped) {
+        changed = true;
+        continue;
+      }
+
+      const same =
+        clamped.x === g.x &&
+        clamped.y === g.y &&
+        clamped.w === g.w &&
+        clamped.h === g.h;
+
+      if (same) out.push(a);
+      else {
+        changed = true;
+        out.push(withRectGeometry(a, clamped));
+      }
+      continue;
+    }
+
+    if (!isPolygonAnno(a)) {
       out.push(a);
       continue;
     }
 
-    const clamped = clampRectToImage(g, natural.w, natural.h);
+    const polygon = readPolygonGeometry(a);
+    if (!polygon) {
+      out.push(a);
+      continue;
+    }
+
+    const clamped = clampPolygonToImage(polygon.points, natural.w, natural.h);
     if (!clamped) {
       changed = true;
       continue;
     }
 
     const same =
-      clamped.x === g.x &&
-      clamped.y === g.y &&
-      clamped.w === g.w &&
-      clamped.h === g.h;
+      clamped.length === polygon.points.length &&
+      clamped.every(
+        ([x, y], index) =>
+          x === polygon.points[index]?.[0] && y === polygon.points[index]?.[1],
+      );
 
     if (same) out.push(a);
     else {
       changed = true;
-      out.push(withRectGeometry(a, clamped));
+      out.push(withPolygonGeometry(a, clamped));
     }
   }
 

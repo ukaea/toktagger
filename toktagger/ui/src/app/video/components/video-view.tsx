@@ -1,52 +1,23 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Annotorious } from "@annotorious/react";
 import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
-import { SearchField, Button, ButtonGroup } from "@adobe/react-spectrum";
+import { Button } from "@adobe/react-spectrum";
 import {
   VideoSessionProvider,
   useVideoSession,
 } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
+import { FrameJumpField } from "@/app/video/components/ui_elements";
 import { useSample } from "@/app/contexts/SampleContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
+import {
+  VideoUiStateProvider,
+  useVideoUiState,
+} from "@/app/video/components/video-context";
 import { useParams } from "react-router-dom";
-
-/**
- * Small "jump to frame" input with validation. Delegates the actual navigation
- * to the parent via `onJump`.
- */
-export function FrameSearch({ onJump }: { onJump: (n: number) => void }) {
-  const [errorMessage, setErrorMessage] = useState<string>("");
-
-  const onSearchSubmit = (newValue: string) => {
-    if (newValue === "") {
-      setErrorMessage("");
-      return;
-    }
-
-    const n = Number(newValue);
-
-    if (Number.isInteger(n) && n >= 0) {
-      setErrorMessage("");
-      onJump(n);
-      return;
-    }
-
-    setErrorMessage("Please enter a number.");
-  };
-
-  return (
-    <SearchField
-      aria-label="Jump to Frame"
-      onSubmit={onSearchSubmit}
-      validationState={errorMessage ? "invalid" : undefined}
-      errorMessage={errorMessage}
-    />
-  );
-}
 
 /**
  * Frame annotator UI wrapper:
@@ -82,7 +53,7 @@ function VideoFrameAnnotator(props: {
 
     // Forward-propagate current annotations into the next frame if that frame is empty.
     // This is purely in-session state; image loading is driven by goToFrame().
-    session.forwardPropToNextIfEmpty(next);
+    if (session.propagate) session.forwardPropToNextIfEmpty(next);
 
     props.goToFrame(next);
   };
@@ -95,15 +66,8 @@ function VideoFrameAnnotator(props: {
   return (
     <div className="flex flex-col items-center gap-4 w-full">
       <div className="flex flex-col items-center gap-2">
-        <div className="w-60 text-center">
-          <div className="text-[13px] text-gray-700 dark:text-gray-200 mb-1">
-            Jump to Frame
-          </div>
-          <FrameSearch onJump={handleJump} />
-        </div>
-
         <div className="flex justify-center">
-          <ButtonGroup>
+          <div className="flex items-start gap-2">
             <Button
               variant="primary"
               onPress={handlePrev}
@@ -111,9 +75,7 @@ function VideoFrameAnnotator(props: {
             >
               Prev
             </Button>
-            <Button variant="primary" isDisabled>
-              Frame {session.frame}
-            </Button>
+            <FrameJumpField frame={session.frame} onJump={handleJump} />
             <Button
               variant="primary"
               onPress={handleNext}
@@ -121,7 +83,7 @@ function VideoFrameAnnotator(props: {
             >
               Next
             </Button>
-          </ButtonGroup>
+          </div>
         </div>
       </div>
 
@@ -134,8 +96,17 @@ function VideoFrameAnnotator(props: {
 }
 
 export function VideoProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <VideoUiStateProvider>
+      <VideoProvidersInner>{children}</VideoProvidersInner>
+    </VideoUiStateProvider>
+  );
+}
+
+function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
   const { data, annotations, dataParams } = useSample();
+  const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
     return <>{children}</>;
@@ -150,6 +121,8 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
         data={data}
         dataParams={dataParams}
         dbAnnotations={annotations ?? []}
+        propagate={videoPropagate}
+        setPropagate={setVideoPropagate}
       >
         <VideoNavAdapterBridge>{children}</VideoNavAdapterBridge>
       </VideoSessionProvider>

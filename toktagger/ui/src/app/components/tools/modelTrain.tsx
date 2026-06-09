@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Provider,
   defaultTheme,
@@ -20,15 +20,26 @@ import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
-import { startTraining, getModels } from "@/app/core";
+import { startTraining, getModelTypes, getModelTrainSchema } from "@/app/core";
+import ModelForm from "@/app/components/ui/schemaForm";
+import { RJSFSchema } from "@rjsf/utils";
+import Form from "@rjsf/core";
 
 export function ModelTrainModal({ project }: { project: Project }) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [trainDisabled, setTrainDisabled] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageColour, setMessageColour] = useState<string>("primary");
-  const [messageIcon, setMessageIcon] = useState<JSX.Element | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
+    null,
+  );
+  const [modelNames, setModelNames] = useState<string[] | null>(null);
+  const [selectedModelName, setSelectedModelName] = useState<string | null>(
+    null,
+  );
+  const [schema, setSchema] = useState<RJSFSchema | null>(null);
+  const [unvalidatedFormData, setUnvalidatedFormData] = useState<
+    Record<string, unknown>
+  >({});
+  const formRef = useRef<Form>(null);
   const buttonStyle = {
     position: "fixed",
     top: 10,
@@ -37,37 +48,62 @@ export function ModelTrainModal({ project }: { project: Project }) {
   };
 
   useEffect(() => {
-    if (!modalOpen) return;
-
-    (async () => {
-      const response = await getModels(project._id);
-
-      if (!response.ok) {
-        const errorMessage = await response.json();
-        setMessage(errorMessage.detail);
-        setMessageColour("negative");
-        setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
-        setTrainDisabled(true);
-      }
-    })();
-  }, [modalOpen, project._id]);
-
-  const submitTrainJob = async () => {
-    if (selectedModel == null) {
+    if (!modalOpen) {
       return;
     }
-    const response = await startTraining(project._id, selectedModel);
+    (async () => {
+      const response = await getModelTypes(project.task);
 
+      if (response.ok) {
+        const data = await response.json();
+        const modelTypes = data as string[];
+        setModelNames(modelTypes);
+      } else {
+        const errorMessage = await response.json();
+        setMessage(errorMessage.detail);
+        setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+      }
+    })();
+  }, [modalOpen, project.task]);
+
+  useEffect(() => {
+    const updateSchema = async () => {
+      if (!selectedModelName) {
+        setSchema(null);
+        return;
+      }
+      const newSchema: RJSFSchema =
+        await getModelTrainSchema(selectedModelName);
+      setSchema(newSchema);
+    };
+    updateSchema();
+  }, [selectedModelName]);
+
+  const pressSubmit = () => {
+    if (schema) {
+      formRef.current?.submit();
+    } else {
+      submitTrainJob({});
+    }
+  };
+
+  const submitTrainJob = async (params: Record<string, unknown>) => {
+    if (!selectedModelName || !project._id) {
+      return;
+    }
+    const response = await startTraining(
+      project._id,
+      selectedModelName,
+      params,
+    );
     if (response.ok) {
       setMessage("Model training added to job queue!");
-      setMessageColour("positive");
       setMessageIcon(
         <CheckmarkCircle aria-label="Success" color="positive" size="S" />,
       );
     } else {
       const errorMessage = await response.json();
       setMessage(errorMessage.detail);
-      setMessageColour("negative");
       setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
     }
   };
@@ -90,16 +126,30 @@ export function ModelTrainModal({ project }: { project: Project }) {
             <Content>
               <ComboBox
                 label="Select Model Type"
-                onSelectionChange={setSelectedModel}
+                selectedKey={selectedModelName}
+                onSelectionChange={(key) =>
+                  setSelectedModelName(key !== null ? String(key) : null)
+                }
               >
-                {project.model_types.map((model_type) => (
-                  <Item key={model_type}>{model_type}</Item>
-                ))}
+                {modelNames
+                  ? modelNames.map((model_name) => (
+                      <Item key={model_name}>{model_name}</Item>
+                    ))
+                  : null}
               </ComboBox>
+              {schema && (
+                <ModelForm
+                  ref={formRef}
+                  schema={schema}
+                  onSubmit={submitTrainJob}
+                  formData={unvalidatedFormData}
+                  setFormData={setUnvalidatedFormData}
+                />
+              )}
             </Content>
             <Footer>
               {message && (
-                <Text color={messageColour}>
+                <Text>
                   {messageIcon} {message}
                 </Text>
               )}
@@ -110,8 +160,8 @@ export function ModelTrainModal({ project }: { project: Project }) {
               </Button>
               <Button
                 variant="accent"
-                onPress={submitTrainJob}
-                isDisabled={trainDisabled}
+                onPress={pressSubmit}
+                isDisabled={!modelNames || !selectedModelName}
               >
                 Train
               </Button>

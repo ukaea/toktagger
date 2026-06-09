@@ -1,7 +1,6 @@
 import os
 import ray
 import pathlib
-import typing
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 from toktagger.api.schemas.annotations import (
@@ -17,7 +16,7 @@ from toktagger.api.core.sender import (
 )
 import logging
 from platformdirs import user_cache_dir
-
+import pydantic
 
 logger = logging.getLogger("ray")
 logger.setLevel("DEBUG")
@@ -43,16 +42,20 @@ def get_actor(project, model):
         model_registry = ray.get_actor("WorkerModelRegistry")
         model_type = ray.get(model_registry.get.remote(model.type))
 
-        ml_model = model_type.options(name=model.id, lifetime="detached").remote(
-            model_id=str(model.id),
-            project=project,
+        ml_model = (
+            ray.remote(model_type)
+            .options(name=model.id, lifetime="detached")
+            .remote(
+                model_id=str(model.id),
+                project=project,
+            )
         )
 
-        model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
-            f"{str(model.id)}.model"
+        model_path = next(
+            pathlib.Path(os.environ["MODEL_STORAGE"]).glob(f"{str(model.id)}*"), None
         )
-        if model_path.exists():
-            ml_model.load.remote(model_path)
+        if model_path:
+            ml_model.wrapped_load.remote(model_path)
         else:
             logger.debug("No saved weights found, initializing blank model")
 
@@ -65,19 +68,14 @@ def train_model(
     project: Project,
     samples: list[Sample],
     annotations: list[list[AnnotationOutTypes]],
-    train_val_test_split: typing.Tuple[float, float, float],
-    num_epochs: int = 100,
-    batch_size: int = 32,
+    params: pydantic.BaseModel | None,
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
     model_actor = get_actor(project=project, model=model)
     try:
         logger.info(f"Running model training for project {project.id}")
         model_actor.log_progress.remote(training_status="started", progress=0)
-        train_task = model_actor.train.remote(
-            samples=samples,
-            annotations=annotations,
-            train_val_test_split=train_val_test_split,
-            num_epochs=num_epochs,
+        train_task = model_actor.wrapped_train.remote(
+            samples=samples, annotations=annotations, params=params
         )
 
         # Wait for train task to complete
@@ -85,13 +83,15 @@ def train_model(
 
         model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
         model_dir.mkdir(exist_ok=True)  # Do i need to do this every time?
-        model_actor.save.remote(model_dir.joinpath(f"{model.id}.model"))
+        model_actor.wrapped_save.remote(model_dir.joinpath(str(model.id)))
 
         send_model_updates(
             project_id=project.id,
             model_id=model.id,
             updates=ModelUpdate(training_status="completed", progress=100, score=score),
         )
+
+        return {"project_id": project.id, "model_id": model.id, "score": score}
 
     except Exception as e:
         # If anything goes wrong, update model to failed status
@@ -108,7 +108,7 @@ def train_model(
 
 @ray.remote
 def get_predictions(
-    project: Project, model: Model, samples: list[Sample], batch_size: int = 32
+    project: Project, model: Model, samples: list[Sample], params: pydantic.BaseModel
 ):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
@@ -118,7 +118,9 @@ def get_predictions(
     )
     model_actor = get_actor(project=project, model=model)
 
-    predictions_task = model_actor.predict.remote(samples, batch_size=batch_size)
+    predictions_task = model_actor.wrapped_predict.remote(
+        samples=samples, params=params
+    )
     predictions = ray.get(predictions_task)
 
     samples_batch = [
@@ -151,6 +153,6 @@ def get_predictions(
     return {
         "project_id": project.id,
         "model_type": model.type,
-        "sample_ids": [sample.id for sample in samples],
-        "annotations": annotations_batch,
+        "samples_batch": samples_batch,
+        "annotations_batch": annotations_batch,
     }

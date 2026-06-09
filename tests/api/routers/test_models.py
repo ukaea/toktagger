@@ -1,54 +1,49 @@
 import pytest
 import pathlib
 from toktagger.api.schemas.models import ModelUpdate
+from toktagger.api.models.base import ActorRegistry
+from toktagger.api.core.sender import (
+    send_batch_samples,
+    send_batch_annotations,
+    send_model_updates,
+)
+import ray
 from unittest.mock import patch
 from bson import ObjectId
 import os
+import time
 
 
-async def send_to_url(api_client, url, method):
-    """
-    Perform a POST or PUT to a URL with the test API client.
+def wait_for_results(task_registry: ActorRegistry, task_id: str):
+    task = task_registry.get(task_id)
+    results = ray.get(task, timeout=30)
+    return results
 
-    Catch any response which is sent from the worker to the server via the API,
-    and use the test API client to send it (this is needed due to a sync / async mismatch in the tests)
 
-    Note that ray is in local mode, which means everything is executed in a single thread.
-    This means tasks are executed in serial, and there is no need to wait for the model to complete predictions.
-    """
-    RESULTS = {}
+async def collect_predict_results(api_client, task_id):
+    results = wait_for_results(api_client.app.state.task_registry, task_id)
+    with patch("requests.put", api_client.put):
+        response = await send_batch_annotations(
+            results["project_id"], results["annotations_batch"]
+        )
+        assert response.status_code == 200
+        await send_batch_samples(results["project_id"], results["samples_batch"])
+        assert response.status_code == 200
 
-    def mock_send_updates(object_type: str, url: str, updates: list):
-        if isinstance(updates, list):
-            payload = [model.model_dump(mode="json") for model in updates]
-        else:
-            payload = updates.model_dump(mode="json")
-        payloads = RESULTS.get(url, [])
-        payloads.append(payload)
-        RESULTS[url] = payloads
 
-    with patch("toktagger.api.core.sender.send_updates", mock_send_updates):
-        if method == "POST":
-            response = await api_client.post(url)
-        else:
-            response = await api_client.put(url)
-            # Check you get a 200 response
-            assert response.status_code == 200
-
-    # Push results to server via API endpoints which predict task uses
-    # This is a fudge since that uses sync requests module, whereas this is an Async test client
-    for put_url, payloads in RESULTS.items():
-        for payload in payloads:
-            await api_client.put(put_url, json=payload)
-
-    return response.json(), RESULTS
+async def collect_train_results(api_client, task_id):
+    results = wait_for_results(api_client.app.state.task_registry, task_id)
+    update = ModelUpdate(
+        training_status="completed", progress=100, score=results["score"]
+    )
+    with patch("requests.put", api_client.put):
+        response = await send_model_updates(
+            results["project_id"], results["model_id"], update
+        )
+        assert response.status_code == 200
 
 
 KILL_COUNT = 0
-
-
-def mock_wait(*args, **kwargs):
-    return [], ["waiting"]
 
 
 def kill(*args, **kwargs):
@@ -59,16 +54,17 @@ def kill(*args, **kwargs):
 async def test_model_batch_predict_num_predictions(
     api_client, db_client, setup_model_db
 ):
-    await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5",
-        method="POST",
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5"
     )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
 
     # Get annotations from the database, there should be 5 non validated ones
     annotations = await db_client.get_filtered_documents(
         collection="annotations", filters={"validated": False}
     )
+
     assert len(annotations) == 5
 
     # Check latest version of model has been used by default (annotation label set to model ID in Mock)
@@ -76,15 +72,44 @@ async def test_model_batch_predict_num_predictions(
 
 
 @pytest.mark.asyncio
+async def test_model_batch_predict_num_predictions_params(
+    api_client, db_client, setup_model_db
+):
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/predict?num_predictions=5",
+        json={
+            "params": {
+                "final_score": 50,
+                "test_string": "testing",
+                "test_bool": True,
+                "test_selection": "selection_1",
+            }
+        },
+    )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
+
+    # Get annotations from the database, there should be 5 x 3 non validated ones
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+
+    assert len(annotations) == 15
+
+    # Check disruption annotations have used params correctly to give time = params.final_score + 1
+    assert all(ann["time"] == 51 for ann in annotations if ann["label"] == "disruption")
+
+
+@pytest.mark.asyncio
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
     query_string = "&".join(
         f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
     )
-    await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?{query_string}",
-        method="POST",
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?{query_string}"
     )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
 
     # Get annotations from the database, there should be 2 non validated ones
     annotations = await db_client.get_filtered_documents(
@@ -103,11 +128,11 @@ async def test_model_batch_predict_samples(api_client, db_client, setup_model_db
 
 @pytest.mark.asyncio
 async def test_model_batch_predict_version(api_client, db_client, setup_model_db):
-    await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1",
-        method="POST",
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
     )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
 
     # Get annotations from the database, there should be 5 non validated ones
     annotations = await db_client.get_filtered_documents(
@@ -120,12 +145,56 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
-async def test_model_sample_predict(api_client, db_client, setup_model_db):
-    await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
-        method="POST",
+async def test_model_predict_missing_weights(api_client, db_client, setup_model_db):
+    # Delete weights
+    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+        f"{setup_model_db['model_id_1']}.model"
+    ).unlink()
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
     )
+    with pytest.raises(RuntimeError) as e:
+        wait_for_results(api_client.app.state.task_registry, response.json()["task_id"])
+        assert "Cannot make predictions using an untrained model!" in str(e)
+
+
+@pytest.mark.asyncio
+async def test_model_sample_predict_params(api_client, db_client, setup_model_db):
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_params_timeseries_cnn/predict",
+        json={
+            "params": {
+                "final_score": 50,
+                "test_string": "testing",
+                "test_bool": True,
+                "test_selection": "selection_1",
+            }
+        },
+    )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
+
+    # Get annotations from the database, there should be 3 non validated one
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert len(annotations) == 3
+
+    # Check it corresponds to sample ID we asked for predictions on
+    assert str(annotations[0]["sample_id"]) == setup_model_db["sample_ids"][-1]
+
+    # Check disruption has time corresponding to final_score in params + 1
+    ann = next(ann for ann in annotations if ann["label"] == "Disruption")
+    assert ann["time"] == 51
+
+
+@pytest.mark.asyncio
+async def test_model_sample_predict(api_client, db_client, setup_model_db):
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
+    )
+
+    await collect_predict_results(api_client, response.json()["task_id"])
 
     # Get annotations from the database, there should be 1 non validated one
     annotations = await db_client.get_filtered_documents(
@@ -142,31 +211,31 @@ async def test_model_sample_predict(api_client, db_client, setup_model_db):
 
 @pytest.mark.asyncio
 async def test_model_get_sample_prediction(api_client, db_client, setup_model_db):
-    prediction_response, _ = await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
-        method="POST",
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
     )
-    task_id = prediction_response["task_id"]
 
-    get_response = await api_client.get(
-        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict/{task_id}"
-    )
+    task_id = response.json()["task_id"]
+
+    # Poll the endpoint until results arrive
+    t = 0
+    while t < 10:
+        get_response = await api_client.get(
+            f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict/{task_id}"
+        )
+        if get_response.status_code == 200:
+            break
+        elif get_response.status_code != 202:
+            raise ValueError(f"Got response {response.status_code}!")
+        time.sleep(1)
+        t += 1
+
     assert get_response.status_code == 200
 
-    # Get annotation from the database
-    annotations = await db_client.get_filtered_documents(
-        collection="annotations", filters={"validated": False}
-    )
-    annotation = annotations[0]
+    annotation = get_response.json()[0]
+
     # Check it corresponds to sample ID we asked for predictions on
     assert str(annotation["sample_id"]) == setup_model_db["sample_ids"][-1]
-
-    # Check it is the same as the one returned to us via API
-    returned_annotation = get_response.json()[0]
-
-    for key in ("validated", "uncertainty", "label", "created_by", "time"):
-        assert annotation[key] == returned_annotation[key]
 
 
 @pytest.mark.asyncio
@@ -187,19 +256,26 @@ async def test_model_get_sample_prediction_invalid_task(
 async def test_model_get_sample_prediction_wrong_sample(
     api_client, db_client, setup_model_db
 ):
-    prediction_response, _ = await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
-        method="POST",
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
     )
-    task_id = prediction_response["task_id"]
+
+    task_id = response.json()["task_id"]
 
     # Ask for predictions from this task for a sample which we did not predict on
-    get_response = await api_client.get(
-        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_disruption_cnn/predict/{task_id}"
-    )
+    t = 0
+    while t < 10:
+        get_response = await api_client.get(
+            f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_disruption_cnn/predict/{task_id}"
+        )
+        if get_response.status_code == 202:
+            time.sleep(1)
+            t += 1
+            continue
+        else:
+            break
 
-    # Check it returns 404 with appropriate message
+    # Check it returned 404 with appropriate message
     assert get_response.status_code == 404
     assert (
         "This task does not have results for the specified sample!"
@@ -207,17 +283,20 @@ async def test_model_get_sample_prediction_wrong_sample(
     )
 
 
+def mock_wait(*args, **kwargs):
+    return [], ["waiting"]
+
+
 @pytest.mark.asyncio
 @patch("ray.wait", mock_wait)
 async def test_model_get_sample_prediction_in_progress(
     api_client, db_client, setup_model_db
 ):
-    prediction_response, _ = await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict",
-        method="POST",
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
     )
-    task_id = prediction_response["task_id"]
+
+    task_id = response.json()["task_id"]
 
     # Ask for predictions from this task for a sample while it is still in progress
     get_response = await api_client.get(
@@ -248,29 +327,103 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
-async def test_model_start_training(api_client, db_client, setup_model_db):
-    response, model_updates = await send_to_url(
-        api_client=api_client,
-        url=f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train",
-        method="PUT",
+async def test_model_start_training_no_params(api_client, db_client, setup_model_db):
+    response = await api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
     )
 
-    # Check model has been set to
-    #   - Started, with 0% completion
-    #   - Started, with 50% completion (inside mock train method)
-    #   - Completed, with 100% completion (outside train method)
-    url, updates = next(iter(model_updates.items()))
-    model_id = url.split("/")[-1]
-    assert updates[0]["training_status"] == "started"
-    assert updates[0]["progress"] == 0
+    await collect_train_results(api_client, response.json()["task_id"])
+    model_id = response.json()["model_id"]
 
-    assert updates[1]["training_status"] == "started"
-    assert updates[1]["progress"] == 50
-    assert updates[1]["score"] == 20
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(model_id)
+    )
 
-    assert updates[2]["training_status"] == "completed"
-    assert updates[2]["progress"] == 100
-    assert updates[2]["score"] == 60  # value returned by train method
+    # Check model has been set to completed, with 100% completion
+    assert model["training_status"] == "completed"
+    assert model["progress"] == 100
+    assert model["score"] == 60  # value returned by train method
+
+    # Check model has been saved after completion
+    assert (
+        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id}.model").exists()
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["train", "predict", "sample"])
+async def test_model_wrong_params(api_client, db_client, setup_model_db, method):
+    if method == "sample":
+        url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_params_timeseries_cnn/predict"
+    else:
+        url = f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/{method}"
+
+    json = {
+        "params": {
+            "final_score": 20,
+            "test_bool": 5,
+            "test_selection": "wrong_selection",
+        }
+    }
+
+    if method == "train":
+        response = await api_client.put(url, json=json)
+    else:
+        response = await api_client.post(url, json=json)
+
+    assert response.status_code == 422
+    error = response.json()["detail"]
+    assert "'final_score': Input should be greater than or equal to 50" in error
+    assert "'test_string': Field required" in error
+    assert "'test_bool': Input should be a valid boolean" in error
+    assert "'test_selection': Input should be 'selection_1' or 'selection_2'" in error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["train", "predict", "sample"])
+async def test_model_missing_params(api_client, db_client, setup_model_db, method):
+    if method == "sample":
+        url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_params_timeseries_cnn/predict"
+    else:
+        url = f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/{method}"
+
+    if method == "train":
+        response = await api_client.put(url)
+    else:
+        response = await api_client.post(url)
+
+    assert response.status_code == 422
+    assert (
+        "Model training parameters are missing! Requires 'TimeSeriesCNNParams' parameters."
+        in response.json()["detail"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_model_start_training_params(api_client, db_client, setup_model_db):
+    response = await api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
+        json={
+            "params": {
+                "final_score": 50,
+                "test_string": "testing",
+                "test_bool": True,
+                "test_selection": "selection_1",
+            }
+        },
+    )
+
+    await collect_train_results(api_client, response.json()["task_id"])
+    model_id = response.json()["model_id"]
+
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(model_id)
+    )
+
+    # Check model has been set to completed, with 100% completion
+    assert model["training_status"] == "completed"
+    assert model["progress"] == 100
+    assert model["score"] == 50  # value returned from params
 
     # Check model has been saved after completion
     assert (
@@ -347,7 +500,7 @@ async def test_model_delete_type_version(api_client, db_client, setup_db):
 
 
 @pytest.mark.asyncio
-@patch("ray.kill")
+@patch("ray.cancel")
 async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
     response = await api_client.delete(
         f"/projects/{setup_db['project_id_1']}/models/disruption_cnn/train"
@@ -374,7 +527,7 @@ async def test_model_stop_training_not_in_progress(
 ):
     response = await api_client.delete(
         f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn/train?version=1"
-    )
+    )  # Version 1 model is 'completed' so nothing to do
     assert response.status_code == 409
     assert (
         response.json()["detail"] == "Model training is not in progress for this model!"

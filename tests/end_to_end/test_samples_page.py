@@ -9,6 +9,7 @@ from tests.endpoints import (
     create_model_samples,
     create_query_strategy_samples,
 )
+from tests.end_to_end import form_check
 import time
 import requests
 import tempfile
@@ -264,7 +265,13 @@ def test_samples_sorting(server_setup, page: Page):
     create_uda_samples(project_id, shot_ids=[20000])
     time.sleep(0.1)
 
-    create_uda_samples(project_id, shot_ids=[10000])
+    sample_ids = create_uda_samples(project_id, shot_ids=[10000])
+
+    # Set 10000 sample to be validated
+    requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples",
+        json=[{"id": sample_ids[0], "updates": {"validated_annotations": True}}],
+    )
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
 
@@ -276,6 +283,9 @@ def test_samples_sorting(server_setup, page: Page):
 
     # Sort by Shot ID, 10000 should be first, then 20000
     sort(page, "Shot ID", "10000", "20000")
+
+    # Sort by validated annotations - ascending, so should be non validated first
+    sort(page, "Validated", "20000", "10000")
 
 
 def test_samples_search(server_setup, page: Page):
@@ -549,10 +559,10 @@ def test_create_samples_file_data(server_setup, page: Page, file_type: str):
         pathlib.Path(tempd).joinpath(f"10000.{file_type.lower()}").touch()
         pathlib.Path(tempd).joinpath(f"10001.{file_type.lower()}").touch()
 
-        # Check we can see File Type, Directory Path, and Column Names input fields
+        # Check we can see File Type, Directory Path, and Signal Names input fields
         expect(modal.get_by_role("combobox", name="File Type")).to_be_visible()
         expect(modal.get_by_role("textbox", name="Directory Path")).to_be_visible()
-        expect(modal.get_by_role("textbox", name="Column Names")).to_be_visible()
+        expect(modal.get_by_role("textbox", name="Signal Names")).to_be_visible()
 
         # Select given file type in dropdown
         modal.get_by_role("button", name="File Type").click()
@@ -565,8 +575,8 @@ def test_create_samples_file_data(server_setup, page: Page, file_type: str):
             modal.get_by_text("Found 2 files with shot IDs: 10000, 10001")
         ).to_be_visible()
 
-        # Add column names
-        modal.get_by_role("textbox", name="Column Names").fill("ip, dalpha")
+        # Add signal names
+        modal.get_by_role("textbox", name="Signal Names").fill("ip, dalpha")
 
         # Create samples
         modal.get_by_role("button", name="Add Samples").click()
@@ -763,22 +773,22 @@ def test_samples_page_import_annotations(sample_id: bool, server_setup, page: Pa
             f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}"
         )
 
-        expect(page.get_by_role("rowheader", name="Disruption")).to_be_visible()
-        expect(page.get_by_role("rowheader", name="Flat Top")).to_be_visible()
+        expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
+        expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
 
-        expect(page.get_by_label("zone", exact=True)).to_have_count(1)
-        expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
+        expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
+        expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
 
         # Navigate to second sample, check annotations visble
         page.goto(
             f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[1]}"
         )
 
-        expect(page.get_by_role("rowheader", name="Control Loss")).to_be_visible()
-        expect(page.get_by_role("rowheader", name="Ramp Up")).to_be_visible()
+        expect(page.get_by_role("gridcell", name="Control Loss")).to_be_visible()
+        expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
 
-        expect(page.get_by_label("zone", exact=True)).to_have_count(1)
-        expect(page.get_by_label("vspan", exact=True)).to_have_count(1)
+        expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
+        expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
 
 
 def test_samples_page_export_annotations(server_setup, page: Page):
@@ -863,7 +873,10 @@ def test_samples_page_export_annotations(server_setup, page: Page):
     assert exported_control_loss["sample_id"] == sample_ids[1]
 
 
-def test_model_train_predict(server_setup, setup_model_samples, page: Page):
+@pytest.mark.parametrize(
+    "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
+)
+def test_model_train_predict(server_setup, setup_model_samples, page: Page, model_name):
     project_id, sample_ids = create_model_samples(setup_model_samples)
 
     # Navigate to projects page
@@ -881,7 +894,7 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     expect(page.get_by_role("button", name="Close")).to_be_visible()
     expect(page.get_by_role("button", name="Train", exact=True)).to_be_visible()
 
-    # Click on dropdown box, check 'disruption_cnn' is shown
+    # Click on dropdown box, check models are shown
     page.get_by_role("button", name="Select Model Type").click()
     expect(
         page.get_by_role("option", name="disruption_cnn", exact=True)
@@ -889,7 +902,15 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     expect(
         page.get_by_role("option", name="mock_timeseries_cnn", exact=True)
     ).to_be_visible()
-    page.get_by_role("option", name="mock_timeseries_cnn", exact=True).click()
+    expect(
+        page.get_by_role("option", name="mock_params_timeseries_cnn", exact=True)
+    ).to_be_visible()
+
+    page.get_by_role("option", name=model_name, exact=True).click()
+
+    # If params model chosen, new form should open
+    if model_name == "mock_params_timeseries_cnn":
+        form_check(page, "Train")
 
     # Click train, should get accepted message
     page.get_by_role("button", name="Train", exact=True).click()
@@ -919,9 +940,12 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
 
     # Check entry is there for newly trained model
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("mock_timeseries_cnn")
+    expect(modal.get_by_role("row").nth(1)).to_contain_text(model_name)
     expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
+    if model_name == "mock_params_timeseries_cnn":
+        expect(modal.get_by_role("row").nth(1)).to_contain_text("50")
+    else:
+        expect(modal.get_by_role("row").nth(1)).to_contain_text("60")
 
     # Check cancel training button disabled after training complete
     expect(
@@ -935,7 +959,11 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
     )
 
     # Select our model from the list
-    modal.get_by_role("checkbox", name="Select mock_timeseries_cnn").click()
+    modal.get_by_role("checkbox", name=f"Select {model_name}").click()
+
+    # If params model chosen, new form should open
+    if model_name == "mock_params_timeseries_cnn":
+        form_check(page, "Predict")
 
     # Check Predict button has been enabled, click it
     expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_enabled()
@@ -958,4 +986,16 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page):
         f"http://localhost:8002/projects/{project_id}/annotations?validated=False",
     )
     assert response.status_code == 200
-    assert len(response.json()) == 30
+    annotations = response.json()
+    assert len(annotations) == 30
+
+    if model_name == "mock_params_timeseries_cnn":
+        # Check disruptions have the value of params.final_score + 1
+        assert all(
+            ann["time"] == 51 for ann in annotations if ann["label"] == "Disruption"
+        )
+    else:
+        # Hardcoded time to 60+1 inside mock model
+        assert all(
+            ann["time"] == 61 for ann in annotations if ann["label"] == "Disruption"
+        )

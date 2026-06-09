@@ -1,6 +1,7 @@
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.core.data_loaders import DataLoader
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
 import typing
@@ -8,7 +9,7 @@ import math
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models import models_dependencies_installed
-
+import pydantic
 import uuid
 import logging
 
@@ -16,6 +17,46 @@ logger = logging.getLogger("ray")
 
 if models_dependencies_installed():
     import ray
+
+
+# Recursively walk through schema, finding things which need to be changed
+def _update_schema(schema: dict) -> dict:
+    """Mutates schema in place and returns draft-7 compliant version."""
+    # Convert $defs to definitions
+    if "$defs" in schema:
+        defs = schema.pop("$defs")
+        if "definitions" in schema:
+            schema["definitions"].update(defs)
+        else:
+            schema["definitions"] = defs
+
+    # Convert prefixItems to items, items to additionalItems
+    if "prefixItems" in schema:
+        additional_items = schema.pop("items", None)
+        schema["items"] = schema.pop("prefixItems")
+        if additional_items is not None:
+            schema["additionalItems"] = additional_items
+
+    # Remove unevaluatedProperties or unevaluatedItems
+    schema.pop("unevaluatedProperties", None)
+    schema.pop("unevaluatedItems", None)
+
+    return schema
+
+
+def walk_schema(schema: dict | list) -> dict | list:
+    """Walk through a JSON Schema and update relevant items."""
+    if isinstance(schema, list):
+        schema = [walk_schema(item) for item in schema]
+
+    elif isinstance(schema, dict):
+        for key, value in list(schema.items()):
+            if isinstance(value, (dict, list)):
+                schema[key] = walk_schema(value)
+
+        schema = _update_schema(schema)
+
+    return schema
 
 
 class Model(ABC):
@@ -28,6 +69,42 @@ class Model(ABC):
         self.project = project
         self.model = self.define_model()
         self.type = ModelRegistry.get_name(self.__class__)
+        loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
+        data_loader: DataLoader = ray.get(
+            loader_registry.get.remote(project.data_loader)
+        )
+        self.data_loader = data_loader()
+        self._trained = False
+
+    @typing.final
+    def wrapped_train(
+        self,
+        samples: list[Sample],
+        annotations: list[list[Annotation]],
+        params: pydantic.BaseModel,
+    ) -> float:
+        score = self.train(samples=samples, annotations=annotations, params=params)
+        self._trained = True
+        return score
+
+    @typing.final
+    def wrapped_predict(
+        self, samples: list[Sample], params: pydantic.BaseModel | None
+    ) -> list[list[AnnotationBase]]:
+        if not self._trained:
+            raise RuntimeError("Cannot make predictions using an untrained model!")
+        return self.predict(samples=samples, params=params)
+
+    @typing.final
+    def wrapped_save(self, file_stem: str) -> None:
+        if not self._trained:
+            raise RuntimeError("Cannot save a model before it has been trained!")
+        self.save(file_stem=file_stem)
+
+    @typing.final
+    def wrapped_load(self, file_path: str) -> None:
+        self.load(file_path=file_path)
+        self._trained = True
 
     def log_progress(
         self,
@@ -37,7 +114,7 @@ class Model(ABC):
         | None = None,
         progress: float | None = None,
         score: float | None = None,
-    ):
+    ) -> None:
         model_update = ModelUpdate(
             training_status=training_status, progress=progress, score=score
         )
@@ -106,7 +183,7 @@ class Model(ABC):
             )
 
     @abstractmethod
-    def define_model(self):
+    def define_model(self) -> None:
         pass
 
     @abstractmethod
@@ -114,41 +191,65 @@ class Model(ABC):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
-        num_epochs: int = 100,
+        params: pydantic.BaseModel | None = None,
     ) -> float:
         # pass in list of samples and list of annotations
         # return some measure of accuracy
         pass
 
     @abstractmethod
-    def predict(self, samples: list[Sample]) -> list[list[AnnotationBase]]:
-        # pass in list of samples and list of annotations (could be size 1)
+    def predict(
+        self,
+        samples: list[Sample],
+        params: pydantic.BaseModel | None = None,
+    ) -> list[list[AnnotationBase]]:
+        # pass in list of samples and params required
         # returns list / array / tensor of predictions and uncertainties
         pass
 
     @abstractmethod
-    def save(self, file_path: str):
+    def save(self, file_stem: str) -> None:
         pass
 
     @abstractmethod
-    def load(cls, project: Project, file_path: str):
+    def load(self, file_path: str) -> None:
         pass
 
 
 class ModelRegistry:
-    _registry: dict[str, Model] = {}
+    _registry: dict[str, typing.Type[Model]] = {}
     _tasks: dict[str, list[Task]] = {}
+    _training_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
+    _prediction_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
 
     @classmethod
-    def register(cls, name: str, tasks: list[Task | str]):
+    def register(
+        cls,
+        name: str,
+        tasks: list[Task | str],
+        training_params: typing.Type[pydantic.BaseModel] | None = None,
+        prediction_params: typing.Type[pydantic.BaseModel] | None = None,
+    ):
         def decorator(model_class: Model):
             if not issubclass(model_class, Model):
                 raise ValueError(
                     f"Loader '{name}' does not inherit from Model base class."
                 )
+            if training_params and not issubclass(training_params, pydantic.BaseModel):
+                raise ValueError(
+                    "Must provide training params as a Pydantic BaseModel."
+                )
+            if prediction_params and not issubclass(
+                prediction_params, pydantic.BaseModel
+            ):
+                raise ValueError(
+                    "Must provide prediction params as a Pydantic BaseModel."
+                )
+
             cls._registry[name] = model_class
             cls._tasks[name] = [Task(_task) for _task in tasks]
+            cls._training_params[name] = training_params
+            cls._prediction_params[name] = prediction_params
 
             return model_class
 
@@ -163,7 +264,7 @@ class ModelRegistry:
         return ray.remote(model_class)
 
     @classmethod
-    def get_name(cls, model_class: Model):
+    def get_name(cls, model_class: Model) -> str:
         return next(
             name
             for name, model in cls._registry.items()
@@ -171,29 +272,86 @@ class ModelRegistry:
         )
 
     @classmethod
-    def names(cls, task: Task | None = None):
+    def names(cls, task: Task | None = None) -> list[str]:
         if not task:
             return list(cls._registry.keys())
         return [name for name, tasks in cls._tasks.items() if task in tasks]
 
     @classmethod
-    def tasks(cls, name: str):
+    def tasks(cls, name: str) -> list[Task]:
         tasks: list[Task] | None = cls._tasks.get(name)
         if not tasks:
             raise ValueError(f"No tasks associated with model '{name}'!")
         return tasks
 
+    @classmethod
+    def get_params(
+        cls, name: str, schema_type: typing.Literal["training", "prediction"]
+    ) -> typing.Type[pydantic.BaseModel] | None:
+        if schema_type == "training":
+            params: typing.Type[pydantic.BaseModel] | None = cls._training_params.get(
+                name, False
+            )
+        elif schema_type == "prediction":
+            params = cls._prediction_params.get(name, False)
+        else:
+            raise ValueError(
+                "Unexpected type of params - should be training or prediction."
+            )
+
+        if params is False:
+            raise ValueError(f"No Model class called '{name}' found in registry!")
+        return params
+
+    @classmethod
+    def get_params_schema(
+        cls,
+        name: str,
+        schema_type: typing.Literal["training", "prediction"],
+        return_draft_07: bool = False,
+    ) -> dict | None:
+        """
+        Return a schema of the parameters required when training the specified model.
+
+        Parameters
+        ----------
+        name : str
+            The name of the model to return a schema for
+        type : Literal["training", "prediction"]
+            The type of parameters to get a schema for
+        return_draft_07 : bool, optional
+            Whether to convert the schema to JSONSchema draft-07, by default False
+
+        Returns
+        -------
+        schema : dict | None
+            The JSONSchema of the params model, if required.
+        """
+
+        params: typing.Type[pydantic.BaseModel] | None = cls.get_params(
+            name, schema_type
+        )
+        if not params:
+            return None
+
+        schema = params.model_json_schema()
+
+        if not return_draft_07:
+            return schema
+
+        return walk_schema(schema)
+
 
 @ray.remote
-class WorkerModelRegistry:
+class WorkerRegistry:
     def __init__(self, registry):
-        self._registry: dict[str, Model] = registry
+        self._registry: dict[str, Model | DataLoader] = registry
 
     def get(self, name):
-        model_class: Model | None = self._registry.get(name)
-        if not model_class:
-            raise ValueError(f"No Model class called '{name}' found in registry!")
-        return ray.remote(model_class)
+        registered: Model | DataLoader | None = self._registry.get(name)
+        if not registered:
+            raise ValueError(f"No class called '{name}' found in registry!")
+        return registered
 
 
 class ActorRegistry:
@@ -260,6 +418,7 @@ class ActorRegistry:
             stale_actor = self.actors.pop(0)
             try:
                 actor = ray.get_actor(stale_actor)
-                ray.kill(actor)
+                # Queue a kill job, letting any other in progress tasks finish first
+                actor.__ray_terminate__.remote()
             except ValueError:
                 return
