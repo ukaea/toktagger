@@ -154,16 +154,6 @@ export function stampCreator(
   return { ...a, bodies };
 }
 
-/** Ensure class label, track id, and backend creator bodies exist. */
-function stampLabelTrackAndCreator(
-  a: ImageAnnotation,
-  className: string,
-  trackId: string,
-  createdBy: string | null | undefined,
-): ImageAnnotation {
-  return stampCreator(stampLabelAndTrack(a, className, trackId), createdBy);
-}
-
 /** Read the class label + track id bodies. */
 export function getLabelTrack(a: ImageAnnotation): {
   className: string | null;
@@ -409,12 +399,8 @@ export function videoBBoxToAnno(
     },
   };
 
-  return stampLabelTrackAndCreator(
-    anno,
-    b.label,
-    String(b.track_id),
-    b.created_by,
-  );
+  const labelled = stampLabelAndTrack(anno, b.label, String(b.track_id));
+  return stampCreator(labelled, b.created_by);
 }
 
 /** Convert backend VideoPolygon -> Annotorious polygon annotation. */
@@ -467,12 +453,8 @@ export function videoPolygonToAnno(
     },
   };
 
-  return stampLabelTrackAndCreator(
-    anno,
-    p.label,
-    String(p.track_id),
-    p.created_by,
-  );
+  const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
+  return stampCreator(labelled, p.created_by);
 }
 
 /**
