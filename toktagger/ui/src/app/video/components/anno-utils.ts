@@ -165,9 +165,9 @@ export function getLabelTrack(a: ImageAnnotation): {
   };
 }
 
-/** Read backend creator metadata, falling back to manual at export time. */
-export function getAnnotationCreator(a: ImageAnnotation): string | null {
-  return getBodyValue(a, CREATOR_PURPOSE);
+/** Read backend creator metadata, defaulting to manual when none is stored. */
+export function getAnnotationCreator(a: ImageAnnotation): string {
+  return getBodyValue(a, CREATOR_PURPOSE) ?? "manual";
 }
 
 function newBodyId(): string {
@@ -316,7 +316,7 @@ export function annoToVideoBBox(
     y_min: Math.round(g.y),
     width: Math.round(g.w),
     height: Math.round(g.h),
-    created_by: getAnnotationCreator(a) ?? "manual",
+    created_by: getAnnotationCreator(a),
   };
 }
 
@@ -345,7 +345,7 @@ export function annoToVideoPolygon(
     label: String(className),
     class_id: classIdForName(className),
     segmentation,
-    created_by: getAnnotationCreator(a) ?? "manual",
+    created_by: getAnnotationCreator(a),
   };
 }
 
