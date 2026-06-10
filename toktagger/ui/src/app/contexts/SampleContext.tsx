@@ -335,7 +335,6 @@ export function SampleProvider({
                 return prev;
               }
               return {
-                ...prev,
                 name: "image",
                 frame,
               };
