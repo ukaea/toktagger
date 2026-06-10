@@ -41,7 +41,7 @@ interface SampleContextType {
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
-  setDataParams: React.Dispatch<React.SetStateAction<DataParams>>;
+  setDataParams: (params: DataParams) => void;
   setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
   setIsValidated: (validated: boolean) => void;
