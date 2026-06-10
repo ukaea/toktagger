@@ -50,16 +50,23 @@ async def test_get_project_wrong_id(db_client, setup_db):
 
 @pytest.mark.asyncio
 async def test_delete_project(db_client, setup_db):
-    await utils.delete_project(db_client, setup_db["project_id_1"])
+    await utils.delete_projects(db_client, setup_db["project_id_1"])
     projects = await db_client.get_filtered_documents("projects")
     assert len(projects) == 2
     assert setup_db["project_id_1"] not in [project["_id"] for project in projects]
 
 
 @pytest.mark.asyncio
+async def test_delete_projects(db_client, setup_db):
+    await utils.delete_projects(db_client)
+    projects = await db_client.get_filtered_documents("projects")
+    assert len(projects) == 0
+
+
+@pytest.mark.asyncio
 async def test_delete_project_wrong_id(db_client, setup_db):
     with pytest.raises(HTTPException, match="Project not found with that ID"):
-        await utils.delete_project(db_client, str(ObjectId()))
+        await utils.delete_projects(db_client, str(ObjectId()))
 
 
 @pytest.mark.asyncio
