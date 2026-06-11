@@ -45,10 +45,12 @@ def get_actor(project: Project, model: Model, use_gpu: bool):
         gpu_available = ray.get(ml_model.gpu_available.remote())
         if use_gpu and not gpu_available:
             # Stop existing actor
+            logger.info("Existing Actor does not have access to a GPU!")
             try:
                 ray.get(ml_model.__ray_terminate__.remote())
             except ActorDiedError:
                 ml_model = None
+                logger.info("Stopped existing Actor, restarting with GPU...")
 
     if not ml_model:
         # Actor not alive, so load from weights
