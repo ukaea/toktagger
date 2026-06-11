@@ -48,7 +48,15 @@ class Server:
         if (api_url := os.environ.get("API_URL")) is None:
             raise ValueError("API URL must be set!")
         if not ray.is_initialized():
+            num_gpus = None
+            # ALlow the user to force overriding of number of GPUs available
+            # This is so that eg Mac can work correctly
+            if os.environ.get("FORCE_NUM_GPUS") and os.environ.get("MAX_GPU_ACTORS"):
+                print("Warning: Overriding automatically detected GPU availablity!")
+                num_gpus = int(os.environ.get("MAX_GPU_ACTORS"))
+
             ray.init(
+                num_gpus=num_gpus if num_gpus else None,
                 runtime_env={
                     "env_vars": {
                         "API_URL": api_url,
