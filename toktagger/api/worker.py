@@ -1,5 +1,6 @@
 import os
 import ray
+from ray.exceptions import ActorDiedError
 import pathlib
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
@@ -44,8 +45,10 @@ def get_actor(project: Project, model: Model, use_gpu: bool):
         gpu_available = ray.get(ml_model.gpu_available.remote())
         if use_gpu and not gpu_available:
             # Stop existing actor
-            ray.get(ml_model.__ray_terminate__.remote())
-            ml_model = None
+            try:
+                ray.get(ml_model.__ray_terminate__.remote())
+            except ActorDiedError:
+                ml_model = None
 
     if not ml_model:
         # Actor not alive, so load from weights
