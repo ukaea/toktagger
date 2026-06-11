@@ -234,17 +234,19 @@ function videoAnnotationSignature(annotations: Annotation[]): string {
       continue;
     }
 
-    entries.push(
-      JSON.stringify({
-        type: item.type,
-        frame: item.frame,
-        track_id: item.track_id,
-        label: item.label,
-        segmentation: item.segmentation,
-        created_by: item.created_by,
-        timestamp: item.timestamp,
-      }),
-    );
+    if (item.type === "video_polygon") {
+      entries.push(
+        JSON.stringify({
+          type: item.type,
+          frame: item.frame,
+          track_id: item.track_id,
+          label: item.label,
+          segmentation: item.segmentation,
+          created_by: item.created_by,
+          timestamp: item.timestamp,
+        }),
+      );
+    }
   }
 
   return entries.sort().join("\n");
@@ -275,10 +277,13 @@ function videoAnnotationsToByFrame(args: {
       frame: dbAnno.frame,
     });
 
-    const anno =
-      dbAnno.type === "video_bounding_box"
-        ? videoBBoxToAnno(dbAnno as VideoBoundingBox, key)
-        : videoPolygonToAnno(dbAnno as VideoPolygon, key);
+    let anno: ImageAnnotation | null = null;
+    if (dbAnno.type === "video_bounding_box") {
+      anno = videoBBoxToAnno(dbAnno as VideoBoundingBox, key);
+    } else if (dbAnno.type === "video_polygon") {
+      anno = videoPolygonToAnno(dbAnno as VideoPolygon, key);
+    }
+    if (!anno) continue;
 
     const cur = byFrame.get(dbAnno.frame) ?? [];
     cur.push(anno);
@@ -303,12 +308,17 @@ function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
       const shape = annoToVideoAnnotation(annotation, frame);
       if (!shape) continue;
 
-      const parsed =
-        shape.type === "video_bounding_box"
-          ? VideoBoundingBoxSchema.safeParse(shape)
-          : VideoPolygonSchema.safeParse(shape);
+      let parsed:
+        | ReturnType<typeof VideoBoundingBoxSchema.safeParse>
+        | ReturnType<typeof VideoPolygonSchema.safeParse>
+        | null = null;
+      if (shape.type === "video_bounding_box") {
+        parsed = VideoBoundingBoxSchema.safeParse(shape);
+      } else if (shape.type === "video_polygon") {
+        parsed = VideoPolygonSchema.safeParse(shape);
+      }
 
-      if (parsed.success) out.push(parsed.data);
+      if (parsed?.success) out.push(parsed.data);
     }
   }
 
