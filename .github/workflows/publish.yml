@@ -3,7 +3,7 @@ name: Publish to PyPI
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
     workflow_dispatch:
 
 jobs:
@@ -84,6 +84,9 @@ jobs:
       id-token: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all the dists
         uses: actions/download-artifact@v4
         with:
@@ -96,11 +99,31 @@ jobs:
             ./dist/*.tar.gz
             ./dist/*.whl
 
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+
+          awk -v tag="$TAG" '
+            BEGIN { found=0 }
+            $0 ~ "^## \\[" tag "\\]\\(" {
+              found=1
+              next
+            }
+            /^## / && found { exit }
+            found { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Failed to find release notes for tag ${TAG} in CHANGELOG.md"
+            exit 1
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "TokTagger ${{ github.ref_name }}"
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
           files: dist/**
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,63 @@
+[project]
+site_name = "TokTagger"
+markdown_extensions = [
+    "admonition",
+    "attr_list",
+    "pymdownx.details",
+    "pymdownx.highlight",
+    "pymdownx.inlinehilite",
+    "pymdownx.superfences",
+    "md_in_html",
+    {"pymdownx.arithmatex" = {generic = true}},
+]
+extra_javascript = [
+    "javascripts/mathjax.js",
+    "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js",
+]
+
+[project.theme]
+name = "material"
+features = ["content.code.copy"]
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "blue"
+accent = "indigo"
+toggle = {icon = "material/weather-night", name = "Switch to dark mode"}
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "blue"
+accent = "indigo"
+toggle = {icon = "material/weather-sunny", name = "Switch to light mode"}
+
+[[project.nav]]
+Home = "index.md"
+
+[[project.nav]]
+"Creating Projects" = "creating_projects.md"
+
+[[project.nav]]
+"Time Series Labelling" = "time_series.md"
+
+[[project.nav]]
+Annotators = "annotators.md"
+
+[[project.nav]]
+"Data Loaders" = "data_loaders.md"
+
+[[project.nav]]
+Advanced = [
+    {"Custom Data Loaders" = "custom_dataloaders.md"},
+    {"Custom Models" = "custom_models.md"},
+]
+
+[[project.nav]]
+"Developer Documentation" = [
+    {"Getting Started" = "dev/developer-setup.md"},
+    {"Unit Tests" = "dev/tests.md"},
+    {"Building the Docs" = "dev/building-the-docs.md"},
+    {"API Design" = "dev/API-Design.md"},
+    {"System Architecture" = "dev/System-Architecture.md"},
+    {"User Interface" = [{"Overall Design" = "dev/User-Interface-Overall-Design.md"}, {Planning = "dev/User-Interface-Planning.md"}, {"UI Details" = "dev/User-Interface-Details.md"}, {Providers = "dev/Providers.md"}, {"Context Menu" = "dev/Context-Menu-Provider.md"}]},
+]
