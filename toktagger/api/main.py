@@ -56,6 +56,20 @@ class Server:
                     }
                 },
             )
+            # Detect available resources
+            cluster_resources = ray.cluster_resources()
+            cpus_available = int(cluster_resources.get("CPU")) or os.cpu_count()
+            if not cpus_available:
+                raise RuntimeError("Failed to detect any CPUs!")
+
+            if (max_gpu_actors := os.environ.get("MAX_GPU_ACTORS")) is None:
+                max_gpu_actors = int(cluster_resources.get("GPU", 0)) - 1
+
+            if (max_actors := os.environ.get("MAX_ACTORS")) is None:
+                # Each GPU actor also gets a CPU so subtract these
+                # Then subtract one for head node, one for server, one free space
+                max_actors = cpus_available - max_gpu_actors - 3
+
             # Create a ray actor for use as a model registry
             WorkerRegistry.options(
                 name="WorkerModelRegistry", lifetime="detached"
@@ -67,8 +81,8 @@ class Server:
 
         # Create a task registry
         self.app.state.task_registry = ActorRegistry(
-            max_actors=os.environ.get("MAX_ACTORS", None),
-            max_gpu_actors=os.environ.get("MAX_GPU_ACTORS", None),
+            max_actors=max_actors,
+            max_gpu_actors=max_gpu_actors,
         )
 
     def _setup_app(self):

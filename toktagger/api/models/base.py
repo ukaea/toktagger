@@ -12,7 +12,6 @@ from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models import models_dependencies_installed
 import pydantic
 import uuid
-import os
 from collections import OrderedDict
 import logging
 
@@ -369,9 +368,7 @@ class WorkerRegistry:
 class ActorRegistry:
     """Registry to keep track of Ray actors, and the task they are associated with."""
 
-    def __init__(
-        self, max_actors: int | None = None, max_gpu_actors: int | None = None
-    ):
+    def __init__(self, max_actors: int, max_gpu_actors: int):
         """Create task registry
 
         Parameters
@@ -381,25 +378,12 @@ class ActorRegistry:
         max_gpu_actors : int
             Maximum number of GPU actors to keep alive simultaneously
         """
-        cluster_resources = ray.cluster_resources()
-        cpus_available = int(cluster_resources.get("CPU")) or os.cpu_count()
-        if not cpus_available:
-            raise RuntimeError("Failed to detect any CPUs!")
 
-        if max_gpu_actors is None:
-            max_gpu_actors = int(cluster_resources.get("GPU", 0)) - 1
-        self.max_gpu_actors = max_gpu_actors
-        if max_actors is None:
-            # Each GPU actor also gets a CPU so subtract these
-            # Then subtract one for head node, one for server, one free space
-            max_actors = cpus_available - self.max_gpu_actors - 3
-        self.max_actors = max_actors
-
-        if self.max_actors < 1:
+        if max_actors < 1:
             raise ValueError(
                 "Insufficient CPU cores available for ML model functionality"
             )
-        if self.max_gpu_actors < 1:
+        if max_gpu_actors < 1:
             logger.warning(
                 "Insufficient GPU cores available - GPU model tasks will be disabled."
             )
@@ -407,6 +391,8 @@ class ActorRegistry:
         else:
             self.gpu_enabled = True
 
+        self.max_actors = max_actors
+        self.max_gpu_actors = max_gpu_actors
         self.tasks = {}
         self.actors = OrderedDict()
 
