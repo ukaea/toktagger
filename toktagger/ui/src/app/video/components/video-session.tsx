@@ -474,9 +474,8 @@ export function VideoSessionProvider(props: {
 
   // Keep the editor cache synchronized with SampleContext.annotations.
   useEffect(() => {
-    const { annotations: dbAnnotations, duplicates } = dedupeVideoAnnotations(
-      annotations,
-    );
+    const { annotations: dbAnnotations, duplicates } =
+      dedupeVideoAnnotations(annotations);
     const signature = videoAnnotationSignature(dbAnnotations);
 
     if (signature === lastExternalAnnotationSignatureRef.current) return;
