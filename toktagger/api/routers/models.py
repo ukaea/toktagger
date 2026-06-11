@@ -252,6 +252,8 @@ async def start_model_training(
 
     model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
 
+    task_registry.update_actors(model.id)
+
     train_task = train_model.remote(
         model=model,
         project=project,
@@ -262,7 +264,6 @@ async def start_model_training(
     )
 
     task_id = task_registry.register(train_task)
-    task_registry.update_actors(model.id)
 
     # Associate the task ID with the model in the database
     await utils.update_model(
@@ -406,13 +407,14 @@ async def load_model_weights(
             db_client, project.id, model_type=model_type, model_id=model_id
         )
 
+        task_registry.update_actors(model.id)
+
         task = load_model.remote(
             project=project,
             model=model,
             weights_path=weights_path,
         )
         task_id = task_registry.register(task)
-        task_registry.update_actors(model.id)
 
         # Associate the task ID with the model in the database
         await utils.update_model(
@@ -589,6 +591,8 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
 
+    task_registry.update_actors(model.id)
+
     predict_task = get_predictions.remote(
         project=project,
         model=model,
@@ -597,7 +601,6 @@ async def predict(
         use_gpu=use_gpu,
     )
     task_id = task_registry.register(predict_task)
-    task_registry.update_actors(model.id)
 
     return {"task_id": task_id}
 
@@ -679,6 +682,8 @@ async def create_sample_predictions(
 
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
+    task_registry.update_actors(model.id)
+
     task = get_predictions.remote(
         project=project,
         model=model,
@@ -688,7 +693,6 @@ async def create_sample_predictions(
         use_gpu=task_registry.gpu_enabled,
     )
     task_id = task_registry.register(task)
-    task_registry.update_actors(model.id)
 
     return {"task_id": task_id}
 

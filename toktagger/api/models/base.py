@@ -383,14 +383,8 @@ class ActorRegistry:
             raise ValueError(
                 "Insufficient CPU cores available for ML model functionality"
             )
-        if max_gpu_actors < 1:
-            logger.warning(
-                "Insufficient GPU cores available - GPU model tasks will be disabled."
-            )
-            self.gpu_enabled = False
-        else:
-            self.gpu_enabled = True
 
+        self.gpu_enabled = True if max_gpu_actors > 0 else False
         self.max_actors = max_actors
         self.max_gpu_actors = max_gpu_actors
         self.tasks = {}

@@ -58,17 +58,27 @@ class Server:
             )
             # Detect available resources
             cluster_resources = ray.cluster_resources()
-            cpus_available = int(cluster_resources.get("CPU")) or os.cpu_count()
+            cpus_available = int(cluster_resources.get("CPU", 0))
+            gpus_available = int(cluster_resources.get("GPU", 0))
+
             if not cpus_available:
-                raise RuntimeError("Failed to detect any CPUs!")
+                raise RuntimeError("Ray failed to detect any CPUs!")
 
             if (max_gpu_actors := os.environ.get("MAX_GPU_ACTORS")) is None:
-                max_gpu_actors = int(cluster_resources.get("GPU", 0)) - 1
+                max_gpu_actors = int(cluster_resources.get("GPU", 0))
 
             if (max_actors := os.environ.get("MAX_ACTORS")) is None:
                 # Each GPU actor also gets a CPU so subtract these
-                # Then subtract one for head node, one for server, one free space
-                max_actors = cpus_available - max_gpu_actors - 3
+                # Then subtract one for head node, one for server
+                max_actors = cpus_available - max_gpu_actors - 2
+
+            if max_gpu_actors > gpus_available:
+                raise RuntimeError("More GPU actors requested than hardware supports!")
+
+            if max_actors > cpus_available + gpus_available:
+                raise RuntimeError(
+                    "More model actors requested than the detected hardware supports!"
+                )
 
             # Create a ray actor for use as a model registry
             WorkerRegistry.options(
