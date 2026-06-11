@@ -256,19 +256,15 @@ function videoAnnotationsToByFrame(args: {
   dbAnnotations: Annotation[];
   projectId: string;
   sampleId: string;
-}): { byFrame: ByFrameMap; invalid: number } {
+}): ByFrameMap {
   const byFrame = new Map<number, ImageAnnotation[]>();
-  let invalid = 0;
 
   for (const annotation of args.dbAnnotations ?? []) {
     const parsed = parseVideoAnnotation(annotation);
 
     if (!parsed) continue;
 
-    if (!parsed.success) {
-      invalid += 1;
-      continue;
-    }
+    if (!parsed.success) continue;
 
     const dbAnno = parsed.data;
     const key = buildSourceKey({
@@ -290,7 +286,7 @@ function videoAnnotationsToByFrame(args: {
     byFrame.set(dbAnno.frame, cur);
   }
 
-  return { byFrame, invalid };
+  return byFrame;
 }
 
 function isVideoAnnotationType(annotation: Annotation): boolean {
@@ -490,17 +486,11 @@ export function VideoSessionProvider(props: {
       return;
     }
 
-    const { byFrame: nextByFrame, invalid } = videoAnnotationsToByFrame({
+    const nextByFrame = videoAnnotationsToByFrame({
       dbAnnotations,
       projectId,
       sampleId,
     });
-
-    if (invalid > 0) {
-      console.warn(
-        `[video] external annotation sync: skipped ${invalid} invalid video annotation(s) from backend.`,
-      );
-    }
 
     pendingFocusRef.current = null;
     byFrameRef.current = nextByFrame;
@@ -509,9 +499,6 @@ export function VideoSessionProvider(props: {
     lastExternalAnnotationSignatureRef.current = signature;
     lastLocalAnnotationSignatureRef.current = null;
     if (duplicates > 0) {
-      console.warn(
-        `[video] external annotation sync: collapsed ${duplicates} duplicate video annotation(s).`,
-      );
       setSampleAnnotations(() => dbAnnotations);
     }
   }, [annotations, projectId, sampleId, setSampleAnnotations]);
