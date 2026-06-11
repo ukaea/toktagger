@@ -476,6 +476,46 @@ export function VideoSessionProvider(props: {
     byFrameRef.current = byFrame;
   }, [byFrame]);
 
+  // Keep the editor cache synchronized with SampleContext.annotations.
+  useEffect(() => {
+    const { annotations: dbAnnotations, duplicates } = dedupeVideoAnnotations(
+      annotations,
+    );
+    const signature = videoAnnotationSignature(dbAnnotations);
+
+    if (signature === lastExternalAnnotationSignatureRef.current) return;
+    if (signature === lastLocalAnnotationSignatureRef.current) {
+      nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
+      lastExternalAnnotationSignatureRef.current = signature;
+      return;
+    }
+
+    const { byFrame: nextByFrame, invalid } = videoAnnotationsToByFrame({
+      dbAnnotations,
+      projectId,
+      sampleId,
+    });
+
+    if (invalid > 0) {
+      console.warn(
+        `[video] external annotation sync: skipped ${invalid} invalid video annotation(s) from backend.`,
+      );
+    }
+
+    pendingFocusRef.current = null;
+    byFrameRef.current = nextByFrame;
+    setByFrame(nextByFrame);
+    nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
+    lastExternalAnnotationSignatureRef.current = signature;
+    lastLocalAnnotationSignatureRef.current = null;
+    if (duplicates > 0) {
+      console.warn(
+        `[video] external annotation sync: collapsed ${duplicates} duplicate video annotation(s).`,
+      );
+      setSampleAnnotations(() => dbAnnotations);
+    }
+  }, [annotations, projectId, sampleId, setSampleAnnotations]);
+
   const commitByFrame = useCallback(
     (next: ByFrameMap, opts?: { markDirty?: boolean }) => {
       byFrameRef.current = next;
@@ -678,46 +718,6 @@ export function VideoSessionProvider(props: {
     },
     [frame, projectId, sampleId, updateByFrame],
   );
-
-  // Keep the editor cache synchronized with SampleContext.annotations.
-  useEffect(() => {
-    const { annotations: dbAnnotations, duplicates } = dedupeVideoAnnotations(
-      annotations,
-    );
-    const signature = videoAnnotationSignature(dbAnnotations);
-
-    if (signature === lastExternalAnnotationSignatureRef.current) return;
-    if (signature === lastLocalAnnotationSignatureRef.current) {
-      nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
-      lastExternalAnnotationSignatureRef.current = signature;
-      return;
-    }
-
-    const { byFrame: nextByFrame, invalid } = videoAnnotationsToByFrame({
-      dbAnnotations,
-      projectId,
-      sampleId,
-    });
-
-    if (invalid > 0) {
-      console.warn(
-        `[video] external annotation sync: skipped ${invalid} invalid video annotation(s) from backend.`,
-      );
-    }
-
-    pendingFocusRef.current = null;
-    byFrameRef.current = nextByFrame;
-    setByFrame(nextByFrame);
-    nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
-    lastExternalAnnotationSignatureRef.current = signature;
-    lastLocalAnnotationSignatureRef.current = null;
-    if (duplicates > 0) {
-      console.warn(
-        `[video] external annotation sync: collapsed ${duplicates} duplicate video annotation(s).`,
-      );
-      setSampleAnnotations(() => dbAnnotations);
-    }
-  }, [annotations, projectId, sampleId, setSampleAnnotations]);
 
   /**
    * Single commit point for all Annotorious mutations (create/update/delete).
