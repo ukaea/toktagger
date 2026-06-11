@@ -16,7 +16,8 @@ import {
   type ImageAnnotation,
 } from "@annotorious/react";
 
-import type { Annotation, DataParams } from "@/types";
+import type { Annotation } from "@/types";
+import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/video/components/video-context";
 import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
 import type {
@@ -343,24 +344,17 @@ export function useVideoSession(): VideoSessionCtx {
 export function VideoSessionProvider(props: {
   projectId: string;
   sampleId: string;
-  data: unknown;
-  dataParams: DataParams;
-  dbAnnotations: Annotation[];
-  setSampleAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[],
-  ) => void;
   propagate: boolean;
   setPropagate: (v: boolean) => void;
   children: React.ReactNode;
 }) {
+  const { projectId, sampleId, propagate, setPropagate, children } = props;
   const {
-    projectId,
-    sampleId,
-    propagate,
-    setPropagate,
-    setSampleAnnotations,
-    children,
-  } = props;
+    data,
+    dataParams,
+    annotations,
+    setAnnotations: setSampleAnnotations,
+  } = useSample();
   const {
     videoPanMode,
     setVideoPanMode,
@@ -383,7 +377,7 @@ export function VideoSessionProvider(props: {
   >(() => {});
   const pendingFocusRef = useRef<FocusRequest | null>(null);
   const nextTrackNumsRef = useRef<Map<string, number>>(
-    buildNextTrackIdState(props.dbAnnotations),
+    buildNextTrackIdState(annotations),
   );
   const lastExternalAnnotationSignatureRef = useRef<string | null>(null);
   const lastLocalAnnotationSignatureRef = useRef<string | null>(null);
@@ -398,15 +392,15 @@ export function VideoSessionProvider(props: {
 
   // For video we assume backend returns { frame: number, values: base64, ... }
   const frameFromBackend = useMemo(() => {
-    if (!props.data) return 0;
-    const maybe = props.data as { frame?: number };
+    if (!data) return 0;
+    const maybe = data as { frame?: number };
     return maybe?.frame ?? 0;
-  }, [props.data]);
+  }, [data]);
 
   useLayoutEffect(() => {
-    if (!props.data) return;
+    if (!data) return;
 
-    const dp = props.dataParams as {
+    const dp = dataParams as {
       name?: string;
       frame?: number | null;
     };
@@ -416,7 +410,7 @@ export function VideoSessionProvider(props: {
     }
 
     setVideoFrame(frameFromBackend);
-  }, [props.data, frameFromBackend, props.dataParams]);
+  }, [data, dataParams, frameFromBackend]);
 
   const frame: FrameIndex = (videoFrame ?? frameFromBackend) as FrameIndex;
 
@@ -678,7 +672,7 @@ export function VideoSessionProvider(props: {
   // Keep the editor cache synchronized with SampleContext.annotations.
   useEffect(() => {
     const { annotations: dbAnnotations, duplicates } = dedupeVideoAnnotations(
-      props.dbAnnotations ?? [],
+      annotations,
     );
     const signature = videoAnnotationSignature(dbAnnotations);
 
@@ -713,7 +707,7 @@ export function VideoSessionProvider(props: {
       );
       setSampleAnnotations(() => dbAnnotations);
     }
-  }, [projectId, props.dbAnnotations, sampleId, setSampleAnnotations]);
+  }, [annotations, projectId, sampleId, setSampleAnnotations]);
 
   /**
    * Single commit point for all Annotorious mutations (create/update/delete).

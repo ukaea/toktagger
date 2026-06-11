@@ -108,7 +108,7 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
 
 function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
-  const { data, annotations, dataParams, setAnnotations } = useSample();
+  const { data } = useSample();
   const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
@@ -121,10 +121,6 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
         key={`${project_id}:${sample_id}`}
         projectId={project_id}
         sampleId={sample_id}
-        data={data}
-        dataParams={dataParams}
-        dbAnnotations={annotations ?? []}
-        setSampleAnnotations={setAnnotations}
         propagate={videoPropagate}
         setPropagate={setVideoPropagate}
       >
