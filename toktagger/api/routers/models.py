@@ -488,9 +488,7 @@ async def get_load_model_status(
         return True
 
     else:
-        raise HTTPException(
-            status_code=404, detail="Predict task not found with that ID!"
-        )
+        raise HTTPException(status_code=404, detail="Load task not found with that ID!")
 
 
 @router.post("/models/{model_type}/predict")

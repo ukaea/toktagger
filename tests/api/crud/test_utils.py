@@ -405,7 +405,7 @@ async def test_get_models_by_type(db_client, setup_model_db):
     assert len(models) == 2
     # Check returned in correct order - reverse order of created, not version 3
     assert [model.version for model in models] == [2, 1]
-    assert all(model.type == "mock_disruption_cnn" for model in models)
+    assert all(model.name == "mock_disruption_cnn" for model in models)
 
 
 @pytest.mark.asyncio

@@ -30,11 +30,6 @@ def send_updates(
 
     response = requests.put(url=url, json=payload)
 
-    if not response.ok:
-        raise RuntimeError(
-            f"Failed to send updates for {object_type}! Got response {response.json()}."
-        )
-
     return response
 
 

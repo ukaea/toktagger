@@ -61,6 +61,8 @@ def walk_schema(schema: dict | list) -> dict | list:
 
 
 class Model(ABC):
+    type: str | None = None
+
     def __init__(
         self,
         model_id: str,
@@ -69,7 +71,6 @@ class Model(ABC):
         self.id = model_id
         self.project = project
         self.model = self.define_model()
-        self.type = ModelRegistry.get_name(self.__class__)
         loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
         data_loader: typing.Type[DataLoader] = ray.get(
             loader_registry.get.remote(project.data_loader)
@@ -250,7 +251,7 @@ class ModelRegistry:
                 raise ValueError(
                     "Must provide prediction params as a Pydantic BaseModel."
                 )
-
+            model_class.type = name
             cls._registry[name] = model_class
             cls._tasks[name] = [Task(_task) for _task in tasks]
             cls._training_params[name] = training_params

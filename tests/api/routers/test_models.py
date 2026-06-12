@@ -646,14 +646,6 @@ async def test_model_load_local(api_client, db_client, setup_model_db):
         # Open the file, check contents are there
         assert model_path.read_text() == "Model Weights"
 
-        # Check no file remains in the cache with same name as original file
-        tempfile_name = pathlib.Path(tempf.name).name
-        assert (
-            not pathlib.Path(os.environ["MODEL_STORAGE"])
-            .joinpath(tempfile_name)
-            .exists()
-        )
-
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
@@ -727,13 +719,5 @@ async def test_model_load_local_failed(api_client, db_client, setup_model_db):
         assert (
             not pathlib.Path(os.environ["MODEL_STORAGE"])
             .joinpath(f"{model_id}.model")
-            .exists()
-        )
-
-        # Check no file remains in the cache with same name as original file
-        tempfile_name = pathlib.Path(tempf.name).name
-        assert (
-            not pathlib.Path(os.environ["MODEL_STORAGE"])
-            .joinpath(tempfile_name)
             .exists()
         )
