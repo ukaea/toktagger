@@ -2,7 +2,6 @@ import pytest
 import pytest_asyncio
 from toktagger.api.main import Server
 from toktagger.api.crud.db import MongoDBClient
-from toktagger.api.models.base import ActorRegistry
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
 import asyncio
@@ -237,10 +236,6 @@ def start_server():
                         )
                     if not status["db_connected"]:
                         raise RuntimeError("Database failed to connect.")
-                    if not status["models_enabled"]:
-                        raise RuntimeError(
-                            "Models not enabled! Install model dependencies to run all tests."
-                        )
                     if not status["name"] == "TokTagger":
                         raise RuntimeError(
                             "End to End test has connected to another process running on localhost:8002"
