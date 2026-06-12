@@ -235,8 +235,8 @@ class ModelRegistry:
         training_params: typing.Type[pydantic.BaseModel] | None = None,
         prediction_params: typing.Type[pydantic.BaseModel] | None = None,
     ):
-        def decorator(model_class: Model):
-            if not issubclass(model_class, Model):
+        def decorator(model_class: typing.Type[Model]):
+            if not issubclass(model_class, typing.Type[Model]):
                 raise ValueError(
                     f"Loader '{name}' does not inherit from Model base class."
                 )
@@ -262,18 +262,15 @@ class ModelRegistry:
 
     @classmethod
     def get(cls, name: str):
-        print(cls._registry)
-        model_class: Model | None = cls._registry.get(name)
+        model_class: typing.Type[Model] | None = cls._registry.get(name)
         if not model_class:
             raise ValueError(f"No Model class called '{name}' found in registry!")
         return ray.remote(model_class)
 
     @classmethod
-    def get_name(cls, model_class: Model) -> str:
+    def get_name(cls, model_class: typing.Type[Model]) -> str:
         return next(
-            name
-            for name, model in cls._registry.items()
-            if model_class.__class__.__name__ == model.__class__.__name__
+            name for name, model in cls._registry.items() if model_class == model
         )
 
     @classmethod
