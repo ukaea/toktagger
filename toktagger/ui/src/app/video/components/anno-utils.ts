@@ -12,8 +12,10 @@ import {
   type Shape,
 } from "@annotorious/react";
 import type {
+  AnnotoriousDrawingTool,
   VideoAnnotationShape,
   VideoBoundingBox,
+  VideoPoint,
   VideoPolygon,
 } from "./types";
 import { classIdForName } from "./types";
@@ -30,7 +32,18 @@ import { classIdForName } from "./types";
  */
 
 type UnknownRecord = Record<string, unknown>;
+const POINT_BODY_PURPOSE = "shape";
+const POINT_BODY_VALUE = "point";
+export const POINT_MARKER_SIZE = 28;
 const CREATOR_PURPOSE = "creator";
+
+export type PointGeometry = { x: number; y: number };
+
+export function toAnnotoriousDrawingTool(
+  tool: "rectangle" | "polygon" | "point",
+): AnnotoriousDrawingTool {
+  return tool === "point" ? "rectangle" : tool;
+}
 
 // Our app stores a frame key on target.source (not present in upstream Annotorious types).
 export type VideoImageAnnotation = ImageAnnotation & {
@@ -154,6 +167,12 @@ export function stampCreator(
   return { ...a, bodies };
 }
 
+/** Mark a rectangle selector as the UI representation of a point. */
+export function stampPoint(a: ImageAnnotation): ImageAnnotation {
+  const bodies = upsertBody(a.bodies, POINT_BODY_PURPOSE, POINT_BODY_VALUE);
+  return { ...a, bodies };
+}
+
 /** Read the class label + track id bodies. */
 export function getLabelTrack(a: ImageAnnotation): {
   className: string | null;
@@ -187,6 +206,14 @@ export function isRectangleAnno(a: ImageAnnotation): a is RectangleAnnotation {
 /** True if the annotation target is a polygon selector. */
 export function isPolygonAnno(a: ImageAnnotation): a is PolygonAnnotation {
   return a.target.selector.type === ShapeType.POLYGON;
+}
+
+/** True when a rectangle selector is being used as a point marker. */
+export function isPointAnno(a: ImageAnnotation): a is RectangleAnnotation {
+  return (
+    isRectangleAnno(a) &&
+    getBodyValue(a, POINT_BODY_PURPOSE) === POINT_BODY_VALUE
+  );
 }
 
 function isFiniteNumber(v: unknown): v is number {
@@ -230,6 +257,19 @@ export function readPolygonGeometry(
   }
 
   return g;
+}
+
+/** Read point geometry from the tagged rectangle marker. */
+export function readPointGeometry(a: ImageAnnotation): PointGeometry | null {
+  if (!isPointAnno(a)) return null;
+
+  const g = readRectGeometry(a);
+  if (!g) return null;
+
+  return {
+    x: g.x + g.w / 2,
+    y: g.y + g.h / 2,
+  };
 }
 
 /**
@@ -349,11 +389,35 @@ export function annoToVideoPolygon(
   };
 }
 
+/** Convert a normalized point annotation -> backend VideoPoint. */
+export function annoToVideoPoint(
+  a: ImageAnnotation,
+  frame: number,
+): VideoPoint | null {
+  const g = readPointGeometry(a);
+  if (!g) return null;
+
+  const { className, trackId } = getLabelTrack(a);
+  if (!className || !trackId) return null;
+
+  return {
+    type: "video_point",
+    frame,
+    track_id: String(trackId),
+    label: String(className),
+    class_id: classIdForName(className),
+    x: Math.round(g.x),
+    y: Math.round(g.y),
+    created_by: getAnnotationCreator(a),
+  };
+}
+
 /** Convert a normalized ImageAnnotation -> backend video annotation shape. */
 export function annoToVideoAnnotation(
   a: ImageAnnotation,
   frame: number,
 ): VideoAnnotationShape | null {
+  if (isPointAnno(a)) return annoToVideoPoint(a, frame);
   if (isRectangleAnno(a)) return annoToVideoBBox(a, frame);
   if (isPolygonAnno(a)) return annoToVideoPolygon(a, frame);
   return null;
@@ -455,6 +519,53 @@ export function videoPolygonToAnno(
 
   const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
   return stampCreator(labelled, p.created_by);
+}
+
+/** Convert backend VideoPoint -> tagged Annotorious rectangle marker. */
+export function videoPointToAnno(
+  p: VideoPoint,
+  frameKey: string,
+): ImageAnnotation {
+  const x = Number(p.x);
+  const y = Number(p.y);
+  const half = POINT_MARKER_SIZE / 2;
+  const markerX = x - half;
+  const markerY = y - half;
+
+  const id =
+    globalThis.crypto?.randomUUID?.() ??
+    `anno-${Math.random().toString(36).slice(2)}`;
+
+  const geometry: RectangleGeometry = {
+    x: markerX,
+    y: markerY,
+    w: POINT_MARKER_SIZE,
+    h: POINT_MARKER_SIZE,
+    bounds: {
+      minX: markerX,
+      minY: markerY,
+      maxX: markerX + POINT_MARKER_SIZE,
+      maxY: markerY + POINT_MARKER_SIZE,
+    },
+  };
+
+  const selector: Rectangle = {
+    type: ShapeType.RECTANGLE,
+    geometry,
+  };
+
+  const anno: VideoImageAnnotation = {
+    id,
+    bodies: [],
+    target: {
+      annotation: id,
+      source: frameKey,
+      selector,
+    },
+  };
+
+  const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
+  return stampPoint(stampCreator(labelled, p.created_by));
 }
 
 /**

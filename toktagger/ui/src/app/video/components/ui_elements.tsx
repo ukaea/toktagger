@@ -203,6 +203,15 @@ function PolygonIcon() {
   return <ImageMapPolygon aria-hidden="true" size="M" />;
 }
 
+function PointIcon() {
+  return (
+    <span
+      aria-hidden="true"
+      className="block h-3 w-3 rounded-full bg-current"
+    />
+  );
+}
+
 function CanvasModeToggle(props: {
   label: string;
   isSelected: boolean;
@@ -255,11 +264,12 @@ function CanvasActionButton(props: {
 
 export function CanvasModeToolbar(props: {
   panMode: boolean;
-  drawingTool: "rectangle" | "polygon";
+  drawingTool: "rectangle" | "polygon" | "point";
   hideAnnotations: boolean;
   onTogglePanMode: () => void;
   onSelectRectangle: () => void;
   onSelectPolygon: () => void;
+  onSelectPoint: () => void;
   onResetView: () => void;
 }) {
   const { colorScheme } = useProvider();
@@ -316,6 +326,13 @@ export function CanvasModeToolbar(props: {
             onPress={props.onSelectPolygon}
           >
             <PolygonIcon />
+          </CanvasModeToggle>
+          <CanvasModeToggle
+            label="Point"
+            isSelected={props.drawingTool === "point"}
+            onPress={props.onSelectPoint}
+          >
+            <PointIcon />
           </CanvasModeToggle>
         </Flex>
       </View>

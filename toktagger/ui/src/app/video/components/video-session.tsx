@@ -19,7 +19,11 @@ import {
 import type { Annotation } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/video/components/video-context";
-import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
+import {
+  VideoBoundingBoxSchema,
+  VideoPointSchema,
+  VideoPolygonSchema,
+} from "@/types";
 import type {
   ByFrameMap,
   DrawingTool,
@@ -27,6 +31,7 @@ import type {
   InstanceProfile,
   Selection,
   VideoBoundingBox,
+  VideoPoint,
   VideoPolygon,
 } from "./types";
 import { buildSourceKey } from "./types";
@@ -47,9 +52,12 @@ import {
   annoToVideoAnnotation,
   getLabelTrack,
   videoBBoxToAnno,
+  videoPointToAnno,
   videoPolygonToAnno,
+  stampPoint,
   stampLabelAndTrack,
   normalizeOverlayForSession,
+  toAnnotoriousDrawingTool,
 } from "./anno-utils";
 import { clampOverlayToNaturalImage, sameOverlay } from "./overlay-sync-utils";
 
@@ -151,6 +159,10 @@ function parseVideoAnnotation(annotation: Annotation) {
     return VideoPolygonSchema.safeParse(annotation);
   }
 
+  if (annotation.type === "video_point") {
+    return VideoPointSchema.safeParse(annotation);
+  }
+
   return null;
 }
 
@@ -246,6 +258,22 @@ function videoAnnotationSignature(annotations: Annotation[]): string {
           timestamp: item.timestamp,
         }),
       );
+      continue;
+    }
+
+    if (item.type === "video_point") {
+      entries.push(
+        JSON.stringify({
+          type: item.type,
+          frame: item.frame,
+          track_id: item.track_id,
+          label: item.label,
+          x: item.x,
+          y: item.y,
+          created_by: item.created_by,
+          timestamp: item.timestamp,
+        }),
+      );
     }
   }
 
@@ -278,6 +306,8 @@ function videoAnnotationsToByFrame(args: {
       anno = videoBBoxToAnno(dbAnno as VideoBoundingBox, key);
     } else if (dbAnno.type === "video_polygon") {
       anno = videoPolygonToAnno(dbAnno as VideoPolygon, key);
+    } else if (dbAnno.type === "video_point") {
+      anno = videoPointToAnno(dbAnno as VideoPoint, key);
     }
     if (!anno) continue;
 
@@ -292,7 +322,8 @@ function videoAnnotationsToByFrame(args: {
 function isVideoAnnotationType(annotation: Annotation): boolean {
   return (
     annotation.type === "video_bounding_box" ||
-    annotation.type === "video_polygon"
+    annotation.type === "video_polygon" ||
+    annotation.type === "video_point"
   );
 }
 
@@ -306,12 +337,15 @@ function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
 
       let parsed:
         | ReturnType<typeof VideoBoundingBoxSchema.safeParse>
+        | ReturnType<typeof VideoPointSchema.safeParse>
         | ReturnType<typeof VideoPolygonSchema.safeParse>
         | null = null;
       if (shape.type === "video_bounding_box") {
         parsed = VideoBoundingBoxSchema.safeParse(shape);
       } else if (shape.type === "video_polygon") {
         parsed = VideoPolygonSchema.safeParse(shape);
+      } else if (shape.type === "video_point") {
+        parsed = VideoPointSchema.safeParse(shape);
       }
 
       if (parsed?.success) out.push(parsed.data);
@@ -629,7 +663,7 @@ export function VideoSessionProvider(props: {
       !hideAnnotations &&
       Boolean(selection.className) &&
       !hasSelected;
-    api.setDrawingTool(drawingTool);
+    api.setDrawingTool(toAnnotoriousDrawingTool(drawingTool));
     api.setDrawingEnabled(canDraw);
 
     if (!canDraw) {
@@ -1093,8 +1127,10 @@ export function VideoSessionProvider(props: {
 
       // Important: patch only the newly created annotation via updateAnnotation.
       // Avoid full clear/set rewrite during create, which can break OSD draw state.
+      const createdForTool =
+        drawingTool === "point" ? stampPoint(created) : created;
       const patched = normalizeOverlayForSession({
-        raw: [stampLabelAndTrack(created, cls, String(trackId))],
+        raw: [stampLabelAndTrack(createdForTool, cls, String(trackId))],
         frameKey,
         fallback: { className: cls, trackId: String(trackId) },
         enforceBothBodies: true,
@@ -1143,6 +1179,7 @@ export function VideoSessionProvider(props: {
     api,
     applyAnnotatorInteractionMode,
     commitFromAnnotorious,
+    drawingTool,
     frameKey,
     hideAnnotations,
     panMode,

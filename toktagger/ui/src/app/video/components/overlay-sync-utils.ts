@@ -1,10 +1,13 @@
 import { boundsFromPoints, type ImageAnnotation } from "@annotorious/react";
 import {
   getLabelTrack,
+  isPointAnno,
   isRectangleAnno,
   isPolygonAnno,
+  POINT_MARKER_SIZE,
   type PolygonAnnotation,
   type RectangleAnnotation,
+  readPointGeometry,
   readPolygonGeometry,
   readRectGeometry,
   VideoImageAnnotation,
@@ -102,20 +105,24 @@ function annoSig(a: ImageAnnotation): string {
   const source = getTargetSource(a);
   const rect = isRectangleAnno(a) ? readRectGeometry(a) : null;
   const poly = isPolygonAnno(a) ? readPolygonGeometry(a) : null;
+  const point = isPointAnno(a) ? readPointGeometry(a) : null;
   const { className, trackId } = getLabelTrack(a);
   const polySig = poly
     ? poly.points.map(([x, y]) => `${x},${y}`).join(";")
     : "";
+  const pointSig = point ? `${point.x},${point.y}` : "";
 
   return [
     a.id ?? "",
     sel?.type ?? "",
     source,
+    isPointAnno(a) ? "point" : "",
     rect?.x ?? "",
     rect?.y ?? "",
     rect?.w ?? "",
     rect?.h ?? "",
     polySig,
+    pointSig,
     className ?? "",
     trackId ?? "",
   ].join("|");
@@ -273,6 +280,31 @@ export function clampOverlayToNaturalImage(
   const out: ImageAnnotation[] = [];
 
   for (const a of list) {
+    if (isPointAnno(a)) {
+      const point = readPointGeometry(a);
+      if (!point) {
+        out.push(a);
+        continue;
+      }
+
+      const x = Math.max(0, Math.min(natural.w, point.x));
+      const y = Math.max(0, Math.min(natural.h, point.y));
+      const half = POINT_MARKER_SIZE / 2;
+      const clamped = {
+        x: x - half,
+        y: y - half,
+        w: POINT_MARKER_SIZE,
+        h: POINT_MARKER_SIZE,
+      };
+
+      if (x === point.x && y === point.y) out.push(a);
+      else {
+        changed = true;
+        out.push(withRectGeometry(a, clamped));
+      }
+      continue;
+    }
+
     if (isRectangleAnno(a)) {
       const g = readRectGeometry(a);
       if (!g) {
