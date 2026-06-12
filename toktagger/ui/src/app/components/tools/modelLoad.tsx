@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ComboBox,
   Item,
@@ -52,6 +52,7 @@ export function ModelLoadModal({
   const [selectedModelName, setSelectedModelName] = useState<string | null>(
     null,
   );
+  const pollingModelName = useRef<string | null>(null);
   const [loadMethods, setLoadMethods] = useState<string[] | null>(null);
   const [weightsPath, setWeightsPath] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -73,6 +74,7 @@ export function ModelLoadModal({
     if (response.ok) {
       setIsLoading(true);
       setTaskId(payload.task_id);
+      pollingModelName.current = selectedModelName;
       setMessage(null);
     } else {
       setMessage(payload.detail);
@@ -81,19 +83,19 @@ export function ModelLoadModal({
   };
 
   useEffect(() => {
-    if (!taskId || !project._id || !selectedModelName) return;
+    if (!taskId || !project._id || !pollingModelName.current) return;
 
     let pollCounter = 0;
     // Poll for result from GET predictions endpoint
     const interval = setInterval(async () => {
-      if (selectedModelName == null) {
+      if (pollingModelName.current == null) {
         clearInterval(interval);
         setIsLoading(false);
         return;
       }
       const response = await getLoadModelStatus(
         project._id,
-        selectedModelName,
+        pollingModelName.current,
         taskId,
       );
       const payload = await response.json();
@@ -128,7 +130,7 @@ export function ModelLoadModal({
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [project._id, selectedModelName, taskId]);
+  }, [project._id, taskId]);
 
   useEffect(() => {
     if (!modalOpen) {
