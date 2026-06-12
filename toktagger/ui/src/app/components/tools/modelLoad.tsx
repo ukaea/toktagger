@@ -205,12 +205,6 @@ export function ModelLoadModal({
                       <Text>Use Local File</Text>
                     </Item>
                   ) : null}
-                  {loadMethods?.includes("hugging_face") ? (
-                    <Item key="hugging_face">
-                      <DataAdd />
-                      <Text>Download from Hugging Face</Text>
-                    </Item>
-                  ) : null}
                 </TabList>
                 <TabPanels>
                   {loadMethods?.includes("local") ? (
@@ -229,9 +223,6 @@ export function ModelLoadModal({
                         />
                       </Flex>
                     </Item>
-                  ) : null}
-                  {loadMethods?.includes("hugging_face") ? (
-                    <Item key="hugging_face">HI</Item>
                   ) : null}
                 </TabPanels>
               </Tabs>
