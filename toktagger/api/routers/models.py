@@ -728,7 +728,7 @@ async def get_sample_predictions(
 
         return prediction_annotations
     else:
-        return HTTPException(
+        raise HTTPException(
             status_code=404, detail="Predict task not found with that ID!"
         )
 
