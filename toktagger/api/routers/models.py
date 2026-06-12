@@ -189,6 +189,24 @@ async def start_model_training(
     # Get model params model from registry and validate
     params_validated = validate_model_params(model_type, "training", params)
 
+    # Get annotations and samples
+    annotations = await utils.get_annotations(db_client, project.id, validated=True)
+    samples = await utils.get_samples(db_client, project.id, validated=True)
+
+    # Get all validated samples and annotations for this project
+    logger.info(f"Collected {len(annotations)} annotations.")
+    logger.info(f"Collected {len(samples)} samples.")
+
+    if len(samples) == 0:
+        raise HTTPException(
+            status_code=404, detail="No validated samples found to train a model on!"
+        )
+    if len(annotations) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="No validated annotations found to train a model on!",
+        )
+
     # Create model
     # Try to get model for this project from database if it exists
     db_models = await utils.get_models(db_client, project_id, model_type)
@@ -225,24 +243,6 @@ async def start_model_training(
     model_id = await utils.add_model(
         db_client=db_client, project_id=project.id, model=model_in
     )
-
-    # Get annotations and samples
-    annotations = await utils.get_annotations(db_client, project.id, validated=True)
-    samples = await utils.get_samples(db_client, project.id, validated=True)
-
-    # Get all validated samples and annotations for this project
-    logger.info(f"Collected {len(annotations)} annotations.")
-    logger.info(f"Collected {len(samples)} samples.")
-
-    if len(samples) == 0:
-        raise HTTPException(
-            status_code=404, detail="No validated samples found to train a model on!"
-        )
-    if len(annotations) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="No validated annotations found to train a model on!",
-        )
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
     sample_annotations_mapping = defaultdict(list)
