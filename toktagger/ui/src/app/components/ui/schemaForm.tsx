@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Form from "@rjsf/core";
 import { RJSFSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
@@ -28,6 +27,9 @@ import {
   Content,
   Flex,
   Switch,
+  Footer,
+  Link,
+  ContextualHelp,
 } from "@adobe/react-spectrum";
 import {
   WidgetProps,
@@ -540,15 +542,38 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
                 {" "}
                 <strong>Model Parameters</strong>{" "}
               </Heading>
-              <Switch
-                marginTop={"size-200"}
-                marginBottom={"size-200"}
-                isSelected={useGPU}
-                onChange={setUseGPU}
-                isDisabled={disabled || !gpuAvailable}
-              >
-                Use GPU
-              </Switch>
+              <Flex direction="row" width="100%" justifyContent={"left"}>
+                <Switch
+                  marginTop={"size-200"}
+                  marginBottom={"size-200"}
+                  isSelected={useGPU}
+                  onChange={setUseGPU}
+                  isDisabled={disabled || !gpuAvailable}
+                >
+                  Use GPU
+                </Switch>
+                <ContextualHelp
+                  marginTop="size-200"
+                  placement="right top"
+                  aria-label="ML Model Help"
+                  UNSAFE_style={{ marginLeft: -20 }}
+                >
+                  <Heading>
+                    {gpuAvailable ? "Use GPU For This Task" : "GPU Disabled"}
+                  </Heading>
+                  <Content>
+                    {gpuAvailable
+                      ? "Enable this setting to make a GPU worker node available to this task. This task may then use the GPU, depending on model implementation."
+                      : "GPU tasks are disabled. This may be because no GPU devices were detected. If you believe this was incorrect, you can force the number of GPU nodes to make available via configuration options."}
+                  </Content>
+                  <Footer>
+                    <Link href="https://ukaea.github.io/toktagger/custom_models#gpu-usage">
+                      Learn more about configuring GPU usage for ML Models in
+                      TokTagger.
+                    </Link>
+                  </Footer>
+                </ContextualHelp>
+              </Flex>
               <SchemaForm
                 ref={ref}
                 schema={schema}
