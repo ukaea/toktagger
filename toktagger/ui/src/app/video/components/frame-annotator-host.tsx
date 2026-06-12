@@ -373,9 +373,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const annotoriousDrawingTool = toAnnotoriousDrawingTool(drawingTool);
   const currentFrameHasPoint = useMemo(
     () =>
-      (byFrame.get(frame) ?? []).some((annotation) =>
-        isPointAnno(annotation),
-      ),
+      (byFrame.get(frame) ?? []).some((annotation) => isPointAnno(annotation)),
     [byFrame, frame],
   );
 
@@ -589,7 +587,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   );
 
   const formatDetails = (annotation: ImageAnnotation) => {
-    const point = isPointAnno(annotation) ? readPointGeometry(annotation) : null;
+    const point = isPointAnno(annotation)
+      ? readPointGeometry(annotation)
+      : null;
     if (point) {
       return `x=${Math.round(point.x)}, y=${Math.round(point.y)}`;
     }
