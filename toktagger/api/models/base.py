@@ -169,7 +169,7 @@ class Model(ABC):
         # If no test split requested, return val set
         elif not test_fraction:
             self.val_samples = val_test_samples
-            self.val_annotations = val_test_samples
+            self.val_annotations = val_test_annotations
             self.test_samples = None
             self.test_annotations = None
 
