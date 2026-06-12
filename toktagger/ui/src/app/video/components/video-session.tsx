@@ -819,8 +819,29 @@ export function VideoSessionProvider(props: {
       if (!sameOverlay(raw, normalized)) {
         isProgrammaticAnnoSyncRef.current = true;
         try {
-          api.setSelected?.();
-          api.setAnnotations?.(normalized, true);
+          const rawById = new Map(
+            raw
+              .filter((annotation) => annotation.id)
+              .map((annotation) => [String(annotation.id), annotation]),
+          );
+          const canPatchInPlace =
+            Boolean(api.updateAnnotation) &&
+            raw.length === normalized.length &&
+            normalized.every((annotation) =>
+              annotation.id ? rawById.has(String(annotation.id)) : false,
+            );
+
+          if (canPatchInPlace) {
+            for (const annotation of normalized) {
+              const prev = rawById.get(String(annotation.id));
+              if (!prev || sameOverlay([prev], [annotation])) continue;
+              api.updateAnnotation?.(annotation);
+            }
+          } else {
+            api.setSelected?.();
+            api.setAnnotations?.(normalized, true);
+          }
+
           applyAnnotatorInteractionMode();
         } finally {
           finishProgrammaticAnnotationSync();

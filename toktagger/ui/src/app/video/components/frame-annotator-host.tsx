@@ -694,10 +694,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         {pointGuides.length > 0 && (
           <svg
             className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+            pointerEvents="none"
             aria-hidden="true"
           >
             {pointGuides.map((guide) => (
-              <g key={guide.id}>
+              <g key={guide.id} pointerEvents="none">
                 <line
                   x1={guide.x}
                   y1={guide.cy}
@@ -706,6 +707,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                   stroke="rgba(180, 255, 0, 0.95)"
                   strokeWidth="1.5"
                   strokeDasharray="3 3"
+                  pointerEvents="none"
                 />
                 <line
                   x1={guide.cx}
@@ -715,6 +717,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                   stroke="rgba(180, 255, 0, 0.95)"
                   strokeWidth="1.5"
                   strokeDasharray="3 3"
+                  pointerEvents="none"
                 />
                 <circle
                   cx={guide.cx}
@@ -723,6 +726,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                   fill="rgba(180, 255, 0, 0.95)"
                   stroke="rgba(10, 10, 10, 0.9)"
                   strokeWidth="1"
+                  pointerEvents="none"
                 />
               </g>
             ))}

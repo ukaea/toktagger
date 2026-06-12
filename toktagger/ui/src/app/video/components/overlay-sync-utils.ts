@@ -4,7 +4,6 @@ import {
   isPointAnno,
   isRectangleAnno,
   isPolygonAnno,
-  POINT_MARKER_SIZE,
   type PolygonAnnotation,
   type RectangleAnnotation,
   readPointGeometry,
@@ -189,6 +188,21 @@ function withRectGeometry(
   };
 }
 
+function clampRectPositionToImage(
+  g: { x: number; y: number; w: number; h: number },
+  nw: number,
+  nh: number,
+): { x: number; y: number; w: number; h: number } | null {
+  if (g.w > nw || g.h > nh) return clampRectToImage(g, nw, nh);
+
+  return {
+    x: Math.max(0, Math.min(nw - g.w, g.x)),
+    y: Math.max(0, Math.min(nh - g.h, g.y)),
+    w: g.w,
+    h: g.h,
+  };
+}
+
 function clampPoint(
   point: ReadonlyArray<number>,
   nw: number,
@@ -281,23 +295,25 @@ export function clampOverlayToNaturalImage(
 
   for (const a of list) {
     if (isPointAnno(a)) {
-      const point = readPointGeometry(a);
-      if (!point) {
+      const g = readRectGeometry(a);
+      if (!g) {
         out.push(a);
         continue;
       }
 
-      const x = Math.max(0, Math.min(natural.w, point.x));
-      const y = Math.max(0, Math.min(natural.h, point.y));
-      const half = POINT_MARKER_SIZE / 2;
-      const clamped = {
-        x: x - half,
-        y: y - half,
-        w: POINT_MARKER_SIZE,
-        h: POINT_MARKER_SIZE,
-      };
+      const clamped = clampRectPositionToImage(g, natural.w, natural.h);
+      if (!clamped) {
+        changed = true;
+        continue;
+      }
 
-      if (x === point.x && y === point.y) out.push(a);
+      const same =
+        clamped.x === g.x &&
+        clamped.y === g.y &&
+        clamped.w === g.w &&
+        clamped.h === g.h;
+
+      if (same) out.push(a);
       else {
         changed = true;
         out.push(withRectGeometry(a, clamped));
