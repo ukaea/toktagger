@@ -15,14 +15,12 @@ import {
   Text,
   Tooltip,
   TooltipTrigger,
-  Switch,
 } from "@adobe/react-spectrum";
 import WorkflowAdd from "@spectrum-icons/workflow/WorkflowAdd";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
 import { startTraining, getModelTypes, getModelTrainSchema } from "@/app/core";
-import { useServerHealth } from "@/app/contexts/healthContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
@@ -49,8 +47,6 @@ export function ModelTrainModal({
     Record<string, unknown>
   >({});
   const formRef = useRef<Form>(null);
-
-  const { gpuAvailable } = useServerHealth();
 
   useEffect(() => {
     if (!modalOpen) {
@@ -146,23 +142,15 @@ export function ModelTrainModal({
                 : null}
             </ComboBox>
             {schema && (
-              <Flex direction="column" width="100%">
-                <Switch
-                  marginTop={"size-200"}
-                  isSelected={useGPU}
-                  onChange={setUseGPU}
-                  isDisabled={!gpuAvailable}
-                >
-                  Use GPU
-                </Switch>
-                <ModelForm
-                  ref={formRef}
-                  schema={schema}
-                  onSubmit={submitTrainJob}
-                  formData={unvalidatedFormData}
-                  setFormData={setUnvalidatedFormData}
-                />
-              </Flex>
+              <ModelForm
+                ref={formRef}
+                schema={schema}
+                onSubmit={submitTrainJob}
+                formData={unvalidatedFormData}
+                setFormData={setUnvalidatedFormData}
+                useGPU={useGPU}
+                setUseGPU={setUseGPU}
+              />
             )}
           </Content>
           <Footer>

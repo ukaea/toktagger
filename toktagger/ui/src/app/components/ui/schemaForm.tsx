@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Form from "@rjsf/core";
 import { RJSFSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
@@ -26,6 +27,7 @@ import {
   InlineAlert,
   Content,
   Flex,
+  Switch,
 } from "@adobe/react-spectrum";
 import {
   WidgetProps,
@@ -38,6 +40,7 @@ import {
 } from "@rjsf/utils";
 import { getDefaultRegistry, IChangeEvent } from "@rjsf/core";
 import { getSchemaType } from "@rjsf/utils";
+import { useServerHealth } from "@/app/contexts/healthContext";
 
 export function SpectrumBaseWidget(props: WidgetProps) {
   const {
@@ -410,7 +413,7 @@ const SpectrumArrayFieldItemTemplate = ({
   return <View marginX={"size-400"}>{children}</View>;
 };
 
-type ModelFormProps = {
+type SchemaFormProps = {
   schema: RJSFSchema;
   onSubmit: (data: Record<string, unknown>) => void;
   disabled?: boolean;
@@ -419,7 +422,7 @@ type ModelFormProps = {
   formData?: Record<string, unknown>;
   setFormData?: (formData: Record<string, unknown>) => void;
 };
-const ModelForm = forwardRef<Form, ModelFormProps>(
+const SchemaForm = forwardRef<Form, SchemaFormProps>(
   ({ schema, disabled, onSubmit, formData, setFormData }, ref) => {
     const registry = getDefaultRegistry();
     const widgets = {
@@ -446,6 +449,42 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
     const isControlled = formData !== undefined && setFormData !== undefined;
 
     return (
+      <Form
+        ref={ref}
+        schema={schema}
+        validator={validator}
+        widgets={widgets}
+        disabled={disabled}
+        onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
+          onSubmit(e.formData ?? {});
+        }}
+        uiSchema={{
+          "ui:options": {
+            label: false,
+          },
+        }}
+        templates={{
+          FieldTemplate: SpectrumFieldTemplate,
+          Label: NoLabelTemplate,
+          TitleFieldTemplate: TitleTemplate,
+          ArrayFieldTemplate: SpectrumArrayFieldTemplate,
+          ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
+          ButtonTemplates: { SubmitButton: () => null },
+          ErrorListTemplate: SpectrumErrorTemplate,
+        }}
+        {...(isControlled && {
+          formData: formData,
+          onChange: (data) =>
+            data.formData ? setFormData(data.formData) : null,
+        })}
+      />
+    );
+  },
+);
+
+const GenericForm = forwardRef<Form, SchemaFormProps>(
+  ({ schema, disabled, onSubmit, formData, setFormData }, ref) => {
+    return (
       <div>
         <Provider theme={defaultTheme}>
           <View
@@ -458,38 +497,68 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
           >
             <Heading level={1}>
               {" "}
-              <strong>Model Parameters</strong>{" "}
+              <strong>Parameters</strong>{" "}
             </Heading>
-            <Form
+            <SchemaForm
               ref={ref}
               schema={schema}
-              validator={validator}
-              widgets={widgets}
+              onSubmit={onSubmit}
               disabled={disabled}
-              onSubmit={(e: IChangeEvent<Record<string, unknown>>) => {
-                onSubmit(e.formData ?? {});
-              }}
-              uiSchema={{
-                "ui:options": {
-                  label: false,
-                },
-              }}
-              templates={{
-                FieldTemplate: SpectrumFieldTemplate,
-                Label: NoLabelTemplate,
-                TitleFieldTemplate: TitleTemplate,
-                ArrayFieldTemplate: SpectrumArrayFieldTemplate,
-                ArrayFieldItemTemplate: SpectrumArrayFieldItemTemplate,
-                ButtonTemplates: { SubmitButton: () => null },
-                ErrorListTemplate: SpectrumErrorTemplate,
-              }}
-              {...(isControlled && {
-                formData: formData,
-                onChange: (data) =>
-                  data.formData ? setFormData(data.formData) : null,
-              })}
+              formData={formData}
+              setFormData={setFormData}
             />
           </View>
+        </Provider>
+      </div>
+    );
+  },
+);
+
+type ModelFormProps = SchemaFormProps & {
+  useGPU: boolean;
+  setUseGPU: (useGPU: boolean) => void;
+};
+const ModelForm = forwardRef<Form, ModelFormProps>(
+  (
+    { schema, disabled, onSubmit, formData, setFormData, useGPU, setUseGPU },
+    ref,
+  ) => {
+    const { gpuAvailable } = useServerHealth();
+    return (
+      <div>
+        <Provider theme={defaultTheme}>
+          <Flex direction="column" width="100%">
+            <View
+              marginTop="size-200"
+              padding="size-250"
+              borderWidth="thin"
+              borderColor="dark"
+              borderRadius="medium"
+              backgroundColor="gray-75"
+            >
+              <Heading level={1}>
+                {" "}
+                <strong>Model Parameters</strong>{" "}
+              </Heading>
+              <Switch
+                marginTop={"size-200"}
+                marginBottom={"size-200"}
+                isSelected={useGPU}
+                onChange={setUseGPU}
+                isDisabled={disabled || !gpuAvailable}
+              >
+                Use GPU
+              </Switch>
+              <SchemaForm
+                ref={ref}
+                schema={schema}
+                onSubmit={onSubmit}
+                disabled={disabled}
+                formData={formData}
+                setFormData={setFormData}
+              />
+            </View>
+          </Flex>
         </Provider>
       </div>
     );

@@ -17,7 +17,6 @@ import {
   getSamplePredictions,
 } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useServerHealth } from "@/app/contexts/healthContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
@@ -47,7 +46,6 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
     Record<string, unknown>
   >({});
   const formRef = useRef<Form>(null);
-  const { gpuAvailable } = useServerHealth();
 
   useEffect(() => {
     if (!isEnabled || !project) {
@@ -205,24 +203,16 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
               : null}
           </ComboBox>
           {schema && (
-            <Flex direction="column" width="100%">
-              <Switch
-                marginTop={"size-200"}
-                isSelected={useGPU}
-                onChange={setUseGPU}
-                isDisabled={!isEnabled || !gpuAvailable}
-              >
-                Use GPU
-              </Switch>
-              <ModelForm
-                ref={formRef}
-                schema={schema}
-                onSubmit={submitPredictJob}
-                disabled={!isEnabled}
-                formData={unvalidatedFormData}
-                setFormData={setUnvalidatedFormData}
-              />
-            </Flex>
+            <ModelForm
+              ref={formRef}
+              schema={schema}
+              onSubmit={submitPredictJob}
+              disabled={!isEnabled}
+              formData={unvalidatedFormData}
+              setFormData={setUnvalidatedFormData}
+              useGPU={useGPU}
+              setUseGPU={setUseGPU}
+            />
           )}
           <Flex marginTop="size-200" marginBottom="size-200">
             <Button
