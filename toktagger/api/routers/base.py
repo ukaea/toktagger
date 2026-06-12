@@ -40,6 +40,7 @@ async def health_check(request: Request) -> dict:
         "version": vers,
         "db_connected": db_conn,
         "models_enabled": models_dependencies_installed(),
+        "testing_mode": request.app.state.testing_mode,
     }
 
 
