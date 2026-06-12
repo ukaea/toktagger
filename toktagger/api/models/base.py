@@ -236,7 +236,7 @@ class ModelRegistry:
         prediction_params: typing.Type[pydantic.BaseModel] | None = None,
     ):
         def decorator(model_class: typing.Type[Model]):
-            if not issubclass(model_class, typing.Type[Model]):
+            if not issubclass(model_class, Model):
                 raise ValueError(
                     f"Loader '{name}' does not inherit from Model base class."
                 )
