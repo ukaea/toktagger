@@ -296,6 +296,15 @@ export default function ToolBar() {
       component: <VideoToolbox />,
       defaultExpanded: true,
     });
+    tools.push({
+      name: "Model Prediction",
+      component: (
+        <ModelPredictTool
+          project_id={project_id}
+          sample_id={sample_id}
+        ></ModelPredictTool>
+      ),
+    });
   }
 
   const refreshAnnotations = async () => {
@@ -305,7 +314,7 @@ export default function ToolBar() {
 
   return (
     <Provider theme={defaultTheme} height="100vh">
-      <View overflow="auto" height="100vh">
+      <View overflow="auto" height="100vh" width="18vw">
         <Flex
           direction="column"
           alignItems="center"

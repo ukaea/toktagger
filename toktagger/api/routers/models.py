@@ -6,6 +6,7 @@ import random
 from bson.objectid import ObjectId
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
+from toktagger.api.schemas.data import DataParamTypes, DataParams
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.models import models_dependencies_installed
 from toktagger.api.models.base import ModelRegistry
@@ -444,6 +445,9 @@ async def create_sample_predictions(
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
+    data_params: DataParamTypes = Body(
+        DataParams(), description="Data parameters fort this sample", embed=True
+    ),
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -465,7 +469,11 @@ async def create_sample_predictions(
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
     task = get_predictions.remote(
-        project=project, model=model, samples=[sample], params=params_validated
+        project=project,
+        model=model,
+        samples=[sample],
+        params=params_validated,
+        data_params=data_params,
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)

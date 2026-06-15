@@ -1,6 +1,7 @@
 from toktagger.api.schemas.samples import Sample
 from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.schemas.data import DataParamTypes
 from toktagger.api.core.data_loaders import DataLoader
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
@@ -70,10 +71,10 @@ class Model(ABC):
         self.model = self.define_model()
         self.type = ModelRegistry.get_name(self.__class__)
         loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
-        data_loader: DataLoader = ray.get(
+        data_loader: typing.Type[DataLoader] = ray.get(
             loader_registry.get.remote(project.data_loader)
         )
-        self.data_loader = data_loader()
+        self.data_loader: DataLoader = data_loader()
         self._trained = False
 
     @typing.final
@@ -89,11 +90,14 @@ class Model(ABC):
 
     @typing.final
     def wrapped_predict(
-        self, samples: list[Sample], params: pydantic.BaseModel | None
+        self,
+        samples: list[Sample],
+        params: pydantic.BaseModel | None,
+        data_params: DataParamTypes | None,
     ) -> list[list[AnnotationBase]]:
         if not self._trained:
             raise RuntimeError("Cannot make predictions using an untrained model!")
-        return self.predict(samples=samples, params=params)
+        return self.predict(samples=samples, params=params, data_params=data_params)
 
     @typing.final
     def wrapped_save(self, file_stem: str) -> None:
@@ -202,6 +206,7 @@ class Model(ABC):
         self,
         samples: list[Sample],
         params: pydantic.BaseModel | None = None,
+        data_params: DataParamTypes | None = None,
     ) -> list[list[AnnotationBase]]:
         # pass in list of samples and params required
         # returns list / array / tensor of predictions and uncertainties

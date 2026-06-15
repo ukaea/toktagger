@@ -3,6 +3,7 @@ import ray
 import pathlib
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
+from toktagger.api.schemas.data import DataParamTypes
 from toktagger.api.schemas.annotations import (
     AnnotationBatchTypeAdapter,
     AnnotationOutTypes,
@@ -108,7 +109,11 @@ def train_model(
 
 @ray.remote
 def get_predictions(
-    project: Project, model: Model, samples: list[Sample], params: pydantic.BaseModel
+    project: Project,
+    model: Model,
+    samples: list[Sample],
+    params: pydantic.BaseModel,
+    data_params: DataParamTypes | None = None,
 ):
     # For a first pass, when you get next sample on the web UI, run the model to get predictions
     # In the future, can improve that for smarter sampling in active learning
@@ -119,7 +124,7 @@ def get_predictions(
     model_actor = get_actor(project=project, model=model)
 
     predictions_task = model_actor.wrapped_predict.remote(
-        samples=samples, params=params
+        samples=samples, params=params, data_params=data_params
     )
     predictions = ray.get(predictions_task)
 

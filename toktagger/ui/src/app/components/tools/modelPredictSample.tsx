@@ -27,7 +27,7 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { annotations, project, setAnnotations } = useSample();
+  const { annotations, project, dataParams, setAnnotations } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) => project?.model_types.includes(ann.created_by) || false,
@@ -101,7 +101,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   };
 
   const submitPredictJob = async (params: Record<string, unknown>) => {
-    if (!selectedModelName) {
+    if (!selectedModelName || !project) {
       return;
     }
 
@@ -110,6 +110,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       sample_id,
       selectedModelName,
       params,
+      dataParams,
     );
     const payload = await response.json();
 
@@ -152,11 +153,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
           }
         } else if (response.ok) {
           setAnnotations((previousAnnotations: Annotations) => {
-            const otherAnnotations = previousAnnotations.filter(
-              (annotation: Annotation) =>
-                annotation.created_by !== selectedModelName,
-            );
-            return otherAnnotations.concat(payload);
+            return previousAnnotations.concat(payload);
           });
           clearInterval(interval);
           setIsLoading(false);

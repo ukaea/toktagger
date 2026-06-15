@@ -25,6 +25,7 @@ import {
   Heading,
   InlineAlert,
   Content,
+  Flex,
 } from "@adobe/react-spectrum";
 import {
   WidgetProps,
@@ -105,14 +106,22 @@ export function SpectrumCheckboxWidget(props: WidgetProps) {
       isSelected={!!value}
       isDisabled={disabled || readonly}
       onChange={onChange}
-      width={"100%"}
+      width="100%"
     >
       {label}
-      {schema.description}
+
+      {schema.description && (
+        <Flex marginTop={"size-50"}>
+          <span style={{ fontSize: "12px" }}>
+            <Text slot="description">
+              <em>{schema.description}</em>
+            </Text>
+          </span>
+        </Flex>
+      )}
     </Checkbox>
   );
 }
-
 export function SpectrumCheckboxesWidget(props: WidgetProps) {
   const {
     id,
@@ -380,10 +389,13 @@ const SpectrumArrayFieldTemplate = ({
       </Heading>
       {items.map((item) => item)}
       {schema.description && (
-        <Text>
-          {" "}
-          <em>{schema.description}</em>{" "}
-        </Text>
+        <Flex maxWidth={"size-2000"} marginTop={"size-50"}>
+          <span style={{ fontSize: "12px" }}>
+            <Text slot="description">
+              <em>{schema.description}</em>
+            </Text>
+          </span>
+        </Flex>
       )}
     </View>
   );

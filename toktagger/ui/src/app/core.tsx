@@ -6,6 +6,7 @@ import type {
   SamplesSummary,
   SampleUpdate,
   Annotation,
+  DataParams,
 } from "@/types";
 import { RJSFSchema } from "@rjsf/utils";
 
@@ -188,12 +189,11 @@ export async function saveSampleAnnotations(
   if (!saveOnNavigate) {
     return;
   }
-  // user has validated the annotations, so set created_by to "manual"
-  const updatedAnnotations = annotations.map((annotation: Annotation) => {
-    annotation.created_by = "manual";
-    annotation.validated = true;
-    return annotation;
-  });
+  // Saving validates annotations without changing their creator metadata.
+  const updatedAnnotations = annotations.map((annotation: Annotation) => ({
+    ...annotation,
+    validated: true,
+  }));
 
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations?validated=True`;
   const response = await fetch(ANNOTATIONS_URL, {
@@ -383,6 +383,7 @@ export const startSamplePredictions = async (
   sample_id: string,
   selected_model: string,
   params: Record<string, unknown>,
+  data_params: DataParams,
 ): Promise<Response> => {
   const response = await fetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict`,
@@ -391,7 +392,7 @@ export const startSamplePredictions = async (
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ params: params }),
+      body: JSON.stringify({ params: params, data_params: data_params }),
     },
   );
   return response;
