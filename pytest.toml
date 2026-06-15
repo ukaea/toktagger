@@ -1,0 +1,5 @@
+[pytest]
+markers = [
+    "models_disabled: These tests require models extra dependencies to not be installed to run.",
+    "models_enabled: These tests require models extra dependencies to be installed to run."
+]

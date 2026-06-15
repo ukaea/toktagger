@@ -40,4 +40,3 @@ class Model(ModelIn):
 
 class LoadTypes(str, Enum):
     LOCAL = "local"
-    HUGGING_FACE = "hugging_face"

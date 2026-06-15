@@ -17,7 +17,7 @@ import pydantic
 @ModelRegistry.register("mock_disruption_cnn", ["time-series"])
 class MockDisruptionCNN(Model):
     def define_model(self):
-        return None
+        return "Test Model"
 
     def train(self, samples, annotations, *args, **kwargs):
         self.log_progress(
@@ -42,15 +42,15 @@ class MockDisruptionCNN(Model):
         ]
 
     def save(self, file_stem: str):
-        pathlib.Path(file_stem).with_suffix(".model").touch()
+        pathlib.Path(file_stem).with_suffix(".model").write_text(self.model)
 
     def load(self, file_path):
-        pass
+        self.model = pathlib.Path(file_path).read_text()
 
 
 class TimeSeriesCNN(Model):
     def define_model(self):
-        return None
+        return "Test Model"
 
     def train(self, samples, annotations, params=None):
         self.log_progress(
@@ -97,10 +97,10 @@ class TimeSeriesCNN(Model):
         return anns
 
     def save(self, file_stem: str):
-        pathlib.Path(file_stem).with_suffix(".model").touch()
+        pathlib.Path(file_stem).with_suffix(".model").write_text(self.model)
 
     def load(self, file_path):
-        pass
+        self.model = pathlib.Path(file_path).read_text()
 
 
 @ray.remote

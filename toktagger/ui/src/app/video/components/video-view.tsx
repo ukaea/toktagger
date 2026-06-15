@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Annotorious } from "@annotorious/react";
-import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
 import { Button } from "@adobe/react-spectrum";
 import {
@@ -109,7 +108,7 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
 
 function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
-  const { data, annotations, dataParams, setAnnotations } = useSample();
+  const { data } = useSample();
   const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
@@ -122,10 +121,6 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
         key={`${project_id}:${sample_id}`}
         projectId={project_id}
         sampleId={sample_id}
-        data={data}
-        dataParams={dataParams}
-        dbAnnotations={annotations ?? []}
-        setSampleAnnotations={setAnnotations}
         propagate={videoPropagate}
         setPropagate={setVideoPropagate}
       >
@@ -140,7 +135,7 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
  * This component assumes it is already inside a VideoSessionProvider.
  */
 export function VideoView() {
-  const { data, setDataParams } = useSample();
+  const { data, dataParams, setDataParams } = useSample();
 
   if (!data) return null;
 
@@ -160,14 +155,11 @@ export function VideoView() {
     if (!Number.isFinite(n)) return;
     const target = Math.max(0, Math.trunc(n));
 
-    setDataParams(
-      (prev) =>
-        ({
-          ...(prev as Record<string, unknown>),
-          name: "image",
-          frame: target,
-        }) as DataParams,
-    );
+    setDataParams({
+      ...dataParams,
+      name: "image",
+      frame: target,
+    });
   };
 
   return (

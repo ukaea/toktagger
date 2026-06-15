@@ -394,9 +394,6 @@ const SpectrumArrayFieldTemplate = ({
       </Heading>
       {items.map((item) => item)}
       {schema.description && (
-        // For some reason anything other than hard coding a size here
-        // means the container width grows to accomodate the text
-        // TODO: Fix this so it doesnt look weird in predict modal
         <Flex maxWidth={"size-2000"} marginTop={"size-50"}>
           <span style={{ fontSize: "12px" }}>
             <Text slot="description">

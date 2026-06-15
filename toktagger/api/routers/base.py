@@ -46,6 +46,7 @@ async def health_check(request: Request) -> dict:
         "db_connected": db_conn,
         "models_enabled": models_dependencies_installed(),
         "gpu_available": model_gpu_available,
+        "testing_mode": request.app.state.testing_mode,
     }
 
 

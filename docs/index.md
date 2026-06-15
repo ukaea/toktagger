@@ -29,11 +29,19 @@ source .venv/bin/activate
 ```
 To install the package for labelling only (without ML Model functionality):
 ```sh
+<<<<<<< HEAD
 GIT_LFS_SKIP_SMUDGE=1 pip install toktagger
 ```
 Or to include the ML models:
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 pip install toktagger[models]
+=======
+pip install toktagger
+```
+Or to include the ML models:
+```sh
+pip install toktagger[models]
+>>>>>>> wk9874/models/local_load_support
 ```
 If you intend to add custom data loaders or models to your TokTagger instance, this is the recommended route.
 
@@ -41,11 +49,19 @@ If you intend to add custom data loaders or models to your TokTagger instance, t
 Alternatively, it can be installed as a tool using `uv`. To install the package for labelling only (without ML Model functionality):
 
 ```sh
+<<<<<<< HEAD
 GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 toktagger`
 ```
 Or to include the ML models:
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 uv tool install --lfs --python 3.12.6 toktagger[models]`
+=======
+uv tool install --python 3.12.6 toktagger
+```
+Or to include the ML models:
+```sh
+uv tool install --python 3.12.6 toktagger[models]
+>>>>>>> wk9874/models/local_load_support
 ```
 
 ## Quick Start

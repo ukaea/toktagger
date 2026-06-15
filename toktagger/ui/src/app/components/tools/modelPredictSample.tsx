@@ -9,7 +9,7 @@ import {
   Switch,
   Button,
 } from "@adobe/react-spectrum";
-import { Annotations, Annotation, TaskType } from "@/types";
+import { Annotations, Annotation } from "@/types";
 import {
   getModelTypes,
   getModelPredictSchema,

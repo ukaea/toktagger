@@ -32,8 +32,9 @@ if models_dependencies_installed():
 async def lifespan(app: FastAPI):
     mongo_url = os.environ.get("MONGO_URL", "./toktagger_db")
     db_name = "annotate_db"
+    cache_dir = os.environ.get("DB_CACHE_DIR")
 
-    app.state.db_client = MongoDBClient(mongo_url, db_name)
+    app.state.db_client = MongoDBClient(mongo_url, db_name, cache_dir)
     app.state.project = None
     yield
 
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
 class Server:
     def __init__(self):
         self.frontend_path = pathlib.Path(__file__).parent / "static"
+        self.testing_mode = False
 
     def _setup_ray(self):
         if (api_url := os.environ.get("API_URL")) is None:
@@ -121,6 +123,7 @@ class Server:
 
         # Static front end files
         self.app.state.index_file = self.frontend_path / "index.html"
+        self.app.state.testing_mode = self.testing_mode
         self.app.mount(
             "/assets",
             StaticFiles(directory=self.frontend_path / "assets"),
