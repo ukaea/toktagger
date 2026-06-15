@@ -360,8 +360,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
   const annotoriousDrawingTool = toAnnotoriousDrawingTool(drawingTool);
-  const annotoriousDrawingEnabled =
-    drawingEnabled && drawingTool !== "point";
+  const annotoriousDrawingEnabled = drawingEnabled && drawingTool !== "point";
 
   const selectClassName = (name: string) => {
     const cls = (name ?? "").trim();

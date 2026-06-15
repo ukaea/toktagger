@@ -762,12 +762,8 @@ export function VideoSessionProvider(props: {
         return { w, h };
       })();
       const natural = imageNatural ?? viewerNatural;
-      const x = natural
-        ? Math.max(0, Math.min(natural.w, rawX))
-        : rawX;
-      const y = natural
-        ? Math.max(0, Math.min(natural.h, rawY))
-        : rawY;
+      const x = natural ? Math.max(0, Math.min(natural.w, rawX)) : rawX;
+      const y = natural ? Math.max(0, Math.min(natural.h, rawY)) : rawY;
 
       const raw = api.getAnnotations();
       const used = new Set<string>();
