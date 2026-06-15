@@ -16,7 +16,8 @@ import {
   type ImageAnnotation,
 } from "@annotorious/react";
 
-import type { Annotation, DataParams } from "@/types";
+import type { Annotation } from "@/types";
+import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/video/components/video-context";
 import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
 import type {
@@ -233,17 +234,19 @@ function videoAnnotationSignature(annotations: Annotation[]): string {
       continue;
     }
 
-    entries.push(
-      JSON.stringify({
-        type: item.type,
-        frame: item.frame,
-        track_id: item.track_id,
-        label: item.label,
-        segmentation: item.segmentation,
-        created_by: item.created_by,
-        timestamp: item.timestamp,
-      }),
-    );
+    if (item.type === "video_polygon") {
+      entries.push(
+        JSON.stringify({
+          type: item.type,
+          frame: item.frame,
+          track_id: item.track_id,
+          label: item.label,
+          segmentation: item.segmentation,
+          created_by: item.created_by,
+          timestamp: item.timestamp,
+        }),
+      );
+    }
   }
 
   return entries.sort().join("\n");
@@ -253,19 +256,15 @@ function videoAnnotationsToByFrame(args: {
   dbAnnotations: Annotation[];
   projectId: string;
   sampleId: string;
-}): { byFrame: ByFrameMap; invalid: number } {
+}): ByFrameMap {
   const byFrame = new Map<number, ImageAnnotation[]>();
-  let invalid = 0;
 
   for (const annotation of args.dbAnnotations ?? []) {
     const parsed = parseVideoAnnotation(annotation);
 
     if (!parsed) continue;
 
-    if (!parsed.success) {
-      invalid += 1;
-      continue;
-    }
+    if (!parsed.success) continue;
 
     const dbAnno = parsed.data;
     const key = buildSourceKey({
@@ -274,17 +273,20 @@ function videoAnnotationsToByFrame(args: {
       frame: dbAnno.frame,
     });
 
-    const anno =
-      dbAnno.type === "video_bounding_box"
-        ? videoBBoxToAnno(dbAnno as VideoBoundingBox, key)
-        : videoPolygonToAnno(dbAnno as VideoPolygon, key);
+    let anno: ImageAnnotation | null = null;
+    if (dbAnno.type === "video_bounding_box") {
+      anno = videoBBoxToAnno(dbAnno as VideoBoundingBox, key);
+    } else if (dbAnno.type === "video_polygon") {
+      anno = videoPolygonToAnno(dbAnno as VideoPolygon, key);
+    }
+    if (!anno) continue;
 
     const cur = byFrame.get(dbAnno.frame) ?? [];
     cur.push(anno);
     byFrame.set(dbAnno.frame, cur);
   }
 
-  return { byFrame, invalid };
+  return byFrame;
 }
 
 function isVideoAnnotationType(annotation: Annotation): boolean {
@@ -302,12 +304,17 @@ function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
       const shape = annoToVideoAnnotation(annotation, frame);
       if (!shape) continue;
 
-      const parsed =
-        shape.type === "video_bounding_box"
-          ? VideoBoundingBoxSchema.safeParse(shape)
-          : VideoPolygonSchema.safeParse(shape);
+      let parsed:
+        | ReturnType<typeof VideoBoundingBoxSchema.safeParse>
+        | ReturnType<typeof VideoPolygonSchema.safeParse>
+        | null = null;
+      if (shape.type === "video_bounding_box") {
+        parsed = VideoBoundingBoxSchema.safeParse(shape);
+      } else if (shape.type === "video_polygon") {
+        parsed = VideoPolygonSchema.safeParse(shape);
+      }
 
-      if (parsed.success) out.push(parsed.data);
+      if (parsed?.success) out.push(parsed.data);
     }
   }
 
@@ -343,24 +350,17 @@ export function useVideoSession(): VideoSessionCtx {
 export function VideoSessionProvider(props: {
   projectId: string;
   sampleId: string;
-  data: unknown;
-  dataParams: DataParams;
-  dbAnnotations: Annotation[];
-  setSampleAnnotations: (
-    updater: (annotations: Annotation[]) => Annotation[],
-  ) => void;
   propagate: boolean;
   setPropagate: (v: boolean) => void;
   children: React.ReactNode;
 }) {
+  const { projectId, sampleId, propagate, setPropagate, children } = props;
   const {
-    projectId,
-    sampleId,
-    propagate,
-    setPropagate,
-    setSampleAnnotations,
-    children,
-  } = props;
+    data,
+    dataParams,
+    annotations,
+    setAnnotations: setSampleAnnotations,
+  } = useSample();
   const {
     videoPanMode,
     setVideoPanMode,
@@ -383,7 +383,7 @@ export function VideoSessionProvider(props: {
   >(() => {});
   const pendingFocusRef = useRef<FocusRequest | null>(null);
   const nextTrackNumsRef = useRef<Map<string, number>>(
-    buildNextTrackIdState(props.dbAnnotations),
+    buildNextTrackIdState(annotations),
   );
   const lastExternalAnnotationSignatureRef = useRef<string | null>(null);
   const lastLocalAnnotationSignatureRef = useRef<string | null>(null);
@@ -398,15 +398,15 @@ export function VideoSessionProvider(props: {
 
   // For video we assume backend returns { frame: number, values: base64, ... }
   const frameFromBackend = useMemo(() => {
-    if (!props.data) return 0;
-    const maybe = props.data as { frame?: number };
+    if (!data) return 0;
+    const maybe = data as { frame?: number };
     return maybe?.frame ?? 0;
-  }, [props.data]);
+  }, [data]);
 
   useLayoutEffect(() => {
-    if (!props.data) return;
+    if (!data) return;
 
-    const dp = props.dataParams as {
+    const dp = dataParams as {
       name?: string;
       frame?: number | null;
     };
@@ -416,7 +416,7 @@ export function VideoSessionProvider(props: {
     }
 
     setVideoFrame(frameFromBackend);
-  }, [props.data, frameFromBackend, props.dataParams]);
+  }, [data, dataParams, frameFromBackend]);
 
   const frame: FrameIndex = (videoFrame ?? frameFromBackend) as FrameIndex;
 
@@ -471,6 +471,36 @@ export function VideoSessionProvider(props: {
   useEffect(() => {
     byFrameRef.current = byFrame;
   }, [byFrame]);
+
+  // Keep the editor cache synchronized with SampleContext.annotations.
+  useEffect(() => {
+    const { annotations: dbAnnotations, duplicates } =
+      dedupeVideoAnnotations(annotations);
+    const signature = videoAnnotationSignature(dbAnnotations);
+
+    if (signature === lastExternalAnnotationSignatureRef.current) return;
+    if (signature === lastLocalAnnotationSignatureRef.current) {
+      nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
+      lastExternalAnnotationSignatureRef.current = signature;
+      return;
+    }
+
+    const nextByFrame = videoAnnotationsToByFrame({
+      dbAnnotations,
+      projectId,
+      sampleId,
+    });
+
+    pendingFocusRef.current = null;
+    byFrameRef.current = nextByFrame;
+    setByFrame(nextByFrame);
+    nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
+    lastExternalAnnotationSignatureRef.current = signature;
+    lastLocalAnnotationSignatureRef.current = null;
+    if (duplicates > 0) {
+      setSampleAnnotations(() => dbAnnotations);
+    }
+  }, [annotations, projectId, sampleId, setSampleAnnotations]);
 
   const commitByFrame = useCallback(
     (next: ByFrameMap, opts?: { markDirty?: boolean }) => {
@@ -674,46 +704,6 @@ export function VideoSessionProvider(props: {
     },
     [frame, projectId, sampleId, updateByFrame],
   );
-
-  // Keep the editor cache synchronized with SampleContext.annotations.
-  useEffect(() => {
-    const { annotations: dbAnnotations, duplicates } = dedupeVideoAnnotations(
-      props.dbAnnotations ?? [],
-    );
-    const signature = videoAnnotationSignature(dbAnnotations);
-
-    if (signature === lastExternalAnnotationSignatureRef.current) return;
-    if (signature === lastLocalAnnotationSignatureRef.current) {
-      nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
-      lastExternalAnnotationSignatureRef.current = signature;
-      return;
-    }
-
-    const { byFrame: nextByFrame, invalid } = videoAnnotationsToByFrame({
-      dbAnnotations,
-      projectId,
-      sampleId,
-    });
-
-    if (invalid > 0) {
-      console.warn(
-        `[video] external annotation sync: skipped ${invalid} invalid video annotation(s) from backend.`,
-      );
-    }
-
-    pendingFocusRef.current = null;
-    byFrameRef.current = nextByFrame;
-    setByFrame(nextByFrame);
-    nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
-    lastExternalAnnotationSignatureRef.current = signature;
-    lastLocalAnnotationSignatureRef.current = null;
-    if (duplicates > 0) {
-      console.warn(
-        `[video] external annotation sync: collapsed ${duplicates} duplicate video annotation(s).`,
-      );
-      setSampleAnnotations(() => dbAnnotations);
-    }
-  }, [projectId, props.dbAnnotations, sampleId, setSampleAnnotations]);
 
   /**
    * Single commit point for all Annotorious mutations (create/update/delete).
