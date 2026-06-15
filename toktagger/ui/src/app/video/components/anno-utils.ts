@@ -34,7 +34,7 @@ import { classIdForName } from "./types";
 type UnknownRecord = Record<string, unknown>;
 const POINT_BODY_PURPOSE = "shape";
 const POINT_BODY_VALUE = "point";
-export const POINT_MARKER_SIZE = 28;
+export const POINT_MARKER_SIZE = 5;
 const CREATOR_PURPOSE = "creator";
 
 export type PointGeometry = { x: number; y: number };
