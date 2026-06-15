@@ -688,7 +688,7 @@ async def create_sample_predictions(
         samples=[sample],
         params=params_validated,
         data_params=data_params,
-        use_gpu=task_registry.gpu_enabled,
+        use_gpu=use_gpu,
     )
     task_id = task_registry.register(task)
 

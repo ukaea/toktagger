@@ -106,7 +106,6 @@ def load_model(
             "model_id": model.id,
             "message": f"Worker node cannot find weights file at location {weights_path}",
         }
-
     model_actor = get_actor(project=project, model=model, use_gpu=False)
     # Try loading actor with weights file, catch and reraise any errors
     try:

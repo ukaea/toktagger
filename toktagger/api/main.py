@@ -49,52 +49,62 @@ class Server:
     def _setup_ray(self):
         if (api_url := os.environ.get("API_URL")) is None:
             raise ValueError("API URL must be set!")
-        if not ray.is_initialized():
-            num_gpus = None
-            # ALlow the user to force overriding of number of GPUs available
-            # This is so that eg Mac can work correctly
-            if os.environ.get("FORCE_NUM_GPUS") and os.environ.get("MAX_GPU_ACTORS"):
-                print("Warning: Overriding automatically detected GPU availablity!")
-                num_gpus = int(os.environ.get("MAX_GPU_ACTORS"))
 
-            ray.init(
-                num_gpus=num_gpus if num_gpus else None,
-                runtime_env={
-                    "env_vars": {
-                        "API_URL": api_url,
-                        "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
-                    }
-                },
+        num_gpus = None
+        # ALlow the user to force overriding of number of GPUs available
+        # This is so that eg Mac can work correctly
+        if os.environ.get("FORCE_NUM_GPUS") and os.environ.get("MAX_GPU_ACTORS"):
+            print("Warning: Overriding automatically detected GPU availablity!")
+            num_gpus = int(os.environ.get("MAX_GPU_ACTORS"))
+
+        ray.init(
+            num_gpus=num_gpus if num_gpus else None,
+            ignore_reinit_error=True,
+            include_dashboard=False,
+            runtime_env={
+                "env_vars": {
+                    "API_URL": api_url,
+                    "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
+                }
+            },
+        )
+        # Detect available resources
+        cluster_resources = ray.cluster_resources()
+        cpus_available = int(cluster_resources.get("CPU", 0))
+        gpus_available = int(cluster_resources.get("GPU", 0))
+
+        if not cpus_available:
+            raise RuntimeError("Ray failed to detect any CPUs!")
+
+        if (max_gpu_actors := os.environ.get("MAX_GPU_ACTORS")) is None:
+            max_gpu_actors = cluster_resources.get("GPU", 0)
+        max_gpu_actors = int(max_gpu_actors)
+
+        if (max_actors := os.environ.get("MAX_ACTORS")) is None:
+            # Each GPU actor also gets a CPU so subtract these
+            # Then subtract one for head node, one for server
+            max_actors = cpus_available - max_gpu_actors - 2
+        max_actors = int(max_actors)
+
+        if max_gpu_actors > gpus_available:
+            raise RuntimeError("More GPU actors requested than hardware supports!")
+
+        if max_actors > cpus_available + gpus_available:
+            raise RuntimeError(
+                "More model actors requested than the detected hardware supports!"
             )
-            # Detect available resources
-            cluster_resources = ray.cluster_resources()
-            cpus_available = int(cluster_resources.get("CPU", 0))
-            gpus_available = int(cluster_resources.get("GPU", 0))
 
-            if not cpus_available:
-                raise RuntimeError("Ray failed to detect any CPUs!")
-
-            if (max_gpu_actors := os.environ.get("MAX_GPU_ACTORS")) is None:
-                max_gpu_actors = int(cluster_resources.get("GPU", 0))
-
-            if (max_actors := os.environ.get("MAX_ACTORS")) is None:
-                # Each GPU actor also gets a CPU so subtract these
-                # Then subtract one for head node, one for server
-                max_actors = cpus_available - max_gpu_actors - 2
-
-            if max_gpu_actors > gpus_available:
-                raise RuntimeError("More GPU actors requested than hardware supports!")
-
-            if max_actors > cpus_available + gpus_available:
-                raise RuntimeError(
-                    "More model actors requested than the detected hardware supports!"
-                )
-
-            # Create a ray actor for use as a model registry
+        # Create a ray actor for use as a model registry
+        try:
+            ray.get_actor("WorkerModelRegistry")
+        except ValueError:
             WorkerRegistry.options(
                 name="WorkerModelRegistry", lifetime="detached"
             ).remote(ModelRegistry._registry)
-            # And one for use as a dataloader registry
+        # And one for use as a dataloader registry
+        try:
+            ray.get_actor("WorkerLoaderRegistry")
+        except ValueError:
             WorkerRegistry.options(
                 name="WorkerLoaderRegistry", lifetime="detached"
             ).remote(LoaderRegistry._registry)
