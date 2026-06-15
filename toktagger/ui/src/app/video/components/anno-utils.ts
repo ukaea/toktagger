@@ -11,6 +11,7 @@ import {
   type ImageAnnotationTarget,
   type Shape,
 } from "@annotorious/react";
+import type { Ellipse, EllipseGeometry } from "@annotorious/annotorious";
 import type {
   AnnotoriousDrawingTool,
   VideoAnnotationShape,
@@ -34,7 +35,7 @@ import { classIdForName } from "./types";
 type UnknownRecord = Record<string, unknown>;
 const POINT_BODY_PURPOSE = "shape";
 const POINT_BODY_VALUE = "point";
-export const POINT_MARKER_SIZE = 5;
+export const POINT_MARKER_SIZE = 10;
 const CREATOR_PURPOSE = "creator";
 
 export type PointGeometry = { x: number; y: number };
@@ -63,6 +64,8 @@ export type ImageAnnotationWithSelector<TSelector extends Shape> = Omit<
 
 export type RectangleAnnotation = ImageAnnotationWithSelector<Rectangle>;
 export type PolygonAnnotation = ImageAnnotationWithSelector<Polygon>;
+export type EllipseAnnotation = ImageAnnotationWithSelector<Ellipse>;
+export type PointAnnotation = RectangleAnnotation | EllipseAnnotation;
 
 function withTargetSource(
   a: ImageAnnotation,
@@ -167,7 +170,7 @@ export function stampCreator(
   return { ...a, bodies };
 }
 
-/** Mark a rectangle selector as the UI representation of a point. */
+/** Mark a selector as the UI representation of a point. */
 export function stampPoint(a: ImageAnnotation): ImageAnnotation {
   const bodies = upsertBody(a.bodies, POINT_BODY_PURPOSE, POINT_BODY_VALUE);
   return { ...a, bodies };
@@ -208,10 +211,15 @@ export function isPolygonAnno(a: ImageAnnotation): a is PolygonAnnotation {
   return a.target.selector.type === ShapeType.POLYGON;
 }
 
-/** True when a rectangle selector is being used as a point marker. */
-export function isPointAnno(a: ImageAnnotation): a is RectangleAnnotation {
+/** True if the annotation target is an ellipse selector. */
+export function isEllipseAnno(a: ImageAnnotation): a is EllipseAnnotation {
+  return a.target.selector.type === ShapeType.ELLIPSE;
+}
+
+/** True when a selector is being used as a point marker. */
+export function isPointAnno(a: ImageAnnotation): a is PointAnnotation {
   return (
-    isRectangleAnno(a) &&
+    (isRectangleAnno(a) || isEllipseAnno(a)) &&
     getBodyValue(a, POINT_BODY_PURPOSE) === POINT_BODY_VALUE
   );
 }
@@ -259,11 +267,41 @@ export function readPolygonGeometry(
   return g;
 }
 
-/** Read point geometry from the tagged rectangle marker. */
+/** Read ellipse geometry (returns null if missing/invalid). */
+export function readEllipseGeometry(
+  a: EllipseAnnotation,
+): EllipseGeometry | null {
+  const g = a.target.selector.geometry;
+  const { cx, cy, rx, ry } = g;
+
+  if (
+    !isFiniteNumber(cx) ||
+    !isFiniteNumber(cy) ||
+    !isFiniteNumber(rx) ||
+    !isFiniteNumber(ry)
+  )
+    return null;
+
+  if (rx <= 0 || ry <= 0) return null;
+
+  return g;
+}
+
+/** Read point geometry from the tagged marker shape. */
 export function readPointGeometry(a: ImageAnnotation): PointGeometry | null {
   if (!isPointAnno(a)) return null;
 
-  const g = readRectGeometry(a);
+  if (isEllipseAnno(a)) {
+    const g = readEllipseGeometry(a);
+    if (!g) return null;
+
+    return {
+      x: g.cx,
+      y: g.cy,
+    };
+  }
+
+  const g = isRectangleAnno(a) ? readRectGeometry(a) : null;
   if (!g) return null;
 
   return {
@@ -297,7 +335,7 @@ export function normalizeOverlay(
   const out: ImageAnnotation[] = [];
 
   for (const a of src) {
-    if (!isRectangleAnno(a) && !isPolygonAnno(a)) continue;
+    if (!isRectangleAnno(a) && !isPolygonAnno(a) && !isPointAnno(a)) continue;
 
     const withSource = withTargetSource(a, frameKey);
 
@@ -521,7 +559,7 @@ export function videoPolygonToAnno(
   return stampCreator(labelled, p.created_by);
 }
 
-/** Convert backend VideoPoint -> tagged Annotorious rectangle marker. */
+/** Convert backend VideoPoint -> tagged Annotorious circle marker. */
 export function videoPointToAnno(
   p: VideoPoint,
   frameKey: string,
@@ -529,28 +567,26 @@ export function videoPointToAnno(
   const x = Number(p.x);
   const y = Number(p.y);
   const half = POINT_MARKER_SIZE / 2;
-  const markerX = x - half;
-  const markerY = y - half;
 
   const id =
     globalThis.crypto?.randomUUID?.() ??
     `anno-${Math.random().toString(36).slice(2)}`;
 
-  const geometry: RectangleGeometry = {
-    x: markerX,
-    y: markerY,
-    w: POINT_MARKER_SIZE,
-    h: POINT_MARKER_SIZE,
+  const geometry: EllipseGeometry = {
+    cx: x,
+    cy: y,
+    rx: half,
+    ry: half,
     bounds: {
-      minX: markerX,
-      minY: markerY,
-      maxX: markerX + POINT_MARKER_SIZE,
-      maxY: markerY + POINT_MARKER_SIZE,
+      minX: x - half,
+      minY: y - half,
+      maxX: x + half,
+      maxY: y + half,
     },
   };
 
-  const selector: Rectangle = {
-    type: ShapeType.RECTANGLE,
+  const selector: Ellipse = {
+    type: ShapeType.ELLIPSE,
     geometry,
   };
 

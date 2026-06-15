@@ -16,6 +16,8 @@ import {
 import "@annotorious/react/annotorious-react.css";
 import "react-contexify/ReactContexify.css";
 import { Item, Menu, Submenu, useContextMenu } from "react-contexify";
+import { mountPlugin as mountToolsPlugin } from "@annotorious/plugin-tools";
+import "@annotorious/plugin-tools/annotorious-plugin-tools.css";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -214,6 +216,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     return () => {
       api.off("selectionChanged", onSelectionChanged);
     };
+  }, [api]);
+
+  useEffect(() => {
+    if (!api) return;
+    mountToolsPlugin(api);
   }, [api]);
 
   useEffect(() => {

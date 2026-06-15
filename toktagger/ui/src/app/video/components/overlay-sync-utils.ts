@@ -1,12 +1,15 @@
 import { boundsFromPoints, type ImageAnnotation } from "@annotorious/react";
 import {
   getLabelTrack,
+  isEllipseAnno,
   isPointAnno,
   isRectangleAnno,
   isPolygonAnno,
   POINT_MARKER_SIZE,
+  type EllipseAnnotation,
   type PolygonAnnotation,
   type RectangleAnnotation,
+  readEllipseGeometry,
   readPointGeometry,
   readPolygonGeometry,
   readRectGeometry,
@@ -39,6 +42,15 @@ export function annotationContainsPoint(
   annotation: ImageAnnotation,
   point: ImagePoint,
 ) {
+  const ellipse = isEllipseAnno(annotation)
+    ? readEllipseGeometry(annotation)
+    : null;
+  if (ellipse) {
+    const dx = (point.x - ellipse.cx) / ellipse.rx;
+    const dy = (point.y - ellipse.cy) / ellipse.ry;
+    return dx * dx + dy * dy <= 1;
+  }
+
   const rect = isRectangleAnno(annotation)
     ? readRectGeometry(annotation)
     : null;
@@ -104,6 +116,7 @@ function annoSig(a: ImageAnnotation): string {
   const sel = a.target.selector;
   const source = getTargetSource(a);
   const rect = isRectangleAnno(a) ? readRectGeometry(a) : null;
+  const ellipse = isEllipseAnno(a) ? readEllipseGeometry(a) : null;
   const poly = isPolygonAnno(a) ? readPolygonGeometry(a) : null;
   const point = isPointAnno(a) ? readPointGeometry(a) : null;
   const { className, trackId } = getLabelTrack(a);
@@ -121,6 +134,10 @@ function annoSig(a: ImageAnnotation): string {
     rect?.y ?? "",
     rect?.w ?? "",
     rect?.h ?? "",
+    ellipse?.cx ?? "",
+    ellipse?.cy ?? "",
+    ellipse?.rx ?? "",
+    ellipse?.ry ?? "",
     polySig,
     pointSig,
     className ?? "",
@@ -175,6 +192,36 @@ function withRectGeometry(
     w: g.w,
     h: g.h,
     bounds: { minX: g.x, minY: g.y, maxX: g.x + g.w, maxY: g.y + g.h },
+  };
+
+  return {
+    ...a,
+    target: {
+      ...a.target,
+      selector: {
+        ...a.target.selector,
+        geometry: nextGeom,
+      },
+    },
+  };
+}
+
+function withEllipseGeometry(
+  a: EllipseAnnotation,
+  g: { cx: number; cy: number; rx: number; ry: number },
+): EllipseAnnotation {
+  const nextGeom = {
+    ...a.target.selector.geometry,
+    cx: g.cx,
+    cy: g.cy,
+    rx: g.rx,
+    ry: g.ry,
+    bounds: {
+      minX: g.cx - g.rx,
+      minY: g.cy - g.ry,
+      maxX: g.cx + g.rx,
+      maxY: g.cy + g.ry,
+    },
   };
 
   return {
@@ -290,17 +337,29 @@ export function clampOverlayToNaturalImage(
       const x = Math.max(0, Math.min(natural.w, point.x));
       const y = Math.max(0, Math.min(natural.h, point.y));
       const half = POINT_MARKER_SIZE / 2;
-      const clamped = {
-        x: x - half,
-        y: y - half,
-        w: POINT_MARKER_SIZE,
-        h: POINT_MARKER_SIZE,
-      };
 
       if (x === point.x && y === point.y) out.push(a);
       else {
         changed = true;
-        out.push(withRectGeometry(a, clamped));
+        if (isEllipseAnno(a)) {
+          out.push(
+            withEllipseGeometry(a, {
+              cx: x,
+              cy: y,
+              rx: half,
+              ry: half,
+            }),
+          );
+        } else if (isRectangleAnno(a)) {
+          out.push(
+            withRectGeometry(a, {
+              x: x - half,
+              y: y - half,
+              w: POINT_MARKER_SIZE,
+              h: POINT_MARKER_SIZE,
+            }),
+          );
+        }
       }
       continue;
     }
