@@ -429,7 +429,7 @@ export const getModels = async (project_id: string): Promise<Response> => {
 export const getModelSchema = async (
   modelName: string,
   schemaType: string,
-): Promise<RJSFSchema> => {
+): Promise<RJSFSchema | null> => {
   const response = await fetch(
     `${BACKEND_API_URL}/meta/models/${modelName}/${schemaType}`,
   );
@@ -437,19 +437,22 @@ export const getModelSchema = async (
     throw new Error(`Failed to fetch model schema!`);
   }
   const data = await response.json();
+  if (!data) {
+    return null;
+  }
   const schema: RJSFSchema = data as RJSFSchema;
   return schema;
 };
 
 export const getModelTrainSchema = async (
   modelName: string,
-): Promise<RJSFSchema> => {
+): Promise<RJSFSchema | null> => {
   return getModelSchema(modelName, "train");
 };
 
 export const getModelPredictSchema = async (
   modelName: string,
-): Promise<RJSFSchema> => {
+): Promise<RJSFSchema | null> => {
   return getModelSchema(modelName, "predict");
 };
 

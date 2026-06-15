@@ -73,7 +73,7 @@ export function ModelTrainModal({
         setSchema(null);
         return;
       }
-      const newSchema: RJSFSchema =
+      const newSchema: RJSFSchema | null =
         await getModelTrainSchema(selectedModelName);
       setSchema(newSchema);
     };
@@ -141,17 +141,15 @@ export function ModelTrainModal({
                   ))
                 : null}
             </ComboBox>
-            {schema && (
-              <ModelForm
-                ref={formRef}
-                schema={schema}
-                onSubmit={submitTrainJob}
-                formData={unvalidatedFormData}
-                setFormData={setUnvalidatedFormData}
-                useGPU={useGPU}
-                setUseGPU={setUseGPU}
-              />
-            )}
+            <ModelForm
+              ref={formRef}
+              schema={schema}
+              onSubmit={submitTrainJob}
+              formData={unvalidatedFormData}
+              setFormData={setUnvalidatedFormData}
+              useGPU={useGPU}
+              setUseGPU={setUseGPU}
+            />
           </Content>
           <Footer>
             {message && (

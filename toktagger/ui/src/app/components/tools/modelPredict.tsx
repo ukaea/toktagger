@@ -100,7 +100,7 @@ export function ModelPredictModal({
         setSchema(null);
         return;
       }
-      const newSchema: RJSFSchema = await getModelPredictSchema(
+      const newSchema: RJSFSchema | null = await getModelPredictSchema(
         selectedModel.type,
       );
       setSchema(newSchema);
@@ -276,17 +276,15 @@ export function ModelPredictModal({
                 </TableBody>
               </TableView>
             )}
-            {schema && (
-              <ModelForm
-                ref={formRef}
-                schema={schema}
-                onSubmit={submitPredictJob}
-                formData={unvalidatedFormData}
-                setFormData={setUnvalidatedFormData}
-                useGPU={useGPU}
-                setUseGPU={setUseGPU}
-              />
-            )}
+            <ModelForm
+              ref={formRef}
+              schema={schema}
+              onSubmit={submitPredictJob}
+              formData={unvalidatedFormData}
+              setFormData={setUnvalidatedFormData}
+              useGPU={useGPU}
+              setUseGPU={setUseGPU}
+            />
           </Content>
           <Footer>
             {message && (

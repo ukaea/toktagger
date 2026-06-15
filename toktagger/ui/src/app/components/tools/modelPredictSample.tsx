@@ -71,7 +71,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         setSchema(null);
         return;
       }
-      const newSchema: RJSFSchema =
+      const newSchema: RJSFSchema | null =
         await getModelPredictSchema(selectedModelName);
       setSchema(newSchema);
     };
@@ -202,18 +202,16 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
                 ))
               : null}
           </ComboBox>
-          {schema && (
-            <ModelForm
-              ref={formRef}
-              schema={schema}
-              onSubmit={submitPredictJob}
-              disabled={!isEnabled}
-              formData={unvalidatedFormData}
-              setFormData={setUnvalidatedFormData}
-              useGPU={useGPU}
-              setUseGPU={setUseGPU}
-            />
-          )}
+          <ModelForm
+            ref={formRef}
+            schema={schema}
+            onSubmit={submitPredictJob}
+            disabled={!isEnabled}
+            formData={unvalidatedFormData}
+            setFormData={setUnvalidatedFormData}
+            useGPU={useGPU}
+            setUseGPU={setUseGPU}
+          />
           <Flex marginTop="size-200" marginBottom="size-200">
             <Button
               marginEnd="size-400"
