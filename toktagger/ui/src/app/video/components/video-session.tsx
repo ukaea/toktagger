@@ -105,6 +105,7 @@ type VideoSessionCtx = {
   setImageNatural: (n: { w: number; h: number } | null) => void;
 
   /** Popup helpers so view components don't need direct access to the Annotorious API. */
+  createPointAnnotation: (point: { x: number; y: number }) => void;
   deleteAnnotation: (id: string) => void;
   closePopup: () => void;
   requestFocusInstance: (
@@ -662,7 +663,8 @@ export function VideoSessionProvider(props: {
       !panMode &&
       !hideAnnotations &&
       Boolean(selection.className) &&
-      !hasSelected;
+      !hasSelected &&
+      drawingTool !== "point";
     api.setDrawingTool(toAnnotoriousDrawingTool(drawingTool));
     api.setDrawingEnabled(canDraw);
 
@@ -737,6 +739,97 @@ export function VideoSessionProvider(props: {
       );
     },
     [frame, projectId, sampleId, updateByFrame],
+  );
+
+  const createPointAnnotation = useCallback(
+    (point: { x: number; y: number }) => {
+      if (!api?.getAnnotations) return;
+
+      const cls = (selection.className ?? "").trim();
+      if (!cls) return;
+
+      const rawX = Number(point.x);
+      const rawY = Number(point.y);
+      if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return;
+
+      const viewerNatural = (() => {
+        const item = api.viewer?.world?.getItemAt?.(0);
+        if (!item) return null;
+        const size = item.getContentSize?.();
+        const w = Math.round(Number(size?.x ?? 0));
+        const h = Math.round(Number(size?.y ?? 0));
+        if (!(w > 0 && h > 0)) return null;
+        return { w, h };
+      })();
+      const natural = imageNatural ?? viewerNatural;
+      const x = natural
+        ? Math.max(0, Math.min(natural.w, rawX))
+        : rawX;
+      const y = natural
+        ? Math.max(0, Math.min(natural.h, rawY))
+        : rawY;
+
+      const raw = api.getAnnotations();
+      const used = new Set<string>();
+
+      for (const tid of existingTrackIdsForClass(byFrameRef.current, cls)) {
+        const c = canonicalizeTrackId(tid);
+        if (c) used.add(c);
+      }
+
+      for (const annotation of raw) {
+        const got = getLabelTrack(annotation);
+        if ((got.className ?? "").trim() !== cls) continue;
+
+        const tid = canonicalizeTrackId(got.trackId ?? "");
+        if (tid) used.add(tid);
+      }
+
+      const trackId = selection.trackId ?? uniqueReadableTrackId(used);
+      const dbPoint: VideoPoint = {
+        type: "video_point",
+        frame,
+        track_id: String(trackId),
+        label: cls,
+        x: Math.round(x),
+        y: Math.round(y),
+        created_by: "manual",
+      };
+      const pointAnnotation = videoPointToAnno(dbPoint, frameKey);
+      const normalized = normalizeOverlayForSession({
+        raw: [...raw, pointAnnotation],
+        frameKey,
+        fallback: { className: cls, trackId: String(trackId) },
+        enforceBothBodies: true,
+        dedupeByInstance: true,
+      });
+
+      updateByFrame(
+        (prevByFrame) => mapSetFrame(prevByFrame, frame, normalized),
+        { markDirty: true },
+      );
+
+      isProgrammaticAnnoSyncRef.current = true;
+      try {
+        api.cancelDrawing?.();
+        api.setSelected?.();
+        api.setAnnotations?.(normalized, true);
+        applyAnnotatorInteractionMode();
+      } finally {
+        finishProgrammaticAnnotationSync();
+      }
+    },
+    [
+      api,
+      applyAnnotatorInteractionMode,
+      finishProgrammaticAnnotationSync,
+      frame,
+      frameKey,
+      imageNatural,
+      selection.className,
+      selection.trackId,
+      updateByFrame,
+    ],
   );
 
   /**
@@ -1262,6 +1355,7 @@ export function VideoSessionProvider(props: {
       setHideAnnotations,
       imageNatural,
       setImageNatural,
+      createPointAnnotation,
       deleteAnnotation,
       closePopup,
       requestFocusInstance,
@@ -1296,6 +1390,7 @@ export function VideoSessionProvider(props: {
       setHideAnnotations,
       imageNatural,
       setImageNatural,
+      createPointAnnotation,
       deleteAnnotation,
       closePopup,
       requestFocusInstance,
