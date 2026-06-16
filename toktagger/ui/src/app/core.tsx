@@ -472,7 +472,7 @@ export const startLoadModelWeightsLocal = async (
   weights_path: string,
 ): Promise<Response> => {
   const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/local&weights_path=${weights_path}`,
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/local?weights_path=${weights_path}`,
     {
       method: "POST",
       headers: {
