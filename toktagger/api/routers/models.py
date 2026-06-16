@@ -14,7 +14,7 @@ from collections import defaultdict
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
-    from toktagger.api.worker import load_model, train_model, get_predictions
+    from toktagger.api.worker import load_model_local, train_model, get_predictions
     from toktagger.api.models.base import ModelRegistry
     import ray
 
@@ -345,73 +345,67 @@ async def load_model_weights(
             status_code=403, detail="Loading from local weights is disabled."
         )
 
-    # If local load, create a model db instance and return the model ID
-    elif method == LoadTypes.LOCAL:
-        project = await utils.get_project(db_client, project_id)
-        # Check that this model type is valid for this project
-        if model_type not in project.model_types:
-            raise HTTPException(
-                status_code=422,
-                detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
-            )
-
-        # Try to get model for this project from database if it exists
-        db_models = await utils.get_models(db_client, project_id, model_type)
-
-        if (
-            len(
-                [
-                    db_model
-                    for db_model in db_models
-                    if db_model.training_status in ["queued", "started"]
-                ]
-            )
-            > 0
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail=f"Training of {model_type} model already in progress!",
-            )
-
-        if len(db_models) == 0:
-            # This is the first time a model has been saved for this project, so version = 1
-            version = 1
-        else:
-            version = db_models[0].version + 1
-
-        model_in = ModelIn(
-            type=model_type,
-            version=version,
-            training_status="queued",
-            progress=0,
-            score=0,
-        )
-
-        model_id = await utils.add_model(
-            db_client=db_client, project_id=project.id, model=model_in
-        )
-
-        # Find the latest queued model for this project
-        model = await utils.get_model(
-            db_client, project.id, model_type=model_type, model_id=model_id
-        )
-
-        task = load_model.remote(
-            project=project, model=model, weights_path=weights_path
-        )
-        task_id = task_registry.register(task)
-        task_registry.update_actors(model.id)
-
-        # Associate the task ID with the model in the database
-        await utils.update_model(
-            db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
-        )
-
-        return {"task_id": task_id, "model_id": model.id}
-    else:
+    project = await utils.get_project(db_client, project_id)
+    # Check that this model type is valid for this project
+    if model_type not in project.model_types:
         raise HTTPException(
-            status_code=501, detail=f"Loading method {method} not implemented!"
+            status_code=422,
+            detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
+
+    # Try to get model for this project from database if it exists
+    db_models = await utils.get_models(db_client, project_id, model_type)
+
+    if (
+        len(
+            [
+                db_model
+                for db_model in db_models
+                if db_model.training_status in ["queued", "started"]
+            ]
+        )
+        > 0
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Training of {model_type} model already in progress!",
+        )
+
+    if len(db_models) == 0:
+        # This is the first time a model has been saved for this project, so version = 1
+        version = 1
+    else:
+        version = db_models[0].version + 1
+
+    model_in = ModelIn(
+        type=model_type,
+        version=version,
+        training_status="queued",
+        progress=0,
+        score=0,
+    )
+
+    model_id = await utils.add_model(
+        db_client=db_client, project_id=project.id, model=model_in
+    )
+
+    # Find the latest queued model for this project
+    model = await utils.get_model(
+        db_client, project.id, model_type=model_type, model_id=model_id
+    )
+
+    task = load_model_local.remote(
+        project=project, model=model, weights_path=weights_path
+    )
+    task_id = task_registry.register(task)
+    task_registry.update_actors(model.id)
+
+    # Associate the task ID with the model in the database
+    await utils.update_model(
+        db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
+    )
+
+    return {"task_id": task_id, "model_id": model.id}
 
 
 @router.get("/models/{model_type}/load/{task_id}")

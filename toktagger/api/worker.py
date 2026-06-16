@@ -64,7 +64,7 @@ def get_actor(project, model):
 
 
 @ray.remote
-def load_model(
+def load_model_local(
     model: Model, project: Project, weights_path: pathlib.Path
 ) -> tuple[str, str | None]:
     # Change status to started

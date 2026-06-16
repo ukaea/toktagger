@@ -40,3 +40,4 @@ class Model(ModelIn):
 
 class LoadTypes(str, Enum):
     LOCAL = "local"
+    GITLAB = "gitlab"
