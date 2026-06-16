@@ -2,6 +2,7 @@ from typing import Literal, Annotated, Optional
 from pydantic import Field, field_validator
 from toktagger.api.schemas import ConfiguredModel
 from enum import Enum
+import pydantic
 
 
 class ModelIn(ConfiguredModel):
@@ -41,3 +42,10 @@ class Model(ModelIn):
 class LoadTypes(str, Enum):
     LOCAL = "local"
     GITLAB = "gitlab"
+
+
+class GitlabLoadParams(pydantic.BaseModel):
+    model_name: str
+    weights_path: str
+    version: str | None
+    gitlab_project_id: int | None = None
