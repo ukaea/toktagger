@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.data import DataParamTypes, DataParams
-from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
+from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, GitlabLoadParams
 from toktagger.api.schemas.projects import Project
 from toktagger.api.models import models_dependencies_installed, check_models_enabled
 from pydantic import ValidationError
@@ -15,7 +15,12 @@ from collections import defaultdict
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
-    from toktagger.api.worker import load_model_local, train_model, get_predictions
+    from toktagger.api.worker import (
+        load_model_local,
+        load_model_gitlab,
+        train_model,
+        get_predictions,
+    )
     from toktagger.api.models.base import ModelRegistry
     import ray
 
@@ -361,6 +366,51 @@ async def load_model_weights_local(
     task = load_model_local.remote(
         project=project, model=model, weights_path=weights_path
     )
+    task_id = task_registry.register(task)
+    task_registry.update_actors(model.id)
+
+    # Associate the task ID with the model in the database
+    await utils.update_model(
+        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
+    )
+
+    return {"task_id": task_id, "model_id": model.id}
+
+
+@router.post("/models/{model_type}/load/gitlab")
+async def load_model_weights_gitlab(
+    request: Request, project_id: str, model_type: str, params: GitlabLoadParams
+):
+    db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
+    # Check if local load method is enabled
+    if os.environ.get("DISABLE_GITLAB_MODEL_LOAD"):
+        raise HTTPException(
+            status_code=403, detail="Loading model weights from Gitlab is disabled."
+        )
+
+    # Check if required env vars have been set
+    if not all(
+        os.environ.get("MODELS_GITLAB_URL"), os.environ.get("MODELS_GITLAB_TOKEN")
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Gitlab URL and Token env vars must be set for ML Model loading from Gitlab.",
+        )
+    if not params.gitlab_project_id and not os.environ.get("MODELS_GITLAB_PROJECT_ID"):
+        raise HTTPException(
+            status_code=422,
+            detail="Must set a Gitlab Project ID either via UI or env var.",
+        )
+    elif not params.gitlab_project_id:
+        params.gitlab_project_id = int(os.environ.get("MODELS_GITLAB_PROJECT_ID"))
+
+    project = await utils.get_project(db_client, project_id)
+    model = await create_model(db_client, project, model_type)
+
+    task = load_model_gitlab.remote(project=project, model=model, params=params)
+
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)
 

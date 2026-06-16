@@ -9,7 +9,7 @@ from toktagger.api.schemas.annotations import (
     AnnotationOutTypes,
 )
 from pydantic import ValidationError
-from toktagger.api.schemas.models import Model, ModelUpdate
+from toktagger.api.schemas.models import Model, ModelUpdate, GitlabLoadParams
 from toktagger.api.core.sender import (
     send_batch_samples,
     send_batch_annotations,
@@ -18,6 +18,8 @@ from toktagger.api.core.sender import (
 import logging
 from platformdirs import user_cache_dir
 import pydantic
+from mlflow import MlflowClient, MlflowException
+from safetensors import safe_open
 
 logger = logging.getLogger("ray")
 logger.setLevel("DEBUG")
@@ -114,6 +116,130 @@ def load_model_local(
         model_dir.joinpath(str(model.id))
     )
     ray.get(save_weights_task)
+
+    return {"project_id": project.id, "model_id": model.id, "message": None}
+
+
+@ray.remote
+def load_model_gitlab(
+    model: Model, project: Project, params: GitlabLoadParams
+) -> tuple[str, str | None]:
+    # Make sure model storage location in cache dir exists
+    model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
+    model_dir.mkdir(exist_ok=True)
+
+    # Change status to started
+    send_model_updates(
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(training_status="started"),
+    )
+
+    model_actor = get_actor(project=project, model=model)
+
+    # Construct URI required
+    if not all(
+        os.environ.get("MODELS_GITLAB_URL"),
+        os.environ.get("MODELS_GITLAB_TOKEN"),
+        params.gitlab_project_id,
+    ):
+        logger.error(
+            "Gitlab URL, Token or Project ID not specified when trying to load ML model!"
+        )
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": "Failed to load weights - required variables not defined.",
+        }
+    os.environ["MLFLOW_TRACKING_URI"] = (
+        f"{os.environ.get('MODELS_GITLAB_URL')}/api/v4/projects/{params.gitlab_project_id}/ml/mlflow"
+    )
+    os.environ["MLFLOW_TRACKING_TOKEN"] = os.environ.get("MODELS_GITLAB_TOKEN")
+
+    # Pull object from ML Model registry
+    client = MlflowClient()
+    if params.version:
+        try:
+            mlflow_model = client.get_model_version(params.model_name, params.version)
+        except MlflowException:
+            mlflow_model = None
+    else:
+        mlflow_model = max(
+            client.search_model_versions(f"name='{params.model_name}'"),
+            key=lambda mv: int(mv.version),
+            default=None,
+        )
+
+    if not mlflow_model:
+        logger.error("Requested version of selected model could not be found!")
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": "Failed to load weights - requested version of selected model could not be found!",
+        }
+
+    # Download artifacts
+    weights_path = client.download_artifacts(
+        run_id=mlflow_model.run_id, path=params.weights_path, dst_path=str(model_dir)
+    )
+
+    # If only safetensors allowed, check it is one
+    if os.environ.get("MODELS_SAFETENSORS_ONLY"):
+        try:
+            with safe_open(weights_path, framework="pt", device="cpu") as f:
+                _ = list(f.keys())
+        except Exception:
+            # Not a safetensors object, delete local file and return error
+            pathlib.Path(weights_path).unlink()
+            logger.error(
+                "Only permitted to load SafeTensors files due to env var setting!"
+            )
+            send_model_updates(
+                project_id=project.id,
+                model_id=model.id,
+                updates=ModelUpdate(training_status="failed"),
+            )
+            return {
+                "project_id": project.id,
+                "model_id": model.id,
+                "message": "Failed to load weights - retrieved file is not a SafeTensor!",
+            }
+
+    # Try loading actor with weights file, catch and reraise any errors
+    try:
+        load_temp_weights_task = model_actor.wrapped_load.remote(str(weights_path))
+        ray.get(load_temp_weights_task)
+    except Exception as e:
+        pathlib.Path(weights_path).unlink()
+        logger.error(e)
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": f"Failed to load weights - {str(e)}",
+        }
+
+    # Save the model with the correct file name, delete temporary file
+    save_weights_task = model_actor.wrapped_save.remote(
+        model_dir.joinpath(str(model.id))
+    )
+    ray.get(save_weights_task)
+
+    pathlib.Path(weights_path).unlink()
 
     return {"project_id": project.id, "model_id": model.id, "message": None}
 
