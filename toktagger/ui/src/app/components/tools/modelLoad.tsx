@@ -29,7 +29,7 @@ import DataAdd from "@spectrum-icons/workflow/DataAdd";
 import Alert from "@spectrum-icons/workflow/Alert";
 import { Project } from "@/types";
 import {
-  startLoadModelWeights,
+  startLoadModelWeightsLocal,
   getLoadModelStatus,
   getModelTypes,
   getModelLoadTypes,
@@ -62,13 +62,16 @@ export function ModelLoadModal({
     if (!selectedModelName || !selectedTab || !project._id) {
       return;
     }
-
-    const response = await startLoadModelWeights(
-      project._id,
-      selectedModelName,
-      selectedTab as string,
-      weightsPath,
-    );
+    let response: Response;
+    if (selectedTab == "local") {
+      response = await startLoadModelWeightsLocal(
+        project._id,
+        selectedModelName,
+        weightsPath,
+      );
+    } else {
+      throw new Error("Only one signal name allowed for image array data!");
+    }
     const payload = await response.json();
 
     if (response.ok) {

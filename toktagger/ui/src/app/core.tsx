@@ -466,14 +466,13 @@ export const getModelLoadTypes = async (): Promise<Response> => {
   return response;
 };
 
-export const startLoadModelWeights = async (
+export const startLoadModelWeightsLocal = async (
   project_id: string,
   selected_model: string,
-  load_method: string,
   weights_path: string,
 ): Promise<Response> => {
   const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load?method=${load_method}&weights_path=${weights_path}`,
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/local&weights_path=${weights_path}`,
     {
       method: "POST",
       headers: {

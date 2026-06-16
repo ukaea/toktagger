@@ -7,7 +7,8 @@ from bson.objectid import ObjectId
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.data import DataParamTypes, DataParams
-from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, LoadTypes
+from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
+from toktagger.api.schemas.projects import Project
 from toktagger.api.models import models_dependencies_installed, check_models_enabled
 from pydantic import ValidationError
 from collections import defaultdict
@@ -44,6 +45,58 @@ def validate_model_params(model_type: str, schema_type: str, params: dict):
             detail=error_str,
         )
     return params_validated
+
+
+async def create_model(db_client, project: Project, model_type: str) -> Model:
+    # Check that this model type is valid for this project
+    if model_type not in project.model_types:
+        raise HTTPException(
+            status_code=422,
+            detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
+        )
+
+    # Try to get model for this project from database if it exists
+    db_models = await utils.get_models(db_client, project.id, model_type)
+
+    if (
+        len(
+            [
+                db_model
+                for db_model in db_models
+                if db_model.training_status in ["queued", "started"]
+            ]
+        )
+        > 0
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Training of {model_type} model already in progress!",
+        )
+
+    if len(db_models) == 0:
+        # This is the first time a model has been saved for this project, so version = 1
+        version = 1
+    else:
+        version = db_models[0].version + 1
+
+    model_in = ModelIn(
+        type=model_type,
+        version=version,
+        training_status="queued",
+        progress=0,
+        score=0,
+    )
+
+    model_id = await utils.add_model(
+        db_client=db_client, project_id=project.id, model=model_in
+    )
+
+    # Find the latest queued model for this project
+    model = await utils.get_model(
+        db_client, project.id, model_type=model_type, model_id=model_id
+    )
+
+    return model
 
 
 router = APIRouter(
@@ -169,57 +222,17 @@ async def start_model_training(
 ):
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
-    project = await utils.get_project(db_client, project_id)
-    # Check that this model type is valid for this project
-    if model_type not in project.model_types:
-        raise HTTPException(
-            status_code=422,
-            detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
-        )
 
     # Get model params model from registry and validate
     params_validated = validate_model_params(model_type, "training", params)
 
-    # Create model
-    # Try to get model for this project from database if it exists
-    db_models = await utils.get_models(db_client, project_id, model_type)
+    project = await utils.get_project(db_client, project_id)
 
-    if (
-        len(
-            [
-                db_model
-                for db_model in db_models
-                if db_model.training_status in ["queued", "started"]
-            ]
-        )
-        > 0
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Training of {model_type} model already in progress!",
-        )
-
-    if len(db_models) == 0:
-        # This is the first time a model has been saved for this project, so version = 1
-        version = 1
-    else:
-        version = db_models[0].version + 1
-
-    model_in = ModelIn(
-        type=model_type,
-        version=version,
-        training_status="queued",
-        progress=0,
-        score=0,
-    )
-
-    model_id = await utils.add_model(
-        db_client=db_client, project_id=project.id, model=model_in
-    )
+    model = await create_model(db_client, project, model_type)
 
     # Get annotations and samples
-    annotations = await utils.get_annotations(db_client, project.id, validated=True)
-    samples = await utils.get_samples(db_client, project.id, validated=True)
+    annotations = await utils.get_annotations(db_client, project_id, validated=True)
+    samples = await utils.get_samples(db_client, project_id, validated=True)
 
     # Get all validated samples and annotations for this project
     logger.info(f"Collected {len(annotations)} annotations.")
@@ -241,8 +254,6 @@ async def start_model_training(
         sample_annotations_mapping[annotation.sample_id].append(annotation)
     annotations_2d = [sample_annotations_mapping[sample.id] for sample in samples]
 
-    model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
-
     train_task = train_model.remote(
         model=model,
         project=project,
@@ -256,10 +267,10 @@ async def start_model_training(
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client, model_id=model, updates=ModelUpdate(task_id=task_id)
     )
 
-    return {"task_id": task_id, "model_id": model_id}
+    return {"task_id": task_id, "model_id": model.id}
 
 
 @router.delete("/models/{model_type}/train")
@@ -321,12 +332,11 @@ async def stop_model_training(
     return [model.id for model in models]
 
 
-@router.post("/models/{model_type}/load")
-async def load_model_weights(
+@router.post("/models/{model_type}/load/local")
+async def load_model_weights_local(
     request: Request,
     project_id: str,
     model_type: str,
-    method: LoadTypes,
     weights_path: str,
 ):
     db_client = request.app.state.db_client
@@ -339,60 +349,14 @@ async def load_model_weights(
             status_code=422, detail="Weights file not found at specified path!"
         )
 
-    # Check if that load method is enabled
-    if method == LoadTypes.LOCAL and os.environ.get("DISABLE_LOCAL_MODEL_LOAD"):
+    # Check if local load method is enabled
+    if os.environ.get("DISABLE_LOCAL_MODEL_LOAD"):
         raise HTTPException(
             status_code=403, detail="Loading from local weights is disabled."
         )
 
     project = await utils.get_project(db_client, project_id)
-    # Check that this model type is valid for this project
-    if model_type not in project.model_types:
-        raise HTTPException(
-            status_code=422,
-            detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
-        )
-
-    # Try to get model for this project from database if it exists
-    db_models = await utils.get_models(db_client, project_id, model_type)
-
-    if (
-        len(
-            [
-                db_model
-                for db_model in db_models
-                if db_model.training_status in ["queued", "started"]
-            ]
-        )
-        > 0
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Training of {model_type} model already in progress!",
-        )
-
-    if len(db_models) == 0:
-        # This is the first time a model has been saved for this project, so version = 1
-        version = 1
-    else:
-        version = db_models[0].version + 1
-
-    model_in = ModelIn(
-        type=model_type,
-        version=version,
-        training_status="queued",
-        progress=0,
-        score=0,
-    )
-
-    model_id = await utils.add_model(
-        db_client=db_client, project_id=project.id, model=model_in
-    )
-
-    # Find the latest queued model for this project
-    model = await utils.get_model(
-        db_client, project.id, model_type=model_type, model_id=model_id
-    )
+    model = await create_model(db_client, project, model_type)
 
     task = load_model_local.remote(
         project=project, model=model, weights_path=weights_path
@@ -402,7 +366,7 @@ async def load_model_weights(
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
     )
 
     return {"task_id": task_id, "model_id": model.id}
