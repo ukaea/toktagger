@@ -183,6 +183,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const [dismissedPopupAnnotationId, setDismissedPopupAnnotationId] = useState<
     string | null
   >(null);
+  const [isPointAnnotationSelected, setIsPointAnnotationSelected] =
+    useState(false);
   const shiftDrawActiveRef = useRef(false);
   const classItems = useMemo(
     () => annotationLabels.map((label) => ({ name: label.name })),
@@ -194,9 +196,12 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
+        setIsPointAnnotationSelected(false);
         setDismissedPopupAnnotationId(null);
         return;
       }
+
+      setIsPointAnnotationSelected(isPointAnno(arr[0]));
 
       const selectedId =
         typeof arr[0]?.id === "string" ? String(arr[0].id) : null;
@@ -294,10 +299,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         ? UserSelectAction.NONE
         : panMode
           ? UserSelectAction.SELECT
-          : (annotation) =>
-              isPointAnno(annotation)
-                ? UserSelectAction.SELECT
-                : UserSelectAction.EDIT,
+          : UserSelectAction.EDIT,
     );
 
     if (hideAnnotations) {
@@ -598,7 +600,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   return (
     <div className="w-full flex justify-center">
-      <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
+      <div
+        className={`relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px] ${
+          isPointAnnotationSelected ? "video-point-selected" : ""
+        }`}
+      >
         <CanvasModeToolbar
           panMode={panMode}
           drawingTool={drawingTool}
@@ -663,6 +669,16 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             }}
           />
         </OpenSeadragonAnnotator>
+
+        <style>{`
+          .video-point-selected .a9s-corner-top,
+          .video-point-selected .a9s-corner-handle-right,
+          .video-point-selected .a9s-corner-handle-bottom,
+          .video-point-selected .a9s-corner-handle-left {
+            display: none;
+            pointer-events: none;
+          }
+        `}</style>
 
         <Menu
           id={VIDEO_CANVAS_MENU_ID}
