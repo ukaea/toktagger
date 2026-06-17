@@ -51,6 +51,7 @@ import {
 import {
   annoToVideoAnnotation,
   getLabelTrack,
+  isPointAnno,
   videoBBoxToAnno,
   videoPointToAnno,
   videoPolygonToAnno,
@@ -1003,7 +1004,8 @@ export function VideoSessionProvider(props: {
       if (!id) return false;
       if (!api) return false;
 
-      api.setSelected(id, !panMode);
+      const annotation = api.getAnnotations().find((item) => item.id === id);
+      api.setSelected(id, !panMode && !(annotation && isPointAnno(annotation)));
       return true;
     },
     [api, panMode],
@@ -1139,7 +1141,7 @@ export function VideoSessionProvider(props: {
 
       const id = clicked?.id;
       if (id) {
-        api.setSelected(id, !panMode);
+        api.setSelected(id, !panMode && !isPointAnno(clicked));
       }
 
       const got = getLabelTrack(clicked);

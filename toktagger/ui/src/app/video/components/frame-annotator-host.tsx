@@ -294,7 +294,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         ? UserSelectAction.NONE
         : panMode
           ? UserSelectAction.SELECT
-          : UserSelectAction.EDIT,
+          : (annotation) =>
+              isPointAnno(annotation)
+                ? UserSelectAction.SELECT
+                : UserSelectAction.EDIT,
     );
 
     if (hideAnnotations) {
@@ -443,9 +446,21 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
     const handlePointClick = (event: MouseEvent) => {
       if (isSecondaryMouseEvent(event)) return;
-      if ((api.getSelected?.() ?? []).length > 0) return;
-      if (selection.trackId) return;
-      if (findAnnotationAtPointer(api, event)) return;
+
+      const annotation = findAnnotationAtPointer(api, event);
+      if (annotation) return;
+
+      if ((api.getSelected?.() ?? []).length > 0 || selection.trackId) {
+        stopEvent(event);
+        api.cancelDrawing?.();
+        api.setSelected?.();
+        setSelection({
+          className: selection.className,
+          trackId: null,
+          source: "explicit",
+        });
+        return;
+      }
 
       const viewerBounds = viewerElement.getBoundingClientRect();
       const viewerPoint = new OpenSeadragon.Point(
@@ -474,7 +489,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     createPointAnnotation,
     drawingEnabled,
     drawingTool,
+    selection.className,
     selection.trackId,
+    setSelection,
   ]);
 
   useEffect(() => {
