@@ -75,6 +75,7 @@ def uda_test(uda_env_vars):
 @pytest.fixture(scope="session")
 def settings():
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
+        pathlib.Path(tempd).joinpath("models").mkdir(exist_ok=True)
         settings = config.Settings(
             server=config.Server(cache_dir=tempd),
             models=config.Models(

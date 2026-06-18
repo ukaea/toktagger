@@ -154,11 +154,11 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_predict_missing_weights(
-    api_client, db_client, setup_model_db, settings
-):
+async def test_model_predict_missing_weights(api_client, db_client, setup_model_db):
     # Delete weights
-    settings.models.cache_dir.joinpath(f"{setup_model_db['model_id_1']}.model").unlink()
+    config.settings.models.cache_dir.joinpath(
+        f"{setup_model_db['model_id_1']}.model"
+    ).unlink()
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
     )
@@ -345,7 +345,9 @@ async def test_model_update(api_client, db_client, setup_model_db):
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
 async def test_model_start_training_no_params(
-    api_client, db_client, setup_model_db, settings
+    api_client,
+    db_client,
+    setup_model_db,
 ):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
@@ -364,7 +366,7 @@ async def test_model_start_training_no_params(
     assert model["score"] == 60  # value returned by train method
 
     # Check model has been saved after completion
-    assert settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
+    assert config.settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
 
 
 @pytest.mark.asyncio
@@ -448,13 +450,13 @@ async def test_model_start_training_params(
     assert model["score"] == 50  # value returned from params
 
     # Check model has been saved after completion
-    assert settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
+    assert config.settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
 
 
 # Test delete model
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_delete_type(api_client, db_client, setup_model_db, settings):
+async def test_model_delete_type(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn"
     )
@@ -468,25 +470,23 @@ async def test_model_delete_type(api_client, db_client, setup_model_db, settings
     assert all(model["type"] != "mock_disruption_cnn" for model in models)
 
     # Check for models 1 and 2, their file no longer exists
-    assert not settings.models.cache_dir.joinpath(
+    assert not config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_1']}.model"
     ).exists()
-    assert not settings.models.cache_dir.joinpath(
+    assert not config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_2']}.model"
     ).exists()
     # And for model 3 it does still exist
-    assert settings.models.cache_dir.joinpath(
+    assert config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_3']}.model"
     ).exists()
-    assert settings.models.cache_dir.joinpath(
+    assert config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_3']}.model"
     ).exists()
 
 
 @pytest.mark.asyncio
-async def test_model_delete_type_version(
-    api_client, db_client, setup_model_db, settings
-):
+async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
     )
@@ -504,13 +504,13 @@ async def test_model_delete_type_version(
     )
 
     # Check for model 2, their file no longer exists
-    assert not settings.models.cache_dir.joinpath(
+    assert not config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_2']}.model"
     ).exists()
     # And for models 1, 3 and 4 it does still exist
     assert all(
         (
-            settings.models.cache_dir.joinpath(
+            config.settings.models.cache_dir.joinpath(
                 f"{setup_model_db[model_id]}.model"
             ).exists()
         )

@@ -340,7 +340,7 @@ async def load_model_weights(
         )
 
     # Check if that load method is enabled
-    if method == LoadTypes.LOCAL and config.settings.models.local_load_enabled:
+    if method == LoadTypes.LOCAL and not config.settings.models.local_load_enabled:
         raise HTTPException(
             status_code=403, detail="Loading from local weights is disabled."
         )

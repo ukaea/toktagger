@@ -8,39 +8,36 @@ import ray
 import random
 import pytest
 import pytest_asyncio
-import tempfile
 import os
 import toktagger.api.config as config
 
 
 @pytest.fixture(scope="module")
-def ray_session():
-    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
-        os.environ["MODEL_STORAGE"] = tempd
-        # Ray copies the value of the API_URL env var if already set in this local env
-        # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
-        # Cannot explicitly pass a None, it requires a str:str dict in env_vars
-        # So will pop the env varvalue, init ray, then restore it
-        if (api_url := os.environ.get("API_URL")) is not None:
-            api_url = os.environ.pop("API_URL")
-        ray.init(
-            ignore_reinit_error=True,
-            include_dashboard=False,
-            runtime_env={"env_vars": {"MODEL_STORAGE": tempd}},
-        )
-        if api_url is not None:
-            os.environ["API_URL"] = api_url
+def ray_session(settings):
+    # Ray copies the value of the API_URL env var if already set in this local env
+    # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
+    # Cannot explicitly pass a None, it requires a str:str dict in env_vars
+    # So will pop the env varvalue, init ray, then restore it
+    if (api_url := os.environ.get("API_URL")) is not None:
+        api_url = os.environ.pop("API_URL")
+    ray.init(
+        ignore_reinit_error=True,
+        include_dashboard=False,
+        runtime_env={"env_vars": {"MODEL_STORAGE": str(settings.models.cache_dir)}},
+    )
+    if api_url is not None:
+        os.environ["API_URL"] = api_url
 
-        # Create a ray actor for use as a model registry
-        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
-            ModelRegistry._registry
-        )
-        # And one for use as a dataloader registry
-        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
-            LoaderRegistry._registry
-        )
-        yield
-        ray.shutdown()
+    # Create a ray actor for use as a model registry
+    WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
+        ModelRegistry._registry
+    )
+    # And one for use as a dataloader registry
+    WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
+        LoaderRegistry._registry
+    )
+    yield
+    ray.shutdown()
 
 
 @pytest.fixture(scope="package")
@@ -112,7 +109,7 @@ async def setup_model_db(setup_model_samples, ray_session, db_client):
 
     # Create temp files for each
     for _id in (model_id_1, model_id_2, model_id_3, model_id_4):
-        config.settings.models.cache_dir.joinpath(f"{model_id_2}.model").touch()
+        config.settings.models.cache_dir.joinpath(f"{_id}.model").touch()
     yield {
         "project_id": project_id,
         "sample_ids": sample_ids,

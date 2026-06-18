@@ -49,8 +49,7 @@ async def test_get_model_load_methods(api_client, setup_db, local):
     if not local:
         config.settings.models.local_load_enabled = False
     response = await api_client.get("/meta/models/load")
-    if not local:
-        config.settings.models.local_load_enabled = True
+    config.settings.models.local_load_enabled = True  # Restore default setting
     assert response.status_code == 200
     data = response.json()
     if local:

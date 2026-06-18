@@ -259,7 +259,3 @@ def test_create_toml():
                 for key in ("database", "models", "sal", "server", "uda")
             )
         )
-
-        import pdb
-
-        pdb.set_trace()
