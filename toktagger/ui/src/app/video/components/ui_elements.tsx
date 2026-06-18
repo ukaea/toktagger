@@ -19,7 +19,7 @@ import Draw from "@spectrum-icons/workflow/Draw";
 import ImageMapPolygon from "@spectrum-icons/workflow/ImageMapPolygon";
 import ImageMapRectangle from "@spectrum-icons/workflow/ImageMapRectangle";
 import FullScreenExit from "@spectrum-icons/workflow/FullScreenExit";
-import ImageMapCircle from "@spectrum-icons/workflow/ImageMapCircle";
+import Target from "@spectrum-icons/workflow/Target";
 
 /**
  * Minimal class category shape consumed by the class picker.
@@ -205,7 +205,7 @@ function PolygonIcon() {
 }
 
 function PointIcon() {
-  return <ImageMapCircle aria-hidden="true" size="M" />;
+  return <Target aria-hidden="true" size="M" />;
 }
 
 function CanvasModeToggle(props: {
