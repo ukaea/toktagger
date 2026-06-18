@@ -148,10 +148,11 @@ async def get_model(
     db_client: MongoDBClient,
     project_id: str,
     model_type: str,
-    version: int = None,
-    status: Optional[
-        Literal["queued", "started", "failed", "completed", "aborted"]
-    ] = None,
+    version: int | None = None,
+    status: Literal["queued", "started", "failed", "completed", "aborted"]
+    | None = None,
+    model_id: str | None = None,
+    task_id: str | None = None,
 ) -> Model:
     project_obj_id = convert_to_objectid(project_id, "projects")
     filters = {"project_id": project_obj_id, "type": model_type}
@@ -159,6 +160,11 @@ async def get_model(
         filters["version"] = version
     if status:
         filters["training_status"] = status
+    if model_id:
+        filters["_id"] = convert_to_objectid(model_id, "models")
+    if task_id:
+        filters["task_id"] = task_id
+
     if not await db_client.get_document_by_id("projects", project_obj_id):
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
@@ -171,7 +177,7 @@ async def get_model(
     if not models:
         raise HTTPException(
             status_code=404,
-            detail="No trained models found of that type for this project!",
+            detail="No models found of that type for this project!",
         )
 
     return Model(**models[0])
@@ -489,14 +495,25 @@ async def import_annotations(
         sample_id = str(sample["_id"])
         shot_id = sample["shot_id"]
         sample_obj_id = convert_to_objectid(sample_id, "samples")
-        sample_annotations = sample_groups[shot_id]
+        sample_annotations: list[AnnotationOutTypes] = sample_groups[shot_id]
 
         # Set shot_id for each annotation
         for annotation in sample_annotations:
-            annotation.sample_id = sample_obj_id
+            annotation.sample_id = sample_id
             annotation.shot_id = shot_id
 
         ids["sample_id"] = sample_obj_id
         await db_client.insert_many(
             collection="annotations", models=sample_annotations, ids=ids
         )
+
+        # If all annotations are validated, mark sample as validated
+        if all(ann.validated for ann in sample_annotations):
+            await update_sample(
+                db_client, sample_id, SampleUpdate(validated_annotations=True)
+            )
+        # Else mark as unvalidated (if there are any annotations)
+        elif sample_annotations:
+            await update_sample(
+                db_client, sample_id, SampleUpdate(validated_annotations=False)
+            )

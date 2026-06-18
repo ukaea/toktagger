@@ -11,6 +11,7 @@ from tests.endpoints import (
 )
 from tests.end_to_end import form_check
 import time
+import os
 import requests
 import tempfile
 import pytest
@@ -37,11 +38,13 @@ def check_base_page(page):
     expect(page.get_by_role("button", name="Add Samples", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Clear Samples", exact=True)).to_be_visible()
 
-    # Expect Model Train/Predict buttons visible
+    # Expect Model Train/Load/Predict buttons visible
     expect(
         page.get_by_role("button", name="Create Predictions from ML Model")
     ).to_be_visible()
     expect(page.get_by_role("button", name="Train ML Model")).to_be_visible()
+    expect(page.get_by_role("button", name="Load ML Model")).to_be_visible()
+    expect(page.get_by_role("button", name="ML Model Help")).to_be_visible()
 
     # Expect searchbar visible
     expect(page.get_by_role("searchbox", name="Search By Shot ID")).to_be_visible()
@@ -873,6 +876,7 @@ def test_samples_page_export_annotations(server_setup, page: Page):
     assert exported_control_loss["sample_id"] == sample_ids[1]
 
 
+@pytest.mark.models_enabled
 @pytest.mark.parametrize(
     "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
 )
@@ -884,6 +888,8 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
 
     # Check basic structure of page is correct
     check_base_page(page)
+
+    # Check contextual help explains models buttons
 
     # Click on model train modal
     page.get_by_role("button", name="Train ML Model").click()
@@ -999,3 +1005,180 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
         assert all(
             ann["time"] == 61 for ann in annotations if ann["label"] == "Disruption"
         )
+
+
+@pytest.mark.models_enabled
+def test_model_load_predict(server_setup, setup_model_samples, page: Page):
+    project_id, sample_ids = create_model_samples(setup_model_samples)
+    with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:
+        tempf.write("Loaded Model Weights")
+        tempf.flush()
+
+        # Navigate to projects page
+        page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+        # Check basic structure of page is correct
+        check_base_page(page)
+
+        # Click on model train modal
+        page.get_by_role("button", name="Load ML Model").click()
+
+        # Check modal has opened
+        expect(
+            page.get_by_role("heading", name="Load Pretrained Model Weights")
+        ).to_be_visible()
+        expect(page.get_by_role("combobox", name="Select Model Type")).to_be_visible()
+        expect(page.get_by_role("button", name="Close")).to_be_visible()
+        expect(page.get_by_role("button", name="Submit", exact=True)).to_be_visible()
+
+        # Check it has opened in local file mode
+        expect(page.get_by_role("tab", name="Use Local File")).to_be_visible()
+        expect(page.get_by_role("textbox", name="Model Weights Path")).to_be_visible()
+
+        # Click on dropdown box, check models are shown
+        page.get_by_role("button", name="Select Model Type").click()
+        expect(
+            page.get_by_role("option", name="disruption_cnn", exact=True)
+        ).to_be_visible()
+        expect(
+            page.get_by_role("option", name="mock_timeseries_cnn", exact=True)
+        ).to_be_visible()
+        expect(
+            page.get_by_role("option", name="mock_params_timeseries_cnn", exact=True)
+        ).to_be_visible()
+
+        page.get_by_role(
+            "option", name="mock_params_timeseries_cnn", exact=True
+        ).click()
+
+        # Enter path to weights
+        page.get_by_role("textbox", name="Model Weights Path").fill(tempf.name)
+
+        # Click submit, should get loading wheel and then success message
+        page.get_by_role("button", name="Submit", exact=True).click()
+        expect(page.get_by_text("Model loaded successfully!")).to_be_visible(
+            timeout=20000
+        )
+        # Close modal, check it disappears
+        page.get_by_role("button", name="Close", exact=True).click()
+
+        expect(
+            page.get_by_role("heading", name="Load Pretrained Model Model")
+        ).to_be_hidden()
+        expect(page.get_by_role("combobox", name="Select Model Type")).to_be_hidden()
+        expect(page.get_by_role("button", name="Close")).to_be_hidden()
+        expect(page.get_by_role("button", name="Submit", exact=True)).to_be_hidden()
+
+        # Check model has had a copy of the weights file added to cache
+        response = requests.get(
+            f"http://localhost:8002/projects/{project_id}/models/mock_params_timeseries_cnn",
+        )
+        assert response.status_code == 200
+        # Get model ID
+        model_id = response.json()["_id"]
+        # Check file exists and has correct contents
+        new_weights_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+            f"{model_id}.model"
+        )
+        assert new_weights_path.exists()
+        assert new_weights_path.read_text() == "Loaded Model Weights"
+
+        # Check temp copy not left dangling
+        file_name = pathlib.Path(tempf.name).name
+        assert (
+            not pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(file_name).exists()
+        )
+
+        # Open predict modal, check structure is correct
+        page.get_by_role("button", name="Create Predictions from ML Model").click()
+        modal = page.get_by_role("dialog", name="Create Predictions from ML Model")
+
+        expect(
+            page.get_by_role("heading", name="Create Predictions from ML Model")
+        ).to_be_visible()
+        expect(
+            modal.get_by_role("textbox", name="Number of Predictions")
+        ).to_be_visible()
+        expect(
+            modal.get_by_role("button", name="Cancel Training", exact=True)
+        ).to_be_visible()
+        expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_visible()
+        expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_disabled()
+        expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
+
+        # Check entry is there for newly trained model
+        expect(modal.get_by_role("row").nth(1)).to_contain_text(
+            "mock_params_timeseries_cnn"
+        )
+        expect(modal.get_by_role("row").nth(1)).to_contain_text("completed")
+
+        # Check cancel training button disabled after loading complete
+        expect(
+            modal.get_by_role("button", name="Cancel Training", exact=True)
+        ).to_be_disabled()
+
+        # Click to select 10 predicions
+        modal.get_by_role("button", name="Decrease Number of Predictions").click()
+        expect(
+            modal.get_by_role("textbox", name="Number of Predictions")
+        ).to_have_value("10")
+
+        # Select our model from the list
+        modal.get_by_role("checkbox", name="Select mock_params_timeseries_cnn").click()
+
+        # If params model chosen, new form should open
+        form_check(page, "Predict")
+
+        # Check Predict button has been enabled, click it
+        expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_enabled()
+        modal.get_by_role("button", name="Predict", exact=True).click()
+
+        # Check message is shown
+        expect(
+            page.get_by_text("Model predictions added to job queue!")
+        ).to_be_visible()
+
+        # Close the modal, check it closes
+        modal.get_by_role("button", name="Close", exact=True).click()
+        expect(
+            page.get_by_role("heading", name="Create Predictions from ML Model")
+        ).to_be_hidden()
+
+        # Wait for a short time
+        time.sleep(1)
+
+        # Check 10 * 3 non-validated predictions added
+        response = requests.get(
+            f"http://localhost:8002/projects/{project_id}/annotations?validated=False",
+        )
+        assert response.status_code == 200
+        annotations = response.json()
+        assert len(annotations) == 30
+
+        assert all(
+            ann["time"] == 51 for ann in annotations if ann["label"] == "Disruption"
+        )
+
+
+@pytest.mark.models_disabled
+def test_models_disabled(server_setup, page: Page):
+    project_id = create_project("Test Project", "time-series", "tabular")
+
+    # Navigate to projects page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+
+    # Check basic structure of page is correct
+    check_base_page(page)
+
+    # Check model buttons disabled
+    expect(
+        page.get_by_role("button", name="Create Predictions from ML Model")
+    ).to_be_disabled()
+    expect(page.get_by_role("button", name="Train ML Model")).to_be_disabled()
+    expect(page.get_by_role("button", name="Load ML Model")).to_be_disabled()
+
+    # Open contextual help, check it contains correct info
+    expect(page.get_by_role("button", name="ML Model Help")).to_be_visible()
+    page.get_by_role("button", name="ML Model Help").click()
+
+    expect(page.get_by_text("ML Models Disabled")).to_be_visible()

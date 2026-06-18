@@ -64,6 +64,61 @@ def get_actor(project, model):
 
 
 @ray.remote
+def load_model(
+    model: Model, project: Project, weights_path: pathlib.Path
+) -> tuple[str, str | None]:
+    # Change status to started
+    send_model_updates(
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(training_status="started"),
+    )
+
+    # Make sure model storage location in cache dir exists
+    model_dir = pathlib.Path(os.environ["MODEL_STORAGE"])
+    model_dir.mkdir(exist_ok=True)
+
+    # Check worker can see weights file
+    if not weights_path.exists():
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": f"Worker node cannot find weights file at location {weights_path}",
+        }
+
+    model_actor = get_actor(project=project, model=model)
+    # Try loading actor with weights file, catch and reraise any errors
+    try:
+        load_temp_weights_task = model_actor.wrapped_load.remote(str(weights_path))
+        ray.get(load_temp_weights_task)
+    except Exception as e:
+        logger.error(e)
+        send_model_updates(
+            project_id=project.id,
+            model_id=model.id,
+            updates=ModelUpdate(training_status="failed"),
+        )
+        return {
+            "project_id": project.id,
+            "model_id": model.id,
+            "message": f"Failed to load weights - {str(e)}",
+        }
+
+    # Save the model with the correct file name, delete temporary file
+    save_weights_task = model_actor.wrapped_save.remote(
+        model_dir.joinpath(str(model.id))
+    )
+    ray.get(save_weights_task)
+
+    return {"project_id": project.id, "model_id": model.id, "message": None}
+
+
+@ray.remote
 def train_model(
     model: Model,
     project: Project,

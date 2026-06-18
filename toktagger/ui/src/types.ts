@@ -292,6 +292,14 @@ export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
 });
 export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
 
+export const HealthInfoSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  db_connected: z.boolean(),
+  models_enabled: z.boolean(),
+});
+export type HealthInfo = z.infer<typeof HealthInfoSchema>;
+
 export type ToolingProps = {
   plotId?: string;
   plotReady?: boolean;

@@ -61,6 +61,8 @@ def walk_schema(schema: dict | list) -> dict | list:
 
 
 class Model(ABC):
+    type: str | None = None
+
     def __init__(
         self,
         model_id: str,
@@ -69,7 +71,6 @@ class Model(ABC):
         self.id = model_id
         self.project = project
         self.model = self.define_model()
-        self.type = ModelRegistry.get_name(self.__class__)
         loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
         data_loader: typing.Type[DataLoader] = ray.get(
             loader_registry.get.remote(project.data_loader)
@@ -169,7 +170,7 @@ class Model(ABC):
         # If no test split requested, return val set
         elif not test_fraction:
             self.val_samples = val_test_samples
-            self.val_annotations = val_test_samples
+            self.val_annotations = val_test_annotations
             self.test_samples = None
             self.test_annotations = None
 
@@ -235,7 +236,7 @@ class ModelRegistry:
         training_params: typing.Type[pydantic.BaseModel] | None = None,
         prediction_params: typing.Type[pydantic.BaseModel] | None = None,
     ):
-        def decorator(model_class: Model):
+        def decorator(model_class: typing.Type[Model]):
             if not issubclass(model_class, Model):
                 raise ValueError(
                     f"Loader '{name}' does not inherit from Model base class."
@@ -250,7 +251,7 @@ class ModelRegistry:
                 raise ValueError(
                     "Must provide prediction params as a Pydantic BaseModel."
                 )
-
+            model_class.type = name
             cls._registry[name] = model_class
             cls._tasks[name] = [Task(_task) for _task in tasks]
             cls._training_params[name] = training_params
@@ -262,18 +263,15 @@ class ModelRegistry:
 
     @classmethod
     def get(cls, name: str):
-        print(cls._registry)
-        model_class: Model | None = cls._registry.get(name)
+        model_class: typing.Type[Model] | None = cls._registry.get(name)
         if not model_class:
             raise ValueError(f"No Model class called '{name}' found in registry!")
         return ray.remote(model_class)
 
     @classmethod
-    def get_name(cls, model_class: Model) -> str:
+    def get_name(cls, model_class: typing.Type[Model]) -> str:
         return next(
-            name
-            for name, model in cls._registry.items()
-            if model_class.__class__.__name__ == model.__class__.__name__
+            name for name, model in cls._registry.items() if model_class == model
         )
 
     @classmethod

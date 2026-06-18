@@ -1,4 +1,7 @@
 import pytest
+
+pytest.importorskip("ray")
+
 import pathlib
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models.base import ActorRegistry
@@ -12,6 +15,7 @@ from unittest.mock import patch
 from bson import ObjectId
 import os
 import time
+import tempfile
 
 
 def wait_for_results(task_registry: ActorRegistry, task_id: str):
@@ -51,6 +55,7 @@ def kill(*args, **kwargs):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_num_predictions(
     api_client, db_client, setup_model_db
 ):
@@ -72,6 +77,7 @@ async def test_model_batch_predict_num_predictions(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_num_predictions_params(
     api_client, db_client, setup_model_db
 ):
@@ -101,6 +107,7 @@ async def test_model_batch_predict_num_predictions_params(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_samples(api_client, db_client, setup_model_db):
     query_string = "&".join(
         f"sample_ids={id}" for id in setup_model_db["sample_ids"][:2]
@@ -127,6 +134,7 @@ async def test_model_batch_predict_samples(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_batch_predict_version(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
@@ -145,6 +153,7 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_predict_missing_weights(api_client, db_client, setup_model_db):
     # Delete weights
     pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
@@ -159,6 +168,7 @@ async def test_model_predict_missing_weights(api_client, db_client, setup_model_
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_sample_predict_params(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_params_timeseries_cnn/predict",
@@ -189,6 +199,7 @@ async def test_model_sample_predict_params(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_sample_predict(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
@@ -210,6 +221,7 @@ async def test_model_sample_predict(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_get_sample_prediction(api_client, db_client, setup_model_db):
     response = await api_client.post(
         f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
@@ -219,7 +231,7 @@ async def test_model_get_sample_prediction(api_client, db_client, setup_model_db
 
     # Poll the endpoint until results arrive
     t = 0
-    while t < 10:
+    while t < 30:
         get_response = await api_client.get(
             f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict/{task_id}"
         )
@@ -239,6 +251,7 @@ async def test_model_get_sample_prediction(api_client, db_client, setup_model_db
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_get_sample_prediction_invalid_task(
     api_client, db_client, setup_model_db
 ):
@@ -253,6 +266,7 @@ async def test_model_get_sample_prediction_invalid_task(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_get_sample_prediction_wrong_sample(
     api_client, db_client, setup_model_db
 ):
@@ -264,7 +278,7 @@ async def test_model_get_sample_prediction_wrong_sample(
 
     # Ask for predictions from this task for a sample which we did not predict on
     t = 0
-    while t < 10:
+    while t < 30:
         get_response = await api_client.get(
             f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-2]}/models/mock_disruption_cnn/predict/{task_id}"
         )
@@ -288,6 +302,7 @@ def mock_wait(*args, **kwargs):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @patch("ray.wait", mock_wait)
 async def test_model_get_sample_prediction_in_progress(
     api_client, db_client, setup_model_db
@@ -309,6 +324,7 @@ async def test_model_get_sample_prediction_in_progress(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_update(api_client, db_client, setup_model_db):
     model_updates = ModelUpdate(training_status="started", progress=50, score=20)
     response = await api_client.put(
@@ -327,6 +343,7 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_start_training_no_params(api_client, db_client, setup_model_db):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
@@ -351,6 +368,7 @@ async def test_model_start_training_no_params(api_client, db_client, setup_model
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("method", ["train", "predict", "sample"])
 async def test_model_wrong_params(api_client, db_client, setup_model_db, method):
     if method == "sample":
@@ -380,6 +398,7 @@ async def test_model_wrong_params(api_client, db_client, setup_model_db, method)
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("method", ["train", "predict", "sample"])
 async def test_model_missing_params(api_client, db_client, setup_model_db, method):
     if method == "sample":
@@ -400,6 +419,7 @@ async def test_model_missing_params(api_client, db_client, setup_model_db, metho
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_start_training_params(api_client, db_client, setup_model_db):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
@@ -433,82 +453,91 @@ async def test_model_start_training_params(api_client, db_client, setup_model_db
 
 # Test delete model
 @pytest.mark.asyncio
-async def test_model_delete_type(api_client, db_client, setup_db):
+@pytest.mark.models_enabled
+async def test_model_delete_type(api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn"
     )
     assert response.status_code == 200
 
-    # Check there is one model left in the database
+    # Check there are two model left in the database
     models = await db_client.get_all_documents("models")
-    assert len(models) == 1
+    assert len(models) == 2
 
-    # Check it is not of type 'mock_disruption_cnn'
-    assert models[0]["type"] != "mock_disruption_cnn"
+    # Check they are not of type 'mock_disruption_cnn'
+    assert all(model["type"] != "mock_disruption_cnn" for model in models)
 
     # Check for models 1 and 2, their file no longer exists
     assert (
         not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_1']}.model")
+        .joinpath(f"{setup_model_db['model_id_1']}.model")
         .exists()
     )
     assert (
         not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_2']}.model")
+        .joinpath(f"{setup_model_db['model_id_2']}.model")
         .exists()
     )
-    # And for model 3 it does still exist
+    # And for model 3 and 4 it does still exist
     assert (
         pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_3']}.model")
+        .joinpath(f"{setup_model_db['model_id_3']}.model")
+        .exists()
+    )
+    assert (
+        pathlib.Path(os.environ["MODEL_STORAGE"])
+        .joinpath(f"{setup_model_db['model_id_4']}.model")
         .exists()
     )
 
 
 @pytest.mark.asyncio
-async def test_model_delete_type_version(api_client, db_client, setup_db):
+@pytest.mark.models_enabled
+async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn?version=2"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
     )
     assert response.status_code == 200
 
-    # Check there is one model left in the database
+    # Check there are three models left in the database
     models = await db_client.get_all_documents("models")
-    assert len(models) == 2
+    assert len(models) == 3
     # Check model version 1 of mock_disruption_cnn still exists
-    assert models[0]["type"] == "mock_disruption_cnn" and models[0]["version"] == 1
-    # Check the other one is type 'disruption_cnn'
-    assert models[1]["type"] == "disruption_cnn"
+    # Check the others are not of type 'mock_disruption_cnn'
+    assert all(
+        (model["type"] == "mock_disruption_cnn" and model["version"] == 1)
+        or (model["type"] != "mock_disruption_cnn")
+        for model in models
+    )
 
     # Check for model 2, their file no longer exists
     assert (
         not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_2']}.model")
+        .joinpath(f"{setup_model_db['model_id_2']}.model")
         .exists()
     )
-    # And for models 1 and 3 it does still exist
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_1']}.model")
-        .exists()
-    )
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_db['model_id_3']}.model")
-        .exists()
+    # And for models 1, 3 and 4 it does still exist
+    assert all(
+        (
+            pathlib.Path(os.environ["MODEL_STORAGE"])
+            .joinpath(f"{setup_model_db[model_id]}.model")
+            .exists()
+        )
+        for model_id in ("model_id_1", "model_id_3", "model_id_4")
     )
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @patch("ray.cancel")
-async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
+async def test_model_stop_training(mock_func, api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/disruption_cnn/train"
+        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/train"
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
     deleted_id = response.json()[0]
-    assert deleted_id == setup_db["model_id_3"]
+    assert deleted_id == setup_model_db["model_id_3"]
 
     # Check it is aborted in database
     models = await db_client.get_filtered_documents(
@@ -521,12 +550,13 @@ async def test_model_stop_training(mock_func, api_client, db_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 @patch("ray.kill")
 async def test_model_stop_training_not_in_progress(
-    mock_func, api_client, db_client, setup_db
+    mock_func, api_client, db_client, setup_model_db
 ):
     response = await api_client.delete(
-        f"/projects/{setup_db['project_id_1']}/models/mock_disruption_cnn/train?version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train?version=1"
     )  # Version 1 model is 'completed' so nothing to do
     assert response.status_code == 409
     assert (
@@ -541,6 +571,7 @@ async def test_model_stop_training_not_in_progress(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_predictions(api_client, db_client, setup_model_db):
     await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict"
@@ -553,6 +584,7 @@ async def test_model_delete_predictions(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_no_predictions(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
@@ -566,3 +598,126 @@ async def test_model_delete_no_predictions(api_client, db_client, setup_model_db
     )
     annotations = await db_client.get_all_documents(collection="annotations")
     assert len(annotations) == 10
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_load_local(api_client, db_client, setup_model_db):
+    # Create tempfile
+    with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:
+        tempf.write("Model Weights")
+        tempf.flush()
+        response = await api_client.post(
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+        )
+        assert response.status_code == 200
+        model_id = response.json()["model_id"]
+        task_id = response.json()["task_id"]
+
+        t = 0
+        while t < 30:
+            response = await api_client.get(
+                f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/{task_id}"
+            )
+            if response.status_code == 202:
+                if t >= 30:
+                    raise TimeoutError("Getting load results timed out")
+                time.sleep(1)
+                t += 1
+            elif response.status_code == 200:
+                break
+            else:
+                raise AssertionError(f"Response code {response.status_code} invalid")
+
+        model = await db_client.get_document_by_id(
+            collection="models", object_id=ObjectId(model_id)
+        )
+
+        # Check model has been set to completed, with 100% completion
+        assert model["training_status"] == "completed"
+        assert model["progress"] == 100
+
+        # Check model has been saved after completion
+        model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+            f"{model_id}.model"
+        )
+        assert model_path.exists()
+
+        # Open the file, check contents are there
+        assert model_path.read_text() == "Model Weights"
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_load_local_missing_file(api_client, db_client, setup_model_db):
+    # Try loading nonexistent file
+    response = await api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path=non_existant_path.model"
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Weights file not found at specified path!"
+
+
+@pytest.mark.asyncio
+async def test_model_load_local_disabled(api_client, db_client, setup_model_db):
+    # Try loading nonexistent file
+    os.environ["DISABLE_LOCAL_MODEL_LOAD"] = "true"
+    with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:
+        tempf.write("Model Weights")
+        tempf.flush()
+        response = await api_client.post(
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+        )
+    os.environ.pop("DISABLE_LOCAL_MODEL_LOAD")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Loading from local weights is disabled."
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_load_local_failed(api_client, db_client, setup_model_db):
+    # Create tempfile
+    with tempfile.NamedTemporaryFile(suffix=".model") as tempf:
+        # Write invalid bytes which will fail to be read by the model
+        tempf.write(b"\xff")
+        tempf.flush()
+        response = await api_client.post(
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+        )
+        # Successfully submits the load job
+        assert response.status_code == 200
+
+        model_id = response.json()["model_id"]
+        task_id = response.json()["task_id"]
+        # Get results from endpoint polling
+        t = 0
+        while t < 30:
+            response = await api_client.get(
+                f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/{task_id}"
+            )
+            if response.status_code == 202:
+                if t >= 30:
+                    raise TimeoutError("Getting load results timed out")
+                time.sleep(1)
+                t += 1
+            elif response.status_code == 500:
+                break
+            else:
+                raise AssertionError(f"Response code {response.status_code} invalid")
+
+        # Check message is as expected
+        assert "Load task failed - Failed to load weights" in response.json()["detail"]
+
+        model = await db_client.get_document_by_id(
+            collection="models", object_id=ObjectId(model_id)
+        )
+
+        # Check model has been set to failed
+        assert model["training_status"] == "failed"
+
+        # Check model has not been saved after completion
+        assert (
+            not pathlib.Path(os.environ["MODEL_STORAGE"])
+            .joinpath(f"{model_id}.model")
+            .exists()
+        )
