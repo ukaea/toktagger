@@ -1,6 +1,10 @@
 # Configuration Options
 The following options can be configured within TokTagger to improve your experience. They can either be set via a `toktagger.toml` configuration file in your working directory, or via environment variables. Environment variables will take precidence over settings within the TOML file.
 
+!!! tip
+    You can find an [example TokTagger TOML file here](https://github.com/ukaea/toktagger/blob/main/toktagger.example.toml), or you can generate one locally by running `python -m scripts.generate_example_config` (requires TokTagger v0.2.1 or later.) 
+
+
 ## Server settings
 These settings should be defined under the `[server]` heading in the TOML file:
 
