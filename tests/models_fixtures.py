@@ -39,7 +39,7 @@ async def models_api_client(monkeypatch, db_client, ray_session):
     server = Server()
     server.testing_mode = True
     monkeypatch.setenv("API_URL", "http://test")
-    monkeypatch.setenv("MAX_GPU_ACTORS", 2)
+    monkeypatch.setenv("MAX_GPU_ACTORS", 1)
     monkeypatch.setenv("FORCE_NUM_GPUS", True)
 
     server._setup_app()

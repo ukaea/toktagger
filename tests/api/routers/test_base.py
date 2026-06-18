@@ -11,7 +11,7 @@ async def test_health_models_enabled(models_api_client, setup_db):
     assert data.get("version")  # Won't check its contents here
     assert data.get("db_connected")
     assert data.get("models_enabled")
-    assert data.get("gpu_available")  # Forced to be 2 GPUs in conftest setup
+    assert data.get("gpu_available")  # Forced to be 1 GPUs in conftest setup
 
 
 @pytest.mark.asyncio
