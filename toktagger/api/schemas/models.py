@@ -1,6 +1,7 @@
 from typing import Literal, Annotated, Optional
 from pydantic import Field, field_validator
 from toktagger.api.schemas import ConfiguredModel
+from enum import Enum
 
 
 class ModelIn(ConfiguredModel):
@@ -35,3 +36,7 @@ class ModelUpdate(ConfiguredModel):
 class Model(ModelIn):
     id: str = Field(..., alias="_id")
     project_id: str
+
+
+class LoadTypes(str, Enum):
+    LOCAL = "local"

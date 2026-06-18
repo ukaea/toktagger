@@ -73,6 +73,10 @@ class Models(pydantic.BaseModel):
             gt=0,
         ),
     ]
+    local_load_enabled: bool = pydantic.Field(
+        True,
+        description="Whether to enable the loading of model weights files from local disk. Should be disabled for production servers.",
+    )
 
 
 class Settings(BaseSettings):

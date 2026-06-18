@@ -140,4 +140,22 @@ async def delete_project(
     """
     db_client = request.app.state.db_client
     # Delete this specific project
-    await utils.delete_project(db_client=db_client, project_id=project_id)
+    await utils.delete_projects(db_client=db_client, project_id=project_id)
+
+
+@router.delete(
+    "",
+    responses={
+        200: {"description": "Projects have been successfully deleted."},
+    },
+)
+async def delete_all_projects(
+    request: Request,
+):
+    """
+    Remove all projects.
+    --------------------
+    """
+    db_client = request.app.state.db_client
+    # Check project exists
+    await utils.delete_projects(db_client=db_client)

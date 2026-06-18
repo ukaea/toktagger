@@ -142,3 +142,36 @@ async def test_invalid_id(
     else:
         assert response.status_code == 404
         assert f"{test_component.title()} not found" in response.json().get("detail")
+
+
+@pytest.mark.models_disabled
+@pytest.mark.parametrize(
+    ("endpoint", "request_method"),
+    [
+        ["/projects/id/models", "get"],
+        ["/projects/id/models/mock_disruption_cnn", "get"],
+        ["/projects/id/models/mock_disruption_cnn", "delete"],
+        ["/projects/id/models/mock_disruption_cnn/train", "get"],
+        ["/projects/id/models/mock_disruption_cnn/train", "put"],
+        ["/projects/id/models/mock_disruption_cnn/train", "delete"],
+        ["/projects/id/models/mock_disruption_cnn/load", "post"],
+        ["/projects/id/models/mock_disruption_cnn/load/abc123", "get"],
+        ["/projects/id/models/mock_disruption_cnn/predict", "post"],
+        ["/projects/id/models/mock_disruption_cnn/predict", "delete"],
+        ["/projects/id/models/abc123", "put"],
+    ],
+)
+@pytest.mark.asyncio
+async def test_model_endpoints_disabled(
+    api_client, setup_db_small, endpoint, request_method
+):
+    endpoint_with_ids = endpoint.replace("id", setup_db_small["projects"])
+    response = await make_request(api_client, request_method, endpoint_with_ids, {})
+
+    # Should return 503 error since models endpoints not enabled
+    assert response.status_code == 503
+    data = response.json()
+    assert (
+        "ML model features are disabled (optional dependencies missing)"
+        in data["detail"]
+    )
