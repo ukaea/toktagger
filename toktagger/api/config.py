@@ -17,11 +17,11 @@ class UDA(pydantic.BaseModel):
     )
     meta_pluginname: str = pydantic.Field(
         "MASTU_DB",
-        description="???",  # TODO whats this?
+        description="Database location for MAST-U data",
     )
     metanew_pluginname: str = pydantic.Field(
         "MAST_DB",
-        description="???",  # TODO whats this?
+        description="Database location for MAST data",
     )
 
 
