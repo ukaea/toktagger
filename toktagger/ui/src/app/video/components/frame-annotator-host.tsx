@@ -113,6 +113,11 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
   return false;
 }
 
+function isAnnotationPopupEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest('[aria-label="Annotation actions"]'));
+}
+
 function isBlockedViewModeKey(event: Event | undefined) {
   if (!(event instanceof KeyboardEvent)) return false;
   const key = event.key.toLowerCase();
@@ -448,6 +453,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
     const handlePointClick = (event: MouseEvent) => {
       if (isSecondaryMouseEvent(event)) return;
+      if (isAnnotationPopupEventTarget(event.target)) return;
 
       const annotation = findAnnotationAtPointer(api, event);
       if (annotation) return;

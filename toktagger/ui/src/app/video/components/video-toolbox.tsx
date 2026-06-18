@@ -249,8 +249,8 @@ export function VideoToolbox() {
               <Slider
                 label="Point size"
                 value={session.pointMarkerSize}
-                minValue={4}
-                maxValue={24}
+                minValue={2}
+                maxValue={48}
                 step={1}
                 onChange={session.setPointMarkerSize}
                 width="100%"
