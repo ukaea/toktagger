@@ -82,7 +82,7 @@ def get_actor(project: Project, model: Model, use_gpu: bool):
 @ray.remote(num_cpus=0.1)
 def load_model(
     model: Model, project: Project, weights_path: pathlib.Path
-) -> tuple[str, str | None]:
+) -> dict[str : str | None]:
     # Change status to started
     send_model_updates(
         project_id=project.id,
