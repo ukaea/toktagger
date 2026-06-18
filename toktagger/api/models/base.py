@@ -434,6 +434,10 @@ class ActorRegistry:
         else:
             self.actors[actor_name] = use_gpu
 
+        if not self.actors[actor_name] and use_gpu:
+            # CPU actor may be upgraded to GPU (but not other way round)
+            self.actors[actor_name] = use_gpu
+
         stale_actor = None
         # Check GPU limit first
         gpu_count = sum(1 for gpu in self.actors.values() if gpu)
