@@ -420,7 +420,7 @@ class ActorRegistry:
         """
         return self.tasks.get(task_id)
 
-    def update_actors(self, actor_name: str) -> None:
+    def update_actors(self, actor_name: str, use_gpu: bool) -> None:
         """Record that a Ray Actor has been accessed, and kill any stale Actors.
 
         Parameters
@@ -432,7 +432,7 @@ class ActorRegistry:
         if actor_name in self.actors:
             self.actors.move_to_end(actor_name)
         else:
-            self.actors[actor_name] = self.gpu_enabled
+            self.actors[actor_name] = use_gpu
 
         stale_actor = None
         # Check GPU limit first

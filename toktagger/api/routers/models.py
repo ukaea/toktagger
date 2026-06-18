@@ -252,7 +252,7 @@ async def start_model_training(
 
     model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
 
-    task_registry.update_actors(model.id)
+    task_registry.update_actors(model.id, use_gpu)
 
     train_task = train_model.remote(
         model=model,
@@ -407,7 +407,7 @@ async def load_model_weights(
             db_client, project.id, model_type=model_type, model_id=model_id
         )
 
-        task_registry.update_actors(model.id)
+        task_registry.update_actors(model.id, False)
 
         task = load_model.remote(
             project=project,
@@ -589,7 +589,7 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
 
-    task_registry.update_actors(model.id)
+    task_registry.update_actors(model.id, use_gpu)
 
     predict_task = get_predictions.remote(
         project=project,
@@ -680,7 +680,7 @@ async def create_sample_predictions(
 
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    task_registry.update_actors(model.id)
+    task_registry.update_actors(model.id, use_gpu)
 
     task = get_predictions.remote(
         project=project,
