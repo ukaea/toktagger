@@ -54,7 +54,6 @@ import {
   videoBBoxToAnno,
   videoPointToAnno,
   videoPolygonToAnno,
-  POINT_MARKER_SIZE,
   stampPoint,
   stampLabelAndTrack,
   normalizeOverlayForSession,
@@ -404,6 +403,8 @@ export function VideoSessionProvider(props: {
     setVideoPanMode,
     videoDrawingTool,
     setVideoDrawingTool,
+    videoPointMarkerSize,
+    setVideoPointMarkerSize,
   } = useVideoUiState();
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
@@ -476,13 +477,18 @@ export function VideoSessionProvider(props: {
   const [panMode, setPanModeState] = useState(videoPanMode);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
   const [pointMarkerSize, setPointMarkerSizeState] =
-    useState(POINT_MARKER_SIZE);
+    useState(videoPointMarkerSize);
   const hideAnnotationsRef = useRef(false);
 
-  const setPointMarkerSize = useCallback((size: number) => {
-    if (!Number.isFinite(size)) return;
-    setPointMarkerSizeState(Math.max(1, Math.trunc(size)));
-  }, []);
+  const setPointMarkerSize = useCallback(
+    (size: number) => {
+      if (!Number.isFinite(size)) return;
+      const next = Math.max(1, Math.trunc(size));
+      setPointMarkerSizeState(next);
+      setVideoPointMarkerSize(next);
+    },
+    [setVideoPointMarkerSize],
+  );
 
   const setHideAnnotations = useCallback(
     (v: boolean) => {
