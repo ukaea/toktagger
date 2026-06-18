@@ -9,10 +9,13 @@
 
 [models]
 # The directory to use for storing ML model weights.
-# cache_dir = '/home/wk9874/.cache/toktagger/models'
+# cache_dir = '/home/runner/.cache/toktagger/models'
 
 # The maximum number of ML models which can be loaded concurrently.
 # max_actors = 5
+
+# Whether to enable the loading of model weights files from local disk. Should be disabled for production servers.
+# local_load_enabled = True
 
 
 [sal]
@@ -31,7 +34,7 @@
 # reload = False
 
 # The directory to use for storing entries in the Mongita database, if used.
-# cache_dir = '/home/wk9874/.cache/toktagger'
+# cache_dir = '/home/runner/.cache/toktagger'
 
 
 [uda]
