@@ -27,6 +27,7 @@ def create_project(
         "http://localhost:8002/projects",
         json=project,
     )
+    response.raise_for_status()
     project_id = response.json()["_id"]
     return project_id
 
@@ -46,7 +47,10 @@ def create_uda_samples(
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    r.raise_for_status()
 
 
 def create_sal_samples(project_id: str, shot_ids: list[int]):
@@ -62,7 +66,10 @@ def create_sal_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    r.raise_for_status()
 
 
 def create_fair_mast_samples(project_id: str, shot_ids: list[int]):
@@ -78,7 +85,10 @@ def create_fair_mast_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    r.raise_for_status()
 
 
 def create_local_samples(
@@ -92,7 +102,7 @@ def create_local_samples(
     samples = []
 
     base_path = Path(base_path)
-    for shot_id in shot_ids:
+    for i, shot_id in enumerate(shot_ids):
         file_name = str(base_path / f"{shot_id}.{file_type}")
         sample = {
             "shot_id": shot_id,
@@ -104,10 +114,13 @@ def create_local_samples(
             },
         }
         if annotations:
-            sample["annotations"] = annotations[shot_id]
+            sample["annotations"] = annotations[i]
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    r.raise_for_status()
 
 
 def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
@@ -145,7 +158,10 @@ def create_uda_camera_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    r.raise_for_status()
 
 
 def main():
