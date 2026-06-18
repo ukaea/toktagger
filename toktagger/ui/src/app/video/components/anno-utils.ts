@@ -563,10 +563,14 @@ export function videoPolygonToAnno(
 export function videoPointToAnno(
   p: VideoPoint,
   frameKey: string,
+  markerSize = POINT_MARKER_SIZE,
 ): ImageAnnotation {
   const x = Number(p.x);
   const y = Number(p.y);
-  const half = POINT_MARKER_SIZE / 2;
+  const size = Number.isFinite(markerSize)
+    ? Math.max(1, Number(markerSize))
+    : POINT_MARKER_SIZE;
+  const half = size / 2;
 
   const id =
     globalThis.crypto?.randomUUID?.() ??

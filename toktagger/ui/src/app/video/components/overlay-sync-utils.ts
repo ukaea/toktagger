@@ -336,27 +336,32 @@ export function clampOverlayToNaturalImage(
 
       const x = Math.max(0, Math.min(natural.w, point.x));
       const y = Math.max(0, Math.min(natural.h, point.y));
-      const half = POINT_MARKER_SIZE / 2;
 
       if (x === point.x && y === point.y) out.push(a);
       else {
         changed = true;
         if (isEllipseAnno(a)) {
+          const ellipse = readEllipseGeometry(a);
+          const rx = ellipse?.rx ?? POINT_MARKER_SIZE / 2;
+          const ry = ellipse?.ry ?? POINT_MARKER_SIZE / 2;
           out.push(
             withEllipseGeometry(a, {
               cx: x,
               cy: y,
-              rx: half,
-              ry: half,
+              rx,
+              ry,
             }),
           );
         } else if (isRectangleAnno(a)) {
+          const rect = readRectGeometry(a);
+          const w = rect?.w ?? POINT_MARKER_SIZE;
+          const h = rect?.h ?? POINT_MARKER_SIZE;
           out.push(
             withRectGeometry(a, {
-              x: x - half,
-              y: y - half,
-              w: POINT_MARKER_SIZE,
-              h: POINT_MARKER_SIZE,
+              x: x - w / 2,
+              y: y - h / 2,
+              w,
+              h,
             }),
           );
         }

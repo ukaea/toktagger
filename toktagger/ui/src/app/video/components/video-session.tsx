@@ -54,6 +54,7 @@ import {
   videoBBoxToAnno,
   videoPointToAnno,
   videoPolygonToAnno,
+  POINT_MARKER_SIZE,
   stampPoint,
   stampLabelAndTrack,
   normalizeOverlayForSession,
@@ -99,6 +100,8 @@ type VideoSessionCtx = {
   setPropagate: (v: boolean) => void;
   hideAnnotations: boolean;
   setHideAnnotations: (v: boolean) => void;
+  pointMarkerSize: number;
+  setPointMarkerSize: (size: number) => void;
 
   /** Natural image dimensions for the currently loaded frame (used for clamping). */
   imageNatural: { w: number; h: number } | null;
@@ -472,7 +475,14 @@ export function VideoSessionProvider(props: {
     useState<DrawingTool>(videoDrawingTool);
   const [panMode, setPanModeState] = useState(videoPanMode);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
+  const [pointMarkerSize, setPointMarkerSizeState] =
+    useState(POINT_MARKER_SIZE);
   const hideAnnotationsRef = useRef(false);
+
+  const setPointMarkerSize = useCallback((size: number) => {
+    if (!Number.isFinite(size)) return;
+    setPointMarkerSizeState(Math.max(1, Math.trunc(size)));
+  }, []);
 
   const setHideAnnotations = useCallback(
     (v: boolean) => {
@@ -791,7 +801,11 @@ export function VideoSessionProvider(props: {
         y: Math.round(y),
         created_by: "manual",
       };
-      const pointAnnotation = videoPointToAnno(dbPoint, frameKey);
+      const pointAnnotation = videoPointToAnno(
+        dbPoint,
+        frameKey,
+        pointMarkerSize,
+      );
       const normalized = normalizeOverlayForSession({
         raw: [...raw, pointAnnotation],
         frameKey,
@@ -822,6 +836,7 @@ export function VideoSessionProvider(props: {
       frame,
       frameKey,
       imageNatural,
+      pointMarkerSize,
       selection.className,
       selection.trackId,
       updateByFrame,
@@ -1349,6 +1364,8 @@ export function VideoSessionProvider(props: {
       setPropagate,
       hideAnnotations,
       setHideAnnotations,
+      pointMarkerSize,
+      setPointMarkerSize,
       imageNatural,
       setImageNatural,
       createPointAnnotation,
@@ -1384,6 +1401,8 @@ export function VideoSessionProvider(props: {
       setPropagate,
       hideAnnotations,
       setHideAnnotations,
+      pointMarkerSize,
+      setPointMarkerSize,
       imageNatural,
       setImageNatural,
       createPointAnnotation,
