@@ -234,44 +234,41 @@ def run_server():
 
 
 @pytest.fixture(scope="package")
-def start_server():
-    os.environ["MONGO_URL"] = "./toktagger_test_db"
-    with tempfile.TemporaryDirectory() as tempd:
-        os.environ["DB_CACHE_DIR"] = tempd
-        proc = multiprocessing.Process(target=run_server)
-        proc.start()
-        # Wait for server to start
-        server_up = False
-        for t in range(600):
-            try:
-                response = requests.get(
-                    "http://localhost:8002/health",
-                )
-                if response.status_code == 200:
-                    status = response.json()
-                    if not status["testing_mode"]:
-                        raise RuntimeError(
-                            "End to End test has connected to a live server!"
-                        )
-                    if not status["db_connected"]:
-                        raise RuntimeError("Database failed to connect.")
-                    if not status["name"] == "TokTagger":
-                        raise RuntimeError(
-                            "End to End test has connected to another process running on localhost:8002"
-                        )
-                    server_up = True
-                    break
-                time.sleep(1)
-            except requests.exceptions.ConnectionError:
-                time.sleep(1)
+def start_server(settings):
+    proc = multiprocessing.Process(target=run_server)
+    proc.start()
+    # Wait for server to start
+    server_up = False
+    for t in range(60):
+        try:
+            response = requests.get(
+                "http://localhost:8002/health",
+            )
+            if response.status_code == 200:
+                status = response.json()
+                if not status["testing_mode"]:
+                    raise RuntimeError(
+                        "End to End test has connected to a live server!"
+                    )
+                if not status["db_connected"]:
+                    raise RuntimeError("Database failed to connect.")
+                if not status["name"] == "TokTagger":
+                    raise RuntimeError(
+                        "End to End test has connected to another process running on localhost:8002"
+                    )
+                server_up = True
+                break
+            time.sleep(1)
+        except requests.exceptions.ConnectionError:
+            time.sleep(1)
 
-        if not server_up:
-            proc.terminate()
-            pytest.exit("Server failed to start for End-to-End tests to run!")
-
-        yield
+    if not server_up:
         proc.terminate()
-        proc.join()
+        pytest.exit("Server failed to start for End-to-End tests to run!")
+
+    yield
+    proc.terminate()
+    proc.join()
 
 
 @pytest.fixture(scope="function")

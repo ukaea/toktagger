@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import warnings
+import tempfile
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.data import router as data_router
@@ -34,7 +35,9 @@ async def lifespan(app: FastAPI):
     db_name = "annotate_db"
 
     app.state.db_client = MongoDBClient(
-        str(config.settings.database.mongo_url), db_name
+        str(config.settings.database.mongo_url),
+        db_name,
+        str(config.settings.server.cache_dir),
     )
     app.state.project = None
     yield
@@ -72,6 +75,17 @@ class Server:
         )
 
     def _setup_app(self):
+        # Check cache dirs are in /tmp if testing mode enabled
+        if self.testing_mode:
+            tempdir = pathlib.Path(tempfile.gettempdir())
+            if (
+                tempdir not in config.settings.models.cache_dir.parents
+                or tempdir not in config.settings.server.cache_dir.parents
+            ):
+                raise ValueError(
+                    "In testing mode, cache directories must be in temp directory!"
+                )
+
         self.app = FastAPI(lifespan=lifespan)
 
         # Allow requests from the frontend dev server
