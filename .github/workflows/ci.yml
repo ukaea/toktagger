@@ -3,9 +3,9 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
 
 jobs:
   lint:
@@ -33,7 +33,7 @@ jobs:
         run: uv sync
 
       - name: Run Ruff
-        run: uv run ruff check toktagger tests --ignore=C901 && uv run ruff format --check toktagger tests  
+        run: uv run ruff check toktagger tests --ignore=C901 && uv run ruff format --check toktagger tests
 
   eslint:
     name: ESLint
@@ -51,7 +51,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20  # or your project’s version
+          node-version: 20 # or your project’s version
 
       - name: Install dependencies
         run: npm ci
@@ -75,7 +75,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20   # or your version
+          node-version: 20 # or your version
 
       - name: Install dependencies
         run: npm ci
@@ -115,42 +115,57 @@ jobs:
 
       - name: Run end to end tests
         run: uv run --all-extras pytest tests/end_to_end
-        
+
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0               # needed so we can push later
-          ref: ${{ github.head_ref }}  # PR source branch
+          fetch-depth: 0 # needed so we can push later
+          ref: ${{ github.head_ref }} # PR source branch
 
       - name: Merge main into branch
         run: |
           git config user.name "Dr. CI Bot"
           git config user.email "ci-bot@example.com"
-          
+
           # Fetch main
           git fetch origin main
-          
+
           # Merge main into current branch
           git merge origin/main --no-edit
 
       - name: Set up Node.js (>=22.19.0)
         uses: actions/setup-node@v4
         with:
-          node-version: '22.19.0'
+          node-version: "22.19.0"
 
       - name: Install dependencies
         run: npm --prefix toktagger/ui ci
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync
+
       - name: Build project
         run: npm --prefix toktagger/ui run build
+
+      - name: Regenerate example toml files
+        run: uv run scripts/generate_example_config.py
 
       - name: Commit built files
         run: |
           BUILD_DIR=toktagger/api/static   # <-- replace with your Vite outDir
           git add $BUILD_DIR
+          git add toktagger.example.toml
           if ! git diff --cached --quiet; then
             git commit -m "chore: update build output [skip ci]"
             git push origin HEAD

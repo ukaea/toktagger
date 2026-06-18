@@ -33,7 +33,7 @@ def create_default_toml_file(file_path: pathlib.Path | str):
         for key, values in schema.items():
             # If 'properties' present, need to create a new subsection, as this is a BaseModel
             if properties := values.get("properties"):
-                _walk_schema(file, properties, heading.lower() + key.lower())
+                _walk_schema(file, properties, f"{heading.lower()}.{key.lower()}")
             else:
                 # Otherwise we are in the lowest section applicable, so write lines
                 if desc := values.get("description"):
