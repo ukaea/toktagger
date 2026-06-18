@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Provider,
-  defaultTheme,
   NumberField,
   TableView,
   Cell,
@@ -21,6 +19,8 @@ import {
   Heading,
   Text,
   Selection,
+  Tooltip,
+  TooltipTrigger,
 } from "@adobe/react-spectrum";
 import Workflow from "@spectrum-icons/workflow/Workflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
@@ -37,7 +37,13 @@ import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
 
-export function ModelPredictModal({ project }: { project: Project }) {
+export function ModelPredictModal({
+  project,
+  isEnabled,
+}: {
+  project: Project;
+  isEnabled: boolean;
+}) {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIcon, setMessageIcon] = useState<React.JSX.Element | null>(
@@ -50,12 +56,6 @@ export function ModelPredictModal({ project }: { project: Project }) {
     Record<string, unknown>
   >({});
   const formRef = useRef<Form>(null);
-  const buttonStyle = {
-    position: "fixed",
-    top: 10,
-    right: 10,
-    zIndex: 1000,
-  };
   const [selectedKeys, setSelectedKeys] = useState<Selection | undefined>(
     undefined,
   );
@@ -199,119 +199,118 @@ export function ModelPredictModal({ project }: { project: Project }) {
   };
 
   return (
-    <Provider theme={defaultTheme}>
-      <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
+    <DialogTrigger onOpenChange={(isOpen) => setModalOpen(isOpen)}>
+      <TooltipTrigger delay={350} placement="bottom">
         <ActionButton
-          UNSAFE_style={buttonStyle}
+          isDisabled={!isEnabled}
           aria-label="Create Predictions from ML Model"
         >
           <Workflow />
         </ActionButton>
-        {(close) => (
-          <Dialog>
-            <Heading>
-              <Flex alignItems="center" gap="size-100">
-                <Workflow size="S" />
-                <Text>Create Predictions from ML Model</Text>
-              </Flex>
-            </Heading>
-            <Divider />
-            <Content>
-              <Flex
-                justifyContent="space-between"
-                alignItems="center"
-                marginBottom="size-200"
-              >
-                <NumberField
-                  label="Number of Predictions"
-                  onChange={setNumPredictions}
-                  defaultValue={20}
-                  minValue={10}
-                  step={10}
-                />
-                <Button
-                  variant="negative"
-                  isDisabled={
-                    !selectedKeys ||
-                    !models ||
-                    !selectedModel ||
-                    !["started", "queued"].includes(
-                      selectedModel.training_status,
-                    )
-                  }
-                  onPress={stopTrainingJob}
-                >
-                  Cancel Training
-                </Button>
-              </Flex>
-              {models && (
-                <TableView
-                  flex
-                  selectionMode="single"
-                  selectedKeys={selectedKeys}
-                  onSelectionChange={onSelectModel}
-                  height="size-3000"
-                  aria-label="Model Prediction Table"
-                >
-                  <TableHeader>
-                    <Column>Model Type</Column>
-                    <Column>Version</Column>
-                    <Column>Status</Column>
-                    <Column>Score</Column>
-                  </TableHeader>
-                  <TableBody items={models}>
-                    {(item) => (
-                      <Row key={item["_id"]}>
-                        <Cell>{item["type"]}</Cell>
-                        <Cell>{item["version"]}</Cell>
-                        <Cell>
-                          {item["training_status"] === "started"
-                            ? "Training: " + Math.round(item["progress"]) + "%"
-                            : item["training_status"]}
-                        </Cell>
-                        <Cell>{Math.round(item["score"])}</Cell>
-                      </Row>
-                    )}
-                  </TableBody>
-                </TableView>
-              )}
-              {schema && (
-                <ModelForm
-                  ref={formRef}
-                  schema={schema}
-                  onSubmit={submitPredictJob}
-                  formData={unvalidatedFormData}
-                  setFormData={setUnvalidatedFormData}
-                />
-              )}
-            </Content>
-            <Footer>
-              {message && (
-                <Text>
-                  {messageIcon} {message}
-                </Text>
-              )}
-            </Footer>
-            <ButtonGroup>
-              <Button variant="secondary" onPress={close}>
-                Close
-              </Button>
+        <Tooltip>"Make Predictions"</Tooltip>
+      </TooltipTrigger>
+      {(close) => (
+        <Dialog>
+          <Heading>
+            <Flex alignItems="center" gap="size-100">
+              <Workflow size="S" />
+              <Text>Create Predictions from ML Model</Text>
+            </Flex>
+          </Heading>
+          <Divider />
+          <Content>
+            <Flex
+              justifyContent="space-between"
+              alignItems="center"
+              marginBottom="size-200"
+            >
+              <NumberField
+                label="Number of Predictions"
+                onChange={setNumPredictions}
+                defaultValue={20}
+                minValue={10}
+                step={10}
+              />
               <Button
-                variant="accent"
+                variant="negative"
                 isDisabled={
                   !selectedKeys ||
                   !models ||
                   !selectedModel ||
-                  selectedModel.training_status != "completed"
+                  !["started", "queued"].includes(selectedModel.training_status)
                 }
-                onPress={pressSubmit}
+                onPress={stopTrainingJob}
               >
-                Predict
+                Cancel Training
               </Button>
-            </ButtonGroup>
-          </Dialog>
-        )}
-      </DialogTrigger>
-    </Provider>
+            </Flex>
+            {models && (
+              <TableView
+                flex
+                selectionMode="single"
+                selectedKeys={selectedKeys}
+                onSelectionChange={onSelectModel}
+                height="size-3000"
+                aria-label="Model Prediction Table"
+              >
+                <TableHeader>
+                  <Column>Model Type</Column>
+                  <Column>Version</Column>
+                  <Column>Status</Column>
+                  <Column>Score</Column>
+                </TableHeader>
+                <TableBody items={models}>
+                  {(item) => (
+                    <Row key={item["_id"]}>
+                      <Cell>{item["type"]}</Cell>
+                      <Cell>{item["version"]}</Cell>
+                      <Cell>
+                        {item["training_status"] === "started"
+                          ? "Training: " + Math.round(item["progress"]) + "%"
+                          : item["training_status"]}
+                      </Cell>
+                      <Cell>{Math.round(item["score"])}</Cell>
+                    </Row>
+                  )}
+                </TableBody>
+              </TableView>
+            )}
+            {schema && (
+              <ModelForm
+                ref={formRef}
+                schema={schema}
+                onSubmit={submitPredictJob}
+                formData={unvalidatedFormData}
+                setFormData={setUnvalidatedFormData}
+              />
+            )}
+          </Content>
+          <Footer>
+            {message && (
+              <Text>
+                {messageIcon} {message}
+              </Text>
+            )}
+          </Footer>
+          <ButtonGroup>
+            <Button variant="secondary" onPress={close}>
+              Close
+            </Button>
+            <Button
+              variant="accent"
+              isDisabled={
+                !selectedKeys ||
+                !models ||
+                !selectedModel ||
+                selectedModel.training_status != "completed"
+              }
+              onPress={pressSubmit}
+            >
+              Predict
+            </Button>
+          </ButtonGroup>
+        </Dialog>
+      )}
+    </DialogTrigger>
   );
 }

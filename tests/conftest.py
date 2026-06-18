@@ -2,10 +2,6 @@ import pytest
 import pytest_asyncio
 from toktagger.api.main import Server
 from toktagger.api.crud.db import MongoDBClient
-from toktagger.api.schemas.annotations import TimePointBatch
-from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
-from toktagger.api.models.base import ModelRegistry, WorkerRegistry, ActorRegistry
-from toktagger.api.core.data_loaders import LoaderRegistry
 import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
 import asyncio
@@ -15,9 +11,47 @@ import multiprocessing
 import requests
 import time
 import tempfile
-import pathlib
-import ray
-import random
+
+import importlib
+
+MODELS_ENABLED = importlib.util.find_spec("ray") is not None
+
+
+@pytest.fixture(autouse=True)
+def check_models_status(request):
+    print()
+    if MODELS_ENABLED and request.node.get_closest_marker("models_disabled"):
+        pytest.skip("This test requires models dependencies to not be installed!")
+    elif not MODELS_ENABLED and request.node.get_closest_marker("models_enabled"):
+        pytest.skip("This test requires models dependencies to be installed!")
+
+
+if MODELS_ENABLED:
+    from tests.models_fixtures import (
+        ray_session as ray_session,
+        setup_model_samples as setup_model_samples,
+        setup_model_db as setup_model_db,
+    )
+    from toktagger.api.models.base import ActorRegistry
+
+else:
+    error_msg = """ You have attempted to run a test which uses a fixture that requires models,
+            but the models optional dependencies (Ray) are not installed, 
+            and this test was not marked as a 'models_enabled' test.
+            Please review the fixture usage of this test, or mark it accurately.
+            """
+
+    @pytest.fixture()
+    def ray_session():
+        raise pytest.UsageError(error_msg)
+
+    @pytest.fixture()
+    def setup_model_samples():
+        raise pytest.UsageError(error_msg)
+
+    @pytest.fixture()
+    def setup_model_db():
+        raise pytest.UsageError(error_msg)
 
 
 @pytest.fixture(scope="session")
@@ -37,36 +71,6 @@ def uda_test(uda_env_vars):
         pytest.skip("Could not contact UDA server")
 
 
-@pytest.fixture(scope="package")
-def ray_session():
-    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
-        os.environ["MODEL_STORAGE"] = tempd
-        # Ray copies the value of the API_URL env var if already set in this local env
-        # We want it to be blank inside the ray worker nodes, so that it doesn't try to send stuff to API
-        # Cannot explicitly pass a None, it requires a str:str dict in env_vars
-        # So will pop the env varvalue, init ray, then restore it
-        if (api_url := os.environ.get("API_URL")) is not None:
-            api_url = os.environ.pop("API_URL")
-        ray.init(
-            ignore_reinit_error=True,
-            include_dashboard=False,
-            runtime_env={"env_vars": {"MODEL_STORAGE": tempd}},
-        )
-        if api_url is not None:
-            os.environ["API_URL"] = api_url
-
-        # Create a ray actor for use as a model registry
-        WorkerRegistry.options(name="WorkerModelRegistry", lifetime="detached").remote(
-            ModelRegistry._registry
-        )
-        # And one for use as a dataloader registry
-        WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
-            LoaderRegistry._registry
-        )
-        yield
-        ray.shutdown()
-
-
 @pytest_asyncio.fixture(scope="function")
 async def db_client():
     with tempfile.TemporaryDirectory() as tempd:
@@ -80,14 +84,8 @@ async def db_client():
         await db_client.client.close()
 
 
-# Need to use one task registry throughout so that it doesnt spin up a new Actor for all model tests.
-@pytest_asyncio.fixture(scope="session")
-async def task_actor():
-    yield ActorRegistry(max_actors=1)
-
-
 @pytest_asyncio.fixture(scope="function")
-async def api_client(task_actor, db_client):
+async def api_client(db_client):
     # Have hit various issues getting this setup
     # Using fastAPI TestClient() doesn't play well with async pymongo as it tries to do stuff in different event loops
     # So have to use this AsyncClient from httpx, but this no longer just accepts an app
@@ -102,8 +100,9 @@ async def api_client(task_actor, db_client):
     app = server.app
     app.state.db_client = db_client
     app.state.project = None
-    app.state.task_registry = task_actor
-    app.state.task_registry.tasks["abc123"] = "Ray Task Object"
+    if MODELS_ENABLED:
+        app.state.task_registry = ActorRegistry(max_actors=1)
+        app.state.task_registry.tasks["abc123"] = "Ray Task Object"
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -165,26 +164,7 @@ async def setup_db(db_client):
         ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)},
     )
     await asyncio.sleep(0.01)
-    model_id_1 = await db_client.insert(
-        "models",
-        db_definitions.MODEL_1,
-        ids={"project_id": ObjectId(project_id_1)},
-    )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_1}.model").touch()
-    await asyncio.sleep(0.01)
-    model_id_2 = await db_client.insert(
-        "models",
-        db_definitions.MODEL_2,
-        ids={"project_id": ObjectId(project_id_1)},
-    )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_2}.model").touch()
-    await asyncio.sleep(0.01)
-    model_id_3 = await db_client.insert(
-        "models",
-        db_definitions.MODEL_3,
-        ids={"project_id": ObjectId(project_id_1)},
-    )
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id_3}.model").touch()
+
     yield {
         "project_id_1": project_id_1,
         "project_id_2": project_id_2,
@@ -198,9 +178,6 @@ async def setup_db(db_client):
         "annotation_id_3": annotation_id_3,
         "annotation_id_4": annotation_id_4,
         "annotation_id_5": annotation_id_5,
-        "model_id_1": model_id_1,
-        "model_id_2": model_id_2,
-        "model_id_3": model_id_3,
     }
 
 
@@ -227,79 +204,6 @@ async def setup_db_small(db_client):
     await db_client.delete_filtered_documents("projects")
     await db_client.delete_filtered_documents("samples")
     await db_client.delete_filtered_documents("annotations")
-
-
-@pytest.fixture(scope="package")
-def setup_model_samples():
-    # Create sample data for training / predicting a Disruption model
-    samples = []
-    for i in range(9980, 10000):
-        # Generate sample data
-        disruption_time = random.randint(80, 100)
-        annotation = TimePointBatch(
-            shot_id=i,
-            validated=True,
-            label="Disruption",
-            time=disruption_time,
-            created_by="manual" if i < 9985 else "disruption_cnn",
-        )
-
-        samples.append(
-            SampleIn(
-                shot_id=i,
-                data=TimeSeriesFileData(
-                    file_name=f"{i}.parquet",
-                    type="parquet",
-                ),
-                annotations=[annotation] if i < 9990 else None,
-            )
-        )
-
-    yield samples
-
-
-@pytest_asyncio.fixture(scope="function")
-async def setup_model_db(setup_model_samples, ray_session, db_client):
-    project_id = await db_client.insert("projects", db_definitions.PROJECT_2)
-    sample_ids = []
-    for sample in setup_model_samples:
-        sample_id = await db_client.insert(
-            "samples", sample, ids={"project_id": ObjectId(project_id)}
-        )
-        sample_ids.append(sample_id)
-
-        if sample.annotations:
-            await db_client.insert(
-                "annotations",
-                sample.annotations[0],
-                ids={
-                    "project_id": ObjectId(project_id),
-                    "sample_id": ObjectId(sample_id),
-                },
-            )
-
-    model_id_1 = await db_client.insert(
-        "models", db_definitions.MODEL_1, ids={"project_id": ObjectId(project_id)}
-    )
-
-    model_id_2 = await db_client.insert(
-        "models", db_definitions.MODEL_2, ids={"project_id": ObjectId(project_id)}
-    )
-
-    model_id_4 = await db_client.insert(
-        "models", db_definitions.MODEL_4, ids={"project_id": ObjectId(project_id)}
-    )
-
-    # Create temp files for each
-    for _id in (model_id_1, model_id_2, model_id_4):
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{_id}.model").touch()
-
-    yield {
-        "project_id": project_id,
-        "sample_ids": sample_ids,
-        "model_id_1": model_id_1,
-        "model_id_2": model_id_2,
-    }
 
 
 def run_server():
@@ -332,10 +236,6 @@ def start_server():
                         )
                     if not status["db_connected"]:
                         raise RuntimeError("Database failed to connect.")
-                    if not status["models_enabled"]:
-                        raise RuntimeError(
-                            "Models not enabled! Install model dependencies to run all tests."
-                        )
                     if not status["name"] == "TokTagger":
                         raise RuntimeError(
                             "End to End test has connected to another process running on localhost:8002"
