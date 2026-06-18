@@ -19,7 +19,6 @@ MODELS_ENABLED = importlib.util.find_spec("ray") is not None
 
 @pytest.fixture(autouse=True)
 def check_models_status(request):
-    print()
     if MODELS_ENABLED and request.node.get_closest_marker("models_disabled"):
         pytest.skip("This test requires models dependencies to not be installed!")
     elif not MODELS_ENABLED and request.node.get_closest_marker("models_enabled"):

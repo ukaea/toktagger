@@ -115,7 +115,7 @@ class Model(ABC):
     @typing.final
     def gpu_available(self) -> bool:
         assigned_resources = ray.get_runtime_context().get_assigned_resources()
-        return True if assigned_resources.get("GPU") else False
+        return bool(assigned_resources.get("GPU"))
 
     def log_progress(
         self,

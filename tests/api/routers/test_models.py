@@ -684,6 +684,7 @@ async def test_model_load_local_missing_file(
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_load_local_disabled(
     monkeypatch, models_api_client, db_client, setup_model_db
 ):

@@ -434,7 +434,7 @@ async def get_load_model_status(
     project_id: str = Path(description="The ID of the project to load a model for."),
     model_type: str = Path(description="The type of model to load."),
     task_id: str = Path(description="The load task to get results from."),
-) -> bool:
+) -> JSONResponse | bool:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
