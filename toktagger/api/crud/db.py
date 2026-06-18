@@ -1,10 +1,10 @@
-from pathlib import Path
 import pymongo
 import pydantic
 import typing
 from bson.objectid import ObjectId
+from pathlib import Path
+from appdirs import user_cache_dir
 
-from platformdirs import user_cache_dir
 from toktagger.api.crud.mongita_client import AsyncMongitaClient
 
 DATABASE_NAME = "event_db"

@@ -1,14 +1,14 @@
 import toktagger.api.core.annotators as annotators
 import numpy
 from scipy.datasets import electrocardiogram
-from toktagger.api.schemas.annotations import SpectrogramMask
+from toktagger.api.schemas.annotations import PolygonAnnotation
 from toktagger.api.schemas.data import TimeSeriesData, MultiVariateTimeSeriesData
 import numpy as np
 from toktagger.api.schemas.annotators import (
     PeakDetectionParams,
     OutlierDetectionParams,
     JumpDetectionParams,
-    SpectrogramThresholdParams,
+    Profile2DThresholdParams,
     ChangePointDetectionParams,
 )
 
@@ -174,17 +174,18 @@ def test_changepoint_annotator_no_change():
     assert np.isclose(regions[0].time_max, 99)
 
 
-def test_spectrogram_threshold():
+def test_profile2d_threshold():
     data = electrocardiogram()[2000:4000]
     ts_data = TimeSeriesData(time=numpy.arange(len(data)), values=data)
     mv_data = MultiVariateTimeSeriesData(values={"Ip": ts_data})
 
-    params = SpectrogramThresholdParams(signal_name="Ip", percentile=95)
-    annotator = annotators.SpectrogramThresholdAnnotator(params)
+    params = Profile2DThresholdParams(
+        signal_name="Ip", percentile=95, dim_1_min=0, min_size=1
+    )
+    annotator = annotators.Profile2DThresholdAnnotator(params)
     result = annotator.predict(mv_data)
 
-    assert isinstance(result, SpectrogramMask)
-    mask = numpy.array(result.values)
-    assert mask.shape == (129, 17)
-    assert mask.min() == 0
-    assert mask.max() == 1
+    assert isinstance(result, list)
+    assert len(result) == 37
+    for annotation in result:
+        assert isinstance(annotation, PolygonAnnotation)

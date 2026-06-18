@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { useEffect, useMemo, useState } from "react";
+import { Annotation, MultiVariateTimeSeriesDataSchema } from "@/types";
 import {
   Provider,
   defaultTheme,
@@ -18,7 +18,6 @@ import { useSample } from "@/app/contexts/SampleContext";
 type PeakDetectionType = {
   project_id: string;
   sample_id: string;
-  data: MultiVariateTimeSeriesData;
 };
 export function PeakDetectionTool({
   project_id,
@@ -32,7 +31,7 @@ export function PeakDetectionTool({
     );
   });
 
-  const [prominence, setProminance] = useState<number>(5);
+  const [prominence, setProminence] = useState<number>(5);
   const [distance, setDistance] = useState<number>(1);
 
   const [timeMinDefault, setTimeMinDefault] = useState<number>(0);
@@ -41,23 +40,29 @@ export function PeakDetectionTool({
     start: 0,
     end: 100,
   });
+
+  const dataValues = useMemo(
+    () => MultiVariateTimeSeriesDataSchema.safeParse(data).data?.values || {},
+    [data],
+  );
+
   const [signalName, setSignalName] = useState<string | null>(null);
-  const signalOptions = Object.keys(data.values).map((value, index) => ({
+  const signalOptions = Object.keys(dataValues).map((value, index) => ({
     id: index,
     name: value,
   }));
 
-  const validSignal = signalName !== null && signalName in data.values;
+  const validSignal = signalName !== null && signalName in dataValues;
 
   useEffect(() => {
-    if (data && signalName !== null && signalName in data.values) {
-      const time = data.values[signalName].time;
+    if (data && signalName !== null && signalName in dataValues) {
+      const time = dataValues[signalName].time;
       const tmin = Math.min(...time);
       const tmax = Math.max(...time);
       setTimeMinDefault(tmin);
       setTimeMaxDefault(tmax);
     }
-  }, [data, signalName]);
+  }, [dataValues, signalName, data]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -143,7 +148,7 @@ export function PeakDetectionTool({
             maxValue={10}
             defaultValue={prominence}
             step={0.001}
-            onChangeEnd={setProminance}
+            onChangeEnd={setProminence}
           />
           <Slider
             label="Distance"

@@ -946,8 +946,9 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
     expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
 
     # Check entry is there for newly trained model
+    # Ray worker can take 60+ seconds to initialize on first run (cold start)
     expect(modal.get_by_role("row").nth(1)).to_contain_text(model_name)
-    expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=30000)
+    expect(modal.get_by_role("row").nth(1)).to_contain_text("completed", timeout=90000)
     if model_name == "mock_params_timeseries_cnn":
         expect(modal.get_by_role("row").nth(1)).to_contain_text("50")
     else:

@@ -9,6 +9,7 @@ export const BaseAnnotationSchema = z.object({
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
   created_by: z.string().default("manual"),
+  signal_name: z.string().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -33,23 +34,24 @@ export const ClassLabelSchema = BaseAnnotationSchema.extend({
 });
 export type ClassLabel = z.infer<typeof ClassLabelSchema>;
 
-export const BoundingBoxSchema = BaseAnnotationSchema.extend({
+export const BoundingBoxAnnotationSchema = BaseAnnotationSchema.extend({
   type: z.literal("bounding_box"),
-  height: z.number().int(),
-  width: z.number().int(),
-  x_min: z.number().int(),
-  y_min: z.number().int(),
+  height: z.number(),
+  width: z.number(),
+  x_min: z.number(),
+  y_min: z.number(),
 });
 
-export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
+export type BoundingBoxAnnotation = z.infer<typeof BoundingBoxAnnotationSchema>;
 
-export const VideoBoundingBoxSchema = BoundingBoxSchema.extend({
-  type: z.literal("video_bounding_box"),
-  frame: z.number().int(),
-  track_id: z.string(), // force string
-});
+export const VideoBoundingBoxAnnotationSchema =
+  BoundingBoxAnnotationSchema.extend({
+    type: z.literal("video_bounding_box"),
+    frame: z.number().int(),
+    track_id: z.string(), // force string
+  });
 
-export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;
+export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxAnnotationSchema>;
 
 export const VideoPolygonSchema = BaseAnnotationSchema.extend({
   type: z.literal("video_polygon"),
@@ -64,8 +66,8 @@ export const AnnotationSchema = z.union([
   TimePointSchema,
   TimeRegionSchema,
   ClassLabelSchema,
-  BoundingBoxSchema,
-  VideoBoundingBoxSchema,
+  BoundingBoxAnnotationSchema,
+  VideoBoundingBoxAnnotationSchema,
   VideoPolygonSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
@@ -92,23 +94,37 @@ export type MultiVariateTimeSeriesData = z.infer<
   typeof MultiVariateTimeSeriesDataSchema
 >;
 
-export const SpectrogramDataSchema = z.object({
+export const Profile2DDataSchema = z.object({
   time: z.array(z.number()),
-  frequency: z.array(z.number()),
-  amplitude: z.array(z.array(z.number())),
-  threshold_mask: z.array(z.array(z.number())).optional(),
+  dim_1: z.array(z.number()),
+  values: z.array(z.array(z.number().nullable())),
 });
-export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
+export type Profile2DData = z.infer<typeof Profile2DDataSchema>;
+
+export const MultiProfile2DDataSchema = z.object({
+  values: z.record(z.string(), Profile2DDataSchema),
+});
+export type MultiProfile2DData = z.infer<typeof MultiProfile2DDataSchema>;
+
 export const ImageDataSchema = z.object({
   frame: z.number(),
   values: z.string(), // base64 PNG
 });
 export type ImageData = z.infer<typeof ImageDataSchema>;
 
+export const PolygonAnnotationSchema = BaseAnnotationSchema.extend({
+  segmentation: z.array(z.array(z.number())),
+  area: z.number(),
+  bbox: z.array(z.number()),
+});
+
+export type PolygonAnnotation = z.infer<typeof PolygonAnnotationSchema>;
+
 export const DataSchema = z.union([
   TimeSeriesDataSchema,
   MultiVariateTimeSeriesDataSchema,
-  SpectrogramDataSchema,
+  Profile2DDataSchema,
+  MultiProfile2DDataSchema,
   ImageDataSchema,
 ]);
 export type Data = z.infer<typeof DataSchema>;
@@ -143,27 +159,42 @@ export const VSpanSchema = BaseDisplayAnnotationSchema.extend({
 });
 export type VSpan = z.infer<typeof VSpanSchema>;
 
-export const SpectrogramMaskSchema = z.object({
+export const Profile2DMaskSchema = BaseDisplayAnnotationSchema.extend({
   values: z.array(z.array(z.number())),
 });
-export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
+export type Profile2DMask = z.infer<typeof Profile2DMaskSchema>;
+
+export const BoundingBoxSchema = BaseDisplayAnnotationSchema.extend({
+  x_min: z.number(),
+  y_min: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
+
+export const PolygonSchema = BaseDisplayAnnotationSchema.extend({
+  x: z.array(z.number()),
+  y: z.array(z.number()),
+});
+export type Polygon = z.infer<typeof PolygonSchema>;
 
 export const DisplayAnnotationSchema = z.union([
   ZoneSchema,
   VSpanSchema,
-  SpectrogramMaskSchema,
+  Profile2DMaskSchema,
+  PolygonAnnotationSchema,
 ]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export enum TaskType {
   TimeSeries = "time-series",
-  // Spectrogram = "spectrogram",
+  Profile2D = "profile-2d",
   Video = "video",
 }
 
 export const TaskSchema = z.enum([
   TaskType.TimeSeries,
-  // TaskType.Spectrogram,
+  TaskType.Profile2D,
   TaskType.Video,
 ]);
 
@@ -265,21 +296,22 @@ export const SamplesSummarySchema = z.object({
 export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
 
 export const ViewParamsSchema = z.object({
-  name: z.string(),
+  name: z.literal("identity"),
 });
 export type ViewParams = z.infer<typeof ViewParamsSchema>;
 
-export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
-  nperseg: z.number().optional(),
+export const Profile2DViewParamsSchema = ViewParamsSchema.extend({
+  name: z.literal("profile_2d"),
+  signal_name: z.string(),
+  log_scale: z.boolean().default(false),
   time_min: z.number().optional(),
   time_max: z.number().optional(),
-  frequency_min: z.number().optional(),
-  frequency_max: z.number().optional(),
-  amplitude_min: z.number().optional(),
-  amplitude_max: z.number().optional(),
-  threshold_value: z.number().optional(),
+  dim_1_min: z.number().optional(),
+  dim_1_max: z.number().optional(),
+  values_min: z.number().optional(),
+  values_max: z.number().optional(),
 });
-export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
+export type Profile2DViewParams = z.infer<typeof Profile2DViewParamsSchema>;
 
 export const HealthInfoSchema = z.object({
   name: z.string(),
@@ -300,6 +332,8 @@ export type ToolingProps = {
 export enum ToolingTypes {
   ZONE,
   VSPAN,
+  BOUNDING_BOX,
+  POLYGON,
 }
 
 export enum TimeSeriesAnnotationType {
@@ -342,6 +376,7 @@ export type PlotProps = {
   colorMap?: string;
   numSignificantDigits?: number;
   thresholdActive?: boolean;
+  logScale?: boolean;
 };
 
 type PlotlyAxisTransforms = {

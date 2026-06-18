@@ -19,7 +19,7 @@ import {
 import type { Annotation } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/video/components/video-context";
-import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
+import { VideoBoundingBoxAnnotationSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
   DrawingTool,
@@ -144,7 +144,7 @@ type FocusRequest = {
 
 function parseVideoAnnotation(annotation: Annotation) {
   if (annotation.type === "video_bounding_box") {
-    return VideoBoundingBoxSchema.safeParse(annotation);
+    return VideoBoundingBoxAnnotationSchema.safeParse(annotation);
   }
 
   if (annotation.type === "video_polygon") {
@@ -305,11 +305,11 @@ function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
       if (!shape) continue;
 
       let parsed:
-        | ReturnType<typeof VideoBoundingBoxSchema.safeParse>
+        | ReturnType<typeof VideoBoundingBoxAnnotationSchema.safeParse>
         | ReturnType<typeof VideoPolygonSchema.safeParse>
         | null = null;
       if (shape.type === "video_bounding_box") {
-        parsed = VideoBoundingBoxSchema.safeParse(shape);
+        parsed = VideoBoundingBoxAnnotationSchema.safeParse(shape);
       } else if (shape.type === "video_polygon") {
         parsed = VideoPolygonSchema.safeParse(shape);
       }
