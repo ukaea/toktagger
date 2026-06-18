@@ -11,13 +11,13 @@ from tests.endpoints import (
 )
 from tests.end_to_end import form_check
 import time
-import os
 import requests
 import tempfile
 import pytest
 import json
 import csv
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
+import toktagger.api.config as config
 
 
 def check_base_page(page):
@@ -1077,7 +1077,7 @@ def test_model_load_predict(server_setup, setup_model_samples, page: Page):
         # Get model ID
         model_id = response.json()["_id"]
         # Check file exists and has correct contents
-        new_weights_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+        new_weights_path = config.settings.models.cache_dir.joinpath(
             f"{model_id}.model"
         )
         assert new_weights_path.exists()
@@ -1085,9 +1085,7 @@ def test_model_load_predict(server_setup, setup_model_samples, page: Page):
 
         # Check temp copy not left dangling
         file_name = pathlib.Path(tempf.name).name
-        assert (
-            not pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(file_name).exists()
-        )
+        assert not config.settings.models.cache_dir.joinpath(file_name).exists()
 
         # Open predict modal, check structure is correct
         page.get_by_role("button", name="Create Predictions from ML Model").click()
