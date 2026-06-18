@@ -29,6 +29,8 @@ These settings should be defined under the `[models]` heading in the TOML file:
 |-----------------|-------------------------|--------------|-----------------------------------------|--------------------------------------------------------------------------|
 | cache_dir       | MODELS_CACHE_DIR        | pathlib.Path | ~/.cache/toktagger/models               | The directory to use for storing ML model weights.                       |
 | max_actors      | MODELS_MAX_ACTORS       | int          | 5                                       | The maximum number of ML models which can be loaded concurrently.        |
+| local_load_enabled      | MODELS_LOCAL_LOAD_ENABLED       | bool          | true                                       | Whether to enable the loading of model weights files from local disk. Should be disabled for production servers.        |
+
 
 ## UDA Connection Settings
 These settings should be defined under the `[uda]` heading in the TOML file:
