@@ -80,11 +80,7 @@ class Server:
             max_gpu_actors = cluster_resources.get("GPU", 0)
         max_gpu_actors = int(max_gpu_actors)
 
-        if (max_actors := os.environ.get("MAX_ACTORS")) is None:
-            # Each GPU actor also gets a CPU so subtract these
-            # Then subtract one for head node, one for server
-            max_actors = cpus_available - max_gpu_actors - 2
-        max_actors = int(max_actors)
+        max_actors = int(os.environ.get("MAX_ACTORS", cpus_available))
 
         if max_gpu_actors > gpus_available:
             raise RuntimeError("More GPU actors requested than hardware supports!")
