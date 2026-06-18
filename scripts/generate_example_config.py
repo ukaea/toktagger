@@ -33,14 +33,20 @@ def create_default_toml_file(file_path: pathlib.Path | str):
         for key, values in schema.items():
             # If 'properties' present, need to create a new subsection, as this is a BaseModel
             if properties := values.get("properties"):
-                _walk_schema(file, properties, f"{heading.lower()}.{key.lower()}")
+                _walk_schema(
+                    file,
+                    properties,
+                    f"{heading.lower()}.{key.lower()}" if heading else key.lower(),
+                )
             else:
                 # Otherwise we are in the lowest section applicable, so write lines
                 if desc := values.get("description"):
                     file.write(f"# {desc}\n")
-                file.write(
-                    f"# {key} = {values.get('default', '<your value here>')}\n\n"
-                )
+                default = values.get("default", "<your value here>")
+                if type(default) is str:
+                    default = f"'{default}'"
+
+                file.write(f"# {key} = {default}\n\n")
         file.write("\n")
 
     with open(file_path, "w") as out_file:

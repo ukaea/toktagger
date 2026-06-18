@@ -8,6 +8,8 @@ from pydantic_settings import SettingsConfigDict
 import tempfile
 from toktagger.api.config import Settings
 
+from scripts.generate_example_config import create_default_toml_file
+import tomllib
 
 ENV_VARS = [
     "SERVER_HOST",
@@ -240,3 +242,24 @@ def test_path_env_vars_are_converted_to_paths(monkeypatch, setup_test_settings):
 
     assert settings.server.cache_dir == pathlib.Path("/tmp/server-cache")
     assert settings.models.cache_dir == pathlib.Path("/tmp/models-cache")
+
+
+def test_create_toml():
+    # Create template with defaults
+    with tempfile.TemporaryDirectory() as file:
+        create_default_toml_file(pathlib.Path(file).joinpath("example.toml"))
+
+        # Check it can be loaded as toml
+        with pathlib.Path(file).joinpath("example.toml").open("rb") as toml_file:
+            example_toml = tomllib.load(toml_file)
+
+        assert all(
+            (
+                key in example_toml.keys()
+                for key in ("database", "models", "sal", "server", "uda")
+            )
+        )
+
+        import pdb
+
+        pdb.set_trace()
