@@ -230,7 +230,14 @@ def test_fair_mast_dataloader():
         validated_annotations=False,
     )
     data_loader = data_loaders.FAIRMASTDataLoader()
-    data = data_loader.get_sample(sample, params=DataParams(name="identity"))
+    # FAIR MAST server seems to be a bit flaky at the moment, causing intermittent CI failures
+    # Will catch TimeoutError here, and skip the test if encountered
+    try:
+        data = data_loader.get_sample(sample, params=DataParams(name="identity"))
+    except TimeoutError:
+        pytest.skip(
+            "Timeout error when connecting to FAIR MAST server - skipping test..."
+        )
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Check both columns requested are present

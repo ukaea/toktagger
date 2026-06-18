@@ -10,11 +10,19 @@ export default defineConfig({
     commonjsOptions: {
       transformMixedEsModules: true, // ✅ fixes CJS/ESM interop
     },
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          react: ["react"],
-          plotly: ["plotly.js-dist-min"],
+        codeSplitting: {
+          groups: [
+            {
+              name: "react",
+              test: /node_modules\/react\//,
+            },
+            {
+              name: "plotly",
+              test: /plotly/,
+            },
+          ],
         },
       },
     },
