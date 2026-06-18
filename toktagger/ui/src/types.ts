@@ -313,6 +313,14 @@ export const Profile2DViewParamsSchema = ViewParamsSchema.extend({
 });
 export type Profile2DViewParams = z.infer<typeof Profile2DViewParamsSchema>;
 
+export const HealthInfoSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  db_connected: z.boolean(),
+  models_enabled: z.boolean(),
+});
+export type HealthInfo = z.infer<typeof HealthInfoSchema>;
+
 export type ToolingProps = {
   plotId?: string;
   plotReady?: boolean;

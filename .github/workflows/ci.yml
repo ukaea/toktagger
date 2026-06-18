@@ -3,9 +3,9 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
 
 jobs:
   lint:
@@ -33,7 +33,7 @@ jobs:
         run: uv sync
 
       - name: Run Ruff
-        run: uv run ruff check toktagger tests --ignore=C901 && uv run ruff format --check toktagger tests  
+        run: uv run ruff check toktagger tests --ignore=C901 && uv run ruff format --check toktagger tests
 
   eslint:
     name: ESLint
@@ -51,8 +51,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20  # or your project's version
-          cache: 'npm'
+          node-version: 20 # or your project’s version
+          cache: ‘npm’
           cache-dependency-path: ./toktagger/ui/package-lock.json
 
       - name: Install dependencies
@@ -77,7 +77,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20   # or your version
+          node-version: 20 # or your version
           cache: 'npm'
           cache-dependency-path: ./toktagger/ui/package-lock.json
 
@@ -87,8 +87,8 @@ jobs:
       - name: Run Prettier check
         run: npx prettier --check .
 
-  test:
-    name: Pytest
+  test_models_disabled:
+    name: Pytest (Models Disabled)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -108,18 +108,45 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Install dependencies (with dev extras)
-        run: uv sync --all-extras
+      - name: Install playwright
+        run: uv run --group dev python -m playwright install --with-deps
+
+      - name: Run unit tests
+        run: uv run --group dev pytest tests/api
+
+      - name: Run end to end tests
+        run: uv run --group dev pytest tests/end_to_end
+
+  test_models_enabled:
+    name: Pytest (Models Enabled)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
 
       - name: Install playwright
-        run: uv run python -m playwright install --with-deps
+        run: uv run --all-extras python -m playwright install --with-deps
 
       - name: Run unit tests
         run: uv run --all-extras pytest tests/api
 
       - name: Run end to end tests
         run: uv run --all-extras pytest tests/end_to_end
-        
+
   build:
     runs-on: ubuntu-latest
 
@@ -131,24 +158,24 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0               # needed so we can push later
-          ref: ${{ github.head_ref }}  # PR source branch
+          fetch-depth: 0 # needed so we can push later
+          ref: ${{ github.head_ref }} # PR source branch
 
       - name: Merge main into branch
         run: |
           git config user.name "Dr. CI Bot"
           git config user.email "ci-bot@example.com"
-          
+
           # Fetch main
           git fetch origin main
-          
+
           # Merge main into current branch
           git merge origin/main --no-edit
 
       - name: Set up Node.js (>=22.19.0)
         uses: actions/setup-node@v4
         with:
-          node-version: '22.19.0'
+          node-version: "22.19.0"
           cache: 'npm'
           cache-dependency-path: ./toktagger/ui/package-lock.json
 

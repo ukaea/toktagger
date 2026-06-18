@@ -1,6 +1,6 @@
 # Change Log
 
-## [v0.2.0](https://github.com/ukaea/toktagger/releases/tag/v0.2.0) - 2025-06-05
+## [v0.2.0](https://github.com/ukaea/toktagger/releases/tag/v0.2.0) - 2025-06-08
 * Added polygon tooling to image annotations UI
 * Added propogate annotations toggle to image annotation UI
 * Added zoom functionality to image annotation UI

@@ -14,12 +14,13 @@ T = typing.TypeVar("T", bound=pydantic.BaseModel)
 
 
 class MongoDBClient:
-    def __init__(self, url: str, db_name: str):
+    def __init__(self, url: str, db_name: str, cache_dir: str | None = None):
         if url.startswith("mongodb://"):
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
-            cache_dir = user_cache_dir("toktagger", "ukaea")
+            if not cache_dir:
+                cache_dir = user_cache_dir("toktagger", "ukaea")
             cache_dir = Path(cache_dir)
             cache_dir.mkdir(parents=True, exist_ok=True)
             file_name = cache_dir / db_name

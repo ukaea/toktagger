@@ -67,3 +67,23 @@ pytest -k test_my_new_functionality --headed --browser=chromium --slowmo=3000
 ```
 
 Once your test is passing, you can just do `pytest` to run the test without seeing it in the browser.
+
+## Models Enabled vs Disabled tests
+TokTagger has an optional set of `models` dependencies, which are required to run model training and prediction within the server. The majority of tests are unaffected by this, and can be ran either with the optional dependencies installed or not. However, some of the tests require these optional dependencies to either be present or missing, to check functionality in both cases. To add one of these tests, add the relevant mark:
+```py
+@pytest.mark.models_enabled
+```
+or
+```py
+@pytest.mark.models_disabled
+```
+There is a fixture which automatically runs on all tests which checks for this mark, checks whether the optional dependencies are installed, and skips the test if those two things are conflicting.
+
+To allow this to work effectively, fixtures written into `conftest.py` or definitions made in `db_definitions.py` should **not** require models to be installed to work. This is because these are automatically loaded for all tests. If you require a fixture which contains model specific code (ie, things which use `ray`, or which define a new model, etc), then it should be defined separately in `models_fixtures.py` or `models_definitions.py`, and then imported into `conftest.py` or `db_definitions.py` with the relevant guard which only imports them if model dependencies are enabled.
+
+If you are writing a full file of tests which should only be ran when the models optional dependencies are present, for example `api/routers/test_models.py`, then you can add the following lines at the very top of the file to skip all subsequent imports and tests if 
+the dependencies are missing:
+```py
+import pytest
+pytest.importorskip("ray")
+```

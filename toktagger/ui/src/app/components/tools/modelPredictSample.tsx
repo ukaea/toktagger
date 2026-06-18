@@ -27,7 +27,7 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { annotations, project, setAnnotations } = useSample();
+  const { annotations, project, dataParams, setAnnotations } = useSample();
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) => project?.model_types.includes(ann.created_by) || false,
@@ -101,7 +101,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   };
 
   const submitPredictJob = async (params: Record<string, unknown>) => {
-    if (!selectedModelName) {
+    if (!selectedModelName || !project) {
       return;
     }
 
@@ -110,6 +110,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       sample_id,
       selectedModelName,
       params,
+      dataParams,
     );
     const payload = await response.json();
 
@@ -123,52 +124,46 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!taskId || !selectedModelName || !isEnabled) return;
+    if (!taskId || !selectedModelName || !isEnabled) return;
 
-      let pollCounter = 0;
-      // Poll for result from GET predictions endpoint
-      const interval = setInterval(async () => {
-        if (selectedModelName == null) {
-          clearInterval(interval);
-          setIsLoading(false);
-          return;
-        }
-        const response = await getSamplePredictions(
-          project_id,
-          sample_id,
-          selectedModelName,
-          taskId,
-        );
-        const payload = await response.json();
+    let pollCounter = 0;
+    // Poll for result from GET predictions endpoint
+    const interval = setInterval(async () => {
+      if (selectedModelName == null) {
+        clearInterval(interval);
+        setIsLoading(false);
+        return;
+      }
+      const response = await getSamplePredictions(
+        project_id,
+        sample_id,
+        selectedModelName,
+        taskId,
+      );
+      const payload = await response.json();
 
-        if (response.status === 202) {
-          // Predictions queued but not done yet, so continue to poll
-          pollCounter += 1;
-          if (pollCounter > 30) {
-            setMessage("Failed to retrieve predictions result.");
-            clearInterval(interval);
-            setIsLoading(false);
-          }
-        } else if (response.ok) {
-          setAnnotations((previousAnnotations: Annotations) => {
-            const otherAnnotations = previousAnnotations.filter(
-              (annotation: Annotation) =>
-                annotation.created_by !== selectedModelName,
-            );
-            return otherAnnotations.concat(payload);
-          });
-          clearInterval(interval);
-          setIsLoading(false);
-          setMessage(null);
-        } else {
-          setMessage(payload.detail);
+      if (response.status === 202) {
+        // Predictions queued but not done yet, so continue to poll
+        pollCounter += 1;
+        if (pollCounter > 30) {
+          setMessage("Predictions timed out - try refreshing the page later!");
           clearInterval(interval);
           setIsLoading(false);
         }
-      }, 1000);
-    };
-    fetchData();
+      } else if (response.ok) {
+        setAnnotations((previousAnnotations: Annotations) => {
+          return previousAnnotations.concat(payload);
+        });
+        clearInterval(interval);
+        setIsLoading(false);
+        setMessage(null);
+      } else {
+        setMessage(payload.detail);
+        clearInterval(interval);
+        setIsLoading(false);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
   }, [
     project_id,
     sample_id,

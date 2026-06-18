@@ -256,6 +256,8 @@ export function SampleProvider({
   const lastGoodVideoFrameRef = useRef<number | null>(null);
   // Video: track which sample has already had its first-frame bootstrap request.
   const bootstrappedVideoSampleIdRef = useRef<string | null>(null);
+  // Annotations are sample-level working state. Do not reload them on every video frame fetch.
+  const loadedAnnotationsSampleKeyRef = useRef<string | null>(null);
 
   if (prevSampleId !== sampleId) {
     setPrevSampleId(sampleId);
@@ -283,7 +285,11 @@ export function SampleProvider({
 
         setProject(projectData);
         setSample(sampleData);
-        setAnnotations(dbAnnotations);
+        const sampleKey = `${projectId}:${sampleId}`;
+        if (loadedAnnotationsSampleKeyRef.current !== sampleKey) {
+          setAnnotations(dbAnnotations);
+          loadedAnnotationsSampleKeyRef.current = sampleKey;
+        }
         setIsValidated(sampleData.validated_annotations);
 
         setViewParams((prevViewParams) => {
@@ -364,6 +370,15 @@ export function SampleProvider({
           if (typeof frame === "number" && Number.isFinite(frame)) {
             bootstrappedVideoSampleIdRef.current = sampleId;
             lastGoodVideoFrameRef.current = frame;
+            setDataParams((prev) => {
+              if (prev.name === "image" && prev.frame === frame) {
+                return prev;
+              }
+              return {
+                name: "image",
+                frame,
+              };
+            });
             setVideoFrameBounds((prev) => ({
               ...prev,
               min: prev.min === null ? frame : Math.min(prev.min, frame),

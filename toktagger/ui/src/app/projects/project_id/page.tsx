@@ -23,6 +23,10 @@ import {
   Content,
   ButtonGroup,
   Checkbox,
+  View,
+  ContextualHelp,
+  Footer,
+  Link,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
@@ -32,14 +36,16 @@ import {
   deleteSample,
   deleteSamples,
 } from "@/app/core";
-import Delete from "@spectrum-icons/workflow/Delete";
-import type { Project, Sample } from "@/types";
 import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
+import { ModelLoadModal } from "@/app/components/tools/modelLoad";
+import Delete from "@spectrum-icons/workflow/Delete";
+import type { Project, Sample } from "@/types";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
 import { JumpToNextButton } from "@/app/components/tools/nav";
+import { useServerHealth } from "@/app/contexts/healthContext";
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
   return (
@@ -174,8 +180,8 @@ export default function ProjectView() {
     direction: "ascending",
   });
   const [samples, setSamples] = useState<Sample[]>([]);
-
   const [project, setProject] = useState<Project | null>(null);
+  const { modelsEnabled } = useServerHealth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -249,12 +255,46 @@ export default function ProjectView() {
   return (
     <div>
       <SampleBreadCrumbs project={project} />
-      <ModelTrainModal project={project}></ModelTrainModal>
-      <ModelPredictModal project={project}></ModelPredictModal>
-      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
+      <div className="relative w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
         <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
+            <View
+              position="fixed"
+              top="size-100"
+              right="size-100"
+              zIndex={9999}
+            >
+              <Flex direction="row" gap={"size-100"}>
+                <ModelTrainModal
+                  project={project}
+                  isEnabled={modelsEnabled}
+                ></ModelTrainModal>
+                <ModelLoadModal
+                  project={project}
+                  isEnabled={modelsEnabled}
+                ></ModelLoadModal>
+                <ModelPredictModal
+                  project={project}
+                  isEnabled={modelsEnabled}
+                ></ModelPredictModal>
+                <ContextualHelp placement="top end" aria-label="ML Model Help">
+                  <Heading>
+                    {modelsEnabled ? "ML Model Controls" : "ML Models Disabled"}
+                  </Heading>
+                  <Content>
+                    {modelsEnabled
+                      ? "Use these inputs to train / load and make predictions with Machine Learning models. You can define custom ML models for your datasets using the TokTagger Python module."
+                      : "Model tools are disabled due to missing dependencies on the server."}
+                  </Content>
+                  <Footer>
+                    <Link href="https://ukaea.github.io/toktagger/custom_models/">
+                      Learn more about ML models in TokTagger
+                    </Link>
+                  </Footer>
+                </ContextualHelp>
+              </Flex>
+            </View>
             <ToastContainer placement="top" />
             <Flex
               direction="row"
