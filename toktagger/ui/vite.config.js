@@ -12,9 +12,9 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ["react"],
-          plotly: ["plotly.js-dist-min"],
+        manualChunks: (id) => {
+          if (id.includes("node_modules/react")) return "react";
+          if (id.includes("node_modules/plotly.js-dist-min")) return "plotly";
         },
       },
     },
