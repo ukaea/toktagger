@@ -518,7 +518,7 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
                 onChange={setUseGPU}
                 isDisabled={disabled || !gpuAvailable}
               >
-                Use GPU
+                Allocate GPU
               </Switch>
               <ContextualHelp
                 marginTop="size-200"
@@ -527,7 +527,7 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
                 UNSAFE_style={{ marginLeft: -20 }}
               >
                 <Heading>
-                  {gpuAvailable ? "Use GPU For This Task" : "GPU Disabled"}
+                  {gpuAvailable ? "Allocate GPU For This Task" : "GPU Disabled"}
                 </Heading>
                 <Content>
                   {gpuAvailable
