@@ -22,7 +22,7 @@ def ray_session():
         os.environ["MODEL_STORAGE"] = tempd
 
         ray.init(
-            num_gpus=2,  # Due to env vars set in models_api_client
+            num_gpus=1,  # Due to env vars set in models_api_client
             ignore_reinit_error=True,
             include_dashboard=False,
             runtime_env={"env_vars": {"MODEL_STORAGE": tempd, "API_URL": ""}},
