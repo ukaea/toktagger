@@ -32,6 +32,7 @@ import { Profile2DViewParamsWidget } from "../tools/profile2dViewParamsWidget";
 
 import { ColorMapPicker } from "./colorMapPicker";
 import Profile2DThresholdTool from "../annotators/thresholding";
+import { PreprocessingTool } from "./preprocessing";
 import { useState } from "react";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
 import { useServerHealth } from "@/app/contexts/healthContext";
@@ -174,6 +175,11 @@ export default function ToolBar() {
 
   if (project.task == TaskType.TimeSeries) {
     tools.push({
+      name: "Signal Preprocessing",
+      component: <PreprocessingTool />,
+    });
+
+    tools.push({
       name: "Peak Detection",
       component: (
         <PeakDetectionTool
@@ -262,11 +268,10 @@ export default function ToolBar() {
 
   return (
     <Provider theme={defaultTheme} height="100vh">
-      <View overflow="auto" height="100vh" width="18vw">
+      <View overflow="auto" height="100vh" minWidth="280px" width="22vw">
         <Flex
           direction="column"
-          alignItems="center"
-          justifyContent="center"
+          alignItems="stretch"
           gap="size-100"
           width="100%"
         >
@@ -276,8 +281,8 @@ export default function ToolBar() {
           <Flex
             direction="column"
             alignItems="center"
-            justifyContent="center"
             gap="size-100"
+            width="100%"
           >
             <Header height="size-300" marginBottom="size-100">
               <span style={{ fontSize: "1.2rem" }}>Controls</span>

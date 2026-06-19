@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { useSample } from "@/app/contexts/SampleContext";
 import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
 import {
   type Annotation,
@@ -17,7 +16,6 @@ export function VideoNavAdapterBridge({
   children: React.ReactNode;
 }) {
   const session = useVideoSession();
-  const { annotations } = useSample();
 
   const adapter: NavAdapter = {
     getAnnotations: () => {

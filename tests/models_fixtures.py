@@ -36,6 +36,18 @@ def ray_session(settings):
     WorkerRegistry.options(name="WorkerLoaderRegistry", lifetime="detached").remote(
         LoaderRegistry._registry
     )
+
+    # Block until the Ray worker environment is initialised (venv + working dir
+    # package) so the first test does not race against setup and hit the
+    # ray.get(timeout=30) limit. Import from the project so the working-dir
+    # runtime_env zip is unpacked on the worker before any test tasks run.
+    @ray.remote
+    def _warmup():
+        import toktagger  # noqa: F401
+
+        return True
+
+    ray.get(_warmup.remote(), timeout=90)
     yield
     ray.shutdown()
 

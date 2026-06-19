@@ -389,3 +389,39 @@ type PlotlyAxisTransforms = {
 export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
   _fullLayout: Record<string, PlotlyAxisTransforms>;
 }
+
+export const SmoothingStepSchema = z.object({
+  type: z.literal("smoothing"),
+  signal_name: z.string(),
+  method: z.enum(["gaussian", "uniform"]).default("gaussian"),
+  sigma: z.number().positive().default(1.0),
+});
+export type SmoothingStep = z.infer<typeof SmoothingStepSchema>;
+
+export const BackgroundSubtractionStepSchema = z.object({
+  type: z.literal("background_subtraction"),
+  signal_name: z.string(),
+  window_size: z.number().int().positive().default(1000),
+});
+export type BackgroundSubtractionStep = z.infer<
+  typeof BackgroundSubtractionStepSchema
+>;
+
+export const NormalisationStepSchema = z.object({
+  type: z.literal("normalisation"),
+  signal_name: z.string(),
+  method: z.enum(["zscore", "minmax"]).default("zscore"),
+});
+export type NormalisationStep = z.infer<typeof NormalisationStepSchema>;
+
+export const PreprocessingStepSchema = z.discriminatedUnion("type", [
+  SmoothingStepSchema,
+  BackgroundSubtractionStepSchema,
+  NormalisationStepSchema,
+]);
+export type PreprocessingStep = z.infer<typeof PreprocessingStepSchema>;
+
+export const PreprocessingConfigSchema = z.object({
+  steps: z.array(PreprocessingStepSchema).default([]),
+});
+export type PreprocessingConfig = z.infer<typeof PreprocessingConfigSchema>;

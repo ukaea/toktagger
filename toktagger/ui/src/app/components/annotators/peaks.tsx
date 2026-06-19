@@ -23,7 +23,8 @@ export function PeakDetectionTool({
   project_id,
   sample_id,
 }: PeakDetectionType) {
-  const { annotations, setAnnotations, dataParams, data } = useSample();
+  const { annotations, setAnnotations, dataParams, data, preprocessingConfig } =
+    useSample();
 
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
@@ -97,6 +98,10 @@ export function PeakDetectionTool({
               time_max: timeRange.end,
             },
             data_params: dataParams,
+            preprocessing:
+              preprocessingConfig.steps.length > 0
+                ? preprocessingConfig
+                : undefined,
           }),
         },
       );
@@ -124,6 +129,7 @@ export function PeakDetectionTool({
     validSignal,
     dataParams,
     setAnnotations,
+    preprocessingConfig,
   ]);
 
   return (

@@ -24,6 +24,7 @@ import {
   ImageDataSchema,
   TaskType,
   DataParams,
+  PreprocessingConfig,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
 import { getSignalNames } from "../utils";
@@ -40,6 +41,8 @@ interface SampleContextType {
   isLoading: boolean;
   isValidated: boolean | null;
   error: string | null;
+  preprocessingConfig: PreprocessingConfig;
+  displayPreprocessingConfig: PreprocessingConfig;
   setAnnotations: (
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
@@ -47,6 +50,8 @@ interface SampleContextType {
   setViewParams: (params: ViewParams | Profile2DViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
   setIsValidated: (validated: boolean) => void;
+  setPreprocessingConfig: (config: PreprocessingConfig) => void;
+  setDisplayPreprocessingConfig: (config: PreprocessingConfig) => void;
 }
 
 const SampleContext = createContext<SampleContextType | undefined>(undefined);
@@ -246,6 +251,18 @@ export function SampleProvider({
 
   const [isValidated, setIsValidated] = useState<boolean | null>(null);
 
+  const [preprocessingConfig, setPreprocessingConfig] =
+    useState<PreprocessingConfig>(() => {
+      try {
+        const stored = localStorage.getItem(`preprocessing-${projectId}`);
+        if (stored) return JSON.parse(stored) as PreprocessingConfig;
+      } catch {}
+      return { steps: [] };
+    });
+
+  const [displayPreprocessingConfig, setDisplayPreprocessingConfig] =
+    useState<PreprocessingConfig>(preprocessingConfig);
+
   const [error, setError] = useState<string | null>(null);
   const [videoFrameBounds, setVideoFrameBounds] = useState<{
     min: number | null;
@@ -268,6 +285,15 @@ export function SampleProvider({
     setVideoFrameBounds({ min: null, max: null });
     lastGoodVideoFrameRef.current = null;
   }, [sampleId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        `preprocessing-${projectId}`,
+        JSON.stringify(preprocessingConfig),
+      );
+    } catch {}
+  }, [preprocessingConfig, projectId]);
 
   // Consolidated data fetching - fetch everything together
   useEffect(() => {
@@ -416,11 +442,15 @@ export function SampleProvider({
     isLoading,
     isValidated,
     error,
+    preprocessingConfig,
+    displayPreprocessingConfig,
     setAnnotations,
     setPlotProps,
     setViewParams,
     setDataParams,
     setIsValidated,
+    setPreprocessingConfig,
+    setDisplayPreprocessingConfig,
   };
 
   return (

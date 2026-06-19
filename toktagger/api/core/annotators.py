@@ -4,11 +4,10 @@ import hmmlearn.hmm as hmm
 from typing import List, Dict, Union
 from abc import ABC, abstractmethod
 from scipy.signal import find_peaks, peak_widths, stft
-from scipy.ndimage import uniform_filter1d, gaussian_filter, uniform_filter
+from scipy.ndimage import gaussian_filter, uniform_filter
 from scipy.interpolate import interp1d
 from skimage import measure, morphology
 from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
 from toktagger.api.schemas.data import (
     MultiVariateTimeSeriesData,
     Profile2DData,
@@ -297,26 +296,18 @@ class PeakDetectionAnnotator(DataAnnotator):
         signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
 
-        signal = signal.reshape(-1, 1)
-        scaler = StandardScaler()
-        signal = scaler.fit_transform(signal)
-        signal = signal.flatten()
-
         tmin, tmax = self.params.time_min, self.params.time_max
         tmin = time.min() if tmin is None else tmin
         tmax = time.max() if tmax is None else tmax
 
-        trend = uniform_filter1d(signal, 1000)
-        dalpha_detrend = signal - trend
-
         peak_idx, params = find_peaks(
-            dalpha_detrend,
+            signal,
             prominence=self.params.prominence,
             width=[1, 150],
             distance=self.params.distance,
         )
 
-        widths, _, _, _ = peak_widths(dalpha_detrend, peak_idx, rel_height=0.9)
+        widths, _, _, _ = peak_widths(signal, peak_idx, rel_height=0.9)
 
         dt = np.abs(time[1] - time[0])
         regions = []
@@ -387,13 +378,10 @@ class OutlierDetectionAnnotator(DataAnnotator):
         if self.params.contamination is None or self.params.contamination <= 0:
             return []
 
-        scaler = StandardScaler()
-        np_scaled = scaler.fit_transform(values)
-
         model = IsolationForest(contamination=self.params.contamination)
-        model.fit(np_scaled)
+        model.fit(values)
 
-        outliers = model.predict(np_scaled) == -1
+        outliers = model.predict(values) == -1
         bounds = binary_runs_to_tuples(outliers)
         bounds = [
             TimeRegion(
@@ -491,9 +479,6 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         time = time.reshape(-1, 1)
         signal = signal.reshape(-1, 1)
 
-        scaler = StandardScaler()
-        signal = scaler.fit_transform(signal)
-
         intercept = np.ones(len(time))
 
         inputs = np.column_stack((signal, time, intercept))
@@ -519,9 +504,6 @@ class ChangePointDetectionAnnotator(DataAnnotator):
     def hmm_changepoint(self, signal, time):
         time = time.reshape(-1, 1)
         signal = signal.reshape(-1, 1)
-
-        scaler = StandardScaler()
-        signal = scaler.fit_transform(signal)
 
         best_score = -1e-10
         best_model = None
@@ -602,14 +584,7 @@ class JumpDetectionAnnotator(DataAnnotator):
             time, signal, num_points=self.params.num_points
         )
 
-        # Smooth the signal to reduce noise
-        signal = gaussian_filter(signal, self.params.smoothing)
         signal_grad = np.absolute(np.gradient(signal))
-
-        signal_grad = signal_grad.reshape(-1, 1)
-        scaler = StandardScaler()
-        signal_grad = scaler.fit_transform(signal_grad)
-        signal_grad = signal_grad.flatten()
 
         # Detect sharp drops (e.g., drops > 3 * std of normal fluctuations)
         threshold = self.params.threshold * signal_grad.std()

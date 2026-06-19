@@ -12,21 +12,30 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
+import { applyPreprocessingClientSide } from "@/app/preprocessingUtils";
 
 export const TimeSeriesView = () => {
-  const { data } = useSample();
+  const { data, displayPreprocessingConfig } = useSample();
 
   const [plotData, setPlotData] = useState<Partial<Plotly.PlotData>[]>([]);
 
   const viewData = data as MultiVariateTimeSeriesData | null;
 
-  useEffect(() => {
-    if (!viewData) return;
+  const displayData = useMemo(
+    () =>
+      viewData
+        ? applyPreprocessingClientSide(viewData, displayPreprocessingConfig)
+        : null,
+    [viewData, displayPreprocessingConfig],
+  );
 
-    const numRows = Object.keys(viewData.values).length;
+  useEffect(() => {
+    if (!displayData) return;
+
+    const numRows = Object.keys(displayData.values).length;
 
     let plotData: Partial<Plotly.PlotData>[] = Object.entries(
-      viewData.values,
+      displayData.values,
     ).map(([key, value]: [string, TimeSeriesData]) => {
       return {
         name: key,
@@ -47,7 +56,7 @@ export const TimeSeriesView = () => {
       yaxis: yAxesNames[index],
     }));
     setPlotData(plotData);
-  }, [data, viewData]);
+  }, [displayData]);
 
   const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
     let maxTime = -Infinity;
@@ -120,7 +129,7 @@ export const TimeSeriesView = () => {
     };
   }, [plotData]);
 
-  if (!viewData) {
+  if (!viewData || !displayData) {
     return null;
   }
 

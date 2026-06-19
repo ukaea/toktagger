@@ -108,7 +108,7 @@ def test_jump_annotator_detects_jump():
     # Create a signal with a jump at index 50
     values = np.concatenate([np.ones(50), np.ones(50) * 10])
     params = JumpDetectionParams(
-        signal_name="Ip", threshold=1, min_distance=1, smoothing=0, num_points=100
+        signal_name="Ip", threshold=1, min_distance=1, num_points=100
     )
     mv_data = make_mv_data(values)
     annotator = annotators.JumpDetectionAnnotator(params)
@@ -120,7 +120,7 @@ def test_jump_annotator_detects_jump():
 def test_jump_annotator_no_jump():
     values = np.ones(100)
     params = JumpDetectionParams(
-        signal_name="Ip", threshold=1, min_distance=1, smoothing=0, num_points=100
+        signal_name="Ip", threshold=1, min_distance=1, num_points=100
     )
     mv_data = make_mv_data(values)
     annotator = annotators.JumpDetectionAnnotator(params)

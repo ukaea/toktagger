@@ -27,7 +27,8 @@ export function ChangePointDetectionTool({
   project_id,
   sample_id,
 }: ChangePointDetectionType) {
-  const { data, dataParams, annotations, setAnnotations } = useSample();
+  const { data, dataParams, annotations, setAnnotations, preprocessingConfig } =
+    useSample();
 
   const methodOptions = [
     { id: 0, name: ChangePointMethod.PELT },
@@ -90,6 +91,10 @@ export function ChangePointDetectionTool({
               num_components: numComponents,
             },
             data_params: dataParams,
+            preprocessing:
+              preprocessingConfig.steps.length > 0
+                ? preprocessingConfig
+                : undefined,
           }),
         },
       );
@@ -117,6 +122,7 @@ export function ChangePointDetectionTool({
     validSignalName,
     dataParams,
     setAnnotations,
+    preprocessingConfig,
   ]);
 
   return (

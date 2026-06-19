@@ -16,7 +16,7 @@ import {
   type ImageAnnotation,
 } from "@annotorious/react";
 
-import type { Annotation, DataParams } from "@/types";
+import type { Annotation } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/video/components/video-context";
 import { VideoBoundingBoxAnnotationSchema, VideoPolygonSchema } from "@/types";
@@ -131,6 +131,9 @@ type VideoSessionCtx = {
   // forward propagation
   /** Seed next frame with current overlay if the next frame has no annotations. */
   forwardPropToNextIfEmpty: (nextFrame: FrameIndex) => void;
+
+  /** Collect all video annotations across all frames (for save/export). */
+  collectAllVideoAnnotations: () => VideoAnnotationShape[];
 };
 
 const Ctx = createContext<VideoSessionCtx | null>(null);
@@ -144,7 +147,7 @@ type FocusRequest = {
 
 function parseVideoAnnotation(annotation: Annotation) {
   if (annotation.type === "video_bounding_box") {
-    return VideoBoundingBoxSchema.safeParse(annotation);
+    return VideoBoundingBoxAnnotationSchema.safeParse(annotation);
   }
 
   if (annotation.type === "video_polygon") {
@@ -305,11 +308,11 @@ function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
       if (!shape) continue;
 
       let parsed:
-        | ReturnType<typeof VideoBoundingBoxSchema.safeParse>
+        | ReturnType<typeof VideoBoundingBoxAnnotationSchema.safeParse>
         | ReturnType<typeof VideoPolygonSchema.safeParse>
         | null = null;
       if (shape.type === "video_bounding_box") {
-        parsed = VideoBoundingBoxSchema.safeParse(shape);
+        parsed = VideoBoundingBoxAnnotationSchema.safeParse(shape);
       } else if (shape.type === "video_polygon") {
         parsed = VideoPolygonSchema.safeParse(shape);
       }
@@ -704,25 +707,6 @@ export function VideoSessionProvider(props: {
     },
     [frame, projectId, sampleId, updateByFrame],
   );
-
-  /** Flatten all per-frame overlays into a single list (useful for debugging/export). */
-  const collectAllNative = useCallback(() => {
-    const out: ImageAnnotation[] = [];
-    for (const list of byFrame.values()) out.push(...(list ?? []));
-    return out;
-  }, [byFrame]);
-
-  /** Convert the session overlays into backend video bounding boxes. */
-  const collectAllVideoBBoxes = useCallback(() => {
-    const out: VideoBoundingBox[] = [];
-    for (const [f, list] of byFrame.entries()) {
-      for (const a of list ?? []) {
-        const shape = annoToVideoAnnotation(a, f);
-        if (shape?.type === "video_bounding_box") out.push(shape);
-      }
-    }
-    return out;
-  }, [byFrame]);
 
   /** Convert the session overlays into backend video annotation shapes. */
   const collectAllVideoAnnotations = useCallback(() => {
@@ -1314,6 +1298,7 @@ export function VideoSessionProvider(props: {
       deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
+      collectAllVideoAnnotations,
     }),
     [
       projectId,
@@ -1348,6 +1333,7 @@ export function VideoSessionProvider(props: {
       deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
+      collectAllVideoAnnotations,
     ],
   );
 

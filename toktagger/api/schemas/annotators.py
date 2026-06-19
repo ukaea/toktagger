@@ -48,7 +48,6 @@ class JumpDetectionParams(AnnotatorParams):
     signal_name: str
     threshold: float
     min_distance: int
-    smoothing: float
     num_points: int
 
 
