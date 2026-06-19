@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends
 from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.schemas.models import LoadTypes
+from toktagger.api.schemas.models import LoadMethods
 from toktagger.api.models import models_dependencies_installed, check_models_enabled
 import typing
 import os
@@ -40,11 +40,24 @@ async def get_model_load_methods() -> list[str]:
     """Get list of enabled ways to load pretrained weights into the server."""
     enabled = []
     if not os.environ.get("DISABLE_LOCAL_MODEL_LOAD"):
-        enabled.append(LoadTypes.LOCAL)
+        enabled.append(LoadMethods.LOCAL)
     if not os.environ.get("DISABLE_GITLAB_MODEL_LOAD"):
-        enabled.append(LoadTypes.GITLAB)
+        enabled.append(LoadMethods.GITLAB)
 
     return enabled
+
+
+@router.get(
+    "/models/load/{load_method}",
+    dependencies=[Depends(check_models_enabled)],
+)
+async def get_model_load_method_allowlist(load_method: LoadMethods) -> str | None:
+    """Get allowed ID for loading from online projects, if applicable."""
+    match load_method:
+        case LoadMethods.LOCAL:
+            return None
+        case LoadMethods.GITLAB:
+            return os.environ.get("MODELS_GITLAB_PROJECT_ID")
 
 
 @router.get(

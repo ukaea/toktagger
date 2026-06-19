@@ -39,7 +39,7 @@ class Model(ModelIn):
     project_id: str
 
 
-class LoadTypes(str, Enum):
+class LoadMethods(str, Enum):
     LOCAL = "local"
     GITLAB = "gitlab"
 

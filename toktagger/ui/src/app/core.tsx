@@ -466,6 +466,18 @@ export const getModelLoadTypes = async (): Promise<Response> => {
   return response;
 };
 
+export const getModelLoadAllowedIds = async (
+  load_method: string,
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/meta/models/load/${load_method}`,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch model types!`);
+  }
+  return response;
+};
+
 export const startLoadModelWeightsLocal = async (
   project_id: string,
   selected_model: string,
@@ -478,6 +490,33 @@ export const startLoadModelWeightsLocal = async (
       headers: {
         "Content-Type": "application/json",
       },
+    },
+  );
+  return response;
+};
+
+export const startLoadModelWeightsGitlab = async (
+  project_id: string,
+  selected_model: string,
+  model_name: string,
+  weights_path: string,
+  model_version: string | null,
+  gitlab_project_id: number | null,
+): Promise<Response> => {
+  const response = await fetch(
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/gitlab`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        weights_path: weights_path,
+        model_name: model_name,
+        version: model_version,
+        gitlab_project_id: gitlab_project_id,
+      }),
     },
   );
   return response;

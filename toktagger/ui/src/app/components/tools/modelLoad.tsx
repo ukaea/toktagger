@@ -21,6 +21,7 @@ import {
   ProgressCircle,
   TooltipTrigger,
   Tooltip,
+  NumberField,
 } from "@adobe/react-spectrum";
 import FileWorkflow from "@spectrum-icons/workflow/FileWorkflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
@@ -30,10 +31,13 @@ import { GitlabIcon } from "@/app/utils";
 import { Project } from "@/types";
 import {
   startLoadModelWeightsLocal,
+  startLoadModelWeightsGitlab,
   getLoadModelStatus,
   getModelTypes,
   getModelLoadTypes,
+  getModelLoadAllowedIds,
 } from "@/app/core";
+import { unstable_HistoryRouter } from "react-router-dom";
 
 export function ModelLoadModal({
   project,
@@ -54,10 +58,17 @@ export function ModelLoadModal({
   );
   const pollingModelName = useRef<string | null>(null);
   const [loadMethods, setLoadMethods] = useState<string[] | null>(null);
+  const [allowedProjectId, setAllowedProjectId] = useState<string | null>(null);
   const [weightsPath, setWeightsPath] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [taskId, setTaskId] = useState<string | null>(null);
 
+  // TODO these shouldnt all be in here
+  const [gitlabModelName, setGitlabModelName] = useState<string>("");
+  const [gitlabProjectId, setGitlabProjectId] = useState<number | null>(null);
+  const [gitlabModelVersion, setGitlabModelVersion] = useState<string | null>(
+    null,
+  );
   const submitLoadJob = async () => {
     if (!selectedModelName || !selectedTab || !project._id) {
       return;
@@ -68,6 +79,15 @@ export function ModelLoadModal({
         project._id,
         selectedModelName,
         weightsPath,
+      );
+    } else if (selectedTab == "gitlab") {
+      response = await startLoadModelWeightsGitlab(
+        project._id,
+        selectedModelName,
+        gitlabModelName,
+        weightsPath,
+        gitlabModelVersion,
+        gitlabProjectId,
       );
     } else {
       throw new Error("Only one signal name allowed for image array data!");
@@ -80,6 +100,7 @@ export function ModelLoadModal({
       pollingModelName.current = selectedModelName;
       setMessage(null);
     } else {
+      console.log(payload.detail);
       setMessage(payload.detail);
       setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
     }
@@ -134,6 +155,23 @@ export function ModelLoadModal({
     }, 1000);
     return () => clearInterval(interval);
   }, [project._id, taskId]);
+
+  useEffect(() => {
+    if (!selectedTab) {
+      return;
+    }
+    (async () => {
+      const response = await getModelLoadAllowedIds(selectedTab as string);
+      if (response.ok) {
+        const data = await response.json();
+        setAllowedProjectId(data as string);
+      } else {
+        const errorMessage = await response.json();
+        setMessage(errorMessage.detail);
+        setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
+      }
+    })();
+  }, [selectedTab]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -220,15 +258,63 @@ export function ModelLoadModal({
                     <Item key="local">
                       <Flex direction="column">
                         <Text marginTop={"size-100"}>
-                          Specify the path to the weights file to load, ensuring
-                          that the file has the correct permissions which allow
-                          it to be copied.
+                          <em>
+                            Specify the path to the weights file to load,
+                            ensuring that the file has the correct permissions
+                            which allow it to be copied.
+                          </em>
                         </Text>
                         <TextField
                           marginTop={"size-100"}
                           width={"100%"}
                           label="Model Weights Path"
                           onChange={setWeightsPath}
+                        />
+                      </Flex>
+                    </Item>
+                  ) : null}
+                  {loadMethods?.includes("gitlab") ? (
+                    <Item key="gitlab">
+                      <Flex direction="column">
+                        <Text marginTop={"size-100"}>
+                          <em>
+                            Load model weights from the Gitlab ML Model
+                            Registry.
+                          </em>
+                        </Text>
+                        <NumberField
+                          marginTop={"size-100"}
+                          width={"100%"}
+                          label="Project ID"
+                          onChange={setGitlabProjectId}
+                          description={
+                            allowedProjectId
+                              ? "Project ID is configured on the server."
+                              : "The ID of the project whose ML Model Registry will be connected to."
+                          }
+                          defaultValue={Number(allowedProjectId) ?? undefined}
+                          isDisabled={!!allowedProjectId}
+                        />
+                        <TextField
+                          marginTop={"size-100"}
+                          width={"100%"}
+                          label="Model Name"
+                          onChange={setGitlabModelName}
+                          description="The name of the ML Model stored in the registry to download weights for."
+                        />
+                        <TextField
+                          marginTop={"size-100"}
+                          width={"100%"}
+                          label="Model Version"
+                          onChange={setGitlabModelVersion}
+                          description="Optional: The semantic version of the model to download, eg v1.0.0"
+                        />
+                        <TextField
+                          marginTop={"size-100"}
+                          width={"100%"}
+                          label="Weights Path"
+                          onChange={setWeightsPath}
+                          description="The path to the weights artifact within the model registry."
                         />
                       </Flex>
                     </Item>
@@ -254,7 +340,7 @@ export function ModelLoadModal({
             <Button
               variant="accent"
               onPress={submitLoadJob}
-              isDisabled={!weightsPath || !selectedModelName}
+              isDisabled={!weightsPath || !selectedModelName} // TODO this doesnt work for load via gitlab yet
             >
               Submit
             </Button>

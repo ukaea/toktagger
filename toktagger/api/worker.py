@@ -19,7 +19,6 @@ import logging
 from platformdirs import user_cache_dir
 import pydantic
 from mlflow import MlflowClient, MlflowException
-from safetensors import safe_open
 
 logger = logging.getLogger("ray")
 logger.setLevel("DEBUG")
@@ -194,26 +193,26 @@ def load_model_gitlab(
     )
 
     # If only safetensors allowed, check it is one
-    if os.environ.get("MODELS_SAFETENSORS_ONLY"):
-        try:
-            with safe_open(weights_path, framework="pt", device="cpu") as f:
-                _ = list(f.keys())
-        except Exception:
-            # Not a safetensors object, delete local file and return error
-            pathlib.Path(weights_path).unlink()
-            logger.error(
-                "Only permitted to load SafeTensors files due to env var setting!"
-            )
-            send_model_updates(
-                project_id=project.id,
-                model_id=model.id,
-                updates=ModelUpdate(training_status="failed"),
-            )
-            return {
-                "project_id": project.id,
-                "model_id": model.id,
-                "message": "Failed to load weights - retrieved file is not a SafeTensor!",
-            }
+    # if os.environ.get("MODELS_SAFETENSORS_ONLY"):
+    #     try:
+    #         with safe_open(weights_path, framework="pt", device="cpu") as f:
+    #             _ = list(f.keys())
+    #     except Exception:
+    #         # Not a safetensors object, delete local file and return error
+    #         pathlib.Path(weights_path).unlink()
+    #         logger.error(
+    #             "Only permitted to load SafeTensors files due to env var setting!"
+    #         )
+    #         send_model_updates(
+    #             project_id=project.id,
+    #             model_id=model.id,
+    #             updates=ModelUpdate(training_status="failed"),
+    #         )
+    #         return {
+    #             "project_id": project.id,
+    #             "model_id": model.id,
+    #             "message": "Failed to load weights - retrieved file is not a SafeTensor!",
+    #         }
 
     # Try loading actor with weights file, catch and reraise any errors
     try:

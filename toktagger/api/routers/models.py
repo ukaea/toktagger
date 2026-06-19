@@ -392,7 +392,7 @@ async def load_model_weights_gitlab(
 
     # Check if required env vars have been set
     if not all(
-        os.environ.get("MODELS_GITLAB_URL"), os.environ.get("MODELS_GITLAB_TOKEN")
+        (os.environ.get("MODELS_GITLAB_URL"), os.environ.get("MODELS_GITLAB_TOKEN"))
     ):
         raise HTTPException(
             status_code=409,
