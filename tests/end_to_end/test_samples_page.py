@@ -899,7 +899,7 @@ def test_model_train_predict(server_setup, setup_model_samples, page: Page, mode
     expect(page.get_by_role("combobox", name="Select Model Type")).to_be_visible()
     expect(page.get_by_role("button", name="Close")).to_be_visible()
     expect(page.get_by_role("button", name="Train", exact=True)).to_be_visible()
-    expect(page.get_by_role("switch", name="Use GPU")).to_be_visible()
+    expect(page.get_by_role("switch", name="Allocate GPU")).to_be_visible()
 
     # Click on dropdown box, check models are shown
     page.get_by_role("button", name="Select Model Type").click()
@@ -1106,7 +1106,7 @@ def test_model_load_predict(server_setup, setup_model_samples, page: Page):
         expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_visible()
         expect(modal.get_by_role("button", name="Predict", exact=True)).to_be_disabled()
         expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
-        expect(page.get_by_role("switch", name="Use GPU")).to_be_visible()
+        expect(page.get_by_role("switch", name="Allocate GPU")).to_be_visible()
 
         # Check entry is there for newly trained model
         expect(modal.get_by_role("row").nth(1)).to_contain_text(

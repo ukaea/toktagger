@@ -263,14 +263,14 @@ Note that a CPU is always available on all worker nodes, even if a GPU is reques
 !!! note
     Note that TokTagger uses Ray for task scheduling and management. Ray will detect Nvidia and most AMD GPUs reliably and make them available if requested, but for intel GPUs it may be less reliable. 
     
-    For Macs with Apple silicon chips (such as the M1, M2, M3 series), the GPU is integrated and appears similarly to a CPU, and Ray will not detect it. Therefore it should be available to every worker node, regardless of the Use GPU setting, and regardless of what `self.gpu_available()` reports.
+    For Macs with Apple silicon chips (such as the M1, M2, M3 series), the GPU is integrated and appears similarly to a CPU, and Ray will not detect it. Therefore it should be available to every worker node, regardless of the Allocate GPU setting, and regardless of what `self.gpu_available()` reports.
 
 If Ray detects a GPU is available on your machine, it will automatically start TokTagger with GPU support enabled, and will use all GPU cores it is able to detect. If you wish to limit the number of GPUs which TokTagger should use in parallel, set the `MAX_GPU_ACTORS` environment variable. To disable GPUs, set `MAX_GPU_ACTORS` to 0.
 
 !!! tip
     As mentioned above, Ray may fail to detect your GPU, especially on Mac devices. If you know how many GPU cores you can use in parallel on your machine, you can set `MAX_GPU_ACTORS` to that number. You should also set the environment variable `FORCE_NUM_GPUS` to `True`, as otherwise TokTagger will throw an error during start up as it tries to allocate more cores than it thinks are available.
 
-    Note that this is just for task scheduling, and has no impact on the underlying resources available to each task. However the `Use GPU` button on the UI will now be enabled, and the `self.gpu_available()` will correctly report whether the user requested GPU usage or not for the given task, meaning that you can correctly assign tasks to GPU or CPU hardware accordingly.
+    Note that this is just for task scheduling, and has no impact on the underlying resources available to each task. However the `Allocate GPU` button on the UI will now be enabled, and the `self.gpu_available()` will correctly report whether the user requested GPU usage or not for the given task, meaning that you can correctly assign tasks to GPU or CPU hardware accordingly.
 
 
 ## Complete Example: Random Forest Classification Model
