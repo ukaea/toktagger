@@ -495,14 +495,25 @@ async def import_annotations(
         sample_id = str(sample["_id"])
         shot_id = sample["shot_id"]
         sample_obj_id = convert_to_objectid(sample_id, "samples")
-        sample_annotations = sample_groups[shot_id]
+        sample_annotations: list[AnnotationOutTypes] = sample_groups[shot_id]
 
         # Set shot_id for each annotation
         for annotation in sample_annotations:
-            annotation.sample_id = sample_obj_id
+            annotation.sample_id = sample_id
             annotation.shot_id = shot_id
 
         ids["sample_id"] = sample_obj_id
         await db_client.insert_many(
             collection="annotations", models=sample_annotations, ids=ids
         )
+
+        # If all annotations are validated, mark sample as validated
+        if all(ann.validated for ann in sample_annotations):
+            await update_sample(
+                db_client, sample_id, SampleUpdate(validated_annotations=True)
+            )
+        # Else mark as unvalidated (if there are any annotations)
+        elif sample_annotations:
+            await update_sample(
+                db_client, sample_id, SampleUpdate(validated_annotations=False)
+            )
