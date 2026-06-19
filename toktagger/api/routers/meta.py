@@ -38,7 +38,13 @@ async def get_model_types(task: str) -> list[str]:
 )
 async def get_model_load_methods() -> list[str]:
     """Get list of enabled ways to load pretrained weights into the server."""
-    return [LoadTypes.LOCAL] if not os.environ.get("DISABLE_LOCAL_MODEL_LOAD") else []
+    enabled = []
+    if not os.environ.get("DISABLE_LOCAL_MODEL_LOAD"):
+        enabled.append(LoadTypes.LOCAL)
+    if not os.environ.get("DISABLE_GITLAB_MODEL_LOAD"):
+        enabled.append(LoadTypes.GITLAB)
+
+    return enabled
 
 
 @router.get(

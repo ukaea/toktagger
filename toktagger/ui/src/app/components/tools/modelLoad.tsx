@@ -25,8 +25,8 @@ import {
 import FileWorkflow from "@spectrum-icons/workflow/FileWorkflow";
 import CheckmarkCircle from "@spectrum-icons/workflow/CheckmarkCircle";
 import DataAdd from "@spectrum-icons/workflow/DataAdd";
-
 import Alert from "@spectrum-icons/workflow/Alert";
+import { GitlabIcon } from "@/app/utils";
 import { Project } from "@/types";
 import {
   startLoadModelWeightsLocal,
@@ -206,6 +206,12 @@ export function ModelLoadModal({
                     <Item key="local">
                       <DataAdd />
                       <Text>Use Local File</Text>
+                    </Item>
+                  ) : null}
+                  {loadMethods?.includes("gitlab") ? (
+                    <Item key="gitlab">
+                      <GitlabIcon />
+                      <Text>From Gitlab</Text>
                     </Item>
                   ) : null}
                 </TabList>
