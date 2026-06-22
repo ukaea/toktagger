@@ -42,6 +42,17 @@ async def get_model_load_methods() -> list[str]:
 
 
 @router.get(
+    "/models/{model}",
+    dependencies=[Depends(check_models_enabled)],
+)
+async def get_model_meta(model: str) -> dict[str, typing.Any]:
+    """Get metadata (name, description, tasks) for a specific model type."""
+    description = ModelRegistry.get_description(model)
+    tasks = [str(t) for t in ModelRegistry.tasks(model)]
+    return {"name": model, "description": description, "tasks": tasks}
+
+
+@router.get(
     "/models/{model}/train",
     dependencies=[Depends(check_models_enabled)],
 )

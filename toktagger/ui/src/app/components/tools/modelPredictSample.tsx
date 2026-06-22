@@ -127,7 +127,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
     if (!taskId || !selectedModelName || !isEnabled) return;
 
     let pollCounter = 0;
-    // Poll for result from GET predictions endpoint
+    // Poll for result from GET predictions endpoint every 3 seconds.
+    // DTW inference can take several seconds so polling faster just spams the server.
     const interval = setInterval(async () => {
       if (selectedModelName == null) {
         clearInterval(interval);
@@ -145,14 +146,20 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       if (response.status === 202) {
         // Predictions queued but not done yet, so continue to poll
         pollCounter += 1;
-        if (pollCounter > 30) {
+        if (pollCounter > 20) {
           setMessage("Predictions timed out - try refreshing the page later!");
           clearInterval(interval);
           setIsLoading(false);
         }
       } else if (response.ok) {
         setAnnotations((previousAnnotations: Annotations) => {
-          return previousAnnotations.concat(payload);
+          // Replace any unvalidated predictions from this model with the new
+          // results rather than appending, so repeated runs don't stack up.
+          const withoutStale = previousAnnotations.filter(
+            (ann: Annotation) =>
+              ann.created_by !== selectedModelName || ann.validated,
+          );
+          return [...withoutStale, ...payload];
         });
         clearInterval(interval);
         setIsLoading(false);
@@ -162,7 +169,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         clearInterval(interval);
         setIsLoading(false);
       }
-    }, 1000);
+    }, 3000);
     return () => clearInterval(interval);
   }, [
     project_id,
@@ -190,9 +197,12 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
             errorMessage={message}
             isDisabled={!isEnabled}
             selectedKey={selectedModelName}
-            onSelectionChange={(key) =>
-              setSelectedModelName(key !== null ? String(key) : null)
-            }
+            onSelectionChange={(key) => {
+              setSelectedModelName(key !== null ? String(key) : null);
+              setTaskId(null);
+              setMessage(null);
+              setIsLoading(false);
+            }}
           >
             {modelNames
               ? modelNames.map((model_name) => (
