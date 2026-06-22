@@ -219,8 +219,7 @@ export function isEllipseAnno(a: ImageAnnotation): a is EllipseAnnotation {
 /** True when a selector is being used as a point marker. */
 export function isPointAnno(a: ImageAnnotation): a is PointAnnotation {
   return (
-    isEllipseAnno(a) &&
-    getBodyValue(a, POINT_BODY_PURPOSE) === POINT_BODY_VALUE
+    isEllipseAnno(a) && getBodyValue(a, POINT_BODY_PURPOSE) === POINT_BODY_VALUE
   );
 }
 
