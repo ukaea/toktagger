@@ -1,5 +1,14 @@
 # Change Log
 
+## [v0.2.1](https://github.com/ukaea/toktagger/releases/tag/v0.2.1) - 2025-06-22
+* Added support for ML model predictions from video UI toolbar
+* Fixed bug so that video annotations update immediately on importing
+* Added support for loading local weights files for ML models
+* Fixed bug to correctly update sample validation status when annotations are imported
+* Fixed bug where annotation `created_by` field was being overwritten when validated
+* Fixed zooming bug in time series UI
+* Increased minimum supported Python version to 3.10
+
 ## [v0.2.0](https://github.com/ukaea/toktagger/releases/tag/v0.2.0) - 2025-06-08
 * Added polygon tooling to image annotations UI
 * Added propogate annotations toggle to image annotation UI
