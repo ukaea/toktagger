@@ -20,7 +20,7 @@ dependencies = [
   "s3fs",
   "zarr",
   "scipy",
-  "pyarrow<21",
+  "pyarrow<24",
   "pymongo",
   "requests",
   "numpy<2",
