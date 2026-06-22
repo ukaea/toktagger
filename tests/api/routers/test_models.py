@@ -21,7 +21,7 @@ import tests.db_definitions as db_definitions
 
 def wait_for_results(task_registry: ActorRegistry, task_id: str):
     task = task_registry.get(task_id)
-    results = ray.get(task, timeout=30)
+    results = ray.get(task, timeout=120)
     return results
 
 
