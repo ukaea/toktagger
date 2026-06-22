@@ -6,30 +6,21 @@ import random
 from bson.objectid import ObjectId
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
-from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
-from toktagger.api.models import models_dependencies_installed
-from toktagger.api.models.base import ModelRegistry
+from toktagger.api.schemas.data import DataParamTypes, DataParams
+from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, LoadTypes
+from toktagger.api.models import models_dependencies_installed, check_models_enabled
 from pydantic import ValidationError
 from collections import defaultdict
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
-    from toktagger.api.worker import train_model, get_predictions
+    from toktagger.api.worker import load_model, train_model, get_predictions
+    from toktagger.api.models.base import ModelRegistry
     import ray
 
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Check models are enabled whenever an endpoint is called
-
-
-def check_models_enabled():
-    if not models_dependencies_installed():
-        raise HTTPException(
-            status_code=503,
-            detail="ML model features are disabled (optional dependencies missing)",
-        )
 
 
 def validate_model_params(model_type: str, schema_type: str, params: dict):
@@ -58,6 +49,7 @@ def validate_model_params(model_type: str, schema_type: str, params: dict):
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Models"],
+    # Check models are enabled whenever an endpoint is called
     dependencies=[Depends(check_models_enabled)],
 )
 
@@ -101,7 +93,9 @@ async def get_model(
     ),
 ) -> Model:
     db_client = request.app.state.db_client
-    model = await utils.get_model(db_client, project_id, model_type, version)
+    model = await utils.get_model(
+        db_client, project_id=project_id, model_type=model_type, version=version
+    )
     return model
 
 
@@ -121,7 +115,9 @@ async def delete_models(
 
     if version:
         models_to_delete = [
-            await utils.get_model(db_client, project_id, model_type, version)
+            await utils.get_model(
+                db_client, project_id=project_id, model_type=model_type, version=version
+            )
         ]
     else:
         models_to_delete = await utils.get_models(db_client, project_id, model_type)
@@ -152,7 +148,9 @@ async def get_training_info(
 ) -> Model:
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
-    latest_model = await utils.get_model(db_client, project_id, model_type)
+    latest_model = await utils.get_model(
+        db_client, project_id=project_id, model_type=model_type
+    )
     if latest_model.training_status not in ("queued", "started"):
         raise HTTPException(
             status_code=404, detail=f"No training in progress for {model_type}"
@@ -279,7 +277,7 @@ async def stop_model_training(
     # If version provided, get only that model
     if version:
         model = await utils.get_model(
-            db_client, project_id, model_type, version=version
+            db_client, project_id, model_type=model_type, version=version
         )
         if model.training_status not in ("started", "queued"):
             raise HTTPException(
@@ -323,6 +321,176 @@ async def stop_model_training(
     return [model.id for model in models]
 
 
+@router.post("/models/{model_type}/load")
+async def load_model_weights(
+    request: Request,
+    project_id: str,
+    model_type: str,
+    method: LoadTypes,
+    weights_path: str,
+):
+    db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
+    # Check file available at weights path
+    weights_path: pathlib.Path = pathlib.Path(weights_path)
+    if not weights_path.exists():
+        raise HTTPException(
+            status_code=422, detail="Weights file not found at specified path!"
+        )
+
+    # Check if that load method is enabled
+    if method == LoadTypes.LOCAL and os.environ.get("DISABLE_LOCAL_MODEL_LOAD"):
+        raise HTTPException(
+            status_code=403, detail="Loading from local weights is disabled."
+        )
+
+    # If local load, create a model db instance and return the model ID
+    elif method == LoadTypes.LOCAL:
+        project = await utils.get_project(db_client, project_id)
+        # Check that this model type is valid for this project
+        if model_type not in project.model_types:
+            raise HTTPException(
+                status_code=422,
+                detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
+            )
+
+        # Try to get model for this project from database if it exists
+        db_models = await utils.get_models(db_client, project_id, model_type)
+
+        if (
+            len(
+                [
+                    db_model
+                    for db_model in db_models
+                    if db_model.training_status in ["queued", "started"]
+                ]
+            )
+            > 0
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Training of {model_type} model already in progress!",
+            )
+
+        if len(db_models) == 0:
+            # This is the first time a model has been saved for this project, so version = 1
+            version = 1
+        else:
+            version = db_models[0].version + 1
+
+        model_in = ModelIn(
+            type=model_type,
+            version=version,
+            training_status="queued",
+            progress=0,
+            score=0,
+        )
+
+        model_id = await utils.add_model(
+            db_client=db_client, project_id=project.id, model=model_in
+        )
+
+        # Find the latest queued model for this project
+        model = await utils.get_model(
+            db_client, project.id, model_type=model_type, model_id=model_id
+        )
+
+        task = load_model.remote(
+            project=project, model=model, weights_path=weights_path
+        )
+        task_id = task_registry.register(task)
+        task_registry.update_actors(model.id)
+
+        # Associate the task ID with the model in the database
+        await utils.update_model(
+            db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
+        )
+
+        return {"task_id": task_id, "model_id": model.id}
+    else:
+        raise HTTPException(
+            status_code=501, detail=f"Loading method {method} not implemented!"
+        )
+
+
+@router.get("/models/{model_type}/load/{task_id}")
+async def get_load_model_status(
+    request: Request,
+    project_id: str = Path(description="The ID of the project to load a model for."),
+    model_type: str = Path(description="The type of model to load."),
+    task_id: str = Path(description="The load task to get results from."),
+) -> bool:
+    db_client = request.app.state.db_client
+    task_registry = request.app.state.task_registry
+
+    project = await utils.get_project(db_client, project_id)
+
+    if model_type not in project.model_types:
+        raise HTTPException(
+            status_code=422,
+            detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
+        )
+
+    # Check whether predictions are complete
+    task = task_registry.get(task_id)
+    if task is None:
+        raise HTTPException(detail="Load task not found with that ID!", status_code=404)
+
+    ready, waiting = ray.wait([task], timeout=0)
+
+    if waiting:
+        return JSONResponse(
+            content={"message": "Load task in the queue!"}, status_code=202
+        )
+    elif ready:
+        # Get model which has this task ID associated
+        model = await utils.get_model(
+            db_client,
+            project_id,
+            model_type=model_type,
+            task_id=task_id,
+        )
+        try:
+            result: dict[str, str | None] = ray.get(task)
+
+        except Exception as e:
+            # Find model ID of latest in progress model
+
+            await utils.update_model(
+                db_client=db_client,
+                model_id=model.id,
+                updates=ModelUpdate(training_status="failed", progress=0),
+            )
+            raise HTTPException(
+                detail=f"Load task failed unexpectedly - {e}.",
+                status_code=500,
+            )
+
+        if result.get("message"):
+            await utils.update_model(
+                db_client=db_client,
+                model_id=result["model_id"],
+                updates=ModelUpdate(training_status="failed", progress=0),
+            )
+            raise HTTPException(
+                detail=f"Load task failed - {result['message']}.",
+                status_code=500,
+            )
+
+        # Update model to be completed and ready for predictions
+        await utils.update_model(
+            db_client=db_client,
+            model_id=result["model_id"],
+            updates=ModelUpdate(training_status="completed", progress=100),
+        )
+
+        return True
+
+    else:
+        raise HTTPException(status_code=404, detail="Load task not found with that ID!")
+
+
 @router.post("/models/{model_type}/predict")
 async def predict(
     request: Request,
@@ -356,7 +524,11 @@ async def predict(
 
     # Find the latest created model for this project
     model = await utils.get_model(
-        db_client, project_id, model_type, status="completed", version=version
+        db_client,
+        project_id,
+        model_type=model_type,
+        status="completed",
+        version=version,
     )
     if model.training_status != "completed":
         raise HTTPException(
@@ -444,6 +616,9 @@ async def create_sample_predictions(
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
+    data_params: DataParamTypes = Body(
+        DataParams(), description="Data parameters fort this sample", embed=True
+    ),
 ) -> dict[str, str]:
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
@@ -457,7 +632,9 @@ async def create_sample_predictions(
         )
 
     # Find the latest created model for this project
-    model = await utils.get_model(db_client, project.id, model_type, status="completed")
+    model = await utils.get_model(
+        db_client, project_id=project.id, model_type=model_type, status="completed"
+    )
 
     # Get model params model from registry and validate
     params_validated = validate_model_params(model_type, "prediction", params)
@@ -465,7 +642,11 @@ async def create_sample_predictions(
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
     task = get_predictions.remote(
-        project=project, model=model, samples=[sample], params=params_validated
+        project=project,
+        model=model,
+        samples=[sample],
+        params=params_validated,
+        data_params=data_params,
     )
     task_id = task_registry.register(task)
     task_registry.update_actors(model.id)
@@ -535,7 +716,9 @@ async def get_sample_predictions(
         prediction_annotations = result.get("annotations_batch")
 
         # Check that annotations contain results for this sample ID
-        if not any(ann.sample_id == sample_id for ann in prediction_annotations):
+        if prediction_annotations and not all(
+            ann.sample_id == sample_id for ann in prediction_annotations
+        ):
             raise HTTPException(
                 status_code=404,
                 detail="This task does not have results for the specified sample!",
@@ -543,7 +726,7 @@ async def get_sample_predictions(
 
         return prediction_annotations
     else:
-        return HTTPException(
+        raise HTTPException(
             status_code=404, detail="Predict task not found with that ID!"
         )
 

@@ -548,6 +548,7 @@ def test_timeseries_annotator(server_setup, page: Page):
     expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
 
 
+@pytest.mark.models_enabled
 @pytest.mark.parametrize(
     "model_name", ["mock_timeseries_cnn", "mock_params_timeseries_cnn"]
 )
@@ -563,8 +564,8 @@ def test_timeseries_model_predict(
 
     sample_id = ids[0]
 
-    # Navigate to page
-    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    # Navigate to samples table page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
 
     # Click on model train modal
     page.get_by_role("button", name="Train ML Model").click()
@@ -634,6 +635,9 @@ def test_timeseries_model_predict(
     # Close modal
     modal.get_by_role("button", name="Close", exact=True).click()
 
+    # Navigate to timeseries page
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+
     # Expand Model Predict in toolbar
     expect(page.get_by_role("button", name="Model Prediction")).to_be_visible()
     page.get_by_role("button", name="Model Prediction").click()
@@ -692,3 +696,11 @@ def test_timeseries_model_predict(
     expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
+
+
+@pytest.mark.models_disabled
+def test_timeseries_models_disabled(server_setup, page: Page):
+    setup_project(page)
+
+    # Check model prediction tool is not visible
+    expect(page.get_by_role("button", name="Model Prediction")).to_be_hidden()

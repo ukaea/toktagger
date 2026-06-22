@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Annotorious } from "@annotorious/react";
-import type { DataParams } from "@/types";
 import { ImageDataSchema } from "@/types";
 import { Button } from "@adobe/react-spectrum";
 import {
@@ -23,7 +22,7 @@ import { useParams } from "react-router-dom";
  * Frame annotator UI wrapper:
  * - Renders the frame navigation (prev/next + jump)
  * - Shows the current frame index (from session state)
- * - Seeds the session overlay from backend annotations (one-shot)
+ * - Flushes the current frame overlay before frame changes
  *
  * Note: this component does not fetch frames. The parent drives frame changes by
  * updating dataParams and passing the new image when the backend responds.
@@ -44,6 +43,7 @@ function VideoFrameAnnotator(props: {
   const handlePrev = () => {
     if (prevDisabled) return;
     const prev = Math.max(0, session.frame - 1);
+    session.flushCurrentFrameOverlay();
     props.goToFrame(prev);
   };
 
@@ -51,8 +51,10 @@ function VideoFrameAnnotator(props: {
     if (nextDisabled) return;
     const next = session.frame + 1;
 
+    session.flushCurrentFrameOverlay();
+
     // Forward-propagate current annotations into the next frame if that frame is empty.
-    // This is purely in-session state; image loading is driven by goToFrame().
+    // This updates SampleContext working annotations; image loading is driven by goToFrame().
     if (session.propagate) session.forwardPropToNextIfEmpty(next);
 
     props.goToFrame(next);
@@ -60,6 +62,7 @@ function VideoFrameAnnotator(props: {
 
   const handleJump = (n: number) => {
     const target = Math.max(0, Math.trunc(n));
+    session.flushCurrentFrameOverlay();
     props.goToFrame(target);
   };
 
@@ -105,7 +108,7 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
 
 function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
-  const { data, annotations, dataParams } = useSample();
+  const { data } = useSample();
   const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
@@ -118,9 +121,6 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
         key={`${project_id}:${sample_id}`}
         projectId={project_id}
         sampleId={sample_id}
-        data={data}
-        dataParams={dataParams}
-        dbAnnotations={annotations ?? []}
         propagate={videoPropagate}
         setPropagate={setVideoPropagate}
       >
@@ -135,7 +135,7 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
  * This component assumes it is already inside a VideoSessionProvider.
  */
 export function VideoView() {
-  const { data, setDataParams } = useSample();
+  const { data, dataParams, setDataParams } = useSample();
 
   if (!data) return null;
 
@@ -155,14 +155,11 @@ export function VideoView() {
     if (!Number.isFinite(n)) return;
     const target = Math.max(0, Math.trunc(n));
 
-    setDataParams(
-      (prev) =>
-        ({
-          ...(prev as Record<string, unknown>),
-          name: "image",
-          frame: target,
-        }) as DataParams,
-    );
+    setDataParams({
+      ...dataParams,
+      name: "image",
+      frame: target,
+    });
   };
 
   return (
