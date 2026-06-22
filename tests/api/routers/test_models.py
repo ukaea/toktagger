@@ -13,9 +13,9 @@ from toktagger.api.core.sender import (
 import ray
 from unittest.mock import patch
 from bson import ObjectId
-import os
 import time
 import tempfile
+import toktagger.api.config as config
 
 
 def wait_for_results(task_registry: ActorRegistry, task_id: str):
@@ -156,7 +156,7 @@ async def test_model_batch_predict_version(api_client, db_client, setup_model_db
 @pytest.mark.models_enabled
 async def test_model_predict_missing_weights(api_client, db_client, setup_model_db):
     # Delete weights
-    pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+    config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_1']}.model"
     ).unlink()
     response = await api_client.post(
@@ -344,7 +344,11 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_start_training_no_params(api_client, db_client, setup_model_db):
+async def test_model_start_training_no_params(
+    api_client,
+    db_client,
+    setup_model_db,
+):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
     )
@@ -362,9 +366,7 @@ async def test_model_start_training_no_params(api_client, db_client, setup_model
     assert model["score"] == 60  # value returned by train method
 
     # Check model has been saved after completion
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id}.model").exists()
-    )
+    assert config.settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
 
 
 @pytest.mark.asyncio
@@ -420,7 +422,9 @@ async def test_model_missing_params(api_client, db_client, setup_model_db, metho
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_start_training_params(api_client, db_client, setup_model_db):
+async def test_model_start_training_params(
+    api_client, db_client, setup_model_db, settings
+):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
         json={
@@ -446,9 +450,7 @@ async def test_model_start_training_params(api_client, db_client, setup_model_db
     assert model["score"] == 50  # value returned from params
 
     # Check model has been saved after completion
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model_id}.model").exists()
-    )
+    assert config.settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
 
 
 # Test delete model
@@ -468,31 +470,22 @@ async def test_model_delete_type(api_client, db_client, setup_model_db):
     assert all(model["type"] != "mock_disruption_cnn" for model in models)
 
     # Check for models 1 and 2, their file no longer exists
-    assert (
-        not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_model_db['model_id_1']}.model")
-        .exists()
-    )
-    assert (
-        not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_model_db['model_id_2']}.model")
-        .exists()
-    )
-    # And for model 3 and 4 it does still exist
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_model_db['model_id_3']}.model")
-        .exists()
-    )
-    assert (
-        pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_model_db['model_id_4']}.model")
-        .exists()
-    )
+    assert not config.settings.models.cache_dir.joinpath(
+        f"{setup_model_db['model_id_1']}.model"
+    ).exists()
+    assert not config.settings.models.cache_dir.joinpath(
+        f"{setup_model_db['model_id_2']}.model"
+    ).exists()
+    # And for model 3 it does still exist
+    assert config.settings.models.cache_dir.joinpath(
+        f"{setup_model_db['model_id_3']}.model"
+    ).exists()
+    assert config.settings.models.cache_dir.joinpath(
+        f"{setup_model_db['model_id_3']}.model"
+    ).exists()
 
 
 @pytest.mark.asyncio
-@pytest.mark.models_enabled
 async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
@@ -511,17 +504,15 @@ async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     )
 
     # Check for model 2, their file no longer exists
-    assert (
-        not pathlib.Path(os.environ["MODEL_STORAGE"])
-        .joinpath(f"{setup_model_db['model_id_2']}.model")
-        .exists()
-    )
+    assert not config.settings.models.cache_dir.joinpath(
+        f"{setup_model_db['model_id_2']}.model"
+    ).exists()
     # And for models 1, 3 and 4 it does still exist
     assert all(
         (
-            pathlib.Path(os.environ["MODEL_STORAGE"])
-            .joinpath(f"{setup_model_db[model_id]}.model")
-            .exists()
+            config.settings.models.cache_dir.joinpath(
+                f"{setup_model_db[model_id]}.model"
+            ).exists()
         )
         for model_id in ("model_id_1", "model_id_3", "model_id_4")
     )
@@ -638,7 +629,7 @@ async def test_model_load_local(api_client, db_client, setup_model_db):
         assert model["progress"] == 100
 
         # Check model has been saved after completion
-        model_path = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(
+        model_path = pathlib.Path(config.settings.models.cache_dir).joinpath(
             f"{model_id}.model"
         )
         assert model_path.exists()
@@ -660,15 +651,15 @@ async def test_model_load_local_missing_file(api_client, db_client, setup_model_
 
 @pytest.mark.asyncio
 async def test_model_load_local_disabled(api_client, db_client, setup_model_db):
-    # Try loading nonexistent file
-    os.environ["DISABLE_LOCAL_MODEL_LOAD"] = "true"
+    # Try loading  file with local load disabled
+    config.settings.models.local_load_enabled = False
     with tempfile.NamedTemporaryFile(suffix=".model", mode="w") as tempf:
         tempf.write("Model Weights")
         tempf.flush()
         response = await api_client.post(
             f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
         )
-    os.environ.pop("DISABLE_LOCAL_MODEL_LOAD")
+    config.settings.models.local_load_enabled = True
     assert response.status_code == 403
     assert response.json()["detail"] == "Loading from local weights is disabled."
 
@@ -717,7 +708,7 @@ async def test_model_load_local_failed(api_client, db_client, setup_model_db):
 
         # Check model has not been saved after completion
         assert (
-            not pathlib.Path(os.environ["MODEL_STORAGE"])
+            not pathlib.Path(config.settings.models.cache_dir)
             .joinpath(f"{model_id}.model")
             .exists()
         )
