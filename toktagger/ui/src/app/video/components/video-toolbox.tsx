@@ -7,7 +7,6 @@ import {
   Switch,
   Divider,
   Flex,
-  Slider,
 } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
@@ -244,18 +243,6 @@ export function VideoToolbox() {
               >
                 <span className="whitespace-nowrap">Hide annotations</span>
               </Switch>
-            </div>
-            <div className="w-[170px]">
-              <Slider
-                label="Point size"
-                value={session.pointMarkerSize}
-                minValue={2}
-                maxValue={48}
-                step={1}
-                onChange={session.setPointMarkerSize}
-                width="100%"
-                showValueLabel
-              />
             </div>
           </Flex>
         </div>

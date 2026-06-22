@@ -2,7 +2,6 @@
 
 import React, { createContext, useCallback, useContext, useState } from "react";
 import type { DrawingTool } from "@/app/video/components/types";
-import { POINT_MARKER_SIZE } from "@/app/video/components/anno-utils";
 
 type VideoUiStateContextType = {
   videoPropagate: boolean;
@@ -13,8 +12,6 @@ type VideoUiStateContextType = {
   setVideoPanMode: (value: boolean) => void;
   videoDrawingTool: DrawingTool;
   setVideoDrawingTool: (value: DrawingTool) => void;
-  videoPointMarkerSize: number;
-  setVideoPointMarkerSize: (value: number) => void;
 };
 
 const VideoUiStateContext = createContext<VideoUiStateContextType | undefined>(
@@ -26,7 +23,6 @@ const videoUiStateSnapshot = {
   videoLastClassName: null as string | null,
   videoPanMode: true,
   videoDrawingTool: "rectangle" as DrawingTool,
-  videoPointMarkerSize: POINT_MARKER_SIZE,
 };
 
 export function VideoUiStateProvider({
@@ -45,9 +41,6 @@ export function VideoUiStateProvider({
   );
   const [videoDrawingTool, setVideoDrawingToolState] = useState<DrawingTool>(
     () => videoUiStateSnapshot.videoDrawingTool,
-  );
-  const [videoPointMarkerSize, setVideoPointMarkerSizeState] = useState(
-    () => videoUiStateSnapshot.videoPointMarkerSize,
   );
 
   const setVideoPropagate = useCallback((value: boolean) => {
@@ -70,13 +63,6 @@ export function VideoUiStateProvider({
     setVideoDrawingToolState(value);
   }, []);
 
-  const setVideoPointMarkerSize = useCallback((value: number) => {
-    if (!Number.isFinite(value)) return;
-    const next = Math.max(1, Math.trunc(value));
-    videoUiStateSnapshot.videoPointMarkerSize = next;
-    setVideoPointMarkerSizeState(next);
-  }, []);
-
   return (
     <VideoUiStateContext.Provider
       value={{
@@ -88,8 +74,6 @@ export function VideoUiStateProvider({
         setVideoPanMode,
         videoDrawingTool,
         setVideoDrawingTool,
-        videoPointMarkerSize,
-        setVideoPointMarkerSize,
       }}
     >
       {children}

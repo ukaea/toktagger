@@ -35,7 +35,7 @@ import { classIdForName } from "./types";
 type UnknownRecord = Record<string, unknown>;
 const POINT_BODY_PURPOSE = "shape";
 const POINT_BODY_VALUE = "point";
-export const POINT_MARKER_SIZE = 6;
+export const POINT_MARKER_SIZE = 4;
 const CREATOR_PURPOSE = "creator";
 
 export type PointGeometry = { x: number; y: number };
@@ -552,14 +552,10 @@ export function videoPolygonToAnno(
 export function videoPointToAnno(
   p: VideoPoint,
   frameKey: string,
-  markerSize = POINT_MARKER_SIZE,
 ): ImageAnnotation {
   const x = Number(p.x);
   const y = Number(p.y);
-  const size = Number.isFinite(markerSize)
-    ? Math.max(1, Number(markerSize))
-    : POINT_MARKER_SIZE;
-  const half = size / 2;
+  const half = POINT_MARKER_SIZE / 2;
 
   const id =
     globalThis.crypto?.randomUUID?.() ??
