@@ -65,7 +65,7 @@ export type ImageAnnotationWithSelector<TSelector extends Shape> = Omit<
 export type RectangleAnnotation = ImageAnnotationWithSelector<Rectangle>;
 export type PolygonAnnotation = ImageAnnotationWithSelector<Polygon>;
 export type EllipseAnnotation = ImageAnnotationWithSelector<Ellipse>;
-export type PointAnnotation = RectangleAnnotation | EllipseAnnotation;
+export type PointAnnotation = EllipseAnnotation;
 
 function withTargetSource(
   a: ImageAnnotation,
@@ -219,7 +219,7 @@ export function isEllipseAnno(a: ImageAnnotation): a is EllipseAnnotation {
 /** True when a selector is being used as a point marker. */
 export function isPointAnno(a: ImageAnnotation): a is PointAnnotation {
   return (
-    (isRectangleAnno(a) || isEllipseAnno(a)) &&
+    isEllipseAnno(a) &&
     getBodyValue(a, POINT_BODY_PURPOSE) === POINT_BODY_VALUE
   );
 }
@@ -291,22 +291,12 @@ export function readEllipseGeometry(
 export function readPointGeometry(a: ImageAnnotation): PointGeometry | null {
   if (!isPointAnno(a)) return null;
 
-  if (isEllipseAnno(a)) {
-    const g = readEllipseGeometry(a);
-    if (!g) return null;
-
-    return {
-      x: g.cx,
-      y: g.cy,
-    };
-  }
-
-  const g = isRectangleAnno(a) ? readRectGeometry(a) : null;
+  const g = readEllipseGeometry(a);
   if (!g) return null;
 
   return {
-    x: g.x + g.w / 2,
-    y: g.y + g.h / 2,
+    x: g.cx,
+    y: g.cy,
   };
 }
 
