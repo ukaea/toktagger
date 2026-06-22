@@ -5,7 +5,9 @@ from fastapi import HTTPException
 
 
 def models_dependencies_installed() -> bool:
-    return importlib.util.find_spec("ray") is not None
+    # ray is a base dependency; check for one of the models-extra packages instead
+    # so that the models-enabled/disabled distinction matches the CI matrix.
+    return importlib.util.find_spec("dtaidistance") is not None
 
 
 def check_models_enabled():

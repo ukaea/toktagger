@@ -12,8 +12,6 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-pytest.importorskip("ray")
-
 from toktagger.api.models.dtw_motif import DTWMotifModel, DTWMotifTrainParams
 from toktagger.api.models.minirocket import MiniRocketModel, MiniRocketTrainParams
 from toktagger.api.models.stumpy_motif import (
@@ -24,6 +22,7 @@ from toktagger.api.models.stumpy_motif import (
 from toktagger.api.schemas.annotations import AnnotationBase, TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
 
+pytestmark = pytest.mark.models_enabled
 
 # ---------------------------------------------------------------------------
 # Shared helpers
