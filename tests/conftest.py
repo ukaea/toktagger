@@ -218,7 +218,7 @@ def run_server():
 @pytest.fixture(scope="package")
 def start_server():
     os.environ["MONGO_URL"] = "./toktagger_test_db"
-    os.environ["MAX_GPU_ACTORS"] = 0
+    os.environ["MAX_GPU_ACTORS"] = "0"
     with tempfile.TemporaryDirectory() as tempd:
         os.environ["DB_CACHE_DIR"] = tempd
         proc = multiprocessing.Process(target=run_server)
