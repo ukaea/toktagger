@@ -19,17 +19,24 @@ class MongoDBClient:
             # Use mongodb (expects running instance of mongodb at this address)
             self.client = pymongo.AsyncMongoClient(url)
         else:
-            if not cache_dir:
-                cache_dir = user_cache_dir("toktagger", "ukaea")
-            cache_dir = Path(cache_dir)
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            file_name = cache_dir / db_name
-            self.client = AsyncMongitaClient(file_name)
+            # File-path mode: cache_dir takes priority, else fall back to url as a base
+            # directory path (backward-compatibility for users who configured a filesystem
+            # path as the DB URL before the cache_dir option was added).
+            if cache_dir:
+                base_dir = Path(cache_dir)
+            elif url and url != "default":
+                base_dir = Path(url)
+            else:
+                base_dir = Path(user_cache_dir("toktagger", "ukaea"))
+            base_dir.mkdir(parents=True, exist_ok=True)
+            self.client = AsyncMongitaClient(str(base_dir / db_name))
         self.db = self.client[db_name]
 
     async def insert(
         self,
-        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        collection: typing.Literal[
+            "projects", "annotations", "models", "samples", "users", "project_members"
+        ],
         model: T,
         ids: dict[str, ObjectId] | None = None,
     ):
@@ -41,7 +48,9 @@ class MongoDBClient:
 
     async def insert_many(
         self,
-        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        collection: typing.Literal[
+            "projects", "annotations", "models", "samples", "users", "project_members"
+        ],
         models: list[T],
         ids: typing.Union[dict, list[dict]] | None = None,
     ):
@@ -62,7 +71,9 @@ class MongoDBClient:
 
     async def update(
         self,
-        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        collection: typing.Literal[
+            "projects", "annotations", "models", "samples", "users", "project_members"
+        ],
         model: T,
         object_id: ObjectId,
     ):
@@ -81,7 +92,9 @@ class MongoDBClient:
 
     async def get_document_by_id(
         self,
-        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        collection: typing.Literal[
+            "projects", "annotations", "models", "samples", "users", "project_members"
+        ],
         object_id: ObjectId,
     ):
         return await self.db[collection].find_one({"_id": object_id})
@@ -94,7 +107,9 @@ class MongoDBClient:
 
     async def get_filtered_documents(
         self,
-        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        collection: typing.Literal[
+            "projects", "annotations", "models", "samples", "users", "project_members"
+        ],
         filters: dict = {},
         sort_by: str = "_id",
         sort_direction: typing.Literal["ascending", "descending"] = "descending",
@@ -114,7 +129,9 @@ class MongoDBClient:
 
     async def delete_filtered_documents(
         self,
-        collection: typing.Literal["projects", "annotations", "models", "samples"],
+        collection: typing.Literal[
+            "projects", "annotations", "models", "samples", "users", "project_members"
+        ],
         filters: dict = {},
     ):
         return await self.db[collection].delete_many(filters)

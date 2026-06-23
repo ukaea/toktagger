@@ -13,6 +13,15 @@ from toktagger.api.schemas.annotations import (
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import FileData, Sample, SampleUpdate, SampleSummary
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
+from toktagger.api.auth.core import hash_password
+from toktagger.api.schemas.users import (
+    ProjectMember,
+    ProjectMemberOut,
+    ProjectMemberUpdate,
+    UserIn,
+    UserOut,
+    UserUpdate,
+)
 
 
 async def get_projects(
@@ -391,17 +400,20 @@ async def update_annotations(
     project_id: str,
     sample_id: str,
     annotations: list[AnnotationBatchTypes],
+    created_by: Optional[str] = None,
 ) -> list[str]:
-    # Delete previous annotations, if they exist
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    sample_obj_id = convert_to_objectid(sample_id, "samples")
+    filters: dict = {"project_id": project_obj_id, "sample_id": sample_obj_id}
+    if created_by is not None:
+        # Scope the delete to only this user's annotations (concurrent-safe)
+        filters["created_by"] = created_by
     try:
-        await delete_annotations(
-            db_client=db_client, project_id=project_id, sample_id=sample_id
-        )
+        await db_client.delete_filtered_documents("annotations", filters)
     except HTTPException:
         pass
 
     if len(annotations) == 0:
-        # Nothing to add!
         return []
 
     return await add_annotations(
@@ -517,3 +529,194 @@ async def import_annotations(
             await update_sample(
                 db_client, sample_id, SampleUpdate(validated_annotations=False)
             )
+
+
+# ---------------------------------------------------------------------------
+# User helpers
+# ---------------------------------------------------------------------------
+
+
+async def get_user_by_username(
+    db_client: MongoDBClient, username: str
+) -> UserOut | None:
+    docs = await db_client.get_filtered_documents(
+        "users", filters={"username": username}
+    )
+    return UserOut.model_validate(docs[0]) if docs else None
+
+
+async def get_user_by_id(db_client: MongoDBClient, user_id: str) -> UserOut | None:
+    obj_id = convert_to_objectid(user_id, "users")
+    doc = await db_client.get_document_by_id("users", obj_id)
+    return UserOut.model_validate(doc) if doc else None
+
+
+async def get_all_users(db_client: MongoDBClient) -> list[UserOut]:
+    docs = await db_client.get_all_documents("users")
+    return [UserOut.model_validate(d) for d in docs]
+
+
+async def create_user(db_client: MongoDBClient, user: UserIn) -> str:
+    existing = await get_user_by_username(db_client, user.username)
+    if existing:
+        raise HTTPException(status_code=409, detail="Username already exists")
+    return await db_client.insert("users", user)
+
+
+async def update_user(
+    db_client: MongoDBClient, user_id: str, updates: UserUpdate
+) -> None:
+    obj_id = convert_to_objectid(user_id, "users")
+    user = await get_user_by_id(db_client, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    update_dict = updates.model_dump(exclude_none=True)
+    if "password" in update_dict:
+        update_dict["hashed_password"] = hash_password(update_dict.pop("password"))
+    await db_client.db["users"].update_one({"_id": obj_id}, {"$set": update_dict})
+
+
+async def delete_user(db_client: MongoDBClient, user_id: str) -> None:
+    obj_id = convert_to_objectid(user_id, "users")
+    result = await db_client.delete_filtered_documents("users", {"_id": obj_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Also remove their project memberships
+    await db_client.delete_filtered_documents("project_members", {"user_id": obj_id})
+
+
+# ---------------------------------------------------------------------------
+# Project membership helpers
+# ---------------------------------------------------------------------------
+
+
+async def get_project_members(
+    db_client: MongoDBClient, project_id: str
+) -> list[ProjectMemberOut]:
+    project_oid = convert_to_objectid(project_id, "projects")
+    docs = await db_client.get_filtered_documents(
+        "project_members", filters={"project_id": project_oid}
+    )
+    result = []
+    for doc in docs:
+        user = await get_user_by_id(db_client, str(doc["user_id"]))
+        doc["username"] = user.username if user else "unknown"
+        doc["user_id"] = str(doc["user_id"])
+        result.append(ProjectMemberOut.model_validate(doc))
+    return result
+
+
+async def get_project_membership(
+    db_client: MongoDBClient, project_id: str, user_id: str
+) -> dict | None:
+    project_oid = convert_to_objectid(project_id, "projects")
+    user_oid = convert_to_objectid(user_id, "users")
+    docs = await db_client.get_filtered_documents(
+        "project_members",
+        filters={"project_id": project_oid, "user_id": user_oid},
+    )
+    return docs[0] if docs else None
+
+
+async def add_project_member(
+    db_client: MongoDBClient,
+    project_id: str,
+    user_id: str,
+    role: str = "annotator",
+) -> str:
+    project_oid = convert_to_objectid(project_id, "projects")
+    user_oid = convert_to_objectid(user_id, "users")
+
+    existing = await get_project_membership(db_client, project_id, user_id)
+    if existing:
+        raise HTTPException(
+            status_code=409, detail="User is already a member of this project"
+        )
+
+    member = ProjectMember(
+        project_id=str(project_oid),
+        user_id=str(user_oid),
+        role=role,
+    )
+    return await db_client.insert(
+        "project_members",
+        member,
+        ids={"project_id": project_oid, "user_id": user_oid},
+    )
+
+
+async def update_project_member(
+    db_client: MongoDBClient,
+    project_id: str,
+    user_id: str,
+    updates: ProjectMemberUpdate,
+) -> None:
+    project_oid = convert_to_objectid(project_id, "projects")
+    user_oid = convert_to_objectid(user_id, "users")
+
+    docs = await db_client.get_filtered_documents(
+        "project_members",
+        filters={"project_id": project_oid, "user_id": user_oid},
+    )
+    if not docs:
+        raise HTTPException(status_code=404, detail="Membership not found")
+
+    member_oid = convert_to_objectid(str(docs[0]["_id"]), "project_members")
+    await db_client.update("project_members", updates, member_oid)
+
+
+async def remove_project_member(
+    db_client: MongoDBClient, project_id: str, user_id: str
+) -> None:
+    project_oid = convert_to_objectid(project_id, "projects")
+    user_oid = convert_to_objectid(user_id, "users")
+    result = await db_client.delete_filtered_documents(
+        "project_members",
+        {"project_id": project_oid, "user_id": user_oid},
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Membership not found")
+
+
+async def get_user_projects(
+    db_client: MongoDBClient,
+    user_id: str,
+    global_role: str,
+    name: Optional[str] = None,
+    sort_by: str = "_id",
+    sort_direction: str = "descending",
+    start: int = 0,
+    count: Optional[int] = None,
+) -> list[Project]:
+    if global_role == "admin":
+        return await get_projects(
+            db_client,
+            name=name,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            start=start,
+            count=count,
+        )
+
+    user_oid = convert_to_objectid(user_id, "users")
+    memberships = await db_client.get_filtered_documents(
+        "project_members", filters={"user_id": user_oid}
+    )
+    project_oids = [m["project_id"] for m in memberships]
+
+    if not project_oids:
+        return []
+
+    filters: dict = {"_id": {"$in": project_oids}}
+    if name:
+        filters["name"] = {"$regex": f"{name}", "$options": "i"}
+
+    docs = await db_client.get_filtered_documents(
+        "projects",
+        filters=filters,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        start=start,
+        limit=count if count is not None else 0,
+    )
+    return [Project(**d) for d in docs]

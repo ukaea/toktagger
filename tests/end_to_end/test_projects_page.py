@@ -1,3 +1,6 @@
+import pytest
+
+pytest.importorskip("playwright")
 import requests
 from playwright.sync_api import Page, expect
 import re

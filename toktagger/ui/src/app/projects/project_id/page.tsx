@@ -1,8 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import {
-  Provider,
-  defaultTheme,
   Cell,
   Column,
   Row,
@@ -15,7 +13,6 @@ import {
   Button,
   Picker,
   SearchField,
-  ToastContainer,
   DialogTrigger,
   Dialog,
   Heading,
@@ -27,9 +24,13 @@ import {
   ContextualHelp,
   Footer,
   Link,
+  Provider,
+  defaultTheme,
+  ToastContainer,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
 import { AddSamplesEditor } from "./components/add_samples";
+import { ProjectMembersDialog } from "./components/members";
 import {
   getSamples,
   getProject,
@@ -45,7 +46,9 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
 import { JumpToNextButton } from "@/app/components/tools/nav";
+import { useAuth } from "@/app/contexts/AuthContext";
 import { useServerHealth } from "@/app/contexts/healthContext";
+
 const SampleBreadCrumbs = ({ project }: { project: Project }) => {
   const navigate = useNavigate();
   return (
@@ -77,98 +80,96 @@ const SamplesTable = ({
   onSortChange,
   onModify,
 }: SamplesTableProps) => {
-  const navigate = useNavigate();
   const rows = samples.map(({ _id, ...rest }) => ({
     ...rest,
     id: _id,
   }));
 
   return (
-    <Provider theme={defaultTheme} router={{ navigate, useHref }}>
-      <Flex height="size-5000" width="100%" direction="column">
-        <TableView
-          flex
-          aria-label="Samples"
-          selectionMode="none"
-          selectionStyle="highlight"
-          sortDescriptor={sortDescriptor}
-          onSortChange={onSortChange}
-        >
-          <TableHeader>
-            <Column key="shot_id" allowsSorting>
-              Shot ID
-            </Column>
-            <Column key="_id" allowsSorting>
-              Date Created
-            </Column>
-            <Column key="validated_annotations" allowsSorting>
-              Validated
-            </Column>
-            <Column key="actions">Actions</Column>
-          </TableHeader>
-          <TableBody items={rows}>
-            {(item) => (
-              <Row
-                href={`/ui/projects/${project_id}/samples/${item["id"]}?sortColumn=${sortDescriptor.column}&sortDirection=${sortDescriptor.direction}`}
-              >
-                <Cell>{item["shot_id"]}</Cell>
-                <Cell>{item["timestamp"]}</Cell>
-                <Cell>
-                  <Checkbox
-                    isSelected={item["validated_annotations"]}
-                    isReadOnly={true}
-                  />
-                </Cell>
-                <Cell>
-                  <Flex direction="row" gap="size-100">
-                    <DialogTrigger>
-                      <Button aria-label="Delete" variant="negative">
-                        <Delete />
-                      </Button>
-                      {(close) => (
-                        <Dialog>
-                          <Heading>Confirm Deletion</Heading>
-                          <Divider />
-                          <Content>
-                            Are you sure you want to delete sample with Shot ID{" "}
-                            <strong>{item["shot_id"]}</strong>? You will also
-                            lose <strong>all annotations</strong> associated
-                            with this sample. This action cannot be undone.
-                          </Content>
-                          <ButtonGroup>
-                            <Button variant="secondary" onPress={close}>
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="negative"
-                              onPress={async () => {
-                                if (item["id"] == null) {
-                                  return;
-                                }
-                                await deleteSample(project_id, item["id"]);
-                                onModify?.();
-                                close();
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          </ButtonGroup>
-                        </Dialog>
-                      )}
-                    </DialogTrigger>
-                  </Flex>
-                </Cell>
-              </Row>
-            )}
-          </TableBody>
-        </TableView>
-      </Flex>
-    </Provider>
+    <Flex height="size-5000" width="100%" direction="column">
+      <TableView
+        flex
+        aria-label="Samples"
+        selectionMode="none"
+        selectionStyle="highlight"
+        sortDescriptor={sortDescriptor}
+        onSortChange={onSortChange}
+      >
+        <TableHeader>
+          <Column key="shot_id" allowsSorting>
+            Shot ID
+          </Column>
+          <Column key="_id" allowsSorting>
+            Date Created
+          </Column>
+          <Column key="validated_annotations" allowsSorting>
+            Validated
+          </Column>
+          <Column key="actions">Actions</Column>
+        </TableHeader>
+        <TableBody items={rows}>
+          {(item) => (
+            <Row
+              href={`/ui/projects/${project_id}/samples/${item["id"]}?sortColumn=${sortDescriptor.column}&sortDirection=${sortDescriptor.direction}`}
+            >
+              <Cell>{item["shot_id"]}</Cell>
+              <Cell>{item["timestamp"]}</Cell>
+              <Cell>
+                <Checkbox
+                  isSelected={item["validated_annotations"]}
+                  isReadOnly={true}
+                />
+              </Cell>
+              <Cell>
+                <Flex direction="row" gap="size-100">
+                  <DialogTrigger>
+                    <Button aria-label="Delete" variant="negative">
+                      <Delete />
+                    </Button>
+                    {(close) => (
+                      <Dialog>
+                        <Heading>Confirm Deletion</Heading>
+                        <Divider />
+                        <Content>
+                          Are you sure you want to delete sample with Shot ID{" "}
+                          <strong>{item["shot_id"]}</strong>? You will also lose{" "}
+                          <strong>all annotations</strong> associated with this
+                          sample. This action cannot be undone.
+                        </Content>
+                        <ButtonGroup>
+                          <Button variant="secondary" onPress={close}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="negative"
+                            onPress={async () => {
+                              if (item["id"] == null) {
+                                return;
+                              }
+                              await deleteSample(project_id, item["id"]);
+                              onModify?.();
+                              close();
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </ButtonGroup>
+                      </Dialog>
+                    )}
+                  </DialogTrigger>
+                </Flex>
+              </Cell>
+            </Row>
+          )}
+        </TableBody>
+      </TableView>
+    </Flex>
   );
 };
 
 export default function ProjectView() {
   const { project_id } = useParams();
+  const { user: currentUser } = useAuth();
   const hasId = project_id !== undefined;
 
   const [samplesPerPage, setSamplesPerPage] = useState<number>(10);
@@ -255,8 +256,8 @@ export default function ProjectView() {
   return (
     <div>
       <SampleBreadCrumbs project={project} />
-      <div className="relative w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400">
-        <div className="w-full md:w-4/5 p-6 bg-white/60 text-gray-800 rounded-lg shadow-lg backdrop-blur-sm">
+      <div className="relative w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900">
+        <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
             <View
@@ -305,6 +306,12 @@ export default function ProjectView() {
             >
               <Flex gap="size-100" alignItems="center" justifyContent="start">
                 <AddSamplesEditor project={project} onModify={refreshSamples} />
+                {project_id && (
+                  <ProjectMembersDialog
+                    projectId={project_id}
+                    isProjectAdmin={currentUser?.global_role === "admin"}
+                  />
+                )}
                 <DialogTrigger>
                   <Button variant="negative">
                     <Delete /> Clear Samples
@@ -352,8 +359,6 @@ export default function ProjectView() {
                 </Flex>
                 <SearchField
                   label="Search By Shot ID"
-                  // SearchField should be able to do validation when provided a 'pattern' inside a Form element
-                  // But I could not for the life of me get that to work, so will do it manually...
                   onSubmit={onSearchSubmit}
                   validationState={errorMessage ? "invalid" : undefined}
                   errorMessage={errorMessage}
@@ -366,7 +371,7 @@ export default function ProjectView() {
               sortDescriptor={sortDescriptor}
               onSortChange={onSortChange}
               onModify={refreshSamples}
-            ></SamplesTable>
+            />
             <div className="flex items-center justify-between pl-4 pr-4">
               <Button
                 variant="primary"

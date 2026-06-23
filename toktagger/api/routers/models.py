@@ -2,10 +2,16 @@ from fastapi import APIRouter, Request, Depends, Path, Query, Body, HTTPExceptio
 from fastapi.responses import JSONResponse
 import random
 from bson.objectid import ObjectId
+from toktagger.api.auth.dependencies import (
+    require_project_viewer,
+    require_project_annotator,
+    require_project_admin_role,
+)
 from toktagger.api.crud import utils
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.data import DataParamTypes, DataParams
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, LoadTypes
+from toktagger.api.schemas.users import UserOut
 from toktagger.api.models import models_dependencies_installed, check_models_enabled
 from pydantic import ValidationError
 from collections import defaultdict
@@ -17,6 +23,8 @@ if models_dependencies_installed():
     from toktagger.api.worker import load_model, train_model, get_predictions
     from toktagger.api.models.base import ModelRegistry
     import ray
+else:
+    ModelRegistry = None
 
 import logging
 
@@ -58,6 +66,7 @@ router = APIRouter(
 async def get_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_viewer),
     start: int = Query(
         0,
         description="Index of the first model you want returned when sorted by version",
@@ -84,6 +93,7 @@ async def get_models(
 async def get_model(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_viewer),
     model_type: str = Path(
         description="The type of model to return information about."
     ),
@@ -103,6 +113,7 @@ async def get_model(
 async def delete_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_admin_role),
     model_type: str = Path(description="The type of model to delete."),
     version: int = Query(
         None,
@@ -144,7 +155,10 @@ async def delete_models(
 
 @router.get("/models/{model_type}/train")
 async def get_training_info(
-    request: Request, project_id: str, model_type: str
+    request: Request,
+    project_id: str,
+    model_type: str,
+    current_user: UserOut = Depends(require_project_viewer),
 ) -> Model:
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
@@ -163,6 +177,7 @@ async def start_model_training(
     request: Request,
     project_id: str,
     model_type: str,
+    current_user: UserOut = Depends(require_project_annotator),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
@@ -267,6 +282,7 @@ async def stop_model_training(
     request: Request,
     project_id: str,
     model_type: str,
+    current_user: UserOut = Depends(require_project_annotator),
     version: int | None = Query(
         None, description="Version of model to use, leave blank for latest version"
     ),
@@ -495,6 +511,7 @@ async def get_load_model_status(
 async def predict(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_annotator),
     model_type: str = Path(description="The type of model to use for predictions."),
     version: int = Query(
         None, description="Version of model to use, leave blank for latest version"
@@ -578,6 +595,7 @@ async def predict(
 async def delete_predictions(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_admin_role),
     model_type: str = Path(description="The type of model to delete predictions from."),
 ):
     db_client = request.app.state.db_client
@@ -593,7 +611,10 @@ async def delete_predictions(
 
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="annotations",
-        filters={"project_id": ObjectId(project.id), "created_by": model_type},
+        filters={
+            "project_id": ObjectId(project.id),
+            "created_by": f"model::{model_type}",
+        },
     )
 
     if result.deleted_count == 0:
@@ -612,6 +633,7 @@ async def create_sample_predictions(
     sample_id: str = Path(
         description="The ID of the sample to make model predictions for."
     ),
+    current_user: UserOut = Depends(require_project_annotator),
     model_type: str = Path(description="The type of model to make predictions from."),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
@@ -663,6 +685,7 @@ async def get_sample_predictions(
     sample_id: str = Path(
         description="The ID of the sample to get model predictions for."
     ),
+    current_user: UserOut = Depends(require_project_viewer),
     model_type: str = Path(description="The type of model to get predictions from."),
     task_id: str = Path(description="The prediction task to get results from."),
 ) -> list[AnnotationBatchTypes]:
@@ -738,6 +761,7 @@ async def update_model(
     project_id: str = Path(
         description="The ID of the project to make model predictions for."
     ),
+    current_user: UserOut = Depends(require_project_annotator),
     model_id: str = Path(
         description="The ID of the model to update information about."
     ),
@@ -751,7 +775,11 @@ async def update_model(
 
 
 @router.get("/models/{model_id}/evaluate")
-async def evaluate(project_id: str, model_id: str):
+async def evaluate(
+    project_id: str,
+    model_id: str,
+    current_user: UserOut = Depends(require_project_viewer),
+):
     # Get evaluation of model by comparing model predictions to human evaluations
     # Specify samples to use via filters
     # Return overall statistics, as well as correct/incorrect for each sample ID

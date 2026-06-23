@@ -1,3 +1,6 @@
+import pytest
+
+pytest.importorskip("playwright")
 from playwright.sync_api import Page, expect
 import pathlib
 from tests.endpoints import create_project, create_local_samples, create_model_samples
@@ -355,7 +358,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     assert len(annotations) == 2
 
     for annotation in annotations:
-        assert annotation["created_by"] == "manual"
+        assert annotation["created_by"] == "admin"
         assert annotation["validated"]  # == True
         assert annotation["uncertainty"] == 0
 

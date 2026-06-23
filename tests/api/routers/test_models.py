@@ -2,7 +2,6 @@ import pytest
 
 pytest.importorskip("ray")
 
-import pathlib
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.models.base import ActorRegistry
 from toktagger.api.core.sender import (
@@ -344,11 +343,7 @@ async def test_model_update(api_client, db_client, setup_model_db):
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_start_training_no_params(
-    api_client,
-    db_client,
-    setup_model_db,
-):
+async def test_model_start_training_no_params(api_client, db_client, setup_model_db):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
     )
@@ -422,9 +417,7 @@ async def test_model_missing_params(api_client, db_client, setup_model_db, metho
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_start_training_params(
-    api_client, db_client, setup_model_db, settings
-):
+async def test_model_start_training_params(api_client, db_client, setup_model_db):
     response = await api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/mock_params_timeseries_cnn/train",
         json={
@@ -476,16 +469,17 @@ async def test_model_delete_type(api_client, db_client, setup_model_db):
     assert not config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_2']}.model"
     ).exists()
-    # And for model 3 it does still exist
+    # And for model 3 and 4 it does still exist
     assert config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_3']}.model"
     ).exists()
     assert config.settings.models.cache_dir.joinpath(
-        f"{setup_model_db['model_id_3']}.model"
+        f"{setup_model_db['model_id_4']}.model"
     ).exists()
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
@@ -565,7 +559,7 @@ async def test_model_stop_training_not_in_progress(
 @pytest.mark.models_enabled
 async def test_model_delete_predictions(api_client, db_client, setup_model_db):
     await api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
     )
 
     # Should be 5 annotations remaining since half were created by 'manual'
@@ -578,14 +572,14 @@ async def test_model_delete_predictions(api_client, db_client, setup_model_db):
 @pytest.mark.models_enabled
 async def test_model_delete_no_predictions(api_client, db_client, setup_model_db):
     response = await api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
+        f"/projects/{setup_model_db['project_id']}/models/mock_timeseries_cnn/predict"
     )
 
     # Nothing created by this model, so should return 404 and not delete anything
     assert response.status_code == 404
     assert (
         response.json()["detail"]
-        == "No annotations produced by mock_disruption_cnn could be found for this Project."
+        == "No annotations produced by mock_timeseries_cnn could be found for this Project."
     )
     annotations = await db_client.get_all_documents(collection="annotations")
     assert len(annotations) == 10
@@ -629,9 +623,7 @@ async def test_model_load_local(api_client, db_client, setup_model_db):
         assert model["progress"] == 100
 
         # Check model has been saved after completion
-        model_path = pathlib.Path(config.settings.models.cache_dir).joinpath(
-            f"{model_id}.model"
-        )
+        model_path = config.settings.models.cache_dir.joinpath(f"{model_id}.model")
         assert model_path.exists()
 
         # Open the file, check contents are there
@@ -707,8 +699,6 @@ async def test_model_load_local_failed(api_client, db_client, setup_model_db):
         assert model["training_status"] == "failed"
 
         # Check model has not been saved after completion
-        assert (
-            not pathlib.Path(config.settings.models.cache_dir)
-            .joinpath(f"{model_id}.model")
-            .exists()
-        )
+        assert not config.settings.models.cache_dir.joinpath(
+            f"{model_id}.model"
+        ).exists()
