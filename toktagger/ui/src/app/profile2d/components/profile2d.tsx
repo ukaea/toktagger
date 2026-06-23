@@ -1,6 +1,12 @@
 "use client";
 
-import { Profile2DData, Profile2DViewParams } from "@/types";
+import {
+  Annotation,
+  Profile2DMaskSchema,
+  Profile2DMask,
+  Profile2DData,
+  Profile2DViewParams,
+} from "@/types";
 import {
   applyGlobalStyle,
   arrayMax,
@@ -162,6 +168,7 @@ export const Profile2dView = () => {
   const { polygons } = usePolygonContext();
   const { boundingBoxes } = useBoundingBoxContext();
   const [shapes, setShapes] = useState<Partial<Plotly.Shape>[]>([]);
+  const [mask, setMask] = useState<Profile2DMask | null>(null);
   const [logScale, setLogScale] = useState<boolean>(false);
 
   const viewData: Profile2DData | null = data as Profile2DData | null;
@@ -223,6 +230,16 @@ export const Profile2dView = () => {
       });
     });
 
+    // Extract mask from annotations
+    const maskAnnotations = annotations.filter(
+      (x: Annotation) => Profile2DMaskSchema.safeParse(x).success,
+    );
+    const newMask =
+      maskAnnotations.length > 0
+        ? Profile2DMaskSchema.parse(maskAnnotations[0])
+        : null;
+
+    setMask(newMask);
     setShapes(newShapes);
   }, [annotations, viewData, polygons, boundingBoxes]);
 
