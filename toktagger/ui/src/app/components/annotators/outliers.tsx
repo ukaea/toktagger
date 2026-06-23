@@ -22,8 +22,7 @@ export function OutlierDetectionTool({
   project_id,
   sample_id,
 }: OutlierDetectionType) {
-  const { annotations, dataParams, data, setAnnotations, preprocessingConfig } =
-    useSample();
+  const { annotations, dataParams, data, setAnnotations } = useSample();
 
   const methodOptions = [
     { id: 0, name: "mad" },
@@ -78,10 +77,6 @@ export function OutlierDetectionTool({
               contamination: contamination,
             },
             data_params: dataParams,
-            preprocessing:
-              preprocessingConfig.steps.length > 0
-                ? preprocessingConfig
-                : undefined,
           }),
         },
       );
@@ -108,7 +103,6 @@ export function OutlierDetectionTool({
     validSignalName,
     dataParams,
     setAnnotations,
-    preprocessingConfig,
   ]);
 
   return (

@@ -1,17 +1,14 @@
-from typing import Optional
 from fastapi import APIRouter, Request, HTTPException
 from toktagger.api.schemas.projects import Project, Task
 from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas.data import DataParamTypes, MultiVariateTimeSeriesData
+from toktagger.api.schemas.data import DataParamTypes
 from toktagger.api.schemas.annotators import (
     AnnotatorParamTypes,
     AnnotatorTypes,
 )
-from toktagger.api.schemas.preprocessing import PreprocessingConfig
 from toktagger.api.crud.utils import get_project, get_sample
 from toktagger.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.core.preprocessors import apply_preprocessing
 
 router = APIRouter(
     prefix="/projects/{project_id}",
@@ -33,7 +30,6 @@ async def create_annotations(
     annotator_type: AnnotatorTypes,
     annotator_params: AnnotatorParamTypes,
     data_params: DataParamTypes,
-    preprocessing: Optional[PreprocessingConfig] = None,
 ):
     # Use the specified annotator to label this sample for this project
     # Would use the datapool to load and process the data
@@ -56,9 +52,6 @@ async def create_annotations(
 
     data_loader = LoaderRegistry.get(project.data_loader)()
     data_item = data_loader.get_sample(sample, params=data_params)
-
-    if preprocessing and isinstance(data_item, MultiVariateTimeSeriesData):
-        data_item = apply_preprocessing(data_item, preprocessing)
 
     annotator = annotator_cls(annotator_params)
     annotations = annotator.predict(data_item)
