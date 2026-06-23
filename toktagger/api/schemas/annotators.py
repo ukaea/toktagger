@@ -59,7 +59,6 @@ class Profile2DThresholdParams(AnnotatorParams):
     sigma: float = 0.1
     min_size: int = 150
     line_filter_width: int = 3
-    max_polygon_points: int = 30
 
 
 AnnotatorParamTypes = Union[
