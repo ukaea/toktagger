@@ -180,7 +180,7 @@ def test_profile2d_threshold():
     mv_data = MultiVariateTimeSeriesData(values={"Ip": ts_data})
 
     params = Profile2DThresholdParams(
-        signal_name="Ip", percentile=95, dim_1_min=0, min_size=1
+        signal_name="Ip", percentile=95, freq_min=0, min_size=1
     )
     annotator = annotators.Profile2DThresholdAnnotator(params)
     result = annotator.predict(mv_data)
