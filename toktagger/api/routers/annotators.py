@@ -57,7 +57,6 @@ async def create_annotations(
     data_loader = LoaderRegistry.get(project.data_loader)(data_params)
     data_item = data_loader.get_sample(
         sample,
-        params=data_params,
         time_min=project.time_min,
         time_max=project.time_max,
         min_time_step=project.min_time_step,

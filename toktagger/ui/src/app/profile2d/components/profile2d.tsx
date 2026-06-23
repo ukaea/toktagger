@@ -198,13 +198,10 @@ export const Profile2dView = () => {
     }));
 
     polygons.forEach((polygon, index) => {
-      const isDefaultColor = polygon.category.color === "rgb(150, 150, 150)";
-      const lineColor = isDefaultColor ? "rgb(255, 255, 255)" : polygon.category.color;
       newShapes[index].meta = { label: polygon.category.name };
-      newShapes[index].line = { color: lineColor, width: 3 };
-      newShapes[index].fillcolor = lineColor
+      newShapes[index].fillcolor = polygon.category.color
         .replace("rgb(", "rgba(")
-        .replace(")", ", 0.2)");
+        .replace(")", ", 0.5)");
     });
 
     boundingBoxes.forEach((bbox) => {
