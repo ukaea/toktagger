@@ -1,27 +1,26 @@
 from enum import Enum
-from typing import Literal, Optional, Union
-from pydantic import BaseModel
+from typing import Optional, Union
+from toktagger.api.schemas import ConfiguredModel
 
 
 class ViewType(str, Enum):
     IDENTITY = "identity"
-    PROFILE_2D = "profile_2d"
+    SPECTROGRAM = "spectrogram"
 
 
-class ViewParams(BaseModel):
-    name: Literal[ViewType.IDENTITY] = ViewType.IDENTITY
+class ViewParams(ConfiguredModel):
+    name: ViewType = ViewType.IDENTITY
 
 
-class Profile2DViewParams(ViewParams):
-    name: Literal[ViewType.PROFILE_2D] = ViewType.PROFILE_2D
-    signal_name: str
+class SpectrogramViewParams(ViewParams):
+    nperseg: Optional[int] = 256
     time_min: Optional[float] = None
     time_max: Optional[float] = None
-    dim_1_min: Optional[float] = None
-    dim_1_max: Optional[float] = None
-    values_min: Optional[float] = None
-    values_max: Optional[float] = None
-    log_scale: bool = False
+    frequency_min: Optional[float] = None
+    frequency_max: Optional[float] = None
+    amplitude_min: Optional[float] = None
+    amplitude_max: Optional[float] = None
+    threshold_value: Optional[float] = None
 
 
-ViewParamTypes = Union[ViewParams, Profile2DViewParams]
+ViewParamTypes = Union[ViewParams, SpectrogramViewParams]

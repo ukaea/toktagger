@@ -2,12 +2,7 @@
 
 import React from "react";
 import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
-import {
-  type Annotation,
-  type NavAdapter,
-  VideoBoundingBoxAnnotationSchema,
-  VideoPolygonSchema,
-} from "@/types";
+import { type Annotation, type NavAdapter } from "@/types";
 import { useVideoSession } from "./video-session";
 
 export function VideoNavAdapterBridge({
@@ -20,22 +15,18 @@ export function VideoNavAdapterBridge({
   const adapter: NavAdapter = {
     getAnnotations: () => {
       const nowIso = new Date().toISOString();
-      return session
-        .collectAllVideoAnnotations()
-        .map((annotation): Annotation => {
-          if (annotation.type === "video_bounding_box") {
-            const parsed = VideoBoundingBoxAnnotationSchema.parse(annotation);
-            return {
-              ...parsed,
-              timestamp: parsed.timestamp ?? nowIso,
-            };
-          }
-          const parsed = VideoPolygonSchema.parse(annotation);
+      return (annotations ?? []).map((annotation): Annotation => {
+        if (
+          annotation.type === "video_bounding_box" ||
+          annotation.type === "video_polygon"
+        ) {
           return {
-            ...parsed,
-            timestamp: parsed.timestamp ?? nowIso,
+            ...annotation,
+            timestamp: annotation.timestamp ?? nowIso,
           };
-        });
+        }
+        return { ...annotation };
+      });
     },
     clear: () => {
       session.clearCurrentFrame();

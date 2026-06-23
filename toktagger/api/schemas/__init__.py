@@ -1,4 +1,3 @@
-from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from bson.objectid import ObjectId
@@ -7,7 +6,7 @@ from fastapi import HTTPException
 
 
 class ConfiguredModel(BaseModel):
-    timestamp: Optional[datetime] = Field(
+    timestamp: datetime = Field(
         default_factory=datetime.now,
         description="Time when this object was created, leave blank to automatically generate.",
     )

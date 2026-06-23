@@ -9,7 +9,7 @@ class AnnotatorTypes(str, Enum):
     CHANGE_POINT_DETECTION = "change_point_detection"
     JUMP_DETECTION = "jump_detection"
     MANUAL_ANNOTATION = "manual"
-    PROFILE2D_THRESHOLD = "profile2d_threshold"
+    SPECTROGRAM_THRESHOLD = "spectrogram_threshold"
 
 
 class DataTypes(Enum):
@@ -51,14 +51,9 @@ class JumpDetectionParams(AnnotatorParams):
     num_points: int
 
 
-class Profile2DThresholdParams(AnnotatorParams):
+class SpectrogramThresholdParams(AnnotatorParams):
     signal_name: str
     percentile: float
-    dim_1_min: Optional[float] = None
-    dim_1_max: Optional[float] = None
-    sigma: float = 0.1
-    min_size: int = 150
-    line_filter_width: int = 3
 
 
 AnnotatorParamTypes = Union[
@@ -66,5 +61,5 @@ AnnotatorParamTypes = Union[
     OutlierDetectionParams,
     ChangePointDetectionParams,
     JumpDetectionParams,
-    Profile2DThresholdParams,
+    SpectrogramThresholdParams,
 ]

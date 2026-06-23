@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -8,7 +8,7 @@ import {
   Item,
   Switch,
 } from "@adobe/react-spectrum";
-import { Annotation, MultiVariateTimeSeriesDataSchema } from "@/types";
+import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -21,26 +21,21 @@ enum ChangePointMethod {
 type ChangePointDetectionType = {
   project_id: string;
   sample_id: string;
+  data: MultiVariateTimeSeriesData;
 };
 
 export function ChangePointDetectionTool({
   project_id,
   sample_id,
+  data,
 }: ChangePointDetectionType) {
-  const { data, dataParams, annotations, setAnnotations, preprocessingConfig } =
-    useSample();
+  const { annotations, dataParams, setAnnotations } = useSample();
 
   const methodOptions = [
     { id: 0, name: ChangePointMethod.PELT },
     { id: 1, name: ChangePointMethod.HMM },
   ];
-
-  const dataValues = useMemo(
-    () => MultiVariateTimeSeriesDataSchema.safeParse(data).data?.values || {},
-    [data],
-  );
-
-  const signalOptions = Object.keys(dataValues).map((value, index) => ({
+  const signalOptions = Object.keys(data.values).map((value, index) => ({
     id: index,
     name: value,
   }));
@@ -56,7 +51,7 @@ export function ChangePointDetectionTool({
   const [numPoints, setNumPoints] = useState<number>(500);
   const [method, setMethod] = useState<string>(ChangePointMethod.PELT);
   const [numComponents, setNumComponents] = useState<number>(3);
-  const validSignalName = signalName && signalName in dataValues;
+  const validSignalName = signalName && signalName in data.values;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -91,10 +86,6 @@ export function ChangePointDetectionTool({
               num_components: numComponents,
             },
             data_params: dataParams,
-            preprocessing:
-              preprocessingConfig.steps.length > 0
-                ? preprocessingConfig
-                : undefined,
           }),
         },
       );
@@ -122,7 +113,6 @@ export function ChangePointDetectionTool({
     validSignalName,
     dataParams,
     setAnnotations,
-    preprocessingConfig,
   ]);
 
   return (

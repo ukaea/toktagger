@@ -54,13 +54,8 @@ async def create_annotations(
 
     sample: Sample = await get_sample(db_client, project_id, sample_id)
 
-    data_loader = LoaderRegistry.get(project.data_loader)(data_params)
-    data_item = data_loader.get_sample(
-        sample,
-        time_min=project.time_min,
-        time_max=project.time_max,
-        min_time_step=project.min_time_step,
-    )
+    data_loader = LoaderRegistry.get(project.data_loader)()
+    data_item = data_loader.get_sample(sample, params=data_params)
 
     if preprocessing and isinstance(data_item, MultiVariateTimeSeriesData):
         data_item = apply_preprocessing(data_item, preprocessing)

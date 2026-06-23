@@ -403,7 +403,7 @@ export function ProjectConfigEditor({
                       />
                     </>
                   )}
-                  {task === TaskType.Profile2D ? (
+                  {/* {task === TaskType.Spectrogram ? (
                     <>
                       <LabelsForm
                         label="Bounding Box Labels"
@@ -416,7 +416,7 @@ export function ProjectConfigEditor({
                         setLabels={setPolygonLabels}
                       />
                     </>
-                  ) : null}
+                  ) : null} */}
                   {task === TaskType.Video && (
                     <LabelsForm
                       label="Video Bounding Box Labels"

@@ -15,25 +15,23 @@ import {
   Annotation,
   ViewParams,
   PlotProps,
-  Profile2DViewParams,
   MultiVariateTimeSeriesData,
-  Profile2DData,
+  SpectrogramData,
   MultiVariateTimeSeriesDataSchema,
-  Profile2DDataSchema,
   ImageData,
   ImageDataSchema,
   TaskType,
   DataParams,
 } from "@/types";
 import { BACKEND_API_URL } from "@/app/core";
-import { getSignalNames } from "../utils";
+
 interface SampleContextType {
   project: Project | null;
   sample: Sample | null;
   data: Data | null;
   annotations: Annotation[];
   dataParams: DataParams;
-  viewParams: ViewParams | Profile2DViewParams | null;
+  viewParams: ViewParams;
   plotProps: PlotProps;
   annotationLabels: { id: number; name: string }[];
   videoFrameBounds: { min: number | null; max: number | null };
@@ -44,7 +42,7 @@ interface SampleContextType {
     updater: (annotations: Annotation[]) => Annotation[] | Annotation[],
   ) => void;
   setDataParams: (params: DataParams) => void;
-  setViewParams: (params: ViewParams | Profile2DViewParams) => void;
+  setViewParams: (params: ViewParams) => void;
   setPlotProps: (props: PlotProps) => void;
   setIsValidated: (validated: boolean) => void;
 }
@@ -82,101 +80,32 @@ async function getAnnotations(
   );
 }
 
-async function getSampleData(
-  project: Project,
-  sample: Sample,
-  dataParams: DataParams,
-  viewParams: ViewParams | Profile2DViewParams | null,
-  setError: (error: string | null) => void,
-  setIsLoading: (isLoading: boolean) => void,
-  setDataParams: (params: DataParams) => void,
-  setData: (data: Data | null) => void,
-  lastGoodVideoFrameRef: React.MutableRefObject<number | null>,
-): Promise<MultiVariateTimeSeriesData | Profile2DData | ImageData | null> {
-  if (!viewParams) return null;
-
-  const response = await fetch(
-    `${BACKEND_API_URL}/projects/${project._id}/samples/${sample._id}/data`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ params: dataParams, view: viewParams }),
-    },
-  );
-
-  if (!response.ok) {
-    // error handling
-    let payload: unknown = null;
-    try {
-      payload = await response.json();
-    } catch {
-      // ignore; payload stays null
-    }
-
-    const detail = extractDetail(payload);
-
-    // Video-only: treat missing frame as "boundary" and stay on last good frame.
-    if (project.task === TaskType.Video) {
-      const requestedFrame = dataParams?.frame as number | null | undefined;
-
-      const lastGood = lastGoodVideoFrameRef.current;
-
-      if (
-        typeof requestedFrame === "number" &&
-        typeof lastGood === "number" &&
-        requestedFrame !== lastGood &&
-        isMissingFrameError(response.status, detail)
-      ) {
-        ToastQueue.negative(`Frame ${requestedFrame} not found.`, {
-          timeout: 2500,
-        });
-
-        // Roll back params; do NOT set error and do NOT clear data.
-        setDataParams((prev) => ({
-          ...prev,
-          name: "image",
-          frame: lastGood,
-        }));
-        setIsLoading(false);
-        return null;
-      }
-    }
-
-    setError(detail);
-    setData(null);
-    setIsLoading(false);
-    return null;
-  }
-
-  const fetchedData: Data = await response.json();
-
-  const viewData = await parseData(fetchedData, project.task);
-  if (!viewData) {
-    setError("Data could not read the data for the selected view");
-    return null;
-  }
-
-  return viewData;
-}
-
 async function parseData(
   data: Data,
   task: TaskType,
-): Promise<MultiVariateTimeSeriesData | Profile2DData | ImageData | undefined> {
+): Promise<
+  MultiVariateTimeSeriesData | SpectrogramData | ImageData | undefined
+> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for time series view");
     }
     return result.data;
-  } else if (task == TaskType.Profile2D) {
-    const result = Profile2DDataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error("Invalid data for profile 2D view");
-    }
-    return result.data;
+    // } else if (task == TaskType.Spectrogram) {
+    //   const result = CompositeDataSchema.safeParse(data);
+    //   if (!result.success) {
+    //     throw new Error("Invalid data for spectrogram view");
+    //   }
+
+    //   const mhdData = SpectrogramDataSchema.safeParse(
+    //     result.data.values["mirnov"],
+    //   );
+    //   if (!mhdData.success) {
+    //     throw new Error("Invalid data for spectrogram view");
+    //   }
+
+    //   return mhdData.data;
   } else if (task == TaskType.Video) {
     const result = ImageDataSchema.safeParse(data);
     if (!result.success) {
@@ -186,37 +115,6 @@ async function parseData(
   }
 
   return undefined;
-}
-
-function extractDetail(payload: unknown): string {
-  if (!payload) return "Unknown error";
-  if (typeof payload === "string") return payload;
-  if (typeof payload === "object") {
-    const d = (payload as { detail?: unknown }).detail;
-    if (typeof d === "string" && d.trim()) return d;
-    if (Array.isArray(d)) {
-      const first = d.find((x) => typeof x === "string" && x.trim());
-      if (typeof first === "string") return first;
-    }
-  }
-  try {
-    return JSON.stringify(payload);
-  } catch {
-    return "Unknown error";
-  }
-}
-
-function isMissingFrameError(status: number, detail: string): boolean {
-  // Your backend message example: "Could not find image on disk for this frame index"
-  // Treat 404 + that phrasing as "navigation boundary" rather than fatal.
-  if (status === 404) return true;
-  const msg = (detail || "").toLowerCase();
-  return (
-    msg.includes("could not find image") ||
-    msg.includes("file not found") ||
-    msg.includes("no such file") ||
-    msg.includes("frame index")
-  );
 }
 
 export function SampleProvider({
@@ -229,9 +127,9 @@ export function SampleProvider({
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
-  const [viewParams, setViewParams] = useState<
-    ViewParams | Profile2DViewParams | null
-  >();
+  const [viewParams, setViewParams] = useState<ViewParams>({
+    name: "identity",
+  });
 
   const [dataParams, setDataParams] = useState<DataParams>({
     name: "identity",
@@ -322,81 +220,113 @@ export function SampleProvider({
         }
         setIsValidated(sampleData.validated_annotations);
 
-        setViewParams((prevViewParams) => {
-          if (prevViewParams) {
-            return prevViewParams;
-          }
+        let params = viewParams;
+        // if (projectData.task === TaskType.Spectrogram) {
+        //   params = {
+        //     ...params,
+        //     name: "spectrogram",
+        //     nperseg: 256,
+        //   } as SpectrogramViewParams;
+        // }
 
-          // Set default viewParams based on project task
-          if (
-            projectData.task === TaskType.TimeSeries ||
-            projectData.task === TaskType.Video
-          ) {
-            return {
-              name: "identity",
-            };
-          } else if (projectData.task === TaskType.Profile2D) {
-            return {
-              name: "profile_2d",
-              signal_name: getSignalNames(sampleData)[0],
-            } as Profile2DViewParams;
-          }
-          return null;
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-      }
-    };
+        // ------------------------------------------------------------
+        // video projects must request image data parameters.
+        // Backend ImageDataLoader requires params.name === "image".
+        // frame: null means "backend picks first frame automatically".
+        // ------------------------------------------------------------
+        let effectiveDataParams: DataParams = dataParams;
 
-    refreshData();
-  }, [projectId, sampleId, dataParams]);
+        if (projectData.task === TaskType.Video) {
+          const isFirstRequestForSample =
+            bootstrappedVideoSampleIdRef.current !== sampleId;
+          effectiveDataParams = {
+            ...dataParams,
+            name: "image",
+            frame: isFirstRequestForSample ? null : (dataParams.frame ?? null),
+          };
+        }
 
-  useEffect(() => {
-    const fetchDataAsync = async () => {
-      if (!project || !sample || !viewParams) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      // ------------------------------------------------------------
-      // video projects must request image data parameters.
-      // Backend ImageDataLoader requires params.name === "image".
-      // frame: null means "backend picks first frame automatically".
-      // ------------------------------------------------------------
-      let effectiveDataParams: DataParams = dataParams;
-
-      if (project.task === TaskType.Video) {
-        const prev = dataParams as unknown as {
-          name?: string;
-          frame?: number | null;
-        };
-
-        effectiveDataParams = {
-          ...(dataParams as Record<string, unknown>),
-          name: "image",
-          frame: prev.frame ?? null,
-        } as DataParams;
-      }
-
-      try {
-        const fetchedData = await getSampleData(
-          project,
-          sample,
-          effectiveDataParams,
-          viewParams,
-          setError,
-          setIsLoading,
-          setDataParams,
-          setData,
-          lastGoodVideoFrameRef,
+        const response = await fetch(
+          `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/data`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ params: effectiveDataParams, view: params }),
+          },
         );
 
-        setData(fetchedData);
+        if (!response.ok) {
+          let payload: unknown = null;
+          try {
+            payload = await response.json();
+          } catch {
+            // ignore; payload stays null
+          }
 
-        // video: remember last good frame so we can roll back on missing-frame errors
-        if (project.task === TaskType.Video) {
-          const frame = (fetchedData as unknown as { frame?: unknown }).frame;
+          const detail = extractDetail(payload);
+
+          // Video-only: treat missing frame as "boundary" and stay on last good frame.
+          if (projectData.task === TaskType.Video) {
+            const requestedFrame = effectiveDataParams.frame;
+
+            const lastGood = lastGoodVideoFrameRef.current;
+
+            if (
+              typeof requestedFrame === "number" &&
+              typeof lastGood === "number" &&
+              requestedFrame !== lastGood &&
+              isMissingFrameError(response.status, detail)
+            ) {
+              ToastQueue.negative(`Frame ${requestedFrame} not found.`, {
+                timeout: 2500,
+              });
+
+              setVideoFrameBounds((prev) => {
+                // Only tighten bounds for adjacent navigation attempts.
+                // Large jump probes (e.g. 0 -> 5000) should not clamp next/prev.
+                if (Math.abs(requestedFrame - lastGood) !== 1) {
+                  return prev;
+                }
+
+                if (requestedFrame < lastGood) {
+                  return { ...prev, min: lastGood };
+                }
+                return { ...prev, max: lastGood };
+              });
+
+              // Roll back params; do NOT set error and do NOT clear data.
+              setDataParams((prev) => ({
+                ...prev,
+                name: "image",
+                frame: lastGood,
+              }));
+
+              setIsLoading(false);
+              return;
+            }
+          }
+
+          setError(detail);
+          setData(null);
+          setIsLoading(false);
+          return;
+        }
+
+        const fetchedData: Data = await response.json();
+
+        const viewData = await parseData(fetchedData, projectData.task);
+        if (!viewData) {
+          setError("Data could not read the data for the selected view");
+          return;
+        }
+
+        setData(viewData);
+
+        // Video: remember last good frame so we can roll back on missing-frame errors.
+        if (projectData.task === TaskType.Video) {
+          const frame = (viewData as { frame?: unknown }).frame;
           if (typeof frame === "number" && Number.isFinite(frame)) {
             bootstrappedVideoSampleIdRef.current = sampleId;
             lastGoodVideoFrameRef.current = frame;
@@ -422,8 +352,8 @@ export function SampleProvider({
       }
     };
 
-    fetchDataAsync();
-  }, [project, sample, dataParams, viewParams, sampleId]);
+    refreshData();
+  }, [projectId, sampleId, dataParams, viewParams, plotProps]);
 
   const annotationLabels =
     project?.task === TaskType.Video

@@ -1,51 +1,6 @@
-"""
-async_mongita_wrapper.py
-
-A fully asynchronous, multi-process-safe wrapper around Mongita that mimics a subset of
-PyMongo/Motor's async API. Concurrency across processes is coordinated using a file lock,
-and synchronous Mongita operations are executed in a worker thread so the asyncio event
-loop stays responsive.
-
-Features
-- Async client / database / collection objects with awaitable CRUD methods
-- Multi-process safety via file-based mutex (filelock)
-- Motor-like minimal API surface: insert_one, insert_many, find_one, find (async iterator),
-  update_one, update_many, delete_one, delete_many, count_documents, create_index
-- Supports find sorting, skipping, and limiting results
-- Type hints and structured design to extend further
-
-Limitations
-- Operations are serialized across processes by a single exclusive file lock. This is the
-  safest default but may reduce throughput compared to DBs with reader/writer locks.
-- No real MongoDB transactions or change streams.
-- API is a pragmatic subset; extend as needed
-
-Usage
--------
-from async_mongita_wrapper import AsyncMongitaClient
-
-client = AsyncMongitaClient(db_path="./mydb")
-db = client["testdb"]
-collection = db["users"]
-
-async def main():
-    await collection.insert_one({"name": "Alice", "age": 30})
-    doc = await collection.find_one({"name": "Alice"})
-    print(doc)
-
-    # Async iteration with skip, limit, sort
-    async for d in collection.find({"age": {"$gte": 18}}, sort=[("age", 1)], skip=0, limit=10):
-        print(d)
-
-    await client.close()
-
-"""
-
-from __future__ import annotations
-
 import asyncio
-from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, Tuple
 import re
+from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, Tuple
 from mongita import MongitaClientDisk
 
 

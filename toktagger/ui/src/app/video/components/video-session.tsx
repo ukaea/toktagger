@@ -19,7 +19,7 @@ import {
 import type { Annotation } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/video/components/video-context";
-import { VideoBoundingBoxAnnotationSchema, VideoPolygonSchema } from "@/types";
+import { VideoBoundingBoxSchema, VideoPolygonSchema } from "@/types";
 import type {
   ByFrameMap,
   DrawingTool,
@@ -131,9 +131,6 @@ type VideoSessionCtx = {
   // forward propagation
   /** Seed next frame with current overlay if the next frame has no annotations. */
   forwardPropToNextIfEmpty: (nextFrame: FrameIndex) => void;
-
-  /** Collect all video annotations across all frames (for save/export). */
-  collectAllVideoAnnotations: () => VideoAnnotationShape[];
 };
 
 const Ctx = createContext<VideoSessionCtx | null>(null);
@@ -147,7 +144,7 @@ type FocusRequest = {
 
 function parseVideoAnnotation(annotation: Annotation) {
   if (annotation.type === "video_bounding_box") {
-    return VideoBoundingBoxAnnotationSchema.safeParse(annotation);
+    return VideoBoundingBoxSchema.safeParse(annotation);
   }
 
   if (annotation.type === "video_polygon") {
@@ -308,11 +305,11 @@ function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
       if (!shape) continue;
 
       let parsed:
-        | ReturnType<typeof VideoBoundingBoxAnnotationSchema.safeParse>
+        | ReturnType<typeof VideoBoundingBoxSchema.safeParse>
         | ReturnType<typeof VideoPolygonSchema.safeParse>
         | null = null;
       if (shape.type === "video_bounding_box") {
-        parsed = VideoBoundingBoxAnnotationSchema.safeParse(shape);
+        parsed = VideoBoundingBoxSchema.safeParse(shape);
       } else if (shape.type === "video_polygon") {
         parsed = VideoPolygonSchema.safeParse(shape);
       }
@@ -707,87 +704,6 @@ export function VideoSessionProvider(props: {
     },
     [frame, projectId, sampleId, updateByFrame],
   );
-
-  /** Convert the session overlays into backend video annotation shapes. */
-  const collectAllVideoAnnotations = useCallback(() => {
-    const out: VideoAnnotationShape[] = [];
-    for (const [f, list] of byFrame.entries()) {
-      for (const a of list ?? []) {
-        const shape = annoToVideoAnnotation(a, f);
-        if (shape) out.push(shape);
-      }
-    }
-    return out;
-  }, [byFrame]);
-
-  /**
-   * Seed session overlays from backend annotations if the user hasn't edited anything yet.
-   * This is intentionally conservative:
-   * - no-op if session is dirty
-   * - no-op if we already have in-memory overlays
-   * - only consumes supported video annotation entries
-   */
-  const seedFromDbIfEmpty = useCallback(
-    (dbAnnotations: Annotation[]) => {
-      if (dirty) return;
-      if (byFrame.size > 0) return;
-      if (!dbAnnotations || dbAnnotations.length === 0) return;
-
-      const byF = new Map<number, ImageAnnotation[]>();
-
-      let invalid = 0;
-
-      for (const a of dbAnnotations) {
-        const parsed =
-          a.type === "video_bounding_box"
-            ? VideoBoundingBoxAnnotationSchema.safeParse(a)
-            : a.type === "video_polygon"
-              ? VideoPolygonSchema.safeParse(a)
-              : null;
-
-        if (!parsed) continue;
-
-
-        if (!parsed.success) {
-          invalid += 1;
-          continue;
-        }
-
-        const dbAnno = parsed.data;
-        const key = buildSourceKey({
-          projectId,
-          sampleId,
-          frame: dbAnno.frame,
-        });
-        const anno =
-          dbAnno.type === "video_bounding_box"
-            ? videoBBoxToAnno(dbAnno as VideoBoundingBox, key)
-            : videoPolygonToAnno(dbAnno as VideoPolygon, key);
-
-        const cur = byF.get(dbAnno.frame) ?? [];
-        cur.push(anno);
-        byF.set(dbAnno.frame, cur);
-      }
-
-      if (invalid > 0) {
-        console.warn(
-          `[video] seedFromDbIfEmpty: skipped ${invalid} invalid video annotation(s) from backend.`,
-        );
-      }
-
-      if (byF.size === 0) return;
-
-      setByFrame(byF);
-      setDirty(false);
-    },
-    [byFrame.size, dirty, projectId, sampleId],
-  );
-
-  // Seed session state from backend annotations once (no-op if the session already has data).
-  useEffect(() => {
-    if (!props.dbAnnotations || props.dbAnnotations.length === 0) return;
-    seedFromDbIfEmpty(props.dbAnnotations);
-  }, [props.dbAnnotations, seedFromDbIfEmpty]);
 
   /**
    * Single commit point for all Annotorious mutations (create/update/delete).
@@ -1299,7 +1215,6 @@ export function VideoSessionProvider(props: {
       deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
-      collectAllVideoAnnotations,
     }),
     [
       projectId,
@@ -1334,7 +1249,6 @@ export function VideoSessionProvider(props: {
       deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
       forwardPropToNextIfEmpty,
-      collectAllVideoAnnotations,
     ],
   );
 

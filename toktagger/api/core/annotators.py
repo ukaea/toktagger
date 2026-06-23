@@ -1,18 +1,14 @@
 import numpy as np
 import ruptures as rpt
 import hmmlearn.hmm as hmm
-from typing import List, Dict, Union
 from abc import ABC, abstractmethod
-from scipy.signal import find_peaks, peak_widths, stft
-from scipy.ndimage import gaussian_filter, uniform_filter
+from scipy.signal import find_peaks, peak_widths
+from scipy.ndimage import uniform_filter1d, gaussian_filter
 from scipy.interpolate import interp1d
-from skimage import measure, morphology
+
 from sklearn.ensemble import IsolationForest
-from toktagger.api.schemas.data import (
-    MultiVariateTimeSeriesData,
-    Profile2DData,
-    MultiProfile2DData,
-)
+from sklearn.preprocessing import StandardScaler
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.annotators import (
     AnnotatorTypes,
     ChangePointDetectionParams,
@@ -20,15 +16,12 @@ from toktagger.api.schemas.annotators import (
     JumpDetectionParams,
     OutlierDetectionParams,
 )
-from shapely.geometry import Polygon, MultiPolygon
+from scipy.signal import stft
 
 from toktagger.api.schemas.data import TimeSeriesData
-from toktagger.api.schemas.annotations import TimeRegion
-from toktagger.api.schemas.annotations import (
-    PolygonAnnotation,
-)
+from toktagger.api.schemas.annotations import SpectrogramMask, TimeRegion
 from toktagger.api.schemas.annotators import (
-    Profile2DThresholdParams,
+    SpectrogramThresholdParams,
     AnnotatorParamTypes,
 )
 from toktagger.api.schemas.projects import Task
@@ -148,101 +141,18 @@ def downsample_time_series(
     return time_coarse, signal
 
 
-def _coords_to_flat_list(coords) -> List[float]:
-    """
-    Convert an iterable of (x,y) coordinates to COCO flattened list [x1,y1,x2,y2,...].
-    Drops the closing coordinate if it's equal to the first (Shapely exterior rings often close).
-    """
-    coords = list(coords)
-    if len(coords) == 0:
-        return []
-    # If last is same as first, drop it
-    if len(coords) > 1 and coords[0] == coords[-1]:
-        coords = coords[:-1]
-    flat = []
-    for x, y in coords:
-        # keep floats (COCO accepts floats)
-        flat.append(float(x))
-        flat.append(float(y))
-    return flat
-
-
-def shapely_to_coco_style_annotation(
-    geom: Union[Polygon, MultiPolygon],
-) -> Dict:
-    """
-    Convert a Shapely Polygon or MultiPolygon to a COCO annotation dict (polygon segmentation).
-    Returns a dict with keys: segmentation, area, bbox, iscrowd, image_id, category_id, id.
-    """
-    segs = []
-    if geom.is_empty:
-        raise ValueError("Geometry is empty")
-
-    def handle_polygon(poly: Polygon):
-        # exterior
-        exterior_coords = _coords_to_flat_list(poly.exterior.coords)
-        if exterior_coords:
-            segs.append(exterior_coords)
-        # interiors (holes) - add as separate polygons (common practice)
-        for interior in poly.interiors:
-            interior_coords = _coords_to_flat_list(interior.coords)
-            if interior_coords:
-                segs.append(interior_coords)
-
-    if isinstance(geom, Polygon):
-        handle_polygon(geom)
-    elif isinstance(geom, MultiPolygon):
-        for p in geom.geoms:
-            handle_polygon(p)
-    else:
-        raise TypeError("geom must be shapely.geometry.Polygon or MultiPolygon")
-
-    minx, miny, maxx, maxy = geom.bounds
-    width = float(maxx - minx)
-    height = float(maxy - miny)
-    bbox = [float(minx), float(miny), width, height]
-    area = float(geom.area)
-
-    annotation = {
-        "segmentation": segs,
-        "area": area,
-        "bbox": bbox,
-    }
-    return annotation
-
-
-def smooth_binary_mask(mask: np.ndarray, radius: int = 3) -> np.ndarray:
-    """
-    Smooth a binary mask (0/1) using morphological open+close.
-    """
-    # Ensure boolean mask
-    mask = mask.astype(bool)
-
-    selem = morphology.disk(radius)
-
-    opened = morphology.opening(mask, selem)  # remove small noise
-    closed = morphology.closing(opened, selem)  # fill small holes
-
-    return closed.astype(np.uint8)
-
-
-def compute_stft(
-    data: TimeSeriesData, nfft: int = 256, nperseg: int = 256, noverlap: int = 128
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def compute_stft(data: TimeSeriesData) -> np.ndarray:
     time = np.array(data.time)
     values = np.array(data.values)
 
-    sample_rate = 1 / np.abs(np.median(np.diff(time)))
+    sample_rate = 1 / (time[1] - time[0])
 
     freq, ts, Zxx = stft(
         values,
         fs=int(sample_rate),
-        nfft=nfft,
-        nperseg=nperseg,
-        noverlap=noverlap,
+        nperseg=256,
+        noverlap=128,
     )
-    freq /= 1000
-    ts += time[0]
 
     return freq, ts, np.abs(Zxx)
 
@@ -296,18 +206,26 @@ class PeakDetectionAnnotator(DataAnnotator):
         signal = data.values[self.params.signal_name].values
         signal = np.array(signal)
 
+        signal = signal.reshape(-1, 1)
+        scaler = StandardScaler()
+        signal = scaler.fit_transform(signal)
+        signal = signal.flatten()
+
         tmin, tmax = self.params.time_min, self.params.time_max
         tmin = time.min() if tmin is None else tmin
         tmax = time.max() if tmax is None else tmax
 
+        trend = uniform_filter1d(signal, 1000)
+        dalpha_detrend = signal - trend
+
         peak_idx, params = find_peaks(
-            signal,
+            dalpha_detrend,
             prominence=self.params.prominence,
             width=[1, 150],
             distance=self.params.distance,
         )
 
-        widths, _, _, _ = peak_widths(signal, peak_idx, rel_height=0.9)
+        widths, _, _, _ = peak_widths(dalpha_detrend, peak_idx, rel_height=0.9)
 
         dt = np.abs(time[1] - time[0])
         regions = []
@@ -378,10 +296,13 @@ class OutlierDetectionAnnotator(DataAnnotator):
         if self.params.contamination is None or self.params.contamination <= 0:
             return []
 
-        model = IsolationForest(contamination=self.params.contamination)
-        model.fit(values)
+        scaler = StandardScaler()
+        np_scaled = scaler.fit_transform(values)
 
-        outliers = model.predict(values) == -1
+        model = IsolationForest(contamination=self.params.contamination)
+        model.fit(np_scaled)
+
+        outliers = model.predict(np_scaled) == -1
         bounds = binary_runs_to_tuples(outliers)
         bounds = [
             TimeRegion(
@@ -479,6 +400,9 @@ class ChangePointDetectionAnnotator(DataAnnotator):
         time = time.reshape(-1, 1)
         signal = signal.reshape(-1, 1)
 
+        scaler = StandardScaler()
+        signal = scaler.fit_transform(signal)
+
         intercept = np.ones(len(time))
 
         inputs = np.column_stack((signal, time, intercept))
@@ -504,6 +428,9 @@ class ChangePointDetectionAnnotator(DataAnnotator):
     def hmm_changepoint(self, signal, time):
         time = time.reshape(-1, 1)
         signal = signal.reshape(-1, 1)
+
+        scaler = StandardScaler()
+        signal = scaler.fit_transform(signal)
 
         best_score = -1e-10
         best_model = None
@@ -584,7 +511,14 @@ class JumpDetectionAnnotator(DataAnnotator):
             time, signal, num_points=self.params.num_points
         )
 
+        # Smooth the signal to reduce noise
+        signal = gaussian_filter(signal, self.params.smoothing)
         signal_grad = np.absolute(np.gradient(signal))
+
+        signal_grad = signal_grad.reshape(-1, 1)
+        scaler = StandardScaler()
+        signal_grad = scaler.fit_transform(signal_grad)
+        signal_grad = signal_grad.flatten()
 
         # Detect sharp drops (e.g., drops > 3 * std of normal fluctuations)
         threshold = self.params.threshold * signal_grad.std()
@@ -614,98 +548,42 @@ class JumpDetectionAnnotator(DataAnnotator):
         return bounds
 
 
-class Profile2DThresholdAnnotator:
+class SpectrogramThresholdAnnotator:
     """
-    Profile2DThresholdAnnotator for generating a 2D profile mask based on thresholding.
-    This annotator applies a percentile-based threshold to the 2D profile values, and generates a list of polygon annotations
-    representing the regions where the profile exceeds the threshold.
+    SpectrogramThresholdAnnotator for generating a spectrogram mask based on thresholding.
+    This annotator computes the Short-Time Fourier Transform (STFT) of a specified signal
+    from multivariate time series data, applies a percentile-based threshold to the
+    spectrogram values, and generates a binary mask indicating regions exceeding the threshold.
 
     Parameters
     ----------
-    params : Profile2DThresholdParams
-        Configuration parameters for 2D profile thresholding, including signal name and percentile.
+    params : SpectrogramThresholdParams
+        Configuration parameters for spectrogram thresholding, including signal name and percentile.
 
     Methods
     -------
-    predict(data: MultiVariateTimeSeriesData) -> list[PolygonAnnotation]
-        Computes the 2D profile mask based on the specified thresholding parameters.
+    predict(data: MultiVariateTimeSeriesData) -> SpectrogramMask
+        Computes the spectrogram mask based on the specified thresholding parameters.
 
     Examples
     --------
-    >>> annotator = Profile2DThresholdAnnotator(params)
+    >>> annotator = SpectrogramThresholdAnnotator(params)
     >>> mask = annotator.predict(data)
     """
 
-    def __init__(self, params: Profile2DThresholdParams):
+    def __init__(self, params: SpectrogramThresholdParams):
         self.params = params
 
-    def predict(
-        self, data: MultiProfile2DData | MultiVariateTimeSeriesData
-    ) -> list[PolygonAnnotation]:
-        signal = data.values[self.params.signal_name]
+    def predict(self, data: MultiVariateTimeSeriesData) -> SpectrogramMask:
+        _, _, values = compute_stft(data.values[self.params.signal_name])
 
-        if isinstance(signal, TimeSeriesData):
-            dim_1, time, values = compute_stft(signal)
-            values = values  # Transpose to have shape (time, dim_1)
-        elif isinstance(signal, Profile2DData):
-            dim_1 = np.array(signal.dim_1)
-            time = np.array(signal.time)
-            values = np.array(signal.values).T
-
-        values = np.nan_to_num(values, 1e-6).clip(1e-6)
-
-        if self.params.line_filter_width > 0:
-            values = values - uniform_filter(
-                values, size=(self.params.line_filter_width, 1)
-            )
-        values = gaussian_filter(values, sigma=self.params.sigma)
-
-        mask = np.where(values > np.percentile(values, self.params.percentile), 1, 0)
-
-        if self.params.dim_1_min is not None:
-            mask[dim_1 < self.params.dim_1_min] = 0
-
-        if self.params.dim_1_max is not None:
-            mask[dim_1 > self.params.dim_1_max] = 0
-
-        labeled_regions = measure.label(mask, connectivity=2)
-
-        if self.params.min_size > 0:
-            labeled_regions = morphology.remove_small_objects(
-                labeled_regions, min_size=self.params.min_size
-            )
-
-        # Convert each labeled region to polygons
-        polygons = []
-        for region_label in range(1, labeled_regions.max() + 1):
-            # Create a binary mask for the current label
-            region_mask = labeled_regions == region_label
-
-            # Find contours at the 0.5 level
-            contours = measure.find_contours(region_mask, 0.5)
-
-            for contour in contours:
-                # Contour coordinates are (row, col), convert to (x, y)
-                contour_coords = [
-                    (int(np.round(c[1])), int(np.round(c[0]))) for c in contour
-                ]
-                contour_coords = [(time[x], dim_1[y]) for x, y in contour_coords]
-                poly = Polygon(contour_coords)
-                # if poly.is_valid and poly.area > 0:
-                polygons.append(poly)
-
-        polygons = [shapely_to_coco_style_annotation(polygon) for polygon in polygons]
-
-        annotations = [
-            PolygonAnnotation(
-                **poly,
-                label="Unknown",
-                created_by=AnnotatorTypes.PROFILE2D_THRESHOLD,
-                signal_name=self.params.signal_name,
-            )
-            for poly in polygons
-        ]
-        return annotations
+        threshold_value = np.percentile(values, self.params.percentile)
+        threshold_mask = values > threshold_value
+        return SpectrogramMask(
+            label="SpectrogramMask",
+            values=threshold_mask.tolist(),
+            created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD,
+        )
 
 
 ANNOTATORS = {
@@ -713,7 +591,7 @@ ANNOTATORS = {
     AnnotatorTypes.OUTLIER_DETECTION: OutlierDetectionAnnotator,
     AnnotatorTypes.CHANGE_POINT_DETECTION: ChangePointDetectionAnnotator,
     AnnotatorTypes.JUMP_DETECTION: JumpDetectionAnnotator,
-    AnnotatorTypes.PROFILE2D_THRESHOLD: Profile2DThresholdAnnotator,
+    AnnotatorTypes.SPECTROGRAM_THRESHOLD: SpectrogramThresholdAnnotator,
 }
 
 # Currently only allowing these annotators to task mapping
@@ -725,6 +603,6 @@ ANNOTATORS_PER_TASK = {
         AnnotatorTypes.CHANGE_POINT_DETECTION,
         AnnotatorTypes.JUMP_DETECTION,
     ],
-    Task.PROFILE_2D: [AnnotatorTypes.PROFILE2D_THRESHOLD],
+    Task.SPECTROGRAM: [AnnotatorTypes.SPECTROGRAM_THRESHOLD],
     Task.VIDEO: [],
 }

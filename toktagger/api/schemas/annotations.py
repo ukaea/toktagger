@@ -11,9 +11,6 @@ class AnnotationBase(ConfiguredModel):
     label: str
     created_by: str
     validated: bool = False
-    sample_id: Optional[str] = None
-    project_id: Optional[str] = None
-    signal_name: Optional[str] = None
     uncertainty: Optional[float] = 1
 
     @model_validator(mode="before")
@@ -47,10 +44,10 @@ class TimeRegion(AnnotationBase):
 
 class BoundingBox(AnnotationBase):
     type: Literal["bounding_box"] = "bounding_box"
-    x_min: float
-    y_min: float
-    width: float
-    height: float
+    height: int
+    width: int
+    x_min: int
+    y_min: int
 
 
 class VideoBoundingBox(BoundingBox):
@@ -72,18 +69,6 @@ class VideoPolygon(AnnotationBase):
 
 class SpectrogramMask(AnnotationBase):
     type: Literal["spectrogram_mask"] = "spectrogram_mask"
-    values: list[list[float]]
-
-
-class PolygonAnnotation(AnnotationBase):
-    type: Literal["polygon"] = "polygon"
-    segmentation: list[list[float]]
-    area: float
-    bbox: list[float]  # [x, y, width, height]
-
-
-class Profile2DMask(AnnotationBase):
-    type: Literal["profile_2d_mask"] = "profile_2d_mask"
     values: list[list[float]]
 
 
@@ -128,11 +113,8 @@ TimePointOut = create_out_model(TimePoint)
 TimeRegionOut = create_out_model(TimeRegion)
 BoundingBoxOut = create_out_model(BoundingBox)
 VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
-<<<<<<< HEAD
 VideoPolygonOut = create_out_model(VideoPolygon)
 SpectrogramMaskOut = create_out_model(SpectrogramMask)
-Profile2DMaskOut = create_out_model(Profile2DMask)
-PolygonAnnotationOut = create_out_model(PolygonAnnotation)
 ClassLabelOut = create_out_model(ClassLabel)
 
 # Generate Batch classes using factory function
@@ -140,11 +122,8 @@ TimePointBatch = create_batch_model(TimePoint)
 TimeRegionBatch = create_batch_model(TimeRegion)
 BoundingBoxBatch = create_batch_model(BoundingBox)
 VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
-<<<<<<< HEAD
 VideoPolygonBatch = create_batch_model(VideoPolygon)
 SpectrogramMaskBatch = create_batch_model(SpectrogramMask)
-Profile2DMaskBatch = create_batch_model(Profile2DMask)
-PolygonAnnotationBatch = create_batch_model(PolygonAnnotation)
 ClassLabelBatch = create_batch_model(ClassLabel)
 
 
@@ -154,11 +133,8 @@ AnnotationTypes = Union[
     TimeRegion,
     BoundingBox,
     VideoBoundingBox,
-<<<<<<< HEAD
     VideoPolygon,
     SpectrogramMask,
-    Profile2DMask,
-    PolygonAnnotation,
     ClassLabel,
 ]
 
@@ -169,8 +145,6 @@ AnnotationOutTypes = Union[
     VideoBoundingBoxOut,
     VideoPolygonOut,
     SpectrogramMaskOut,
-    Profile2DMaskOut,
-    PolygonAnnotationOut,
     ClassLabelOut,
 ]
 
@@ -181,8 +155,6 @@ AnnotationBatchTypes = Union[
     VideoBoundingBoxBatch,
     VideoPolygonBatch,
     SpectrogramMaskBatch,
-    Profile2DMaskBatch,
-    PolygonAnnotationBatch,
     ClassLabelBatch,
 ]
 

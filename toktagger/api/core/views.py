@@ -1,14 +1,14 @@
-from toktagger.api.core.annotators import compute_stft
 import numpy as np
 import xarray as xr
+from toktagger.api.core.annotators import compute_stft
 from toktagger.api.schemas.data import (
-    Profile2DData,
-    Data,
-    MultiProfile2DData,
+    CompositeData,
     MultiVariateTimeSeriesData,
+    SpectrogramData,
+    Data,
     TimeSeriesData,
 )
-from toktagger.api.schemas.views import Profile2DViewParams, ViewParams, ViewType
+from toktagger.api.schemas.views import SpectrogramViewParams, ViewParams, ViewType
 
 
 class IdentityView:
@@ -19,40 +19,30 @@ class IdentityView:
         return data
 
 
-class Profile2DView:
-    def __init__(self, params: Profile2DViewParams):
-        if not isinstance(params, Profile2DViewParams):
-            raise RuntimeError(f"Invalid params type for Profile2DView: {type(params)}")
-
+class SpectrogramView:
+    def __init__(self, params: SpectrogramViewParams):
         self.params = params
 
-    def __call__(
-        self, data: MultiProfile2DData | MultiVariateTimeSeriesData
-    ) -> Profile2DData:
-        if self.params.signal_name not in data.values:
-            raise RuntimeError("Signal name not found in data")
-
-        profile_data = data.values[self.params.signal_name]
-
-        if profile_data is None:
-            raise RuntimeError(
-                f"Profile data for {self.params.signal_name} does not exist."
-            )
-
-        return self.convert_profile_to_view(profile_data)
-
-    def convert_profile_to_view(
-        self, data: Profile2DData | TimeSeriesData
-    ) -> Profile2DData:
-        if isinstance(data, TimeSeriesData):
-            dim_1, time, values = compute_stft(data)
-            values = values.T  # Transpose to have shape (time, dim_1)
-        elif isinstance(data, Profile2DData):
-            time = np.array(data.time)
-            values = np.array(data.values)
-            dim_1 = np.array(data.dim_1)
+    def __call__(self, data: Data) -> Data:
+        if isinstance(data, MultiVariateTimeSeriesData):
+            response = {}
+            for key, value in data.values.items():
+                response[key] = self.convert_timeseries_to_spectrogram(value)
         else:
-            raise RuntimeError(f"Unsupported data type for Profile2DView: {type(data)}")
+            raise RuntimeError(f"Unsupported data type: {type(data)}")
+
+        return CompositeData(values=response)
+
+    def convert_timeseries_to_spectrogram(
+        self, data: TimeSeriesData
+    ) -> SpectrogramData:
+        time = np.array(data.time)
+        values = np.array(data.values)
+
+        # Compute the Short-Time Fourier Transform (STFT)
+        freq, ts, values = compute_stft(data)
+        freq /= 1000
+        time = ts + time[0]
 
         # Clip to time/frequency range
         time_min = (
@@ -62,39 +52,41 @@ class Profile2DView:
             self.params.time_max if self.params.time_max is not None else time.max()
         )
 
-        dim_1_min = (
-            self.params.dim_1_min if self.params.dim_1_min is not None else dim_1.min()
+        frequency_min = (
+            self.params.frequency_min
+            if self.params.frequency_min is not None
+            else freq.min()
         )
-        dim_1_max = (
-            self.params.dim_1_max if self.params.dim_1_max is not None else dim_1.max()
-        )
-
-        values_min = (
-            self.params.values_min
-            if self.params.values_min is not None
-            else np.nanmin(values)
-        )
-        values_max = (
-            self.params.values_max
-            if self.params.values_max is not None
-            else np.nanmax(values)
+        frequency_max = (
+            self.params.frequency_max
+            if self.params.frequency_max is not None
+            else freq.max()
         )
 
-        ds = xr.DataArray(
-            values.T, coords=dict(dim_1=dim_1, time=time), dims=["dim_1", "time"]
+        amplitude_min = (
+            self.params.amplitude_min
+            if self.params.amplitude_min is not None
+            else values.min()
         )
+        amplitude_max = (
+            self.params.amplitude_max
+            if self.params.amplitude_max is not None
+            else values.max()
+        )
+
+        ds = xr.DataArray(values, coords=dict(frequency=freq, time=time))
         ds = ds.sel(time=slice(time_min, time_max))
-        ds = ds.sel(dim_1=slice(dim_1_min, dim_1_max))
-        ds = ds.clip(values_min, values_max)
+        ds = ds.sel(frequency=slice(frequency_min, frequency_max))
+        ds = ds.clip(amplitude_min, amplitude_max)
 
-        return Profile2DData(
+        return SpectrogramData(
             time=ds.time.values.tolist(),
-            dim_1=ds.dim_1.values.tolist(),
-            values=ds.values.tolist(),
+            frequency=ds.frequency.values.tolist(),
+            amplitude=ds.values.tolist(),
         )
 
 
 DATA_VIEWS = {
     ViewType.IDENTITY: IdentityView,
-    ViewType.PROFILE_2D: Profile2DView,
+    ViewType.SPECTROGRAM: SpectrogramView,
 }
