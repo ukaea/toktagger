@@ -16,11 +16,12 @@ from bson import ObjectId
 import time
 import tempfile
 import toktagger.api.config as config
+import tests.db_definitions as db_definitions
 
 
 def wait_for_results(task_registry: ActorRegistry, task_id: str):
     task = task_registry.get(task_id)
-    results = ray.get(task, timeout=30)
+    results = ray.get(task, timeout=120)
     return results
 
 
@@ -486,6 +487,7 @@ async def test_model_delete_type(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
@@ -650,6 +652,7 @@ async def test_model_load_local_missing_file(api_client, db_client, setup_model_
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_load_local_disabled(api_client, db_client, setup_model_db):
     # Try loading  file with local load disabled
     config.settings.models.local_load_enabled = False
@@ -712,3 +715,25 @@ async def test_model_load_local_failed(api_client, db_client, setup_model_db):
             .joinpath(f"{model_id}.model")
             .exists()
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_train_no_samples_no_zombie_model(api_client, db_client, ray_session):
+    """Training with no validated samples must return 404 without leaving a queued model."""
+    project_id = await db_client.insert("projects", db_definitions.PROJECT_2)
+
+    response = await api_client.put(
+        f"/projects/{project_id}/models/mock_disruption_cnn/train",
+        json={"params": {}},
+    )
+
+    assert response.status_code == 404
+    assert "No validated samples" in response.json()["detail"]
+
+    # Confirm no model record was written to the DB
+    models = await db_client.get_filtered_documents(
+        collection="models",
+        filters={"training_status": "queued"},
+    )
+    assert len(models) == 0

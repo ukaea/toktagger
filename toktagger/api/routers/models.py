@@ -205,23 +205,11 @@ async def start_model_training(
     else:
         version = db_models[0].version + 1
 
-    model_in = ModelIn(
-        type=model_type,
-        version=version,
-        training_status="queued",
-        progress=0,
-        score=0,
-    )
-
-    model_id = await utils.add_model(
-        db_client=db_client, project_id=project.id, model=model_in
-    )
-
-    # Get annotations and samples
+    # Get annotations and samples before creating the model record so that
+    # a missing-data 404 never leaves an orphaned "queued" model in the DB.
     annotations = await utils.get_annotations(db_client, project.id, validated=True)
     samples = await utils.get_samples(db_client, project.id, validated=True)
 
-    # Get all validated samples and annotations for this project
     logger.info(f"Collected {len(annotations)} annotations.")
     logger.info(f"Collected {len(samples)} samples.")
 
@@ -234,6 +222,18 @@ async def start_model_training(
             status_code=404,
             detail="No validated annotations found to train a model on!",
         )
+
+    model_in = ModelIn(
+        type=model_type,
+        version=version,
+        training_status="queued",
+        progress=0,
+        score=0,
+    )
+
+    model_id = await utils.add_model(
+        db_client=db_client, project_id=project.id, model=model_in
+    )
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
     sample_annotations_mapping = defaultdict(list)
@@ -641,6 +641,16 @@ async def create_sample_predictions(
 
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
+    # Remove any unvalidated predictions from a previous run of this model so
+    # that stale annotations don't accumulate in the DB across prediction runs.
+    await utils.delete_annotations(
+        db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        created_by=model_type,
+        validated=False,
+    )
+
     task = get_predictions.remote(
         project=project,
         model=model,
@@ -696,6 +706,7 @@ async def get_sample_predictions(
         try:
             result = ray.get(task)
         except Exception as e:
+            logger.error(f"Prediction task failed: {e}")
             raise HTTPException(
                 detail="Predict task failed - no predictions available",
                 status_code=500,

@@ -9,15 +9,13 @@ import typing
 import math
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
-from toktagger.api.models import models_dependencies_installed
 import pydantic
 import uuid
 import logging
 
-logger = logging.getLogger("ray")
+import ray
 
-if models_dependencies_installed():
-    import ray
+logger = logging.getLogger("ray")
 
 
 # Recursively walk through schema, finding things which need to be changed
@@ -275,6 +273,21 @@ class ModelRegistry:
         )
 
     @classmethod
+    def class_refs(cls) -> dict[str, tuple[str, str]]:
+        """Return the registry as (module_name, class_name) string pairs.
+
+        Used when passing the registry to Ray workers: sending class objects
+        directly triggers cloudpickle deserialization in the worker, which
+        imports the module — and some models import heavy optional dependencies
+        (e.g. torch) that are not present in the worker's isolated venv.
+        String refs defer the import to the moment the class is actually needed.
+        """
+        return {
+            name: (model_class.__module__, model_class.__name__)
+            for name, model_class in cls._registry.items()
+        }
+
+    @classmethod
     def names(cls, task: Task | None = None) -> list[str]:
         if not task:
             return list(cls._registry.keys())
@@ -305,6 +318,13 @@ class ModelRegistry:
         if params is False:
             raise ValueError(f"No Model class called '{name}' found in registry!")
         return params
+
+    @classmethod
+    def get_description(cls, name: str) -> str | None:
+        import inspect
+
+        model_class = cls._registry.get(name)
+        return inspect.getdoc(model_class) if model_class else None
 
     @classmethod
     def get_params_schema(
@@ -348,12 +368,25 @@ class ModelRegistry:
 @ray.remote
 class WorkerRegistry:
     def __init__(self, registry):
-        self._registry: dict[str, Model | DataLoader] = registry
+        # registry is either:
+        #   {name: class}               — for loader registries (no heavy deps)
+        #   {name: (module, classname)} — for model registries (lazy import avoids
+        #                                 importing optional deps like torch on init)
+        self._registry = registry
 
     def get(self, name):
-        registered: Model | DataLoader | None = self._registry.get(name)
-        if not registered:
+        registered = self._registry.get(name)
+        if registered is None:
             raise ValueError(f"No class called '{name}' found in registry!")
+        if (
+            isinstance(registered, tuple)
+            and len(registered) == 2
+            and isinstance(registered[0], str)
+        ):
+            import importlib
+
+            module = importlib.import_module(registered[0])
+            return getattr(module, registered[1])
         return registered
 
 

@@ -57,7 +57,7 @@ def get_actor(project, model):
             pathlib.Path(os.environ["MODEL_STORAGE"]).glob(f"{str(model.id)}*"), None
         )
         if model_path:
-            ml_model.wrapped_load.remote(model_path)
+            ray.get(ml_model.wrapped_load.remote(model_path))
         else:
             logger.debug("No saved weights found, initializing blank model")
 
@@ -127,8 +127,8 @@ def train_model(
     annotations: list[list[AnnotationOutTypes]],
     params: pydantic.BaseModel | None,
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
-    model_actor = get_actor(project=project, model=model)
     try:
+        model_actor = get_actor(project=project, model=model)
         logger.info(f"Running model training for project {project.id}")
         model_actor.log_progress.remote(training_status="started", progress=0)
         train_task = model_actor.wrapped_train.remote(
@@ -151,9 +151,10 @@ def train_model(
         return {"project_id": project.id, "model_id": model.id, "score": score}
 
     except Exception as e:
-        # If anything goes wrong, update model to failed status
-        # This is important as if this does not happen, your model will be stuck in 'training' forever,
-        # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
+        # If anything goes wrong, update model to failed status.
+        # This is important as if this does not happen, your model will be stuck
+        # in 'training' forever, preventing you from ever starting a new training
+        # session again. TODO: should we have some kind of timeout in case this fails?
         logger.error(e)
         send_model_updates(
             project_id=project.id,

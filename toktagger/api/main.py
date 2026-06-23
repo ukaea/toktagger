@@ -60,11 +60,14 @@ class Server:
                     }
                 },
             )
-            # Create a ray actor for use as a model registry
+            # Pass the model registry as (module, classname) string pairs rather
+            # than class objects. Ray workers run in isolated venvs that lack
+            # optional deps such as torch; sending class objects would trigger
+            # those imports during cloudpickle deserialization and crash the actor.
             WorkerRegistry.options(
                 name="WorkerModelRegistry", lifetime="detached"
-            ).remote(ModelRegistry._registry)
-            # And one for use as a dataloader registry
+            ).remote(ModelRegistry.class_refs())
+            # Loader classes only depend on base packages, so class objects are safe.
             WorkerRegistry.options(
                 name="WorkerLoaderRegistry", lifetime="detached"
             ).remote(LoaderRegistry._registry)

@@ -438,6 +438,16 @@ export const getModelSchema = async (
   return schema;
 };
 
+export const getModelMeta = async (
+  modelName: string,
+): Promise<{ name: string; description: string | null; tasks: string[] }> => {
+  const response = await fetch(`${BACKEND_API_URL}/meta/models/${modelName}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch model metadata!`);
+  }
+  return response.json();
+};
+
 export const getModelTrainSchema = async (
   modelName: string,
 ): Promise<RJSFSchema> => {
