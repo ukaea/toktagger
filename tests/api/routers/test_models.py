@@ -487,6 +487,7 @@ async def test_model_delete_type(api_client, db_client, setup_model_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_delete_type_version(api_client, db_client, setup_model_db):
     response = await api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn?version=2"
@@ -651,6 +652,7 @@ async def test_model_load_local_missing_file(api_client, db_client, setup_model_
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_model_load_local_disabled(api_client, db_client, setup_model_db):
     # Try loading  file with local load disabled
     config.settings.models.local_load_enabled = False
