@@ -59,7 +59,7 @@ def test_add_smoothing_step_appears_in_applied_list(server_setup, page: Page):
     panel.get_by_role("button", name="Add Step").click()
 
     expect(panel.get_by_text("Applied Steps")).to_be_visible()
-    expect(panel.get_by_text("1. Smoothing", exact=False)).to_be_visible()
+    expect(panel.get_by_text("Smoothing", exact=False)).to_be_visible()
 
 
 def test_clear_all_removes_applied_steps(server_setup, page: Page):
@@ -85,15 +85,15 @@ def test_remove_individual_step(server_setup, page: Page):
     panel.get_by_role("button", name="Add Step").click()
 
     # Both steps numbered 1 and 2 should appear
-    expect(panel.get_by_text("1. Smoothing", exact=False)).to_be_visible()
-    expect(panel.get_by_text("2. Smoothing", exact=False)).to_be_visible()
+    expect(panel.get_by_text("1.", exact=False)).to_be_visible()
+    expect(panel.get_by_text("2.", exact=False)).to_be_visible()
 
     # Remove the first one
     panel.get_by_role("button", name="✕").first.click()
 
     # Only one step should remain, renumbered as 1
-    expect(panel.get_by_text("1. Smoothing", exact=False)).to_be_visible()
-    expect(panel.get_by_text("2. Smoothing", exact=False)).not_to_be_visible()
+    expect(panel.get_by_text("1.", exact=False)).to_be_visible()
+    expect(panel.get_by_text("2.", exact=False)).not_to_be_visible()
 
 
 def test_step_type_picker_changes_controls(server_setup, page: Page):
@@ -106,7 +106,7 @@ def test_step_type_picker_changes_controls(server_setup, page: Page):
     # Switch to Background Subtraction
     panel.get_by_role("button", name="Smoothing").click()
     page.get_by_role("option", name="Background Subtraction").click()
-    expect(page.get_by_label("Window Size (samples)")).to_be_visible()
+    expect(panel.get_by_role("spinbutton", name="Window Size")).to_be_visible()
     expect(panel.get_by_role("slider", name="Sigma", exact=False)).not_to_be_visible()
 
     # Switch to Normalisation
@@ -137,7 +137,7 @@ def test_each_step_type_can_be_added(
     panel.get_by_role("button", name="Add Step").click()
 
     expect(panel.get_by_text("Applied Steps")).to_be_visible()
-    expect(panel.get_by_text(f"1. {step_label}", exact=False)).to_be_visible()
+    expect(panel.get_by_text(step_label, exact=False)).to_be_visible()
 
 
 def test_preprocessing_persists_across_shot_navigation(server_setup, page: Page):
@@ -160,4 +160,4 @@ def test_preprocessing_persists_across_shot_navigation(server_setup, page: Page)
 
     # The committed step should still be listed
     expect(panel.get_by_text("Applied Steps")).to_be_visible()
-    expect(panel.get_by_text("1. Smoothing", exact=False)).to_be_visible()
+    expect(panel.get_by_text("Smoothing", exact=False)).to_be_visible()

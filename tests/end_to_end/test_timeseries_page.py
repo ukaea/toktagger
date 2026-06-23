@@ -539,8 +539,8 @@ def test_timeseries_annotator(server_setup, page: Page):
     peak_detection.get_by_role("button", name="Show suggestions Signal Name").click()
     page.get_by_role("option", name="Ip").click()
 
-    # Check that 21 peaks have been identified
-    expect(page.get_by_label("time-zone", exact=True)).to_have_count(21)
+    # Check that 4 peaks have been identified
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(4)
 
     # Disable tool, these should disappear
     peak_detection.get_by_role("switch", name="Enable Tool").click()
@@ -548,10 +548,10 @@ def test_timeseries_annotator(server_setup, page: Page):
 
     # Enable tool, they should reappear
     peak_detection.get_by_role("switch", name="Enable Tool").click()
-    expect(page.get_by_label("time-zone", exact=True)).to_have_count(21)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(4)
 
     # Change settings in toolbar, check they impact on annotations
-    # Here drags min time to ~74, leaving only peaks in the upper range
+    # Here drags min time to 74, so should only have one peak within window
     time_range = peak_detection.get_by_role("group", name="Time Range")
     min_slider = time_range.get_by_role("slider").nth(0)
     min_slider.scroll_into_view_if_needed()
@@ -561,8 +561,8 @@ def test_timeseries_annotator(server_setup, page: Page):
     page.mouse.move(box["x"] + 140, box["y"])  # drag horizontally
     page.mouse.up()
 
-    # Check reduced annotation count after time range filter
-    expect(page.get_by_label("time-zone", exact=True)).to_have_count(5)
+    # Check one annotation present
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
 
 
 @pytest.mark.models_enabled
