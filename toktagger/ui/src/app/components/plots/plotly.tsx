@@ -624,10 +624,14 @@ export const PlotlyWidget = ({
           (shape.xref as string | undefined)?.replace("x", "") ?? "";
         const ySuffix =
           (shape.yref as string | undefined)?.replace("y", "") ?? "";
-         
-        const fullLayout = (plot as { _fullLayout: Record<string, { p2d: (v: number) => number }> })._fullLayout;
-        const shapeXaxis = fullLayout[`xaxis${xSuffix}`] ?? fullLayout.xaxis;
-        const shapeYaxis = fullLayout[`yaxis${ySuffix}`] ?? fullLayout.yaxis;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const shapeXaxis =
+          (plot as any)._fullLayout[`xaxis${xSuffix}`] ??
+          (plot as any)._fullLayout.xaxis;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const shapeYaxis =
+          (plot as any)._fullLayout[`yaxis${ySuffix}`] ??
+          (plot as any)._fullLayout.yaxis;
 
         const subplotKey = `x${xSuffix}y${ySuffix}`;
         const shapeDragEl = (plot as HTMLElement).querySelector(
