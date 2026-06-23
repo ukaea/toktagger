@@ -4,38 +4,33 @@ import tests.db_definitions as db_definitions
 from toktagger.api.main import Server
 from httpx import AsyncClient, ASGITransport
 from bson.objectid import ObjectId
-import pathlib
 import ray
 import random
 import pytest
 import pytest_asyncio
-import tempfile
-import os
+import toktagger.api.config as config
 
 
 @pytest.fixture(scope="module")
-def ray_session():
-    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
-        # Pop existing values of env vars
-        # Cannot use monkeypatch since it is function scoped and this is module scoped
-        model_storage = os.environ.get("MODEL_STORAGE")
-        os.environ["MODEL_STORAGE"] = tempd
+def ray_session(settings):
+    ray.init(
+        num_gpus=1,  # Due to env vars set in models_api_client
+        ignore_reinit_error=True,
+        include_dashboard=False,
+        runtime_env={
+            "env_vars": {
+                "MODEL_STORAGE": config.settings.models.cache_dir,
+                "API_URL": "",
+            }
+        },
+    )
 
-        ray.init(
-            num_gpus=1,  # Due to env vars set in models_api_client
-            ignore_reinit_error=True,
-            include_dashboard=False,
-            runtime_env={"env_vars": {"MODEL_STORAGE": tempd, "API_URL": ""}},
-        )
-
-        yield
-        ray.shutdown()
-        # Restore preexisting env vars
-        os.environ["MODEL_STORAGE"] = model_storage
+    yield
+    ray.shutdown()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def models_api_client(monkeypatch, db_client, ray_session):
+async def models_api_client(monkeypatch, settings, db_client, ray_session):
     server = Server()
     server.testing_mode = True
     monkeypatch.setenv("API_URL", "http://test")
@@ -136,10 +131,9 @@ async def setup_model_db(setup_model_samples, db_client):
 
     # Create temp files for each
     for _id in (model_id_1, model_id_2, model_id_3, model_id_4):
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{_id}.model").write_text(
+        config.settings.models.cache_dir.joinpath(f"{_id}.model").write_text(
             "Test Model"
         )
-
     yield {
         "project_id": project_id,
         "sample_ids": sample_ids,

@@ -11,8 +11,9 @@ import multiprocessing
 import requests
 import time
 import tempfile
-
+import toktagger.api.config as config
 import importlib
+import pathlib
 
 MODELS_ENABLED = importlib.util.find_spec("ray") is not None
 
@@ -74,17 +75,35 @@ def uda_test(uda_env_vars):
         pytest.skip("Could not contact UDA server")
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db_client():
-    with tempfile.TemporaryDirectory() as tempd:
-        db_client = MongoDBClient("./toktagger_test_db", "annotate_db", tempd)
-        yield db_client
+@pytest.fixture(scope="session")
+def settings():
+    with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
+        pathlib.Path(tempd).joinpath("models").mkdir(exist_ok=True)
+        settings = config.Settings(
+            server=config.Server(cache_dir=tempd),
+            models=config.Models(
+                cache_dir=pathlib.Path(tempd).joinpath("models"), max_actors=1
+            ),
+            database=config.Database(mongo_url="./toktagger_test_db"),
+            uda=config.UDA(),
+            sal=config.SAL(),
+        )
+        config.settings = settings
+        yield settings
 
-        await db_client.delete_filtered_documents("projects")
-        await db_client.delete_filtered_documents("samples")
-        await db_client.delete_filtered_documents("annotations")
-        await db_client.delete_filtered_documents("models")
-        await db_client.client.close()
+
+@pytest_asyncio.fixture(scope="function")
+async def db_client(settings):
+    db_client = MongoDBClient(
+        settings.database.mongo_url, "annotate_db", settings.server.cache_dir
+    )
+    yield db_client
+
+    await db_client.delete_filtered_documents("projects")
+    await db_client.delete_filtered_documents("samples")
+    await db_client.delete_filtered_documents("annotations")
+    await db_client.delete_filtered_documents("models")
+    await db_client.client.close()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -96,6 +115,7 @@ async def api_client(monkeypatch, db_client):
     # So have to run this manually, however trying to run the close after the yield to close the db connection gives errors
     # So am just going to leave it open, since the db container will be deleted after anyway
     # Any alternative solution ideas are welcome.....
+    os.environ["API_URL"] = "http://test"
     server = Server()
     server.testing_mode = True
     monkeypatch.setenv("API_URL", "http://test")
@@ -165,7 +185,6 @@ async def setup_db(db_client):
         ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)},
     )
     await asyncio.sleep(0.01)
-
     yield {
         "project_id_1": project_id_1,
         "project_id_2": project_id_2,
@@ -216,45 +235,41 @@ def run_server():
 
 
 @pytest.fixture(scope="package")
-def start_server():
-    os.environ["MONGO_URL"] = "./toktagger_test_db"
-    os.environ["MAX_GPU_ACTORS"] = "0"
-    with tempfile.TemporaryDirectory() as tempd:
-        os.environ["DB_CACHE_DIR"] = tempd
-        proc = multiprocessing.Process(target=run_server)
-        proc.start()
-        # Wait for server to start
-        server_up = False
-        for t in range(600):
-            try:
-                response = requests.get(
-                    "http://localhost:8002/health",
-                )
-                if response.status_code == 200:
-                    status = response.json()
-                    if not status["testing_mode"]:
-                        raise RuntimeError(
-                            "End to End test has connected to a live server!"
-                        )
-                    if not status["db_connected"]:
-                        raise RuntimeError("Database failed to connect.")
-                    if not status["name"] == "TokTagger":
-                        raise RuntimeError(
-                            "End to End test has connected to another process running on localhost:8002"
-                        )
-                    server_up = True
-                    break
-                time.sleep(1)
-            except requests.exceptions.ConnectionError:
-                time.sleep(1)
+def start_server(settings):
+    proc = multiprocessing.Process(target=run_server)
+    proc.start()
+    # Wait for server to start
+    server_up = False
+    for t in range(60):
+        try:
+            response = requests.get(
+                "http://localhost:8002/health",
+            )
+            if response.status_code == 200:
+                status = response.json()
+                if not status["testing_mode"]:
+                    raise RuntimeError(
+                        "End to End test has connected to a live server!"
+                    )
+                if not status["db_connected"]:
+                    raise RuntimeError("Database failed to connect.")
+                if not status["name"] == "TokTagger":
+                    raise RuntimeError(
+                        "End to End test has connected to another process running on localhost:8002"
+                    )
+                server_up = True
+                break
+            time.sleep(1)
+        except requests.exceptions.ConnectionError:
+            time.sleep(1)
 
-        if not server_up:
-            proc.terminate()
-            pytest.exit("Server failed to start for End-to-End tests to run!")
-
-        yield
+    if not server_up:
         proc.terminate()
-        proc.join()
+        pytest.exit("Server failed to start for End-to-End tests to run!")
+
+    yield
+    proc.terminate()
+    proc.join()
 
 
 @pytest.fixture(scope="function")
