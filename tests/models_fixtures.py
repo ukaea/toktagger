@@ -19,7 +19,7 @@ def ray_session(settings):
         include_dashboard=False,
         runtime_env={
             "env_vars": {
-                "MODEL_STORAGE": config.settings.models.cache_dir,
+                "MODEL_STORAGE": str(config.settings.models.cache_dir),
                 "API_URL": "",
             }
         },
