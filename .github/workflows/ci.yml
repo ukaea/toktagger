@@ -51,9 +51,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.19.0"
-          cache: ‘npm’
-          cache-dependency-path: ./toktagger/ui/package-lock.json
+          node-version: 20 # or your project’s version
 
       - name: Install dependencies
         run: npm ci
@@ -77,9 +75,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.19.0"
-          cache: 'npm'
-          cache-dependency-path: ./toktagger/ui/package-lock.json
+          node-version: 20 # or your version
 
       - name: Install dependencies
         run: npm ci
