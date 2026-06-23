@@ -382,22 +382,21 @@ export function ModelTrainModal({
             </Tabs>
           </Content>
           <Footer>
-            {isTrainingActive ? (
-              <Flex alignItems="center" gap="size-100">
+            <Flex alignItems="center" gap="size-100">
+              {isTrainingActive && (
                 <ProgressCircle
                   aria-label="Training in progress"
                   isIndeterminate
                   size="S"
                 />
-                <Text>Training…</Text>
-              </Flex>
-            ) : (
-              message && (
+              )}
+              {message && (
                 <Text>
-                  {messageIcon} {message}
+                  {!isTrainingActive && messageIcon} {message}
                 </Text>
-              )
-            )}
+              )}
+              {isTrainingActive && !message && <Text>Training…</Text>}
+            </Flex>
           </Footer>
           <ButtonGroup>
             <Button variant="secondary" onPress={close}>

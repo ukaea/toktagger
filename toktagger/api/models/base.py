@@ -9,15 +9,13 @@ import typing
 import math
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
-from toktagger.api.models import models_dependencies_installed
 import pydantic
 import uuid
 import logging
 
-logger = logging.getLogger("ray")
+import ray
 
-if models_dependencies_installed():
-    import ray
+logger = logging.getLogger("ray")
 
 
 # Recursively walk through schema, finding things which need to be changed
