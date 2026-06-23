@@ -171,7 +171,7 @@ export function PreprocessingTool() {
 
           <ComboBox
             label="Signal"
-            defaultItems={signalOptions}
+            items={signalOptions}
             onInputChange={setSignalName}
             width="100%"
           >
