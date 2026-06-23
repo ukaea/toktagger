@@ -112,7 +112,7 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
-    return null;
+    return <>{children}</>;
   }
 
   return (

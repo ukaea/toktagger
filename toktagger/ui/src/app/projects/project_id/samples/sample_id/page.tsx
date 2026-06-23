@@ -21,7 +21,7 @@ import { ContextMenuProvider } from "@/app/components/providers/annotation-provi
 import { ZoneProvider } from "@/app/components/providers/zone-provider";
 import { VSpanProvider } from "@/app/components/providers/vpsan-provider";
 import { PolygonProvider } from "@/app/components/providers/polygon-provider";
-import { VideoProviders, VideoView } from "@/app/video/components/video-view";
+import { VideoView } from "@/app/video/components/video-view";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
 import { randomColor } from "@/app/utils";
 
@@ -52,16 +52,6 @@ const SampleDataBreadCrumbs = ({
 
 const SampleView = () => {
   const { project, isLoading, error } = useSample();
-  if (error) return <ErrorView message={error} />;
-  if (!project) return isLoading ? <LoadingView /> : null;
-  if (project.task === TaskType.Video) return <VideoView />;
-  if (isLoading) return <LoadingView />;
-  if (project.task === TaskType.TimeSeries) return <TimeSeriesView />;
-  if (project.task === TaskType.Profile2D) return <Profile2dView />;
-};
-
-function SampleTaskProviders({ children }: { children: React.ReactNode }) {
-  const { project } = useSample();
 
   const zoneCategories: Category[] = useMemo(() => {
     const timeRegionLabels = project?.time_region_labels || [];
@@ -95,36 +85,51 @@ function SampleTaskProviders({ children }: { children: React.ReactNode }) {
     }));
   }, [project?.bounding_box_labels]);
 
-  if (project?.task === TaskType.Video) {
-    return <VideoProviders>{children}</VideoProviders>;
-  } else if (project?.task == TaskType.TimeSeries) {
+  if (error) return <ErrorView message={error} />;
+
+  if (!project) return isLoading ? <LoadingView /> : null;
+
+  if (isLoading) return <LoadingView />;
+
+  // Video: keep the video UI mounted while fetching the next frame.
+  if (project.task === TaskType.Video) return <VideoView />;
+
+  if (project.task == TaskType.TimeSeries) {
     return (
       <ContextMenuProvider menuId="time-series-menu">
         <ZoneProvider categories={zoneCategories}>
           <VSpanProvider categories={vspanCategories}>
             <PolygonProvider categories={[]}>
               <BoundingBoxProvider categories={[]}>
-                {children}
+                <TimeSeriesView />
               </BoundingBoxProvider>
             </PolygonProvider>
           </VSpanProvider>
         </ZoneProvider>
       </ContextMenuProvider>
     );
-  } else if (project?.task == TaskType.Profile2D) {
+  } else if (project.task == TaskType.Profile2D) {
     return (
       <ContextMenuProvider menuId="profile2d-menu">
         <ZoneProvider categories={zoneCategories}>
           <VSpanProvider categories={vspanCategories}>
             <BoundingBoxProvider categories={[...boundingBoxCategories]}>
               <PolygonProvider categories={[...polygonCategories]}>
-                {children}
+                <Profile2dView />
               </PolygonProvider>
             </BoundingBoxProvider>
           </VSpanProvider>
         </ZoneProvider>
       </ContextMenuProvider>
     );
+  }
+};
+
+function SampleTaskProviders({ children }: { children: React.ReactNode }) {
+  const { project } = useSample();
+
+  if (project?.task === TaskType.Video) {
+    return <VideoProviders>{children}</VideoProviders>;
   }
 
   return <>{children}</>;
