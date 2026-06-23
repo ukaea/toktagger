@@ -19,7 +19,6 @@ from toktagger.api.schemas.data import (
     TimeSeriesData,
     ImageData,
     DataParamTypes,
-    DataParams,
     DataResponseType,
     ImageParams,
     Profile2DData,
@@ -55,16 +54,11 @@ class DataLoaderError(Exception):
 
 
 class DataLoader(ABC):
-    def __init__(self, params: DataParamTypes):
-        self.params = params
-
     @classmethod
     @abstractmethod
     def sample_data_type(
         cls,
-    ) -> Type[
-        ShotData | ImageFileData | FileData | TimeSeriesFileData | ImageArrayFileData
-    ]:
+    ) -> Type[DataTypes]:
         # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
         pass
 
@@ -72,6 +66,7 @@ class DataLoader(ABC):
     def get_sample(
         self,
         sample: Sample,
+        params: DataParamTypes = DataParams(),
         **kwargs,
     ) -> DataResponseType:
         pass

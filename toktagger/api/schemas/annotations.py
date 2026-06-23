@@ -128,6 +128,7 @@ TimePointOut = create_out_model(TimePoint)
 TimeRegionOut = create_out_model(TimeRegion)
 BoundingBoxOut = create_out_model(BoundingBox)
 VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
+<<<<<<< HEAD
 VideoPolygonOut = create_out_model(VideoPolygon)
 SpectrogramMaskOut = create_out_model(SpectrogramMask)
 Profile2DMaskOut = create_out_model(Profile2DMask)
@@ -139,6 +140,7 @@ TimePointBatch = create_batch_model(TimePoint)
 TimeRegionBatch = create_batch_model(TimeRegion)
 BoundingBoxBatch = create_batch_model(BoundingBox)
 VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
+<<<<<<< HEAD
 VideoPolygonBatch = create_batch_model(VideoPolygon)
 SpectrogramMaskBatch = create_batch_model(SpectrogramMask)
 Profile2DMaskBatch = create_batch_model(Profile2DMask)
@@ -152,6 +154,7 @@ AnnotationTypes = Union[
     TimeRegion,
     BoundingBox,
     VideoBoundingBox,
+<<<<<<< HEAD
     VideoPolygon,
     SpectrogramMask,
     Profile2DMask,
