@@ -620,24 +620,20 @@ export const PlotlyWidget = ({
       for (let i = 0; i < shapes?.length; i++) {
         const shape = shapes[i];
 
-        const xSuffix =
-          (shape.xref as string | undefined)?.replace("x", "") ?? "";
-        const ySuffix =
-          (shape.yref as string | undefined)?.replace("y", "") ?? "";
+        const xSuffix = (shape.xref as string | undefined)?.replace("x", "") ?? "";
+        const ySuffix = (shape.yref as string | undefined)?.replace("y", "") ?? "";
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const shapeXaxis =
-          (plot as any)._fullLayout[`xaxis${xSuffix}`] ??
-          (plot as any)._fullLayout.xaxis;
+        const shapeXaxis = (plot as any)._fullLayout[`xaxis${xSuffix}`] ?? (plot as any)._fullLayout.xaxis;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const shapeYaxis =
-          (plot as any)._fullLayout[`yaxis${ySuffix}`] ??
-          (plot as any)._fullLayout.yaxis;
+        const shapeYaxis = (plot as any)._fullLayout[`yaxis${ySuffix}`] ?? (plot as any)._fullLayout.yaxis;
 
         const subplotKey = `x${xSuffix}y${ySuffix}`;
         const shapeDragEl = (plot as HTMLElement).querySelector(
           `.drag[data-subplot="${subplotKey}"]`,
         ) as HTMLElement | null;
-        const shapeBB = shapeDragEl ? shapeDragEl.getBoundingClientRect() : bb; // fall back to whatever the click landed on
+        const shapeBB = shapeDragEl
+          ? shapeDragEl.getBoundingClientRect()
+          : bb; // fall back to whatever the click landed on
         const sx = shapeXaxis.p2d(event.clientX - shapeBB.left);
         const sy = shapeYaxis.p2d(event.clientY - shapeBB.top);
 
