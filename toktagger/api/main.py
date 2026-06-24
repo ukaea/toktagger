@@ -1,10 +1,11 @@
-import os
 import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+import warnings
+import tempfile
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.data import router as data_router
@@ -17,6 +18,7 @@ from toktagger.api.routers.meta import router as meta_router
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.models import models_dependencies_installed
+import toktagger.api.config as config
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
@@ -30,11 +32,13 @@ if models_dependencies_installed():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    mongo_url = os.environ.get("MONGO_URL", "./toktagger_db")
     db_name = "annotate_db"
-    cache_dir = os.environ.get("DB_CACHE_DIR")
 
-    app.state.db_client = MongoDBClient(mongo_url, db_name, cache_dir)
+    app.state.db_client = MongoDBClient(
+        str(config.settings.database.mongo_url),
+        db_name,
+        str(config.settings.server.cache_dir),
+    )
     app.state.project = None
     yield
 
@@ -47,14 +51,12 @@ class Server:
         self.testing_mode = False
 
     def _setup_ray(self):
-        if (api_url := os.environ.get("API_URL")) is None:
-            raise ValueError("API URL must be set!")
         if not ray.is_initialized():
             ray.init(
                 runtime_env={
                     "env_vars": {
-                        "API_URL": api_url,
-                        "MODEL_STORAGE": os.environ.get("MODEL_STORAGE"),
+                        "API_URL": f"http://{config.settings.server.host}:{config.settings.server.port}",
+                        "MODEL_STORAGE": str(config.settings.models.cache_dir),
                     }
                 },
             )
@@ -69,10 +71,21 @@ class Server:
 
         # Create a task registry
         self.app.state.task_registry = ActorRegistry(
-            max_actors=os.environ.get("MAX_ACTORS", 5)
+            max_actors=config.settings.models.max_actors
         )
 
     def _setup_app(self):
+        # Check cache dirs are in /tmp if testing mode enabled
+        if self.testing_mode:
+            tempdir = pathlib.Path(tempfile.gettempdir())
+            if (
+                tempdir not in config.settings.models.cache_dir.parents
+                or tempdir not in config.settings.server.cache_dir.parents
+            ):
+                raise ValueError(
+                    "In testing mode, cache directories must be in temp directory!"
+                )
+
         self.app = FastAPI(lifespan=lifespan)
 
         # Allow requests from the frontend dev server
@@ -107,14 +120,41 @@ class Server:
         self.app.include_router(meta_router)
         self.app.include_router(base_router)
 
-    def run(
-        self,
-        host: str = "localhost",
-        port: int = 8002,
-    ):
-        os.environ["API_URL"] = f"http://{host}:{port}"
+    def run(self, host: str | None = None, port: int | None = None):
+        """
+        Launch the TokTagger server.
+
+        Parameters
+        ----------
+        host : str
+            DEPRECATED - use config file or environment variables instead.
+            The host to launch the server on, by default 'localhost'
+        port : int
+            DEPRECATED - use config file or environment variables instead.
+            The port to launch the server on, by default 8002
+        """
+        # Provide deprecation warning
+        if host or port:
+            warnings.warn(
+                """
+                Specifying host and port within Server.run() is deprecated and will be removed in a future version. 
+                Please provide these arguments via configuration file or environment variable instead. 
+                See https://ukaea.github.io/toktagger/configuration for details.
+                """,
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if host:
+            config.settings.server.host = host
+        if port:
+            config.settings.server.port = port
+
         self._setup_app()
         # Setup ray if required
         if models_dependencies_installed():
             self._setup_ray()
-        uvicorn.run(self.app, host=host, port=port)
+        uvicorn.run(
+            self.app,
+            host=config.settings.server.host,
+            port=config.settings.server.port,
+        )

@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Request, Depends, Path, Query, Body, HTTPException
 from fastapi.responses import JSONResponse
-import pathlib
-import os
 import random
 from bson.objectid import ObjectId
 from toktagger.api.crud import utils
@@ -11,6 +9,8 @@ from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate, LoadTypes
 from toktagger.api.models import models_dependencies_installed, check_models_enabled
 from pydantic import ValidationError
 from collections import defaultdict
+import toktagger.api.config as config
+import pathlib
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
@@ -137,7 +137,7 @@ async def delete_models(
         )
 
         # And delete file from storage (if it exists - may not if the job failed)
-        pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(f"{model.id}.model").unlink(
+        config.settings.models.cache_dir.joinpath(f"{model.id}.model").unlink(
             missing_ok=True
         )
 
@@ -340,7 +340,7 @@ async def load_model_weights(
         )
 
     # Check if that load method is enabled
-    if method == LoadTypes.LOCAL and os.environ.get("DISABLE_LOCAL_MODEL_LOAD"):
+    if method == LoadTypes.LOCAL and not config.settings.models.local_load_enabled:
         raise HTTPException(
             status_code=403, detail="Loading from local weights is disabled."
         )
