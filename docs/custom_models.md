@@ -251,7 +251,7 @@ class MyModel(Model):
         annotations: list[list[Annotation]],
         params: MyTrainParams,
         ):
-        if self.gpu_available() and params.device != "cpu":
+        if not self.gpu_available() and params.device != "cpu":
             raise ValueError(
                 "Only CPU available on current worker node, but non-CPU device requested!"
             )

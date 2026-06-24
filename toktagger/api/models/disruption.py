@@ -114,7 +114,7 @@ class DisruptionCNN(Model):
     ) -> float:
         self.log_progress(training_status="started")
 
-        if self.gpu_available() and params.device != "cpu":
+        if not self.gpu_available() and params.device != "cpu":
             raise ValueError(
                 "Only CPU available on current worker node, but non-CPU device requested!"
             )
@@ -317,7 +317,7 @@ class DisruptionCNN(Model):
         params: DisruptionCNNPredictParams,
         data_params: DataParams | None = None,
     ) -> list[list[TimePoint]]:
-        if self.gpu_available() and params.device != "cpu":
+        if not self.gpu_available() and params.device != "cpu":
             raise ValueError(
                 "Only CPU available on current worker node, but non-CPU device requested!"
             )
