@@ -18,10 +18,10 @@
 # max_gpu_actors = None
 
 # Force the set number of GPU actors available, even if insufficient available GPU cores detected on hardware.
-# force_num_gpus = False
+# force_num_gpus = false
 
 # Whether to enable the loading of model weights files from local disk. Should be disabled for production servers.
-# local_load_enabled = True
+# local_load_enabled = true
 
 
 [sal]
@@ -37,7 +37,7 @@
 # port = 8002
 
 # Whether to hot reload the TokTagger server on changes to files.
-# reload = False
+# reload = false
 
 # The directory to use for storing entries in the Mongita database, if used.
 # cache_dir = '/home/runner/.cache/toktagger'
