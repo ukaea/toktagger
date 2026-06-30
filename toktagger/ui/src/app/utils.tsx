@@ -68,7 +68,7 @@ export function convertRawAnnotationsToTimeSeries(
   if (TimeRegionSchema.safeParse(annotation).success) {
     const timeRegion = TimeRegionSchema.parse(annotation);
     return {
-      id: uuidv4(),
+      id: annotation.id || uuidv4(),
       created_by: timeRegion.created_by,
       label: timeRegion.label,
       type: TimeSeriesAnnotationType.TIME_REGION,
@@ -83,7 +83,7 @@ export function convertRawAnnotationsToTimeSeries(
   if (TimePointSchema.safeParse(annotation).success) {
     const timePoint = TimePointSchema.parse(annotation);
     return {
-      id: uuidv4(),
+      id: annotation.id || uuidv4(),
       created_by: timePoint.created_by,
       label: timePoint.label,
       type: TimeSeriesAnnotationType.TIME_POINT,
@@ -105,6 +105,7 @@ export function convertTimeSeriesToRawAnnotations(
     const timePoint: TimePoint = {
       project_id: null,
       sample_id: null,
+      id: annotation.id,
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
@@ -119,6 +120,7 @@ export function convertTimeSeriesToRawAnnotations(
     const timePoint: TimeRegion = {
       project_id: null,
       sample_id: null,
+      id: annotation.id,
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
