@@ -43,14 +43,17 @@ export const BoundingBoxSchema = BaseAnnotationSchema.extend({
 
 export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 
-export const VideoBoundingBoxSchema = BaseAnnotationSchema.extend({
+export const PolygonSchema = BaseAnnotationSchema.extend({
+  type: z.literal("polygon"),
+  segmentation: z.array(z.number()).min(6),
+});
+
+export type Polygon = z.infer<typeof PolygonSchema>;
+
+export const VideoBoundingBoxSchema = BoundingBoxSchema.extend({
   type: z.literal("video_bounding_box"),
   frame: z.number().int(),
   track_id: z.string(), // force string
-  height: z.number().int(),
-  width: z.number().int(),
-  x_min: z.number().int(),
-  y_min: z.number().int(),
 });
 
 export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;
@@ -79,6 +82,7 @@ export const AnnotationSchema = z.union([
   TimeRegionSchema,
   ClassLabelSchema,
   BoundingBoxSchema,
+  PolygonSchema,
   VideoBoundingBoxSchema,
   VideoPolygonSchema,
   VideoPointSchema,
@@ -321,6 +325,7 @@ export enum TimeSeriesAnnotationType {
   TIME_POINT = "TIME POINT",
   TIME_REGION = "TIME REGION",
   BOUNDING_BOX = "BOUNDING BOX",
+  POLYGON = "POLYGON",
 }
 
 export type TimeSeriesToolDefinition = {

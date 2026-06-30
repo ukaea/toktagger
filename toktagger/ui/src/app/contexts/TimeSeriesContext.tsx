@@ -172,6 +172,16 @@ export const TimeSeriesProvider = ({
         });
       });
     }
+    if (project.bounding_box_labels) {
+      project.bounding_box_labels.forEach((label, index) => {
+        const category_id = `${TimeSeriesAnnotationType.POLYGON}_${label}`;
+        timeSeriesCategories.set(category_id, {
+          label,
+          color: randomColor(index),
+          type: TimeSeriesAnnotationType.POLYGON,
+        });
+      });
+    }
     setCategories(timeSeriesCategories);
   }, [project]);
 
@@ -225,6 +235,7 @@ export const TimeSeriesProvider = ({
 
   const addAnnotation = useCallback(
     (annotation: TimeSeriesAnnotation) => {
+      console.log("Add: ", annotation)
       if (syncTimeoutRef.current !== null) {
         clearTimeout(syncTimeoutRef.current);
         syncTimeoutRef.current = null;
@@ -285,6 +296,7 @@ export const TimeSeriesProvider = ({
 
   const updateAnnotation = useCallback(
     (annotation: TimeSeriesAnnotation) => {
+      console.log("Update call: ", annotation)
       if (syncTimeoutRef.current !== null) {
         clearTimeout(syncTimeoutRef.current);
       }
