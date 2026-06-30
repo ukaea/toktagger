@@ -1,6 +1,6 @@
 [project]
 name = "toktagger"
-version = "0.2.1"
+version = "0.3.0"
 requires-python = ">=3.10,<3.14"
 authors = [
 ]
@@ -38,6 +38,7 @@ dependencies = [
   "sal-xarray>=0.2.1",
   "bump-my-version>=1.2.7",
   "platformdirs>=4.4.0",
+  "pydantic-settings>=2.11.0",
 ]
 [project.optional-dependencies]
 models = [
