@@ -46,7 +46,7 @@ export const BoundingBox = ({ plotId, plotReady }: ToolingProps) => {
 
   useEffect(() => {
     const toolingCallbacks: ToolingCallbacks = {
-      start: (x, y, label) => {
+      start: (x, y, label, _axisSize) => {
         const annotation = createAnnotation(
           TimeSeriesAnnotationType.BOUNDING_BOX,
           label,

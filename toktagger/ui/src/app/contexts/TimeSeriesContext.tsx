@@ -235,7 +235,6 @@ export const TimeSeriesProvider = ({
 
   const addAnnotation = useCallback(
     (annotation: TimeSeriesAnnotation) => {
-      console.log("Add: ", annotation)
       if (syncTimeoutRef.current !== null) {
         clearTimeout(syncTimeoutRef.current);
         syncTimeoutRef.current = null;
@@ -296,7 +295,6 @@ export const TimeSeriesProvider = ({
 
   const updateAnnotation = useCallback(
     (annotation: TimeSeriesAnnotation) => {
-      console.log("Update call: ", annotation)
       if (syncTimeoutRef.current !== null) {
         clearTimeout(syncTimeoutRef.current);
       }

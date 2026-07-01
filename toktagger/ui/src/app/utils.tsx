@@ -100,7 +100,7 @@ export function convertRawAnnotationsToTimeSeries(
   if (BoundingBoxSchema.safeParse(annotation).success) {
     const boundingBox = BoundingBoxSchema.parse(annotation);
     return {
-      id: uuidv4(),
+      id: annotation.id || uuidv4(),
       created_by: boundingBox.created_by,
       label: boundingBox.label,
       type: TimeSeriesAnnotationType.BOUNDING_BOX,
@@ -115,12 +115,10 @@ export function convertRawAnnotationsToTimeSeries(
     };
   }
 
-  console.log("Parse: ", annotation)
-
   if (PolygonSchema.safeParse(annotation).success) {
     const polygon = PolygonSchema.parse(annotation);
     return {
-      id: uuidv4(),
+      id: annotation.id || uuidv4(),
       created_by: polygon.created_by,
       label: polygon.label,
       type: TimeSeriesAnnotationType.POLYGON,
@@ -135,8 +133,6 @@ export function convertRawAnnotationsToTimeSeries(
       }, []),
       selected: false,
     };
-  } else {
-    console.log(PolygonSchema.safeParse(annotation).error?.message);
   }
 
   console.warn(
@@ -183,6 +179,7 @@ export function convertTimeSeriesToRawAnnotations(
     const boundingBox: BoundingBox = {
       project_id: null,
       sample_id: null,
+      id: annotation.id,
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
@@ -200,6 +197,7 @@ export function convertTimeSeriesToRawAnnotations(
     const polygon: Polygon = {
       project_id: null,
       sample_id: null,
+      id: annotation.id,
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,

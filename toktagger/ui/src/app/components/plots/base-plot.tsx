@@ -72,6 +72,7 @@ export const BaseTimeSeriesPlot = ({
 
   const isDraggingRef = useRef(false);
   const allowRelayout = useRef(true);
+  const lastHoverTime = useRef(0);
 
   const plotId = externalId || "time-series";
 
@@ -307,7 +308,7 @@ export const BaseTimeSeriesPlot = ({
     function getClickData(
       event: MouseEvent,
       _plot: PlotlyHTMLElement,
-    ): TimeSeriesAnnotationPoint {
+    ): TimeSeriesAnnotationPoint & { axisSize: { x: number; y: number } } {
       const plot = _plot as ExtendedPlotlyHTMLElement;
       let xaxis = plot._fullLayout.xaxis; // x-axis descriptor
       let yaxis = plot._fullLayout.yaxis; // y-axis descriptor
@@ -336,7 +337,12 @@ export const BaseTimeSeriesPlot = ({
       const x = xaxis.p2d(relX); // data-space X at click
       const y = yaxis.p2d(relY); // data-space Y at click
 
-      return { x, y };
+      const axisSize = {
+        x: Math.abs(xaxis.range[1] - xaxis.range[0]),
+        y: Math.abs(yaxis.range[1] - yaxis.range[0]),
+      };
+
+      return { x, y, axisSize };
     }
 
     const draggableElements =
@@ -358,7 +364,6 @@ export const BaseTimeSeriesPlot = ({
 
     const startAnnotationCreation = (event: MouseEvent) => {
       if (event.ctrlKey) {
-        console.log(editMode);
         if (!editMode) {
           ToastQueue.info(
             "Change to Edit Mode to draw annotations - see help popup in annotation toolbar for more info",
@@ -376,6 +381,7 @@ export const BaseTimeSeriesPlot = ({
               clickLocation.x,
               clickLocation.y,
               activeAnnotationTool.label,
+              clickLocation.axisSize,
             );
         } else {
           ToastQueue.info(
@@ -395,6 +401,17 @@ export const BaseTimeSeriesPlot = ({
       }
     };
 
+    const hoverAnnotation = (event: MouseEvent) => {
+      if (!activeAnnotationTool) return;
+      const now = Date.now();
+      if (now - lastHoverTime.current < 20) return;
+      lastHoverTime.current = now;
+      const clickLocation = getClickData(event, plot);
+      toolingCallbacks
+        .get(activeAnnotationTool.type)
+        ?.hover?.(clickLocation.x, clickLocation.y);
+    };
+
     const finishAnnotationCreation = (event: MouseEvent) => {
       setOngoingAction(false);
       isDraggingRef.current = false;
@@ -410,6 +427,7 @@ export const BaseTimeSeriesPlot = ({
       element.addEventListener("contextmenu", handleContextMenu);
       element.addEventListener("mousedown", handleCancelSelection);
       element.addEventListener("mousedown", startAnnotationCreation);
+      element.addEventListener("mousemove", hoverAnnotation);
 
       if (editMode) {
         element.addEventListener("mousemove", updateAnnotation);
@@ -422,6 +440,7 @@ export const BaseTimeSeriesPlot = ({
         element.removeEventListener("contextmenu", handleContextMenu);
         element.removeEventListener("mousedown", handleCancelSelection);
         element.removeEventListener("mousedown", startAnnotationCreation);
+        element.removeEventListener("mousemove", hoverAnnotation);
         element.removeEventListener("mousemove", updateAnnotation);
         element.removeEventListener("mouseup", finishAnnotationCreation);
       });

@@ -179,7 +179,7 @@ AnnotationBatchTypes = Union[
     TimePointBatch,
     TimeRegionBatch,
     BoundingBoxBatch,
-    PolygonBatch
+    PolygonBatch,
     VideoBoundingBoxBatch,
     VideoPolygonBatch,
     VideoPointBatch,

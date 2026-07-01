@@ -355,9 +355,10 @@ export type TimeSeriesAnnotation = {
 };
 
 export type ToolingCallbacks = {
-  start: (x: number, y: number, label: string) => void;
+  start: (x: number, y: number, label: string, axisSize: { x: number; y: number }) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
+  hover?: (x: number, y: number) => void;
 };
 
 export type PlotProps = {

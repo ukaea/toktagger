@@ -14,7 +14,7 @@ import {
   ToolingProps,
 } from "@/types";
 import * as d3 from "d3";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useContextMenu } from "react-contexify";
 
 export const Polygon = ({ plotId, plotReady }: ToolingProps) => {
@@ -31,7 +31,7 @@ export const Polygon = ({ plotId, plotReady }: ToolingProps) => {
 
   const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
-  const isAddingPoints = useRef(false);
+  const isUpdatingPolygon = useRef(false);
 
   // Hook to trigger the context provider to render context menu
   const { show } = useContextMenu({
@@ -40,9 +40,8 @@ export const Polygon = ({ plotId, plotReady }: ToolingProps) => {
 
   useEffect(() => {
     const toolingCallbacks: ToolingCallbacks = {
-      start: (x, y, label) => {
-        console.log("drawing: ", isAddingPoints)
-        if (isAddingPoints.current) {
+      start: (x, y, label, axisSize) => {
+        if (isUpdatingPolygon.current) {
             if (!currentAnnotation.current) {
                 console.error("Could not find current annotation to add point to")
                 return
@@ -53,13 +52,25 @@ export const Polygon = ({ plotId, plotReady }: ToolingProps) => {
                 return
             }
 
-            currentAnnotation.current.points.push({ x, y })
-            console.log("Update: ", currentAnnotation.current)
+            const pointArrayLength = currentAnnotation.current.points.length
+            const closeThreshold = { x: axisSize.x * 0.02, y: axisSize.y * 0.02};
+
+            if (Math.abs(x - currentAnnotation.current.points[0].x) < closeThreshold.x && Math.abs(y - currentAnnotation.current.points[0].y) < closeThreshold.y) {
+                if (pointArrayLength > 4) {
+                    isUpdatingPolygon.current = false
+                    currentAnnotation.current.points.splice(pointArrayLength-2, 2)
+                    updateAnnotation(currentAnnotation.current);
+                }
+                return
+            }
+
+            currentAnnotation.current.points[pointArrayLength - 2] = { x, y };
+            currentAnnotation.current.points.splice(pointArrayLength-1, 0, {x, y})
+            console.log("Added: ", currentAnnotation.current.points)
             updateAnnotation(currentAnnotation.current);
             return
         }
         
-        isAddingPoints.current = true;
         const annotation = createAnnotation(
           TimeSeriesAnnotationType.POLYGON,
           label,
@@ -68,12 +79,16 @@ export const Polygon = ({ plotId, plotReady }: ToolingProps) => {
         annotation.points.push({ x, y });
         annotation.points.push({ x, y });
         annotation.points.push({ x, y });
-        console.log(annotation)
+        isUpdatingPolygon.current = true;
         addAnnotation(annotation);
       },
-      move(x, y) {
-      },
-      end(_x, _y) {
+      move(_x, _y) {},
+      end(_x, _y) {},
+      hover(x, y) {
+        if (!currentAnnotation.current || !isUpdatingPolygon.current) return;
+        const pointArrayLength = currentAnnotation.current.points.length
+        currentAnnotation.current.points[pointArrayLength - 2] = { x, y };
+        updateAnnotation(currentAnnotation.current);
       },
     };
     registerTooling(TimeSeriesAnnotationType.POLYGON, toolingCallbacks);
@@ -129,7 +144,10 @@ export const Polygon = ({ plotId, plotReady }: ToolingProps) => {
       const xAxis = plot._fullLayout.xaxis;
 
       const graphGroup = d3.select(overplot);
-      graphGroup.selectAll(".bounding-box").remove(); // All VSpans are removed each render cycle
+      graphGroup.selectAll(".polygon").remove();
+      graphGroup.selectAll(".polygon-point").remove();
+      graphGroup.selectAll(".polygon-vertex").remove();
+      graphGroup.selectAll(".polygon-edge").remove();
 
       function handleContextMenu(
         event: MouseEvent,
@@ -147,23 +165,86 @@ export const Polygon = ({ plotId, plotReady }: ToolingProps) => {
         }
       }
 
-      // Create a line and a transparent drag handle for each VSpan
+      const getVertexHandler = (index: number) =>
+        d3.drag<SVGCircleElement, TimeSeriesAnnotation>()
+          .on("start", (_, d) => { selectAnnotations([d.id]); setOngoingAction(true); })
+          .on("drag", (event, d) => {
+            d.points[index] = { x: xAxis.p2d(event.x), y: yAxis.p2d(event.y) };
+            updateAnnotation(d);
+          })
+          .on("end", () => setOngoingAction(false));
+
       for (const polygon of annotations) {
         if (polygon.type !== TimeSeriesAnnotationType.POLYGON)
           continue;
         const opacity = polygon.selected ? 0.8 : 0.5;
         const pointerEvent = isDrawing || !editMode ? "none" : "all";
+        const isInProgress = currentAnnotation.current?.id === polygon.id && isUpdatingPolygon.current;
+
+        const convertedPoints = polygon.points.map((point) => ({
+            x: xAxis.d2p(point.x),
+            y: yAxis.d2p(point.y),
+        }))
 
         const categoryId = `${polygon.type}_${polygon.label}`;
         const color = categories.get(categoryId)?.color || "black";
 
-        // Polygon
         graphGroup
             .append("polygon")
-            .attr("points", polygon.points.map(p => (`${p.x}, ${p.y}`)).join(" "))
-            .attr("fill", "steelblue")
-            .attr("stroke", "black")
-            .attr("stroke-width", 2);       
+            .attr("aria-label", "polygon")
+            .attr(
+                "class",
+                "annotation polygon cursor-grab disable-on-modifier",
+            )
+            .attr("points", convertedPoints.map(p => (`${p.x}, ${p.y}`)).join(" "))
+            .attr("fill", color)
+            .attr("opacity", opacity)
+            .attr("style", `pointer-events: ${pointerEvent}`)
+            .attr("stroke-width", 1)
+            .attr("stroke", "gray")
+            .datum(polygon)
+            .on("contextmenu", handleContextMenu);
+
+        if (!isInProgress) {
+          // Edge hit targets — appended before vertex circles so vertices take priority
+          convertedPoints.forEach((p, i) => {
+            const next = convertedPoints[(i + 1) % convertedPoints.length];
+            graphGroup
+              .append("line")
+              .attr("aria-label", "polygon-edge-handle")
+              .attr("class", "annotation polygon-edge disable-on-modifier")
+              .attr("x1", p.x).attr("y1", p.y)
+              .attr("x2", next.x).attr("y2", next.y)
+              .attr("stroke", "transparent")
+              .attr("stroke-width", 10)
+              .attr("style", `pointer-events: ${pointerEvent}; cursor: cell`)
+              .datum(polygon)
+              .on("click", (event, d) => {
+                const x = xAxis.p2d((p.x + next.x) / 2)
+                const y = yAxis.p2d((p.y + next.y) / 2)
+
+                d.points.splice(i + 1, 0, { x, y });
+                updateAnnotation(d);
+              });
+          });
+
+          convertedPoints.forEach((p, i) => {
+            graphGroup
+              .append("circle")
+              .attr("aria-label", "polygon-vertex-handle")
+              .attr("class", "annotation polygon-vertex disable-on-modifier")
+              .attr("cx", p.x)
+              .attr("cy", p.y)
+              .attr("r", 3)
+              .attr("fill", "grey")
+              .attr("stroke", "grey")
+              .attr("stroke-width", 1)
+              .attr("style", `pointer-events: ${pointerEvent}; cursor: move`)
+              .datum(polygon)
+              .call(getVertexHandler(i))
+              .on("contextmenu", handleContextMenu);
+          });
+        }
       }
     });
   }, [
