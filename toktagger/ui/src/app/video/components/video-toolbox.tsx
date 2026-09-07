@@ -254,8 +254,8 @@ export function VideoToolbox() {
                       and model-created annotations are not propagated.
                       <br />
                       <br />
-                      When reviewing frames, use View mode to avoid restoring
-                      an intentionally removed annotation.
+                      When reviewing frames, use View mode to avoid restoring an
+                      intentionally removed annotation.
                     </Text>
                   </Content>
                 </ContextualHelp>
