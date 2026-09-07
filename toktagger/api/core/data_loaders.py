@@ -36,8 +36,7 @@ from toktagger.api.schemas.samples import (
 )
 import toktagger.api.config as config
 
-# Set up UDA environment variables with defaults if not already set. This is required for
-# the pyuda client to work correctly outside of Freia.
+# Set UDA env var defaults so the pyuda client works correctly outside of Freia.
 os.environ["UDA_HOST"] = os.environ.get("UDA_HOST", config.settings.uda.host)
 os.environ["UDA_META_PLUGINNAME"] = os.environ.get(
     "UDA_META_PLUGINNAME", config.settings.uda.meta_pluginname
@@ -46,13 +45,16 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
     "UDA_METANEW_PLUGINNAME", config.settings.uda.metanew_pluginname
 )
 
-# Setup SAL environment variables with defaults if not already set. This is required for
-# the SAL client to work correctly.
+# Set SAL env var defaults so the SAL client works correctly.
 os.environ["SAL_HOST"] = os.environ.get("SAL_HOST", config.settings.sal.host)
 
 
 class DataLoaderError(Exception):
     """Custom exception for data loader errors."""
+
+
+class FrameNotFoundError(DataLoaderError):
+    """The requested video frame does not exist."""
 
 
 class DataLoader(ABC):
@@ -147,12 +149,12 @@ class ImageDataLoader(DataLoader):
         elif params.frame is None:
             files = sorted(dir_path.iterdir())
             if len(files) == 0:
-                raise FileNotFoundError("No files exist in specified directory!")
+                raise FrameNotFoundError("No files exist in specified directory!")
             file_path = files[0]
         else:
             file_path = dir_path.joinpath(f"{params.frame}.{sample_data.type}")
         if not file_path.exists():
-            raise FileNotFoundError(
+            raise FrameNotFoundError(
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
             )
         # return raw encoded file bytes if return_raw is True
@@ -242,7 +244,7 @@ class ArrayDataLoader(DataLoader):
         frame = params.frame if params.frame is not None else 0
 
         if frame < 0 or frame >= arr.shape[0]:
-            raise DataLoaderError(
+            raise FrameNotFoundError(
                 f"Frame {frame} unavailable! Available frame range is 0 to {arr.shape[0] - 1}."
             )
 
@@ -252,10 +254,15 @@ class ArrayDataLoader(DataLoader):
         buffer = io.BytesIO()
         im.save(buffer, format="PNG")
         buffer.seek(0)
+        png_bytes = buffer.getvalue()
 
         return ImageData(
             frame=frame,
-            values=base64.b64encode(buffer.getvalue()).decode(),
+            values=(
+                list(png_bytes)
+                if params.return_raw
+                else base64.b64encode(png_bytes).decode()
+            ),
         )
 
 
@@ -448,11 +455,28 @@ class UDACameraDataLoader(DataLoader):
             if params.frame is None:
                 params.frame = 0  # Default to first frame if not specified
 
-            signal = xr.open_dataset(
-                f"uda://{signal_name}:{sample.shot_id}",
-                engine="uda",
-                frame_number=params.frame,
-            )
+            try:
+                signal = xr.open_dataset(
+                    f"uda://{signal_name}:{sample.shot_id}",
+                    engine="uda",
+                    frame_number=params.frame,
+                )
+            except RuntimeError as e:
+                metadata_signal = xr.open_dataset(
+                    f"uda://{signal_name}:{sample.shot_id}",
+                    engine="uda",
+                    frame_number=0,
+                )
+                n_frames = metadata_signal["data"].attrs.get("n_frames")
+                if not isinstance(n_frames, (int, np.integer)):
+                    raise ValueError("UDA image metadata does not contain n_frames")
+
+                if params.frame < 0 or params.frame >= n_frames:
+                    raise FrameNotFoundError(
+                        f"Frame {params.frame} unavailable for image signal "
+                        f"'{signal_name}' and shot ID '{sample.shot_id}'."
+                    ) from e
+                raise
 
             image_array = signal["data"].values
             image_array = np.squeeze(image_array)
@@ -466,10 +490,7 @@ class UDACameraDataLoader(DataLoader):
                 else:
                     image_array = image_array.reshape(-1, 1)  # 1D grayscale strip
 
-            # Convert uint16 to uint8 for Pillow compatibility (Pillow doesn't support u2).
-            # Scale using the camera's declared bit depth (not the per-frame min/max) so
-            # brightness stays consistent across frames, e.g. RCO reports depth=8 even
-            # though UDA returns a uint16 array for shot 54339.
+            # Convert uint16 to uint8, scaled by the camera's declared bit depth.
             if image_array.dtype == np.uint16:
                 bit_depth = signal["data"].attrs.get("depth")
                 if bit_depth:
@@ -483,11 +504,18 @@ class UDACameraDataLoader(DataLoader):
             buffer = io.BytesIO()
             im.save(buffer, format="PNG")
             buffer.seek(0)
+            png_bytes = buffer.getvalue()
 
             return ImageData(
                 frame=str(params.frame),
-                values=base64.b64encode(buffer.getvalue()).decode(),
+                values=(
+                    list(png_bytes)
+                    if params.return_raw
+                    else base64.b64encode(png_bytes).decode()
+                ),
             )
+        except FrameNotFoundError:
+            raise
         except Exception as e:
             raise DataLoaderError(
                 f"Could not load image signal '{signal_name}' for shot ID '{sample.shot_id}': {e}"
@@ -561,7 +589,9 @@ def _get_sal_signal(
     min_time_step: Optional[float] = None,
 ) -> Profile2DData | TimeSeriesData:
     full_name = f"pulse/{shot_id}/{name}"
-    ds = xr.open_dataset(f"sal://{full_name}", engine="sal")
+    ds = xr.open_dataset(
+        f"sal://{full_name}", engine="sal", host=os.environ["SAL_HOST"]
+    )
     ds = ds.sel(time=slice(time_min, time_max))
 
     time = ds["time"].values
@@ -629,8 +659,7 @@ def _get_fair_mast_signals(
     min_time_step: Optional[float] = None,
 ) -> MultiVariateTimeSeriesData | MultiProfile2DData:
     kwargs = {"chunks": None}
-    # check if xarray version supports create_default_indexes argument, and if so, set it to False
-    # to avoid unnecessary index creation which can cause performance issues with large datasets
+    # Disable default index creation if supported, to avoid performance issues on large datasets
     sig = inspect.signature(xr.open_dataset)
     if "create_default_indexes" in sig.parameters:
         kwargs["create_default_indexes"] = False

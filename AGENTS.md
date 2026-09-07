@@ -50,6 +50,7 @@ Prefer running a single test (`pytest path/to/test_file.py -k test_name`) over a
 - Route third-party library (Annotorious, Plotly) mutations through one function; use D3 for custom drawing/geometry layered on top rather than extending those libraries directly.
 
 **Both**: short one-line "why" comments, not multi-line comment blocks or docstrings. Don't loosen a type or a test assertion just to make something pass without first checking whether it's masking a real bug.
+- Use descriptive variable names that communicate each value’s role; avoid ambiguous abbreviations or generic names when a clearer domain-specific name is available.
 
 ## PR expectations & constraints
 

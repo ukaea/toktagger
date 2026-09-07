@@ -4,15 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DialogContainer,
   AlertDialog,
+  Content,
+  ContextualHelp,
   Switch,
   Divider,
   Flex,
+  Heading,
+  Text,
 } from "@adobe/react-spectrum";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useVideoUiState } from "@/app/video/components/video-context";
+import { useVideoUiState } from "@/app/contexts/VideoContext";
 import {
   ClassPanel as VideoClassPanel,
   InstancePanel as VideoInstancePanel,
@@ -229,12 +233,33 @@ export function VideoToolbox() {
             gap="size-100"
           >
             <div className="w-[170px] flex justify-start">
-              <Switch
-                isSelected={session.propagate}
-                onChange={session.setPropagate}
-              >
-                Propagation
-              </Switch>
+              <Flex direction="row" alignItems="center" gap="size-50">
+                <Switch
+                  isSelected={session.editMode && session.propagate}
+                  isDisabled={!session.editMode}
+                  onChange={session.setPropagate}
+                >
+                  Propagation
+                </Switch>
+                <ContextualHelp
+                  aria-label="Propagation help"
+                  placement="end bottom"
+                >
+                  <Heading>Forward Propagation</Heading>
+                  <Content>
+                    <Text>
+                      When enabled in Edit mode, pressing Next copies manual
+                      annotations to the next frame when they are not already
+                      present there. Existing annotations are not overwritten,
+                      and model-created annotations are not propagated.
+                      <br />
+                      <br />
+                      When reviewing frames, use View mode to avoid restoring an
+                      intentionally removed annotation.
+                    </Text>
+                  </Content>
+                </ContextualHelp>
+              </Flex>
             </div>
             <div className="w-[170px] flex justify-start">
               <Switch

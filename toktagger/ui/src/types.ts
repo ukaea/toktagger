@@ -1,4 +1,4 @@
-import { PlotlyHTMLElement } from "plotly.js";
+import { Config, PlotlyHTMLElement } from "plotly.js";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
@@ -44,10 +44,19 @@ export const BoundingBoxSchema = BaseAnnotationSchema.extend({
 
 export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 
-export const VideoBoundingBoxSchema = BaseAnnotationSchema.extend({
-  type: z.literal("video_bounding_box"),
+export const VideoAnnotationBaseSchema = BaseAnnotationSchema.extend({
   frame: z.number().int(),
   track_id: z.string(), // force string
+});
+
+export const VideoFrameLabelSchema = VideoAnnotationBaseSchema.extend({
+  type: z.literal("video_frame_label"),
+});
+
+export type VideoFrameLabel = z.infer<typeof VideoFrameLabelSchema>;
+
+export const VideoBoundingBoxSchema = VideoAnnotationBaseSchema.extend({
+  type: z.literal("video_bounding_box"),
   height: z.number().int(),
   width: z.number().int(),
   x_min: z.number().int(),
@@ -77,19 +86,15 @@ export const PolygonSchema = BaseAnnotationSchema.extend({
 
 export type Polygon = z.infer<typeof PolygonSchema>;
 
-export const VideoPolygonSchema = BaseAnnotationSchema.extend({
+export const VideoPolygonSchema = VideoAnnotationBaseSchema.extend({
   type: z.literal("video_polygon"),
-  frame: z.number().int(),
-  track_id: z.string(),
   segmentation: z.array(VideoPolygonCoordinatesSchema).length(1),
 });
 
 export type VideoPolygon = z.infer<typeof VideoPolygonSchema>;
 
-export const VideoPointSchema = BaseAnnotationSchema.extend({
+export const VideoPointSchema = VideoAnnotationBaseSchema.extend({
   type: z.literal("video_point"),
-  frame: z.number().int(),
-  track_id: z.string(),
   x: z.number().int(),
   y: z.number().int(),
 });
@@ -105,6 +110,7 @@ export const AnnotationSchema = z.union([
   VideoBoundingBoxSchema,
   VideoPolygonSchema,
   VideoPointSchema,
+  VideoFrameLabelSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
@@ -268,13 +274,35 @@ export const ModelSchema = z.object({
   project_id: z.string(),
   type: z.string(),
   version: z.int(),
-  training_status: z.string(),
+  status: z.string(),
   progress: z.number(),
   score: z.number(),
   task_id: z.string(),
 });
 
 export type Model = z.infer<typeof ModelSchema>;
+
+export const LocalLoadFormSchema = z.object({
+  weights_path: z.string().nonempty(),
+});
+export type LocalLoadForm = z.infer<typeof LocalLoadFormSchema>;
+
+export const GitlabLoadFormSchema = z.object({
+  model_name: z.string().nonempty(),
+  weights_path: z.string().nonempty(),
+  model_version: z.string().nullish(),
+  gitlab_project_id: z.number().min(1),
+});
+export type GitlabLoadForm = z.infer<typeof GitlabLoadFormSchema>;
+
+export const HuggingfaceLoadFormSchema = z.object({
+  model_name: z.string().nonempty(),
+  weights_path: z.string().nonempty(),
+  model_version: z.string().nullish(),
+  huggingface_userspace: z.string().nonempty(),
+});
+export type HuggingfaceLoadForm = z.infer<typeof HuggingfaceLoadFormSchema>;
+
 export const DataParamsSchema = z.object({
   name: z.string(),
   // Only used for video/image loader params.
@@ -378,10 +406,11 @@ export type ToolingCallbacks = {
   ) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
-  hover?: (x: number, y: number) => void;
-  // Discards any in-progress annotation and resets tool-local state - called when a draw
-  // is abandoned (tool switched mid-draw, Escape pressed) rather than completed normally
+  hover?: (x: number, y: number, axisSize: { x: number; y: number }) => void;
+  // Called when a draw is abandoned (tool switched or Escape pressed) instead of finished
   cancel?: () => void;
+  // Alternative gesture for finishing an in-progress shape (e.g. double-click to close a polygon)
+  doubleClick?: (x: number, y: number) => void;
 };
 
 export type PlotProps = {
@@ -399,6 +428,7 @@ type PlotlyAxisTransforms = {
 };
 export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
   _fullLayout: Record<string, PlotlyAxisTransforms>;
+  _context: { doubleClick: Config["doubleClick"] };
 }
 
 export interface SelectionRange {

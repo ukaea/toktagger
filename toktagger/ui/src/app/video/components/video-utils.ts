@@ -4,6 +4,7 @@ import type { ImageAnnotation } from "@annotorious/react";
 import type { Annotation } from "@/types";
 import {
   VideoBoundingBoxSchema,
+  VideoFrameLabelSchema,
   VideoPointSchema,
   VideoPolygonSchema,
 } from "@/types";
@@ -14,7 +15,21 @@ import type {
   TrackKey,
 } from "./types";
 import { classIdForName, makeTrackKey, buildSourceKey } from "./types";
-import { getLabelTrack } from "./anno-utils";
+import { getAnnotationCreator, getLabelTrack } from "./anno-utils";
+
+/** True when global annotation shortcuts should yield to text entry controls. */
+export function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target instanceof HTMLTextAreaElement) return true;
+  if (target instanceof HTMLSelectElement) return true;
+
+  return (
+    target instanceof HTMLInputElement &&
+    target.type !== "checkbox" &&
+    target.type !== "radio"
+  );
+}
 
 /**
  * Simple deep clone for annotation payloads.
@@ -174,6 +189,24 @@ export function existingTrackIdsForClass(
       const tid = canonicalizeTrackId(got.trackId || "");
       if (tid) out.push(tid);
     }
+  }
+  return out;
+}
+
+// Track ids already used by whole-frame labels of a class - shares the pool with shapes.
+export function existingFrameLabelTrackIdsForClass(
+  annotations: Annotation[],
+  className: string,
+): string[] {
+  const cls = className.trim();
+  if (!cls) return [];
+
+  const out: string[] = [];
+  for (const annotation of annotations) {
+    if (annotation.type !== "video_frame_label") continue;
+    if ((annotation.label || "").trim() !== cls) continue;
+    const tid = canonicalizeTrackId(annotation.track_id || "");
+    if (tid) out.push(tid);
   }
   return out;
 }
@@ -341,37 +374,176 @@ export function deleteTrackAcrossFrames(
   return next;
 }
 
-/**
- * Seed `nextFrame` with a copy of `frame` only if `nextFrame` is currently empty.
- * `withRetarget` is responsible for adjusting any frame-specific fields (e.g. target.source).
- */
-export function forwardPropagateIfEmpty(
+/** Append missing manual instances from `sourceFrame` to `destinationFrame`. */
+export function forwardPropagateMissingManualAnnotations(
   byFrame: ByFrameMap,
-  frame: FrameIndex,
-  nextFrame: FrameIndex,
-  ids: { projectId: string; sampleId: string },
+  sourceFrame: FrameIndex,
+  destinationFrame: FrameIndex,
+  sessionIds: { projectId: string; sampleId: string },
 ): ByFrameMap {
-  const cur = byFrame.get(frame) ?? [];
-  if (cur.length === 0) return byFrame;
+  const sourceAnnotations = byFrame.get(sourceFrame) ?? [];
+  const destinationAnnotations = byFrame.get(destinationFrame) ?? [];
 
-  const nxt = byFrame.get(nextFrame) ?? [];
-  if (nxt.length > 0) return byFrame;
+  const destinationKeys = new Set<TrackKey>();
+  for (const annotation of destinationAnnotations) {
+    const { className, trackId } = getLabelTrack(annotation);
+    const trimmedClassName = (className ?? "").trim();
+    const canonicalTrackId = canonicalizeTrackId(trackId ?? "");
+    if (!trimmedClassName || !canonicalTrackId) continue;
 
-  const nextKey = buildSourceKey({
-    projectId: ids.projectId,
-    sampleId: ids.sampleId,
-    frame: nextFrame,
+    destinationKeys.add(makeTrackKey(trimmedClassName, canonicalTrackId));
+  }
+
+  const destinationFrameSourceKey = buildSourceKey({
+    projectId: sessionIds.projectId,
+    sampleId: sessionIds.sampleId,
+    frame: destinationFrame,
   });
 
-  const seeded = cur.map((a) => {
-    const cloned = deepClone(a);
+  const annotationsToPropagate: ImageAnnotation[] = [];
+  for (const annotation of sourceAnnotations) {
+    if (getAnnotationCreator(annotation) !== "manual") continue;
+
+    const { className, trackId } = getLabelTrack(annotation);
+    const trimmedClassName = (className ?? "").trim();
+    const canonicalTrackId = canonicalizeTrackId(trackId ?? "");
+    if (!trimmedClassName || !canonicalTrackId) continue;
+
+    const instanceKey = makeTrackKey(trimmedClassName, canonicalTrackId);
+    if (destinationKeys.has(instanceKey)) continue;
+
+    const clonedAnnotation = deepClone(annotation);
+    annotationsToPropagate.push({
+      ...clonedAnnotation,
+      target: { ...clonedAnnotation.target, source: destinationFrameSourceKey },
+    });
+    destinationKeys.add(instanceKey);
+  }
+
+  if (annotationsToPropagate.length === 0) return byFrame;
+
+  const updatedByFrame = new Map(byFrame);
+  updatedByFrame.set(destinationFrame, [
+    ...destinationAnnotations,
+    ...annotationsToPropagate,
+  ]);
+  return updatedByFrame;
+}
+
+// Derive instance profiles from whole-frame labels, grouped like deriveInstances groups shapes.
+export function deriveFrameLabelInstances(
+  annotations: Annotation[],
+): InstanceProfile[] {
+  const framesByKey = new Map<
+    TrackKey,
+    { className: string; trackId: string; frames: Set<number> }
+  >();
+
+  for (const annotation of annotations) {
+    if (annotation.type !== "video_frame_label") continue;
+
+    const className = (annotation.label || "").trim();
+    const trackId = canonicalizeTrackId(annotation.track_id || "");
+    if (!className || !trackId) continue;
+
+    const key = makeTrackKey(className, trackId);
+    const entry = framesByKey.get(key) ?? {
+      className,
+      trackId,
+      frames: new Set<number>(),
+    };
+    entry.frames.add(annotation.frame);
+    framesByKey.set(key, entry);
+  }
+
+  return Array.from(framesByKey.entries()).map(([key, entry]) => {
+    const frames = Array.from(entry.frames).sort((a, b) => a - b);
     return {
-      ...cloned,
-      target: { ...cloned.target, source: nextKey },
+      key,
+      className: entry.className,
+      classId: classIdForName(entry.className),
+      trackId: entry.trackId,
+      frames,
+      count: frames.length,
     };
   });
+}
 
-  const next = new Map(byFrame);
-  next.set(nextFrame, seeded);
-  return next;
+// Merge shape and frame-label instance profiles that share a (className, trackId) key.
+export function mergeInstanceProfiles(
+  primary: InstanceProfile[],
+  extra: InstanceProfile[],
+): InstanceProfile[] {
+  const byKey = new Map<TrackKey, InstanceProfile>();
+  for (const profile of primary) byKey.set(profile.key, profile);
+
+  for (const profile of extra) {
+    const existing = byKey.get(profile.key);
+    if (!existing) {
+      byKey.set(profile.key, profile);
+      continue;
+    }
+
+    const frames = Array.from(
+      new Set([...existing.frames, ...profile.frames]),
+    ).sort((a, b) => a - b);
+    byKey.set(profile.key, { ...existing, frames, count: frames.length });
+  }
+
+  const out = Array.from(byKey.values());
+  out.sort(
+    (a, b) =>
+      (a.frames[0] ?? Number.POSITIVE_INFINITY) -
+        (b.frames[0] ?? Number.POSITIVE_INFINITY) ||
+      a.trackId.localeCompare(b.trackId),
+  );
+  return out;
+}
+
+// Append missing manual frame labels from frame without replacing destination labels.
+export function propagateMissingManualFrameLabels(
+  annotations: Annotation[],
+  frame: FrameIndex,
+  nextFrame: FrameIndex,
+): Annotation[] {
+  const destinationClasses = new Set<string>();
+  for (const annotation of annotations) {
+    if (
+      annotation.type !== "video_frame_label" ||
+      annotation.frame !== nextFrame
+    )
+      continue;
+
+    const parsed = VideoFrameLabelSchema.safeParse(annotation);
+    if (!parsed.success) continue;
+
+    const className = parsed.data.label.trim();
+    if (className) destinationClasses.add(className);
+  }
+
+  const propagated: Annotation[] = [];
+  const acceptedClasses = new Set(destinationClasses);
+  for (const annotation of annotations) {
+    if (annotation.type !== "video_frame_label" || annotation.frame !== frame)
+      continue;
+
+    const parsed = VideoFrameLabelSchema.safeParse(annotation);
+    if (!parsed.success || parsed.data.created_by !== "manual") continue;
+
+    const className = parsed.data.label.trim();
+    if (!className || acceptedClasses.has(className)) continue;
+
+    const nextLabel = VideoFrameLabelSchema.safeParse({
+      ...parsed.data,
+      frame: nextFrame,
+    });
+    if (!nextLabel.success) continue;
+
+    propagated.push(nextLabel.data);
+    acceptedClasses.add(className);
+  }
+
+  if (propagated.length === 0) return annotations;
+
+  return [...annotations, ...propagated];
 }
