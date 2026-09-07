@@ -56,6 +56,17 @@ def create_local_samples(
     return response.json()
 
 
+def create_annotations(
+    project_id: str, sample_id: str, annotations: list[dict]
+) -> None:
+    """Overwrite the annotations on a sample (as the UI's PUT endpoint does)."""
+    response = requests.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
+        json=annotations,
+    )
+    assert response.status_code == 200
+
+
 def create_image_samples(
     project_id: str,
     shot_id: int,

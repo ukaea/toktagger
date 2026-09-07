@@ -1,4 +1,9 @@
+import pathlib
+
+import pandas as pd
 import pytest
+from toktagger.api.schemas.annotations import TimeRegion
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.samples import SampleSummary
 from toktagger.client.client import (
     Project,
@@ -116,3 +121,79 @@ def test_get_samples_summary(client, seeded_project_with_samples):
     assert summary.total == 2
     assert summary.shot_min == 10000
     assert summary.shot_max == 10001
+
+
+def test_get_data(client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+    data = client.get_data(project_id, sample_ids[0])
+
+    # The tabular loader returns one TimeSeriesData per requested signal
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    assert set(data.values.keys()) == {"Ip"}
+    assert data.values["Ip"].time == list(range(100))
+    # Values match the underlying parquet file
+    df = pd.read_parquet(pathlib.Path(__file__).parents[2] / "10000.parquet")
+    assert data.values["Ip"].values == df.Ip.tolist()
+
+
+def test_get_data_missing_sample_raises_not_found(client, seeded_project_with_samples):
+    project_id, _ = seeded_project_with_samples
+    with pytest.raises(NotFoundError) as exc_info:
+        client.get_data(project_id, MISSING_OBJECT_ID)
+    assert exc_info.value.status_code == 404
+
+
+def test_list_annotations_project_level(client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+    annotations = client.list_annotations(project_id)
+
+    assert len(annotations) == 3
+    # Parsed into concrete annotation types, not raw dicts
+    assert all(isinstance(a, TimeRegion) for a in annotations)
+    assert all(a.project_id == project_id for a in annotations)
+    # Two from sample_ids[0], one from sample_ids[1]
+    assert sum(a.sample_id == sample_ids[0] for a in annotations) == 2
+    assert sum(a.sample_id == sample_ids[1] for a in annotations) == 1
+
+
+def test_list_annotations_sample_level(client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+
+    annotations = client.list_annotations(project_id, sample_id=sample_ids[0])
+    assert len(annotations) == 2
+    assert all(isinstance(a, TimeRegion) for a in annotations)
+    assert all(a.project_id == project_id for a in annotations)
+
+
+def test_list_annotations_sample_level_filters(client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+
+    annotations = client.list_annotations(
+        project_id, sample_id=sample_ids[0], created_by="manual"
+    )
+    assert len(annotations) == 1
+    assert annotations[0].label == "Flat Top"
+    assert annotations[0].created_by == "manual"
+    assert annotations[0].validated is True
+
+    annotations = client.list_annotations(
+        project_id, sample_id=sample_ids[0], validated=True
+    )
+    assert len(annotations) == 1
+    assert annotations[0].label == "Flat Top"
+
+    annotations = client.list_annotations(
+        project_id, sample_id=sample_ids[0], validated=False
+    )
+    assert len(annotations) == 1
+    assert annotations[0].label == "Ramp Up"
+    assert annotations[0].created_by == "peak_detection"
+
+
+def test_list_annotations_missing_sample_raises_not_found(
+    client, seeded_project_with_samples
+):
+    project_id, _ = seeded_project_with_samples
+    with pytest.raises(NotFoundError) as exc_info:
+        client.list_annotations(project_id, sample_id=MISSING_OBJECT_ID)
+    assert exc_info.value.status_code == 404

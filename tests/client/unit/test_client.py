@@ -1,6 +1,14 @@
+import json
+
 import httpx
 import pytest
 import tests.db_definitions as db_definitions
+from toktagger.api.schemas.annotations import TimeRegion
+from toktagger.api.schemas.data import (
+    ImageData,
+    ImageParams,
+    MultiVariateTimeSeriesData,
+)
 from toktagger.api.schemas.projects import Project as ProjectSchema
 from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
 from toktagger.client.client import (
@@ -11,6 +19,7 @@ from toktagger.client.client import (
 from toktagger.client.exceptions import (
     MultipleResultsFoundError,
     NotFoundError,
+    TokTaggerClientError,
 )
 from tests.client.conftest import (
     make_client,
@@ -18,6 +27,8 @@ from tests.client.conftest import (
     PROJECT_2_ID,
     SAMPLE_1_ID,
     SAMPLE_2_ID,
+    ANNOTATION_1_ID,
+    ANNOTATION_2_ID,
 )
 
 
@@ -293,3 +304,229 @@ def test_chained_retrieval_style(project_1, sample_1):
     assert sample.id == SAMPLE_1_ID
     assert sample.project_id == PROJECT_1_ID
     assert sample._client is client
+
+
+# --- get_data ---
+
+
+def test_get_data_posts_params_and_parses_response():
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        return httpx.Response(
+            200,
+            json={"values": {"Ip": {"time": [0.0, 1.0], "values": [0.5, 0.6]}}},
+        )
+
+    client = make_client(handler)
+    data = client.get_data(PROJECT_1_ID, SAMPLE_1_ID)
+
+    # Parsed into the concrete data type, not a raw dict
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    assert data.values["Ip"].time == [0.0, 1.0]
+    assert data.values["Ip"].values == [0.5, 0.6]
+
+    request = requests_seen[0]
+    assert request.method == "POST"
+    assert request.url.path == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/data"
+    # Default params and view are sent explicitly in the body
+    body = json.loads(request.content)
+    assert body["params"]["name"] == "identity"
+    assert body["view"]["name"] == "identity"
+
+
+def test_get_data_forwards_image_params():
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        return httpx.Response(200, json={"frame": 3, "values": "BASE64"})
+
+    client = make_client(handler)
+    data = client.get_data(PROJECT_1_ID, SAMPLE_1_ID, params=ImageParams(frame=3))
+
+    assert isinstance(data, ImageData)
+    assert data.frame == 3
+    body = json.loads(requests_seen[0].content)
+    assert body["params"]["name"] == "image"
+    assert body["params"]["frame"] == 3
+    assert body["params"]["return_raw"] is False
+
+
+def test_get_data_missing_sample_raises_not_found():
+    client = make_client(
+        lambda request: httpx.Response(
+            404, json={"detail": "Sample not found with that ID."}
+        )
+    )
+    with pytest.raises(NotFoundError) as exc_info:
+        client.get_data(PROJECT_1_ID, SAMPLE_1_ID)
+    assert exc_info.value.status_code == 404
+
+
+# --- list_annotations ---
+
+
+def test_list_annotations_project_level(annotation_1, annotation_2):
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        return httpx.Response(200, json=[annotation_1, annotation_2])
+
+    client = make_client(handler)
+    annotations = client.list_annotations(PROJECT_1_ID)
+
+    # Parsed into concrete annotation types, not raw dicts
+    assert all(isinstance(a, TimeRegion) for a in annotations)
+    assert [a.id for a in annotations] == [ANNOTATION_1_ID, ANNOTATION_2_ID]
+    assert annotations[0].time_min == 0.2
+    assert annotations[0].label == "annotation"
+
+    request = requests_seen[0]
+    assert request.url.path == f"/projects/{PROJECT_1_ID}/annotations"
+    params = request.url.params
+    # Defaults are sent explicitly; optional filters are omitted when None
+    assert params["start"] == "0"
+    assert params["count"] == "100"
+    assert params["sort_by"] == "_id"
+    assert params["sort_direction"] == "descending"
+    assert "validated" not in params
+    assert "created_by" not in params
+
+
+def test_list_annotations_sample_level(annotation_1):
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        return httpx.Response(200, json=[annotation_1])
+
+    client = make_client(handler)
+    annotations = client.list_annotations(
+        PROJECT_1_ID,
+        sample_id=SAMPLE_1_ID,
+        validated=True,
+        created_by="manual",
+        start=5,
+        count=3,
+        sort_by="timestamp",
+        sort_direction="ascending",
+    )
+
+    assert all(isinstance(a, TimeRegion) for a in annotations)
+    request = requests_seen[0]
+    # Routed to the sample-level endpoint with all filters forwarded
+    assert (
+        request.url.path
+        == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/annotations"
+    )
+    params = request.url.params
+    assert params["validated"] == "true"
+    assert params["created_by"] == "manual"
+    assert params["start"] == "5"
+    assert params["count"] == "3"
+    assert params["sort_by"] == "timestamp"
+    assert params["sort_direction"] == "ascending"
+
+
+def test_list_annotations_created_by_requires_sample_id():
+    client = make_client(lambda request: httpx.Response(200, json=[]))
+    with pytest.raises(TokTaggerClientError):
+        client.list_annotations(PROJECT_1_ID, created_by="manual")
+
+
+# --- bootstrapped get_data / list_annotations (delegation + chaining) ---
+
+
+def test_project_get_data_delegates(project_1):
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        if request.url.path == f"/projects/{PROJECT_1_ID}":
+            return httpx.Response(200, json=project_1)
+        return httpx.Response(
+            200,
+            json={"values": {"Ip": {"time": [0.0], "values": [0.5]}}},
+        )
+
+    client = make_client(handler)
+    project = client.get_project(PROJECT_1_ID)
+    data = project.get_data(SAMPLE_1_ID)
+
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    # Delegated to the data endpoint with the project's own id
+    assert requests_seen[-1].method == "POST"
+    assert requests_seen[-1].url.path == (
+        f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/data"
+    )
+
+
+def test_project_list_annotations_delegates(project_1, annotation_1):
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        if request.url.path == f"/projects/{PROJECT_1_ID}":
+            return httpx.Response(200, json=project_1)
+        return httpx.Response(200, json=[annotation_1])
+
+    client = make_client(handler)
+    project = client.get_project(PROJECT_1_ID)
+    annotations = project.list_annotations(validated=True)
+
+    assert all(isinstance(a, TimeRegion) for a in annotations)
+    assert requests_seen[-1].url.path == f"/projects/{PROJECT_1_ID}/annotations"
+    assert requests_seen[-1].url.params["validated"] == "true"
+
+
+def test_sample_get_data_delegates(project_1, sample_1):
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        path = request.url.path
+        if path == f"/projects/{PROJECT_1_ID}":
+            return httpx.Response(200, json=project_1)
+        if path == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}":
+            return httpx.Response(200, json=sample_1)
+        return httpx.Response(
+            200,
+            json={"values": {"Ip": {"time": [0.0], "values": [0.5]}}},
+        )
+
+    client = make_client(handler)
+    sample = client.get_project(PROJECT_1_ID).get_sample(SAMPLE_1_ID)
+    data = sample.get_data()
+
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    # Delegated using the sample's own project and ids
+    assert requests_seen[-1].url.path == (
+        f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/data"
+    )
+
+
+def test_sample_list_annotations_delegates(project_1, sample_1, annotation_1):
+    requests_seen = []
+
+    def handler(request):
+        requests_seen.append(request)
+        path = request.url.path
+        if path == f"/projects/{PROJECT_1_ID}":
+            return httpx.Response(200, json=project_1)
+        if path == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}":
+            return httpx.Response(200, json=sample_1)
+        return httpx.Response(200, json=[annotation_1])
+
+    client = make_client(handler)
+    sample = client.get_project(PROJECT_1_ID).get_sample(SAMPLE_1_ID)
+    annotations = sample.list_annotations(created_by="manual")
+
+    assert all(isinstance(a, TimeRegion) for a in annotations)
+    # Routed to the sample-level endpoint, created_by filter forwarded
+    assert requests_seen[-1].url.path == (
+        f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/annotations"
+    )
+    assert requests_seen[-1].url.params["created_by"] == "manual"
