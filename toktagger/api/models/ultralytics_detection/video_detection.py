@@ -33,6 +33,12 @@ from toktagger.api.models.ultralytics_detection.utils import (
 
 logger = logging.getLogger(__name__)
 
+_BLACK_FRAME_MEAN_THRESHOLD = 13
+_BLACK_FRAME_MAX_THRESHOLD = 50
+_BLACK_FRAME_STD_THRESHOLD = 5
+_BLACK_FRAME_COARSE_STEP = 25
+_BLACK_FRAME_MAX_SCAN = 500
+
 
 class YoloPredictParams(pydantic.BaseModel):
     """Parameters exposed by the prediction form."""
@@ -59,11 +65,76 @@ class YoloPredictParams(pydantic.BaseModel):
         default=False,
         description="Predict only the current frame for individual-sample predictions; ignored for multi-sample predictions.",
     )
+    skip_initial_black_frames: bool = pydantic.Field(
+        default=False,
+        description="Use a coarse-to-fine search to skip initial black frames for full-video prediction; ignored for individual-frame predictions.",
+    )
+
+
+def _is_useful_frame(frame_image: ImageData) -> bool:
+    image = decode_frame_image(frame_image)
+    return bool(
+        image.mean() > _BLACK_FRAME_MEAN_THRESHOLD
+        or image.max() > _BLACK_FRAME_MAX_THRESHOLD
+        or image.std() > _BLACK_FRAME_STD_THRESHOLD
+    )
+
+
+def _find_first_useful_frame(
+    data_loader: TokTaggerDataLoader,
+    sample: Sample,
+    initial_frame: ImageData,
+) -> ImageData:
+    if _is_useful_frame(initial_frame):
+        return initial_frame
+
+    previous_offset = 0
+
+    for offset in range(
+        _BLACK_FRAME_COARSE_STEP,
+        _BLACK_FRAME_MAX_SCAN + 1,
+        _BLACK_FRAME_COARSE_STEP,
+    ):
+        try:
+            candidate_frame = data_loader.get_sample(
+                sample,
+                ImageParams(
+                    name="image",
+                    frame=initial_frame.frame + offset,
+                    return_raw=True,
+                ),
+            )
+        except FileNotFoundError:
+            return initial_frame
+
+        if _is_useful_frame(candidate_frame):
+            for refinement_offset in range(previous_offset + 1, offset):
+                try:
+                    refinement_frame = data_loader.get_sample(
+                        sample,
+                        ImageParams(
+                            name="image",
+                            frame=initial_frame.frame + refinement_offset,
+                            return_raw=True,
+                        ),
+                    )
+                except FileNotFoundError:
+                    return initial_frame
+
+                if _is_useful_frame(refinement_frame):
+                    return refinement_frame
+
+            return candidate_frame
+
+        previous_offset = offset
+
+    return initial_frame
 
 
 def iter_sample_frames(
     data_loader: TokTaggerDataLoader,
     sample: Sample,
+    skip_initial_black_frames: bool = False,
 ) -> Iterator[ImageData]:
     """Yield every contiguous frame in a TokTagger video sample.
 
@@ -87,6 +158,20 @@ def iter_sample_frames(
         )
         return
 
+    if skip_initial_black_frames:
+        selected_frame = _find_first_useful_frame(
+            data_loader,
+            sample,
+            frame_image,
+        )
+        if selected_frame.frame != frame_image.frame:
+            logger.info(
+                "Skipping initial black frames; starting at frame %s for shot %s.",
+                selected_frame.frame,
+                sample.shot_id,
+            )
+        frame_image = selected_frame
+
     while True:
         yield frame_image
 
@@ -108,6 +193,7 @@ def build_video_frame_manifest(
     annotations: list[list[Annotation]],
     class_map: dict[str, int],
     data_loader: TokTaggerDataLoader,
+    skip_initial_black_frames: bool = False,
 ) -> list[DetectionRecord]:
     """
     Convert validated video samples into frame-level training records.
@@ -142,6 +228,7 @@ def build_video_frame_manifest(
         for frame_image in iter_sample_frames(
             data_loader,
             sample,
+            skip_initial_black_frames=skip_initial_black_frames,
         ):
             if isinstance(frame_image.values, str):
                 raise TypeError(
@@ -239,6 +326,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
+        params: YoloTrainParams,
     ) -> list[DetectionRecord]:
         """Build the in-memory video training manifest."""
         labels = sorted(
@@ -264,6 +352,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
             annotations=annotations,
             class_map=self.class_map,
             data_loader=self.data_loader,
+            skip_initial_black_frames=params.skip_initial_black_frames,
         )
 
     def load(
@@ -327,6 +416,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
                 frame_images = iter_sample_frames(
                     self.data_loader,
                     sample,
+                    skip_initial_black_frames=params.skip_initial_black_frames,
                 )
 
             for frame_image in frame_images:

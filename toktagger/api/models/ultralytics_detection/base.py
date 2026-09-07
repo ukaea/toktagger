@@ -72,6 +72,10 @@ class YoloTrainParams(pydantic.BaseModel):
         default=False,
         description="Show detailed Ultralytics training output in the server logs.",
     )
+    skip_initial_black_frames: bool = pydantic.Field(
+        default=False,
+        description="Use a coarse-to-fine search to skip initial black frames before building the training dataset.",
+    )
 
 
 class YoloP2TrainParams(YoloTrainParams):
@@ -388,6 +392,7 @@ class BaseUltralyticsDetection(Model):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
+        params: YoloTrainParams,
     ) -> list[DetectionRecord]:
         """Build task-specific image records."""
         raise NotImplementedError
@@ -477,6 +482,7 @@ class BaseUltralyticsDetection(Model):
         train_records = self.build_manifest(
             samples,
             annotations,
+            params,
         )
 
         if not train_records:
