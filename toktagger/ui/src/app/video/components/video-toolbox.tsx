@@ -235,7 +235,7 @@ export function VideoToolbox() {
             <div className="w-[170px] flex justify-start">
               <Flex direction="row" alignItems="center" gap="size-50">
                 <Switch
-                  isSelected={session.propagate}
+                  isSelected={session.editMode && session.propagate}
                   isDisabled={!session.editMode}
                   onChange={session.setPropagate}
                 >
