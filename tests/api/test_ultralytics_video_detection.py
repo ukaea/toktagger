@@ -3,12 +3,14 @@ import pytest
 pytest.importorskip("ray")
 pytest.importorskip("ultralytics")
 
+from types import SimpleNamespace
+
 import cv2
 import numpy
 import torch
-from types import SimpleNamespace
 from ultralytics.engine.results import Boxes
 
+from toktagger.api.core.data_loaders import FrameNotFoundError
 from toktagger.api.models.ultralytics_detection import video_detection
 from toktagger.api.schemas.annotations import VideoBoundingBox
 from toktagger.api.schemas.data import ImageData, ImageParams
@@ -67,7 +69,7 @@ def test_iter_sample_frames_stops_at_end_of_video():
             return frames[0]
         if params.frame == 4:
             return frames[1]
-        raise FileNotFoundError
+        raise FrameNotFoundError
 
     data_loader = SimpleNamespace(get_sample=get_sample)
 
@@ -106,11 +108,15 @@ def test_build_video_frame_manifest_includes_negative_frames_and_boxes(monkeypat
             ),
         ]
     ]
-    monkeypatch.setattr(
-        video_detection,
-        "iter_sample_frames",
-        lambda data_loader, iterated_sample: iter(frames),
-    )
+
+    def iter_frames(
+        data_loader,
+        iterated_sample,
+        skip_initial_black_frames: bool = False,
+    ):
+        return iter(frames)
+
+    monkeypatch.setattr(video_detection, "iter_sample_frames", iter_frames)
 
     manifest = video_detection.build_video_frame_manifest(
         samples=[sample],
@@ -192,8 +198,12 @@ def test_this_frame_only_is_ignored_without_data_params(monkeypatch):
     iterator_calls = []
     decoded_frames = []
 
-    def iter_frames(loader, iterated_sample):
-        iterator_calls.append((loader, iterated_sample))
+    def iter_frames(
+        loader,
+        iterated_sample,
+        skip_initial_black_frames: bool = False,
+    ):
+        iterator_calls.append((loader, iterated_sample, skip_initial_black_frames))
         return iter(frames)
 
     def decode_frame(frame):
@@ -210,7 +220,7 @@ def test_this_frame_only_is_ignored_without_data_params(monkeypatch):
     )
 
     assert predictions == [[]]
-    assert iterator_calls == [(data_loader, sample)]
+    assert iterator_calls == [(data_loader, sample, False)]
     assert decoded_frames == frames
     assert len(prediction_model.calls) == 2
 
@@ -232,11 +242,15 @@ def test_predict_converts_yolo_boxes_to_video_annotations(monkeypatch):
     )
     data_loader = object()
     model = make_model(data_loader, prediction_model)
-    monkeypatch.setattr(
-        video_detection,
-        "iter_sample_frames",
-        lambda loader, iterated_sample: iter((frame_image,)),
-    )
+
+    def iter_frames(
+        loader,
+        iterated_sample,
+        skip_initial_black_frames: bool = False,
+    ):
+        return iter((frame_image,))
+
+    monkeypatch.setattr(video_detection, "iter_sample_frames", iter_frames)
     monkeypatch.setattr(
         video_detection,
         "decode_frame_image",

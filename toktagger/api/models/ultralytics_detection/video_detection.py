@@ -12,14 +12,10 @@ from ultralytics import YOLO
 from toktagger.api.core.data_loaders import (
     DataLoader as TokTaggerDataLoader,
 )
-from toktagger.api.models.base import ModelRegistry
-from toktagger.api.schemas.annotations import (
-    Annotation,
-    AnnotationBase,
-    VideoBoundingBox,
+from toktagger.api.core.data_loaders import (
+    FrameNotFoundError,
 )
-from toktagger.api.schemas.data import DataParamTypes, ImageData, ImageParams
-from toktagger.api.schemas.samples import Sample
+from toktagger.api.models.base import ModelRegistry
 from toktagger.api.models.ultralytics_detection.base import (
     BaseUltralyticsDetection,
     DetectionRecord,
@@ -30,6 +26,13 @@ from toktagger.api.models.ultralytics_detection.utils import (
     check_pretrained_model_availability,
     resolve_weights_path,
 )
+from toktagger.api.schemas.annotations import (
+    Annotation,
+    AnnotationBase,
+    VideoBoundingBox,
+)
+from toktagger.api.schemas.data import DataParamTypes, ImageData, ImageParams
+from toktagger.api.schemas.samples import Sample
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +107,7 @@ def _find_first_useful_frame(
                     return_raw=True,
                 ),
             )
-        except FileNotFoundError:
+        except FrameNotFoundError:
             fallback_frame = initial_frame
         else:
             if not _is_useful_frame(candidate_frame):
@@ -122,7 +125,7 @@ def _find_first_useful_frame(
                         return_raw=True,
                     ),
                 )
-            except FileNotFoundError:
+            except FrameNotFoundError:
                 return initial_frame
 
             if _is_useful_frame(refinement_frame):
@@ -153,7 +156,7 @@ def iter_sample_frames(
                 return_raw=True,
             ),
         )
-    except FileNotFoundError:
+    except FrameNotFoundError:
         logger.warning(
             "No frames found for shot %s.",
             sample.shot_id,
@@ -186,7 +189,7 @@ def iter_sample_frames(
                     return_raw=True,
                 ),
             )
-        except FileNotFoundError:
+        except FrameNotFoundError:
             break
 
 
