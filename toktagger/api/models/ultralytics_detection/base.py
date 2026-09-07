@@ -469,7 +469,7 @@ class BaseUltralyticsDetection(Model):
     ) -> float:
         """Train an Ultralytics detector using TokTagger data."""
         self.log_progress(
-            training_status="started",
+            status="training",
             progress=0,
         )
 
@@ -548,7 +548,7 @@ class BaseUltralyticsDetection(Model):
             del self._prediction_model
 
         self.log_progress(
-            training_status="completed",
+            status="completed",
             progress=100,
         )
 
