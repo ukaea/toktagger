@@ -105,28 +105,30 @@ def _find_first_useful_frame(
                 ),
             )
         except FileNotFoundError:
-            return initial_frame
+            fallback_frame = initial_frame
+        else:
+            if not _is_useful_frame(candidate_frame):
+                previous_offset = offset
+                continue
+            fallback_frame = candidate_frame
 
-        if _is_useful_frame(candidate_frame):
-            for refinement_offset in range(previous_offset + 1, offset):
-                try:
-                    refinement_frame = data_loader.get_sample(
-                        sample,
-                        ImageParams(
-                            name="image",
-                            frame=initial_frame.frame + refinement_offset,
-                            return_raw=True,
-                        ),
-                    )
-                except FileNotFoundError:
-                    return initial_frame
+        for refinement_offset in range(previous_offset + 1, offset):
+            try:
+                refinement_frame = data_loader.get_sample(
+                    sample,
+                    ImageParams(
+                        name="image",
+                        frame=initial_frame.frame + refinement_offset,
+                        return_raw=True,
+                    ),
+                )
+            except FileNotFoundError:
+                return initial_frame
 
-                if _is_useful_frame(refinement_frame):
-                    return refinement_frame
+            if _is_useful_frame(refinement_frame):
+                return refinement_frame
 
-            return candidate_frame
-
-        previous_offset = offset
+        return fallback_frame
 
     return initial_frame
 
