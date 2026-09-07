@@ -374,18 +374,18 @@ export function deleteTrackAcrossFrames(
   return next;
 }
 
-/** Append missing manual instances from `frame` to `nextFrame`. */
+/** Append missing manual instances from `sourceFrame` to `destinationFrame`. */
 export function forwardPropagateMissingManualAnnotations(
   byFrame: ByFrameMap,
-  frame: FrameIndex,
-  nextFrame: FrameIndex,
-  ids: { projectId: string; sampleId: string },
+  sourceFrame: FrameIndex,
+  destinationFrame: FrameIndex,
+  sessionIds: { projectId: string; sampleId: string },
 ): ByFrameMap {
-  const cur = byFrame.get(frame) ?? [];
-  const nxt = byFrame.get(nextFrame) ?? [];
+  const sourceAnnotations = byFrame.get(sourceFrame) ?? [];
+  const destinationAnnotations = byFrame.get(destinationFrame) ?? [];
 
   const destinationKeys = new Set<TrackKey>();
-  for (const annotation of nxt) {
+  for (const annotation of destinationAnnotations) {
     const { className, trackId } = getLabelTrack(annotation);
     const trimmedClassName = (className ?? "").trim();
     const canonicalTrackId = canonicalizeTrackId(trackId ?? "");
@@ -394,14 +394,14 @@ export function forwardPropagateMissingManualAnnotations(
     destinationKeys.add(makeTrackKey(trimmedClassName, canonicalTrackId));
   }
 
-  const nextKey = buildSourceKey({
-    projectId: ids.projectId,
-    sampleId: ids.sampleId,
-    frame: nextFrame,
+  const destinationFrameSourceKey = buildSourceKey({
+    projectId: sessionIds.projectId,
+    sampleId: sessionIds.sampleId,
+    frame: destinationFrame,
   });
 
-  const propagated: ImageAnnotation[] = [];
-  for (const annotation of cur) {
+  const annotationsToPropagate: ImageAnnotation[] = [];
+  for (const annotation of sourceAnnotations) {
     if (getAnnotationCreator(annotation) !== "manual") continue;
 
     const { className, trackId } = getLabelTrack(annotation);
@@ -409,22 +409,25 @@ export function forwardPropagateMissingManualAnnotations(
     const canonicalTrackId = canonicalizeTrackId(trackId ?? "");
     if (!trimmedClassName || !canonicalTrackId) continue;
 
-    const key = makeTrackKey(trimmedClassName, canonicalTrackId);
-    if (destinationKeys.has(key)) continue;
+    const instanceKey = makeTrackKey(trimmedClassName, canonicalTrackId);
+    if (destinationKeys.has(instanceKey)) continue;
 
-    const cloned = deepClone(annotation);
-    propagated.push({
-      ...cloned,
-      target: { ...cloned.target, source: nextKey },
+    const clonedAnnotation = deepClone(annotation);
+    annotationsToPropagate.push({
+      ...clonedAnnotation,
+      target: { ...clonedAnnotation.target, source: destinationFrameSourceKey },
     });
-    destinationKeys.add(key);
+    destinationKeys.add(instanceKey);
   }
 
-  if (propagated.length === 0) return byFrame;
+  if (annotationsToPropagate.length === 0) return byFrame;
 
-  const next = new Map(byFrame);
-  next.set(nextFrame, [...nxt, ...propagated]);
-  return next;
+  const updatedByFrame = new Map(byFrame);
+  updatedByFrame.set(destinationFrame, [
+    ...destinationAnnotations,
+    ...annotationsToPropagate,
+  ]);
+  return updatedByFrame;
 }
 
 // Derive instance profiles from whole-frame labels, grouped like deriveInstances groups shapes.
