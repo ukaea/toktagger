@@ -258,7 +258,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
     ) -> str:
         """Resolve the selected YOLO checkpoint."""
         return str(check_pretrained_model_availability(params.yolo_size))
-    
+
     def build_manifest(
         self,
         samples: list[Sample],
@@ -517,9 +517,7 @@ class RTDETRVideoDetectionModel(YoloVideoDetectionModel):
         params: RTDETRTrainParams,
     ) -> str:
         """Resolve the selected RT-DETR checkpoint."""
-        return str(
-            check_pretrained_model_availability(params.rtdetr_size)
-        )
+        return str(check_pretrained_model_availability(params.rtdetr_size))
 
     def get_prediction_overrides(
         self,

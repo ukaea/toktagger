@@ -24,7 +24,6 @@ from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.samples import Sample
 
 from toktagger.api.models.ultralytics_detection.utils import (
-    check_pretrained_model_availability,
     get_canonical_weights_path,
     get_toktagger_cache_dir,
     get_torch_device,
