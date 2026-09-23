@@ -14,7 +14,7 @@ It currently supports the following features:
 - **Annotation Tools**: Apply consistent labels to signals and images using a customizable tagging system.
 - **ML Models**: Train and infer from ML models within the UI.
 - **Dataset Management**: Organize and manage annotations in a central repository.
-- **Extensible API**: A Python API for integrating with existing workflows and tools.
+- **Extensible API**: A [Python API](./client_library.md) for integrating with existing workflows and tools.
 
 
 ## Installation

@@ -1,7 +1,4 @@
-"""Stateless Python client for pulling TokTagger data for analysis.
-
-See docs/dev/client-library.md for the full API specification.
-"""
+"""Stateless Python client for pulling TokTagger data for analysis."""
 
 from __future__ import annotations
 
