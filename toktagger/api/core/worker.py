@@ -13,13 +13,14 @@ from pydantic import ValidationError
 from toktagger.api.schemas.models import (
     Model,
     ModelUpdate,
+    PredictionBatch,
     LocalLoadParams,
     GitlabLoadParams,
     HuggingfaceLoadParams,
 )
 from toktagger.api.core.sender import (
     send_batch_samples,
-    send_batch_annotations,
+    send_batch_predictions,
     send_model_updates,
 )
 import logging
@@ -68,8 +69,8 @@ def get_actor(project: Project, model: Model, use_gpu: bool):
         )
 
         results_dir = pathlib.Path(os.environ["MODEL_STORAGE"]).joinpath(str(model.id))
-        if results_dir.exists():
-            ml_model.wrapped_load.remote(results_dir)
+        if results_dir.joinpath("weights.model").exists():
+            ray.get(ml_model.wrapped_load.remote(results_dir))
         else:
             logger.debug("No saved weights found, initializing blank model")
 
@@ -121,14 +122,12 @@ def train_model(
     params: pydantic.BaseModel | None,
     use_gpu: bool = False,
 ):  # TODO: do we want to support retraining where we only get annotations not previously put into model?
-    model_actor = get_actor(project=project, model=model, use_gpu=use_gpu)
-
     if not (models_dir := os.environ.get("MODEL_STORAGE")):
         raise ValueError("Model storage directory not provided to worker node.")
     results_dir = pathlib.Path(models_dir).joinpath(str(model.id))
-    results_dir.mkdir(parents=True)
 
     try:
+        model_actor = get_actor(project=project, model=model, use_gpu=use_gpu)
         logger.info(f"Running model training for project {project.id}")
         model_actor.log_progress.remote(status="training", progress=0)
         train_task = model_actor.wrapped_train.remote(
@@ -150,9 +149,8 @@ def train_model(
         return {"project_id": project.id, "model_id": model.id, "score": score}
 
     except Exception as e:
-        # If anything goes wrong, update model to failed status
-        # This is important as if this does not happen, your model will be stuck in 'training' forever,
-        # Preventing you from ever starting a new training session again. TODO should we have some kind of timeout in case this fails?
+        # Update model to failed status so it doesn't stay stuck in 'training' forever, blocking new training sessions.
+        # TODO: should we have some kind of timeout in case this fails?
         logger.error(e)
         send_model_updates(
             project_id=project.id,
@@ -203,22 +201,30 @@ def get_predictions(
             annotation["sample_id"] = sample.id
             annotation["project_id"] = project.id
             annotation["shot_id"] = sample.shot_id
-            annotation["created_by"] = model.type
+            annotation["created_by"] = model.annotator_name
+            annotation["model_id"] = model.id
             try:
                 annotation = AnnotationBatchTypeAdapter.validate_python(annotation)
             except ValidationError as e:
                 logger.error(f"Failed to validate annotation: {e}")
             annotations_batch.append(annotation)
 
+    predictions_batch = PredictionBatch(
+        sample_ids=[sample.id for sample in samples], annotations=annotations_batch
+    )
+
     # Return predictions over rest API to server
     send_batch_samples(project.id, samples_batch)
-    send_batch_annotations(project.id, annotations_batch)
+    send_batch_predictions(
+        project_id=project.id, model_id=model.id, predictions=predictions_batch
+    )
 
     logger.info(f"Predictions for project {project.id} complete!")
 
     return {
         "project_id": project.id,
+        "model_id": model.id,
         "model_type": model.type,
         "samples_batch": samples_batch,
-        "annotations_batch": annotations_batch,
+        "predictions_batch": predictions_batch,
     }

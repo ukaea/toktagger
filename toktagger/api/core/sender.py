@@ -1,6 +1,6 @@
 import requests
 from toktagger.api.schemas.samples import SampleUpdateBatchItem
-from toktagger.api.schemas.models import ModelUpdate
+from toktagger.api.schemas.models import ModelUpdate, PredictionBatch
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 import typing
 import os
@@ -10,6 +10,7 @@ def send_updates(
     object_type: str,
     url: str,
     updates: ModelUpdate
+    | PredictionBatch
     | list[typing.Union[SampleUpdateBatchItem, AnnotationBatchTypes]],
 ) -> requests.Response:
     """Send a single item or batch of items from worker node to a provided URL.
@@ -85,3 +86,25 @@ def send_batch_annotations(
     if api_url := os.environ.get("API_URL"):
         url = f"{api_url}/projects/{project_id}/annotations"
         return send_updates("annotations", url, annotations)
+
+
+def send_batch_predictions(
+    project_id: str, model_id: str, predictions: PredictionBatch
+) -> requests.Response | None:
+    """Send a completed prediction run from worker node to server via API.
+
+    The server replaces this model's earlier predictions for these samples as it
+    writes the new ones, so nothing is lost if a run never finishes.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project these predictions belong to
+    model_id : str
+        The ID of the model which produced these predictions
+    predictions : PredictionBatch
+        The samples predicted on and the annotations found for them
+    """
+    if api_url := os.environ.get("API_URL"):
+        url = f"{api_url}/projects/{project_id}/models/{model_id}/predictions"
+        return send_updates("predictions", url, predictions)

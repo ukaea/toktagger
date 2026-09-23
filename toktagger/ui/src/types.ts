@@ -9,6 +9,7 @@ export const BaseAnnotationSchema = z.object({
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
   created_by: z.string().default("manual"),
+  model_id: z.string().nullable().default(null),
   signal_name: z.string().nullable().default(null),
   label: z.string(),
   type: z.string(),
@@ -273,6 +274,7 @@ export const ModelSchema = z.object({
   timestamp: z.string(),
   project_id: z.string(),
   type: z.string(),
+  name: z.string().nullable().optional(),
   version: z.int(),
   status: z.string(),
   progress: z.number(),
@@ -389,6 +391,7 @@ export type TimeSeriesAnnotationPoint = {
 export type TimeSeriesAnnotation = {
   id: string;
   created_by: string;
+  model_id: string | null;
   label: string;
   type: TimeSeriesAnnotationType;
   points: TimeSeriesAnnotationPoint[];

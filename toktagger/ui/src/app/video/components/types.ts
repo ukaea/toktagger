@@ -59,6 +59,7 @@ export type VideoBoundingBox = {
   width: number;
   height: number;
   created_by?: string;
+  model_id?: string | null;
   timestamp?: string;
   class_id?: number;
 };
@@ -70,6 +71,7 @@ export type VideoPolygon = {
   label: string;
   segmentation: number[][];
   created_by?: string;
+  model_id?: string | null;
   timestamp?: string;
   class_id?: number;
 };
@@ -82,6 +84,7 @@ export type VideoPoint = {
   x: number;
   y: number;
   created_by?: string;
+  model_id?: string | null;
   timestamp?: string;
   class_id?: number;
 };

@@ -1,7 +1,8 @@
 import asyncio
 import re
-from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, Tuple
+from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, Sequence, Tuple
 from mongita import MongitaClientDisk
+from pymongo import DeleteMany, DeleteOne, InsertOne
 
 
 class AsyncMutex:
@@ -159,6 +160,27 @@ class AsyncCollection:
             return await asyncio.to_thread(
                 self._sync_col.delete_many, filter, *args, **kwargs
             )
+
+    async def bulk_write(
+        self, requests: Sequence[Any], ordered: bool = True, *args, **kwargs
+    ) -> Any:
+        """Apply insert and delete operations in order, holding the lock throughout."""
+
+        def _apply() -> None:
+            for request in requests:
+                if isinstance(request, InsertOne):
+                    self._sync_col.insert_one(request._doc)
+                elif isinstance(request, DeleteMany):
+                    self._sync_col.delete_many(request._filter)
+                elif isinstance(request, DeleteOne):
+                    self._sync_col.delete_one(request._filter)
+                else:
+                    raise NotImplementedError(
+                        f"Bulk operation {type(request).__name__} is not supported."
+                    )
+
+        async with self._database._client._mutex:
+            return await asyncio.to_thread(_apply)
 
     async def count_documents(
         self, filter: Optional[Dict[str, Any]] = None, *args, **kwargs

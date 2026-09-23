@@ -524,6 +524,21 @@ TimeInterval(
 )
 ```
 
+!!! note
+    The server replaces `created_by` with the name given to the trained model when
+    it saves the predictions. Models loaded from pretrained weights have no name, so
+    they keep their model type.
+
+    The server also sets `model_id` to the unique ID of the model. Two models can have
+    the same name, and thus the server uses `model_id` to find and to delete the
+    predictions of a model. Use `created_by` only to show the model to the user.
+
+!!! note
+    The server keeps the predictions of the last run that was successful until a new
+    run is complete. If your `predict` method fails, the user keeps the old
+    predictions. If your `predict` method gives no annotations for a sample, the
+    server removes the old predictions for that sample.
+
 ## Best Practices
 
 1. **Use `log_progress()` frequently** to keep the UI updated on training progress

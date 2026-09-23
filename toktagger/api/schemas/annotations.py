@@ -10,6 +10,8 @@ class AnnotationBase(ConfiguredModel):
 
     label: str
     created_by: str
+    # Identifies the model that produced this prediction; created_by is a display label.
+    model_id: str | None = None
     validated: bool = False
     signal_name: Optional[str] = None
     uncertainty: Optional[float] = 1

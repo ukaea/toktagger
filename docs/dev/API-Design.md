@@ -59,6 +59,12 @@ Below is a brief outline of the design of the backend API and what each endpoint
 ## `/projects/{project_id}/sampels/{sample_id}/models/{model_type}/predict?{filters}`
 - **POST**: Get modle predictions for this sample - blocking endpoint
 
+## `/projects/{project_id}/models/{model_id}/predictions`
+- **PUT**: Store a completed prediction run. The worker node calls this when inference
+  finishes. For each sample in the run, this model's unvalidated predictions are deleted
+  and the new ones are written in the same bulk operation. Thus, if a run fails, the user
+  keeps the predictions from the last successful run.
+
 ## `/projects/{project_id}/models/{model_type}/evaluate?{filters}`
 - **GET**: Returns statistics about how the predictions from the model compare to the human annotations for the shot(s) specified by filters (not implemented)
 
@@ -71,6 +77,8 @@ The rest API connects to a MongoDB database on the backend to store results. The
       * Models
 
 When an endpoint is called which creates a new entry in any of these collections, a new JSON document is added according to a Pydantic schema which defines the expected fields. These documents are linked by storing the relevant IDs to other documents in the other collections - eg if a new Sample is added to a certain project, the Sample document will be given a `"project_id": ObjectID(...)` which links it back tot he correct document in the Projects collection.
+
+An Annotation which a model produced also has a `"model_id"` field. This field holds the ID of the document in the Models collection. It is a string, and not an `ObjectID`. Model names are not unique, and thus `model_id` is the only correct way to find the predictions of a given model.
 ```
 
 # Program flow:

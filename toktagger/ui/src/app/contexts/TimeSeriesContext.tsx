@@ -328,6 +328,7 @@ export const TimeSeriesProvider = ({
       return {
         id,
         created_by: "manual",
+        model_id: null,
         label,
         signal_name: signalName,
         type,

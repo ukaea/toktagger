@@ -9,6 +9,7 @@ from toktagger.api.schemas.models import (
     Model,
     ModelIn,
     ModelUpdate,
+    PredictionBatch,
     LocalLoadParams,
     GitlabLoadParams,
     HuggingfaceLoadParams,
@@ -199,6 +200,14 @@ async def delete_models(
 
     # Delete from DB
     for model in models_to_delete:
+        # Validated annotations are human-owned now, so they outlive their model.
+        await utils.delete_annotations(
+            db_client,
+            project_id=project_id,
+            model_id=model.id,
+            validated=False,
+        )
+
         await utils.delete_model(
             db_client=db_client, project_id=project_id, model_id=model.id
         )
@@ -233,6 +242,11 @@ async def start_model_training(
     use_gpu: bool = Query(False, description="Whether to use GPU to train the model"),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
+    ),
+    name: str | None = Body(
+        None,
+        description="User-facing display name for the trained model",
+        embed=True,
     ),
 ):
     db_client = request.app.state.db_client
@@ -301,6 +315,7 @@ async def start_model_training(
 
     model_in = ModelIn(
         type=model_type,
+        name=name,
         version=version,
         status="queued",
         progress=0,
@@ -708,9 +723,16 @@ async def delete_predictions(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
+    models = await utils.get_models(db_client, project_id, model_type=model_type)
+    model_ids = [model.id for model in models]
+
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="annotations",
-        filters={"project_id": ObjectId(project.id), "created_by": model_type},
+        filters={
+            "project_id": ObjectId(project.id),
+            "model_id": {"$in": model_ids},
+            "validated": False,
+        },
     )
 
     if result.deleted_count == 0:
@@ -718,6 +740,35 @@ async def delete_predictions(
             status_code=404,
             detail=f"No annotations produced by {model_type} could be found for this Project.",
         )
+
+
+@router.put("/models/{model_id}/predictions")
+async def replace_model_predictions(
+    request: Request,
+    predictions: PredictionBatch,
+    project_id: str = Path(
+        description="The ID of the project these predictions belong to."
+    ),
+    model_id: str = Path(
+        description="The ID of the model which produced these predictions."
+    ),
+) -> None:
+    """
+    Store a completed prediction run, replacing this model's previous predictions.
+    ------------------------------------------------------------------------------
+    Predictions a human has already validated are kept, and the samples which were
+    predicted on only lose their old predictions as the new ones are written.
+    """
+    db_client = request.app.state.db_client
+    await utils.get_project(db_client, project_id)
+
+    await utils.replace_predictions(
+        db_client,
+        project_id=project_id,
+        model_id=model_id,
+        sample_ids=predictions.sample_ids,
+        annotations=predictions.annotations,
+    )
 
 
 @router.post("/samples/{sample_id}/models/{model_type}/predict")
@@ -730,6 +781,9 @@ async def create_sample_predictions(
         description="The ID of the sample to make model predictions for."
     ),
     model_type: str = Path(description="The type of model to make predictions from."),
+    version: int = Query(
+        None, description="Version of model to use, leave blank for latest version"
+    ),
     use_gpu: bool = Query(
         False, description="Whether to use GPU to create these predictions"
     ),
@@ -758,9 +812,13 @@ async def create_sample_predictions(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
-    # Find the latest created model for this project
+    # Find the requested model version, or the latest one for this project
     model = await utils.get_model(
-        db_client, project_id=project.id, model_type=model_type, status="completed"
+        db_client,
+        project_id=project.id,
+        model_type=model_type,
+        status="completed",
+        version=version,
     )
 
     # Get model params model from registry and validate
@@ -825,6 +883,7 @@ async def get_sample_predictions(
         try:
             result = ray.get(task)
         except Exception as e:
+            logger.error(f"Prediction task failed: {e}")
             raise HTTPException(
                 detail="Predict task failed - no predictions available",
                 status_code=500,
@@ -842,7 +901,7 @@ async def get_sample_predictions(
                 detail="Model used for this task does not match!", status_code=422
             )
 
-        prediction_annotations = result.get("annotations_batch")
+        prediction_annotations = result["predictions_batch"].annotations
 
         # Check that annotations contain results for this sample ID
         if prediction_annotations and not all(

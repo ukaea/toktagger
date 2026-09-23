@@ -146,3 +146,37 @@ async def setup_model_db(setup_model_samples, db_client):
         "model_id_3": model_id_3,
         "model_id_4": model_id_4,
     }
+
+
+@pytest_asyncio.fixture(scope="function")
+async def setup_model_predictions(setup_model_db, db_client):
+    """Predictions stamped with the ID of the model which produced them.
+
+    Three are unvalidated and one is validated, so tests can tell apart deletion of
+    stale predictions from deletion of work a human has approved.
+    """
+    project_obj_id = ObjectId(setup_model_db["project_id"])
+    model_id = setup_model_db["model_id_3"]
+    annotation_ids = []
+
+    for index, sample_id in enumerate(setup_model_db["sample_ids"][:4]):
+        annotation = TimePointBatch(
+            shot_id=9980 + index,
+            validated=index == 3,
+            label="Disruption",
+            time=50 + index,
+            created_by=db_definitions.MODEL_3.annotator_name,
+            model_id=model_id,
+        )
+        annotation_ids.append(
+            await db_client.insert(
+                "annotations",
+                annotation,
+                ids={
+                    "project_id": project_obj_id,
+                    "sample_id": ObjectId(sample_id),
+                },
+            )
+        )
+
+    yield {"model_id": model_id, "annotation_ids": annotation_ids}

@@ -105,6 +105,7 @@ export function convertRawAnnotationsToTimeSeries(
     return {
       id: uuidv4(),
       created_by: timeRegion.created_by,
+      model_id: timeRegion.model_id,
       label: timeRegion.label,
       signal_name: timeRegion.signal_name,
       type: TimeSeriesAnnotationType.TIME_REGION,
@@ -121,6 +122,7 @@ export function convertRawAnnotationsToTimeSeries(
     return {
       id: uuidv4(),
       created_by: timePoint.created_by,
+      model_id: timePoint.model_id,
       label: timePoint.label,
       signal_name: timePoint.signal_name,
       type: TimeSeriesAnnotationType.TIME_POINT,
@@ -134,6 +136,7 @@ export function convertRawAnnotationsToTimeSeries(
     return {
       id: uuidv4(),
       created_by: boundingBox.created_by,
+      model_id: boundingBox.model_id,
       label: boundingBox.label,
       signal_name: boundingBox.signal_name,
       type: TimeSeriesAnnotationType.BOUNDING_BOX,
@@ -153,6 +156,7 @@ export function convertRawAnnotationsToTimeSeries(
     return {
       id: uuidv4(),
       created_by: polygon.created_by,
+      model_id: polygon.model_id,
       label: polygon.label,
       signal_name: polygon.signal_name,
       type: TimeSeriesAnnotationType.POLYGON,
@@ -188,6 +192,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "time_point",
       time: annotation.points[0].x,
@@ -203,6 +208,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "time_region",
       time_min: annotation.points[0].x,
@@ -219,6 +225,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "bounding_box",
       x_min: Math.min(annotation.points[0].x, annotation.points[1].x),
@@ -237,6 +244,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       created_by: annotation.created_by,
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "polygon",
       segmentation: [
