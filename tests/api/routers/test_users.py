@@ -554,11 +554,16 @@ async def _hold_account(client, admin_token, user_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_held_account_can_still_read_its_own_profile(auth_setup):
+async def test_held_account_can_still_read_its_own_profile(
+    setup_db_auth, unauthenticated_api_client
+):
     """/auth/me stays reachable, or the UI cannot tell the user why they are held."""
-    client = auth_setup["client"]
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    await _hold_account(client, admin_token, auth_setup["alice_id"])
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    alice_id = setup_db_auth["alice_id"]
+    await _hold_account(client, admin_token, alice_id)
 
     token = await get_auth_token(client, "alice", "alice_pass")
     response = await client.get(
@@ -569,11 +574,15 @@ async def test_held_account_can_still_read_its_own_profile(auth_setup):
 
 
 @pytest.mark.asyncio
-async def test_held_account_can_change_its_own_password(auth_setup):
+async def test_held_account_can_change_its_own_password(
+    setup_db_auth, unauthenticated_api_client
+):
     """The one write a held account must be able to make."""
-    client = auth_setup["client"]
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    alice_id = auth_setup["alice_id"]
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    alice_id = setup_db_auth["alice_id"]
     await _hold_account(client, admin_token, alice_id)
 
     token = await get_auth_token(client, "alice", "alice_pass")
@@ -590,14 +599,18 @@ async def test_held_account_can_change_its_own_password(auth_setup):
 
 
 @pytest.mark.asyncio
-async def test_cannot_clear_own_forced_change_without_a_new_password(auth_setup):
+async def test_cannot_clear_own_forced_change_without_a_new_password(
+    setup_db_auth, unauthenticated_api_client
+):
     """Otherwise the flag is decorative: clear it and keep the handed-over password.
 
     Worst case is the bootstrap admin, whose default password is public knowledge.
     """
-    client = auth_setup["client"]
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    alice_id = auth_setup["alice_id"]
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    alice_id = setup_db_auth["alice_id"]
     await _hold_account(client, admin_token, alice_id)
 
     token = await get_auth_token(client, "alice", "alice_pass")
@@ -615,11 +628,15 @@ async def test_cannot_clear_own_forced_change_without_a_new_password(auth_setup)
 
 
 @pytest.mark.asyncio
-async def test_an_admin_cannot_clear_its_own_forced_change_either(auth_setup):
+async def test_an_admin_cannot_clear_its_own_forced_change_either(
+    setup_db_auth, unauthenticated_api_client
+):
     """The guard is about the account being held, not about its role."""
-    client = auth_setup["client"]
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    admin_id = auth_setup["admin_id"]
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    admin_id = setup_db_auth["admin_id"]
     await _hold_account(client, admin_token, admin_id)
 
     response = await client.put(
@@ -631,11 +648,15 @@ async def test_an_admin_cannot_clear_its_own_forced_change_either(auth_setup):
 
 
 @pytest.mark.asyncio
-async def test_an_admin_can_clear_someone_elses_forced_change(auth_setup):
+async def test_an_admin_can_clear_someone_elses_forced_change(
+    setup_db_auth, unauthenticated_api_client
+):
     """Waiving the requirement for another account is a normal admin action."""
-    client = auth_setup["client"]
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    alice_id = auth_setup["alice_id"]
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    alice_id = setup_db_auth["alice_id"]
     await _hold_account(client, admin_token, alice_id)
 
     response = await client.put(

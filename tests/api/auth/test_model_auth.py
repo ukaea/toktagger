@@ -11,7 +11,7 @@ Tests for model × auth interactions:
 
 import pytest
 
-from tests.api.auth.conftest import create_user, get_auth_token
+from tests.api.auth.conftest import get_auth_token
 from toktagger.api.auth.core import get_internal_token
 
 
@@ -235,7 +235,16 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
     sample_id = setup_db_auth["sample_id"]
 
     # Create a human user whose name matches a model type (the collision scenario).
-    await create_user(client, admin_token, "disruption_cnn", "pass123")
+    create_resp = await client.post(
+        "/users",
+        json={
+            "username": "disruption_cnn",
+            "password": "pass123",
+            "global_role": "user",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_resp.status_code == 200
 
     # Insert a model prediction via the internal tokens.
     internal_token = get_internal_token()
@@ -281,14 +290,18 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
 
 
 @pytest.mark.asyncio
-async def test_import_preserves_machine_created_by(project_setup):
+async def test_import_preserves_machine_created_by(
+    setup_db_auth, unauthenticated_api_client
+):
     """Re-importing an export must not reassign predictions to the importer.
 
     Matches the sample-level save, which already exempts the reserved prefixes.
     """
-    client = project_setup["client"]
-    admin_token = project_setup["admin_token"]
-    project_id = project_setup["project_id"]
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
 
     await client.post(
         f"/projects/{project_id}/members",
