@@ -246,6 +246,15 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
     )
     assert create_resp.status_code == 200
 
+    # Disable must change password
+    user_id = create_resp.json()["_id"]
+    resp = await client.put(
+        f"/users/{user_id}",
+        json={"must_change_password": False},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
+
     # Insert a model prediction via the internal tokens.
     internal_token = get_internal_token()
     await client.put(

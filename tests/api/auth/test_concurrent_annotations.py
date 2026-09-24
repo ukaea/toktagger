@@ -384,6 +384,7 @@ async def test_edit_to_model_prediction_is_persisted(
     assert annotations[0]["created_by"] == "model::changepoint_detection"
 
 
+@pytest.mark.asyncio
 async def test_save_does_not_duplicate_or_reattribute_others_annotation(
     setup_db_auth, unauthenticated_api_client
 ):
