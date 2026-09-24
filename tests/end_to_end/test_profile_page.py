@@ -32,12 +32,14 @@ def test_password_mismatch_is_rejected(server_setup, admin_token, browser):
     user_page = login_as(browser, "profuser3", "profuser3_pass")
     user_page.goto("http://localhost:8002/ui/profile")
 
-    user_page.get_by_role("textbox", name="New password", exact=True).fill(
+    user_page.get_by_role("button", name="Change Password").click()
+    dialog = user_page.get_by_role("dialog")
+    dialog.get_by_role("textbox", name="New password", exact=True).fill(
         "newpassword123"
     )
-    user_page.get_by_role("textbox", name="Confirm new password").fill("different123")
-    user_page.get_by_role("button", name="Change Password").click()
-    expect(user_page.get_by_text("Passwords do not match")).to_be_visible()
+    dialog.get_by_role("textbox", name="Confirm new password").fill("different123")
+    dialog.get_by_role("button", name="Change Password").click()
+    expect(dialog.get_by_text("Passwords do not match")).to_be_visible()
 
     user_page.context.close()
 
@@ -47,12 +49,12 @@ def test_password_too_short_is_rejected(server_setup, admin_token, browser):
     user_page = login_as(browser, "profuser4", "profuser4_pass")
     user_page.goto("http://localhost:8002/ui/profile")
 
-    user_page.get_by_role("textbox", name="New password", exact=True).fill("short1")
-    user_page.get_by_role("textbox", name="Confirm new password").fill("short1")
     user_page.get_by_role("button", name="Change Password").click()
-    expect(
-        user_page.get_by_text("Password must be at least 8 characters")
-    ).to_be_visible()
+    dialog = user_page.get_by_role("dialog")
+    dialog.get_by_role("textbox", name="New password", exact=True).fill("short1")
+    dialog.get_by_role("textbox", name="Confirm new password").fill("short1")
+    dialog.get_by_role("button", name="Change Password").click()
+    expect(dialog.get_by_text("Password must be at least 8 characters")).to_be_visible()
 
     user_page.context.close()
 
@@ -74,11 +76,14 @@ def test_forced_password_change_holds_user_on_profile(
     expect(user_page).to_have_url("http://localhost:8002/ui/profile", timeout=5000)
     expect(user_page.get_by_text("Password change required")).to_be_visible()
 
-    user_page.get_by_role("textbox", name="New password", exact=True).fill(
+    # The dialog opens itself for a forced change, and its confirm button shares the
+    # trigger's name, so scope to the dialog rather than the page.
+    dialog = user_page.get_by_role("dialog")
+    dialog.get_by_role("textbox", name="New password", exact=True).fill(
         "newpassword123"
     )
-    user_page.get_by_role("textbox", name="Confirm new password").fill("newpassword123")
-    user_page.get_by_role("button", name="Change Password").click()
+    dialog.get_by_role("textbox", name="Confirm new password").fill("newpassword123")
+    dialog.get_by_role("button", name="Change Password").click()
 
     # Once changed, the user is released to the projects page.
     expect(user_page).to_have_url("http://localhost:8002/ui/projects", timeout=5000)
@@ -90,17 +95,19 @@ def test_password_visibility_can_be_toggled(server_setup, admin_token, browser):
     user_page = login_as(browser, "profuser6", "profuser6_pass")
     user_page.goto("http://localhost:8002/ui/profile")
 
-    new_password = user_page.get_by_role("textbox", name="New password", exact=True)
-    confirm_password = user_page.get_by_role("textbox", name="Confirm new password")
+    user_page.get_by_role("button", name="Change Password").click()
+    dialog = user_page.get_by_role("dialog")
+    new_password = dialog.get_by_role("textbox", name="New password", exact=True)
+    confirm_password = dialog.get_by_role("textbox", name="Confirm new password")
     expect(new_password).to_have_attribute("type", "password")
     expect(confirm_password).to_have_attribute("type", "password")
 
     # Each field has its own toggle, so revealing one leaves the other hidden.
-    user_page.get_by_role("button", name="Show New password").click()
+    dialog.get_by_role("button", name="Show New password").click()
     expect(new_password).to_have_attribute("type", "text")
     expect(confirm_password).to_have_attribute("type", "password")
 
-    user_page.get_by_role("button", name="Hide New password").click()
+    dialog.get_by_role("button", name="Hide New password").click()
     expect(new_password).to_have_attribute("type", "password")
 
     user_page.context.close()
@@ -111,11 +118,13 @@ def test_user_can_change_own_password(server_setup, admin_token, browser):
     user_page = login_as(browser, "profuser5", "profuser5_pass")
     user_page.goto("http://localhost:8002/ui/profile")
 
-    user_page.get_by_role("textbox", name="New password", exact=True).fill(
+    user_page.get_by_role("button", name="Change Password").click()
+    dialog = user_page.get_by_role("dialog")
+    dialog.get_by_role("textbox", name="New password", exact=True).fill(
         "newpassword123"
     )
-    user_page.get_by_role("textbox", name="Confirm new password").fill("newpassword123")
-    user_page.get_by_role("button", name="Change Password").click()
+    dialog.get_by_role("textbox", name="Confirm new password").fill("newpassword123")
+    dialog.get_by_role("button", name="Change Password").click()
     expect(user_page.get_by_text("Password changed")).to_be_visible()
     user_page.context.close()
 

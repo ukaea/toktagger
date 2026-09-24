@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from toktagger.api.auth.dependencies import (
-    get_current_user,
+    require_password_changed,
     require_project_annotator,
     require_project_viewer,
 )
 from toktagger.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.crud.utils import get_project, get_sample
 from toktagger.api.schemas.annotators import (
     AnnotatorParamTypes,
@@ -20,7 +21,7 @@ from toktagger.api.schemas.users import UserOut
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Annotators"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_password_changed)],
 )
 
 
@@ -49,7 +50,7 @@ async def create_annotations(
     # The pass it through the selected annotator within the Project to make predictions
     # Return these predictions to the user, *without* adding to the database
     # Can be passed a set of annotator params and sample params?
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     project: Project = await get_project(db_client, project_id)
     annotator_cls = ANNOTATORS[annotator_type]
 

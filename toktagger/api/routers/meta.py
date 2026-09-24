@@ -3,7 +3,7 @@ import typing
 from fastapi import APIRouter, Depends, Request
 
 from toktagger.api import config
-from toktagger.api.auth.dependencies import get_current_user
+from toktagger.api.auth.dependencies import require_password_changed
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.models import check_models_enabled, models_dependencies_installed
 from toktagger.api.schemas.models import LoadMethods
@@ -16,7 +16,7 @@ else:
 router = APIRouter(
     prefix="/meta",
     tags=["Metadata"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_password_changed)],
 )
 
 

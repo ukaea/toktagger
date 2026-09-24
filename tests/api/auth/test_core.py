@@ -7,6 +7,7 @@ from toktagger.api.auth.core import (
     _get_serializer,
     create_access_token,
     decode_token,
+    decode_token_with_age,
     hash_password,
     verify_password,
 )
@@ -93,3 +94,15 @@ def test_decode_token_tampered_raises():
     tampered = token[:-4] + "XXXX"
     with pytest.raises(ValueError):
         decode_token(tampered)
+
+
+def test_decode_token_with_age_reports_a_fresh_token_as_new():
+    payload, age = decode_token_with_age(create_access_token({"sub": "alice"}))
+    assert payload["sub"] == "alice"
+    assert 0 <= age < 5
+
+
+def test_decode_token_with_age_rejects_a_tampered_token():
+    token = create_access_token({"sub": "alice"})
+    with pytest.raises(ValueError):
+        decode_token_with_age(token[:-4] + "XXXX")

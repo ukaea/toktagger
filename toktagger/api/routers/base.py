@@ -68,4 +68,6 @@ def spa_fallback(request: Request, full_path: str):
     """
     if request.method in ("GET", "HEAD"):
         return FileResponse(request.app.state.index_file)
-    return RedirectResponse(url=f"/{full_path}", status_code=303)
+    # A fixed target, not the requested path: "//host/" reflected into Location is a
+    # protocol-relative URL the browser follows off-site.
+    return RedirectResponse(url="/", status_code=303)

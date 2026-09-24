@@ -293,6 +293,97 @@ async def test_save_preserves_model_created_by(
 
 
 @pytest.mark.asyncio
+async def test_save_returns_every_updated_annotation_id(
+    setup_db_auth, unauthenticated_api_client
+):
+    """The response lists in-place edits as well as the caller's own annotations."""
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    for username in ("alice", "bob"):
+        await add_member(client, admin_token, project_id, username, "annotator")
+
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    bob_token = await get_auth_token(client, "bob", "bob_pass")
+
+    await put_annotations(client, project_id, sample_id, bob_token, "bob_ann")
+
+    loaded = await get_annotations(client, project_id, sample_id, alice_token)
+    loaded.extend(annotation_payload("alice_ann"))
+
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=loaded,
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    stored = await get_annotations(client, project_id, sample_id, admin_token)
+    assert sorted(resp.json()) == sorted(a["_id"] for a in stored)
+
+
+@pytest.mark.asyncio
+async def test_edit_to_model_prediction_is_persisted(
+    setup_db_auth, unauthenticated_api_client
+):
+    """Correcting a model's prediction and saving must keep the correction.
+
+    Reviewing machine output is the point of the tool, so the edit is stored against
+    the prediction, keeping its "model::" author so provenance is not rewritten.
+    """
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    await add_member(client, admin_token, project_id, "alice", "annotator")
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=[
+            {
+                "label": "predicted",
+                "time_min": 0.2,
+                "time_max": 0.6,
+                "type": "time_region",
+                "validated": False,
+                "created_by": "model::changepoint_detection",
+            }
+        ],
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    loaded = await get_annotations(client, project_id, sample_id, alice_token)
+    assert len(loaded) == 1
+    loaded[0]["time_min"] = 1.25
+    loaded[0]["time_max"] = 1.75
+    loaded[0]["label"] = "corrected"
+    loaded[0]["validated"] = True
+
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=loaded,
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    annotations = await get_annotations(client, project_id, sample_id, admin_token)
+    assert len(annotations) == 1
+    assert annotations[0]["label"] == "corrected"
+    assert annotations[0]["time_min"] == 1.25
+    assert annotations[0]["time_max"] == 1.75
+    assert annotations[0]["validated"] is True
+    assert annotations[0]["created_by"] == "model::changepoint_detection"
+
+
 async def test_save_does_not_duplicate_or_reattribute_others_annotation(
     setup_db_auth, unauthenticated_api_client
 ):
@@ -555,3 +646,168 @@ async def test_cross_project_annotation_edit_is_scoped_out(
     assert len(untouched) == 1
     assert untouched[0]["label"] == "other_project_ann"
     assert untouched[0]["created_by"] == "bob"
+
+
+@pytest.mark.asyncio
+async def test_claiming_another_users_annotation_does_not_copy_it(
+    setup_db_auth, unauthenticated_api_client
+):
+    """Authorship of an existing annotation comes from the database, not the body.
+
+    A client that re-sends bob's annotation with created_by set to itself would
+    otherwise route it into the replace step, which is scoped to the caller's own
+    rows - so bob's original survives and the "edit" lands as a second copy under
+    the caller.
+    """
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    for username in ("alice", "bob"):
+        await add_member(client, admin_token, project_id, username, "annotator")
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    bob_token = await get_auth_token(client, "bob", "bob_pass")
+
+    await put_annotations(client, project_id, sample_id, bob_token, "bob_ann")
+    loaded = await get_annotations(client, project_id, sample_id, alice_token)
+    assert len(loaded) == 1
+
+    # Alice relabels bob's annotation but claims it as her own work.
+    loaded[0]["label"] = "claimed_by_alice"
+    loaded[0]["created_by"] = "alice"
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=loaded,
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    annotations = await get_annotations(client, project_id, sample_id, admin_token)
+    assert len(annotations) == 1, "the spoofed author must not produce a second copy"
+    assert annotations[0]["created_by"] == "bob", "authorship must be unchanged"
+    assert annotations[0]["label"] == "claimed_by_alice", "the edit still applies"
+
+
+def machine_payload(label: str, created_by: str):
+    """An unsaved annotator suggestion or model prediction, as the client holds it.
+
+    Deliberately has no _id: /annotator/{type} and the predict endpoints return
+    annotations without storing them, so nothing ever assigns one client-side.
+    """
+    return [
+        {
+            "label": label,
+            "time_min": 0.8,
+            "time_max": 0.9,
+            "type": "time_region",
+            "validated": False,
+            "created_by": created_by,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "created_by", ["annotators::peak_detection", "model::disruption_cnn"]
+)
+async def test_repeated_saves_do_not_duplicate_machine_annotations(
+    setup_db_auth, unauthenticated_api_client, created_by
+):
+    """Saving an annotator suggestion twice leaves one row, not two.
+
+    The client holds these with no _id and cannot learn the one the server assigns,
+    so each save resubmits them. Replacing by author keeps that idempotent.
+    """
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    await add_member(client, admin_token, project_id, "alice", "annotator")
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+
+    for _ in range(3):
+        resp = await client.put(
+            f"/projects/{project_id}/samples/{sample_id}/annotations",
+            json=machine_payload("suggested", created_by),
+            headers={"Authorization": f"Bearer {alice_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+
+    annotations = await get_annotations(client, project_id, sample_id, admin_token)
+    assert len(annotations) == 1, f"three saves left {len(annotations)} rows"
+    assert annotations[0]["created_by"] == created_by
+
+
+@pytest.mark.asyncio
+async def test_replacing_machine_annotations_leaves_human_work_alone(
+    setup_db_auth, unauthenticated_api_client
+):
+    """The by-author replace must not reach anybody's own annotations."""
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    for username in ("alice", "bob"):
+        await add_member(client, admin_token, project_id, username, "annotator")
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    bob_token = await get_auth_token(client, "bob", "bob_pass")
+
+    await put_annotations(client, project_id, sample_id, bob_token, "bob_ann")
+
+    loaded = await get_annotations(client, project_id, sample_id, alice_token)
+    payload = loaded + machine_payload("suggested", "annotators::peak_detection")
+    for _ in range(2):
+        resp = await client.put(
+            f"/projects/{project_id}/samples/{sample_id}/annotations",
+            json=payload,
+            headers={"Authorization": f"Bearer {alice_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+
+    annotations = await get_annotations(client, project_id, sample_id, admin_token)
+    authors = sorted(a["created_by"] for a in annotations)
+    assert authors == ["annotators::peak_detection", "bob"], authors
+
+
+@pytest.mark.asyncio
+async def test_a_save_without_machine_rows_leaves_them_untouched(
+    setup_db_auth, unauthenticated_api_client
+):
+    """A member who never ran the annotator must not clear its saved output.
+
+    Matters for show_others_annotations=false, where those rows are filtered out of
+    what the client loaded and so are absent from what it sends back.
+    """
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    for username in ("alice", "bob"):
+        await add_member(client, admin_token, project_id, username, "annotator")
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    bob_token = await get_auth_token(client, "bob", "bob_pass")
+
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=machine_payload("suggested", "annotators::peak_detection"),
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    await put_annotations(client, project_id, sample_id, bob_token, "bob_ann")
+
+    annotations = await get_annotations(client, project_id, sample_id, admin_token)
+    authors = sorted(a["created_by"] for a in annotations)
+    assert authors == ["annotators::peak_detection", "bob"], authors

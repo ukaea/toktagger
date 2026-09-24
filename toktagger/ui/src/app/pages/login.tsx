@@ -47,14 +47,23 @@ export default function LoginPage() {
 
   return (
     <Flex
-      UNSAFE_className="w-screen h-screen bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900"
+      width="100vw"
+      height="100vh"
       alignItems="center"
       justifyContent="center"
+      UNSAFE_style={{
+        background:
+          "linear-gradient(to bottom right, var(--spectrum-global-color-gray-200), var(--spectrum-global-color-gray-400))",
+      }}
     >
       <View
-        UNSAFE_className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl"
+        backgroundColor="gray-50"
+        borderRadius="large"
         padding="size-500"
         minWidth="size-4600"
+        UNSAFE_style={{
+          boxShadow: "var(--spectrum-alias-dropshadow-color) 0 10px 40px",
+        }}
       >
         <Heading level={2} marginBottom="size-300">
           TokTagger — Sign In

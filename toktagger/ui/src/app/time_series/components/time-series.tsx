@@ -14,9 +14,9 @@ import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 import { useElementHeight } from "@/app/hooks/useElementHeight";
 
-// The traces are stacked, so each one needs its own share of the height. Below
-// this the subplots are too squashed to read, so the plot keeps its size and the
-// page scrolls instead. The rangeslider takes 10% of the plot, hence the extra.
+// The traces are stacked, so each one needs its own share of the height. The
+// plot never renders smaller than this - the column scrolls instead. The
+// rangeslider takes 10% of the plot, hence the extra.
 const MIN_TRACE_HEIGHT = 105;
 const RANGESLIDER_FRACTION = 0.1;
 
@@ -71,8 +71,8 @@ export const TimeSeriesView = () => {
     setPlotData(plotData);
   }, [data, viewData]);
 
-  // The plot fills whatever height is left once the annotations table has taken
-  // its share, but never drops below what the stacked traces need to stay legible.
+  // The plot grows into spare height, but never shrinks below what the stacked
+  // traces need to stay legible - the column scrolls instead.
   const { ref: plotAreaRef, height: plotAreaHeight } =
     useElementHeight<HTMLDivElement>();
   const minPlotHeight = Math.max(
@@ -165,11 +165,13 @@ export const TimeSeriesView = () => {
     <View width="100%" height="100%" minHeight={0}>
       <TimeSeriesProvider>
         <div className="flex h-full min-h-0 flex-row justify-between">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
             <div
               ref={plotAreaRef}
-              className="flex-1"
-              style={{ minHeight: minPlotHeight }}
+              style={{
+                flex: `1 0 ${minPlotHeight}px`,
+                minHeight: minPlotHeight,
+              }}
             >
               <BaseTimeSeriesPlot
                 plotId="TimesSeriesView"

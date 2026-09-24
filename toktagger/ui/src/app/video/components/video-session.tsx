@@ -11,23 +11,24 @@ import React, {
   useRef,
 } from "react";
 import {
+  UserSelectAction,
   useAnnotator,
   type AnnotoriousOpenSeadragonAnnotator,
   type ImageAnnotation,
 } from "@annotorious/react";
 
-import type { Annotation } from "@/types";
+import type { Annotation, VideoFrameLabel } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useVideoUiState } from "@/app/video/components/video-context";
-import { useProjectRole } from "@/app/hooks/useProjectRole";
+import { useVideoUiState } from "@/app/contexts/VideoContext";
 import {
   VideoBoundingBoxSchema,
+  VideoFrameLabelSchema,
   VideoPointSchema,
   VideoPolygonSchema,
 } from "@/types";
 import type {
+  ActiveDrawingTool,
   ByFrameMap,
-  DrawingTool,
   FrameIndex,
   InstanceProfile,
   Selection,
@@ -41,12 +42,17 @@ import {
   buildNextTrackIdState,
   deleteTrackAcrossFrames,
   canonicalizeTrackId,
+  deriveFrameLabelInstances,
   deriveInstances,
-  forwardPropagateIfEmpty,
+  existingFrameLabelTrackIdsForClass,
+  forwardPropagateMissingManualAnnotations,
   mapClearAll,
   mapClearFrame,
   mapSetFrame,
+  mergeInstanceProfiles,
   existingTrackIdsForClass,
+  isEditableEventTarget,
+  propagateMissingManualFrameLabels,
   uniqueReadableTrackId,
 } from "./video-utils";
 import {
@@ -91,14 +97,23 @@ type VideoSessionCtx = {
   /** Derived instance summary across all frames (used by sidebar UI). */
   instances: InstanceProfile[];
 
-  drawingTool: DrawingTool;
-  setDrawingTool: (tool: DrawingTool) => void;
-  /** When true, drawing is disabled and frame drag/pan is enabled. */
-  panMode: boolean;
-  setPanMode: (v: boolean) => void;
-  // Project admin or annotator. False for a viewer, who is pinned into pan mode and
+  /** Whole-frame class labels applied to the current frame. */
+  frameLabels: VideoFrameLabel[];
+  /** Tag the current frame: adds a new instance, or toggles the armed one off/on. */
+  toggleFrameLabel: () => void;
+  removeFrameLabel: (className: string, trackId: string) => void;
+
+  drawingTool: ActiveDrawingTool;
+  setDrawingTool: (tool: ActiveDrawingTool) => void;
+  editMode: boolean;
+  setEditMode: (v: boolean) => void;
+  // Project admin or annotator. False for a viewer, who is pinned out of edit mode and
   // must not be offered any control that creates, edits or deletes annotations.
   canAnnotate: boolean;
+  drawIntent: boolean;
+  canDrawShape: boolean;
+  canDrawPoint: boolean;
+  canTagFrame: boolean;
   propagate: boolean;
   setPropagate: (v: boolean) => void;
   hideAnnotations: boolean;
@@ -141,9 +156,8 @@ type VideoSessionCtx = {
   /** Delete the currently selected instance across all frames. */
   deleteSelectedInstanceAcrossFrames: () => void;
 
-  // forward propagation
-  /** Seed next frame with current overlay if the next frame has no annotations. */
-  forwardPropToNextIfEmpty: (nextFrame: FrameIndex) => void;
+  /** Append missing manual instances from the current frame to the next frame in Edit mode. */
+  forwardPropMissingManualToNext: (nextFrame: FrameIndex) => void;
 };
 
 const Ctx = createContext<VideoSessionCtx | null>(null);
@@ -172,6 +186,17 @@ function parseVideoAnnotation(annotation: Annotation) {
 }
 
 function videoAnnotationDedupeKey(annotation: Annotation): string | null {
+  if (annotation.type === "video_frame_label") {
+    const parsed = VideoFrameLabelSchema.safeParse(annotation);
+    if (!parsed.success) return null;
+
+    const { frame, label } = parsed.data;
+    const trimmedLabel = label.trim();
+    if (!trimmedLabel) return null;
+
+    return `video_frame_label::${frame}::${trimmedLabel}`;
+  }
+
   const parsed = parseVideoAnnotation(annotation);
   if (!parsed?.success) return null;
 
@@ -193,11 +218,6 @@ function dedupeVideoAnnotations(annotations: Annotation[]): {
   let duplicates = 0;
 
   for (const annotation of annotations ?? []) {
-    if (!isVideoAnnotationType(annotation)) {
-      nonVideoAnnotations.push(annotation);
-      continue;
-    }
-
     const key = videoAnnotationDedupeKey(annotation);
     if (!key) {
       nonVideoAnnotations.push(annotation);
@@ -324,11 +344,34 @@ function videoAnnotationsToByFrame(args: {
   return byFrame;
 }
 
+// Excludes video_frame_label on purpose: it lives in context annotations, not byFrame, and must survive overlay commits.
 function isVideoAnnotationType(annotation: Annotation): boolean {
   return (
     annotation.type === "video_bounding_box" ||
     annotation.type === "video_polygon" ||
     annotation.type === "video_point"
+  );
+}
+
+function parseFrameLabel(annotation: Annotation): VideoFrameLabel | null {
+  if (annotation.type !== "video_frame_label") return null;
+
+  const parsed = VideoFrameLabelSchema.safeParse(annotation);
+  return parsed.success ? parsed.data : null;
+}
+
+/** True if `annotation` is the whole-frame label for this (className, trackId) instance. */
+function frameLabelMatchesInstance(
+  annotation: Annotation,
+  className: string,
+  trackId: string,
+): boolean {
+  const parsed = parseFrameLabel(annotation);
+  if (!parsed) return false;
+
+  return (
+    parsed.label === className &&
+    canonicalizeTrackId(parsed.track_id) === trackId
   );
 }
 
@@ -398,15 +441,16 @@ export function VideoSessionProvider(props: {
     data,
     dataParams,
     annotations,
+    isLoading,
     setAnnotations: setSampleAnnotations,
+    canAnnotate,
   } = useSample();
   const {
-    videoPanMode,
-    setVideoPanMode,
+    videoEditMode,
+    setVideoEditMode,
     videoDrawingTool,
     setVideoDrawingTool,
   } = useVideoUiState();
-  const { canAnnotate } = useProjectRole(projectId);
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -466,6 +510,7 @@ export function VideoSessionProvider(props: {
 
   const [byFrame, setByFrame] = useState<ByFrameMap>(() => new Map());
   const byFrameRef = useRef<ByFrameMap>(new Map());
+  const annotationsRef = useRef<Annotation[]>(annotations);
   const [dirty, setDirty] = useState(false);
 
   const [selection, setSelectionState] = useState<Selection>({
@@ -474,14 +519,34 @@ export function VideoSessionProvider(props: {
     source: null,
   });
   const [drawingTool, setDrawingToolState] =
-    useState<DrawingTool>(videoDrawingTool);
-  // panMode is this view's edit-mode toggle, inverted: drawing is enabled when it is
-  // false. A viewer is pinned into pan mode, so it starts true and cannot be turned off.
-  const [panMode, setPanModeState] = useState(
-    canAnnotate ? videoPanMode : true,
+    useState<ActiveDrawingTool>(videoDrawingTool);
+  // A viewer is pinned out of edit mode, so it starts false and cannot be turned on.
+  const [editMode, setEditModeState] = useState(
+    canAnnotate ? videoEditMode : false,
   );
+  const [ctrlHeld, setCtrlHeld] = useState(false);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
   const hideAnnotationsRef = useRef(false);
+
+  const isFramePending =
+    isLoading &&
+    dataParams.name === "image" &&
+    typeof dataParams.frame === "number" &&
+    Number.isFinite(dataParams.frame) &&
+    dataParams.frame !== frame;
+
+  const drawIntent = editMode && ctrlHeld && !hideAnnotations;
+  const canCreate =
+    drawIntent &&
+    drawingTool !== null &&
+    Boolean(selection.className) &&
+    !isFramePending;
+  const canDrawShape =
+    canCreate && (drawingTool === "rectangle" || drawingTool === "polygon");
+  const canDrawPoint = canCreate && drawingTool === "point";
+  const canTagFrame = canCreate && drawingTool === "frame";
+  const drawIntentRef = useRef(drawIntent);
+  drawIntentRef.current = drawIntent;
 
   const setHideAnnotations = useCallback(
     (v: boolean) => {
@@ -489,11 +554,16 @@ export function VideoSessionProvider(props: {
       setHideAnnotationsState(v);
 
       if (v) {
-        setPanModeState(true);
-        setVideoPanMode(true);
+        api?.cancelDrawing?.();
+        api?.setSelected?.();
+        setCtrlHeld(false);
+        setEditModeState(false);
+        setVideoEditMode(false);
+        setDrawingToolState(null);
+        setVideoDrawingTool(null);
       }
     },
-    [setVideoPanMode],
+    [api, setVideoDrawingTool, setVideoEditMode],
   );
 
   const frameKey = useMemo(
@@ -501,11 +571,119 @@ export function VideoSessionProvider(props: {
     [projectId, sampleId, frame],
   );
 
-  // Instances are derived from byFrame so UI can render a stable sidebar list.
-  const instances = useMemo(
+  // Instances merge shapes and frame labels, since both share one track-id pool per class.
+  const shapeInstances = useMemo(
     () => deriveInstances(byFrame, getLabelTrack),
     [byFrame],
   );
+  const instances = useMemo(
+    () =>
+      mergeInstanceProfiles(
+        shapeInstances,
+        deriveFrameLabelInstances(annotations),
+      ),
+    [annotations, shapeInstances],
+  );
+
+  // Frame labels are plain context annotations, so they are derived straight from there.
+  const frameLabels = useMemo(() => {
+    const out: VideoFrameLabel[] = [];
+
+    for (const annotation of annotations ?? []) {
+      const parsed = parseFrameLabel(annotation);
+      if (parsed?.frame === frame) out.push(parsed);
+    }
+
+    return out;
+  }, [annotations, frame]);
+
+  /** Track ids already used by a class, across both shapes and frame labels. */
+  const collectUsedTrackIdsForClass = useCallback(
+    (cls: string, raw?: ImageAnnotation[]) => {
+      const used = new Set<string>();
+
+      for (const tid of existingTrackIdsForClass(byFrameRef.current, cls)) {
+        const c = canonicalizeTrackId(tid);
+        if (c) used.add(c);
+      }
+
+      for (const tid of existingFrameLabelTrackIdsForClass(
+        annotationsRef.current,
+        cls,
+      )) {
+        if (tid) used.add(tid);
+      }
+
+      for (const annotation of raw ?? []) {
+        const got = getLabelTrack(annotation);
+        if ((got.className ?? "").trim() !== cls) continue;
+        const tid = canonicalizeTrackId(got.trackId ?? "");
+        if (tid) used.add(tid);
+      }
+
+      return used;
+    },
+    [],
+  );
+
+  const removeFrameLabel = useCallback(
+    (className: string, trackId: string) => {
+      const cls = (className || "").trim();
+      const tid = canonicalizeTrackId(trackId || "");
+      if (!cls || !tid) return;
+
+      setSampleAnnotations((prev) =>
+        prev.filter(
+          (annotation) =>
+            !(
+              frameLabelMatchesInstance(annotation, cls, tid) &&
+              parseFrameLabel(annotation)?.frame === frame
+            ),
+        ),
+      );
+      setDirty(true);
+    },
+    [frame, setSampleAnnotations],
+  );
+
+  // Frame Label tool click: toggles the armed instance's label, or starts a new one.
+  const toggleFrameLabel = useCallback(() => {
+    const cls = (selection.className ?? "").trim();
+    if (!cls) return;
+
+    const trackId =
+      selection.trackId ??
+      uniqueReadableTrackId(collectUsedTrackIdsForClass(cls));
+
+    const created = VideoFrameLabelSchema.safeParse({
+      type: "video_frame_label",
+      frame,
+      track_id: trackId,
+      label: cls,
+      created_by: "manual",
+    });
+    if (!created.success) return;
+
+    setSampleAnnotations((prev) => {
+      const matchesCurrentClass = (annotation: Annotation) =>
+        annotation.type === "video_frame_label" &&
+        annotation.frame === frame &&
+        annotation.label.trim() === cls;
+
+      if (prev.some(matchesCurrentClass)) {
+        return prev.filter((annotation) => !matchesCurrentClass(annotation));
+      }
+
+      return [...prev, created.data];
+    });
+    setDirty(true);
+  }, [
+    collectUsedTrackIdsForClass,
+    frame,
+    selection.className,
+    selection.trackId,
+    setSampleAnnotations,
+  ]);
 
   const getFrameList = useCallback(
     (f: FrameIndex) => byFrame.get(f) ?? [],
@@ -516,11 +694,19 @@ export function VideoSessionProvider(props: {
     byFrameRef.current = byFrame;
   }, [byFrame]);
 
+  useEffect(() => {
+    annotationsRef.current = annotations;
+  }, [annotations]);
+
   // Keep the editor cache synchronized with SampleContext.annotations.
   useEffect(() => {
     const { annotations: dbAnnotations, duplicates } =
       dedupeVideoAnnotations(annotations);
     const signature = videoAnnotationSignature(dbAnnotations);
+
+    if (duplicates > 0) {
+      setSampleAnnotations(() => dbAnnotations);
+    }
 
     if (signature === lastExternalAnnotationSignatureRef.current) return;
     if (signature === lastLocalAnnotationSignatureRef.current) {
@@ -541,9 +727,6 @@ export function VideoSessionProvider(props: {
     nextTrackNumsRef.current = buildNextTrackIdState(dbAnnotations);
     lastExternalAnnotationSignatureRef.current = signature;
     lastLocalAnnotationSignatureRef.current = null;
-    if (duplicates > 0) {
-      setSampleAnnotations(() => dbAnnotations);
-    }
   }, [annotations, projectId, sampleId, setSampleAnnotations]);
 
   const commitByFrame = useCallback(
@@ -600,7 +783,8 @@ export function VideoSessionProvider(props: {
   }, [api, flushPendingOverlay]);
 
   const setDrawingTool = useCallback(
-    (tool: DrawingTool) => {
+    (tool: ActiveDrawingTool) => {
+      api?.cancelDrawing?.();
       api?.setSelected?.();
       flushPendingOverlay();
       setDrawingToolState(tool);
@@ -609,28 +793,78 @@ export function VideoSessionProvider(props: {
     [api, flushPendingOverlay, setVideoDrawingTool],
   );
 
-  // Gate the setter rather than only the toolbar button, so the Shift-key shortcut in
-  // frame-annotator-host cannot leave pan mode either. Mirrors TimeSeriesContext's
-  // setEditMode wrapper.
-  const setPanMode = useCallback(
+  // Gate the setter rather than only the toolbar button, so the "e" shortcut cannot
+  // enter edit mode either. Mirrors TimeSeriesContext's setEditMode wrapper.
+  const setEditMode = useCallback(
     (v: boolean) => {
-      const next = canAnnotate ? v : true;
+      if (hideAnnotationsRef.current) return;
+      if (!canAnnotate) return;
+      api?.cancelDrawing?.();
       api?.setSelected?.();
       flushPendingOverlay();
-      setPanModeState(next);
-      setVideoPanMode(next);
+      setCtrlHeld(false);
+      setEditModeState(v);
+      setVideoEditMode(v);
     },
-    [api, flushPendingOverlay, setVideoPanMode, canAnnotate],
+    [api, flushPendingOverlay, setVideoEditMode, canAnnotate],
   );
 
   // canAnnotate defaults open and only corrects downward once the membership check
-  // resolves, so force pan mode back on if this turns out to be a viewer.
+  // resolves, so drop back out of edit mode if this turns out to be a viewer.
   useEffect(() => {
     if (!canAnnotate) {
-      setPanModeState(true);
-      setVideoPanMode(true);
+      setEditModeState(false);
+      setVideoEditMode(false);
     }
-  }, [canAnnotate, setVideoPanMode]);
+  }, [canAnnotate, setVideoEditMode]);
+
+  useEffect(() => {
+    const releaseCtrl = () => {
+      setCtrlHeld(false);
+      api?.cancelDrawing?.();
+      api?.viewer?.setMouseNavEnabled(true);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableEventTarget(event.target)) return;
+
+      if (event.key === "Control") {
+        if (!event.repeat) setCtrlHeld(true);
+        return;
+      }
+
+      if (
+        event.key.toLowerCase() === "e" &&
+        !event.repeat &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !hideAnnotationsRef.current
+      ) {
+        setEditMode(!editMode);
+      }
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Control") releaseCtrl();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) releaseCtrl();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", releaseCtrl);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", releaseCtrl);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [api, editMode, setEditMode]);
 
   const clearCurrentFrame = useCallback(() => {
     if (!canAnnotate) return;
@@ -639,6 +873,9 @@ export function VideoSessionProvider(props: {
     pendingFocusRef.current = null;
 
     updateByFrame((prev) => mapClearFrame(prev, frame), { markDirty: true });
+    setSampleAnnotations((prev) =>
+      prev.filter((annotation) => parseFrameLabel(annotation)?.frame !== frame),
+    );
 
     isProgrammaticAnnoSyncRef.current = true;
     try {
@@ -654,6 +891,7 @@ export function VideoSessionProvider(props: {
     finishProgrammaticAnnotationSync,
     flushPendingOverlay,
     frame,
+    setSampleAnnotations,
     updateByFrame,
   ]);
 
@@ -664,6 +902,9 @@ export function VideoSessionProvider(props: {
     pendingFocusRef.current = null;
 
     updateByFrame((prev) => mapClearAll(prev), { markDirty: true });
+    setSampleAnnotations((prev) =>
+      prev.filter((annotation) => !parseFrameLabel(annotation)),
+    );
 
     isProgrammaticAnnoSyncRef.current = true;
     try {
@@ -678,26 +919,50 @@ export function VideoSessionProvider(props: {
     canAnnotate,
     finishProgrammaticAnnotationSync,
     flushPendingOverlay,
+    setSampleAnnotations,
     updateByFrame,
   ]);
 
   const applyAnnotatorInteractionMode = useCallback(() => {
     if (!api) return;
 
-    const hasSelected = (api.getSelected?.() ?? []).length > 0;
-    const canDraw =
-      !panMode &&
-      !hideAnnotations &&
-      Boolean(selection.className) &&
-      !hasSelected &&
-      drawingTool !== "point";
-    api.setDrawingTool(toAnnotoriousDrawingTool(drawingTool));
-    api.setDrawingEnabled(canDraw);
+    api.setUserSelectAction(
+      hideAnnotations || drawIntent
+        ? UserSelectAction.NONE
+        : editMode
+          ? UserSelectAction.EDIT
+          : UserSelectAction.SELECT,
+    );
 
-    if (!canDraw) {
+    if (drawingTool) {
+      api.setDrawingTool(toAnnotoriousDrawingTool(drawingTool));
+    }
+
+    if (drawIntent) {
+      api.setSelected?.();
+    }
+
+    api.setDrawingEnabled(canDrawShape);
+
+    if (!canDrawShape) {
       api.cancelDrawing?.();
     }
-  }, [api, drawingTool, hideAnnotations, panMode, selection.className]);
+
+    if (api.viewer && (canDrawPoint || canTagFrame)) {
+      api.viewer.setMouseNavEnabled(false);
+    } else if (api.viewer && !canDrawShape) {
+      api.viewer.setMouseNavEnabled(true);
+    }
+  }, [
+    api,
+    canDrawPoint,
+    canDrawShape,
+    canTagFrame,
+    drawIntent,
+    drawingTool,
+    editMode,
+    hideAnnotations,
+  ]);
 
   const createNewInstanceForClass = useCallback(
     (className: string) => {
@@ -731,6 +996,11 @@ export function VideoSessionProvider(props: {
           ),
         { markDirty: true },
       );
+      setSampleAnnotations((prev) =>
+        prev.filter(
+          (annotation) => !frameLabelMatchesInstance(annotation, cls, tid),
+        ),
+      );
 
       // If the deleted instance is currently selected, clear selection.trackId
       setSelectionState((prev) => {
@@ -742,7 +1012,7 @@ export function VideoSessionProvider(props: {
         return prev;
       });
     },
-    [updateByFrame, canAnnotate],
+    [setSampleAnnotations, updateByFrame, canAnnotate],
   );
 
   /**
@@ -760,23 +1030,41 @@ export function VideoSessionProvider(props: {
     canAnnotate,
   ]);
 
-  /**
-   * Copies current frame annotations into `nextFrame` if it's empty.
-   * Any copied annotations get their target.source updated to match the destination frame.
-   */
-  const forwardPropToNextIfEmpty = useCallback(
+  /** Append missing manual instances from the current frame to `nextFrame` in Edit mode. */
+  const forwardPropMissingManualToNext = useCallback(
     (nextFrame: FrameIndex) => {
-      if (!canAnnotate) return;
+      if (!editMode) return;
+
       updateByFrame(
         (prev) =>
-          forwardPropagateIfEmpty(prev, frame, nextFrame, {
+          forwardPropagateMissingManualAnnotations(prev, frame, nextFrame, {
             projectId,
             sampleId,
           }),
         { markDirty: true },
       );
+
+      const nextAnnotations = propagateMissingManualFrameLabels(
+        annotations,
+        frame,
+        nextFrame,
+      );
+      if (nextAnnotations !== annotations) {
+        setSampleAnnotations((prev) =>
+          propagateMissingManualFrameLabels(prev, frame, nextFrame),
+        );
+        setDirty(true);
+      }
     },
-    [frame, projectId, sampleId, updateByFrame, canAnnotate],
+    [
+      annotations,
+      frame,
+      editMode,
+      projectId,
+      sampleId,
+      setSampleAnnotations,
+      updateByFrame,
+    ],
   );
 
   const createPointAnnotation = useCallback(
@@ -805,20 +1093,7 @@ export function VideoSessionProvider(props: {
       const y = natural ? Math.max(0, Math.min(natural.h, rawY)) : rawY;
 
       const raw = api.getAnnotations();
-      const used = new Set<string>();
-
-      for (const tid of existingTrackIdsForClass(byFrameRef.current, cls)) {
-        const c = canonicalizeTrackId(tid);
-        if (c) used.add(c);
-      }
-
-      for (const annotation of raw) {
-        const got = getLabelTrack(annotation);
-        if ((got.className ?? "").trim() !== cls) continue;
-
-        const tid = canonicalizeTrackId(got.trackId ?? "");
-        if (tid) used.add(tid);
-      }
+      const used = collectUsedTrackIdsForClass(cls, raw);
 
       const trackId = selection.trackId ?? uniqueReadableTrackId(used);
       const dbPoint: VideoPoint = {
@@ -858,6 +1133,7 @@ export function VideoSessionProvider(props: {
       api,
       applyAnnotatorInteractionMode,
       canAnnotate,
+      collectUsedTrackIdsForClass,
       finishProgrammaticAnnotationSync,
       frame,
       frameKey,
@@ -921,11 +1197,7 @@ export function VideoSessionProvider(props: {
 
               let used = usedByClass.get(c);
               if (!used) {
-                const existing = existingTrackIdsForClass(
-                  byFrameRef.current,
-                  c,
-                );
-                used = new Set(existing.map((t) => canonicalizeTrackId(t)));
+                used = collectUsedTrackIdsForClass(c);
                 usedByClass.set(c, used);
               }
 
@@ -988,6 +1260,7 @@ export function VideoSessionProvider(props: {
     },
     [
       api,
+      collectUsedTrackIdsForClass,
       finishProgrammaticAnnotationSync,
       frame,
       frameKey,
@@ -1043,10 +1316,10 @@ export function VideoSessionProvider(props: {
       if (!id) return false;
       if (!api) return false;
 
-      api.setSelected(id, !panMode);
+      api.setSelected(id, editMode);
       return true;
     },
-    [api, panMode],
+    [api, editMode],
   );
 
   const tryFocusPending = useCallback(
@@ -1176,10 +1449,11 @@ export function VideoSessionProvider(props: {
     ) => {
       if (isProgrammaticAnnoSyncRef.current) return;
       if (hideAnnotations) return;
+      if (drawIntentRef.current) return;
 
       const id = clicked?.id;
       if (id) {
-        api.setSelected(id, !panMode);
+        api.setSelected(id, editMode);
       }
 
       const got = getLabelTrack(clicked);
@@ -1192,14 +1466,15 @@ export function VideoSessionProvider(props: {
           source: "explicit",
         });
       }
-
-      // While an annotation is selected, prioritize reshape/move over new drawing.
-      api.cancelDrawing?.();
-      api.setDrawingEnabled(false);
     };
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (isProgrammaticAnnoSyncRef.current) return;
+
+      if (drawIntentRef.current && arr.length > 0) {
+        api.setSelected?.();
+        return;
+      }
 
       if (arr.length > 0) {
         if (!hideAnnotations) {
@@ -1215,10 +1490,6 @@ export function VideoSessionProvider(props: {
               source: "explicit",
             });
           }
-
-          // While selected, keep drawing off so edit handles work predictably.
-          api.cancelDrawing?.();
-          api.setDrawingEnabled(false);
         }
         return;
       }
@@ -1255,20 +1526,7 @@ export function VideoSessionProvider(props: {
       const raw = api.getAnnotations();
 
       // Track ids already used for this class (session + current overlay).
-      const used = new Set<string>();
-
-      for (const tid of existingTrackIdsForClass(byFrameRef.current, cls)) {
-        const c = canonicalizeTrackId(tid);
-        if (c) used.add(c);
-      }
-
-      for (const a of raw) {
-        const got = getLabelTrack(a);
-        if ((got.className ?? "").trim() !== cls) continue;
-
-        const tid = canonicalizeTrackId(got.trackId ?? "");
-        if (tid) used.add(tid);
-      }
+      const used = collectUsedTrackIdsForClass(cls, raw);
 
       let trackId = selection.trackId ?? null;
       if (!trackId) {
@@ -1328,11 +1586,12 @@ export function VideoSessionProvider(props: {
   }, [
     api,
     applyAnnotatorInteractionMode,
+    collectUsedTrackIdsForClass,
     commitFromAnnotorious,
     drawingTool,
     frameKey,
     hideAnnotations,
-    panMode,
+    editMode,
     selection.className,
     selection.trackId,
   ]);
@@ -1382,11 +1641,18 @@ export function VideoSessionProvider(props: {
       selection,
       setSelection,
       instances,
+      frameLabels,
+      toggleFrameLabel,
+      removeFrameLabel,
       drawingTool,
       setDrawingTool,
-      panMode,
-      setPanMode,
+      editMode,
+      setEditMode,
       canAnnotate,
+      drawIntent,
+      canDrawShape,
+      canDrawPoint,
+      canTagFrame,
       propagate,
       setPropagate,
       hideAnnotations,
@@ -1404,7 +1670,7 @@ export function VideoSessionProvider(props: {
       createNewInstanceForClass,
       deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
-      forwardPropToNextIfEmpty,
+      forwardPropMissingManualToNext,
     }),
     [
       projectId,
@@ -1418,11 +1684,18 @@ export function VideoSessionProvider(props: {
       selection,
       setSelection,
       instances,
+      frameLabels,
+      toggleFrameLabel,
+      removeFrameLabel,
       drawingTool,
       setDrawingTool,
-      panMode,
-      setPanMode,
+      editMode,
+      setEditMode,
       canAnnotate,
+      drawIntent,
+      canDrawShape,
+      canDrawPoint,
+      canTagFrame,
       propagate,
       setPropagate,
       hideAnnotations,
@@ -1440,7 +1713,7 @@ export function VideoSessionProvider(props: {
       createNewInstanceForClass,
       deleteInstanceAcrossFrames,
       deleteSelectedInstanceAcrossFrames,
-      forwardPropToNextIfEmpty,
+      forwardPropMissingManualToNext,
     ],
   );
 

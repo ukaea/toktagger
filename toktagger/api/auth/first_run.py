@@ -21,9 +21,8 @@ async def ensure_admin_user(db_client) -> bool:
             return True
 
         password = "admin"
-        # The default password is public knowledge, so this account is no different
-        # from an admin-created one: the first person to sign in must replace it
-        # before they can reach any other page.
+        # The default password is public knowledge, so require_password_changed holds
+        # the account out of every endpoint until the first person to sign in replaces it.
         admin = UserIn(
             username="admin",
             hashed_password=hash_password(password),

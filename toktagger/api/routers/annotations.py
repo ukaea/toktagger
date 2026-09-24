@@ -3,11 +3,12 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from toktagger.api.auth.dependencies import (
-    get_current_user,
+    require_password_changed,
     require_project_annotator,
     require_project_viewer,
 )
 from toktagger.api.crud import utils
+from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.annotations import (
     RESERVED_CREATED_BY_PREFIXES,
     AnnotationBatchTypes,
@@ -19,7 +20,7 @@ from toktagger.api.schemas.users import UserOut
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Annotations"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_password_changed)],
 )
 
 
@@ -59,7 +60,7 @@ async def get_all_annotations(
     current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
     """Retrieve all annotations for this project."""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
 
     annotations = await utils.get_annotations(
@@ -91,13 +92,17 @@ async def import_annotations(
     current_user: UserOut = Depends(require_project_annotator),
 ) -> None:
     """Update or add annotations for this project."""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Every human caller — admins included — is recorded as the author of the
-    # annotations they import, so authorship is always auditable. Only the internal
-    # Ray-worker user may supply its own created_by (e.g. "model::<type>" predictions).
+    # annotations they import, so authorship is always auditable. Machine authorship
+    # is kept as-is, matching the sample-level save, so re-importing an export does
+    # not reassign every prediction to whoever imported it.
     if current_user.username != "__internal__":
         for annotation in annotations:
-            annotation.created_by = current_user.username
+            if not (annotation.created_by or "").startswith(
+                RESERVED_CREATED_BY_PREFIXES
+            ):
+                annotation.created_by = current_user.username
     await utils.import_annotations(db_client, project_id, annotations)
 
 
@@ -116,7 +121,7 @@ async def delete_all_annotations(
     current_user: UserOut = Depends(require_project_annotator),
 ):
     """Delete ALL annotations for the given project."""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.delete_annotations(db_client=db_client, project_id=project_id)
 
@@ -159,16 +164,14 @@ async def get_annotations(
     ),
     current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
 
-    # Membership already validated by require_project_viewer; re-fetch only to check
-    # the per-user show_others_annotations preference. Fetched for admins too, since an
-    # admin who is also an explicit project member has their own preference to honor;
-    # non-member admins simply get None back and fall through to seeing everything.
+    # require_project_viewer already checked access; re-fetch to read this user's
+    # show_others_annotations preference (None for a non-member admin, who sees everything).
     membership = await utils.get_project_membership(
         db_client, project_id, current_user.id
     )
@@ -214,14 +217,14 @@ async def update_annotations(
         description="Whether to set sample to validated (useful if no annotations present).",
     ),
     current_user: UserOut = Depends(require_project_annotator),
-):
+) -> list[str]:
     """Update the annotations for a sample.
 
     The caller's own annotations are replaced wholesale. Annotations belonging to
     another user or to a model are edited in place instead, keeping their author, so
     a client that cannot see them (show_others_annotations=false) can never delete them.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
 
     await utils.get_project(db_client=db_client, project_id=project_id)
     sample = await utils.get_sample(
@@ -229,53 +232,61 @@ async def update_annotations(
     )
 
     is_internal = current_user.username == "__internal__"
+    # Whose an existing annotation is comes from the database, never from the body -
+    # a client claiming someone else's row as its own would otherwise route it into
+    # the replace step below and have it re-inserted as a second copy.
+    stored_authors = await utils.get_annotation_authors(
+        db_client, project_id, sample_id
+    )
     owned_annotations = []
+    edited_ids = []
+    machine_authors: set[str] = set()
     for annotation in annotations:
-        if annotation.id is not None:
-            # Pre-existing annotation (fetched via GET, e.g. someone else's or a
-            # model's). The delete-then-reinsert path below is scoped to this user's
-            # own created_by, so re-saving it there would duplicate it under the
-            # saving user's identity. Apply a targeted in-place edit instead, which
-            # keeps the original author.
-            if not is_internal and annotation.created_by != current_user.username:
-                # A machine-authored suggestion (annotators::/model::) is not the
-                # caller's to change. The UI still lets them drag or relabel one
-                # locally, but that is a view-level tweak: persisting it would
-                # silently rewrite the suggestion this run produced, so drop it and
-                # leave the stored row alone. A *human* co-author's annotation is
-                # editable in place - a shared sample is meant to be worked on
-                # together - keeping its original author.
-                if (annotation.created_by or "").startswith(
-                    RESERVED_CREATED_BY_PREFIXES
-                ):
-                    continue
-                await utils.update_annotation_by_id(
-                    db_client=db_client,
-                    project_id=project_id,
-                    sample_id=sample_id,
-                    annotation_id=annotation.id,
-                    annotation=annotation,
-                )
-                continue
-        else:
-            # Brand-new annotation. Preserve synthetic authorship (a just-run
-            # model prediction or annotator suggestion); otherwise the server
-            # is authoritative for identity. created_by may be absent entirely
-            # (it's optional on AnnotationBatch), hence the "" fallback.
-            if not is_internal and not (annotation.created_by or "").startswith(
-                RESERVED_CREATED_BY_PREFIXES
+        is_other_authors = (
+            annotation.id is not None
+            and not is_internal
+            and stored_authors.get(annotation.id, annotation.created_by)
+            != current_user.username
+        )
+        if is_other_authors:
+            # The replace step below is scoped to the caller's own created_by, so
+            # re-saving another author's annotation there would duplicate it under
+            # the caller's name.
+            if await utils.update_annotation_by_id(
+                db_client=db_client,
+                project_id=project_id,
+                sample_id=sample_id,
+                annotation_id=annotation.id,
+                annotation=annotation,
             ):
+                edited_ids.append(annotation.id)
+            continue
+
+        if annotation.id is None and not is_internal:
+            # A just-run model prediction or annotator suggestion keeps its synthetic
+            # author; otherwise the server is authoritative for identity.
+            if (annotation.created_by or "").startswith(RESERVED_CREATED_BY_PREFIXES):
+                machine_authors.add(annotation.created_by)
+            else:
                 annotation.created_by = current_user.username
+
         annotation.shot_id = sample.shot_id
         owned_annotations.append(annotation)
 
+    # Machine rows arrive with no id - /annotator/{type} and the predict endpoints
+    # return them unsaved - so the client can never send one back for in-place edit,
+    # and a delete scoped only to the caller would leave the previous save behind and
+    # stack up another copy on every save. Replace them by author instead, which is
+    # well defined because the prefix names the annotator or model, not a user.
     result = await utils.update_annotations(
         db_client,
         project_id,
         sample_id,
         owned_annotations,
         created_by=current_user.username,
+        also_replace=machine_authors,
     )
+    result.extend(edited_ids)
 
     if validated or any(annotation.validated for annotation in annotations):
         await utils.update_sample(
@@ -303,7 +314,7 @@ async def remove_annotations(
     current_user: UserOut = Depends(require_project_annotator),
 ):
     """Delete ALL annotations for a given sample from a given project."""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id
@@ -335,7 +346,7 @@ async def remove_annotation(
     scoped to the caller's own annotations, so removing someone else's annotation --
     or a model's prediction -- has to be an explicit call.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id

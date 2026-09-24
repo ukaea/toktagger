@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from toktagger.api.auth.dependencies import (
     get_current_user,
     require_global_admin,
+    require_password_changed,
     require_project_annotator,
     require_project_viewer,
     require_project_admin_role,
@@ -24,7 +25,7 @@ from toktagger.api.schemas.users import UserOut
 router = APIRouter(
     prefix="/projects",
     tags=["Projects"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_password_changed)],
 )
 
 
@@ -132,7 +133,7 @@ async def delete_project(
     current_user: UserOut = Depends(require_project_annotator),
 ):
     """Permanently delete a project."""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.delete_projects(db_client=db_client, project_id=project_id)
 
 

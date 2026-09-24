@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Request
 
-from toktagger.api.auth.dependencies import get_current_user
+from toktagger.api.auth.dependencies import require_password_changed
 from toktagger.api.crud import utils
 
 router = APIRouter(
-    prefix="/paths", tags=["Paths"], dependencies=[Depends(get_current_user)]
+    prefix="/paths", tags=["Paths"], dependencies=[Depends(require_password_changed)]
 )
 
 

@@ -14,6 +14,7 @@ import {
 import type { Ellipse, EllipseGeometry } from "@annotorious/annotorious";
 import type {
   AnnotoriousDrawingTool,
+  DrawingTool,
   VideoAnnotationShape,
   VideoBoundingBox,
   VideoPoint,
@@ -28,6 +29,7 @@ import { classIdForName } from "./types";
  * - purpose="tagging"     -> class label
  * - purpose="identifying" -> track id
  * - purpose="creator"     -> backend created_by value
+ * - purpose="db-id"       -> backend _id, for annotations that already exist
  *
  * These helpers keep the shape consistent and make conversion to/from backend boxes trivial.
  */
@@ -37,13 +39,14 @@ const POINT_BODY_PURPOSE = "shape";
 const POINT_BODY_VALUE = "point";
 export const POINT_MARKER_SIZE = 4;
 const CREATOR_PURPOSE = "creator";
+const DB_ID_PURPOSE = "db-id";
 
 export type PointGeometry = { x: number; y: number };
 
 export function toAnnotoriousDrawingTool(
-  tool: "rectangle" | "polygon" | "point",
+  tool: DrawingTool,
 ): AnnotoriousDrawingTool {
-  return tool === "point" ? "rectangle" : tool;
+  return tool === "point" || tool === "frame" ? "rectangle" : tool;
 }
 
 // Our app stores a frame key on target.source (not present in upstream Annotorious types).
@@ -170,6 +173,19 @@ export function stampCreator(
   return { ...a, bodies };
 }
 
+/** Carry the backend _id through Annotorious, which mints its own ids.
+
+ * Without it a colleague's annotation comes back looking brand new on save, so it
+ * is inserted again under whoever saved rather than edited in place.
+ */
+export function stampDbId(
+  a: ImageAnnotation,
+  dbId: string | null | undefined,
+): ImageAnnotation {
+  if (!dbId) return a;
+  return { ...a, bodies: upsertBody(a.bodies, DB_ID_PURPOSE, dbId) };
+}
+
 /** Mark a selector as the UI representation of a point. */
 export function stampPoint(a: ImageAnnotation): ImageAnnotation {
   const bodies = upsertBody(a.bodies, POINT_BODY_PURPOSE, POINT_BODY_VALUE);
@@ -190,6 +206,11 @@ export function getLabelTrack(a: ImageAnnotation): {
 /** Read backend creator metadata, defaulting to manual when none is stored. */
 export function getAnnotationCreator(a: ImageAnnotation): string {
   return getBodyValue(a, CREATOR_PURPOSE) ?? "manual";
+}
+
+/** Read the backend _id, or null for a shape drawn here and not yet saved. */
+export function getAnnotationDbId(a: ImageAnnotation): string | null {
+  return getBodyValue(a, DB_ID_PURPOSE);
 }
 
 function newBodyId(): string {
@@ -375,6 +396,7 @@ export function annoToVideoBBox(
 
   return {
     type: "video_bounding_box",
+    _id: getAnnotationDbId(a),
     frame,
     track_id: String(trackId),
     label: String(className),
@@ -407,6 +429,7 @@ export function annoToVideoPolygon(
 
   return {
     type: "video_polygon",
+    _id: getAnnotationDbId(a),
     frame,
     track_id: String(trackId),
     label: String(className),
@@ -429,6 +452,7 @@ export function annoToVideoPoint(
 
   return {
     type: "video_point",
+    _id: getAnnotationDbId(a),
     frame,
     track_id: String(trackId),
     label: String(className),
@@ -491,7 +515,7 @@ export function videoBBoxToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, b.label, String(b.track_id));
-  return stampCreator(labelled, b.created_by);
+  return stampDbId(stampCreator(labelled, b.created_by), b._id);
 }
 
 /** Convert backend VideoPolygon -> Annotorious polygon annotation. */
@@ -546,7 +570,7 @@ export function videoPolygonToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
-  return stampCreator(labelled, p.created_by);
+  return stampDbId(stampCreator(labelled, p.created_by), p._id);
 }
 
 /** Convert backend VideoPoint -> tagged Annotorious circle marker. */
@@ -591,7 +615,7 @@ export function videoPointToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
-  return stampPoint(stampCreator(labelled, p.created_by));
+  return stampPoint(stampDbId(stampCreator(labelled, p.created_by), p._id));
 }
 
 /**

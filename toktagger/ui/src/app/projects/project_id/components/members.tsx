@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   Button,
   ActionButton,
@@ -24,8 +24,9 @@ import {
 } from "@adobe/react-spectrum";
 import UserGroup from "@spectrum-icons/workflow/UserGroup";
 import Delete from "@spectrum-icons/workflow/Delete";
+import { z } from "zod/v4";
 import { BACKEND_API_URL, apiFetch } from "@/app/core";
-import type { ProjectMember } from "@/types";
+import { ProjectMemberOutSchema, type ProjectMemberOut } from "@/types";
 
 interface Props {
   projectId: string;
@@ -33,21 +34,21 @@ interface Props {
 }
 
 export function ProjectMembersDialog({ projectId, isProjectAdmin }: Props) {
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [open, setOpen] = useState(false);
+  const [members, setMembers] = useState<ProjectMemberOut[]>([]);
 
   const refresh = useCallback(async () => {
     const res = await apiFetch(
       `${BACKEND_API_URL}/projects/${projectId}/members`,
     );
     if (res.ok) {
-      setMembers(await res.json());
+      const parsed = z
+        .array(ProjectMemberOutSchema)
+        .safeParse(await res.json());
+      if (parsed.success) {
+        setMembers(parsed.data);
+      }
     }
   }, [projectId]);
-
-  useEffect(() => {
-    if (open) refresh();
-  }, [open, refresh]);
 
   const removeMember = async (userId: string) => {
     try {
@@ -91,76 +92,78 @@ export function ProjectMembersDialog({ projectId, isProjectAdmin }: Props) {
   };
 
   return (
-    <DialogTrigger isOpen={open} onOpenChange={setOpen}>
+    <DialogTrigger onOpenChange={(isOpen) => isOpen && refresh()}>
       <ActionButton isQuiet>
         <UserGroup />
         <Text>Manage Members</Text>
       </ActionButton>
-      <Dialog width="size-9000">
-        <Heading>Project Members</Heading>
-        <Divider />
-        <Content>
-          {isProjectAdmin && (
-            <AddMemberForm projectId={projectId} onAdded={refresh} />
-          )}
-          <TableView
-            aria-label="Members"
-            selectionMode="none"
-            marginTop="size-200"
-          >
-            <TableHeader>
-              <Column key="username">Username</Column>
-              <Column key="role" width={220}>
-                Role
-              </Column>
-              <Column key="actions" width={100}>
-                {isProjectAdmin ? "Actions" : ""}
-              </Column>
-            </TableHeader>
-            <TableBody items={members}>
-              {(item) => (
-                <Row key={item._id}>
-                  <Cell>{item.username}</Cell>
-                  <Cell>
-                    {isProjectAdmin ? (
-                      <Picker
-                        aria-label="Role"
-                        selectedKey={item.role}
-                        onSelectionChange={(k) =>
-                          updateRole(item.user_id, k as string)
-                        }
-                        width="100%"
-                      >
-                        <Item key="admin">Admin</Item>
-                        <Item key="annotator">Annotator</Item>
-                        <Item key="viewer">Viewer</Item>
-                      </Picker>
-                    ) : (
-                      item.role
-                    )}
-                  </Cell>
-                  <Cell>
-                    {isProjectAdmin && (
-                      <Button
-                        variant="negative"
-                        aria-label="Remove member"
-                        onPress={() => removeMember(item.user_id)}
-                      >
-                        <Delete />
-                      </Button>
-                    )}
-                  </Cell>
-                </Row>
-              )}
-            </TableBody>
-          </TableView>
-        </Content>
-        <ButtonGroup>
-          <Button variant="secondary" onPress={() => setOpen(false)}>
-            Close
-          </Button>
-        </ButtonGroup>
-      </Dialog>
+      {(close) => (
+        <Dialog width="size-9000">
+          <Heading>Project Members</Heading>
+          <Divider />
+          <Content>
+            {isProjectAdmin && (
+              <AddMemberForm projectId={projectId} onAdded={refresh} />
+            )}
+            <TableView
+              aria-label="Members"
+              selectionMode="none"
+              marginTop="size-200"
+            >
+              <TableHeader>
+                <Column key="username">Username</Column>
+                <Column key="role" width={220}>
+                  Role
+                </Column>
+                <Column key="actions" width={100}>
+                  {isProjectAdmin ? "Actions" : ""}
+                </Column>
+              </TableHeader>
+              <TableBody items={members}>
+                {(item) => (
+                  <Row key={item._id}>
+                    <Cell>{item.username}</Cell>
+                    <Cell>
+                      {isProjectAdmin ? (
+                        <Picker
+                          aria-label="Role"
+                          selectedKey={item.role}
+                          onSelectionChange={(k) =>
+                            updateRole(item.user_id, k as string)
+                          }
+                          width="100%"
+                        >
+                          <Item key="admin">Admin</Item>
+                          <Item key="annotator">Annotator</Item>
+                          <Item key="viewer">Viewer</Item>
+                        </Picker>
+                      ) : (
+                        item.role
+                      )}
+                    </Cell>
+                    <Cell>
+                      {isProjectAdmin && (
+                        <Button
+                          variant="negative"
+                          aria-label="Remove member"
+                          onPress={() => removeMember(item.user_id)}
+                        >
+                          <Delete />
+                        </Button>
+                      )}
+                    </Cell>
+                  </Row>
+                )}
+              </TableBody>
+            </TableView>
+          </Content>
+          <ButtonGroup>
+            <Button variant="secondary" onPress={close}>
+              Close
+            </Button>
+          </ButtonGroup>
+        </Dialog>
+      )}
     </DialogTrigger>
   );
 }

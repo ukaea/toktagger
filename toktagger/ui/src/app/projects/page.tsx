@@ -184,7 +184,7 @@ export default function Projects() {
 
   return (
     <div className="h-full">
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900">
+      <div className="w-full min-h-full flex items-start justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 py-6">
         <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold">Projects</h1>

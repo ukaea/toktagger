@@ -16,7 +16,7 @@ import SampleView from "./src/app/projects/project_id/samples/sample_id/page";
 import LoginPage from "./src/app/pages/login";
 import AdminUsersPage from "./src/app/pages/admin/users";
 import ProfilePage from "./src/app/pages/profile";
-import TopBar from "./src/app/components/layout/TopBar";
+import TopBar from "./src/app/components/tools/topBar";
 import { BreadcrumbProvider } from "./src/app/contexts/BreadcrumbContext";
 
 function SpectrumProvider({ children }) {

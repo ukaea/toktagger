@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   ReactNode,
 } from "react";
@@ -45,11 +46,29 @@ export function useBreadcrumbItems() {
   return useBreadcrumbContext().items;
 }
 
+function areBreadcrumbItemsEqual(
+  a: BreadcrumbItem[],
+  b: BreadcrumbItem[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (item, i) =>
+        item.key === b[i].key &&
+        item.label === b[i].label &&
+        item.href === b[i].href,
+    )
+  );
+}
+
 export function useBreadcrumbs(items: BreadcrumbItem[]) {
   const { setItems } = useBreadcrumbContext();
-  const key = JSON.stringify(items);
+  const previousItems = useRef<BreadcrumbItem[]>([]);
   useEffect(() => {
+    if (areBreadcrumbItemsEqual(previousItems.current, items)) {
+      return;
+    }
+    previousItems.current = items;
     setItems(items);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  });
 }

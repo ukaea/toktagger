@@ -25,10 +25,10 @@ import * as d3 from "d3";
 // The subplot annotations with real y values should be restricted to.
 const HEATMAP_SUBPLOT = "xy2";
 
-// Floor for the plot, also used before the container has been measured. Must
-// match the min-h on the container below. The heatmap takes the upper 80% and
-// the integrated trace the lower 20%, so this leaves them ~380px and ~95px -
-// below that the plot keeps its size and the page scrolls instead.
+// Floor for the plot, also used before the container has been measured. The
+// heatmap takes the upper 80% and the integrated trace the lower 20%, so this
+// leaves them ~380px and ~95px. The plot never renders smaller than this - the
+// column scrolls instead.
 const MIN_PLOT_HEIGHT = 480;
 
 // Plotly supports a shared color axis but @types/plotly.js does not declare it.
@@ -279,8 +279,8 @@ export const Profile2dView = () => {
     return buildPlotData(viewData, plot.values, plotProps?.thresholdActive);
   }, [viewData, plot, plotProps?.thresholdActive]);
 
-  // The plot fills whatever height is left once the annotations table has taken
-  // its share, down to a floor that keeps it usable on a short window.
+  // The plot grows into spare height, but never shrinks below MIN_PLOT_HEIGHT -
+  // the column scrolls instead.
   const { ref: plotAreaRef, height: plotAreaHeight } =
     useElementHeight<HTMLDivElement>();
   const plotHeight = Math.max(plotAreaHeight, MIN_PLOT_HEIGHT);
@@ -298,8 +298,14 @@ export const Profile2dView = () => {
     <View width="100%" height="100%" minHeight={0}>
       <TimeSeriesProvider signalName={profileViewParams.signal_name}>
         <div className="flex h-full min-h-0 flex-row justify-between">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-            <div ref={plotAreaRef} className="min-h-[480px] flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <div
+              ref={plotAreaRef}
+              style={{
+                flex: `1 0 ${MIN_PLOT_HEIGHT}px`,
+                minHeight: MIN_PLOT_HEIGHT,
+              }}
+            >
               <BaseTimeSeriesPlot
                 plotId="Profile2DView"
                 ariaLabel="profile-2d"

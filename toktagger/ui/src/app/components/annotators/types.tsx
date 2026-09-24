@@ -6,13 +6,11 @@ export enum AnnotatorTypes {
   PROFILE_2D_THRESHOLD = "profile_2d_threshold",
 }
 
-// Mirrors the "annotators::<type>" prefix the backend stamps on annotator
-// suggestions (toktagger/api/core/annotators.py), so a real user can never
-// collide with it (see the reserved-prefix check in the users router).
 export const annotatorCreatedBy = (type: AnnotatorTypes) =>
   `annotators::${type}`;
 
-// Mirrors the "model::<type>" prefix the backend stamps on ML-model
-// predictions (toktagger/api/worker.py), so a real user can never collide
-// with it (see the reserved-prefix check in the users router).
 export const modelCreatedBy = (modelType: string) => `model::${modelType}`;
+
+// Display only; the raw created_by value is kept for filtering, exports, etc.
+export const displayCreatedBy = (createdBy: string) =>
+  createdBy.replace(/^(model|annotators)::/, "");

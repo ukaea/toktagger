@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal
 
@@ -368,6 +369,24 @@ async def get_annotations(
     return [AnnotationOutTypeAdapter.validate_python(a) for a in annotations]
 
 
+async def get_annotation_authors(
+    db_client: MongoDBClient, project_id: str, sample_id: str
+) -> dict[str, str]:
+    """Map each stored annotation id on a sample to the author recorded for it.
+
+    Lets a write route decide whose an annotation is without trusting the created_by
+    in the request body, in one query rather than one per annotation.
+    """
+    docs = await db_client.get_filtered_documents(
+        collection="annotations",
+        filters={
+            "project_id": convert_to_objectid(project_id, "projects"),
+            "sample_id": convert_to_objectid(sample_id, "samples"),
+        },
+    )
+    return {str(doc["_id"]): doc.get("created_by", "") for doc in docs}
+
+
 async def add_annotations(
     db_client: MongoDBClient,
     project_id: str,
@@ -419,13 +438,16 @@ async def update_annotations(
     sample_id: str,
     annotations: list[AnnotationBatchTypes],
     created_by: str | None = None,
+    also_replace: Iterable[str] = (),
 ) -> list[str]:
-    await delete_annotations(
-        db_client=db_client,
-        project_id=project_id,
-        sample_id=sample_id,
-        created_by=created_by,
-    )
+    """Replace a sample's annotations for `created_by`, plus any author in `also_replace`."""
+    for author in (created_by, *also_replace):
+        await delete_annotations(
+            db_client=db_client,
+            project_id=project_id,
+            sample_id=sample_id,
+            created_by=author,
+        )
 
     if len(annotations) == 0:
         return []

@@ -1,18 +1,10 @@
 "use client";
-import { useState } from "react";
-import {
-  Button,
-  Flex,
-  InlineAlert,
-  Heading,
-  Content,
-  ToastQueue,
-} from "@adobe/react-spectrum";
+import { useEffect, useState } from "react";
+import { Flex, InlineAlert, Heading, Content } from "@adobe/react-spectrum";
 import { useNavigate } from "react-router-dom";
-import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
-import { PasswordField } from "@/app/components/ui/passwordField";
+import { PasswordChangeDialog } from "@/app/components/ui/passwordChangeDialog";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -22,57 +14,24 @@ export default function ProfilePage() {
     { key: "profile", label: "Profile" },
   ]);
 
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
-  const savePassword = async () => {
-    if (!user) return;
-    if (newPassword !== confirmPassword) {
-      ToastQueue.negative("Passwords do not match", { timeout: 3000 });
-      return;
-    }
-    if (newPassword.length < 8) {
-      ToastQueue.negative("Password must be at least 8 characters", {
-        timeout: 3000,
-      });
-      return;
-    }
-    setPasswordSaving(true);
-    try {
-      const res = await apiFetch(`${BACKEND_API_URL}/users/${user._id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          password: newPassword,
-          must_change_password: false,
-        }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? "Failed to change password");
-      }
-      ToastQueue.positive("Password changed", { timeout: 2000 });
-      setNewPassword("");
-      setConfirmPassword("");
-      const wasForced = user.must_change_password;
-      await refreshUser();
-      if (wasForced) {
-        navigate("/ui/projects");
-      }
-    } catch (e) {
-      ToastQueue.negative(e instanceof Error ? e.message : "Error", {
-        timeout: 3000,
-      });
-    } finally {
-      setPasswordSaving(false);
-    }
+  useEffect(() => {
+    if (user?.must_change_password) setIsPasswordDialogOpen(true);
+  }, [user]);
+
+  const onPasswordChanged = async () => {
+    await refreshUser();
+    if (user?.must_change_password) navigate("/ui/projects");
   };
 
   return (
     <div className="h-full">
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900">
         <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
-          <h1 className="text-2xl font-bold mb-4">Profile</h1>
+          <Heading level={1} marginBottom="size-200">
+            Profile
+          </Heading>
           <Flex direction="column" alignItems="center">
             <Flex
               direction="column"
@@ -95,26 +54,20 @@ export default function ProfilePage() {
                 </InlineAlert>
               )}
 
-              <h2 className="text-lg font-semibold">Change Password</h2>
-              <PasswordField
-                label="New password"
-                value={newPassword}
-                onChange={setNewPassword}
-              />
-              <PasswordField
-                label="Confirm new password"
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-              />
-              <Button
-                variant="primary"
-                onPress={savePassword}
-                isPending={passwordSaving}
-                isDisabled={passwordSaving || !newPassword || !confirmPassword}
-                width="100%"
-              >
-                Change Password
-              </Button>
+              {user && (
+                <PasswordChangeDialog
+                  userId={user._id}
+                  triggerLabel="Change Password"
+                  heading="Change Password"
+                  forceChangeOnNextLogin={false}
+                  successMessage="Password changed"
+                  triggerVariant="cta"
+                  isOpen={isPasswordDialogOpen}
+                  onOpenChange={setIsPasswordDialogOpen}
+                  isDismissable={!user.must_change_password}
+                  onSuccess={onPasswordChanged}
+                />
+              )}
             </Flex>
           </Flex>
         </div>

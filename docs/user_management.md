@@ -42,7 +42,7 @@ Password : admin
 ```
 
 !!! warning
-    This is an insecure default password. TokTagger holds this account on the **Profile** page at first login until you set a new password. This applies to every account, admin accounts included.
+    This is an insecure default password. TokTagger holds this account on the **Profile** page at first login until you set a new password. The server refuses every other request from the account until then, so you cannot work around the prompt. This applies to every account, admin accounts included.
 
 ---
 

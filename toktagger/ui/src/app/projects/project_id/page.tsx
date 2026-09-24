@@ -193,7 +193,17 @@ export default function ProjectView() {
             href: `/ui/projects/${project._id}`,
           },
         ]
-      : [{ key: "projects", label: "Projects", href: "/ui/projects" }],
+      : loadError
+        ? [
+            { key: "projects", label: "Projects", href: "/ui/projects" },
+            {
+              key: "denied",
+              label: loadError.forbidden ? "Access Denied" : "Error",
+            },
+          ]
+        : // Spectrum renders the last breadcrumb as the (unclickable) current
+          // page, so a single "Projects" crumb here can't act as a link.
+          [{ key: "projects", label: "Projects", href: "/ui/projects" }],
   );
 
   const refreshSamples = useCallback(async () => {
@@ -214,9 +224,6 @@ export default function ProjectView() {
       setLoadError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
-        // A non-member is told plainly that access is refused, rather than that the
-        // project does not exist. This does confirm the project exists to anyone who
-        // guesses its ID, which is the accepted trade for an actionable message.
         setLoadError({
           forbidden: true,
           message: err.message || "You are not a member of this project.",
@@ -277,7 +284,7 @@ export default function ProjectView() {
 
   return (
     <div className="h-full">
-      <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900">
+      <div className="relative w-full min-h-full flex items-start justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 py-6">
         <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
@@ -353,17 +360,20 @@ export default function ProjectView() {
                 </Flex>
                 <Flex gap="size-100" alignItems="end" wrap>
                   <Flex direction="row" gap={"size-100"}>
+                    {/* Training/loading/predicting all write to the project, so
+                    a viewer gets the same disabled state the backend already
+                    enforces (require_project_annotator on these endpoints). */}
                     <ModelTrainModal
                       project={project}
-                      isEnabled={modelsEnabled}
+                      isEnabled={modelsEnabled && canAnnotate}
                     ></ModelTrainModal>
                     <ModelLoadModal
                       project={project}
-                      isEnabled={modelsEnabled}
+                      isEnabled={modelsEnabled && canAnnotate}
                     ></ModelLoadModal>
                     <ModelPredictModal
                       project={project}
-                      isEnabled={modelsEnabled}
+                      isEnabled={modelsEnabled && canAnnotate}
                     ></ModelPredictModal>
                     <ContextualHelp
                       placement="top end"

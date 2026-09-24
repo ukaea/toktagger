@@ -21,7 +21,6 @@ import React, {
 import { v4 as uuidv4 } from "uuid";
 import { useSample } from "./SampleContext";
 import { useAuth } from "./AuthContext";
-import { useProjectRole } from "@/app/hooks/useProjectRole";
 import {
   convertRawAnnotationsToTimeSeries,
   convertTimeSeriesToRawAnnotations,
@@ -143,12 +142,12 @@ export const TimeSeriesProvider = ({
     annotations: rawAnnotations,
     setAnnotations: setRawAnnotations,
     project,
+    canAnnotate,
   } = useSample();
 
   // project is guaranteed non-null here: TimeSeriesProvider is only rendered
   // after SampleView confirms project is loaded.
   const projectId = project?._id ?? "";
-  const { canAnnotate } = useProjectRole(project?._id);
   const { user } = useAuth();
 
   const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
@@ -244,10 +243,31 @@ export const TimeSeriesProvider = ({
   // only its own and carry the rest through untouched. Without this, annotations it
   // cannot represent - shot labels, for example - are lost on every edit.
   const mergeTimeSeriesAnnotations = useCallback(
-    (previous: Annotation[], updated: TimeSeriesAnnotation[]): Annotation[] => [
-      ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
-      ...parseTimeSeriesAnnotations(updated),
-    ],
+    (previous: Annotation[], updated: TimeSeriesAnnotation[]): Annotation[] => {
+      // This view shows no validated or uncertainty control, so the conversion back
+      // has to invent both. Right for a shape drawn here, but for an annotation that
+      // already exists those invented values would be written over the stored ones -
+      // downgrading somebody else's validated work on any edit, before a save.
+      const stored = new Map(
+        previous
+          .filter((annotation) => annotation._id)
+          .map((annotation) => [annotation._id, annotation]),
+      );
+      return [
+        ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
+        ...parseTimeSeriesAnnotations(updated).map((annotation) => {
+          const existing = annotation._id
+            ? stored.get(annotation._id)
+            : undefined;
+          if (!existing) return annotation;
+          return {
+            ...annotation,
+            validated: existing.validated,
+            uncertainty: existing.uncertainty,
+          };
+        }),
+      ];
+    },
     [parseTimeSeriesAnnotations],
   );
 
@@ -346,10 +366,6 @@ export const TimeSeriesProvider = ({
     syncAnnotations();
   }, [syncAnnotations, syncCounter]);
 
-  // A new annotation belongs to whoever is drawing it, so it carries their username
-  // from the moment it appears in the table - the same value the server stamps on it
-  // when it is saved. "manual" is only a fallback for the brief window before the
-  // auth context resolves.
   const createAnnotation = useCallback(
     (type: TimeSeriesAnnotationType, label: string): TimeSeriesAnnotation => {
       const id = uuidv4();
@@ -590,12 +606,24 @@ export const TimeSeriesProvider = ({
     [annotations, mergeTimeSeriesAnnotations, setRawAnnotations],
   );
 
-  const batchDeleteAnnotations = useCallback(() => {
-    const updatedState = annotations.filter(
-      (annotation) => !annotation.selected,
-    );
-    setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, updatedState));
-  }, [annotations, mergeTimeSeriesAnnotations, setRawAnnotations]);
+  // Writes straight through to the sample's annotations, unlike removeAnnotation,
+  // which only drops a half-drawn shape from this view's own working copy.
+  const deleteAnnotations = useCallback(
+    (shouldDelete: (annotation: TimeSeriesAnnotation) => boolean) => {
+      setRawAnnotations((prev) =>
+        mergeTimeSeriesAnnotations(
+          prev,
+          annotations.filter((annotation) => !shouldDelete(annotation)),
+        ),
+      );
+    },
+    [annotations, mergeTimeSeriesAnnotations, setRawAnnotations],
+  );
+
+  const batchDeleteAnnotations = useCallback(
+    () => deleteAnnotations((annotation) => annotation.selected ?? false),
+    [deleteAnnotations],
+  );
 
   const actionsValue: TimeSeriesActions = useMemo(
     () => ({
@@ -757,7 +785,9 @@ export const TimeSeriesProvider = ({
               }
 
               // If the annotation is not selected, only delete this one
-              removeAnnotation(props.annotation.id);
+              deleteAnnotations(
+                (candidate) => candidate.id === props.annotation.id,
+              );
             }}
           >
             Delete

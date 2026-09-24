@@ -32,7 +32,6 @@ import Profile2DThresholdTool from "../annotators/thresholding";
 import { Profile2DViewParamsWidget } from "@/app/profile2d/components/profile2dViewParamsWidget";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
 import { useServerHealth } from "@/app/contexts/healthContext";
-import { useProjectRole } from "@/app/hooks/useProjectRole";
 
 type ColorMapPickerInfo = {
   plotProps: PlotProps;
@@ -93,14 +92,14 @@ export default function ToolBar() {
     project,
     sample,
     data,
-    setAnnotations,
+    syncAnnotationsFromServer,
     plotProps,
     setPlotProps,
     isValidated,
+    canAnnotate,
   } = useSample();
 
   const { modelsEnabled } = useServerHealth();
-  const { canAnnotate } = useProjectRole(project?._id);
 
   if (!project || !sample) {
     console.warn("Project or sample not found in ToolBar");
@@ -121,6 +120,22 @@ export default function ToolBar() {
     defaultExpanded?: boolean;
   }[] = [];
 
+  // Profile2D shows shot labels even without data (see comment below); the
+  // other tasks need data loaded first, matching their branch's own gating.
+  const showShotLabels =
+    project.task === TaskType.Profile2D ||
+    (Boolean(data) &&
+      (project.task === TaskType.TimeSeries ||
+        project.task === TaskType.Video));
+
+  if (showShotLabels) {
+    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
+    tools.push({
+      name: "Shot Labels",
+      component: <ShotLabels labels={labels} canAnnotate={canAnnotate} />,
+    });
+  }
+
   if (data && project.task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
@@ -130,18 +145,7 @@ export default function ToolBar() {
     }
 
     const tsData = result.data;
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: (
-        <ShotLabels labels={labels} canAnnotate={canAnnotate}></ShotLabels>
-      ),
-    });
 
-    // The automatic annotators exist only to write annotations, and each POSTs to
-    // /annotator/* from an effect as soon as it is enabled -- which for a sample that
-    // already holds its suggestions happens on mount. Disabling the controls would
-    // not stop that, so they are left out entirely for a viewer.
     if (canAnnotate) {
       tools.push({
         name: "Peak Detection",
@@ -189,14 +193,6 @@ export default function ToolBar() {
     }
   } else if (project.task == TaskType.Profile2D) {
     // Not gated on data so the signal picker below still lets the user recover.
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: (
-        <ShotLabels labels={labels} canAnnotate={canAnnotate}></ShotLabels>
-      ),
-    });
-
     tools.push({
       name: "View Parameters",
       component: <Profile2DViewParamsWidget />,
@@ -221,13 +217,6 @@ export default function ToolBar() {
       });
     }
   } else if (data && project.task === TaskType.Video) {
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels} canAnnotate={canAnnotate} />,
-    });
-
     tools.push({
       name: "Video Tools",
       component: <VideoToolbox />,
@@ -248,8 +237,9 @@ export default function ToolBar() {
   }
 
   const refreshAnnotations = async () => {
-    const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
-    setAnnotations(() => dbAnnotations);
+    syncAnnotationsFromServer(
+      await getAnnotationsForSample(project_id, sample_id),
+    );
   };
 
   return (

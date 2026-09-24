@@ -45,6 +45,18 @@ class Auth(pydantic.BaseModel):
         None,
         description="Secret key used to sign auth tokens. If unset, a key is generated and persisted to secret.key under the server cache_dir on first run. Set this explicitly for multi-worker/multi-process deployments so all processes share the same signing key.",
     )
+    cookie_name: str = pydantic.Field(
+        "tt_access_token",
+        description="Name of the httpOnly cookie holding the session token. Set to __Host-tt_access_token on an HTTPS-only deployment for extra hardening.",
+    )
+    cookie_secure: bool | None = pydantic.Field(
+        None,
+        description="Whether to mark the auth cookie Secure (HTTPS only). If unset, it is derived from the scheme of the login request, so local HTTP development works and an HTTPS deployment is hardened automatically. Set this explicitly to true when TLS is terminated by a proxy on a different host, where the forwarded scheme is not visible to the server.",
+    )
+    cookie_samesite: typing.Literal["lax", "strict", "none"] = pydantic.Field(
+        "lax",
+        description="SameSite policy for the auth cookie. Only use none if the frontend is served from a different site to the API; this also forces the cookie to be Secure.",
+    )
 
 
 class Server(pydantic.BaseModel):

@@ -104,13 +104,12 @@ def test_admin_created_user_forced_to_change_password(server_setup, browser, pag
     expect(gina_page).to_have_url("http://localhost:8002/ui/profile", timeout=3000)
     expect(gina_page.get_by_text("Password change required")).to_be_visible()
 
-    gina_page.get_by_role("textbox", name="New password", exact=True).fill(
+    dialog = gina_page.get_by_role("dialog")
+    dialog.get_by_role("textbox", name="New password", exact=True).fill(
         "gina_new_pass456"
     )
-    gina_page.get_by_role("textbox", name="Confirm new password").fill(
-        "gina_new_pass456"
-    )
-    gina_page.get_by_role("button", name="Change Password").click()
+    dialog.get_by_role("textbox", name="Confirm new password").fill("gina_new_pass456")
+    dialog.get_by_role("button", name="Change Password").click()
 
     # Once changed, the redirect stops firing and normal navigation works.
     expect(gina_page).to_have_url("http://localhost:8002/ui/projects", timeout=3000)
@@ -126,7 +125,12 @@ def test_admin_can_reset_user_password(server_setup, admin_token, browser, page)
     row = _user_row(page, "resetme_hank")
     row.get_by_role("button", name="Reset Password").click()
     dialog = page.get_by_role("dialog")
-    dialog.get_by_role("textbox", name="New password").fill("hank_reset_pass456")
+    dialog.get_by_role("textbox", name="New password", exact=True).fill(
+        "hank_reset_pass456"
+    )
+    dialog.get_by_role("textbox", name="Confirm new password").fill(
+        "hank_reset_pass456"
+    )
     dialog.get_by_role("button", name="Reset", exact=True).click()
 
     expect(page.get_by_text("Password reset for resetme_hank")).to_be_visible()

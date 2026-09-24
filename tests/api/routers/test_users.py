@@ -49,6 +49,32 @@ async def test_create_user_as_admin(unauthenticated_api_client, setup_db_auth):
 
 
 @pytest.mark.asyncio
+async def test_created_user_must_change_password(
+    unauthenticated_api_client, setup_db_auth
+):
+    """A new account always has to replace the password the admin chose for it."""
+    client = unauthenticated_api_client
+    token = await get_auth_token(client, "admin", "admin_pass")
+    response = await client.post(
+        "/users",
+        json={
+            "username": "newuser",
+            "password": "newpass123",
+            "must_change_password": False,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.text
+
+    response = await client.get(
+        f"/users/{response.json()['_id']}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["must_change_password"] is True
+
+
+@pytest.mark.asyncio
 async def test_create_user_non_admin_forbidden(
     unauthenticated_api_client, setup_db_auth
 ):
@@ -515,3 +541,112 @@ async def test_list_my_memberships_is_self_scoped(
 
     # "me" must not be read as a user_id by GET /users/{user_id}
     assert (await client.get("/users/me/memberships")).status_code == 401
+
+
+async def _hold_account(client, admin_token, user_id) -> None:
+    """Put a user behind a forced password change, as an admin would."""
+    response = await client.put(
+        f"/users/{user_id}",
+        json={"must_change_password": True},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_held_account_can_still_read_its_own_profile(auth_setup):
+    """/auth/me stays reachable, or the UI cannot tell the user why they are held."""
+    client = auth_setup["client"]
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    await _hold_account(client, admin_token, auth_setup["alice_id"])
+
+    token = await get_auth_token(client, "alice", "alice_pass")
+    response = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["must_change_password"] is True
+
+
+@pytest.mark.asyncio
+async def test_held_account_can_change_its_own_password(auth_setup):
+    """The one write a held account must be able to make."""
+    client = auth_setup["client"]
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    alice_id = auth_setup["alice_id"]
+    await _hold_account(client, admin_token, alice_id)
+
+    token = await get_auth_token(client, "alice", "alice_pass")
+    response = await client.put(
+        f"/users/{alice_id}",
+        json={"password": "alice_new_pass123", "must_change_password": False},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.text
+
+    token = await get_auth_token(client, "alice", "alice_new_pass123")
+    response = await client.get("/users", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 403, "alice is not an admin, but is no longer held"
+
+
+@pytest.mark.asyncio
+async def test_cannot_clear_own_forced_change_without_a_new_password(auth_setup):
+    """Otherwise the flag is decorative: clear it and keep the handed-over password.
+
+    Worst case is the bootstrap admin, whose default password is public knowledge.
+    """
+    client = auth_setup["client"]
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    alice_id = auth_setup["alice_id"]
+    await _hold_account(client, admin_token, alice_id)
+
+    token = await get_auth_token(client, "alice", "alice_pass")
+    response = await client.put(
+        f"/users/{alice_id}",
+        json={"must_change_password": False},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422, response.text
+
+    response = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.json()["must_change_password"] is True
+
+
+@pytest.mark.asyncio
+async def test_an_admin_cannot_clear_its_own_forced_change_either(auth_setup):
+    """The guard is about the account being held, not about its role."""
+    client = auth_setup["client"]
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    admin_id = auth_setup["admin_id"]
+    await _hold_account(client, admin_token, admin_id)
+
+    response = await client.put(
+        f"/users/{admin_id}",
+        json={"must_change_password": False},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test_an_admin_can_clear_someone_elses_forced_change(auth_setup):
+    """Waiving the requirement for another account is a normal admin action."""
+    client = auth_setup["client"]
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    alice_id = auth_setup["alice_id"]
+    await _hold_account(client, admin_token, alice_id)
+
+    response = await client.put(
+        f"/users/{alice_id}",
+        json={"must_change_password": False},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200, response.text
+
+    token = await get_auth_token(client, "alice", "alice_pass")
+    response = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.json()["must_change_password"] is False

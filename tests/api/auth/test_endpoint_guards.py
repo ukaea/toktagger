@@ -14,6 +14,8 @@ below rather than relying on weaker roles being implied by stronger ones:
                               artifact
   - Project admin (member role="admin") -> 200 on everything
   - Global admin            -> 200 on everything
+  - Held (must_change_password) -> 403 on everything, whatever its role, until
+                              the account replaces its password
 """
 
 import typing
@@ -29,10 +31,11 @@ ROLES = [
     "annotator",
     "project_admin",
     "global_admin",
+    "held",
 ]
 
 
-async def _get_role_token(client, admin_token, project_id, role):
+async def _get_role_token(client, admin_token, project_id, role, alice_id=None):
     """Return a bearer token for `role` on `project_id` (None for unauthenticated)."""
     if role == "unauthenticated":
         return None
@@ -40,6 +43,15 @@ async def _get_role_token(client, admin_token, project_id, role):
         return admin_token
     if role == "non_member":
         return await get_auth_token(client, "bob", "bob_pass")
+    if role == "held":
+        # Project admin first, so a 403 can only come from the forced change.
+        await add_member(client, admin_token, project_id, "alice", "admin")
+        await client.put(
+            f"/users/{alice_id}",
+            json={"must_change_password": True},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        return await get_auth_token(client, "alice", "alice_pass")
     if role in ("viewer", "annotator"):
         await add_member(client, admin_token, project_id, "alice", role)
     elif role == "project_admin":
@@ -78,6 +90,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     # Which samples a project holds is project configuration, not annotation work, so
@@ -95,6 +108,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(403),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "delete_sample": Action(
@@ -107,6 +121,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(403),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "delete_all_samples": Action(
@@ -119,6 +134,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(403),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     # Annotator-level, unlike the sample actions above: SampleUpdate carries only
@@ -136,6 +152,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "get_project_annotations": Action(
@@ -148,6 +165,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "import_annotations": Action(
@@ -173,6 +191,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "delete_project_annotations": Action(
@@ -185,6 +204,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "delete_sample_annotations": Action(
@@ -197,6 +217,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "get_data": Action(
@@ -210,6 +231,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _not_forbidden(),
             "project_admin": _not_forbidden(),
             "global_admin": _not_forbidden(),
+            "held": _status(403),
         },
     ),
     "update_project": Action(
@@ -229,6 +251,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "delete_project": Action(
@@ -241,6 +264,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(200),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     # A well-formed but absent annotation ID: an authorised caller gets past the guard
@@ -255,6 +279,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(404),
             "project_admin": _status(404),
             "global_admin": _status(404),
+            "held": _status(403),
         },
     ),
     # Deletes prediction annotations, so annotators may run it. May 503 when the ML
@@ -269,6 +294,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _not_forbidden(),
             "project_admin": _not_forbidden(),
             "global_admin": _not_forbidden(),
+            "held": _status(403),
         },
     ),
     # A trained model artifact is not an annotation, so this stays project-admin only.
@@ -282,6 +308,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(403),
             "project_admin": _not_forbidden(),
             "global_admin": _not_forbidden(),
+            "held": _status(403),
         },
     ),
     "add_member": Action(
@@ -295,6 +322,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(403),
             "project_admin": _status(200),
             "global_admin": _status(200),
+            "held": _status(403),
         },
     ),
     "remove_member": Action(
@@ -307,6 +335,7 @@ ACTIONS: dict[str, Action] = {
             "annotator": _status(403),
             "project_admin": _not_forbidden(),
             "global_admin": _not_forbidden(),
+            "held": _status(403),
         },
     ),
 }
@@ -326,7 +355,9 @@ async def test_permission_matrix(
     sample_id = setup_db_auth["sample_id"]
     action = ACTIONS[action_name]
 
-    token = await _get_role_token(client, admin_token, project_id, role)
+    token = await _get_role_token(
+        client, admin_token, project_id, role, setup_db_auth["alice_id"]
+    )
 
     path = action.path.format(
         project_id=project_id,

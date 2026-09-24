@@ -7,40 +7,35 @@ import React, {
   ReactNode,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { BACKEND_API_URL } from "@/app/core";
-import type { CurrentUser } from "@/types";
-
-const TOKEN_KEY = "tt_access_token";
+import { apiFetch, BACKEND_API_URL, setUnauthorizedHandler } from "@/app/core";
+import { CurrentUserSchema, type CurrentUser } from "@/types";
 
 interface AuthContextType {
   user: CurrentUser | null;
-  token: string | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const fetchCurrentUser = async (): Promise<CurrentUser | null> => {
+  const res = await apiFetch(`${BACKEND_API_URL}/auth/me`);
+  if (!res.ok) return null;
+  const parsed = CurrentUserSchema.safeParse(await res.json());
+  return parsed.success ? parsed.data : null;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem(TOKEN_KEY),
-  );
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
   const refreshUser = async () => {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (!stored) return;
-    const res = await fetch(`${BACKEND_API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${stored}` },
-    });
-    if (res.ok) {
-      setUser((await res.json()) as CurrentUser);
-    }
+    const me = await fetchCurrentUser();
+    if (me) setUser(me);
   };
 
   // Force a password change before anything else - an admin knows the password they
@@ -51,27 +46,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user, location.pathname, navigate]);
 
-  // Validate stored token on mount. Always calls /auth/me since auth is required.
+  // Re-registered as `user` changes so the check below sees the current value.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (!user) return;
+      setUser(null);
+      navigate("/ui/login");
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [user, navigate]);
+
+  // The session cookie is invisible to JS, so asking the server is the only way to
+  // know whether one is held.
   useEffect(() => {
     const validate = async () => {
-      const stored = localStorage.getItem(TOKEN_KEY);
-      const headers: HeadersInit = stored
-        ? { Authorization: `Bearer ${stored}` }
-        : {};
+      // One-off cleanup: sessions predating the cookie left a readable token behind.
+      localStorage.removeItem("tt_access_token");
       try {
-        const res = await fetch(`${BACKEND_API_URL}/auth/me`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data as CurrentUser);
-          setToken(stored);
-        } else {
-          if (stored) localStorage.removeItem(TOKEN_KEY);
-          setToken(null);
-          setUser(null);
-        }
+        setUser(await fetchCurrentUser());
       } catch {
-        if (stored) localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -82,7 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const body = new URLSearchParams({ username, password });
-    const res = await fetch(`${BACKEND_API_URL}/auth/token`, {
+    // The response sets the session cookie; its body is for non-browser clients.
+    const res = await apiFetch(`${BACKEND_API_URL}/auth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
@@ -91,32 +85,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.detail ?? "Login failed");
     }
-    const { access_token } = await res.json();
-    localStorage.setItem(TOKEN_KEY, access_token);
-    setToken(access_token);
 
-    // Fetch user profile
-    const meRes = await fetch(`${BACKEND_API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    if (!meRes.ok) {
-      localStorage.removeItem(TOKEN_KEY);
-      setToken(null);
+    const me = await fetchCurrentUser();
+    if (!me) {
       throw new Error("Login failed: could not load user profile");
     }
-    setUser((await meRes.json()) as CurrentUser);
+    setUser(me);
   };
 
-  const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    setToken(null);
+  const logout = async () => {
+    // Only the server can clear an httpOnly cookie, but a failed call must not strand
+    // the user in a logged-in UI, so sign out locally regardless.
+    await apiFetch(`${BACKEND_API_URL}/auth/logout`, { method: "POST" }).catch(
+      () => {},
+    );
     setUser(null);
     navigate("/ui/login");
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, token, isLoading, login, logout, refreshUser }}
+      value={{ user, isLoading, login, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

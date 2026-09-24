@@ -1,5 +1,11 @@
 "use client";
-import { Project, type NavAdapter } from "@/types";
+import {
+  Project,
+  ProjectMemberSchema,
+  type Annotation,
+  type NavAdapter,
+} from "@/types";
+import { z } from "zod/v4";
 import {
   Flex,
   ActionButton,
@@ -39,7 +45,6 @@ import { useSampleHistory } from "@/app/contexts/SampleHistoryContext";
 import { getNextSample } from "@/app/core";
 import type { SortDescriptor, SortDirection, Key } from "@react-types/shared";
 import { useNavAdapter } from "@/app/contexts/NavAdapterContext";
-import { useProjectRole } from "@/app/hooks/useProjectRole";
 
 const TOAST_TIMEOUT = 5000;
 
@@ -94,6 +99,7 @@ type ButtonInfo = {
   setIsValidated: (validated: boolean) => void;
   navAdapter: NavAdapter;
   onPermissionError: () => void;
+  username?: string;
 };
 
 type SaveButtonInfo = ButtonInfo & {
@@ -120,6 +126,29 @@ type PreviousButtonInfo = ButtonInfo & {
   popVisitedSampleId: () => string | null;
 };
 
+// Every save goes through here so a removal the batch PUT cannot express - deleting
+// another author's annotation - is persisted alongside it, matching Clear.
+async function persistAnnotations(
+  project_id: string,
+  sample_id: string,
+  navAdapter: NavAdapter,
+  saveOnNavigate: boolean,
+  username?: string,
+): Promise<Annotation[]> {
+  const annotationsToSave = navAdapter.getAnnotations();
+  await saveSampleAnnotations(
+    project_id,
+    sample_id,
+    annotationsToSave,
+    saveOnNavigate,
+    username,
+  );
+  if (saveOnNavigate) {
+    await navAdapter.syncRemovals?.();
+  }
+  return annotationsToSave;
+}
+
 function NextButton({
   project_id,
   sample_id,
@@ -129,17 +158,18 @@ function NextButton({
   saveOnNavigate,
   navAdapter,
   onPermissionError,
+  username,
 }: NextButtonInfo) {
   const navigate = useNavigate();
 
   const moveNextShot = useCallback(async () => {
-    const annotationsToSave = navAdapter.getAnnotations();
     try {
-      await saveSampleAnnotations(
+      await persistAnnotations(
         project_id,
         sample_id,
-        annotationsToSave,
-        saveOnNavigate,
+        navAdapter,
+        saveOnNavigate ?? false,
+        username,
       );
       if (saveOnNavigate) {
         navAdapter.afterSave?.();
@@ -169,6 +199,7 @@ function NextButton({
     sortDescriptor,
     navAdapter,
     onPermissionError,
+    username,
   ]);
 
   useEffect(() => {
@@ -231,17 +262,18 @@ function PreviousButton({
   sortDescriptor,
   navAdapter,
   onPermissionError,
+  username,
 }: PreviousButtonInfo) {
   const navigate = useNavigate();
 
   const movePreviousShot = useCallback(async () => {
-    const annotationsToSave = navAdapter.getAnnotations();
     try {
-      await saveSampleAnnotations(
+      await persistAnnotations(
         project_id,
         sample_id,
-        annotationsToSave,
-        saveOnNavigate,
+        navAdapter,
+        saveOnNavigate ?? false,
+        username,
       );
       if (saveOnNavigate) {
         navAdapter.afterSave?.();
@@ -275,6 +307,7 @@ function PreviousButton({
     setIsValidated,
     navAdapter,
     onPermissionError,
+    username,
   ]);
 
   useEffect(() => {
@@ -311,15 +344,16 @@ function SaveButton({
   navAdapter,
   onPermissionError,
   canAnnotate,
+  username,
 }: SaveButtonInfo) {
   const handleClick = async () => {
     try {
-      const annotationsToSave = navAdapter.getAnnotations();
-      await saveSampleAnnotations(
+      const annotationsToSave = await persistAnnotations(
         project_id,
         sample_id,
-        annotationsToSave,
+        navAdapter,
         true,
+        username,
       );
       navAdapter.afterSave?.();
       ToastQueue.positive(`Saved ${annotationsToSave.length} annotations!`, {
@@ -368,7 +402,10 @@ function ClearButton({
   canAnnotate,
   showOthers,
 }: ClearButtonInfo) {
-  const handleClick = async () => {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const handleConfirm = async () => {
+    setConfirmOpen(false);
     try {
       // Clear whatever the user can see: everything when others' annotations are on
       // display, only their own when they are not.
@@ -394,7 +431,7 @@ function ClearButton({
       <TooltipTrigger delay={1000} placement="bottom">
         <ActionButton
           aria-label="Clear"
-          onPress={handleClick}
+          onPress={() => setConfirmOpen(true)}
           isDisabled={!canAnnotate}
         >
           <Delete />
@@ -408,6 +445,22 @@ function ClearButton({
               : "Discard your own annotations for this sample."}
         </Tooltip>
       </TooltipTrigger>
+      <DialogContainer onDismiss={() => setConfirmOpen(false)}>
+        {confirmOpen && (
+          <AlertDialog
+            title="Clear annotations?"
+            variant="destructive"
+            primaryActionLabel="Clear"
+            cancelLabel="Cancel"
+            onPrimaryAction={handleConfirm}
+            onCancel={() => setConfirmOpen(false)}
+          >
+            {showOthers
+              ? "This will discard all annotations for this sample, including other users'. This can't be undone."
+              : "This will discard your own annotations for this sample. This can't be undone."}
+          </AlertDialog>
+        )}
+      </DialogContainer>
     </View>
   );
 }
@@ -417,6 +470,7 @@ type SaveInfo = {
   sample_id: string;
   sortDescriptor: SortDescriptor | null;
   saveOnNavigate?: boolean;
+  username?: string;
   setIsValidated: (validated: boolean) => void;
   navAdapter: NavAdapter;
 };
@@ -428,6 +482,7 @@ export function ShotSearch({
   saveOnNavigate,
   setIsValidated,
   navAdapter,
+  username,
 }: SaveInfo) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -441,12 +496,12 @@ export function ShotSearch({
       try {
         const sample = await getShotSample(project_id, shot_id);
         if (sample !== null) {
-          const annotationsToSave = navAdapter.getAnnotations();
-          await saveSampleAnnotations(
+          await persistAnnotations(
             project_id,
             sample_id,
-            annotationsToSave,
-            saveOnNavigate,
+            navAdapter,
+            saveOnNavigate ?? false,
+            username,
           );
           if (saveOnNavigate) {
             navAdapter.afterSave?.();
@@ -479,11 +534,11 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { setIsValidated, setAnnotations } = useSample();
+  const { setIsValidated, syncAnnotationsFromServer, canAnnotate } =
+    useSample();
   const { user } = useAuth();
   const navAdapter = useNavAdapter();
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const { canAnnotate } = useProjectRole(project_id);
 
   const {
     visitedSampleIds,
@@ -516,20 +571,15 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
     let cancelled = false;
     apiFetch(`${BACKEND_API_URL}/users/me/memberships`)
       .then((response) => (response.ok ? response.json() : []))
-      .then(
-        (
-          memberships: Array<{
-            project_id: string;
-            show_others_annotations: boolean;
-          }>,
-        ) => {
-          if (cancelled) return;
-          const membership = memberships.find(
-            (candidate) => candidate.project_id === project_id,
-          );
-          setShowOthers(membership?.show_others_annotations ?? true);
-        },
-      )
+      .then((data: unknown) => {
+        if (cancelled) return;
+        const parsed = z.array(ProjectMemberSchema).safeParse(data);
+        if (!parsed.success) return;
+        const membership = parsed.data.find(
+          (candidate) => candidate.project_id === project_id,
+        );
+        setShowOthers(membership?.show_others_annotations ?? true);
+      })
       .catch(() => {
         // Leave the default in place - the server is the authority on the filter.
       });
@@ -551,10 +601,11 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
         );
       }
       // Re-fetch annotations with updated visibility
-      const fresh = await getAnnotationsForSample(project_id, sample_id);
-      setAnnotations(() => fresh);
+      syncAnnotationsFromServer(
+        await getAnnotationsForSample(project_id, sample_id),
+      );
     },
-    [project_id, sample_id, user, setAnnotations],
+    [project_id, sample_id, user, syncAnnotationsFromServer],
   );
 
   return (
@@ -580,6 +631,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           navAdapter={navAdapter}
           onPermissionError={() => setPermissionDenied(true)}
           canAnnotate={canAnnotate}
+          username={user?.username}
         />
         <PreviousButton
           project_id={project_id}
@@ -591,6 +643,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           sortDescriptor={sortDescriptor}
           navAdapter={navAdapter}
           onPermissionError={() => setPermissionDenied(true)}
+          username={user?.username}
         />
         <NextButton
           project_id={project_id}
@@ -601,6 +654,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           sortDescriptor={sortDescriptor}
           navAdapter={navAdapter}
           onPermissionError={() => setPermissionDenied(true)}
+          username={user?.username}
         />
         <ClearButton
           project_id={project_id}
@@ -641,6 +695,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
         saveOnNavigate={SaveOnNavigate && canAnnotate}
         setIsValidated={setIsValidated}
         navAdapter={navAdapter}
+        username={user?.username}
       />
     </Flex>
   );

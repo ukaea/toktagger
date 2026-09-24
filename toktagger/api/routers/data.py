@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from toktagger.api.auth.dependencies import get_current_user, require_project_viewer
+from toktagger.api.auth.dependencies import (
+    require_password_changed,
+    require_project_viewer,
+)
 from toktagger.api.core.data_loaders import DataLoaderError, LoaderRegistry
 from toktagger.api.core.views import DATA_VIEWS
 from toktagger.api.crud import utils
+from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.data import DataParams, DataParamTypes, DataResponseType
 from toktagger.api.schemas.users import UserOut
 from toktagger.api.schemas.views import ViewParams, ViewParamTypes
@@ -11,7 +15,7 @@ from toktagger.api.schemas.views import ViewParams, ViewParamTypes
 router = APIRouter(
     prefix="/projects/{project_id}/samples/{sample_id}/data",
     tags=["Data"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_password_changed)],
 )
 
 
@@ -25,7 +29,7 @@ async def get_data(
     view: ViewParamTypes | None = ViewParams(),
 ) -> DataResponseType:
     """Get data, e.g. time trace, about the given sample required for the given project"""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
 
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, project_id, sample_id)

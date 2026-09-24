@@ -1,5 +1,6 @@
 # tests/test_settings.py
 
+import argparse
 import pathlib
 import tempfile
 
@@ -9,6 +10,7 @@ import tomllib
 from pydantic_settings import SettingsConfigDict
 
 from scripts.generate_example_config import create_default_toml_file
+from toktagger.api.cli import apply_cli_overrides
 from toktagger.api.config import Settings
 
 ENV_VARS = [
@@ -19,6 +21,9 @@ ENV_VARS = [
     "SERVER_CACHE_DIR",
     "DATABASE_MONGO_URL",
     "AUTH_SECRET_KEY",
+    "AUTH_COOKIE_NAME",
+    "AUTH_COOKIE_SECURE",
+    "AUTH_COOKIE_SAMESITE",
     "UDA_HOST",
     "UDA_META_PLUGINNAME",
     "UDA_METANEW_PLUGINNAME",
@@ -353,3 +358,60 @@ def test_create_toml():
             key in example_toml
             for key in ("database", "models", "sal", "server", "uda")
         )
+
+
+def _parse_cli(argv: list[str]) -> argparse.Namespace:
+    """The same flags main() defines, so the defaults under test are the real ones."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host")
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--reload", action="store_true")
+    parser.add_argument("--workers", type=int)
+    return parser.parse_args(argv)
+
+
+def test_cli_leaves_configured_server_settings_alone():
+    """Flags the user did not pass must not overwrite the file or the environment.
+
+    SERVER_WORKERS is the documented way to ask for multiple workers, and an
+    argparse default of 1 used to silently put it back to single-worker.
+    """
+    settings = Settings()
+    settings.server.host = "0.0.0.0"
+    settings.server.port = 9999
+    settings.server.workers = 4
+
+    apply_cli_overrides(settings, _parse_cli(["--no-browser"]))
+
+    assert settings.server.host == "0.0.0.0"
+    assert settings.server.port == 9999
+    assert settings.server.workers == 4
+    assert settings.server.reload is False
+
+
+def test_cli_flags_override_configured_server_settings():
+    """An explicitly passed flag still wins."""
+    settings = Settings()
+    settings.server.workers = 4
+
+    apply_cli_overrides(
+        settings,
+        _parse_cli(["--host", "127.0.0.1", "--port", "1234", "--workers", "2"]),
+    )
+
+    assert settings.server.host == "127.0.0.1"
+    assert settings.server.port == 1234
+    assert settings.server.workers == 2
+
+
+def test_cli_reload_flag_is_opt_in_only():
+    """--reload is store_true, so absence means "leave it as configured"."""
+    settings = Settings()
+    settings.server.reload = True
+
+    apply_cli_overrides(settings, _parse_cli([]))
+    assert settings.server.reload is True
+
+    apply_cli_overrides(settings, _parse_cli(["--reload"]))
+    assert settings.server.reload is True

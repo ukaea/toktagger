@@ -12,11 +12,7 @@ import {
   Flex,
 } from "@adobe/react-spectrum";
 import { useTimeSeriesState } from "@/app/contexts/TimeSeriesContext";
-
-// Strip the internal "model::" / "annotators::" namespacing for display only;
-// the raw created_by value is kept everywhere else (filtering, exports, etc).
-const displayCreatedBy = (createdBy: string) =>
-  createdBy.replace(/^(model|annotators)::/, "");
+import { displayCreatedBy } from "@/app/components/annotators/types";
 
 interface MarkerProps {
   color: string;
@@ -144,8 +140,6 @@ export const AnnotationsTable = () => {
   }, [annotations, categories]);
 
   return (
-    // shrink-0 so the table keeps its full height and the plot above it gives up
-    // the space instead - otherwise the last rows are pushed off the window.
     <div className="relative ml-auto mr-auto w-[70%] shrink-0 overflow-x-auto px-4 pb-4 shadow-md sm:rounded-lg">
       {/* <ToolingControls /> */}
       <Flex justifyContent="center" marginBottom="size-200">

@@ -3,20 +3,94 @@
 import React, { useEffect } from "react";
 import { Annotorious } from "@annotorious/react";
 import { ImageDataSchema } from "@/types";
-import { Button, ProgressCircle } from "@adobe/react-spectrum";
+import {
+  ActionButton,
+  Button,
+  Flex,
+  Grid,
+  ProgressCircle,
+  Text,
+} from "@adobe/react-spectrum";
+import Label from "@spectrum-icons/workflow/Label";
 import {
   VideoSessionProvider,
   useVideoSession,
 } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
+import { VideoAnnotationToolbar } from "@/app/video/components/video-annotation-toolbar";
 import { FrameJumpField } from "@/app/video/components/ui_elements";
 import { useSample } from "@/app/contexts/SampleContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
 import {
   VideoUiStateProvider,
   useVideoUiState,
-} from "@/app/video/components/video-context";
+} from "@/app/contexts/VideoContext";
 import { useParams } from "react-router-dom";
+
+import { AnnotationPopup } from "@/app/video/components/annotation-popup";
+
+function FrameLabelBadges() {
+  const { frame, frameLabels, hideAnnotations, editMode, removeFrameLabel } =
+    useVideoSession();
+  const [selectedBadgeKey, setSelectedBadgeKey] = React.useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setSelectedBadgeKey(null);
+  }, [frame, frameLabels, hideAnnotations]);
+
+  if (hideAnnotations || frameLabels.length === 0) return null;
+
+  return (
+    <Flex direction="column" gap="size-100" alignItems="start">
+      {frameLabels.map((frameLabel) => {
+        const badgeKey = `${frameLabel.label}::${frameLabel.track_id}`;
+        const isSelected = selectedBadgeKey === badgeKey;
+
+        return (
+          <Flex key={badgeKey} position="relative">
+            <ActionButton
+              aria-label={`Frame label: ${frameLabel.label}`}
+              onPress={() =>
+                setSelectedBadgeKey((prev) =>
+                  prev === badgeKey ? null : badgeKey,
+                )
+              }
+            >
+              <Label aria-hidden="true" />
+              <Text>{frameLabel.label}</Text>
+            </ActionButton>
+
+            {isSelected && (
+              <Flex
+                position="absolute"
+                zIndex={60}
+                direction="column"
+                gap="size-100"
+                left="100%"
+                top={0}
+              >
+                <AnnotationPopup
+                  className={frameLabel.label}
+                  trackId={frameLabel.track_id}
+                  heading="Frame label"
+                  details={`Frame ${frame} · ${frameLabel.created_by}`}
+                  deleteDisabled={!editMode}
+                  onDeleteBox={() => {
+                    setSelectedBadgeKey(null);
+                    removeFrameLabel(frameLabel.label, frameLabel.track_id);
+                  }}
+                  onClose={() => setSelectedBadgeKey(null)}
+                />
+              </Flex>
+            )}
+          </Flex>
+        );
+      })}
+    </Flex>
+  );
+}
 
 /**
  * Frame annotator UI wrapper:
@@ -58,9 +132,10 @@ function VideoFrameAnnotator(props: {
 
     session.flushCurrentFrameOverlay();
 
-    // Forward-propagate current annotations into the next frame if that frame is empty.
-    // This updates SampleContext working annotations; image loading is driven by goToFrame().
-    if (session.propagate) session.forwardPropToNextIfEmpty(next);
+    // Append missing manual instances only in Edit mode.
+    if (session.editMode && session.propagate) {
+      session.forwardPropMissingManualToNext(next);
+    }
   };
 
   const handleJump = (n: number) => {
@@ -71,41 +146,55 @@ function VideoFrameAnnotator(props: {
 
   return (
     <div className="flex flex-col items-center gap-4 w-full">
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex justify-center">
-          <div className="flex items-start gap-2">
-            <Button
-              variant="primary"
-              onPress={handlePrev}
-              isDisabled={prevDisabled}
-            >
-              Prev
-            </Button>
-            <FrameJumpField frame={props.desiredFrame} onJump={handleJump} />
-            <Button
-              variant="primary"
-              onPress={handleNext}
-              isDisabled={nextDisabled}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      </div>
+      <Flex alignItems="start" gap="size-100">
+        <Button
+          variant="primary"
+          onPress={handlePrev}
+          isDisabled={prevDisabled}
+        >
+          Prev
+        </Button>
+        <FrameJumpField frame={props.desiredFrame} onJump={handleJump} />
+        <Button
+          variant="primary"
+          onPress={handleNext}
+          isDisabled={nextDisabled}
+        >
+          Next
+        </Button>
+      </Flex>
 
       {/* Frame annotator canvas (image + Annotorious overlay). */}
-      <div className="relative w-full flex flex-col items-center gap-3">
-        <FrameAnnotatorHost imageBase64={props.imageBase64} />
-        {isFramePending && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/30">
-            <ProgressCircle
-              aria-label={`Loading frame ${props.desiredFrame}`}
-              size="L"
-              isIndeterminate
-            />
-          </div>
-        )}
-      </div>
+      <Grid
+        width="100%"
+        columns={["size-1600", "1fr", "size-1600"]}
+        areas={["labels viewer spacer"]}
+        columnGap="size-200"
+        alignItems="start"
+      >
+        <Flex gridArea="labels" alignItems="end">
+          <FrameLabelBadges />
+        </Flex>
+        <Flex
+          gridArea="viewer"
+          position="relative"
+          width="100%"
+          direction="column"
+          alignItems="center"
+          gap="size-150"
+        >
+          <FrameAnnotatorHost imageBase64={props.imageBase64} />
+          {isFramePending && (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+              <ProgressCircle
+                aria-label={`Loading frame ${props.desiredFrame}`}
+                size="L"
+                isIndeterminate
+              />
+            </div>
+          )}
+        </Flex>
+      </Grid>
     </div>
   );
 }
@@ -248,14 +337,17 @@ export function VideoView() {
   };
 
   return (
-    <div className="w-full flex justify-center">
-      <div className="w-full max-w-5xl mx-auto px-4 py-3">
-        <VideoFrameAnnotator
-          imageBase64={imageBase64}
-          desiredFrame={desiredFrame}
-          goToFrame={goToFrame}
-          goToRelativeFrame={goToRelativeFrame}
-        />
+    <div className="min-w-0 flex-1">
+      <div className="flex w-full justify-between">
+        <div className="min-w-0 flex-1 px-4 py-3">
+          <VideoFrameAnnotator
+            imageBase64={imageBase64}
+            desiredFrame={desiredFrame}
+            goToFrame={goToFrame}
+            goToRelativeFrame={goToRelativeFrame}
+          />
+        </div>
+        <VideoAnnotationToolbar desiredFrame={desiredFrame} />
       </div>
     </div>
   );

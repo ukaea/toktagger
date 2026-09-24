@@ -74,3 +74,19 @@ npm --prefix toktagger/ui run build
 ```
 
 This will run vite build and create a production-ready version of the application in the `toktagger/api/static` directory. This is then packaged with the application when pip installed.
+
+## Session lifetime
+
+A session stays valid for 24 hours. When a request arrives with a session cookie that is
+more than 12 hours old, the server sends a new cookie with a full 24-hour window. An
+active user thus stays signed in, but an idle session ends 24 hours after the last
+request. Only cookie sessions get a new window. A caller that sends a bearer token keeps
+the token it holds.
+
+## Authenticating against the API docs
+
+The browser sends its session in an httpOnly cookie, and requests that change data must
+also carry a matching `X-CSRF-Token` header. The Swagger UI at `/docs` does not send that
+header, so a `POST`, `PUT` or `DELETE` tried from there while you are signed in to the SPA
+is rejected with a 403. Click **Authorize** in Swagger first and it sends a bearer token
+instead, which needs no CSRF header.

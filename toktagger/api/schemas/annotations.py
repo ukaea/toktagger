@@ -32,6 +32,15 @@ class AnnotationBase(ConfiguredModel):
         return values
 
 
+class VideoAnnotationBase(AnnotationBase):
+    frame: int
+    track_id: str
+
+
+class VideoFrameLabel(VideoAnnotationBase):
+    type: Literal["video_frame_label"] = "video_frame_label"
+
+
 class Annotation(AnnotationBase):
     id: str = Field(..., alias="_id")
 
@@ -59,10 +68,8 @@ class BoundingBox(AnnotationBase):
     y_min: float
 
 
-class VideoBoundingBox(AnnotationBase):
+class VideoBoundingBox(VideoAnnotationBase):
     type: Literal["video_bounding_box"] = "video_bounding_box"
-    frame: int
-    track_id: str
     height: int
     width: int
     x_min: int
@@ -91,10 +98,8 @@ class Polygon(AnnotationBase):
         return v
 
 
-class VideoPolygon(AnnotationBase):
+class VideoPolygon(VideoAnnotationBase):
     type: Literal["video_polygon"] = "video_polygon"
-    frame: int
-    track_id: str
     segmentation: list[list[int]] = Field(
         ...,
         min_length=1,
@@ -115,10 +120,8 @@ class VideoPolygon(AnnotationBase):
         return v
 
 
-class VideoPoint(AnnotationBase):
+class VideoPoint(VideoAnnotationBase):
     type: Literal["video_point"] = "video_point"
-    frame: int
-    track_id: str
     x: int
     y: int
 
@@ -171,6 +174,7 @@ PolygonOut = create_out_model(Polygon)
 VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
 VideoPolygonOut = create_out_model(VideoPolygon)
 VideoPointOut = create_out_model(VideoPoint)
+VideoFrameLabelOut = create_out_model(VideoFrameLabel)
 ClassLabelOut = create_out_model(ClassLabel)
 
 # Generate Batch classes using factory function
@@ -181,6 +185,7 @@ PolygonBatch = create_batch_model(Polygon)
 VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
 VideoPolygonBatch = create_batch_model(VideoPolygon)
 VideoPointBatch = create_batch_model(VideoPoint)
+VideoFrameLabelBatch = create_batch_model(VideoFrameLabel)
 ClassLabelBatch = create_batch_model(ClassLabel)
 
 
@@ -193,6 +198,7 @@ AnnotationTypes = (
     | VideoBoundingBox
     | VideoPolygon
     | VideoPoint
+    | VideoFrameLabel
     | ClassLabel
 )
 
@@ -204,6 +210,7 @@ AnnotationOutTypes = (
     | VideoBoundingBoxOut
     | VideoPolygonOut
     | VideoPointOut
+    | VideoFrameLabelOut
     | ClassLabelOut
 )
 
@@ -215,6 +222,7 @@ AnnotationBatchTypes = (
     | VideoBoundingBoxBatch
     | VideoPolygonBatch
     | VideoPointBatch
+    | VideoFrameLabelBatch
     | ClassLabelBatch
 )
 

@@ -1,6 +1,7 @@
 "use client";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useState,
   useEffect,
@@ -30,6 +31,7 @@ import {
 } from "@/types";
 import { ApiError, BACKEND_API_URL, apiFetch, ensureOk } from "@/app/core";
 import { getSignalNames } from "@/app/utils";
+import { useProjectRole } from "@/app/hooks/useProjectRole";
 
 const viewParamsKey = (projectId: string) => `view-params-${projectId}`;
 const colorMapKey = (projectId: string) => `color-map-${projectId}`;
@@ -68,6 +70,9 @@ interface SampleContextType {
   sample: Sample | null;
   data: Data | null;
   annotations: Annotation[];
+  // The annotations as the server last returned them, so a save can tell which of
+  // them the user removed locally.
+  serverAnnotations: Annotation[];
   dataParams: DataParams;
   viewParams: ViewParams | Profile2DViewParams;
   plotProps: PlotProps;
@@ -79,7 +84,15 @@ interface SampleContextType {
   // HTTP status behind `error`, when it came from the API. Lets the page tell
   // "no access" (403) apart from a genuine failure.
   errorStatus: number | null;
+  // Sourced here, rather than each consumer calling useProjectRole itself, because
+  // the sample view/toolbar remount on every sample change (see the stale-render
+  // guard in page.tsx) - a component-local role hook would reset to its
+  // default-open state on every remount and briefly re-enable gated controls.
+  canAnnotate: boolean;
   setAnnotations: React.Dispatch<React.SetStateAction<Annotation[]>>;
+  // Replaces the working set with a freshly fetched one, so `serverAnnotations`
+  // stays the baseline a save diffs against.
+  syncAnnotationsFromServer: (annotations: Annotation[]) => void;
   setDataParams: React.Dispatch<React.SetStateAction<DataParams>>;
   setViewParams: React.Dispatch<
     React.SetStateAction<ViewParams | Profile2DViewParams>
@@ -171,6 +184,8 @@ export function SampleProvider({
   const [sample, setSample] = useState<Sample | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [serverAnnotations, setServerAnnotations] = useState<Annotation[]>([]);
+  const { canAnnotate } = useProjectRole(projectId);
 
   const [viewParams, setViewParams] = useState<
     ViewParams | Profile2DViewParams
@@ -287,6 +302,7 @@ export function SampleProvider({
         const sampleKey = `${projectId}:${sampleId}`;
         if (loadedAnnotationsSampleKeyRef.current !== sampleKey) {
           setAnnotations(dbAnnotations);
+          setServerAnnotations(dbAnnotations);
           loadedAnnotationsSampleKeyRef.current = sampleKey;
         }
         setIsValidated(sampleData.validated_annotations);
@@ -477,6 +493,11 @@ export function SampleProvider({
     };
   }, [projectId, sampleId, dataParams, viewParams, plotProps]);
 
+  const syncAnnotationsFromServer = useCallback((fetched: Annotation[]) => {
+    setAnnotations(fetched);
+    setServerAnnotations(fetched);
+  }, []);
+
   const annotationLabels =
     project?.task === TaskType.Video
       ? (project.video_bounding_box_labels || []).map((name, i) => ({
@@ -490,6 +511,7 @@ export function SampleProvider({
     sample,
     data,
     annotations,
+    serverAnnotations,
     dataParams,
     viewParams,
     plotProps,
@@ -499,7 +521,9 @@ export function SampleProvider({
     isValidated,
     error,
     errorStatus,
+    canAnnotate,
     setAnnotations,
+    syncAnnotationsFromServer,
     setPlotProps,
     setViewParams,
     setDataParams,

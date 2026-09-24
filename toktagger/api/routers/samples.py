@@ -4,13 +4,14 @@ from typing import Literal
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
 
 from toktagger.api.auth.dependencies import (
-    get_current_user,
+    require_password_changed,
     require_project_admin_role,
     require_project_annotator,
     require_project_viewer,
 )
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.crud import utils
+from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
 from toktagger.api.schemas.annotations import (
     RESERVED_CREATED_BY_PREFIXES,
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/projects/{project_id}/samples",
     tags=["Samples"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_password_changed)],
 )
 
 
@@ -69,7 +70,7 @@ async def get_samples(
     Get the full list of samples available for this project.
     --------------------------------------------------------
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     samples = await utils.get_samples(
         db_client=db_client,
         project_id=project_id,
@@ -116,12 +117,9 @@ async def add_samples(
     # Remove annotations (if they exist), these will be added later
     all_annotations = [sample.annotations for sample in samples]
 
-    # Annotations that arrive with a sample are attributed to the caller, exactly as
-    # they are on the import and save routes in routers/annotations.py: the created_by
-    # in the request body is a client-side placeholder ("manual"), and storing it would
-    # leave the annotations table naming a user who does not exist. Synthetic authorship
-    # is preserved, so a project can still be seeded with model predictions, and the
-    # internal Ray-worker user keeps whatever it supplies.
+    # Attribute to the caller, as on the import/save routes in routers/annotations.py:
+    # the incoming created_by is a client-side placeholder ("manual"), not a real user.
+    # Synthetic authorship (model predictions) is preserved so seeding still works.
     is_internal = current_user.username == "__internal__"
     for annotation_list in all_annotations:
         for annotation in annotation_list or []:
@@ -225,7 +223,7 @@ async def update_samples(
     `validated_annotations`, which is annotation progress rather than sample
     configuration, and the save/clear flow sets it on every annotation round-trip.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client, project_id)
 
     for sample_batch_item in sample_batch:
@@ -273,7 +271,7 @@ async def get_next_sample(
     # Should use the query strategy, which access the database to determine the next sample to annotate
     # This should then be passed in to the /data endpoint to get required data for visualisation
     # And the /annotation endpoint to get initial prediction (if available)
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
     samples = await utils.get_samples(
         db_client,
@@ -304,7 +302,7 @@ async def get_sample_summary(
 
     This includes total number of samples, min and max shot IDs, and sample data type.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     summary = await utils.get_sample_summary(db_client, project_id)
     return summary
 
@@ -329,7 +327,7 @@ async def get_sample(
     Get the specified sample from this project.
     --------------------------------------------
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Check project exists
     project = await utils.get_project(db_client, project_id)
     # Get specified sample
@@ -364,7 +362,7 @@ async def remove_sample(
     # Remove samples from the project
     # Dont envisage this actually deleting the data stored about these samples
     # But do we need a separate method for that?
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Check project exists
     await utils.get_project(db_client, project_id=project_id)
 
@@ -391,7 +389,7 @@ async def remove_all_samples(
 
     Project-admin only, as with the single-sample delete above.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Check project exists
     await utils.get_project(db_client, project_id=project_id)
 

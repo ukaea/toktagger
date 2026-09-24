@@ -3,7 +3,11 @@
 import React, { createContext, useContext } from "react";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { deleteSampleAnnotations } from "@/app/core";
+import {
+  deleteAnnotationsByIds,
+  deleteSampleAnnotations,
+  removedAnnotationIds,
+} from "@/app/core";
 import { type Annotation, type NavAdapter } from "@/types";
 
 const NavAdapterContext = createContext<NavAdapter | null>(null);
@@ -26,10 +30,28 @@ export function useNavAdapterOptional(): NavAdapter | null {
   return useContext(NavAdapterContext);
 }
 
+// Handles deletions explicitly since a batch save only replaces the caller's own annotations.
+export function useSyncRemovals(): () => Promise<void> {
+  const { annotations, serverAnnotations, project, sample } = useSample();
+  const { user } = useAuth();
+
+  return async () => {
+    if (!project?._id || !sample?._id) return;
+    const removed = removedAnnotationIds(
+      serverAnnotations,
+      annotations,
+      user?.username,
+    );
+    if (removed.length === 0) return;
+    await deleteAnnotationsByIds(project._id, sample._id, removed);
+  };
+}
+
 export function useNavAdapter(): NavAdapter {
   const navAdapter = useNavAdapterOptional();
   const { annotations, setAnnotations, project, sample } = useSample();
   const { user } = useAuth();
+  const syncRemovals = useSyncRemovals();
 
   if (navAdapter) {
     return navAdapter;
@@ -37,6 +59,7 @@ export function useNavAdapter(): NavAdapter {
 
   return {
     getAnnotations: () => annotations,
+    syncRemovals,
     afterSave: () => {
       // Mirrors the server-side validation so saved annotator output isn't discarded.
       setAnnotations((previousAnnotations: Annotation[]) =>
@@ -47,10 +70,7 @@ export function useNavAdapter(): NavAdapter {
       );
     },
     clear: async (includeOthers?: boolean) => {
-      // Clearing what the user can see means clearing other users' annotations and
-      // model predictions too. A save cannot do that - its replace step is scoped to
-      // the caller's own created_by - so they are deleted here explicitly, and the
-      // local view is only emptied once that succeeds.
+      // Deleted explicitly since a save's replace step is scoped to the caller's own created_by.
       if (includeOthers) {
         if (project?._id && sample?._id) {
           await deleteSampleAnnotations(project._id, sample._id);
@@ -59,10 +79,7 @@ export function useNavAdapter(): NavAdapter {
         return;
       }
 
-      // "Show others" is off, so the user can only see their own annotations and
-      // only those are cleared. They are removed from the local view alone; the save
-      // that follows is what deletes them server-side. "manual" is the placeholder
-      // used until the auth context resolves, so it belongs to whoever is drawing.
+      // "manual" is the placeholder created_by used until the auth context resolves.
       setAnnotations((previousAnnotations: Annotation[]) =>
         previousAnnotations.filter(
           (annotation) =>

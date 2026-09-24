@@ -20,6 +20,22 @@ def create_app():
     return server.app
 
 
+def apply_cli_overrides(settings, args) -> None:
+    """Let explicit command-line flags win over the loaded configuration.
+
+    Only flags the user actually passed: an argparse default would otherwise
+    overwrite whatever the TOML file or the environment supplied.
+    """
+    if args.host is not None:
+        settings.server.host = args.host
+    if args.port is not None:
+        settings.server.port = args.port
+    if args.workers is not None:
+        settings.server.workers = args.workers
+    if args.reload:
+        settings.server.reload = True
+
+
 def do_open_browser(host: str, port: int):
     time.sleep(1)  # allow server to start
     display_host = "localhost" if host == "0.0.0.0" else host
@@ -36,10 +52,8 @@ def main():
 
     """)
     argparser = argparse.ArgumentParser(description="Run the FastAPI application")
-    argparser.add_argument("--host", default="localhost", help="Host to run the app on")
-    argparser.add_argument(
-        "--port", default=8002, type=int, help="Port to run the app on"
-    )
+    argparser.add_argument("--host", help="Host to run the app on")
+    argparser.add_argument("--port", type=int, help="Port to run the app on")
     argparser.add_argument(
         "--no-browser", action="store_true", help="Don't open a browser"
     )
@@ -50,23 +64,16 @@ def main():
     )
     argparser.add_argument(
         "--workers",
-        default=1,
         type=int,
         help="Number of Gunicorn worker processes (use 1 for single-worker uvicorn dev mode)",
     )
     args = argparser.parse_args()
-    open_browser = not args.no_browser
-    if open_browser:
-        threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
+    apply_cli_overrides(settings, args)
 
-    if args.host:
-        settings.server.host = args.host
-    if args.port:
-        settings.server.port = args.port
-    if args.reload:
-        settings.server.reload = args.reload
-    if args.workers:
-        settings.server.workers = args.workers
+    if not args.no_browser:
+        threading.Thread(
+            target=do_open_browser, args=(settings.server.host, settings.server.port)
+        ).start()
 
     if settings.server.workers > 1:
         if settings.server.reload:

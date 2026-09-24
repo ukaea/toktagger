@@ -28,8 +28,10 @@ const SampleView = () => {
     return isLoading ? <LoadingView /> : <TimeSeriesView />;
   if (project.task === TaskType.Video)
     return isLoading && !data ? <LoadingView /> : <VideoView />;
+  // Only swap in the loading view before there is anything to show: doing it on a
+  // background refetch unmounts the view and loses annotations not yet synced to the sample.
   if (project.task === TaskType.Profile2D)
-    return isLoading ? <LoadingView /> : <Profile2dView />;
+    return isLoading && !data ? <LoadingView /> : <Profile2dView />;
   return null;
 };
 
@@ -56,7 +58,17 @@ function SamplePageContent(props: { sampleId: string }) {
           },
           { key: "samples", label: `Shot: ${sample.shot_id}` },
         ]
-      : [{ key: "projects", label: "Projects", href: "/ui/projects" }],
+      : error
+        ? [
+            { key: "projects", label: "Projects", href: "/ui/projects" },
+            {
+              key: "denied",
+              label: errorStatus === 403 ? "Access Denied" : "Error",
+            },
+          ]
+        : // Spectrum renders the last breadcrumb as the (unclickable) current
+          // page, so a single "Projects" crumb here can't act as a link.
+          [{ key: "projects", label: "Projects", href: "/ui/projects" }],
   );
 
   // Early returns AFTER all hooks

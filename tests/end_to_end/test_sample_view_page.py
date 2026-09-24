@@ -4,6 +4,7 @@ pytest.importorskip("playwright")
 import json
 import pathlib
 import tempfile
+import threading
 import time
 
 import pytest
@@ -584,6 +585,53 @@ def test_new_annotation_is_attributed_to_signed_in_user(server_setup, page: Page
     expect(annotations_table.get_by_role("gridcell", name="manual")).to_have_count(0)
 
 
+def test_deleting_another_authors_annotation_is_saved(server_setup, page: Page):
+    """Deleting an annotation the user does not own survives a save and a reload.
+
+    The batch save replaces only the caller's own annotations, so the removal has to
+    be sent as an explicit delete - otherwise the annotation reappears on refresh.
+    """
+    page, project_id, sample_ids = setup_annotations(page, 1)
+    sample_id = sample_ids[0]
+
+    # Plotly's drag layer sits over the annotation until the view is in edit mode.
+    page.get_by_role("button", name="View Mode").click()
+    page.locator("body").click()
+    annotation = page.get_by_label("time-zone").first
+    expect(annotation).to_be_visible()
+    annotation.click(button="right")
+    page.get_by_role("menuitem", name="Delete").click()
+    expect(page.get_by_label("time-zone")).to_have_count(0)
+
+    with page.expect_response(
+        lambda response: (
+            response.request.method == "DELETE" and "/annotations/" in response.url
+        )
+    ):
+        page.get_by_role("button", name="Save").click()
+
+    page.reload()
+    expect(page.get_by_label("time-zone")).to_have_count(0)
+
+    response = session.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    )
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def _confirm_clear(page: Page):
+    """Press Clear and confirm it in the dialog that asks.
+
+    Named rather than scoped by role alone, because Spectrum's toasts are
+    alertdialogs too and a save toast may still be on screen.
+    """
+    page.get_by_role("button", name="Clear", exact=True).click()
+    page.get_by_role("alertdialog", name="Clear annotations?").get_by_role(
+        "button", name="Clear", exact=True
+    ).click()
+
+
 def test_clear_button_showing_others_clears_everything(server_setup, page: Page):
     """With "Show Others' Annotations" on, Clear discards every annotation shown.
 
@@ -608,7 +656,7 @@ def test_clear_button_showing_others_clears_everything(server_setup, page: Page)
     expect(page.get_by_text("Annotations Validated")).to_be_visible()
 
     # Press Clear - everything on display goes, whoever created it
-    page.get_by_role("button", name="Clear").click()
+    _confirm_clear(page)
 
     expect(page.get_by_label("time-point")).to_have_count(0)
     expect(page.get_by_label("time-zone")).to_have_count(0)
@@ -637,7 +685,7 @@ def test_clear_button_hiding_others_clears_own_only(server_setup, page: Page):
     expect(page.get_by_label("time-zone")).to_have_count(0)
     expect(page.get_by_label("time-point").first).to_be_visible()
 
-    page.get_by_role("button", name="Clear").click()
+    _confirm_clear(page)
     expect(page.get_by_label("time-point")).to_have_count(0)
     expect(page.get_by_text("Annotations Not Validated")).to_be_visible()
 
@@ -1082,3 +1130,44 @@ def test_validated_alertbox(server_setup, page: Page):
         f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[3]}"
     )
     expect(page.get_by_text("Annotations Validated")).to_be_visible()
+
+
+def test_viewer_controls_start_disabled_before_the_role_resolves(
+    server_setup, admin_token, browser
+):
+    """Save must not be enabled during the window where the role is still unknown.
+
+    The membership request is held open so the window is deterministic rather than a
+    race. Defaulting to open here meant a viewer could press Save on every project
+    they opened and only be stopped by the resulting 403.
+    """
+    username = "rolewindow_viewer"
+    create_user(username, f"{username}_pass123")
+    project_id = create_project("Role Window Project", "time-series", "tabular")
+    sample_ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    sample_id = sample_ids[0]
+    add_project_member(project_id, username, role="viewer")
+
+    user_page = login_as(browser, username, f"{username}_pass123")
+
+    release = threading.Event()
+
+    def hold_members(route):
+        release.wait(timeout=15)
+        route.continue_()
+
+    user_page.route(f"**/projects/{project_id}/members", hold_members)
+    user_page.goto(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}"
+    )
+
+    save_button = user_page.get_by_role("button", name="Save")
+    expect(save_button).to_be_disabled()
+
+    release.set()
+    # Still disabled once the role lands, since they really are a viewer.
+    expect(save_button).to_be_disabled()
+
+    user_page.context.close()

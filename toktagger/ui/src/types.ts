@@ -1,4 +1,4 @@
-import { PlotlyHTMLElement } from "plotly.js";
+import { Config, PlotlyHTMLElement } from "plotly.js";
 import { z } from "zod/v4";
 
 export const BaseAnnotationSchema = z.object({
@@ -45,10 +45,19 @@ export const BoundingBoxSchema = BaseAnnotationSchema.extend({
 
 export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 
-export const VideoBoundingBoxSchema = BaseAnnotationSchema.extend({
-  type: z.literal("video_bounding_box"),
+export const VideoAnnotationBaseSchema = BaseAnnotationSchema.extend({
   frame: z.number().int(),
   track_id: z.string(), // force string
+});
+
+export const VideoFrameLabelSchema = VideoAnnotationBaseSchema.extend({
+  type: z.literal("video_frame_label"),
+});
+
+export type VideoFrameLabel = z.infer<typeof VideoFrameLabelSchema>;
+
+export const VideoBoundingBoxSchema = VideoAnnotationBaseSchema.extend({
+  type: z.literal("video_bounding_box"),
   height: z.number().int(),
   width: z.number().int(),
   x_min: z.number().int(),
@@ -78,19 +87,15 @@ export const PolygonSchema = BaseAnnotationSchema.extend({
 
 export type Polygon = z.infer<typeof PolygonSchema>;
 
-export const VideoPolygonSchema = BaseAnnotationSchema.extend({
+export const VideoPolygonSchema = VideoAnnotationBaseSchema.extend({
   type: z.literal("video_polygon"),
-  frame: z.number().int(),
-  track_id: z.string(),
   segmentation: z.array(VideoPolygonCoordinatesSchema).length(1),
 });
 
 export type VideoPolygon = z.infer<typeof VideoPolygonSchema>;
 
-export const VideoPointSchema = BaseAnnotationSchema.extend({
+export const VideoPointSchema = VideoAnnotationBaseSchema.extend({
   type: z.literal("video_point"),
-  frame: z.number().int(),
-  track_id: z.string(),
   x: z.number().int(),
   y: z.number().int(),
 });
@@ -106,6 +111,7 @@ export const AnnotationSchema = z.union([
   VideoBoundingBoxSchema,
   VideoPolygonSchema,
   VideoPointSchema,
+  VideoFrameLabelSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
@@ -115,6 +121,8 @@ export type NavAdapter = {
   // caller's own. The Clear button passes the "Show Others' Annotations" state, so
   // what the button discards is always what the user can see.
   clear: (includeOthers?: boolean) => void | Promise<void>;
+  // Deletes the annotations the user removed that a save cannot remove for them.
+  syncRemovals?: () => Promise<void>;
   afterSave?: () => void;
 };
 
@@ -400,10 +408,6 @@ export type TimeSeriesAnnotation = {
   signal_name?: string | null;
 };
 
-// ---------------------------------------------------------------------------
-// Auth / User types
-// ---------------------------------------------------------------------------
-
 export const CurrentUserSchema = z.object({
   _id: z.string(),
   username: z.string(),
@@ -413,15 +417,21 @@ export const CurrentUserSchema = z.object({
 });
 export type CurrentUser = z.infer<typeof CurrentUserSchema>;
 
+// Mirrors the backend's ProjectMember, as GET /users/me/memberships returns it.
 export const ProjectMemberSchema = z.object({
-  _id: z.string(),
   project_id: z.string(),
   user_id: z.string(),
-  username: z.string(),
   role: z.enum(["admin", "annotator", "viewer"]),
   show_others_annotations: z.boolean(),
 });
 export type ProjectMember = z.infer<typeof ProjectMemberSchema>;
+
+// Mirrors ProjectMemberOut: what GET /projects/{id}/members adds for the member list.
+export const ProjectMemberOutSchema = ProjectMemberSchema.extend({
+  _id: z.string(),
+  username: z.string(),
+});
+export type ProjectMemberOut = z.infer<typeof ProjectMemberOutSchema>;
 
 export type ToolingCallbacks = {
   start: (
@@ -432,10 +442,11 @@ export type ToolingCallbacks = {
   ) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
-  hover?: (x: number, y: number) => void;
-  // Discards any in-progress annotation and resets tool-local state - called when a draw
-  // is abandoned (tool switched mid-draw, Escape pressed) rather than completed normally
+  hover?: (x: number, y: number, axisSize: { x: number; y: number }) => void;
+  // Called when a draw is abandoned (tool switched or Escape pressed) instead of finished
   cancel?: () => void;
+  // Alternative gesture for finishing an in-progress shape (e.g. double-click to close a polygon)
+  doubleClick?: (x: number, y: number) => void;
 };
 
 export type PlotProps = {
@@ -453,6 +464,7 @@ type PlotlyAxisTransforms = {
 };
 export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
   _fullLayout: Record<string, PlotlyAxisTransforms>;
+  _context: { doubleClick: Config["doubleClick"] };
 }
 
 export interface SelectionRange {
