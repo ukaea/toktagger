@@ -1,11 +1,13 @@
-import webbrowser
 import argparse
-from toktagger.api.main import Server
-import toktagger.api.config as config
-from toktagger.api.models import models_dependencies_installed
-import uvicorn
-import time
 import threading
+import time
+import webbrowser
+
+import uvicorn
+
+from toktagger.api.config import settings
+from toktagger.api.main import Server, run_with_gunicorn
+from toktagger.api.models import models_dependencies_installed
 
 
 # Need to point to app as a module level string if we want reload option
@@ -18,9 +20,26 @@ def create_app():
     return server.app
 
 
+def apply_cli_overrides(settings, args) -> None:
+    """Let explicit command-line flags win over the loaded configuration.
+
+    Only flags the user actually passed: an argparse default would otherwise
+    overwrite whatever the TOML file or the environment supplied.
+    """
+    if args.host is not None:
+        settings.server.host = args.host
+    if args.port is not None:
+        settings.server.port = args.port
+    if args.workers is not None:
+        settings.server.workers = args.workers
+    if args.reload:
+        settings.server.reload = True
+
+
 def do_open_browser(host: str, port: int):
     time.sleep(1)  # allow server to start
-    webbrowser.open(f"http://{host}:{port}/ui/projects")
+    display_host = "localhost" if host == "0.0.0.0" else host
+    webbrowser.open(f"http://{display_host}:{port}/ui/projects")
 
 
 def main():
@@ -33,39 +52,45 @@ def main():
 
     """)
     argparser = argparse.ArgumentParser(description="Run the FastAPI application")
-    argparser.add_argument(
-        "--host", help="Host to run the app on, by default localhost"
-    )
-    argparser.add_argument(
-        "--port", type=int, help="Port to run the app on, by default 8002"
-    )
+    argparser.add_argument("--host", help="Host to run the app on")
+    argparser.add_argument("--port", type=int, help="Port to run the app on")
     argparser.add_argument(
         "--no-browser", action="store_true", help="Don't open a browser"
     )
     argparser.add_argument(
         "--reload",
         action="store_true",
-        help="Reload the API on changes, by default False",
+        help="Reload the API on changes (single-worker uvicorn only)",
+    )
+    argparser.add_argument(
+        "--workers",
+        type=int,
+        help="Number of Gunicorn worker processes (use 1 for single-worker uvicorn dev mode)",
     )
     args = argparser.parse_args()
-    open_browser = not args.no_browser
-    if open_browser:
-        threading.Thread(target=do_open_browser, args=(args.host, args.port)).start()
+    apply_cli_overrides(settings, args)
 
-    if args.host:
-        config.settings.server.host = args.host
-    if args.port:
-        config.settings.server.port = args.port
-    if args.reload:
-        config.settings.server.reload = args.reload
+    if not args.no_browser:
+        threading.Thread(
+            target=do_open_browser, args=(settings.server.host, settings.server.port)
+        ).start()
 
-    uvicorn.run(
-        "toktagger.api.cli:create_app",
-        factory=True,
-        host=config.settings.server.host,
-        port=config.settings.server.port,
-        reload=config.settings.server.reload,
-    )
+    if settings.server.workers > 1:
+        if settings.server.reload:
+            print("Warning: --reload is ignored when --workers > 1 (gunicorn mode)")
+        run_with_gunicorn(
+            settings.server.host,
+            settings.server.port,
+            settings.server.workers,
+        )
+    else:
+        uvicorn.run(
+            "toktagger.api.cli:create_app",
+            factory=True,
+            host=settings.server.host,
+            port=settings.server.port,
+            reload=settings.server.reload,
+        )
 
 
 if __name__ == "__main__":

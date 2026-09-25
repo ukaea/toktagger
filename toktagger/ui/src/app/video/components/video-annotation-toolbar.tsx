@@ -35,6 +35,7 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
     setDrawingTool,
     editMode,
     setEditMode,
+    canAnnotate,
     hideAnnotations,
   } = useVideoSession();
   const { isLoading } = useSample();
@@ -52,7 +53,8 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
     viewport.applyConstraints();
   };
 
-  const toolsDisabled = !editMode || hideAnnotations || isFramePending;
+  const toolsDisabled =
+    !canAnnotate || !editMode || hideAnnotations || isFramePending;
   const modeVariant: "accent" | "primary" = editMode ? "accent" : "primary";
 
   return (
@@ -68,15 +70,17 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
           <Button
             width="size-1600"
             variant={modeVariant}
-            isDisabled={hideAnnotations}
+            isDisabled={hideAnnotations || !canAnnotate}
             onPress={() => setEditMode(!editMode)}
           >
             {editMode ? "Edit Mode" : "View Mode"}
           </Button>
           <Tooltip>
-            {editMode
-              ? "Return to View Mode (shortcut: e)"
-              : "Enter Edit Mode (shortcut: e)"}
+            {!canAnnotate
+              ? "You have view-only access to this project - annotations cannot be edited"
+              : editMode
+                ? "Return to View Mode (shortcut: e)"
+                : "Enter Edit Mode (shortcut: e)"}
           </Tooltip>
         </TooltipTrigger>
 

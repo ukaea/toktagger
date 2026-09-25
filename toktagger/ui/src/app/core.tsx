@@ -12,13 +12,84 @@ import type {
 } from "@/types";
 import { RJSFSchema } from "@rjsf/utils";
 
-export let BACKEND_API_URL = "http://localhost:8002";
+// Empty in a production build so requests stay on whatever origin served the app,
+// which is what lets the session cookie be sent under any hostname or scheme.
+export let BACKEND_API_URL = import.meta.env.DEV ? "http://localhost:8002" : "";
 if (import.meta.env.VITE_DATA_API_URL) {
   BACKEND_API_URL = import.meta.env.VITE_DATA_API_URL;
 }
 
+const CSRF_COOKIE = "tt_csrf";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+let onUnauthorized: (() => void) | null = null;
+
+// Registered by AuthProvider. The session cookie can expire at any point and is
+// unreadable from here, so a 401 is the only signal that it has gone.
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
+export async function apiFetch(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  // The session token lives in an httpOnly cookie the browser attaches itself, so
+  // credentials must be included even cross-origin against the dev server.
+  const method = (options.method ?? "GET").toUpperCase();
+  const csrf = SAFE_METHODS.has(method) ? null : readCookie(CSRF_COOKIE);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options.headers as Record<string, string>) ?? {}),
+    ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+  };
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    onUnauthorized?.();
+  }
+  return response;
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+// Fetch helpers below cast the response body directly, so a non-2xx response
+// (e.g. 403 for a project you're not a member of) would otherwise be silently
+// cast as if it were valid data. Call this before reading the body so callers
+// get a real error to catch instead of garbage state.
+export async function ensureOk(response: Response): Promise<Response> {
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const body = await response.json();
+      if (body && typeof body.detail === "string") {
+        detail = body.detail;
+      }
+    } catch {
+      // Body wasn't JSON — fall back to statusText.
+    }
+    throw new ApiError(response.status, detail);
+  }
+  return response;
+}
+
 export const getURL = async (url: string) => {
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   const payload = await response.json();
   return payload;
 };
@@ -27,7 +98,7 @@ export async function getSamplesSummary(
   project_id: string,
 ): Promise<SamplesSummary> {
   const url = `${BACKEND_API_URL}/projects/${project_id}/samples/summary`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   const data = await response.json();
   const summary = data as SamplesSummary;
   return summary;
@@ -51,7 +122,7 @@ export const getSamples = async (
   }
 
   const url = `${BACKEND_API_URL}/projects/${project_id}/samples?${params.toString()}`;
-  const response = await fetch(url);
+  const response = await ensureOk(await apiFetch(url));
   const data = await response.json();
   const samples = data as Sample[];
   return samples;
@@ -61,7 +132,7 @@ export const getSample = async (
   project_id: string,
   sample_id: string,
 ): Promise<Sample> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
   );
   const data = await response.json();
@@ -82,7 +153,7 @@ export const getNextSample = async (
   const NEXT_URL =
     `${BACKEND_API_URL}/projects/${project_id}/samples/next` +
     (params.toString() ? `?${params.toString()}` : "");
-  const sampleResult = await fetch(NEXT_URL, {
+  const sampleResult = await apiFetch(NEXT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -117,25 +188,25 @@ export const getProjects = async (
     params.append("name", name);
   }
 
-  const response = await fetch(
-    `${BACKEND_API_URL}/projects?${params.toString()}`,
+  const response = await ensureOk(
+    await apiFetch(`${BACKEND_API_URL}/projects?${params.toString()}`),
   );
   const data = await response.json();
   const projects = data as Project[];
   return projects;
 };
 
-export const getProject = async (
-  project_id: string,
-): Promise<Project | null> => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}`);
+export const getProject = async (project_id: string): Promise<Project> => {
+  const response = await ensureOk(
+    await apiFetch(`${BACKEND_API_URL}/projects/${project_id}`),
+  );
   const data = await response.json();
   const project = data as Project;
   return project;
 };
 
 export const deleteProject = async (project_id: string) => {
-  const response = await fetch(`${BACKEND_API_URL}/projects/${project_id}`, {
+  const response = await apiFetch(`${BACKEND_API_URL}/projects/${project_id}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -148,7 +219,7 @@ export const deleteProject = async (project_id: string) => {
 
 export async function getShotSample(project_id: string, shot_id: string) {
   const NEXT_URL = `${BACKEND_API_URL}/projects/${project_id}/samples?shot_id=${shot_id}`;
-  const sampleResult = await fetch(NEXT_URL);
+  const sampleResult = await apiFetch(NEXT_URL);
   const sampleArray = await sampleResult.json();
   let sample = null;
   if (sampleArray.length > 0) {
@@ -162,7 +233,7 @@ export async function getAnnotationsForSample(
   sample_id: string,
 ): Promise<Annotation[]> {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`;
-  const response = await fetch(ANNOTATIONS_URL);
+  const response = await apiFetch(ANNOTATIONS_URL);
   if (!response.ok) {
     throw new Error(`Failed to fetch annotations: ${response.statusText}`);
   }
@@ -174,7 +245,7 @@ export async function getAnnotations(
   project_id: string,
 ): Promise<Annotation[]> {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
-  const response = await fetch(ANNOTATIONS_URL);
+  const response = await apiFetch(ANNOTATIONS_URL);
   if (!response.ok) {
     throw new Error(`Failed to fetch annotations: ${response.statusText}`);
   }
@@ -187,18 +258,26 @@ export async function saveSampleAnnotations(
   sample_id: string,
   annotations: Annotation[],
   saveOnNavigate: boolean = true,
+  username?: string,
 ) {
   if (!saveOnNavigate) {
     return;
   }
-  // Saving validates annotations without changing their creator metadata.
+  // A save validates a brand-new annotation (no _id yet - a hand-drawn shape, or an
+  // annotator's just-run, not-yet-saved suggestion, whose _id may be absent from the
+  // response rather than explicitly null) or the caller's own existing work. A
+  // pre-existing annotation belonging to someone else is sent back as loaded, so an
+  // edit to it persists without the save claiming they validated it.
   const updatedAnnotations = annotations.map((annotation: Annotation) => ({
     ...annotation,
-    validated: true,
+    validated:
+      !annotation._id || annotation.created_by === username
+        ? true
+        : annotation.validated,
   }));
 
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations?validated=True`;
-  const response = await fetch(ANNOTATIONS_URL, {
+  const response = await apiFetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -206,8 +285,71 @@ export async function saveSampleAnnotations(
     body: JSON.stringify(updatedAnnotations),
   });
   if (!response.ok) {
-    throw new Error(`Failed to save annotations: ${response.statusText}`);
+    throw new ApiError(
+      response.status,
+      `Failed to save annotations: ${response.statusText}`,
+    );
   }
+}
+
+// Removes every annotation on the sample, whoever created it. The batch save (PUT)
+// only replaces the caller's own annotations, so clearing another user's - or a
+// model's - has to be an explicit call.
+export async function deleteSampleAnnotations(
+  project_id: string,
+  sample_id: string,
+): Promise<void> {
+  await ensureOk(
+    await apiFetch(
+      `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`,
+      { method: "DELETE" },
+    ),
+  );
+}
+
+// IDs the user removed locally that the batch save cannot remove for them: the PUT
+// replaces only their own annotations, so another author's - or a model's - survives.
+export function removedAnnotationIds(
+  serverAnnotations: Annotation[],
+  keptAnnotations: Annotation[],
+  username: string | undefined,
+): string[] {
+  const keptIds = new Set(
+    keptAnnotations.map((annotation) => annotation._id).filter(Boolean),
+  );
+  return serverAnnotations
+    .filter(
+      (annotation) =>
+        annotation._id !== null &&
+        !keptIds.has(annotation._id) &&
+        annotation.created_by !== username,
+    )
+    .map((annotation) => annotation._id as string);
+}
+
+// A removed annotation the caller does not own outlives the batch save: the PUT's
+// replace step is scoped to the caller's own created_by. Delete those explicitly so
+// removing a colleague's annotation persists, as Clear already does. A 404 means it
+// is already gone, which is the state being asked for.
+export async function deleteAnnotationsByIds(
+  project_id: string,
+  sample_id: string,
+  annotation_ids: string[],
+): Promise<void> {
+  await Promise.all(
+    annotation_ids.map(async (annotation_id) => {
+      const response = await apiFetch(
+        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations/${annotation_id}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok && response.status !== 404) {
+        throw new ApiError(
+          response.status,
+          `Failed to delete annotation: ${response.statusText}`,
+        );
+      }
+    }),
+  );
 }
 
 export async function saveAnnotations(
@@ -215,7 +357,7 @@ export async function saveAnnotations(
   annotations: Annotation[],
 ) {
   const ANNOTATIONS_URL = `${BACKEND_API_URL}/projects/${project_id}/annotations`;
-  const response = await fetch(ANNOTATIONS_URL, {
+  const response = await apiFetch(ANNOTATIONS_URL, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -286,7 +428,7 @@ export const exportAnnotations = async (project: Project, sample?: Sample) => {
 };
 
 export const deleteSample = async (project_id: string, sample_id: string) => {
-  await fetch(
+  await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
     {
       method: "DELETE",
@@ -299,7 +441,7 @@ export const updateSample = async (
   sample_id: string,
   updates: SampleUpdate,
 ) => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples`,
     {
       method: "PUT",
@@ -320,7 +462,7 @@ export const updateSample = async (
 };
 
 export const deleteSamples = async (project_id: string) => {
-  await fetch(`${BACKEND_API_URL}/projects/${project_id}/samples`, {
+  await apiFetch(`${BACKEND_API_URL}/projects/${project_id}/samples`, {
     method: "DELETE",
   });
 };
@@ -331,7 +473,7 @@ export const startTraining = async (
   useGPU: boolean,
   params: Record<string, unknown>,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?use_gpu=${useGPU}`,
     {
       method: "PUT",
@@ -349,7 +491,7 @@ export const stopTraining = async (
   selected_model: string,
   version: number,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?version=${version}`,
     {
       method: "DELETE",
@@ -369,7 +511,7 @@ export const startPredictions = async (
   use_gpu: boolean,
   params: Record<string, unknown>,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}&use_gpu=${use_gpu}`,
     {
       method: "POST",
@@ -390,7 +532,7 @@ export const startSamplePredictions = async (
   params: Record<string, unknown>,
   data_params: DataParams,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict?use_gpu=${use_gpu}`,
     {
       method: "POST",
@@ -409,7 +551,7 @@ export const getSamplePredictions = async (
   selected_model: string,
   task_id: string,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict/${task_id}`,
     {
       method: "GET",
@@ -422,7 +564,7 @@ export const getSamplePredictions = async (
 };
 
 export const getModels = async (project_id: string): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/models`,
   );
   return response;
@@ -432,7 +574,7 @@ export const getModelSchema = async (
   modelName: string,
   schemaType: string,
 ): Promise<RJSFSchema | null> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/meta/models/${modelName}/${schemaType}`,
   );
   if (!response.ok) {
@@ -459,7 +601,9 @@ export const getModelPredictSchema = async (
 };
 
 export const getModelTypes = async (task: string): Promise<Response> => {
-  const response = await fetch(`${BACKEND_API_URL}/meta/models?task=${task}`);
+  const response = await apiFetch(
+    `${BACKEND_API_URL}/meta/models?task=${task}`,
+  );
   if (!response.ok) {
     throw new Error(`Failed to fetch model types!`);
   }
@@ -467,7 +611,7 @@ export const getModelTypes = async (task: string): Promise<Response> => {
 };
 
 export const getModelLoadTypes = async (): Promise<Response> => {
-  const response = await fetch(`${BACKEND_API_URL}/meta/models/load`);
+  const response = await apiFetch(`${BACKEND_API_URL}/meta/models/load`);
   if (!response.ok) {
     throw new Error(`Failed to fetch model types!`);
   }
@@ -477,7 +621,7 @@ export const getModelLoadTypes = async (): Promise<Response> => {
 export const getModelLoadAllowedIds = async (
   load_method: string,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/meta/models/load/${load_method}`,
   );
   if (!response.ok) {
@@ -492,7 +636,7 @@ export const startLoadModelWeights = async (
   selected_model: string,
   params: LocalLoadForm | GitlabLoadForm,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/${load_type}`,
     {
       method: "POST",
@@ -511,7 +655,7 @@ export const getLoadModelStatus = async (
   selected_model: string,
   task_id: string,
 ): Promise<Response> => {
-  const response = await fetch(
+  const response = await apiFetch(
     `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/load/${task_id}`,
     {
       method: "GET",

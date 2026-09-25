@@ -1,7 +1,7 @@
-from pydantic import Field, field_validator, computed_field
-from typing import Optional, List
 from enum import Enum
+from typing import Literal
 
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas import ConfiguredModel
@@ -36,27 +36,27 @@ class ProjectIn(ConfiguredModel):
         description="The type of data which will need to be loaded for this project.",
     )
 
-    time_min: Optional[float] = Field(
+    time_min: float | None = Field(
         None,
         description="The minimum time (in seconds) for samples in this project.",
     )
 
-    time_max: Optional[float] = Field(
+    time_max: float | None = Field(
         None,
         description="The maximum time (in seconds) for samples in this project.",
     )
 
-    min_time_step: Optional[float] = Field(
+    min_time_step: float | None = Field(
         None,
         description="The minimum time step (in seconds) between samples in this project.",
     )
 
-    shot_labels: Optional[List[str]] = Field(
+    shot_labels: list[str] | None = Field(
         default=["Valid", "Invalid"],
         description="The list of labels to use for shot labelling (if applicable).",
     )
 
-    time_region_labels: Optional[List[str]] = Field(
+    time_region_labels: list[str] | None = Field(
         default=[
             "ELM",
             "L-mode",
@@ -78,7 +78,7 @@ class ProjectIn(ConfiguredModel):
         description="The list of labels to use for time region labelling (if applicable).",
     )
 
-    time_point_labels: Optional[List[str]] = Field(
+    time_point_labels: list[str] | None = Field(
         default=[
             "Disruption",
             "Thermal Quench",
@@ -90,17 +90,17 @@ class ProjectIn(ConfiguredModel):
         description="The list of labels to use for time point labelling (if applicable).",
     )
 
-    bounding_box_labels: Optional[List[str]] = Field(
+    bounding_box_labels: list[str] | None = Field(
         default=["NTM", "LLM", "Sawteeth", "Locked Mode"],
         description="The list of labels to use for bounding box labelling (if applicable).",
     )
 
-    polygon_labels: Optional[List[str]] = Field(
+    polygon_labels: list[str] | None = Field(
         default=["NTM", "LLM", "Sawteeth", "Locked Mode"],
         description="The list of labels to use for polygon labelling (if applicable).",
     )
 
-    video_bounding_box_labels: Optional[List[str]] = Field(
+    video_bounding_box_labels: list[str] | None = Field(
         default=[
             "UFO",
             "Minor UFO",
@@ -113,7 +113,7 @@ class ProjectIn(ConfiguredModel):
 
     @computed_field
     @property
-    def model_types(self) -> List[str]:
+    def model_types(self) -> list[str]:
         from toktagger.api.models import models_dependencies_installed
 
         if not models_dependencies_installed():
@@ -134,3 +134,27 @@ class ProjectIn(ConfiguredModel):
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
+
+
+class ProjectMember(ConfiguredModel):
+    role: Literal["admin", "annotator", "viewer"] = "annotator"
+    show_others_annotations: bool = True
+
+
+class ProjectMemberOut(ConfiguredModel):
+    id: str = Field(..., alias="_id")
+    project_id: str
+    user_id: str
+    username: str
+    role: Literal["admin", "annotator", "viewer"]
+    show_others_annotations: bool
+
+
+class ProjectMemberCreate(BaseModel):
+    username: str
+    role: Literal["admin", "annotator", "viewer"] = "annotator"
+
+
+class ProjectMemberUpdate(BaseModel):
+    role: Literal["admin", "annotator", "viewer"] | None = None
+    show_others_annotations: bool | None = None

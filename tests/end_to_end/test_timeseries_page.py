@@ -1,15 +1,29 @@
-from playwright.sync_api import Page, expect
-import pathlib
-from tests.endpoints import create_project, create_local_samples, create_model_samples
 import pytest
-import requests
+
+pytest.importorskip("playwright")
+import pathlib
 import time
-from toktagger.api.schemas.annotations import TimePoint, TimeRegion
-from typing import Literal, Tuple, Callable
+from collections.abc import Callable
+from typing import Literal
+
+import pytest
+from playwright.sync_api import Page, expect
+
 from tests.end_to_end import form_check
+from tests.end_to_end.conftest import login_as
+from tests.endpoints import (
+    add_project_member,
+    create_local_samples,
+    create_model_samples,
+    create_project,
+    create_user,
+    session,
+)
+from toktagger.api.schemas.annotations import TimePoint, TimeRegion
+from toktagger.api.schemas.annotators import AnnotatorTypes
 
 
-def setup_project(page: Page) -> Tuple[str, str, Callable]:
+def setup_project(page: Page) -> tuple[str, str, Callable]:
     # Create Project
     project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
@@ -346,7 +360,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
         page.get_by_role("button", name="Save").click(force=True)
 
     # Check annotation stored in db
-    response = requests.get(
+    response = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     )
     assert response.status_code == 200
@@ -355,7 +369,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     assert len(annotations) == 2
 
     for annotation in annotations:
-        assert annotation["created_by"] == "manual"
+        assert annotation["created_by"] == "admin"
         assert annotation["validated"]  # == True
         assert annotation["uncertainty"] == 0
 
@@ -376,17 +390,30 @@ def test_timeseries_load_annotations(server_setup, page: Page):
 
     # Create annotations of each type
     rampup = TimeRegion(
-        label="Ramp Up", created_by="peak_detection", time_min=10, time_max=20
+        label="Ramp Up",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=10,
+        time_max=20,
     )
     flattop = TimeRegion(
-        label="Flat Top", created_by="peak_detection", time_min=20, time_max=70
+        label="Flat Top",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=20,
+        time_max=70,
     )
     rampdown = TimeRegion(
-        label="Ramp Down", created_by="peak_detection", time_min=70, time_max=90
+        label="Ramp Down",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=70,
+        time_max=90,
     )
-    disruption = TimePoint(label="Disruption", created_by="peak_detection", time=91)
+    disruption = TimePoint(
+        label="Disruption",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time=91,
+    )
     # Add annotations
-    response = requests.put(
+    response = session.put(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
         json=[
             model.model_dump(mode="json")
@@ -437,14 +464,24 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     # Create annotations of each type
     rampup = TimeRegion(
-        label="Ramp Up", created_by="peak_detection", time_min=10, time_max=20
+        label="Ramp Up",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=10,
+        time_max=20,
     )
     flattop = TimeRegion(
-        label="Flat Top", created_by="peak_detection", time_min=20, time_max=70
+        label="Flat Top",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=20,
+        time_max=70,
     )
-    disruption = TimePoint(label="Disruption", created_by="peak_detection", time=71)
+    disruption = TimePoint(
+        label="Disruption",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time=71,
+    )
     # Add annotations
-    response = requests.put(
+    response = session.put(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
         json=[model.model_dump(mode="json") for model in (rampup, flattop, disruption)],
     )
@@ -459,7 +496,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     page.get_by_role("button", name="View Mode").click()
     page.locator("body").click()
 
-    # Delete a zone
+    # Delete a zone (the first one, "Flat Top")
     page.get_by_label("time-zone").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
     page.get_by_role("menuitem", name="Delete").click(force=True)
@@ -475,16 +512,18 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     )
     updated_disruption_time = float(row.get_by_role("gridcell").nth(2).inner_text())
 
-    # Press Save and wait for the PUT request to the server to complete
+    # Press Save and wait for the deleted zone's DELETE call to complete - it's the
+    # last of the two requests the save issues, so waiting on it covers the PUT too.
     with page.expect_response(
         lambda r: (
-            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+            f"samples/{sample_id}/annotations/" in r.url
+            and r.request.method == "DELETE"
         )
     ):
         page.get_by_role("button", name="Save").click(force=True)
 
     # Check annotation stored in db
-    response = requests.get(
+    response = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     )
     assert response.status_code == 200
@@ -492,20 +531,135 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     time.sleep(1)
 
-    # Check one annotation removed
+    # These annotations are all annotators::peak_detection's, not admin's, but admin
+    # is still allowed to edit them in place (Ramp Up's move) and delete them (Flat
+    # Top) - the save just never claims admin validated a model's own work, so
+    # `validated` stays untouched and `created_by` keeps its original author.
     assert len(annotations) == 2
-    print(annotations)
-
-    # Check all annotations marked as validated
     for annotation in annotations:
-        assert annotation["validated"]  # == True
-        assert annotation["uncertainty"] == 0
+        assert not annotation["validated"]
+        assert (
+            annotation["created_by"]
+            == f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}"
+        )
+    assert {a["label"] for a in annotations} == {"Ramp Up", "Disruption"}
 
-    # Check time of disruption updated
     disruption_annotation = next(
         ann for ann in annotations if ann["label"] == "Disruption"
     )
-    assert round(disruption_annotation["time"], 4) == updated_disruption_time
+    assert round(disruption_annotation["time"], 4) == round(updated_disruption_time, 4)
+
+
+def test_viewer_cannot_enter_edit_mode(server_setup, admin_token, browser):
+    create_user("viewer_erin", "erin_pass123")
+    project_id = create_project("Viewer Lock Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    add_project_member(project_id, "viewer_erin", role="viewer")
+
+    erin_page = login_as(browser, "viewer_erin", "erin_pass123")
+    erin_page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{ids[0]}")
+    expect(erin_page.get_by_label("time-series")).to_be_visible()
+
+    # Save and the edit-mode toggle are both disabled for a viewer.
+    expect(erin_page.get_by_role("button", name="Save")).to_be_disabled()
+    expect(erin_page.get_by_role("button", name="View Mode")).to_be_disabled()
+
+    # Clicking the disabled mode toggle (force=True bypasses Playwright's normal
+    # actionability check) must not flip it into Edit Mode - it's blocked
+    # server-side by the same canAnnotate check the button's own disabled state
+    # reflects, not just by the click never registering.
+    erin_page.get_by_role("button", name="View Mode").click(force=True)
+    expect(erin_page.get_by_role("button", name="View Mode")).to_be_visible()
+    expect(erin_page.get_by_role("button", name="Edit Mode")).to_be_hidden()
+
+    erin_page.context.close()
+
+
+def test_viewer_role_survives_sample_navigation(server_setup, admin_token, browser):
+    """A viewer's permissions must not be re-derived on every sample change.
+
+    The toolbar/nav bar remount whenever the sample changes (page.tsx's
+    stale-render guard). Role state used to live in a per-component hook, so each
+    remount briefly re-defaulted to "permitted" before the membership re-check
+    resolved -- Save and the edit toggle flashed enabled. Role now lives in
+    SampleContext instead, which does not remount, so the membership lookup
+    should fire once and Save/View Mode should never be seen enabled.
+    """
+    create_user("viewer_gail", "gail_pass123")
+    project_id = create_project("Viewer Nav Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    add_project_member(project_id, "viewer_gail", role="viewer")
+
+    members_requests = []
+    gail_page = login_as(browser, "viewer_gail", "gail_pass123")
+    gail_page.on(
+        "request",
+        lambda request: (
+            members_requests.append(request.url)
+            if f"/projects/{project_id}/members" in request.url
+            else None
+        ),
+    )
+
+    gail_page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{ids[0]}")
+    expect(gail_page.get_by_role("button", name="Save")).to_be_disabled()
+    assert len(members_requests) == 1
+
+    gail_page.get_by_role("button", name="Next Sample").click()
+    expect(gail_page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{ids[1]}"
+    )
+    expect(gail_page.get_by_role("button", name="Save")).to_be_disabled()
+    expect(gail_page.get_by_role("button", name="View Mode")).to_be_disabled()
+    # Confirms role state was carried over rather than re-fetched and briefly
+    # defaulted open: a second fetch would mean a second remount happened.
+    assert len(members_requests) == 1
+
+    gail_page.context.close()
+
+
+def test_show_others_annotations_toggle_works_for_admin(
+    server_setup, admin_token, browser, page: Page
+):
+    # The backend always stamps created_by with the authenticated caller, so a
+    # genuinely different identity's annotation has to come from a second real
+    # user's own session - not from PUTting a different created_by as admin.
+    create_user("annotator_frank", "frank_pass123")
+    project_id = create_project("Show Others Toggle Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    sample_id = ids[0]
+    add_project_member(project_id, "annotator_frank", role="annotator")
+
+    frank_page = login_as(browser, "annotator_frank", "frank_pass123")
+    frank_page.goto(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}"
+    )
+    expect(frank_page.get_by_label("time-series")).to_be_visible()
+    add_annotation(frank_page, "TIME POINT", "Disruption")
+    with frank_page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        frank_page.get_by_role("button", name="Save").click(force=True)
+    frank_page.context.close()
+
+    # create_project auto-adds its creator (admin) as a project member, so this
+    # toggle has a real membership preference to flip.
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    expect(page.get_by_label("time-point").first).to_be_visible()
+
+    page.get_by_role("checkbox", name="Show Others' Annotations").click()
+    expect(page.get_by_label("time-point")).to_have_count(0)
+
+    page.get_by_role("checkbox", name="Show Others' Annotations").click()
+    expect(page.get_by_label("time-point").first).to_be_visible()
 
 
 def test_timeseries_annotator(server_setup, page: Page):
@@ -556,7 +710,7 @@ def test_timeseries_model_predict(
     server_setup, setup_model_samples, page: Page, model_name
 ):
     # Create Project
-    project_id, sample_ids = create_model_samples(setup_model_samples)
+    project_id, _sample_ids = create_model_samples(setup_model_samples)
 
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -706,3 +860,63 @@ def test_timeseries_models_disabled(server_setup, page: Page):
 
     # Check model prediction tool is not visible
     expect(page.get_by_role("button", name="Model Prediction")).to_be_hidden()
+
+
+def test_editing_a_sample_keeps_another_users_validated_flag(
+    server_setup, admin_token, browser, page: Page
+):
+    """Drawing in this view must not downgrade a colleague's validated annotation.
+
+    The view has no validated or uncertainty control, so converting back to the
+    stored shape has to invent both, and the conversion runs over every annotation
+    on the sample after each draw - not only the one being drawn.
+    """
+    create_user("annotator_hazel", "hazel_pass123")
+    project_id = create_project("Validated Flag Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    sample_id = ids[0]
+    add_project_member(project_id, "annotator_hazel", role="annotator")
+
+    hazel_page = login_as(browser, "annotator_hazel", "hazel_pass123")
+    hazel_page.goto(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}"
+    )
+    expect(hazel_page.get_by_label("time-series")).to_be_visible()
+    add_annotation(hazel_page, "TIME POINT", "Disruption")
+    with hazel_page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        hazel_page.get_by_role("button", name="Save").click(force=True)
+    hazel_page.context.close()
+
+    stored = session.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    ).json()
+    assert [a["validated"] for a in stored] == [True], stored
+
+    # Admin opens the same sample and draws their own annotation alongside hazel's.
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    expect(page.get_by_label("time-point").first).to_be_visible()
+    add_annotation(page, "TIME REGION", "Flat Top")
+    with page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        page.get_by_role("button", name="Save").click(force=True)
+
+    stored = session.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    ).json()
+    by_author = {a["created_by"]: a for a in stored}
+    assert set(by_author) == {"annotator_hazel", "admin"}, stored
+    assert by_author["annotator_hazel"]["validated"] is True, (
+        "hazel's validated flag must survive an edit by somebody else"
+    )
+    assert by_author["annotator_hazel"]["uncertainty"] == 0, (
+        "a validated annotation keeps uncertainty 0, not the invented default of 1"
+    )

@@ -1,20 +1,37 @@
-from fastapi import APIRouter, Request, HTTPException, Query, Path, Body
+import logging
+from typing import Literal
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
+
+from toktagger.api.auth.dependencies import (
+    require_password_changed,
+    require_project_admin_role,
+    require_project_annotator,
+    require_project_viewer,
+)
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.crud import utils
+from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.schemas import convert_to_objectid
+from toktagger.api.schemas.annotations import (
+    RESERVED_CREATED_BY_PREFIXES,
+    Annotation,
+)
 from toktagger.api.schemas.samples import (
-    SampleIn,
     Sample,
+    SampleIn,
     SampleSummary,
     SampleUpdateBatchItem,
 )
-from toktagger.api.schemas.annotations import Annotation
-from toktagger.api.schemas import convert_to_objectid
-from typing import Literal
-import logging
+from toktagger.api.schemas.users import UserOut
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
+router = APIRouter(
+    prefix="/projects/{project_id}/samples",
+    tags=["Samples"],
+    dependencies=[Depends(require_password_changed)],
+)
 
 
 @router.get(
@@ -28,6 +45,7 @@ router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 async def get_samples(
     request: Request,
     project_id: str = Path(description="The ID of the project to get samples for."),
+    current_user: UserOut = Depends(require_project_viewer),
     sort_by: str = Query(
         "_id",
         description="Field to sort responses by, by default '_id' (equivalent to timestamp)",
@@ -52,7 +70,7 @@ async def get_samples(
     Get the full list of samples available for this project.
     --------------------------------------------------------
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     samples = await utils.get_samples(
         db_client=db_client,
         project_id=project_id,
@@ -80,16 +98,16 @@ async def add_samples(
     project_id: str = Path(
         description="The project ID to associate these samples with."
     ),
+    current_user: UserOut = Depends(require_project_admin_role),
 ):
     """
     Add a list of samples (with optional annotations) to this project.
     ------------------------------------------------------------------
+
+    Which samples a project contains is part of its configuration, so this is
+    project-admin only. Annotators annotate the samples they are given; they do not
+    choose them.
     """
-    # Add samples from the range specified to the project
-    # I'm assuming these will be shot/pulse numbers, hence int, but could be unique ID strings instead
-    # Depends if for us a 'sample' will always be a shot/pulse, or if it could be a subset eg a single frame of video
-    # Do we also want to allow a single value, or list of specific value?
-    print(samples)
     project_obj_id = convert_to_objectid(project_id, "projects")
     if not await request.app.state.db_client.get_document_by_id(
         "projects", project_obj_id
@@ -98,6 +116,17 @@ async def add_samples(
 
     # Remove annotations (if they exist), these will be added later
     all_annotations = [sample.annotations for sample in samples]
+
+    # Attribute to the caller, as on the import/save routes in routers/annotations.py:
+    # the incoming created_by is a client-side placeholder ("manual"), not a real user.
+    # Synthetic authorship (model predictions) is preserved so seeding still works.
+    is_internal = current_user.username == "__internal__"
+    for annotation_list in all_annotations:
+        for annotation in annotation_list or []:
+            if not is_internal and not (annotation.created_by or "").startswith(
+                RESERVED_CREATED_BY_PREFIXES
+            ):
+                annotation.created_by = current_user.username
 
     # Insert new samples
     ids = await request.app.state.db_client.insert_many(
@@ -184,12 +213,17 @@ async def update_samples(
     project_id: str = Path(
         description="The project ID to associate these samples with."
     ),
+    current_user: UserOut = Depends(require_project_annotator),
 ):
     """
     Update a list of samples (provided with their IDs) for this project.
     ---------------------------------------------------------------------
+
+    Annotator-level, unlike the add/delete endpoints: SampleUpdate carries only
+    `validated_annotations`, which is annotation progress rather than sample
+    configuration, and the save/clear flow sets it on every annotation round-trip.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client, project_id)
 
     for sample_batch_item in sample_batch:
@@ -216,6 +250,7 @@ async def update_samples(
 async def get_next_sample(
     request: Request,
     project_id: str = Path(description="The project to return the next sample from."),
+    current_user: UserOut = Depends(require_project_viewer),
     visited_sample_ids: list[str] = Body(
         ..., description="The IDs of the samples already seen in this session."
     ),
@@ -236,7 +271,7 @@ async def get_next_sample(
     # Should use the query strategy, which access the database to determine the next sample to annotate
     # This should then be passed in to the /data endpoint to get required data for visualisation
     # And the /annotation endpoint to get initial prediction (if available)
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
     samples = await utils.get_samples(
         db_client,
@@ -261,12 +296,13 @@ async def get_sample_summary(
     project_id: str = Path(
         description="The ID of the project to get a summary of samples from."
     ),
+    current_user: UserOut = Depends(require_project_viewer),
 ) -> SampleSummary:
     """Get a summary of samples for this project.
 
     This includes total number of samples, min and max shot IDs, and sample data type.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     summary = await utils.get_sample_summary(db_client, project_id)
     return summary
 
@@ -285,12 +321,13 @@ async def get_sample(
         description="The ID of the project to retrieve a sample from."
     ),
     sample_id: str = Path(description="The ID of the sample to retrieve."),
+    current_user: UserOut = Depends(require_project_viewer),
 ) -> Sample:
     """
     Get the specified sample from this project.
     --------------------------------------------
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Check project exists
     project = await utils.get_project(db_client, project_id)
     # Get specified sample
@@ -313,15 +350,19 @@ async def remove_sample(
         description="The ID of the project to delete a sample from."
     ),
     sample_id: str = Path(description="The ID of the sample to delete."),
+    current_user: UserOut = Depends(require_project_admin_role),
 ):
     """
-    Get the specified sample from this project.
-    --------------------------------------------
+    Remove the specified sample, and its annotations, from this project.
+    -------------------------------------------------------------------
+
+    Project-admin only: this discards every user's annotations for the sample, not
+    just the caller's.
     """
     # Remove samples from the project
     # Dont envisage this actually deleting the data stored about these samples
     # But do we need a separate method for that?
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Check project exists
     await utils.get_project(db_client, project_id=project_id)
 
@@ -340,12 +381,15 @@ async def remove_all_samples(
     project_id: str = Path(
         description="The ID of the project to delete all samples from."
     ),
+    current_user: UserOut = Depends(require_project_admin_role),
 ):
     """
     Remove all samples from this project.
     --------------------------------------------
+
+    Project-admin only, as with the single-sample delete above.
     """
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Check project exists
     await utils.get_project(db_client, project_id=project_id)
 

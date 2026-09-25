@@ -50,8 +50,7 @@ services:
       MODELS_CACHE_DIR: "/app/data/models"
       SERVER_HOST: api_app
       SERVER_PORT: 8002
-      SERVER_RELOAD: "false"
-      CUSTOM_SCRIPT: ${CUSTOM_SCRIPT}
+      SERVER_WORKERS: "${SERVER_WORKERS:-4}"
     working_dir: /app
     command: ["python", "run.py"]
     networks:
