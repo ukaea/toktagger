@@ -156,10 +156,9 @@ async def test_get_data_summary_profile2d(api_client, db_client):
     assert data["type"] == "profile-2d"
     assert (
         data["description"]
-        == "2D profile signals from one or more diagnostics inside a Tokamak (eg, spectrometers). Contains measurements of points along an axis (dim_1) at each time point."
+        == "2D profile signal from one diagnostic inside a Tokamak (eg, spectrometer). Contains measurements of points along an axis (dim_1) at each time point."
     )
     assert data["num_signals"] == 1
-    assert set(data["signals"].keys()) == {"mirnov"}
 
     # Load the file and apply the same STFT conversion as the profile_2d view
     # (time extracted the same way as in the tabular loader)
@@ -170,7 +169,7 @@ async def test_get_data_summary_profile2d(api_client, db_client):
     )
     time = stft_time
 
-    sig = data["signals"]["mirnov"]
+    sig = data["signal"]
     assert sig["time"]["count"] == len(time)
     assert sig["time"]["min"] == time.min()
     assert sig["time"]["max"] == time.max()

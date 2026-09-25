@@ -6,57 +6,17 @@ from toktagger.api.schemas.data import (
     DataResponseType,
     DataParams,
     DataParamTypes,
-    ImageData,
-    MultiVariateTimeSeriesData,
-    MultiProfile2DData,
-    Profile2DData,
     SampleSummaryTypes,
-    SummaryAxes,
-    SummaryValues,
-    Summary2DValues,
-    SignalSummary,
-    Signal2DSummary,
-    ImageSampleSummary,
-    TimeSeriesSampleSummary,
-    Profile2DSampleSummary,
 )
-from toktagger.api.schemas.views import ViewParams, ViewParamTypes, Profile2DViewParams
+from toktagger.api.schemas.views import ViewParams, ViewParamTypes
 
 from fastapi import APIRouter, HTTPException, Request
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.core.data_loaders import DataLoaderError
-from PIL import Image
-import numpy
-import base64
-import io
 
 router = APIRouter(
     prefix="/projects/{project_id}/samples/{sample_id}/data", tags=["Data"]
 )
-
-
-def _profile_2d_signal_summary(profile_2d: Profile2DData) -> Signal2DSummary:
-    """Build a Signal2DSummary for a single 2D profile."""
-    arr = numpy.array(profile_2d.values)
-    return Signal2DSummary(
-        time=SummaryAxes(
-            count=len(profile_2d.time),
-            max=numpy.max(profile_2d.time),
-            min=numpy.min(profile_2d.time),
-        ),
-        dim_1=SummaryAxes(
-            count=len(profile_2d.dim_1),
-            max=numpy.max(profile_2d.dim_1),
-            min=numpy.min(profile_2d.dim_1),
-        ),
-        values=Summary2DValues(
-            shape=arr.shape,
-            count=arr.size,
-            max=numpy.max(profile_2d.values),
-            min=numpy.min(profile_2d.values),
-            mean=numpy.mean(profile_2d.values),
-        ),
-    )
 
 
 async def _get_data(
@@ -193,74 +153,4 @@ async def get_sample_data_summary(
     db_client = request.app.state.db_client
 
     data = await _get_data(db_client, project_id, sample_id, params, view)
-
-    # Compute summaries
-    if isinstance(data, ImageData):
-        # Convert back to image array
-        # TODO may need to change this when return_raw is available
-        image_bytes = base64.b64decode(data.values)
-        im = Image.open(io.BytesIO(image_bytes))
-        arr = numpy.array(im)
-
-        return ImageSampleSummary(
-            type="video",
-            description="One frame from a camera diagnostic video inside a Tokamak",
-            num_signals=1,
-            frame_number=data.frame,
-            shape=arr.shape,
-            height=arr.shape[0],
-            width=arr.shape[1],
-            colour_mode=im.mode,
-            count=arr.size,
-            max=arr.max(),
-            min=arr.min(),
-            mean=arr.mean(),
-        )
-
-    if isinstance(data, MultiVariateTimeSeriesData):
-        signals = {}
-        for signal, time_series in data.values.items():
-            signals[signal] = SignalSummary(
-                time=SummaryAxes(
-                    count=len(time_series.time),
-                    max=numpy.max(time_series.time),
-                    min=numpy.min(time_series.time),
-                ),
-                values=SummaryValues(
-                    count=len(time_series.values),
-                    max=numpy.max(time_series.values),
-                    min=numpy.min(time_series.values),
-                    mean=numpy.mean(time_series.values),
-                ),
-            )
-        return TimeSeriesSampleSummary(
-            type="time-series",
-            description="Time series signals from one or more diagnostics inside a Tokamak.",
-            num_signals=len(data.values),
-            signals=signals,
-        )
-
-    if isinstance(data, MultiProfile2DData):
-        signals = {
-            signal: _profile_2d_signal_summary(profile_2d)
-            for signal, profile_2d in data.values.items()
-        }
-        return Profile2DSampleSummary(
-            type="profile-2d",
-            description="2D profile signals from one or more diagnostics inside a Tokamak (eg, spectrometers). Contains measurements of points along an axis (dim_1) at each time point.",
-            num_signals=len(data.values),
-            signals=signals,
-        )
-
-    if isinstance(data, Profile2DData):
-        # A single profile, eg the output of the profile_2d view applied to a
-        # time series signal (eg an STFT spectrogram of the mirnov signal)
-        signal_name = (
-            view.signal_name if isinstance(view, Profile2DViewParams) else "profile"
-        )
-        return Profile2DSampleSummary(
-            type="profile-2d",
-            description="2D profile signals from one or more diagnostics inside a Tokamak (eg, spectrometers). Contains measurements of points along an axis (dim_1) at each time point.",
-            num_signals=1,
-            signals={signal_name: _profile_2d_signal_summary(data)},
-        )
+    return data.summary()
