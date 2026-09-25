@@ -273,7 +273,7 @@ async def test_predict_endpoint_survives_same_named_human_save(
     create_resp = await client.post(
         "/users",
         json={
-            "username": "disruption_cnn",
+            "username": "mock_disruption_cnn",
             "password": "pass123",
             "global_role": "user",
         },
