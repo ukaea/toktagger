@@ -6,6 +6,7 @@ import tests.db_definitions as db_definitions
 from bson.objectid import ObjectId
 import asyncio
 from httpx import AsyncClient, ASGITransport
+from fastmcp import Client
 import os
 import multiprocessing
 import requests
@@ -107,7 +108,18 @@ async def db_client(settings):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def api_client(monkeypatch, db_client):
+async def api_server(monkeypatch):
+    os.environ["API_URL"] = "http://test"
+    server = Server()
+    server.testing_mode = True
+    monkeypatch.setenv("API_URL", "http://test")
+    server._setup_app()
+
+    yield server
+
+
+@pytest_asyncio.fixture(scope="function")
+async def api_client(api_server, db_client):
     # Have hit various issues getting this setup
     # Using fastAPI TestClient() doesn't play well with async pymongo as it tries to do stuff in different event loops
     # So have to use this AsyncClient from httpx, but this no longer just accepts an app
@@ -115,19 +127,25 @@ async def api_client(monkeypatch, db_client):
     # So have to run this manually, however trying to run the close after the yield to close the db connection gives errors
     # So am just going to leave it open, since the db container will be deleted after anyway
     # Any alternative solution ideas are welcome.....
-    os.environ["API_URL"] = "http://test"
-    server = Server()
-    server.testing_mode = True
-    monkeypatch.setenv("API_URL", "http://test")
-    server._setup_app()
-    app = server.app
-    app.state.db_client = db_client
-    app.state.project = None
+
+    # Lifespan
+    api_server.app.state.db_client = db_client
+    api_server.app.state.project = None
 
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=api_server.app), base_url="http://test"
     ) as client:
-        client.app = app
+        client.app = api_server.app
+        yield client
+
+
+@pytest_asyncio.fixture(scope="function")
+async def mcp_client(api_server, db_client):
+    # Lifespan
+    api_server._api_app.state.db_client = db_client
+    api_server._api_app.state.project = None
+
+    async with Client(api_server._mcp_app) as client:
         yield client
 
 

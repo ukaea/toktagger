@@ -730,7 +730,6 @@ async def test_model_load_local_failed(models_api_client, db_client, setup_model
         assert response.status_code == 500
 
         # Check message is as expected
-        print(response.json())
         assert "Failed to load weights" in response.json()["detail"]
 
         model = await db_client.get_document_by_id(

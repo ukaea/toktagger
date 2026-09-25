@@ -12,17 +12,14 @@ from toktagger.api.core.data_loaders import LoaderRegistry
 
 router = APIRouter(
     prefix="/projects/{project_id}",
-    tags=["Annotators"],
+    tags=["Annotators", "MCP"],
 )
 
 
-@router.get("/annotator")
-async def get_annotators(request: Request, project_id: str):
-    # Dunno if this is of any use
-    pass
-
-
-@router.post("/samples/{sample_id}/annotator/{annotator_type}")
+@router.post(
+    "/samples/{sample_id}/annotator/{annotator_type}",
+    operation_id="create_automated_sample_annotations",
+)
 async def create_annotations(
     request: Request,
     project_id: str,
@@ -31,7 +28,45 @@ async def create_annotations(
     annotator_params: AnnotatorParamTypes,
     data_params: DataParamTypes,
 ):
-    # Use the specified annotator to label this sample for this project
+    """
+    Generate annotations for a sample using a specified annotator model,
+    returning the predictions *without* saving them to the database.
+
+    Some annotators require a set of parameters to be specified - these should
+    be prompted by the user. The annotations will be returned by this endpoint.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project the sample belongs to.
+    sample_id : str
+        The ID of the sample to generate annotations for.
+    annotator_type : AnnotatorTypes
+        The type of automated annotator to run.
+    annotator_params : AnnotatorParamTypes
+        Parameters for the selected annotator.
+    data_params : DataParamTypes
+        Parameters for loading the sample data.
+
+    Returns
+    -------
+    list
+        A list of predicted annotations from the selected annotator.
+
+    Notes
+    -----
+    Use When:
+        - You want to generate annotations automatically using one of the built in annotators
+        - You are testing different annotator types on a sample
+        - You need initial annotation suggestions for human review
+    Do Not Use When:
+        - You want to save annotations to the database - use update_sample_annotations instead
+        - You want to train an ML model - use start_model_training instead
+        - You want to get predictions from an ML model - use create_model_predictions or create_sample_model_predictions instead
+        - You need to inspect diagnostic data - use get_sample_data_summary instead
+    Example User Requests:
+        - "Show me what the peak_detection annotator predicts for this sample"
+    """
     # Would use the datapool to load and process the data
     # The pass it through the selected annotator within the Project to make predictions
     # Return these predictions to the user, *without* adding to the database

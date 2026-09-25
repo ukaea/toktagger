@@ -2,6 +2,10 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastmcp import FastMCP
+from fastmcp.server.providers.openapi import RouteMap, MCPType
+from fastmcp.utilities.lifespan import combine_lifespans
+
 from contextlib import asynccontextmanager
 import uvicorn
 import warnings
@@ -15,6 +19,7 @@ from toktagger.api.routers.samples import router as samples_router
 from toktagger.api.routers.base import router as base_router
 from toktagger.api.routers.paths import router as paths_router
 from toktagger.api.routers.meta import router as meta_router
+from toktagger.api.routers.mcp import INSTRUCTIONS
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.models import models_dependencies_installed
@@ -32,17 +37,19 @@ if models_dependencies_installed():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db_name = "annotate_db"
-
-    app.state.db_client = MongoDBClient(
+    db_client = MongoDBClient(
         str(config.settings.database.mongo_url),
-        db_name,
+        "annotate_db",
         str(config.settings.server.cache_dir),
     )
-    app.state.project = None
-    yield
 
-    await app.state.db_client.client.close()
+    app.state.db_client = db_client
+    app.state.project = None
+
+    try:
+        yield
+    finally:
+        await db_client.client.close()
 
 
 class Server:
@@ -139,7 +146,45 @@ class Server:
                     "In testing mode, cache directories must be in temp directory!"
                 )
 
-        self.app = FastAPI(lifespan=lifespan)
+        self._api_app = FastAPI()
+
+        self._api_app.include_router(annotations_router)
+        self._api_app.include_router(data_router)
+        self._api_app.include_router(models_router)
+        self._api_app.include_router(projects_router)
+        self._api_app.include_router(samples_router)
+        self._api_app.include_router(annotators_router)
+        self._api_app.include_router(paths_router)
+        self._api_app.include_router(meta_router)
+        self._api_app.include_router(base_router)
+
+        if config.settings.server.mcp_enabled:
+            self._mcp_app = FastMCP.from_fastapi(
+                self._api_app,
+                name="toktagger",
+                instructions=INSTRUCTIONS,
+                route_maps=[
+                    # Tagged routers turned into tools
+                    RouteMap(
+                        pattern=r"/.*",
+                        tags={"MCP"},
+                        mcp_type=MCPType.TOOL,
+                    ),
+                    # Routers without MCP tag are excluded
+                    RouteMap(
+                        pattern=r".*",
+                        mcp_type=MCPType.EXCLUDE,
+                    ),
+                ],
+            )
+
+            mcp_http_app = self._mcp_app.http_app("/")
+            self.app = FastAPI(
+                lifespan=combine_lifespans(lifespan, mcp_http_app.lifespan)
+            )
+        else:
+            self._mcp_app = None
+            self.app = FastAPI(lifespan=lifespan)
 
         # Allow requests from the frontend dev server
         origins = [
@@ -163,15 +208,10 @@ class Server:
             name="assets",
         )
 
-        self.app.include_router(annotations_router)
-        self.app.include_router(data_router)
-        self.app.include_router(models_router)
-        self.app.include_router(projects_router)
-        self.app.include_router(samples_router)
-        self.app.include_router(annotators_router)
-        self.app.include_router(paths_router)
-        self.app.include_router(meta_router)
-        self.app.include_router(base_router)
+        if config.settings.server.mcp_enabled:
+            self.app.mount("/mcp", mcp_http_app)
+
+        self.app.include_router(self._api_app.router)
 
     def run(self, host: str | None = None, port: int | None = None):
         """

@@ -16,9 +16,40 @@ def get_app(request: Request):
     return FileResponse(request.app.state.index_file)
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    operation_id="health_check",
+    tags=["MCP"],
+)
 async def health_check(request: Request) -> dict:
-    """Check the server is running correctly."""
+    """
+    Check the server is running correctly, identifying which optional features
+    are currently available.
+
+    Returns
+    -------
+    dict
+        Status information describing backend health and available server
+        features: name, version, db_connected, models_enabled, gpu_available,
+        testing_mode.
+
+    Notes
+    -----
+    Use When:
+        - Verifying if the server is operational before proceeding with other operations
+        - Checking the version of the backend server in use
+        - Determining if ML model tools are enabled or disabled
+        - Determining if GPUs are available for ML model training/prediction
+        - Verifying database connectivity is working
+    Do Not Use When:
+        - Reading or modifying project, annotation, model, or dataset data
+        - Retrieving detailed system metrics, logs, or diagnostics
+    Example User Requests:
+        - "Is the TokTagger server running?"
+        - "Can this server run ML models?"
+        - "Do I have GPU support available?"
+        - "What version of TokTagger is deployed?"
+    """
     # Get version
     try:
         vers = version("toktagger")

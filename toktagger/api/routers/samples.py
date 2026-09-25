@@ -19,6 +19,8 @@ router = APIRouter(prefix="/projects/{project_id}/samples", tags=["Samples"])
 
 @router.get(
     "",
+    operation_id="get_samples",
+    tags=["MCP"],
     response_model=list[Sample],
     responses={
         200: {"description": "Samples have been retrieved successfully."},
@@ -49,8 +51,44 @@ async def get_samples(
     ),
 ) -> list[Sample]:
     """
-    Get the full list of samples available for this project.
-    --------------------------------------------------------
+    Get the full list of samples available for this project, with optional
+    pagination, sorting, and shot ID filtering.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get samples for.
+    sort_by : str
+        Field to sort responses by, by default '_id' (equivalent to timestamp).
+    sort_direction : Literal["ascending", "descending"]
+        Direction to sort responses, by default 'descending'.
+    start : int
+        Index of the first sample you want returned when sorted by the
+        above parameter.
+    count : int | None
+        The number of samples to return, leave blank to return all entries.
+    shot_id : int | None
+        The shot ID to search for, by default None.
+
+    Returns
+    -------
+    list[Sample]
+        A list of Sample objects.
+
+    Notes
+    -----
+    Use When:
+        - You need a complete inventory of samples in a project
+        - You want to find a sample by its shot ID
+        - You need sample metadata (shot_id, data, validated status) without fetching data content
+    Do Not Use When:
+        - You only need summary info, such as the number of samples in a project - use get_samples_summary instead
+        - You need the next sample to annotate - use get_next_sample instead
+        - You need information about diagnostic signal/data values - use get_sample_data_summary instead
+    Example User Requests:
+        - "Show me all samples in this project"
+        - "Has shot 30421 been validated?"
+        - "What is the sample ID for shot 30421?"
     """
     db_client = request.app.state.db_client
     samples = await utils.get_samples(
@@ -67,6 +105,8 @@ async def get_samples(
 
 @router.post(
     "",
+    operation_id="add_samples",
+    tags=["MCP"],
     responses={
         200: {
             "description": "Samples have been added successfully, and a list of their IDs has been returned."
@@ -82,14 +122,39 @@ async def add_samples(
     ),
 ):
     """
-    Add a list of samples (with optional annotations) to this project.
-    ------------------------------------------------------------------
+    Add a list of new samples (with optional initial annotations) to this
+    project.
+
+    Parameters
+    ----------
+    samples : list[SampleIn]
+        The samples to insert into the project, optionally with initial
+        annotations.
+    project_id : str
+        The project ID to associate these samples with.
+
+    Returns
+    -------
+    list[str]
+        A list of sample _id strings for the newly created samples.
+
+    Notes
+    -----
+    Use When:
+        - You are setting up a new project with its initial dataset
+        - You are bulk-importing samples from a data source or external list
+        - You want to add samples and pre-populate them with human annotations
+    Do Not Use When:
+        - You are updating existing samples - use update_samples instead
+        - The project does not exist - verify with get_projects first
+    Example User Requests:
+        - "Add shots 30400 to 30500 from UDA to the project"
+        - "Add samples from my local directory of files at /path/to/my/files"
     """
     # Add samples from the range specified to the project
     # I'm assuming these will be shot/pulse numbers, hence int, but could be unique ID strings instead
     # Depends if for us a 'sample' will always be a shot/pulse, or if it could be a subset eg a single frame of video
     # Do we also want to allow a single value, or list of specific value?
-    print(samples)
     project_obj_id = convert_to_objectid(project_id, "projects")
     if not await request.app.state.db_client.get_document_by_id(
         "projects", project_obj_id
@@ -173,6 +238,8 @@ async def add_samples(
 
 @router.put(
     "",
+    operation_id="update_samples",
+    tags=["MCP"],
     responses={
         200: {"description": "Samples have been updated successfully."},
         404: {"description": "Project or Sample(s) not found with that ID."},
@@ -186,8 +253,29 @@ async def update_samples(
     ),
 ):
     """
-    Update a list of samples (provided with their IDs) for this project.
-    ---------------------------------------------------------------------
+    Update a list of samples (provided with their IDs) for this project,
+    batch-updating properties such as validation status for multiple samples.
+
+    Parameters
+    ----------
+    sample_batch : list[SampleUpdateBatchItem]
+        The samples to update, each with its ID and the updates to apply.
+    project_id : str
+        The project ID to associate these samples with.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    Use When:
+        - You need to mark sample(s) as validated after human annotation
+    Do Not Use When:
+        - You are creating new samples - use add_samples instead
+    Example User Requests:
+        - "Mark these samples as validated"
     """
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
@@ -202,6 +290,8 @@ async def update_samples(
 
 @router.post(
     "/next",
+    operation_id="get_next_sample",
+    tags=["MCP"],
     response_model=Sample,
     responses={
         200: {
@@ -229,8 +319,40 @@ async def get_next_sample(
     ),
 ) -> Sample:
     """
-    Get the next sample to annotate for this project, according to query strategy.
-    ------------------------------------------------------------------------------
+    Get the next sample to annotate for this project, according to its query
+    strategy (random, sequential, etc.), with optional sorting.
+    A list of previously visited sample IDs should be stored and provided here
+    to prevent duplicates.
+
+    Parameters
+    ----------
+    project_id : str
+        The project to return the next sample from.
+    visited_sample_ids : list[str]
+        The IDs of the samples already seen in this session.
+    sort_by : str
+        Field to sort responses by, by default 'shot_id'.
+    sort_direction : Literal["ascending", "descending"]
+        Direction to sort responses, by default 'ascending'.
+
+    Returns
+    -------
+    Sample
+        A Sample object, or 204 if no samples remain.
+
+    Notes
+    -----
+    Use When:
+        - You are building an annotation workflow and need the next sample to annotate
+        - You want the system to pick samples according to the project's query strategy
+        - You are iterating through all samples in a project for annotation
+    Do Not Use When:
+        - You need more than one sample at once - use get_samples instead
+        - You already know the sample you want - use get_samples instead
+        - You need information about diagnostic data from the sample - use get_sample_data_summary instead
+    Example User Requests:
+        - "What's the next sample I need to annotate?"
+        - "Give me the next unvalidated sample in this project"
     """
     # Return the next sample for human validation for this project
     # Should use the query strategy, which access the database to determine the next sample to annotate
@@ -255,16 +377,45 @@ async def get_next_sample(
     return sample
 
 
-@router.get("/summary")
+@router.get(
+    "/summary",
+    operation_id="get_samples_summary",
+    tags=["MCP"],
+)
 async def get_sample_summary(
     request: Request,
     project_id: str = Path(
         description="The ID of the project to get a summary of samples from."
     ),
 ) -> SampleSummary:
-    """Get a summary of samples for this project.
+    """
+    Get a summary of samples for this project, including total number of
+    samples, min and max shot IDs, and sample data type, without returning
+    the full sample list.
 
-    This includes total number of samples, min and max shot IDs, and sample data type.
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get a summary of samples from.
+
+    Returns
+    -------
+    SampleSummary
+        A SampleSummary object with total_samples, min_shot_id, max_shot_id,
+        data_type.
+
+    Notes
+    -----
+    Use When:
+        - You need a quick count of samples in a project
+        - You want to check the shot ID range
+        - You need sample data type information for a project overview
+    Do Not Use When:
+        - You need individual sample details - use get_samples instead
+        - You need information about actual diagnostic data - use get_sample_data_summary instead
+    Example User Requests:
+        - "How many samples does this project have?"
+        - "Show me the shot ID range for this project"
     """
     db_client = request.app.state.db_client
     summary = await utils.get_sample_summary(db_client, project_id)
@@ -273,6 +424,7 @@ async def get_sample_summary(
 
 @router.get(
     "/{sample_id}",
+    operation_id="get_sample",
     response_model=Sample,
     responses={
         200: {"description": "Samples has been returned successfully."},
@@ -288,7 +440,23 @@ async def get_sample(
 ) -> Sample:
     """
     Get the specified sample from this project.
-    --------------------------------------------
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to retrieve a sample from.
+    sample_id : str
+        The ID of the sample to retrieve.
+
+    Returns
+    -------
+    Sample
+        The sample with the specified ID.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server - should use get_samples
+    instead.
     """
     db_client = request.app.state.db_client
     # Check project exists
@@ -300,6 +468,7 @@ async def get_sample(
 
 @router.delete(
     "/{sample_id}",
+    operation_id="remove_sample",
     responses={
         200: {"description": "Samples has been returned successfully."},
         404: {
@@ -315,8 +484,24 @@ async def remove_sample(
     sample_id: str = Path(description="The ID of the sample to delete."),
 ):
     """
-    Get the specified sample from this project.
-    --------------------------------------------
+    Remove the specified sample from this project, along with any annotations
+    associated with it.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete a sample from.
+    sample_id : str
+        The ID of the sample to delete.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
     """
     # Remove samples from the project
     # Dont envisage this actually deleting the data stored about these samples
@@ -334,7 +519,7 @@ async def remove_sample(
     )
 
 
-@router.delete("")
+@router.delete("", operation_id="remove_all_samples")
 async def remove_all_samples(
     request: Request,
     project_id: str = Path(
@@ -342,8 +527,22 @@ async def remove_all_samples(
     ),
 ):
     """
-    Remove all samples from this project.
-    --------------------------------------------
+    Remove all samples from this project, along with any annotations
+    associated with them.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete all samples from.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
     """
     db_client = request.app.state.db_client
     # Check project exists

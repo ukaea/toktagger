@@ -15,6 +15,8 @@ router = APIRouter(
 
 @router.get(
     "/annotations",
+    operation_id="get_project_annotations",
+    tags=["MCP"],
     response_model=list[AnnotationOutTypes],
     responses={
         200: {"description": "Annotations for this project returned successfully."},
@@ -48,8 +50,44 @@ async def get_all_annotations(
     ),
 ) -> list[AnnotationOutTypes]:
     """
-    Retrieve all annotations for this project, subject to specified filters.
-    ------------------------------------------------------------------------
+    Retrieve all annotations for a project, subject to specified filters, with
+    optional sorting, pagination, and filtering by validation status.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to retrieve annotations for.
+    sort_by : str
+        Field to sort responses by, by default '_id' (equivalent to timestamp).
+    sort_direction : Literal["ascending", "descending"]
+        Direction to sort responses, by default 'descending'.
+    start : int
+        Index of the first annotation you want returned when sorted by the
+        above parameter.
+    count : int | None
+        The number of annotations to return, leave blank to return all entries.
+    validated : bool | None
+        Whether to return only validated or unvalidated annotations, leave
+        blank for all annotations.
+
+    Returns
+    -------
+    list[AnnotationOutTypes]
+        A list of Annotation objects relating to the requested project.
+
+    Notes
+    -----
+    Use When:
+        - You need to review all annotations for a project
+        - You need to filter annotations by validated/unvalidated status
+        - You need to sort annotations by any of their attributes, eg by uncertainty, or timestamp
+    Do Not Use When:
+        - You need annotations for a specific sample — use get_sample_annotations instead
+        - You want to create or update annotations — use import_annotations or update_sample_annotations instead
+    Example User Requests:
+        - "Show me all annotations for this project"
+        - "Show me validated annotations for this project"
+        - "Give me the ten most uncertain annotations"
     """
     db_client = request.app.state.db_client
     # Check project exists
@@ -70,6 +108,8 @@ async def get_all_annotations(
 
 @router.put(
     "/annotations",
+    operation_id="import_annotations",
+    tags=["MCP"],
     responses={
         200: {"description": "Annotations for this project updated successfully."},
         404: {"description": "Project not found with that ID."},
@@ -84,8 +124,32 @@ async def import_annotations(
     ),
 ) -> None:
     """
-    Update or add annotations for this project.
-    -------------------------------------------
+    Update or add annotations for this project, bulk creating annotations for
+    one or more samples within the project.
+
+    Parameters
+    ----------
+    annotations : list[AnnotationBatchTypes]
+        The annotations to create, which may span one or more samples within
+        the project.
+    project_id : str
+        The ID of the project to update annotations for.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    Use When:
+        - You are importing annotations from an external source (e.g. JSON file)
+        - You want to bulk-add annotations to multiple samples at once
+    Do Not Use When:
+        - You are adding annotations for a single sample — use update_sample_annotations instead
+        - You are querying annotations — use get_project_annotations or get_sample_annotations instead
+    Example User Requests:
+        - "Import these annotations from this JSON file"
     """
     db_client = request.app.state.db_client
     await utils.import_annotations(db_client, project_id, annotations)
@@ -93,6 +157,7 @@ async def import_annotations(
 
 @router.delete(
     "/annotations",
+    operation_id="delete_all_annotations",
     responses={
         200: {"description": "Annotations for this project deleted successfully."},
         404: {"description": "Project not found with that ID."},
@@ -106,7 +171,20 @@ async def delete_all_annotations(
 ):
     """
     Delete ALL annotations for the given project.
-    ---------------------------------------------
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete all annotations for.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
     """
     db_client = request.app.state.db_client
     # Check project exists
@@ -117,6 +195,8 @@ async def delete_all_annotations(
 
 @router.get(
     "/samples/{sample_id}/annotations",
+    operation_id="get_sample_annotations",
+    tags=["MCP"],
     response_model=list[AnnotationOutTypes],
     responses={
         200: {"description": "Annotations for this sample deleted successfully."},
@@ -152,6 +232,49 @@ async def get_annotations(
         description="Whether to only return annotations created by a specific model or by a human.",
     ),
 ) -> list[AnnotationOutTypes]:
+    """
+    Get all annotations for a specific sample within a project, with optional
+    sorting, pagination, and filtering by validation status or creator.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get samples from.
+    sample_id : str
+        The ID of the sample to get annotations from.
+    sort_by : str
+        Field to sort responses by, by default '_id' (equivalent to timestamp).
+    sort_direction : Literal["ascending", "descending"]
+        Direction to sort responses, by default 'descending'.
+    start : int
+        Index of the first annotation you want returned when sorted newest - oldest.
+    count : int | None
+        The number of annotations to return, leave blank to return all entries.
+    validated : bool | None
+        Whether to return only validated or unvalidated annotations, leave blank
+        for all annotations.
+    created_by : str | None
+        Whether to only return annotations created by a specific model or by a human.
+
+    Returns
+    -------
+    list[AnnotationOutTypes]
+        A list of Annotation objects for the specified sample.
+
+    Notes
+    -----
+    Use When:
+        - You need to get annotations for a specific sample
+        - You want to see what model predictions exist for a sample (filter by created_by)
+        - You want to check if a sample's annotations have already been human-validated
+        - You are building a sample-level annotation review UI
+    Do Not Use When:
+        - You need all annotations for a project — use get_project_annotations instead
+        - You are creating/updating annotations — use update_sample_annotations instead
+    Example User Requests:
+        - "What annotations exist for this sample?"
+        - "Show me the model predictions for this sample"
+    """
     # Return annotations available for this project and sample, if any
     # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
     # Should return whether these are validated as a boolean
@@ -180,6 +303,8 @@ async def get_annotations(
 
 @router.put(
     "/samples/{sample_id}/annotations",
+    operation_id="update_sample_annotations",
+    tags=["MCP"],
     responses={
         200: {"description": "Annotations for this sample updated successfully."},
         404: {"description": "Project or Sample not found with that ID."},
@@ -200,11 +325,41 @@ async def update_annotations(
     ),
 ):
     """
-    Update the list of annotations to a given sample for a specified project. Will overwrite existing annotations.
-    ---------------------------------------------------------------------
+    Update the list of annotations for a given sample in a specified project.
+
+    All existing annotations will be replaced with a new set, optionally marking the
+    sample as validated. This will overwrite existing annotations, so confirm
+    with the user before continuing.
+
+    Parameters
+    ----------
+    annotations : list[AnnotationBatchTypes]
+        The new annotations to set for the sample, overwriting any existing ones.
+    project_id : str
+        The ID of the project to update annotations for.
+    sample_id : str
+        The ID of the sample to update annotations for.
+    validated : bool | None
+        Whether to set sample to validated (useful if no annotations present).
+
+    Returns
+    -------
+    list[str]
+        The IDs of the new annotations if successfully created.
+
+    Notes
+    -----
+    Use When:
+        - An annotator has finished reviewing a sample and wants to save their annotations
+        - You want to replace model predictions with human-validated annotations
+        - You are correcting or refining annotations for a single sample
+    Do Not Use When:
+        - You do not have permission to overwrite existing annotations - check with the user first
+        - You are only querying annotations for a sample - use get_sample_annotations instead
+    Example User Requests:
+        - "Save my annotations for this sample"
+        - "Mark these annotations as validated with my corrections"
     """
-    # Add human annotations to this project and sample
-    # Again dont know what form this data will take so have set to a Request for now
     # This data could be for one or more events per task, ie multiple ELMs or UFOs per pulse
     # This should be added into the database, with validated=True
     # Delete predictions from model, if they exist, since they are being replaced by human validated ones
@@ -238,6 +393,7 @@ async def update_annotations(
 
 @router.delete(
     "/samples/{sample_id}/annotations",
+    operation_id="delete_sample_annotations",
     responses={
         200: {"description": "Annotations for this project deleted successfully."},
         404: {"description": "Project not found with that ID."},
@@ -252,7 +408,22 @@ async def remove_annotations(
 ):
     """
     Delete ALL annotations for a given sample from a given project.
-    ---------------------------------------------------------------
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete samples from.
+    sample_id : str
+        The ID of the sample to delete annotations from.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
     """
     # Remove annotations for this project and sample
     # Probably dont need to be able to specify params here, don't envisage how/why the UI would allow you to remove specific annotations

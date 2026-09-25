@@ -494,7 +494,6 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     # Check one annotation removed
     assert len(annotations) == 2
-    print(annotations)
 
     # Check all annotations marked as validated
     for annotation in annotations:
