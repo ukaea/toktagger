@@ -12,10 +12,6 @@ from toktagger.api.auth.core import (
     verify_password,
 )
 
-# ---------------------------------------------------------------------------
-# hash_password / verify_password
-# ---------------------------------------------------------------------------
-
 
 def test_hash_password_format():
     h = hash_password("secret")
@@ -52,11 +48,6 @@ def test_verify_password_empty_string():
     stored = hash_password("")
     assert verify_password("", stored) is True
     assert verify_password("notempty", stored) is False
-
-
-# ---------------------------------------------------------------------------
-# create_access_token / decode_token (round-trip)
-# ---------------------------------------------------------------------------
 
 
 def test_create_access_token_returns_string():

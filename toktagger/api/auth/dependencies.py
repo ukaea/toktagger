@@ -12,7 +12,8 @@ from toktagger.api.auth.core import (
 )
 from toktagger.api.auth.cookies import set_session_cookies
 from toktagger.api.crud import utils
-from toktagger.api.schemas.users import ProjectMember, UserOut
+from toktagger.api.schemas.projects import ProjectMember
+from toktagger.api.schemas.users import UserOut
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 

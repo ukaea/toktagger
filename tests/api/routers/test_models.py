@@ -11,7 +11,7 @@ from unittest.mock import patch
 import ray
 from bson import ObjectId
 
-from tests.api.auth.conftest import create_user, get_auth_token
+from tests.api.auth.conftest import get_auth_token
 from toktagger.api import config
 from toktagger.api.core.sender import (
     send_batch_annotations,
@@ -270,7 +270,25 @@ async def test_predict_endpoint_survives_same_named_human_save(
     admin_token = await get_auth_token(client, "admin", "admin_pass")
 
     # Create a human user whose name matches the model type (the collision scenario).
-    await create_user(client, admin_token, "mock_disruption_cnn", "pass123")
+    create_resp = await client.post(
+        "/users",
+        json={
+            "username": "mock_disruption_cnn",
+            "password": "pass123",
+            "global_role": "user",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_resp.status_code == 200
+
+    # Disable must change password
+    user_id = create_resp.json()["_id"]
+    resp = await client.put(
+        f"/users/{user_id}",
+        json={"must_change_password": False},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
 
     await client.post(
         f"/projects/{project_id}/members",
