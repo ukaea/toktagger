@@ -73,7 +73,8 @@ def test_gpu_limit_evicts_a_gpu_actor_when_gpu_support_is_on():
 
     remaining = registry.list_actors()
     assert "cpu" in remaining, "the CPU actor is under neither limit"
-    assert remaining.count("gpu_one") + remaining.count("gpu_two") == 1
+    assert "gpu_two" in remaining, "the most recently used GPU actor is kept"
+    assert "gpu_one" not in remaining, "the least recently used GPU actor is evicted"
 
 
 def test_a_cpu_actor_can_be_upgraded_to_gpu():
