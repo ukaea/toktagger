@@ -26,8 +26,14 @@ else:
 
     class _RayStub:
         @staticmethod
-        def remote(target):
-            return target
+        def remote(*args, **kwargs):
+            if len(args) == 1 and not kwargs and callable(args[0]):
+                return args[0]
+
+            def decorator(target):
+                return target
+
+            return decorator
 
         class ObjectRef:
             pass
