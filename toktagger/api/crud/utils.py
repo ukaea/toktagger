@@ -381,14 +381,8 @@ async def get_annotation_authors(
     Lets a write route decide whose an annotation is without trusting the created_by
     in the request body, in one query rather than one per annotation.
     """
-    docs = await db_client.get_filtered_documents(
-        collection="annotations",
-        filters={
-            "project_id": convert_to_objectid(project_id, "projects"),
-            "sample_id": convert_to_objectid(sample_id, "samples"),
-        },
-    )
-    return {str(doc["_id"]): doc.get("created_by", "") for doc in docs}
+    annotations = await get_annotations(db_client, project_id, sample_id=sample_id)
+    return {a.id: a.created_by for a in annotations}
 
 
 async def add_annotations(
