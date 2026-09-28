@@ -199,15 +199,16 @@ async def test_username_with_annotators_prefix_rejected(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("username", ["__internal__", "__user__", "__admin"])
 async def test_username_with_dunder_prefix_rejected(
-    unauthenticated_api_client, setup_db_auth
+    username, unauthenticated_api_client, setup_db_auth
 ):
     client = unauthenticated_api_client
     admin_token = await get_auth_token(client, "admin", "admin_pass")
     resp = await client.post(
         "/users",
         json={
-            "username": "__internal__",
+            "username": username,
             "password": "pass1234",
             "global_role": "user",
         },
