@@ -1,8 +1,10 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 from toktagger.api.schemas import ConfiguredModel
+
+MIN_PASSWORD_LENGTH = 8
 
 
 class UserBase(ConfiguredModel):
@@ -25,14 +27,14 @@ class UserOut(UserBase):
 
 class UserCreate(BaseModel):
     username: str
-    password: str
+    password: Annotated[str, Field(min_length=MIN_PASSWORD_LENGTH)]
     global_role: Literal["admin", "user"] = "user"
 
 
 class UserUpdate(BaseModel):
     global_role: Literal["admin", "user"] | None = None
     is_active: bool | None = None
-    password: str | None = None
+    password: Annotated[str, Field(min_length=MIN_PASSWORD_LENGTH)] | None = None
     must_change_password: bool | None = None
 
 

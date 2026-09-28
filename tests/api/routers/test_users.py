@@ -49,6 +49,24 @@ async def test_create_user_as_admin(unauthenticated_api_client, setup_db_auth):
 
 
 @pytest.mark.asyncio
+async def test_create_user_password_too_short_rejected(
+    unauthenticated_api_client, setup_db_auth
+):
+    client = unauthenticated_api_client
+    token = await get_auth_token(client, "admin", "admin_pass")
+    response = await client.post(
+        "/users",
+        json={
+            "username": "newuser",
+            "password": "short1",
+            "global_role": "user",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_created_user_must_change_password(
     unauthenticated_api_client, setup_db_auth
 ):
@@ -84,7 +102,7 @@ async def test_create_user_non_admin_forbidden(
         "/users",
         json={
             "username": "sneaky",
-            "password": "pass",
+            "password": "sneaky_pass123",
             "global_role": "admin",
         },
         headers={"Authorization": f"Bearer {token}"},
