@@ -28,23 +28,38 @@ _PUBLIC_PATHS = {
 _PUBLIC_METHOD_PATHS = {("POST", "/auth/token")}
 
 
+def _iter_leaf_routes(routes):
+    """Recursively walk a Starlette route list, descending into included routers.
+
+    Starlette wraps each `include_router()` call in an opaque `_IncludedRouter`
+    instead of flattening its routes into `app.routes`, so a plain iteration
+    over `app.routes` never reaches the actual endpoints.
+    """
+    for route in routes:
+        original_router = getattr(route, "original_router", None)
+        if original_router is not None:
+            yield from _iter_leaf_routes(original_router.routes)
+        elif (
+            getattr(route, "methods", None) and getattr(route, "path", None) is not None
+        ):
+            yield route
+
+
 def _protected_routes() -> list[tuple[str, str]]:
     """Introspect the FastAPI app for every (method, path) expected to require auth."""
     server = Server()
     server._setup_app()
 
     routes = []
-    for route in server.app.routes:
-        methods = getattr(route, "methods", None)
-        path = getattr(route, "path", None)
-        if not methods or path is None or path in _PUBLIC_PATHS:
+    for route in _iter_leaf_routes(server.app.routes):
+        if route.path in _PUBLIC_PATHS:
             continue
-        for method in sorted(methods):
+        for method in sorted(route.methods):
             if method in ("HEAD", "OPTIONS"):
                 continue
-            if (method, path) in _PUBLIC_METHOD_PATHS:
+            if (method, route.path) in _PUBLIC_METHOD_PATHS:
                 continue
-            routes.append((method, path))
+            routes.append((method, route.path))
     return routes
 
 
@@ -53,20 +68,15 @@ def _fill_path(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "x", path)
 
 
-def _is_models_route(path: str) -> bool:
-    """Model routes are also gated by check_models_enabled, which returns 503 (not
-    401) when the optional `models` extra isn't installed."""
-    return "models" in path.strip("/").split("/")
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("method,path", _protected_routes())
 async def test_unauthenticated_request_is_rejected(
     unauthenticated_api_client, method, path
 ):
+    # Model routes also depend on check_models_enabled (503 when the optional
+    # `models` extra isn't installed), but every endpoint declares its auth
+    # dependency before that one, so an unauthenticated caller always gets
+    # 401 first regardless of whether models are installed.
     resp = await unauthenticated_api_client.request(method, _fill_path(path))
 
-    if _is_models_route(path):
-        assert resp.status_code in (401, 503), f"{method} {path} -> {resp.status_code}"
-    else:
-        assert resp.status_code == 401, f"{method} {path} -> {resp.status_code}"
+    assert resp.status_code == 401, f"{method} {path} -> {resp.status_code}"
