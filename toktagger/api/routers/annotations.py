@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from toktagger.api.auth.dependencies import (
     require_password_changed,
+    require_project_admin_role,
     require_project_annotator,
     require_project_viewer,
 )
@@ -140,7 +141,7 @@ async def delete_all_annotations(
     project_id: str = Path(
         description="The ID of the project to delete all annotations for"
     ),
-    current_user: UserOut = Depends(require_project_annotator),
+    current_user: UserOut = Depends(require_project_admin_role),
 ):
     """Delete ALL annotations for the given project."""
     db_client: MongoDBClient = request.app.state.db_client
