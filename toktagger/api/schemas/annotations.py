@@ -4,12 +4,7 @@ from pydantic import Field, TypeAdapter, create_model, field_validator, model_va
 
 from toktagger.api.schemas import ConfiguredModel
 
-# Authorship prefixes the server generates itself, for machine-made annotations:
-# "model::<type>" for an ML prediction (worker.py, models/*.py) and
-# "annotators::<type>" for a built-in annotator's suggestion (core/annotators.py).
-# routers/users.py refuses these prefixes as usernames, so a real user can never
-# collide with them, and the write routes below leave them alone when they stamp the
-# caller's identity on incoming annotations.
+# Server-generated authorship prefixes for machine annotations; routers/users.py refuses them as usernames so a real user can never collide with them.
 RESERVED_CREATED_BY_PREFIXES = ("model::", "annotators::")
 
 
