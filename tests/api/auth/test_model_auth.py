@@ -219,19 +219,31 @@ async def test_username_with_dunder_prefix_rejected(
 
 
 @pytest.mark.asyncio
-async def test_user_save_does_not_corrupt_model_prefixed_predictions(
-    setup_db_auth, unauthenticated_api_client
+@pytest.mark.parametrize(
+    "prefix,matching_name",
+    [
+        pytest.param("model::", "disruption_cnn", id="model"),
+        pytest.param("annotators::", "peak_detection", id="annotators"),
+    ],
+)
+async def test_user_save_does_not_corrupt_prefixed_predictions(
+    prefix, matching_name, setup_db_auth, unauthenticated_api_client
 ):
-    """A human user named 'disruption_cnn' saving annotations must NOT delete
-    model predictions stored as 'model::disruption_cnn'. The prefix is the separator.
+    """A human user whose name matches a reserved-prefix type (a model type like
+    'disruption_cnn', or a built-in annotator type like 'peak_detection') saving
+    annotations must NOT delete the machine-made annotations stored under that
+    prefix (e.g. 'model::disruption_cnn' or 'annotators::peak_detection'). The
+    prefix is the separator.
 
-    This hand-crafts the "model::" annotation via a direct PUT with the internal
+    This hand-crafts the prefixed annotation via a direct PUT with the internal
     token, so it only proves the import endpoint's exemption logic — not that the
-    real /predict pipeline actually produces that prefix. For the real end-to-end
-    version (actual /predict call, real Ray worker, real per-user JWTs), see
+    real /predict pipeline or annotator suggestion pipeline actually produces that
+    prefix. For the real end-to-end version of the model case (actual /predict
+    call, real Ray worker, real per-user JWTs), see
     test_predict_endpoint_survives_same_named_human_save in
     tests/api/routers/test_models.py.
     """
+    prefixed_created_by = f"{prefix}{matching_name}"
     client = unauthenticated_api_client
     admin_token = await get_auth_token(
         unauthenticated_api_client, "admin", "admin_pass"
@@ -239,11 +251,11 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
     project_id = setup_db_auth["project_id"]
     sample_id = setup_db_auth["sample_id"]
 
-    # Create a human user whose name matches a model type (the collision scenario).
+    # Create a human user whose name matches a reserved-prefix type (the collision scenario).
     create_resp = await client.post(
         "/users",
         json={
-            "username": "disruption_cnn",
+            "username": matching_name,
             "password": "pass1234",
             "global_role": "user",
         },
@@ -260,21 +272,21 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
     )
     assert resp.status_code == 200
 
-    # Insert a model prediction via the internal tokens.
+    # Insert a machine-made annotation via the internal token.
     internal_token = get_internal_token()
     await client.put(
         f"/projects/{project_id}/annotations",
-        json=annotation_payload(label="model_pred", created_by="model::disruption_cnn"),
+        json=annotation_payload(label="machine_pred", created_by=prefixed_created_by),
         headers={"Authorization": f"Bearer {internal_token}"},
     )
 
     # The human user saves their own annotation for the same sample.
     await client.post(
         f"/projects/{project_id}/members",
-        json={"username": "disruption_cnn", "role": "annotator"},
+        json={"username": matching_name, "role": "annotator"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    human_token = await get_auth_token(client, "disruption_cnn", "pass1234")
+    human_token = await get_auth_token(client, matching_name, "pass1234")
     save_resp = await client.put(
         f"/projects/{project_id}/samples/{sample_id}/annotations",
         json=[
@@ -291,7 +303,7 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
     )
     assert save_resp.status_code == 200
 
-    # Both the model prediction and human annotation must survive — the model::
+    # Both the machine-made and human annotation must survive — the reserved
     # prefix provides complete namespace separation.
     get_resp = await client.get(
         f"/projects/{project_id}/annotations",
@@ -299,8 +311,8 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
     )
     annotations = get_resp.json()
     labels_by_author = {a["created_by"]: a["label"] for a in annotations}
-    assert labels_by_author.get("model::disruption_cnn") == "model_pred"
-    assert labels_by_author.get("disruption_cnn") == "human_ann"
+    assert labels_by_author.get(prefixed_created_by) == "machine_pred"
+    assert labels_by_author.get(matching_name) == "human_ann"
 
 
 @pytest.mark.asyncio

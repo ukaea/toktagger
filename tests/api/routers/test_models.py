@@ -88,7 +88,7 @@ async def test_model_batch_predict_num_predictions(
     # Predictions from the real worker pipeline (get_predictions in worker.py) must be
     # stamped "model::<type>", not the raw type — this is what lets a human user with
     # the same name as a model type import annotations without corrupting predictions
-    # (see test_user_save_does_not_corrupt_model_prefixed_predictions in test_model_auth.py,
+    # (see test_user_save_does_not_corrupt_prefixed_predictions in test_model_auth.py,
     # which only exercises the import-endpoint side of that guarantee via a hand-crafted
     # payload; this is the counterpart that proves the worker actually produces it).
     assert all(ann["created_by"] == "model::mock_disruption_cnn" for ann in annotations)
@@ -258,7 +258,7 @@ async def test_predict_endpoint_survives_same_named_human_save(
     annotation for the same sample — the "model::" prefix is the namespace
     separator that prevents the collision from corrupting either author's data.
 
-    Unlike test_user_save_does_not_corrupt_model_prefixed_predictions in
+    Unlike test_user_save_does_not_corrupt_prefixed_predictions in
     test_model_auth.py (which hand-crafts the "model::" annotation via a direct
     PUT with the internal token), this exercises the actual /predict endpoint and
     Ray worker pipeline end to end, with real per-user JWT auth.
