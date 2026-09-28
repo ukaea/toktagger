@@ -65,6 +65,7 @@ async def test_no_token_rejected_for_import_in_auth_mode(
         json=annotation_payload(),
     )
     assert resp.status_code == 401
+    assert resp.json()["detail"] == "Not authenticated"
 
 
 @pytest.mark.asyncio
