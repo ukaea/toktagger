@@ -189,13 +189,6 @@ def test_parquet_file_loader():
 
 
 def test_uda_loader(uda_test):
-    try:
-        import pyuda
-
-        pyuda.Client().get("help::help()")
-    except Exception:  # noqa: BLE001 -- any failure means the external server is unreachable
-        pytest.skip("Could not contact UDA server")
-
     uda_shot = ShotData(protocol="uda", signal_names=["ip", "ANE_DENSITY"])
     sample = Sample(
         shot_id=14892,
@@ -219,14 +212,7 @@ def test_uda_loader(uda_test):
     assert numpy.max(times) < 1.5
 
 
-def test_uda_camera_loader(uda_env_vars):
-    try:
-        import pyuda
-
-        pyuda.Client().get("help::help()")
-    except Exception:  # noqa: BLE001 -- any failure means the external server is unreachable
-        pytest.skip("Could not contact UDA server")
-
+def test_uda_camera_loader(uda_test):
     camera_name = "rba"
     uda_shot = ShotData(protocol="uda", signal_names=[camera_name])
     sample = Sample(
@@ -537,14 +523,7 @@ def test_image_array_file_loader_upper_out_of_range_frame():
         )
 
 
-def test_uda_loader_data_doesnt_exist(uda_env_vars):
-    try:
-        import pyuda
-
-        pyuda.Client().get("help::help()")
-    except Exception:  # noqa: BLE001 -- any failure means the external server is unreachable
-        pytest.skip("Could not contact UDA server")
-
+def test_uda_loader_data_doesnt_exist(uda_test):
     uda_shot = ShotData(protocol="uda", signal_names=["doesnt_exist"])
     sample = Sample(
         shot_id=10000,
