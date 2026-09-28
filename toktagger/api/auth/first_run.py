@@ -13,7 +13,7 @@ async def ensure_admin_user(db_client: MongoDBClient) -> bool:
         if users:
             return True
 
-        password = "admin"
+        password = "admin1234"
         # The default password is public knowledge, so require_password_changed holds
         # the account out of every endpoint until the first person to sign in replaces it.
         admin = UserIn(

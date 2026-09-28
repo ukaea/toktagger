@@ -38,7 +38,7 @@ On first launch TokTagger automatically creates an `admin` account with a fixed 
 
 ```
 Username : admin
-Password : admin
+Password : admin1234
 ```
 
 !!! warning

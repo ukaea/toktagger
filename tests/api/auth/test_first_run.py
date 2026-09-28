@@ -47,7 +47,7 @@ async def test_ensure_admin_user_password_is_hashed(db_client):
 async def test_ensure_admin_user_default_password_is_admin(db_client):
     await ensure_admin_user(db_client)
     users = await db_client.get_all_documents("users")
-    assert verify_password("admin", users[0]["hashed_password"])
+    assert verify_password("admin1234", users[0]["hashed_password"])
 
 
 @pytest.mark.asyncio

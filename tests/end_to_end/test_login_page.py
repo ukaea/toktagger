@@ -9,7 +9,7 @@ from tests.endpoints import create_user
 def test_login_success(server_setup, guest_page):
     guest_page.goto("http://localhost:8002/ui/login")
     guest_page.get_by_role("textbox", name="Username").fill("admin")
-    guest_page.get_by_role("textbox", name="Password").fill("admin")
+    guest_page.get_by_role("textbox", name="Password").fill("admin1234")
     guest_page.get_by_role("button", name="Sign In").click()
     expect(guest_page).to_have_url("http://localhost:8002/ui/projects/", timeout=3000)
 
@@ -46,7 +46,7 @@ def test_login_button_disabled_with_empty_fields(server_setup, guest_page):
     expect(guest_page.get_by_role("button", name="Sign In")).to_be_disabled()
     guest_page.get_by_role("textbox", name="Username").fill("admin")
     expect(guest_page.get_by_role("button", name="Sign In")).to_be_disabled()
-    guest_page.get_by_role("textbox", name="Password").fill("admin")
+    guest_page.get_by_role("textbox", name="Password").fill("admin1234")
     expect(guest_page.get_by_role("button", name="Sign In")).to_be_enabled()
 
 
@@ -56,12 +56,12 @@ def test_login_password_visibility_can_be_toggled(server_setup, guest_page):
     """
     guest_page.goto("http://localhost:8002/ui/login")
     password = guest_page.get_by_role("textbox", name="Password")
-    password.fill("admin")
+    password.fill("admin1234")
     expect(password).to_have_attribute("type", "password")
 
     guest_page.get_by_role("button", name="Show Password").click()
     expect(password).to_have_attribute("type", "text")
-    expect(password).to_have_value("admin")
+    expect(password).to_have_value("admin1234")
 
     guest_page.get_by_role("button", name="Hide Password").click()
     expect(password).to_have_attribute("type", "password")

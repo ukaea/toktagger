@@ -347,7 +347,7 @@ def admin_token(start_server) -> str:
     """
     response = requests.post(
         "http://localhost:8002/auth/token",
-        data={"username": "admin", "password": "admin"},
+        data={"username": "admin", "password": "admin1234"},
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert response.status_code == 200, response.text
@@ -366,8 +366,8 @@ def admin_token(start_server) -> str:
     response = requests.put(
         f"http://localhost:8002/users/{admin_id}",
         # Re-sends the same password because clearing your own flag requires one; the
-        # rest of the suite keeps logging in as admin/admin.
-        json={"password": "admin", "must_change_password": False},
+        # rest of the suite keeps logging in as admin/admin1234.
+        json={"password": "admin1234", "must_change_password": False},
         headers=headers,
     )
     assert response.status_code == 200, response.text
@@ -388,7 +388,7 @@ def admin_cookies(admin_token) -> dict[str, str]:
     session = requests.Session()
     response = session.post(
         "http://localhost:8002/auth/token",
-        data={"username": "admin", "password": "admin"},
+        data={"username": "admin", "password": "admin1234"},
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert response.status_code == 200, response.text
