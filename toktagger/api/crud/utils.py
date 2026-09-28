@@ -199,15 +199,19 @@ async def get_model(
     return Model(**models[0])
 
 
-async def update_model(db_client: MongoDBClient, model_id: str, updates: ModelUpdate):
+async def update_model(
+    db_client: MongoDBClient, project_id: str, model_id: str, updates: ModelUpdate
+):
+    project_obj_id = convert_to_objectid(project_id, "projects")
     model_obj_id = convert_to_objectid(model_id, "models")
 
     # Check model already exists
-    if not await db_client.get_document_by_id(
-        collection="models", object_id=model_obj_id
+    if not await db_client.get_filtered_documents(
+        collection="models",
+        filters={"_id": model_obj_id, "project_id": project_obj_id},
     ):
         raise HTTPException(
-            status_code=404, detail="Tried to update a model which does not exist!"
+            status_code=404, detail="Model not found belonging to this Project."
         )
 
     # Update model

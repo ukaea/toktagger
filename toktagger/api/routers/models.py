@@ -926,7 +926,10 @@ async def update_model(
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client, project_id)
     await utils.update_model(
-        db_client=db_client, model_id=model_id, updates=model_updates
+        db_client=db_client,
+        project_id=project_id,
+        model_id=model_id,
+        updates=model_updates,
     )
 
 
