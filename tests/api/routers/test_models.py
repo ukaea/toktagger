@@ -85,12 +85,7 @@ async def test_model_batch_predict_num_predictions(
     # Check latest version of model has been used by default (annotation label set to model ID in Mock)
     assert all(ann["label"] == setup_model_db["model_id_2"] for ann in annotations)
 
-    # Predictions from the real worker pipeline (get_predictions in worker.py) must be
-    # stamped "model::<type>", not the raw type — this is what lets a human user with
-    # the same name as a model type import annotations without corrupting predictions
-    # (see test_user_save_does_not_corrupt_prefixed_predictions in test_model_auth.py,
-    # which only exercises the import-endpoint side of that guarantee via a hand-crafted
-    # payload; this is the counterpart that proves the worker actually produces it).
+    # Worker predictions must be stamped "model::<type>", not the raw type (see test_model_auth.py).
     assert all(ann["created_by"] == "model::mock_disruption_cnn" for ann in annotations)
 
 
