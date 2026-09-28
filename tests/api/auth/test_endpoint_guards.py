@@ -21,10 +21,21 @@ below rather than relying on weaker roles being implied by stronger ones:
 import typing
 
 import pytest
+from httpx import AsyncClient
 
 from tests.api.auth.conftest import add_member, get_auth_token
 
-ROLES = [
+Role = typing.Literal[
+    "unauthenticated",
+    "non_member",
+    "viewer",
+    "annotator",
+    "project_admin",
+    "global_admin",
+    "held",
+]
+
+ROLES: list[Role] = [
     "unauthenticated",
     "non_member",
     "viewer",
@@ -35,7 +46,13 @@ ROLES = [
 ]
 
 
-async def _get_role_token(client, admin_token, project_id, role, alice_id=None):
+async def _get_role_token(
+    client: AsyncClient,
+    admin_token: str,
+    project_id: str,
+    role: Role,
+    alice_id: str | None = None,
+) -> str | None:
     """Return a bearer token for `role` on `project_id` (None for unauthenticated)."""
     if role == "unauthenticated":
         return None
@@ -54,10 +71,8 @@ async def _get_role_token(client, admin_token, project_id, role, alice_id=None):
         return await get_auth_token(client, "alice", "alice_pass")
     if role in ("viewer", "annotator"):
         await add_member(client, admin_token, project_id, "alice", role)
-    elif role == "project_admin":
-        await add_member(client, admin_token, project_id, "alice", "admin")
     else:
-        raise ValueError(f"Unknown role: {role}")
+        await add_member(client, admin_token, project_id, "alice", "admin")
     return await get_auth_token(client, "alice", "alice_pass")
 
 
