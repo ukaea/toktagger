@@ -1,5 +1,6 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
+import { AnnotationConflictSchema } from "@/types";
 import type {
   Project,
   Sample,
@@ -65,6 +66,16 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
     this.status = status;
+  }
+}
+
+// A save carried edits to other users' annotations that have since been deleted.
+export class AnnotationConflictError extends ApiError {
+  staleIds: string[];
+  constructor(message: string, staleIds: string[]) {
+    super(409, message);
+    this.name = "AnnotationConflictError";
+    this.staleIds = staleIds;
   }
 }
 
@@ -284,6 +295,17 @@ export async function saveSampleAnnotations(
     },
     body: JSON.stringify(updatedAnnotations),
   });
+  if (response.status === 409) {
+    const conflict = AnnotationConflictSchema.safeParse(
+      await response.json().catch(() => null),
+    );
+    if (conflict.success) {
+      throw new AnnotationConflictError(
+        conflict.data.detail.message,
+        conflict.data.detail.stale_ids,
+      );
+    }
+  }
   if (!response.ok) {
     throw new ApiError(
       response.status,

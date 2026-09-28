@@ -33,6 +33,7 @@ import {
   apiFetch,
   getAnnotationsForSample,
   ApiError,
+  AnnotationConflictError,
 } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 import {
@@ -105,6 +106,7 @@ type ButtonInfo = {
 type SaveButtonInfo = ButtonInfo & {
   saveOnNavigate?: boolean;
   canAnnotate: boolean;
+  syncAnnotationsFromServer: (annotations: Annotation[]) => void;
 };
 
 type NextButtonInfo = ButtonInfo & {
@@ -134,19 +136,41 @@ async function persistAnnotations(
   navAdapter: NavAdapter,
   saveOnNavigate: boolean,
   username?: string,
-): Promise<Annotation[]> {
-  const annotationsToSave = navAdapter.getAnnotations();
-  await saveSampleAnnotations(
-    project_id,
-    sample_id,
-    annotationsToSave,
-    saveOnNavigate,
-    username,
-  );
+): Promise<{ saved: Annotation[]; discarded: number }> {
+  const annotations = navAdapter.getAnnotations();
+  let saved = annotations;
+  try {
+    await saveSampleAnnotations(
+      project_id,
+      sample_id,
+      saved,
+      saveOnNavigate,
+      username,
+    );
+  } catch (err) {
+    if (!(err instanceof AnnotationConflictError)) throw err;
+    // Their owner deleted them, and that deletion wins - the rest of the work still saves.
+    const staleIds = new Set(err.staleIds);
+    saved = annotations.filter(
+      (annotation) => !annotation._id || !staleIds.has(annotation._id),
+    );
+    await saveSampleAnnotations(
+      project_id,
+      sample_id,
+      saved,
+      saveOnNavigate,
+      username,
+    );
+    const count = annotations.length - saved.length;
+    ToastQueue.info(
+      `${count} annotation${count === 1 ? " was" : "s were"} deleted by another user since this sample loaded, so your edits to ${count === 1 ? "it" : "them"} were discarded.`,
+      { timeout: TOAST_TIMEOUT },
+    );
+  }
   if (saveOnNavigate) {
     await navAdapter.syncRemovals?.();
   }
-  return annotationsToSave;
+  return { saved, discarded: annotations.length - saved.length };
 }
 
 function NextButton({
@@ -345,10 +369,11 @@ function SaveButton({
   onPermissionError,
   canAnnotate,
   username,
+  syncAnnotationsFromServer,
 }: SaveButtonInfo) {
   const handleClick = async () => {
     try {
-      const annotationsToSave = await persistAnnotations(
+      const { saved, discarded } = await persistAnnotations(
         project_id,
         sample_id,
         navAdapter,
@@ -356,7 +381,13 @@ function SaveButton({
         username,
       );
       navAdapter.afterSave?.();
-      ToastQueue.positive(`Saved ${annotationsToSave.length} annotations!`, {
+      // Staying on the sample, so drop the deleted annotations from view as well.
+      if (discarded > 0) {
+        syncAnnotationsFromServer(
+          await getAnnotationsForSample(project_id, sample_id),
+        );
+      }
+      ToastQueue.positive(`Saved ${saved.length} annotations!`, {
         timeout: TOAST_TIMEOUT,
       });
       setIsValidated(true);
@@ -632,6 +663,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           onPermissionError={() => setPermissionDenied(true)}
           canAnnotate={canAnnotate}
           username={user?.username}
+          syncAnnotationsFromServer={syncAnnotationsFromServer}
         />
         <PreviousButton
           project_id={project_id}

@@ -396,13 +396,23 @@ async def add_annotations(
     project_id: str,
     sample_id: str,
     annotations: list[AnnotationBatchTypes],
+    keep_ids: Iterable[str] = (),
 ) -> list[str]:
-    db_ids = {
-        "project_id": convert_to_objectid(project_id, "projects"),
-        "sample_id": convert_to_objectid(sample_id, "samples"),
-    }
+    """Insert annotations, reusing the stored `_id` of any annotation in `keep_ids`."""
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    sample_obj_id = convert_to_objectid(sample_id, "samples")
+    available_ids = set(keep_ids)
+
+    db_ids = []
+    for annotation in annotations:
+        db_id = {"project_id": project_obj_id, "sample_id": sample_obj_id}
+        if annotation.id in available_ids:
+            available_ids.remove(annotation.id)
+            db_id["_id"] = convert_to_objectid(annotation.id, "annotations")
+        db_ids.append(db_id)
+
     return await db_client.insert_many(
-        collection="annotations", models=annotations, ids=db_ids
+        collection="annotations", models=annotations, ids=db_ids, exclude={"id"}
     )
 
 
@@ -444,9 +454,21 @@ async def update_annotations(
     created_by: str | None = None,
     also_replace: Iterable[str] = (),
 ) -> list[str]:
-    """Replace a sample's annotations for `created_by`, plus any author in `also_replace`."""
+    """Replace a sample's annotations for `created_by`, plus any author in `also_replace`.
+
+    A re-saved annotation keeps its `_id`, so a colleague holding that id can still
+    edit it in place after this save.
+    """
     async with db_client.lock(f"annotations:{project_id}:{sample_id}"):
-        for author in (created_by, *also_replace):
+        replaced_authors = {created_by, *also_replace}
+        stored_authors = await get_annotation_authors(db_client, project_id, sample_id)
+        replaced_ids = {
+            annotation_id
+            for annotation_id, author in stored_authors.items()
+            if created_by is None or author in replaced_authors
+        }
+
+        for author in replaced_authors:
             await delete_annotations(
                 db_client=db_client,
                 project_id=project_id,
@@ -462,6 +484,7 @@ async def update_annotations(
             project_id=project_id,
             sample_id=sample_id,
             annotations=annotations,
+            keep_ids=replaced_ids,
         )
 
 
@@ -595,7 +618,10 @@ async def import_annotations(
 
         ids["sample_id"] = sample_obj_id
         await db_client.insert_many(
-            collection="annotations", models=sample_annotations, ids=ids
+            collection="annotations",
+            models=sample_annotations,
+            ids=ids,
+            exclude={"id"},
         )
 
         # If all annotations are validated, mark sample as validated

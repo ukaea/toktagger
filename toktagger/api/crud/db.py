@@ -65,9 +65,12 @@ class MongoDBClient:
         ],
         models: list[T],
         ids: dict | list[dict] | None = None,
+        exclude: set[str] | None = None,
     ):
         ids = ids or {}
-        documents = [model.model_dump(mode="python") for model in models]
+        documents = [
+            model.model_dump(mode="python", exclude=exclude) for model in models
+        ]
 
         if type(ids) is list:
             if len(ids) != len(models):

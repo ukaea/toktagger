@@ -115,6 +115,13 @@ export const AnnotationSchema = z.union([
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
+export const AnnotationConflictSchema = z.object({
+  detail: z.object({
+    message: z.string(),
+    stale_ids: z.array(z.string()),
+  }),
+});
+
 export type NavAdapter = {
   getAnnotations: () => Annotation[];
   // includeOthers clears every annotation on the sample rather than only the

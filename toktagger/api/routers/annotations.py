@@ -24,6 +24,17 @@ router = APIRouter(
 )
 
 
+def stale_annotations_conflict(stale_ids: list[str]) -> HTTPException:
+    """A 409 naming the edited annotations that no longer exist, so a client can drop them."""
+    return HTTPException(
+        status_code=409,
+        detail={
+            "message": "Annotations were deleted since this sample was loaded.",
+            "stale_ids": stale_ids,
+        },
+    )
+
+
 @router.get(
     "/annotations",
     response_model=list[AnnotationOutTypes],
@@ -212,6 +223,7 @@ async def get_annotations(
     responses={
         200: {"description": "Annotations for this sample updated successfully."},
         404: {"description": "Project or Sample not found with that ID."},
+        409: {"description": "An edited annotation no longer exists."},
     },
 )
 async def update_annotations(
@@ -250,7 +262,7 @@ async def update_annotations(
         db_client, project_id, sample_id
     )
     owned_annotations = []
-    edited_ids = []
+    others_annotations = []
     machine_authors: set[str] = set()
     for annotation in annotations:
         is_other_authors = (
@@ -263,14 +275,7 @@ async def update_annotations(
             # The replace step below is scoped to the caller's own created_by, so
             # re-saving another author's annotation there would duplicate it under
             # the caller's name.
-            if await utils.update_annotation_by_id(
-                db_client=db_client,
-                project_id=project_id,
-                sample_id=sample_id,
-                annotation_id=annotation.id,
-                annotation=annotation,
-            ):
-                edited_ids.append(annotation.id)
+            others_annotations.append(annotation)
             continue
 
         if not is_internal:
@@ -285,6 +290,23 @@ async def update_annotations(
 
         annotation.shot_id = sample.shot_id
         owned_annotations.append(annotation)
+
+    # Checked before any write, so a stale client saves nothing rather than only part.
+    stale_ids = [a.id for a in others_annotations if a.id not in stored_authors]
+    if stale_ids:
+        raise stale_annotations_conflict(stale_ids)
+
+    edited_ids = []
+    for annotation in others_annotations:
+        if not await utils.update_annotation_by_id(
+            db_client=db_client,
+            project_id=project_id,
+            sample_id=sample_id,
+            annotation_id=annotation.id,
+            annotation=annotation,
+        ):
+            raise stale_annotations_conflict([annotation.id])
+        edited_ids.append(annotation.id)
 
     # Machine rows arrive with no id - /annotator/{type} and the predict endpoints
     # return them unsaved - so the client can never send one back for in-place edit,

@@ -505,6 +505,93 @@ async def test_annotator_can_edit_another_users_annotation(
 
 
 @pytest.mark.asyncio
+async def test_edit_survives_owner_resave_between_load_and_save(
+    setup_db_auth, unauthenticated_api_client
+):
+    """Alice's edit lands on bob's annotation even though bob re-saved after she loaded."""
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    for username in ("alice", "bob"):
+        await add_member(client, admin_token, project_id, username, "annotator")
+
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    bob_token = await get_auth_token(client, "bob", "bob_pass")
+
+    await put_annotations(client, project_id, sample_id, bob_token, "bob_ann")
+    loaded = await get_annotations(client, project_id, sample_id, alice_token)
+
+    bobs_view = await get_annotations(client, project_id, sample_id, bob_token)
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=bobs_view,
+        headers={"Authorization": f"Bearer {bob_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == [loaded[0]["_id"]], "a re-save must keep the stored _id"
+
+    loaded[0]["label"] = "edited_by_alice"
+    loaded[0]["time_min"] = 0.3
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=loaded,
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    annotations = await get_annotations(client, project_id, sample_id, admin_token)
+    assert len(annotations) == 1
+    assert annotations[0]["_id"] == loaded[0]["_id"]
+    assert annotations[0]["label"] == "edited_by_alice"
+    assert annotations[0]["time_min"] == 0.3
+    assert annotations[0]["created_by"] == "bob"
+
+
+@pytest.mark.asyncio
+async def test_edit_to_deleted_annotation_is_rejected(
+    setup_db_auth, unauthenticated_api_client
+):
+    """Editing an annotation its owner has since removed is a 409 and writes nothing."""
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    for username in ("alice", "bob"):
+        await add_member(client, admin_token, project_id, username, "annotator")
+
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    bob_token = await get_auth_token(client, "bob", "bob_pass")
+
+    await put_annotations(client, project_id, sample_id, bob_token, "bob_ann")
+    loaded = await get_annotations(client, project_id, sample_id, alice_token)
+
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=[],
+        headers={"Authorization": f"Bearer {bob_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    loaded[0]["label"] = "edited_by_alice"
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=[*loaded, *annotation_payload("alice_ann")],
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 409, resp.text
+    assert resp.json()["detail"]["stale_ids"] == [loaded[0]["_id"]]
+
+    assert await get_annotations(client, project_id, sample_id, admin_token) == []
+
+
+@pytest.mark.asyncio
 async def test_editing_others_annotation_does_not_delete_their_other_annotations(
     setup_db_auth, unauthenticated_api_client
 ):
@@ -634,7 +721,7 @@ async def test_cross_project_annotation_edit_is_scoped_out(
         json=[{**foreign, "label": "hijacked"}],
         headers={"Authorization": f"Bearer {alice_token}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 409
 
     # ...and to delete it.
     del_resp = await client.delete(
