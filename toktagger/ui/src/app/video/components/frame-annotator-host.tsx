@@ -157,6 +157,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const { setVideoLastClassName } = useVideoUiState();
   const {
     frame,
+    byFrame,
     setImageNatural,
     selection,
     setSelection,
@@ -178,8 +179,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const [dismissedPopupAnnotationId, setDismissedPopupAnnotationId] = useState<
     string | null
   >(null);
-  const [isPointAnnotationSelected, setIsPointAnnotationSelected] =
-    useState(false);
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const classItems = useMemo(
     () => annotationLabels.map((label) => ({ name: label.name })),
     [annotationLabels],
@@ -190,15 +190,14 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
-        setIsPointAnnotationSelected(false);
+        setSelectedPointId(null);
         setDismissedPopupAnnotationId(null);
         return;
       }
 
-      setIsPointAnnotationSelected(isPointAnno(arr[0]));
-
       const selectedId =
         typeof arr[0]?.id === "string" ? String(arr[0].id) : null;
+      setSelectedPointId(isPointAnno(arr[0]) ? selectedId : null);
       if (!selectedId) {
         setDismissedPopupAnnotationId(null);
         return;
@@ -234,6 +233,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     () => `data:image/png;base64,${imageBase64}`,
     [imageBase64],
   );
+  const viewer = api?.viewer;
 
   useEffect(() => {
     if (!api?.viewer) return;
@@ -257,6 +257,63 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       api.viewer.removeHandler("open", onOpen);
     };
   }, [api, dataUrl, setImageNatural]);
+
+  useEffect(() => {
+    if (!viewer) return;
+
+    const dots = new Set<HTMLElement>();
+    const removeDots = () => {
+      dots.forEach((dot) => viewer.removeOverlay(dot));
+      dots.clear();
+    };
+
+    const addPointDots = () => {
+      removeDots();
+      if (hideAnnotations || !viewer.isOpen()) return;
+
+      for (const annotation of byFrame.get(frame) ?? []) {
+        const point = readPointGeometry(annotation);
+        if (!point || (editMode && annotation.id === selectedPointId)) {
+          continue;
+        }
+
+        const dot = document.createElement("div");
+        dot.id = `toktagger-video-point-${annotation.id}`;
+        dot.style.width = "4px";
+        dot.style.height = "4px";
+        dot.style.boxSizing = "border-box";
+        dot.style.border = "1px solid #222";
+        dot.style.borderRadius = "50%";
+        dot.style.backgroundColor = "white";
+        dot.style.pointerEvents = "none";
+        dot.setAttribute("aria-hidden", "true");
+
+        viewer.addOverlay({
+          element: dot,
+          location: viewer.viewport.imageToViewportCoordinates(
+            point.x,
+            point.y,
+          ),
+          placement: OpenSeadragon.Placement.CENTER,
+          checkResize: false,
+        });
+        dot.parentElement?.style.setProperty("pointer-events", "none");
+        dots.add(dot);
+      }
+    };
+
+    const onOpen = () => {
+      addPointDots();
+    };
+
+    viewer.addHandler("open", onOpen);
+    onOpen();
+
+    return () => {
+      viewer.removeHandler("open", onOpen);
+      removeDots();
+    };
+  }, [viewer, byFrame, frame, hideAnnotations, editMode, selectedPointId]);
 
   useEffect(() => {
     if (!api?.viewer) return;
@@ -567,11 +624,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   return (
     <div className="w-full flex justify-center">
-      <div
-        className={`relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px] ${
-          isPointAnnotationSelected ? "video-point-selected" : ""
-        }`}
-      >
+      <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
         <OpenSeadragonAnnotator
           tool={annotoriousDrawingTool}
           drawingEnabled={annotoriousDrawingEnabled}
@@ -633,16 +686,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             }}
           />
         </OpenSeadragonAnnotator>
-
-        <style>{`
-          .video-point-selected .a9s-corner-top,
-          .video-point-selected .a9s-corner-handle-right,
-          .video-point-selected .a9s-corner-handle-bottom,
-          .video-point-selected .a9s-corner-handle-left {
-            display: none;
-            pointer-events: none;
-          }
-        `}</style>
 
         <Menu
           id={VIDEO_CANVAS_MENU_ID}
