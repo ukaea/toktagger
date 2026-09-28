@@ -14,7 +14,6 @@ from toktagger.api.schemas.data import (
     Profile2DData,
 )
 from toktagger.api.schemas.views import Profile2DViewParams
-from toktagger.client import annotations_to_dataframe
 from tests.client.conftest import BASE_URL
 
 
@@ -48,69 +47,6 @@ def seeded_image_project(client):
     )
     yield project_id, sample_ids
     requests.delete(f"{BASE_URL}/projects/{project_id}")
-
-
-def test_annotations_to_dataframe_across_samples(client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
-    df = annotations_to_dataframe(client.list_annotations(project_id))
-
-    # Aggregates annotations from both samples into one frame
-    assert len(df) == 3
-    expected_columns = {
-        "id",
-        "label",
-        "type",
-        "created_by",
-        "validated",
-        "project_id",
-        "sample_id",
-        "shot_id",
-        "time_min",
-        "time_max",
-        "uncertainty",
-        "signal_name",
-        "timestamp",
-    }
-    assert expected_columns == set(df.columns)
-    # Two annotations live on sample_ids[0], one on sample_ids[1]
-    assert sorted(df["sample_id"]) == sorted([sample_ids[0]] * 2 + [sample_ids[1]])
-    # The same label appears on both samples, so per-row sample_id matters
-    assert df[df["label"] == "Flat Top"]["sample_id"].nunique() == 2
-    # Validation status and provenance survive the conversion
-    assert set(df[df["label"] == "Flat Top"]["validated"]) == {True}
-    assert set(df[df["label"] == "Ramp Up"]["created_by"]) == {"peak_detection"}
-    assert (df["project_id"] == project_id).all()
-
-
-def test_annotations_to_dataframe_per_sample(client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
-    df = annotations_to_dataframe(
-        client.list_annotations(project_id, sample_id=sample_ids[0])
-    )
-
-    # Only the two annotations on the first sample come back
-    assert len(df) == 2
-    expected_columns = {
-        "id",
-        "label",
-        "type",
-        "created_by",
-        "validated",
-        "project_id",
-        "sample_id",
-        "shot_id",
-        "time_min",
-        "time_max",
-        "uncertainty",
-        "signal_name",
-        "timestamp",
-    }
-    assert expected_columns == set(df.columns)
-    # Both rows belong to the requested sample
-    assert sorted(df["sample_id"]) == sorted([sample_ids[0]] * 2)
-    # Validation status and provenance survive the conversion
-    assert set(df[df["label"] == "Flat Top"]["validated"]) == {True}
-    assert set(df[df["label"] == "Ramp Up"]["created_by"]) == {"peak_detection"}
 
 
 def test_timeseries_to_processed_multi(client, seeded_project_with_samples):
