@@ -751,11 +751,7 @@ async def add_project_member(
             status_code=409, detail="User is already a member of this project"
         )
 
-    member = ProjectMember(
-        project_id=str(project_oid),
-        user_id=str(user_oid),
-        role=role,
-    )
+    member = ProjectMember(role=role)
     return await db_client.insert(
         "project_members",
         member,
