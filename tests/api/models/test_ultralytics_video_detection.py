@@ -343,6 +343,13 @@ def test_predict_converts_yolo_boxes_to_video_annotations(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    "model_class",
+    [
+        video_detection.YoloVideoDetectionModel,
+        video_detection.RTDETRVideoDetectionModel,
+    ],
+)
+@pytest.mark.parametrize(
     ("available_weights", "expected_weight"),
     [
         (("best.pt", "last.pt"), "best.pt"),
@@ -352,6 +359,7 @@ def test_predict_converts_yolo_boxes_to_video_annotations(monkeypatch):
 def test_wrapped_load_restores_best_weights(
     tmp_path,
     monkeypatch,
+    model_class,
     available_weights,
     expected_weight,
 ):
@@ -363,12 +371,15 @@ def test_wrapped_load_restores_best_weights(
     sentinel_model = object()
     loaded_paths = []
     monkeypatch.setattr(
-        video_detection,
-        "YOLO",
-        lambda path: loaded_paths.append(path) or sentinel_model,
+        model_class,
+        "prediction_model_class",
+        # staticmethod so self is not injected into fake constructor
+        staticmethod(
+            lambda path: loaded_paths.append(path) or sentinel_model,
+        ),
     )
 
-    model = object.__new__(video_detection.YoloVideoDetectionModel)
+    model = object.__new__(model_class)
     model._trained = False
     model.wrapped_load(tmp_path)
 
