@@ -14,12 +14,7 @@ from toktagger.api.schemas.data import (
     Profile2DData,
 )
 from toktagger.api.schemas.views import Profile2DViewParams
-from toktagger.client import (
-    annotations_to_dataframe,
-    image_to_array,
-    profile2d_to_xarray,
-    timeseries_to_dataframe,
-)
+from toktagger.client import annotations_to_dataframe
 from tests.client.conftest import BASE_URL
 
 
@@ -118,11 +113,11 @@ def test_annotations_to_dataframe_per_sample(client, seeded_project_with_samples
     assert set(df[df["label"] == "Ramp Up"]["created_by"]) == {"peak_detection"}
 
 
-def test_timeseries_to_dataframe_multi(client, seeded_project_with_samples):
+def test_timeseries_to_processed_multi(client, seeded_project_with_samples):
     project_id, sample_ids = seeded_project_with_samples
     sample = client.get_project(project_id).get_sample(sample_ids[0])
 
-    df = timeseries_to_dataframe(sample.get_data())
+    df = sample.get_data().to_processed()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["Ip"]
@@ -133,13 +128,13 @@ def test_timeseries_to_dataframe_multi(client, seeded_project_with_samples):
     assert df["Ip"].tolist() == expected.Ip.tolist()
 
 
-def test_timeseries_to_dataframe_single(client, seeded_project_with_samples):
+def test_timeseries_to_processed_single(client, seeded_project_with_samples):
     project_id, sample_ids = seeded_project_with_samples
     data = client.get_data(project_id, sample_ids[0])
     assert isinstance(data, MultiVariateTimeSeriesData)
 
     # Take one time series
-    df = timeseries_to_dataframe(data.values["Ip"])
+    df = data.values["Ip"].to_processed()
 
     assert isinstance(df, pd.DataFrame)
     # Same shape as the multivariate frame: time-indexed, one column named
@@ -151,7 +146,7 @@ def test_timeseries_to_dataframe_single(client, seeded_project_with_samples):
     assert df["values"].tolist() == expected.Ip.tolist()
 
 
-def test_profile2d_to_xarray(client, seeded_profile2d_project):
+def test_profile2d_to_processed(client, seeded_profile2d_project):
     project_id, sample_ids = seeded_profile2d_project
     data = client.get_data(
         project_id, sample_ids[0], view=Profile2DViewParams(signal_name="Ip")
@@ -160,7 +155,7 @@ def test_profile2d_to_xarray(client, seeded_profile2d_project):
     # The view emits (dim_1, time) with distinct lengths
     assert len(data.time) != len(data.dim_1)
 
-    result = profile2d_to_xarray(data)
+    result = data.to_processed()
 
     assert isinstance(result, xr.Dataset)
     assert set(result.data_vars) == {"values"}
@@ -177,14 +172,14 @@ def test_profile2d_to_xarray(client, seeded_profile2d_project):
 
 
 @pytest.mark.parametrize("return_raw", (True, False))
-def test_image_to_array(client, seeded_image_project, return_raw):
+def test_image_to_processed(client, seeded_image_project, return_raw):
     project_id, sample_ids = seeded_image_project
     data = client.get_data(
         project_id, sample_ids[0], params=ImageParams(frame=1, return_raw=return_raw)
     )
     assert isinstance(data, ImageData)
 
-    array = image_to_array(data)
+    array = data.to_processed()
 
     # 1.png is a colour PNG: (H, W, 3) uint8, matching the source file exactly
     assert isinstance(array, np.ndarray)

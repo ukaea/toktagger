@@ -111,42 +111,40 @@ Filters: `validated` (validation status) and `created_by` (annotator; sample lev
 
 ## Converting to pandas, xarray and numpy
 
-The client ships conversion helpers that turn fetched data into standard analysis containers:
+Every data model returned by `get_data()` has a `to_processed()` method that converts it into a standard analysis container. The return type depends on the data type:
 
-| Helper | Input | Returns |
-|---|---|---|
-| `annotations_to_dataframe(annotations)` | list of annotations | `DataFrame` with one row per annotation; a column is created for every field present on any annotation, with NaN where a row lacks it, so mixed annotation types aggregate into one frame |
-| `timeseries_to_dataframe(data)` | `TimeSeriesData` or `MultiVariateTimeSeriesData` | `DataFrame` indexed by `time` with one column per signal |
-| `profile2d_to_xarray(profile)` | `Profile2DData` or `MultiProfile2DData` | xarray `Dataset` with one variable per profile, dims `(time, dim_1)` and both coordinate axes attached |
-| `image_to_array(data)` | `ImageData` | decoded pixel `ndarray`: `(H, W)` grayscale, `(H, W, 3)` RGB, `(H, W, 4)` RGBA |
-| `extract_data(data)` | anything `get_data()` can return | dispatches on the type: `DataFrame` for time series, `Dataset` for profiles, `ndarray` for images |
+| Data type | `to_processed()` returns |
+|---|---|
+| `TimeSeriesData` | `DataFrame` indexed by `time` with one column named `values` (a single series has no signal name of its own) |
+| `MultiVariateTimeSeriesData` | `DataFrame` indexed by `time` with one column per signal; signals whose value is None are skipped, and differing time arrays are aligned on their union (missing points become NaN) |
+| `Profile2DData` | xarray `Dataset` with one variable named `values`, dims `(time, dim_1)` and both coordinate axes attached |
+| `MultiProfile2DData` | xarray `Dataset` with one variable per profile; profiles whose value is None are skipped, and differing coordinates are aligned on their union (missing points become NaN) |
+| `ImageData` | decoded pixel `ndarray`: `(H, W)` grayscale, `(H, W, 3)` RGB, `(H, W, 4)` RGBA |
+
+`Profile2DData.values` has no fixed axis order: loaders emit `(time, dim_1)` while `Profile2DView` emits the transposed `(dim_1, time)` layout, so the axis order is inferred from the coordinate lengths. Square profiles are ambiguous and are assumed to be `(time, dim_1)`.
+
+`to_processed()` raises `ValueError` for a bare `Data` instance (no payload), an `ImageData` whose encoded bytes cannot be decoded, or a profile whose values are inconsistent with its coordinate lengths.
+
+Annotations are not data models, so they have a dedicated helper: `annotations_to_dataframe(annotations)` returns a `DataFrame` with one row per annotation; a column is created for every field present on any annotation, with NaN where a row lacks it, so mixed annotation types aggregate into one frame.
 
 ```python
-from toktagger.client import (
-    TokTaggerClient,
-    annotations_to_dataframe,
-    extract_data,
-    timeseries_to_dataframe,
-)
+from toktagger.client import TokTaggerClient, annotations_to_dataframe
 from toktagger.api.schemas.data import ImageParams
 
 with TokTaggerClient() as client:
-    # One DataFrame across all of a project's annotations
-    df = annotations_to_dataframe(
-        client.list_annotations(project_id, count=1000)
-    )
-
     # Convert whatever get_data() returned, without checking the type
-    result = extract_data(client.get_data(project_id, sample_id))  # DataFrame
+    result = client.get_data(project_id, sample_id).to_processed()  # DataFrame
 
-    # Or target a specific container directly
-    ts = timeseries_to_dataframe(sample.get_data())  # DataFrame, time-indexed
-    frame = image_to_array(
-        client.get_data(project_id, sample_id, params=ImageParams(frame=0))
-    )  # ndarray
+    # A single video frame as a numpy array
+    frame = client.get_data(
+        project_id, sample_id, params=ImageParams(frame=0)
+    ).to_processed()  # ndarray
+
+    # One DataFrame across all of a project's annotations
+    df = annotations_to_dataframe(client.list_annotations(project_id, count=1000))
 ```
 
-The helpers are pure conversions — they make no network calls. Fetch with the client first, then convert.
+The conversions are pure — they make no network calls. Fetch with the client first, then convert.
 
 ## Error Handling
 
