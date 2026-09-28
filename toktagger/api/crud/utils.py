@@ -445,16 +445,17 @@ async def update_annotations(
     project_id: str,
     sample_id: str,
     annotations: list[AnnotationBatchTypes],
-    created_by: str | None = None,
-    also_replace: Iterable[str] = (),
+    created_by: Iterable[str] | None = None,
 ) -> list[str]:
-    """Replace a sample's annotations for `created_by`, plus any author in `also_replace`.
+    """Replace a sample's annotations for each author in `created_by`.
+
+    `created_by=None` replaces annotations from every author.
 
     A re-saved annotation keeps its `_id`, so a colleague holding that id can still
     edit it in place after this save.
     """
     async with db_client.lock(f"annotations:{project_id}:{sample_id}"):
-        replaced_authors = {created_by, *also_replace}
+        replaced_authors = set(created_by) if created_by is not None else set()
         stored_authors = await get_annotation_authors(db_client, project_id, sample_id)
         replaced_ids = {
             annotation_id
@@ -462,13 +463,18 @@ async def update_annotations(
             if created_by is None or author in replaced_authors
         }
 
-        for author in replaced_authors:
+        if created_by is None:
             await delete_annotations(
-                db_client=db_client,
-                project_id=project_id,
-                sample_id=sample_id,
-                created_by=author,
+                db_client=db_client, project_id=project_id, sample_id=sample_id
             )
+        else:
+            for author in replaced_authors:
+                await delete_annotations(
+                    db_client=db_client,
+                    project_id=project_id,
+                    sample_id=sample_id,
+                    created_by=author,
+                )
 
         if len(annotations) == 0:
             return []

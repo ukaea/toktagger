@@ -319,8 +319,7 @@ async def update_annotations(
         project_id,
         sample_id,
         owned_annotations,
-        created_by=current_user.username,
-        also_replace=machine_authors,
+        created_by={current_user.username, *machine_authors},
     )
     result.extend(edited_ids)
 
