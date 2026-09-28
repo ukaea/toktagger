@@ -303,42 +303,43 @@ async def start_model_training(
             detail="No validated annotations found to train a model on!",
         )
 
-    # Create model
-    # Try to get model for this project from database if it exists
-    db_models = await utils.get_models(db_client, project_id, model_type)
+    # Held until the queued model is inserted, so a second start sees it and backs off.
+    async with db_client.lock(f"models:{project.id}:{model_type}"):
+        # Try to get model for this project from database if it exists
+        db_models = await utils.get_models(db_client, project_id, model_type)
 
-    if (
-        len(
-            [
-                db_model
-                for db_model in db_models
-                if db_model.status in ["queued", "training", "loading"]
-            ]
+        if (
+            len(
+                [
+                    db_model
+                    for db_model in db_models
+                    if db_model.status in ["queued", "training", "loading"]
+                ]
+            )
+            > 0
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Training of {model_type} model already in progress!",
+            )
+
+        if len(db_models) == 0:
+            # This is the first time a model has been saved for this project, so version = 1
+            version = 1
+        else:
+            version = db_models[0].version + 1
+
+        model_in = ModelIn(
+            type=model_type,
+            version=version,
+            status="queued",
+            progress=0,
+            score=0,
         )
-        > 0
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Training of {model_type} model already in progress!",
+
+        model_id = await utils.add_model(
+            db_client=db_client, project_id=project.id, model=model_in
         )
-
-    if len(db_models) == 0:
-        # This is the first time a model has been saved for this project, so version = 1
-        version = 1
-    else:
-        version = db_models[0].version + 1
-
-    model_in = ModelIn(
-        type=model_type,
-        version=version,
-        status="queued",
-        progress=0,
-        score=0,
-    )
-
-    model_id = await utils.add_model(
-        db_client=db_client, project_id=project.id, model=model_in
-    )
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
     sample_annotations_mapping = defaultdict(list)

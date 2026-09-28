@@ -9,6 +9,8 @@ Key invariants under test:
   5. A project non-member cannot access annotations (403).
 """
 
+import asyncio
+
 import pytest
 
 from tests.api.auth.conftest import (
@@ -812,3 +814,26 @@ async def test_a_save_without_machine_rows_leaves_them_untouched(
     annotations = await get_annotations(client, project_id, sample_id, admin_token)
     authors = sorted(a["created_by"] for a in annotations)
     assert authors == ["annotators::peak_detection", "bob"], authors
+
+
+@pytest.mark.asyncio
+async def test_concurrent_saves_by_same_user_do_not_duplicate(
+    setup_db_auth, unauthenticated_api_client
+):
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+    await add_member(client, admin_token, project_id, "alice", "annotator")
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+
+    responses = await asyncio.gather(
+        *(
+            put_annotations(client, project_id, sample_id, alice_token, f"save_{i}")
+            for i in range(5)
+        )
+    )
+    assert all(resp.status_code == 200 for resp in responses)
+
+    annotations = await get_annotations(client, project_id, sample_id, alice_token)
+    assert len([a for a in annotations if a["created_by"] == "alice"]) == 1

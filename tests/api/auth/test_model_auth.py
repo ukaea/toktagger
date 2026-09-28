@@ -169,12 +169,13 @@ async def test_username_with_model_prefix_rejected(
         "/users",
         json={
             "username": "model::disruption_cnn",
-            "password": "pass123",
+            "password": "pass1234",
             "global_role": "user",
         },
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 422
+    assert resp.json()["detail"] == "Username uses a reserved prefix"
 
 
 @pytest.mark.asyncio
@@ -187,12 +188,13 @@ async def test_username_with_annotators_prefix_rejected(
         "/users",
         json={
             "username": "annotators::peak_detection",
-            "password": "pass123",
+            "password": "pass1234",
             "global_role": "user",
         },
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 422
+    assert resp.json()["detail"] == "Username uses a reserved prefix"
 
 
 @pytest.mark.asyncio
@@ -205,12 +207,13 @@ async def test_username_with_dunder_prefix_rejected(
         "/users",
         json={
             "username": "__internal__",
-            "password": "pass123",
+            "password": "pass1234",
             "global_role": "user",
         },
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 422
+    assert resp.json()["detail"] == "Username uses a reserved prefix"
 
 
 @pytest.mark.asyncio
@@ -239,7 +242,7 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
         "/users",
         json={
             "username": "disruption_cnn",
-            "password": "pass123",
+            "password": "pass1234",
             "global_role": "user",
         },
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -269,7 +272,7 @@ async def test_user_save_does_not_corrupt_model_prefixed_predictions(
         json={"username": "disruption_cnn", "role": "annotator"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    human_token = await get_auth_token(client, "disruption_cnn", "pass123")
+    human_token = await get_auth_token(client, "disruption_cnn", "pass1234")
     save_resp = await client.put(
         f"/projects/{project_id}/samples/{sample_id}/annotations",
         json=[

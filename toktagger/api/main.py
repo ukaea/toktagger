@@ -16,15 +16,16 @@ import tempfile
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from toktagger.api import config
 from toktagger.api.auth.core import get_internal_token
 from toktagger.api.auth.first_run import ensure_admin_user
 from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
@@ -46,6 +47,13 @@ if models_dependencies_installed():
         ActorRegistry,
         ModelRegistry,
         WorkerRegistry,
+    )
+
+
+async def lock_timeout_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Another request is changing this resource. Try again."},
     )
 
 
@@ -272,6 +280,7 @@ class Server:
                 )
 
         self.app = FastAPI(lifespan=lifespan)
+        self.app.add_exception_handler(LockTimeoutError, lock_timeout_handler)
 
         # Allow requests from the frontend dev server
         origins = [

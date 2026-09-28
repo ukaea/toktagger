@@ -1,21 +1,14 @@
-from pathlib import Path
-
-from filelock import FileLock
-
-from toktagger.api import config
 from toktagger.api.auth.core import hash_password
+from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.users import UserIn
 
 
-async def ensure_admin_user(db_client) -> bool:
+async def ensure_admin_user(db_client: MongoDBClient) -> bool:
     """Create the default admin user on first run.
 
     Returns True if auth is required (users exist after this call).
     """
-    lock_path = Path(config.settings.server.cache_dir) / "first_run.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with FileLock(str(lock_path), timeout=30):
+    async with db_client.lock("users:first_run", timeout=30):
         users = await db_client.get_all_documents("users")
         if users:
             return True

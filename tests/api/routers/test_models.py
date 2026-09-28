@@ -274,7 +274,7 @@ async def test_predict_endpoint_survives_same_named_human_save(
         "/users",
         json={
             "username": "mock_disruption_cnn",
-            "password": "pass123",
+            "password": "pass1234",
             "global_role": "user",
         },
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -315,7 +315,7 @@ async def test_predict_endpoint_survives_same_named_human_save(
 
     # The human user (same name as the model) saves their own annotation for the
     # same sample. update_annotations only replaces the CALLER's own annotations.
-    human_token = await get_auth_token(client, "mock_disruption_cnn", "pass123")
+    human_token = await get_auth_token(client, "mock_disruption_cnn", "pass1234")
     save_resp = await client.put(
         f"/projects/{project_id}/samples/{sample_id}/annotations",
         json=[

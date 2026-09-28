@@ -30,7 +30,7 @@ def test_admin_can_create_user(server_setup, page):
 
 
 def test_admin_can_change_user_role(server_setup, admin_token, page):
-    create_user("promoteme", "pass123")
+    create_user("promoteme", "pass1234")
     page.goto("http://localhost:8002/ui/admin/users")
 
     row = _user_row(page, "promoteme")
@@ -45,7 +45,7 @@ def test_admin_can_change_user_role(server_setup, admin_token, page):
 
 
 def test_admin_can_deactivate_and_reactivate_user(server_setup, admin_token, page):
-    user_id = create_user("flipflop", "pass123")
+    user_id = create_user("flipflop", "pass1234")
     page.goto("http://localhost:8002/ui/admin/users")
 
     row = _user_row(page, "flipflop")
@@ -59,7 +59,7 @@ def test_admin_can_deactivate_and_reactivate_user(server_setup, admin_token, pag
 
 
 def test_admin_can_delete_user(server_setup, admin_token, page):
-    create_user("deleteme", "pass123")
+    create_user("deleteme", "pass1234")
     page.goto("http://localhost:8002/ui/admin/users")
 
     row = _user_row(page, "deleteme")

@@ -1,5 +1,7 @@
 """Unit tests for toktagger.api.auth.first_run."""
 
+import asyncio
+
 import pytest
 
 from toktagger.api.auth.core import verify_password
@@ -65,5 +67,12 @@ async def test_ensure_admin_user_with_existing_users_returns_true(db_client):
     result = await ensure_admin_user(db_client)
     assert result is True
 
+    users = await db_client.get_all_documents("users")
+    assert len(users) == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_first_run_creates_one_admin(db_client):
+    await asyncio.gather(*(ensure_admin_user(db_client) for _ in range(3)))
     users = await db_client.get_all_documents("users")
     assert len(users) == 1

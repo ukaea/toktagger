@@ -441,23 +441,24 @@ async def update_annotations(
     also_replace: Iterable[str] = (),
 ) -> list[str]:
     """Replace a sample's annotations for `created_by`, plus any author in `also_replace`."""
-    for author in (created_by, *also_replace):
-        await delete_annotations(
+    async with db_client.lock(f"annotations:{project_id}:{sample_id}"):
+        for author in (created_by, *also_replace):
+            await delete_annotations(
+                db_client=db_client,
+                project_id=project_id,
+                sample_id=sample_id,
+                created_by=author,
+            )
+
+        if len(annotations) == 0:
+            return []
+
+        return await add_annotations(
             db_client=db_client,
             project_id=project_id,
             sample_id=sample_id,
-            created_by=author,
+            annotations=annotations,
         )
-
-    if len(annotations) == 0:
-        return []
-
-    return await add_annotations(
-        db_client=db_client,
-        project_id=project_id,
-        sample_id=sample_id,
-        annotations=annotations,
-    )
 
 
 async def update_annotation_by_id(
@@ -638,10 +639,11 @@ async def get_all_users(db_client: MongoDBClient) -> list[UserOut]:
 
 
 async def create_user(db_client: MongoDBClient, user: UserIn) -> str:
-    existing = await get_user_by_username(db_client, user.username)
-    if existing:
-        raise HTTPException(status_code=409, detail="Username already exists")
-    return await db_client.insert("users", user)
+    async with db_client.lock(f"users:username:{user.username}"):
+        existing = await get_user_by_username(db_client, user.username)
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already exists")
+        return await db_client.insert("users", user)
 
 
 async def update_user(
@@ -745,18 +747,19 @@ async def add_project_member(
     project_oid = convert_to_objectid(project_id, "projects")
     user_oid = convert_to_objectid(user_id, "users")
 
-    existing = await get_project_membership(db_client, project_id, user_id)
-    if existing:
-        raise HTTPException(
-            status_code=409, detail="User is already a member of this project"
-        )
+    async with db_client.lock(f"project_members:{project_id}:{user_id}"):
+        existing = await get_project_membership(db_client, project_id, user_id)
+        if existing:
+            raise HTTPException(
+                status_code=409, detail="User is already a member of this project"
+            )
 
-    member = ProjectMember(role=role)
-    return await db_client.insert(
-        "project_members",
-        member,
-        ids={"project_id": project_oid, "user_id": user_oid},
-    )
+        member = ProjectMember(role=role)
+        return await db_client.insert(
+            "project_members",
+            member,
+            ids={"project_id": project_oid, "user_id": user_oid},
+        )
 
 
 async def update_project_member(

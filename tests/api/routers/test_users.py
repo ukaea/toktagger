@@ -1,5 +1,7 @@
 """Integration tests for /users and /projects/{id}/members endpoints."""
 
+import asyncio
+
 import pytest
 
 from tests.api.auth.conftest import add_member, get_auth_token
@@ -689,3 +691,67 @@ async def test_an_admin_can_clear_someone_elses_forced_change(
         "/auth/me", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.json()["must_change_password"] is False
+
+
+@pytest.mark.asyncio
+async def test_concurrent_create_same_username_creates_one_user(
+    unauthenticated_api_client, setup_db_auth
+):
+    client = unauthenticated_api_client
+    token = await get_auth_token(client, "admin", "admin_pass")
+    responses = await asyncio.gather(
+        *(
+            client.post(
+                "/users",
+                json={
+                    "username": "carol",
+                    "password": "carolpass1",
+                    "global_role": "user",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            for _ in range(3)
+        )
+    )
+    assert sorted(r.status_code for r in responses) == [200, 409, 409]
+
+    users = await client.get("/users", headers={"Authorization": f"Bearer {token}"})
+    assert [u["username"] for u in users.json()].count("carol") == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_mutual_demotion_keeps_an_admin(
+    unauthenticated_api_client, setup_db_auth
+):
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    promote = await client.put(
+        f"/users/{setup_db_auth['alice_id']}",
+        json={"global_role": "admin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert promote.status_code == 200
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+
+    responses = await asyncio.gather(
+        client.put(
+            f"/users/{setup_db_auth['alice_id']}",
+            json={"global_role": "user"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        ),
+        client.put(
+            f"/users/{setup_db_auth['admin_id']}",
+            json={"global_role": "user"},
+            headers={"Authorization": f"Bearer {alice_token}"},
+        ),
+    )
+    assert sorted(r.status_code for r in responses) == [200, 422]
+
+    users = await client.get(
+        "/users", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    if users.status_code == 403:
+        users = await client.get(
+            "/users", headers={"Authorization": f"Bearer {alice_token}"}
+        )
+    assert any(u["global_role"] == "admin" for u in users.json())

@@ -136,8 +136,12 @@ async def update_user(
 
     db_client: MongoDBClient = request.app.state.db_client
 
-    # Prevent demoting or deactivating the last active admin
-    if body.global_role == "user" or body.is_active is False:
+    if body.global_role != "user" and body.is_active is not False:
+        await utils.update_user(db_client, user_id, body)
+        return
+
+    # Held across check and write so two admins cannot demote each other at once.
+    async with db_client.lock("users:admins"):
         all_users = await utils.get_all_users(db_client)
         remaining_admins = [
             u
@@ -149,8 +153,7 @@ async def update_user(
                 status_code=422,
                 detail="Cannot demote or deactivate the last active admin account",
             )
-
-    await utils.update_user(db_client, user_id, body)
+        await utils.update_user(db_client, user_id, body)
 
 
 @router.delete("/{user_id}", dependencies=[Depends(require_password_changed)])
@@ -163,18 +166,19 @@ async def delete_user(
 
     # Prevent deleting the last active admin (mirrors the demote/deactivate guard
     # in update_user — otherwise the account list becomes unmanageable).
-    all_users = await utils.get_all_users(db_client)
-    target = next((u for u in all_users if u.id == user_id), None)
-    if target and target.global_role == "admin" and target.is_active:
-        remaining_admins = [
-            u
-            for u in all_users
-            if u.global_role == "admin" and u.is_active and u.id != user_id
-        ]
-        if not remaining_admins:
-            raise HTTPException(
-                status_code=422,
-                detail="Cannot delete the last active admin account",
-            )
+    async with db_client.lock("users:admins"):
+        all_users = await utils.get_all_users(db_client)
+        target = next((u for u in all_users if u.id == user_id), None)
+        if target and target.global_role == "admin" and target.is_active:
+            remaining_admins = [
+                u
+                for u in all_users
+                if u.global_role == "admin" and u.is_active and u.id != user_id
+            ]
+            if not remaining_admins:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Cannot delete the last active admin account",
+                )
 
-    await utils.delete_user(db_client, user_id)
+        await utils.delete_user(db_client, user_id)

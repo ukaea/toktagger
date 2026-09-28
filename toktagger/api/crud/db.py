@@ -1,8 +1,17 @@
+import asyncio
+import random
+import time
 import typing
+import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
+import mongita.errors
 import pydantic
 import pymongo
+import pymongo.errors
+from pymongo.results import UpdateResult
 from bson.objectid import ObjectId
 from platformdirs import user_cache_dir
 
@@ -12,6 +21,10 @@ DATABASE_NAME = "event_db"
 COLLECTION_NAME = "shots"
 
 T = typing.TypeVar("T", bound=pydantic.BaseModel)
+
+
+class LockTimeoutError(Exception):
+    """Raised when a distributed lock cannot be acquired before the timeout."""
 
 
 class MongoDBClient:
@@ -76,17 +89,14 @@ class MongoDBClient:
         model: T,
         object_id: ObjectId,
     ):
-        # Retrieve existing entry:
-        document = await self.db[collection].find_one({"_id": object_id})
+        updates = model.model_dump(mode="python", exclude_unset=True, exclude_none=True)
+        if not updates:
+            matched = int(await self.db[collection].count_documents({"_id": object_id}))
+            return UpdateResult({"n": matched, "nModified": 0}, acknowledged=True)
 
-        # Add updates to db entry
-        updated_document = {
-            **document,
-            **model.model_dump(mode="python", exclude_unset=True, exclude_none=True),
-        }
-
+        # Only the given fields are written, so concurrent updates to other fields survive.
         return await self.db[collection].update_one(
-            {"_id": object_id}, {"$set": updated_document}
+            {"_id": object_id}, {"$set": updates}
         )
 
     async def get_document_by_id(
@@ -134,6 +144,42 @@ class MongoDBClient:
         filters: dict | None = None,
     ):
         return await self.db[collection].delete_many(filters or {})
+
+    @asynccontextmanager
+    async def lock(
+        self, name: str, ttl: float = 30.0, timeout: float = 10.0
+    ) -> AsyncIterator[None]:
+        """Hold a lock shared by every API worker using this database.
+
+        A lock left behind by a crashed worker is taken over once `ttl` seconds pass.
+        Raises LockTimeoutError if the lock is not free within `timeout` seconds.
+        """
+        locks = self.db["locks"]
+        owner = uuid.uuid4().hex
+        deadline = time.monotonic() + timeout
+        delay = 0.02
+        while True:
+            now = time.time()
+            try:
+                await locks.insert_one(
+                    {"_id": name, "owner": owner, "expires_at": now + ttl}
+                )
+                break
+            except (pymongo.errors.DuplicateKeyError, mongita.errors.DuplicateKeyError):
+                result = await locks.update_one(
+                    {"_id": name, "expires_at": {"$lt": now}},
+                    {"$set": {"owner": owner, "expires_at": now + ttl}},
+                )
+                if result.modified_count == 1:
+                    break
+            if time.monotonic() >= deadline:
+                raise LockTimeoutError(f"Timed out waiting for lock {name!r}")
+            await asyncio.sleep(delay * random.uniform(0.5, 1.5))
+            delay = min(delay * 2, 0.5)
+        try:
+            yield
+        finally:
+            await locks.delete_one({"_id": name, "owner": owner})
 
 
 # Notes to self
