@@ -210,6 +210,12 @@ class Project(ProjectSchema):
         TokTaggerAPIError
             If the API returns a non-2xx response (e.g. 404 if the sample or
             its data does not exist).
+
+        Notes
+        -----
+        Use `to_processed()` on the `Data` object returned by this method to
+        get the data into a format ready for analysis, eg a pandas Dataframe
+        for time-series, an xarray Dataset for profile-2d, or a numpy Array for images.
         """
         return self._require_client().get_data(
             self.id, sample_id, params=params, view=view
@@ -317,6 +323,12 @@ class Sample(SampleSchema):
         TokTaggerAPIError
             If the API returns a non-2xx response (e.g. 404 if the sample or
             its data does not exist).
+
+        Notes
+        -----
+        Use `to_processed()` on the `Data` object returned by this method to
+        get the data into a format ready for analysis, eg a pandas Dataframe
+        for time-series, an xarray Dataset for profile-2d, or a numpy Array for images.
         """
         return self._require_client().get_data(
             self.project_id, self.id, params=params, view=view
@@ -744,7 +756,7 @@ class TokTaggerClient:
         params: DataParamTypes = DataParams(),
         view: ViewParamTypes = ViewParams(),
     ) -> DataResponseType:
-        """Get data (e.g. a time trace or image) about a sample.
+        """Get data (e.g. a time trace, profile-2d or image) about a sample.
 
         Parameters
         ----------
@@ -774,6 +786,12 @@ class TokTaggerClient:
         TokTaggerAPIError
             If the API returns another non-2xx response (e.g. 400 for an
             invalid view).
+
+        Notes
+        -----
+        Use `to_processed()` on the `Data` object returned by this method to
+        get the data into a format ready for analysis, eg a pandas Dataframe
+        for time-series, an xarray Dataset for profile-2d, or a numpy Array for images.
         """
         body = {
             "params": params.model_dump(mode="json"),
