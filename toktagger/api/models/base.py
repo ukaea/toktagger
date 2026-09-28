@@ -564,6 +564,9 @@ class ActorRegistry:
         actor_name : str
             The name of the Ray Actor
         """
+        if use_gpu and not self._gpu_enabled:
+            raise ValueError("GPU requested but GPU support is not enabled on server")
+
         # Set this actor to be the most recently used
         if actor_name in self.actors:
             self.actors.move_to_end(actor_name)

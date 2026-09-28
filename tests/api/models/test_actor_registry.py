@@ -35,20 +35,19 @@ def _no_ray_cluster():
         yield get_actor
 
 
-def test_gpu_eviction_is_skipped_when_gpu_support_is_off():
-    """A GPU actor must not be evicted the moment it is registered.
+def test_gpu_request_is_rejected_when_gpu_support_is_off():
+    """A caller cannot register a GPU actor on a registry with no GPU budget.
 
-    max_gpu_actors=0 means GPU support is off, so the GPU limit does not apply and
-    the overall actor limit governs. Reading the gpu_enabled *method* instead of the
-    flag made this condition always true, which took the GPU branch and evicted the
-    actor that had just been registered.
+    max_gpu_actors=0 means GPU support is off; silently downgrading the request to a
+    CPU actor would hide a caller bug, so this must fail loudly instead.
     """
     registry = Registry(max_actors=3, max_gpu_actors=0)
     assert registry._gpu_enabled is False
 
-    registry.update_actors("first", use_gpu=True)
+    with pytest.raises(ValueError, match="GPU requested"):
+        registry.update_actors("first", use_gpu=True)
 
-    assert registry.list_actors() == ["first"]
+    assert registry.list_actors() == []
 
 
 def test_actors_are_evicted_least_recently_used_first():
