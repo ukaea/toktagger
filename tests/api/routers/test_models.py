@@ -333,6 +333,7 @@ async def test_predict_endpoint_survives_same_named_human_save(
     )
     labels_by_author = {a["created_by"]: a["label"] for a in annotations}
     assert labels_by_author.get("model::mock_disruption_cnn") is not None
+    assert labels_by_author.get("model::mock_disruption_cnn") != "human_ann"
     assert labels_by_author.get("mock_disruption_cnn") == "human_ann"
 
 
