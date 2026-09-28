@@ -100,6 +100,7 @@ def main():
         shot_id: [
             {
                 "shot_id": shot_id,
+                "type": "time_point",
                 "validated": True,
                 "label": "Disruption",
                 "time": item["annotations"]["disruption"],
