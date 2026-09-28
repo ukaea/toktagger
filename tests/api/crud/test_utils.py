@@ -26,7 +26,7 @@ async def test_get_projects(db_client, setup_db):
     # Check three projects returned
     assert len(projects) == 3
     # Check returned in correct order - reverse order of created
-    assert [project["name"] for project in projects] == [
+    assert [project.name for project in projects] == [
         "project_2",
         "test_project_1",
         "test_project_0",
@@ -39,7 +39,7 @@ async def test_get_projects_by_name(db_client, setup_db):
     # Should fuzzy search for any names including 'test'
     # Case insensitive
     assert len(projects) == 2
-    assert [project["name"] for project in projects] == [
+    assert [project.name for project in projects] == [
         "test_project_1",
         "test_project_0",
     ]

@@ -33,18 +33,21 @@ from toktagger.api.schemas.users import (
 async def get_projects(
     db_client: MongoDBClient,
     name: str | None = None,
+    project_ids: list[ObjectId] | None = None,
     sort_by: str | None = "_id",
     sort_direction: Literal["ascending", "descending"] | None = "descending",
     start: int | None = 0,
     count: int | None = None,
-):
-    filters = {}
+) -> list[Project]:
+    filters: dict = {}
+    if project_ids is not None:
+        filters["_id"] = {"$in": project_ids}
     if name:
         # Search with regex, return any projects which start with the searched for string, case insensitive
         filters["name"] = {"$regex": f"{name}", "$options": "i"}
 
     # Return a list of all projects and info about them
-    projects = await db_client.get_filtered_documents(
+    docs = await db_client.get_filtered_documents(
         collection="projects",
         filters=filters,
         sort_by=sort_by,
@@ -53,7 +56,7 @@ async def get_projects(
         limit=count if count is not None else 0,
     )
 
-    return projects
+    return [Project(**d) for d in docs]
 
 
 async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
@@ -828,38 +831,25 @@ async def get_user_projects(
     global_role: str,
     name: str | None = None,
     sort_by: str = "_id",
-    sort_direction: str = "descending",
+    sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
     count: int | None = None,
 ) -> list[Project]:
-    if global_role == "admin":
-        return await get_projects(
-            db_client,
-            name=name,
-            sort_by=sort_by,
-            sort_direction=sort_direction,
-            start=start,
-            count=count,
+    project_ids = None
+    if global_role != "admin":
+        memberships = await _get_user_membership_docs(
+            db_client, convert_to_objectid(user_id, "users")
         )
+        project_ids = [m["project_id"] for m in memberships]
+        if not project_ids:
+            return []
 
-    memberships = await _get_user_membership_docs(
-        db_client, convert_to_objectid(user_id, "users")
-    )
-    project_oids = [m["project_id"] for m in memberships]
-
-    if not project_oids:
-        return []
-
-    filters: dict = {"_id": {"$in": project_oids}}
-    if name:
-        filters["name"] = {"$regex": f"{name}", "$options": "i"}
-
-    docs = await db_client.get_filtered_documents(
-        "projects",
-        filters=filters,
+    return await get_projects(
+        db_client,
+        name=name,
+        project_ids=project_ids,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
-        limit=count if count is not None else 0,
+        count=count,
     )
-    return [Project(**d) for d in docs]
