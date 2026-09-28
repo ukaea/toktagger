@@ -63,10 +63,21 @@ async def get_all_annotations(
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
 
+    # require_project_viewer already checked access; re-fetch to read this user's
+    # show_others_annotations preference (None for a non-member admin, who sees everything).
+    membership = await utils.get_project_membership(
+        db_client, project_id, current_user.id
+    )
+
+    created_by = None
+    if membership and not membership.show_others_annotations:
+        created_by = current_user.username
+
     annotations = await utils.get_annotations(
         db_client=db_client,
         project_id=project_id,
         validated=validated,
+        created_by=created_by,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
