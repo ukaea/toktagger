@@ -204,12 +204,16 @@ async def test_user_cannot_self_reactivate_via_is_active(
 async def test_update_other_user_as_non_admin_forbidden(
     unauthenticated_api_client, setup_db_auth
 ):
+    """Uses a password change, not global_role, so this actually exercises the
+    "editing someone else" check rather than the separate self-promote guard
+    (which forbids global_role/is_active regardless of whose id is targeted
+    and would mask a broken "editing someone else" check)."""
     client = unauthenticated_api_client
     token = await get_auth_token(client, "alice", "alice_pass")
     bob_id = setup_db_auth["bob_id"]
     response = await client.put(
         f"/users/{bob_id}",
-        json={"global_role": "admin"},
+        json={"password": "new_bob_password"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
