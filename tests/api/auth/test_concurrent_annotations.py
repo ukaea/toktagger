@@ -694,6 +694,39 @@ async def test_claiming_another_users_annotation_does_not_copy_it(
     assert annotations[0]["label"] == "claimed_by_alice", "the edit still applies"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("spoofed_author", ["bob", "model::disruption_cnn"])
+async def test_resaving_own_annotation_cannot_change_its_author(
+    setup_db_auth, unauthenticated_api_client, spoofed_author
+):
+    """Re-sending one's own saved annotation under another author keeps the stored one."""
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(
+        unauthenticated_api_client, "admin", "admin_pass"
+    )
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+
+    await add_member(client, admin_token, project_id, "alice", "annotator")
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+
+    await put_annotations(client, project_id, sample_id, alice_token, "alice_ann")
+    loaded = await get_annotations(client, project_id, sample_id, alice_token)
+    assert len(loaded) == 1
+
+    loaded[0]["created_by"] = spoofed_author
+    resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=loaded,
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    annotations = await get_annotations(client, project_id, sample_id, admin_token)
+    assert len(annotations) == 1
+    assert annotations[0]["created_by"] == "alice"
+
+
 def machine_payload(label: str, created_by: str):
     """An unsaved annotator suggestion or model prediction, as the client holds it.
 

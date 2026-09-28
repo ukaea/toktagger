@@ -463,7 +463,10 @@ async def test_get_model_doesnt_exist(db_client, setup_model_db):
 async def test_update_model(db_client, setup_model_db):
     model_updates = ModelUpdate(status="completed", progress=100, score=80)
     await utils.update_model(
-        db_client, model_id=setup_model_db["model_id_3"], updates=model_updates
+        db_client,
+        project_id=setup_model_db["project_id"],
+        model_id=setup_model_db["model_id_3"],
+        updates=model_updates,
     )
     # Check model has been updated
     model_updated = await db_client.get_document_by_id(
@@ -472,6 +475,24 @@ async def test_update_model(db_client, setup_model_db):
     assert model_updated["status"] == "completed"
     assert model_updated["progress"] == 100
     assert model_updated["score"] == 80
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_update_model_wrong_project(db_client, setup_model_db):
+    with pytest.raises(
+        HTTPException, match="Model not found belonging to this Project"
+    ):
+        await utils.update_model(
+            db_client,
+            project_id=str(ObjectId()),
+            model_id=setup_model_db["model_id_3"],
+            updates=ModelUpdate(status="completed"),
+        )
+    model = await db_client.get_document_by_id(
+        "models", ObjectId(setup_model_db["model_id_3"])
+    )
+    assert model["status"] == "training"
 
 
 @pytest.mark.asyncio

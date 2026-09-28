@@ -273,10 +273,12 @@ async def update_annotations(
                 edited_ids.append(annotation.id)
             continue
 
-        if annotation.id is None and not is_internal:
+        if not is_internal:
             # A just-run model prediction or annotator suggestion keeps its synthetic
             # author; otherwise the server is authoritative for identity.
-            if (annotation.created_by or "").startswith(RESERVED_CREATED_BY_PREFIXES):
+            if annotation.id is None and (annotation.created_by or "").startswith(
+                RESERVED_CREATED_BY_PREFIXES
+            ):
                 machine_authors.add(annotation.created_by)
             else:
                 annotation.created_by = current_user.username

@@ -261,7 +261,7 @@ ACTIONS: dict[str, Action] = {
             "unauthenticated": _status(401),
             "non_member": _status(403),
             "viewer": _status(403),
-            "annotator": _status(200),
+            "annotator": _status(403),
             "project_admin": _status(200),
             "global_admin": _status(200),
             "held": _status(403),

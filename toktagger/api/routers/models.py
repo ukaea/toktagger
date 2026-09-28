@@ -364,7 +364,10 @@ async def start_model_training(
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model_id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model_id}
@@ -421,6 +424,7 @@ async def stop_model_training(
                 pass
         await utils.update_model(
             db_client=db_client,
+            project_id=project_id,
             model_id=model.id,
             updates=ModelUpdate(status="aborted"),
         )
@@ -463,7 +467,10 @@ async def load_model_weights_local(
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model.id}
@@ -516,7 +523,10 @@ async def load_model_weights_gitlab(
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model.id}
@@ -562,7 +572,10 @@ async def load_model_weights_hugging_face(
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model.id}
@@ -615,6 +628,7 @@ async def get_load_model_status(
         err_msg = err_lines[-1] if err_lines else repr(e)
         await utils.update_model(
             db_client=db_client,
+            project_id=project_id,
             model_id=model.id,
             updates=ModelUpdate(status="failed", progress=0),
         )
@@ -626,6 +640,7 @@ async def get_load_model_status(
     if result.get("message"):
         await utils.update_model(
             db_client=db_client,
+            project_id=project_id,
             model_id=result["model_id"],
             updates=ModelUpdate(status="failed", progress=0),
         )

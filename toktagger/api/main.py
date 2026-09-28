@@ -270,10 +270,11 @@ class Server:
     def _setup_app(self):
         # Check cache dirs are in /tmp if testing mode enabled
         if self.testing_mode:
-            tempdir = pathlib.Path(tempfile.gettempdir())
+            # Resolve symlinks, since on macOS /var is a link to /private/var
+            tempdir = pathlib.Path(tempfile.gettempdir()).resolve()
             if (
-                tempdir not in config.settings.models.cache_dir.parents
-                or tempdir not in config.settings.server.cache_dir.parents
+                tempdir not in config.settings.models.cache_dir.resolve().parents
+                or tempdir not in config.settings.server.cache_dir.resolve().parents
             ):
                 raise ValueError(
                     "In testing mode, cache directories must be in temp directory!"
