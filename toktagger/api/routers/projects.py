@@ -130,7 +130,7 @@ async def update_project(
 async def delete_project(
     request: Request,
     project_id: str = Path(description="The ID of the project to delete"),
-    current_user: UserOut = Depends(require_project_annotator),
+    current_user: UserOut = Depends(require_project_admin_role),
 ):
     """Permanently delete a project."""
     db_client: MongoDBClient = request.app.state.db_client
