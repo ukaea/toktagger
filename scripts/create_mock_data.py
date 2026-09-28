@@ -1,12 +1,13 @@
 import getpass
 import os
 import random
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy
 import pandas as pd
-from setup import BASE_URL, create_local_samples, create_project, get_token
+from setup import BASE_URL, SetupError, create_local_samples, create_project, get_token
 
 
 def create_mock_data(base_path: Path, shot_ids: list):
@@ -130,4 +131,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SetupError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)

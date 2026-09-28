@@ -1,5 +1,6 @@
 import getpass
 import os
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -10,13 +11,36 @@ from toktagger.api.config import settings
 BASE_URL = f"http://{settings.server.host}:{settings.server.port}"
 
 
+class SetupError(RuntimeError):
+    """Raised when the TokTagger API rejects a setup script request."""
+
+
+def _raise_for_status(response: requests.Response) -> None:
+    if response.ok:
+        return
+
+    try:
+        detail = response.json().get("detail")
+    except (ValueError, AttributeError):
+        detail = None
+
+    if response.status_code == 403 and detail and "change your password" in detail:
+        raise SetupError(
+            f"{detail} Log in to the TokTagger UI once and set a new password, "
+            "then re-run this script."
+        )
+    if detail:
+        raise SetupError(f"{response.status_code} error from {response.url}: {detail}")
+    response.raise_for_status()
+
+
 def get_token(base_url: str, username: str, password: str) -> str:
     r = requests.post(
         f"{base_url}/auth/token",
         data={"username": username, "password": password},
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
-    r.raise_for_status()
+    _raise_for_status(r)
     return r.json()["access_token"]
 
 
@@ -50,7 +74,7 @@ def create_project(
         json=project,
         headers=_auth(token),
     )
-    response.raise_for_status()
+    _raise_for_status(response)
     project_id = response.json()["_id"]
     return project_id
 
@@ -79,7 +103,7 @@ def create_uda_samples(
         json=samples,
         headers=_auth(token),
     )
-    r.raise_for_status()
+    _raise_for_status(r)
 
 
 def create_sal_samples(
@@ -102,7 +126,7 @@ def create_sal_samples(
         json=samples,
         headers=_auth(token),
     )
-    r.raise_for_status()
+    _raise_for_status(r)
 
 
 def create_fair_mast_samples(
@@ -125,7 +149,7 @@ def create_fair_mast_samples(
         json=samples,
         headers=_auth(token),
     )
-    r.raise_for_status()
+    _raise_for_status(r)
 
 
 def create_local_samples(
@@ -161,7 +185,7 @@ def create_local_samples(
         json=samples,
         headers=_auth(token),
     )
-    r.raise_for_status()
+    _raise_for_status(r)
 
 
 def create_image_samples(
@@ -191,7 +215,7 @@ def create_image_samples(
         json=samples,
         headers=_auth(token),
     )
-    r.raise_for_status()
+    _raise_for_status(r)
 
 
 def create_uda_camera_samples(
@@ -214,7 +238,7 @@ def create_uda_camera_samples(
         json=samples,
         headers=_auth(token),
     )
-    r.raise_for_status()
+    _raise_for_status(r)
 
 
 def main():
@@ -372,4 +396,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SetupError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
