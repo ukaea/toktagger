@@ -238,8 +238,9 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   useEffect(() => {
     if (!api?.viewer) return;
 
-    const onOpen = () => {
-      const item = api.viewer.world.getItemAt(0);
+    const viewer = api.viewer;
+    const onImageAdded = () => {
+      const item = viewer.world.getItemAt(0);
       if (!item) return;
 
       const size = item.getContentSize();
@@ -250,13 +251,13 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       }
     };
 
-    api.viewer.addHandler("open", onOpen);
-    onOpen();
+    viewer.world.addHandler("add-item", onImageAdded);
+    onImageAdded();
 
     return () => {
-      api.viewer.removeHandler("open", onOpen);
+      viewer.world.removeHandler("add-item", onImageAdded);
     };
-  }, [api, dataUrl, setImageNatural]);
+  }, [api, dataUrl, frame, setImageNatural]);
 
   useEffect(() => {
     if (!viewer) return;
@@ -302,15 +303,11 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       }
     };
 
-    const onOpen = () => {
-      addPointDots();
-    };
-
-    viewer.addHandler("open", onOpen);
-    onOpen();
+    viewer.world.addHandler("add-item", addPointDots);
+    addPointDots();
 
     return () => {
-      viewer.removeHandler("open", onOpen);
+      viewer.world.removeHandler("add-item", addPointDots);
       removeDots();
     };
   }, [viewer, byFrame, frame, hideAnnotations, editMode, selectedPointId]);
