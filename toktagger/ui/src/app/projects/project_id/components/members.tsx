@@ -26,7 +26,11 @@ import UserGroup from "@spectrum-icons/workflow/UserGroup";
 import Delete from "@spectrum-icons/workflow/Delete";
 import { z } from "zod/v4";
 import { BACKEND_API_URL, apiFetch } from "@/app/core";
-import { ProjectMemberOutSchema, type ProjectMemberOut } from "@/types";
+import {
+  ProjectMemberSchema,
+  ProjectMemberOutSchema,
+  type ProjectMemberOut,
+} from "@/types";
 
 interface Props {
   projectId: string;
@@ -69,7 +73,10 @@ export function ProjectMembersDialog({ projectId, isProjectAdmin }: Props) {
     }
   };
 
-  const updateRole = async (userId: string, role: string) => {
+  const updateRole = async (
+    userId: string,
+    role: ProjectMemberOut["role"],
+  ) => {
     try {
       const res = await apiFetch(
         `${BACKEND_API_URL}/projects/${projectId}/members/${userId}`,
@@ -129,8 +136,10 @@ export function ProjectMembersDialog({ projectId, isProjectAdmin }: Props) {
                           aria-label="Role"
                           selectedKey={item.role}
                           onSelectionChange={(k) => {
-                            if (k !== null) {
-                              updateRole(item.user_id, String(k));
+                            const parsed =
+                              ProjectMemberSchema.shape.role.safeParse(k);
+                            if (parsed.success) {
+                              updateRole(item.user_id, parsed.data);
                             }
                           }}
                           width="100%"

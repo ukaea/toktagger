@@ -26,7 +26,7 @@ import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
 import { PasswordChangeDialog } from "@/app/components/ui/passwordChangeDialog";
-import type { CurrentUser } from "@/types";
+import { CurrentUserSchema, type CurrentUser } from "@/types";
 
 type UserRow = CurrentUser & { id: string };
 
@@ -253,8 +253,10 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
                 label="Role"
                 selectedKey={role}
                 onSelectionChange={(k) => {
-                  if (k !== null) {
-                    setRole(k as "admin" | "user");
+                  const parsed =
+                    CurrentUserSchema.shape.global_role.safeParse(k);
+                  if (parsed.success) {
+                    setRole(parsed.data);
                   }
                 }}
               >
@@ -326,8 +328,10 @@ function ChangeRoleDialog({
               label="Global Role"
               selectedKey={role}
               onSelectionChange={(k) => {
-                if (k !== null) {
-                  setRole(k as "admin" | "user");
+                const parsed =
+                  CurrentUserSchema.shape.global_role.safeParse(k);
+                if (parsed.success) {
+                  setRole(parsed.data);
                 }
               }}
             >
