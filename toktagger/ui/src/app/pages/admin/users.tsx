@@ -56,7 +56,7 @@ export default function AdminUsersPage() {
     refresh();
   }, [refresh]);
 
-  const deactivate = async (userId: string, isActive: boolean) => {
+  const toggleActivation = async (userId: string, isActive: boolean) => {
     try {
       const res = await apiFetch(`${BACKEND_API_URL}/users/${userId}`, {
         method: "PUT",
@@ -180,7 +180,9 @@ export default function AdminUsersPage() {
                       <Button
                         variant="secondary"
                         isDisabled={item.id === currentUser?._id}
-                        onPress={() => deactivate(item.id, item.is_active)}
+                        onPress={() =>
+                          toggleActivation(item.id, item.is_active)
+                        }
                         UNSAFE_style={{ minInlineSize: 0, flexShrink: 0 }}
                       >
                         {item.is_active ? "Deactivate" : "Activate"}
