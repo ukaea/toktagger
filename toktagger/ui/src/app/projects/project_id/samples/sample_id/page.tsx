@@ -24,12 +24,12 @@ const SampleView = () => {
       <ErrorView message={error} />
     );
 
-  if (project.task === TaskType.TimeSeries)
-    return isLoading ? <LoadingView /> : <TimeSeriesView />;
-  if (project.task === TaskType.Video)
-    return isLoading && !data ? <LoadingView /> : <VideoView />;
   // Only swap in the loading view before there is anything to show: doing it on a
   // background refetch unmounts the view and loses annotations not yet synced to the sample.
+  if (project.task === TaskType.TimeSeries)
+    return isLoading && !data ? <LoadingView /> : <TimeSeriesView />;
+  if (project.task === TaskType.Video)
+    return isLoading && !data ? <LoadingView /> : <VideoView />;
   if (project.task === TaskType.Profile2D)
     return isLoading && !data ? <LoadingView /> : <Profile2dView />;
   return null;
