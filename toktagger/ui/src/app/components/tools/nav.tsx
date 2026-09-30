@@ -206,6 +206,8 @@ function NextButton({
         const message = err instanceof Error ? err.message : String(err);
         ToastQueue.negative(message, { timeout: TOAST_TIMEOUT });
       }
+      // Don't navigate away with unsaved annotations still sitting in the editor.
+      return;
     }
     await navigateToNextSample(
       project_id,
@@ -310,6 +312,8 @@ function PreviousButton({
         const message = err instanceof Error ? err.message : String(err);
         ToastQueue.negative(message, { timeout: TOAST_TIMEOUT });
       }
+      // Don't navigate away with unsaved annotations still sitting in the editor.
+      return;
     }
 
     const previous_sample_id: string | null = popVisitedSampleId();
@@ -543,7 +547,8 @@ export function ShotSearch({
           setErrorMessage("Shot not found!");
         }
       } catch (err) {
-        console.error("Failed to fetch data:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        ToastQueue.negative(message, { timeout: TOAST_TIMEOUT });
       }
     } else {
       setErrorMessage("Please enter a number.");
