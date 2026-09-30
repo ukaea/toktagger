@@ -197,6 +197,81 @@ async def test_delete_sample_annotations(api_client, setup_db, db_client):
 
 
 @pytest.mark.asyncio
+async def test_delete_annotations_bulk(api_client, setup_db, db_client):
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+        json=[setup_db["annotation_id_1"], setup_db["annotation_id_2"]],
+    )
+    assert response.status_code == 200
+    assert response.json() == 2
+
+    annotations = await db_client.get_all_documents("annotations")
+    remaining_ids = {str(annotation["_id"]) for annotation in annotations}
+    assert remaining_ids == {
+        setup_db["annotation_id_3"],
+        setup_db["annotation_id_4"],
+        setup_db["annotation_id_5"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_delete_annotations_bulk_ignores_unknown_ids(
+    api_client, setup_db, db_client
+):
+    unknown_id = str(ObjectId())
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+        json=[setup_db["annotation_id_1"], unknown_id],
+    )
+    assert response.status_code == 200
+    # Only the real id is counted; the unknown one is silently ignored, matching
+    # the single-annotation delete's tolerance for an id that is already gone.
+    assert response.json() == 1
+
+    annotations = await db_client.get_all_documents("annotations")
+    remaining_ids = {str(annotation["_id"]) for annotation in annotations}
+    assert setup_db["annotation_id_1"] not in remaining_ids
+    assert remaining_ids == {
+        setup_db["annotation_id_2"],
+        setup_db["annotation_id_3"],
+        setup_db["annotation_id_4"],
+        setup_db["annotation_id_5"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_delete_annotations_bulk_empty_list(api_client, setup_db, db_client):
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+        json=[],
+    )
+    assert response.status_code == 200
+    assert response.json() == 0
+
+    annotations = await db_client.get_all_documents("annotations")
+    assert len(annotations) == 5
+
+
+@pytest.mark.asyncio
+async def test_delete_annotations_bulk_scoped_to_sample(
+    api_client, setup_db, db_client
+):
+    # annotation_id_4 belongs to sample_id_2, so naming it while deleting from
+    # sample_id_1 must not delete it - the endpoint is scoped by its path, not
+    # solely by the ids in the body.
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+        json=[setup_db["annotation_id_4"]],
+    )
+    assert response.status_code == 200
+    assert response.json() == 0
+
+    annotations = await db_client.get_all_documents("annotations")
+    remaining_ids = {str(annotation["_id"]) for annotation in annotations}
+    assert setup_db["annotation_id_4"] in remaining_ids
+
+
+@pytest.mark.asyncio
 async def test_create_annotations(api_client, setup_db, db_client):
     in_annotations = [
         {

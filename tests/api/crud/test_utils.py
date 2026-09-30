@@ -300,6 +300,45 @@ async def test_delete_specific_annotation(db_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_delete_specific_annotations_bulk(db_client, setup_db):
+    # Delete a batch of annotations by id in a single call
+    deleted_count = await utils.delete_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
+        annotation_ids=[setup_db["annotation_id_1"], setup_db["annotation_id_2"]],
+    )
+    assert deleted_count == 2
+
+    annotations = await db_client.get_filtered_documents("annotations")
+    remaining_ids = {str(annotation["_id"]) for annotation in annotations}
+    assert remaining_ids == {
+        setup_db["annotation_id_3"],
+        setup_db["annotation_id_4"],
+        setup_db["annotation_id_5"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_delete_specific_annotations_bulk_ignores_unknown_ids(
+    db_client, setup_db
+):
+    unknown_id = str(ObjectId())
+    deleted_count = await utils.delete_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
+        annotation_ids=[setup_db["annotation_id_1"], unknown_id],
+    )
+    # Only the real id is counted; the unknown one matches nothing.
+    assert deleted_count == 1
+
+    annotations = await db_client.get_filtered_documents("annotations")
+    remaining_ids = {str(annotation["_id"]) for annotation in annotations}
+    assert setup_db["annotation_id_1"] not in remaining_ids
+
+
+@pytest.mark.asyncio
 async def test_import_annotations_success(db_client, setup_db):
     # Create new annotations with sample_id references
     new_annotations = [

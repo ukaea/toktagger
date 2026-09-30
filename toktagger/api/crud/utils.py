@@ -418,6 +418,7 @@ async def delete_annotations(
     project_id: str,
     sample_id: str | None = None,
     annotation_id: str | None = None,
+    annotation_ids: list[str] | None = None,
     created_by: str | None = None,
 ) -> int:
     """Delete annotations matching the given filters, returning how many were removed."""
@@ -431,6 +432,11 @@ async def delete_annotations(
     if annotation_id:
         annotation_obj_id = convert_to_objectid(annotation_id, "annotations")
         filters["_id"] = annotation_obj_id
+
+    if annotation_ids is not None:
+        filters["_id"] = {
+            "$in": [convert_to_objectid(aid, "annotations") for aid in annotation_ids]
+        }
 
     if created_by is not None:
         # Scope the delete to only this user's annotations (concurrent-safe)

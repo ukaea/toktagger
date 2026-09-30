@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
 
 from toktagger.api.auth.dependencies import (
     require_password_changed,
@@ -396,3 +396,39 @@ async def remove_annotation(
         raise HTTPException(
             status_code=404, detail="Annotation not found for that project and sample."
         )
+
+
+@router.post(
+    "/samples/{sample_id}/annotations/delete",
+    responses={
+        200: {"description": "Matching annotations deleted; unknown ids are ignored."},
+        404: {"description": "Project or Sample not found with that ID."},
+    },
+)
+async def remove_annotations_bulk(
+    request: Request,
+    project_id: str = Path(description="The ID of the project to delete from."),
+    sample_id: str = Path(
+        description="The ID of the sample to delete annotations from."
+    ),
+    annotation_ids: list[str] = Body(
+        ..., description="The IDs of the annotations to delete."
+    ),
+    current_user: UserOut = Depends(require_project_annotator),
+) -> int:
+    """Delete a batch of annotations by id, whoever created them, in one call.
+
+    Mirrors remove_annotation's 404 tolerance: an id already gone is the state being
+    asked for, so unknown ids are silently ignored rather than failing the whole batch.
+    """
+    db_client: MongoDBClient = request.app.state.db_client
+    await utils.get_project(db_client=db_client, project_id=project_id)
+    await utils.get_sample(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+    return await utils.delete_annotations(
+        db_client=db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        annotation_ids=annotation_ids,
+    )

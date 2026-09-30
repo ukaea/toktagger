@@ -382,27 +382,29 @@ export function removedAnnotationIds(
 
 // A removed annotation the caller does not own outlives the batch save: the PUT's
 // replace step is scoped to the caller's own created_by. Delete those explicitly so
-// removing a colleague's annotation persists, as Clear already does. A 404 means it
-// is already gone, which is the state being asked for.
+// removing a colleague's annotation persists, as Clear already does. The endpoint
+// tolerates unknown ids, so this is safe to retry and needs no per-id 404 handling.
 export async function deleteAnnotationsByIds(
   project_id: string,
   sample_id: string,
   annotation_ids: string[],
 ): Promise<void> {
-  await Promise.all(
-    annotation_ids.map(async (annotation_id) => {
-      const response = await apiFetch(
-        `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations/${annotation_id}`,
-        { method: "DELETE" },
-      );
-      if (!response.ok && response.status !== 404) {
-        throw new ApiError(
-          response.status,
-          `Failed to delete annotation: ${response.statusText}`,
-        );
-      }
-    }),
+  const response = await apiFetch(
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations/delete`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(annotation_ids),
+    },
   );
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      `Failed to delete annotations: ${response.statusText}`,
+    );
+  }
 }
 
 export async function saveAnnotations(
