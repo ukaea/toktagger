@@ -73,10 +73,7 @@ export function ProjectMembersDialog({ projectId, isProjectAdmin }: Props) {
     }
   };
 
-  const updateRole = async (
-    userId: string,
-    role: ProjectMemberOut["role"],
-  ) => {
+  const updateRole = async (userId: string, role: ProjectMemberOut["role"]) => {
     try {
       const res = await apiFetch(
         `${BACKEND_API_URL}/projects/${projectId}/members/${userId}`,

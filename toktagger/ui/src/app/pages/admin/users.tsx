@@ -328,8 +328,7 @@ function ChangeRoleDialog({
               label="Global Role"
               selectedKey={role}
               onSelectionChange={(k) => {
-                const parsed =
-                  CurrentUserSchema.shape.global_role.safeParse(k);
+                const parsed = CurrentUserSchema.shape.global_role.safeParse(k);
                 if (parsed.success) {
                   setRole(parsed.data);
                 }

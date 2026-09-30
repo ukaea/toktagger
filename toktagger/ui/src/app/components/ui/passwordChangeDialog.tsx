@@ -128,9 +128,7 @@ export function PasswordChangeDialog({
                 isRequired
               />
             </Flex>
-            {helperText && (
-              <Text marginTop="size-100">{helperText}</Text>
-            )}
+            {helperText && <Text marginTop="size-100">{helperText}</Text>}
           </Content>
           <ButtonGroup>
             {isDismissable && (
