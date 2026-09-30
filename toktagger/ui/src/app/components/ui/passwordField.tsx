@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { TextField, View } from "@adobe/react-spectrum";
+import { ActionButton, TextField, View } from "@adobe/react-spectrum";
 import Visibility from "@spectrum-icons/workflow/Visibility";
 import VisibilityOff from "@spectrum-icons/workflow/VisibilityOff";
 
@@ -41,14 +41,14 @@ export function PasswordField({
         width="100%"
       />
       <View position="absolute" right="size-50" bottom="size-0">
-        <button
-          type="button"
+        <ActionButton
+          isQuiet
+          UNSAFE_className="hover:!bg-transparent active:!border-transparent active:!bg-transparent"
           aria-label={isVisible ? `Hide ${label}` : `Show ${label}`}
-          onClick={() => setIsVisible((prev) => !prev)}
-          className="flex h-8 w-8 items-center justify-center border-none bg-transparent text-gray-600 dark:text-gray-300"
+          onPress={() => setIsVisible((prev) => !prev)}
         >
           {isVisible ? <VisibilityOff /> : <Visibility />}
-        </button>
+        </ActionButton>
       </View>
     </View>
   );
