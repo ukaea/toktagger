@@ -139,18 +139,6 @@ export const getSamples = async (
   return samples;
 };
 
-export const getSample = async (
-  project_id: string,
-  sample_id: string,
-): Promise<Sample> => {
-  const response = await apiFetch(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}`,
-  );
-  const data = await response.json();
-  const sample = data as Sample;
-  return sample;
-};
-
 export const getNextSample = async (
   project_id: string,
   visited_sample_ids: string[],
