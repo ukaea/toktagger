@@ -512,12 +512,12 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     )
     updated_disruption_time = float(row.get_by_role("gridcell").nth(2).inner_text())
 
-    # Press Save and wait for the deleted zone's DELETE call to complete - it's the
-    # last of the two requests the save issues, so waiting on it covers the PUT too.
+    # Press Save and wait for the deleted zone's bulk-delete call to complete - it's
+    # the last of the two requests the save issues, so waiting on it covers the PUT too.
     with page.expect_response(
         lambda r: (
-            f"samples/{sample_id}/annotations/" in r.url
-            and r.request.method == "DELETE"
+            f"samples/{sample_id}/annotations/delete" in r.url
+            and r.request.method == "POST"
         )
     ):
         page.get_by_role("button", name="Save").click(force=True)

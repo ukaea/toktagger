@@ -39,7 +39,9 @@ def test_password_mismatch_is_rejected(server_setup, admin_token, browser):
     )
     dialog.get_by_role("textbox", name="Confirm new password").fill("different123")
     dialog.get_by_role("button", name="Change Password").click()
-    expect(dialog.get_by_text("Passwords do not match")).to_be_visible()
+    alert = user_page.get_by_role("alert")
+    expect(alert).to_be_visible()
+    expect(alert).to_contain_text("Passwords do not match")
 
     user_page.context.close()
 
@@ -54,7 +56,9 @@ def test_password_too_short_is_rejected(server_setup, admin_token, browser):
     dialog.get_by_role("textbox", name="New password", exact=True).fill("short1")
     dialog.get_by_role("textbox", name="Confirm new password").fill("short1")
     dialog.get_by_role("button", name="Change Password").click()
-    expect(dialog.get_by_text("Password must be at least 8 characters")).to_be_visible()
+    alert = user_page.get_by_role("alert")
+    expect(alert).to_be_visible()
+    expect(alert).to_contain_text("Password must be at least 8 characters")
 
     user_page.context.close()
 

@@ -356,9 +356,15 @@ export function othersHaveUnsavedEdits(
   serverAnnotations: Annotation[],
   username: string | undefined,
 ): boolean {
-  // afterSave marks local annotations validated without refreshing the baseline, so ignore it.
+  // afterSave marks local annotations validated without refreshing the baseline, so
+  // ignore it. Keys are sorted before stringifying since the two annotations are built
+  // through different code paths (a fresh fetch vs. round-tripped through the drawing
+  // tool) and JSON.stringify is otherwise sensitive to key insertion order.
   const signature = (annotation: Annotation) =>
-    JSON.stringify({ ...annotation, validated: null });
+    JSON.stringify(
+      { ...annotation, validated: null },
+      Object.keys(annotation).sort(),
+    );
   const local = new Map(
     annotations
       .filter((annotation) => !isOwnAnnotation(annotation, username))

@@ -605,7 +605,7 @@ def test_deleting_another_authors_annotation_is_saved(server_setup, page: Page):
 
     with page.expect_response(
         lambda response: (
-            response.request.method == "DELETE" and "/annotations/" in response.url
+            response.request.method == "POST" and "/annotations/delete" in response.url
         )
     ):
         page.get_by_role("button", name="Save").click()
