@@ -26,7 +26,6 @@ import {
   Link,
   Provider,
   defaultTheme,
-  ToastContainer,
   Text,
 } from "@adobe/react-spectrum";
 import { SortDescriptor } from "@react-types/shared";
@@ -288,7 +287,6 @@ export default function ProjectView() {
         <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
-            <ToastContainer placement="top" />
             <View overflow="auto">
               <Flex
                 direction="row"
