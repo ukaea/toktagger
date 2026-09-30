@@ -104,10 +104,7 @@ export function PasswordChangeDialog({
         onOpenChange?.(open);
       }}
     >
-      <Button
-        variant={triggerVariant}
-        UNSAFE_style={{ minInlineSize: 0, flexShrink: 0 }}
-      >
+      <Button variant={triggerVariant} minWidth={0} flexShrink={0}>
         {triggerLabel}
       </Button>
       {(close) => (
