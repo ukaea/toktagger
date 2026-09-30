@@ -117,13 +117,10 @@ export default function ToolBar() {
     defaultExpanded?: boolean;
   }[] = [];
 
-  // Profile2D shows shot labels even without data (see comment below); the
-  // other tasks need data loaded first, matching their branch's own gating.
   const showShotLabels =
     project.task === TaskType.Profile2D ||
-    (Boolean(data) &&
-      (project.task === TaskType.TimeSeries ||
-        project.task === TaskType.Video));
+    project.task === TaskType.TimeSeries ||
+    project.task === TaskType.Video;
 
   if (showShotLabels) {
     const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
