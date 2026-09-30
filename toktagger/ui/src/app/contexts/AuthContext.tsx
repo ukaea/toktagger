@@ -34,8 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   const refreshUser = async () => {
-    const me = await fetchCurrentUser();
-    if (me) setUser(me);
+    setUser(await fetchCurrentUser());
   };
 
   // Force a password change before anything else - an admin knows the password they
