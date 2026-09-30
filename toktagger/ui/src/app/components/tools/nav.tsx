@@ -623,13 +623,28 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
     async (next: boolean) => {
       setShowOthers(next);
       if (user) {
-        await apiFetch(
-          `${BACKEND_API_URL}/projects/${project_id}/members/${user._id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify({ show_others_annotations: next }),
-          },
-        );
+        try {
+          const response = await apiFetch(
+            `${BACKEND_API_URL}/projects/${project_id}/members/${user._id}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({ show_others_annotations: next }),
+            },
+          );
+          if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body?.detail ?? "Failed to update preference");
+          }
+        } catch (error) {
+          setShowOthers(!next);
+          ToastQueue.negative(
+            error instanceof Error
+              ? error.message
+              : "Failed to update preference",
+            { timeout: TOAST_TIMEOUT },
+          );
+          return;
+        }
       }
       // Re-fetch annotations with updated visibility
       syncAnnotationsFromServer(

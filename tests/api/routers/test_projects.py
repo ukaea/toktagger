@@ -39,6 +39,28 @@ async def test_update_project(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_update_project_member_as_unjoined_global_admin(api_client, setup_db):
+    """A global admin has no membership row on a project until they set a real
+    preference on it themselves (see auth/dependencies.get_project_membership) --
+    the endpoint should materialize one rather than 404."""
+    users = await api_client.get("/users")
+    assert users.status_code == 200
+    admin_id = next(u["_id"] for u in users.json() if u["username"] == "admin")
+
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/members/{admin_id}",
+        json={"show_others_annotations": False},
+    )
+    assert response.status_code == 200
+
+    members = await api_client.get(f"/projects/{setup_db['project_id_1']}/members")
+    assert members.status_code == 200
+    admin_member = next(m for m in members.json() if m["user_id"] == admin_id)
+    assert admin_member["show_others_annotations"] is False
+    assert admin_member["role"] == "admin"
+
+
+@pytest.mark.asyncio
 async def test_get_all_projects_sortby(api_client, setup_db):
     response = await api_client.get("/projects?sort_by=task")
     # Should sort alphabetically by task

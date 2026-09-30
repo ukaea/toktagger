@@ -209,6 +209,14 @@ async def update_project_member(
         if not membership or membership.role != "admin":
             raise HTTPException(status_code=403, detail="Project admin access required")
 
+    # A global admin has no membership row on a project they never explicitly joined
+    # (see auth/dependencies.get_project_membership) -- materialize one here rather
+    # than 404ing when they set a real preference on it themselves.
+    if is_self and current_user.global_role == "admin":
+        existing = await utils.get_project_membership(db_client, project_id, user_id)
+        if existing is None:
+            await utils.add_project_member(db_client, project_id, user_id, role="admin")
+
     await utils.update_project_member(db_client, project_id, user_id, body)
 
 
