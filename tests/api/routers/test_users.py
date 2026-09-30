@@ -290,6 +290,70 @@ async def test_delete_user_as_admin(unauthenticated_api_client, setup_db_auth):
 
 
 @pytest.mark.asyncio
+async def test_admin_cannot_demote_self_even_with_another_admin(
+    unauthenticated_api_client, setup_db_auth
+):
+    """An admin must not be able to demote themselves, even when another admin
+    exists to keep the account list manageable — otherwise they immediately lose
+    access to GET /users (admin-only) and the admin UI they're sitting on breaks.
+    A different admin has to make the change instead."""
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    admin_id = setup_db_auth["admin_id"]
+
+    # Promote alice to admin so the sole-remaining-admin guard alone wouldn't
+    # have blocked this.
+    promote_resp = await client.put(
+        f"/users/{setup_db_auth['alice_id']}",
+        json={"global_role": "admin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert promote_resp.status_code == 200
+
+    response = await client.put(
+        f"/users/{admin_id}",
+        json={"global_role": "user"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 422
+
+    get_resp = await client.get(
+        f"/users/{admin_id}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert get_resp.json()["global_role"] == "admin"
+
+
+@pytest.mark.asyncio
+async def test_admin_can_be_demoted_by_a_different_admin(
+    unauthenticated_api_client, setup_db_auth
+):
+    """The self-demotion guard must not block a *different* admin from doing it."""
+    client = unauthenticated_api_client
+    admin_token = await get_auth_token(client, "admin", "admin_pass")
+    admin_id = setup_db_auth["admin_id"]
+
+    promote_resp = await client.put(
+        f"/users/{setup_db_auth['alice_id']}",
+        json={"global_role": "admin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert promote_resp.status_code == 200
+    alice_token = await get_auth_token(client, "alice", "alice_pass")
+
+    response = await client.put(
+        f"/users/{admin_id}",
+        json={"global_role": "user"},
+        headers={"Authorization": f"Bearer {alice_token}"},
+    )
+    assert response.status_code == 200
+
+    get_resp = await client.get(
+        f"/users/{admin_id}", headers={"Authorization": f"Bearer {alice_token}"}
+    )
+    assert get_resp.json()["global_role"] == "user"
+
+
+@pytest.mark.asyncio
 async def test_admin_cannot_delete_own_user_as_last_admin(
     unauthenticated_api_client, setup_db_auth
 ):

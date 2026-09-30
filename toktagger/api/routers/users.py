@@ -120,6 +120,15 @@ async def update_user(
             detail="Only an admin can change global_role or is_active",
         )
 
+    # An admin demoting themselves loses access to this very endpoint's admin-only
+    # sibling (GET /users) the moment the change lands, breaking the admin UI they're
+    # sitting on. Require a different admin to do it instead of racing a redirect.
+    if current_user.id == user_id and body.global_role == "user":
+        raise HTTPException(
+            status_code=422,
+            detail="You cannot demote yourself from admin; ask another admin to change your role",
+        )
+
     # Clearing your own forced change without supplying a password would leave the
     # account on the password someone else handed you - the bootstrap admin on the
     # public default, in the worst case. Applies whatever your global role is, so an

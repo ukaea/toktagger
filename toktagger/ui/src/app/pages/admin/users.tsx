@@ -133,7 +133,11 @@ export default function AdminUsersPage() {
                   <Cell>{item.is_active ? "Yes" : "No"}</Cell>
                   <Cell>
                     <Flex gap="size-100">
-                      <ChangeRoleDialog user={item} onChanged={refresh} />
+                      <ChangeRoleDialog
+                        user={item}
+                        onChanged={refresh}
+                        isSelf={item.id === currentUser?._id}
+                      />
                       <DialogTrigger>
                         <Button
                           aria-label="Delete"
@@ -274,9 +278,11 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
 function ChangeRoleDialog({
   user,
   onChanged,
+  isSelf,
 }: {
   user: UserRow;
   onChanged: () => void;
+  isSelf: boolean;
 }) {
   const [role, setRole] = useState<"admin" | "user">(user.global_role);
 
@@ -302,7 +308,7 @@ function ChangeRoleDialog({
 
   return (
     <DialogTrigger>
-      <Button aria-label="Edit" variant="accent">
+      <Button aria-label="Edit" variant="accent" isDisabled={isSelf}>
         <Edit />
       </Button>
       {(close) => (
