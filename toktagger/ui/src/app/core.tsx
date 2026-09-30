@@ -287,11 +287,7 @@ export async function saveSampleAnnotations(
   if (!saveOnNavigate) {
     return;
   }
-  // A save validates a brand-new annotation (no _id yet - a hand-drawn shape, or an
-  // annotator's just-run, not-yet-saved suggestion, whose _id may be absent from the
-  // response rather than explicitly null) or the caller's own existing work. A
-  // pre-existing annotation belonging to someone else is sent back as loaded, so an
-  // edit to it persists without the save claiming they validated it.
+  // Only validate new (_id absent/null) or own annotations; others' are saved as-is so edits don't claim their validation.
   const updatedAnnotations = annotations.map((annotation: Annotation) => ({
     ...annotation,
     validated:
