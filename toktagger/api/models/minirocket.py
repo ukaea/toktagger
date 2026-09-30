@@ -119,7 +119,7 @@ class MiniRocketModel(Model):
                 "each sample was skipped."
             )
 
-        window_size = compute_window_size(ann_time_pairs)
+        window_size = compute_window_size(ann_time_pairs, params.class_label)
         if window_size < MINIROCKET_MIN_WINDOW:
             logger.info(
                 f"MiniRocket: inferred window_size={window_size} is below "

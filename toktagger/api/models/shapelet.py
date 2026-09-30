@@ -123,7 +123,7 @@ class ShapeletTransformModel(Model):
                 "each sample was skipped."
             )
 
-        window_size = compute_window_size(ann_time_pairs)
+        window_size = compute_window_size(ann_time_pairs, params.class_label)
         logger.info(f"ShapeletTransform: inferred window_size={window_size}")
 
         pos_label = select_training_label(sample_data, params.class_label)
