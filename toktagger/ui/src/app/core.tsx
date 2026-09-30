@@ -38,10 +38,21 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   onUnauthorized = handler;
 }
 
+function isBackendRequest(url: string): boolean {
+  const origin = window.location.origin;
+  return (
+    new URL(url, origin).origin ===
+    new URL(BACKEND_API_URL || origin, origin).origin
+  );
+}
+
 export async function apiFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<Response> {
+  if (!isBackendRequest(url)) {
+    throw new Error(`apiFetch only supports requests to the backend: ${url}`);
+  }
   // The session token lives in an httpOnly cookie the browser attaches itself, so
   // credentials must be included even cross-origin against the dev server.
   const method = (options.method ?? "GET").toUpperCase();
