@@ -371,7 +371,6 @@ def _make_trained_minirocket(signal_names: list[str]) -> MiniRocketModel:
     ann = make_annotation(2.0, 3.0)
     params = MiniRocketTrainParams(
         signal_names=signal_names,
-        n_background_per_shot=5,
         num_kernels=100,
         class_label="Event",
     )
@@ -417,7 +416,6 @@ def test_minirocket_train_uses_background_only_sample_as_negatives():
     ann = make_annotation(2.0, 3.0)
     params = MiniRocketTrainParams(
         signal_names=["Ip"],
-        n_background_per_shot=5,
         num_kernels=100,
         class_label="Event",
     )
@@ -435,7 +433,6 @@ def test_minirocket_train_raises_without_negative_windows():
     ann = make_annotation(0.0, 10.0)
     params = MiniRocketTrainParams(
         signal_names=["Ip"],
-        n_background_per_shot=3,
         num_kernels=100,
         class_label="Event",
     )
@@ -453,7 +450,6 @@ def test_minirocket_train_pads_window_size_below_minirocket_minimum():
     ann = make_annotation(2.0, 2.1)
     params = MiniRocketTrainParams(
         signal_names=["Ip"],
-        n_background_per_shot=5,
         num_kernels=100,
         class_label="Event",
     )
@@ -498,7 +494,6 @@ def test_shapelet_train_predict(sktime):
     ann = make_annotation(2.0, 3.0)
     params = ShapeletTrainParams(
         signal_names=["Ip"],
-        n_background_per_shot=5,
         max_shapelets=2,
         n_shapelet_samples=20,
         batch_size=10,
@@ -528,7 +523,6 @@ def test_shapelet_train_uses_background_only_sample_as_negatives(sktime):
     ann = make_annotation(2.0, 3.0)
     params = ShapeletTrainParams(
         signal_names=["Ip"],
-        n_background_per_shot=5,
         max_shapelets=2,
         n_shapelet_samples=20,
         batch_size=10,
@@ -553,7 +547,6 @@ def test_shapelet_train_raises_without_negative_windows(sktime):
     ann = make_annotation(0.0, 10.0)
     params = ShapeletTrainParams(
         signal_names=["Ip"],
-        n_background_per_shot=3,
         max_shapelets=2,
         n_shapelet_samples=20,
         batch_size=10,

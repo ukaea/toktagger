@@ -47,9 +47,9 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
     models.find((model) => model._id === selectedModelId) ?? null;
   const selectedModelType = selectedModel?.type ?? null;
 
-  // Refetch when the tool is switched on, so a model trained from this page without a reload still shows up in the list.
+  // Poll every 5s, so a model trained elsewhere (e.g. the Train Model dialog) shows up here without a page reload.
   useEffect(() => {
-    (async () => {
+    const fetchModels = async () => {
       const response = await getModels(project_id);
 
       if (!response.ok) {
@@ -66,8 +66,12 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
 
       // Only a model which finished training can make predictions.
       setModels(result.data.filter((model) => model.status === "completed"));
-    })();
-  }, [project_id, isEnabled]);
+    };
+
+    fetchModels();
+    const interval = setInterval(fetchModels, 5000);
+    return () => clearInterval(interval);
+  }, [project_id]);
 
   // Start out enabled if this sample already has predictions from one of the project's models, but only before the user touches the switch.
   useEffect(() => {

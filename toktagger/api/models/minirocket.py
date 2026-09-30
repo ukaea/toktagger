@@ -13,6 +13,7 @@ from toktagger.api.models.event_detection_utils import (
     MissingSignalError,
     SignalAlignmentError,
     compute_window_size,
+    infer_background_counts,
     load_sample_signals,
     merge_detections,
     non_max_suppression,
@@ -43,11 +44,6 @@ class MiniRocketTrainParams(pydantic.BaseModel):
             "Signal channels to classify. Provide one for single-channel mode, "
             "or multiple for multivariate (e.g. ['Ip', 'dalpha'])."
         ),
-    )
-    n_background_per_shot: int = pydantic.Field(
-        default=10,
-        gt=0,
-        description="Number of background (negative) windows sampled per training shot",
     )
     num_kernels: int = pydantic.Field(
         default=10000,
@@ -133,10 +129,18 @@ class MiniRocketModel(Model):
 
         pos_label = select_training_label(sample_data, params.class_label)
 
+        pos_counts = [
+            sum(
+                1 for ann in anns if hasattr(ann, "time_min") and ann.label == pos_label
+            )
+            for _, _, anns in sample_data
+        ]
+        background_counts = infer_background_counts(pos_counts)
+
         windows: list[np.ndarray] = []
         labels: list[int] = []
 
-        for ta, va, anns in sample_data:
+        for (ta, va, anns), n_background in zip(sample_data, background_counts):
             if multivariate:
                 n_channels, n_samples = va.shape
                 signal_zs = np.array([zscore(va[ch]) for ch in range(n_channels)])
@@ -172,8 +176,8 @@ class MiniRocketModel(Model):
             rng = random.Random(42)
             attempts = 0
             neg_added = 0
-            max_attempts = params.n_background_per_shot * 20
-            while neg_added < params.n_background_per_shot and attempts < max_attempts:
+            max_attempts = n_background * 20
+            while neg_added < n_background and attempts < max_attempts:
                 attempts += 1
                 pos = rng.randint(0, max(0, n_samples - window_size))
                 overlaps = any(

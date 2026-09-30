@@ -83,13 +83,12 @@ Registered as **`minirocket`**.
 
 Sliding-window binary event classifier using [MiniRocket](https://github.com/angus924/minirocket) convolutional features and a Ridge classifier. MiniRocket applies a large, fixed set of random convolutional kernels to each window and pools the results into a feature vector, which a `RidgeClassifierCV` then classifies as event or background. It is fast to train and typically strong on shape-based classification tasks.
 
-**How it works:** `window_size` is inferred as the median annotation duration (in samples), padded up to 9 samples if the median duration is shorter, since sktime's MiniRocket transform requires at least 9 samples per window. For each training sample, positive windows are extracted centered on annotations matching `class_label`, and negative ("background") windows are randomly sampled from the remainder of the signal, avoiding overlap with any annotation. A `MiniRocket` (or `MiniRocketMultivariate` for multi-channel signals) transformer is fit on these windows and used to generate features, which train a `RidgeClassifierCV`. During prediction, a sliding window scans each new sample, and every window is transformed and classified; positive windows are merged into detections.
+**How it works:** `window_size` is inferred as the median annotation duration (in samples), padded up to 9 samples if the median duration is shorter, since sktime's MiniRocket transform requires at least 9 samples per window. For each training sample, positive windows are extracted centered on annotations matching `class_label`, and negative ("background") windows are randomly sampled from the remainder of the signal, avoiding overlap with any annotation. The number of background windows per shot is also inferred: a shot with events gets as many background windows as it has positive windows, and a shot with none (pure background) gets the average positive count of the shots that do have events, so classes stay balanced without a user-specified count. A `MiniRocket` (or `MiniRocketMultivariate` for multi-channel signals) transformer is fit on these windows and used to generate features, which train a `RidgeClassifierCV`. During prediction, a sliding window scans each new sample, and every window is transformed and classified; positive windows are merged into detections.
 
 ### Training Parameters
 
 - **class_label**: Annotation label to train the binary classifier on (event vs. background). Must match one of the project's configured time-region annotation labels.
 - **signal_names**: Signal channels to classify. Provide one for single-channel mode, or multiple for multivariate (e.g. `["Ip", "dalpha"]`).
-- **n_background_per_shot**: Number of background (negative) windows sampled per training shot.
 - **num_kernels**: Number of MiniRocket convolutional kernels. Higher values can improve accuracy at the cost of training/prediction time.
 
 ### Prediction Parameters
@@ -109,13 +108,12 @@ Registered as **`shapelet_transform`**.
 
 Sliding-window binary event classifier using [sktime's `ShapeletTransformClassifier`](https://www.sktime.net/en/stable/api_reference/auto_generated/sktime.classification.shapelet_based.ShapeletTransformClassifier.html). Shapelets are short, discriminative subsequences automatically discovered from the training windows; the classifier represents each window by its distance to the best matching shapelets, then classifies using those distances. Shapelets are more interpretable than MiniRocket's convolutional features, at the cost of slower training.
 
-**How it works:** training follows the same window extraction approach as MiniRocket — `window_size` inferred from median annotation duration, positive windows centered on `class_label` annotations, and randomly sampled negative windows. A `ShapeletTransformClassifier` is then fit directly on the raw (z-normalised) windows. During prediction, a sliding window scans each sample and each window is classified directly by the fitted classifier; positive windows are merged into detections.
+**How it works:** training follows the same window extraction approach as MiniRocket — `window_size` inferred from median annotation duration, positive windows centered on `class_label` annotations, and randomly sampled negative windows whose count per shot is likewise inferred (see MiniRocket above). A `ShapeletTransformClassifier` is then fit directly on the raw (z-normalised) windows. During prediction, a sliding window scans each sample and each window is classified directly by the fitted classifier; positive windows are merged into detections.
 
 ### Training Parameters
 
 - **class_label**: Annotation label to train the binary classifier on (event vs. background). Must match one of the project's configured time-region annotation labels.
 - **signal_names**: Signal channels to use. Provide one for univariate, or multiple for multivariate shapelet learning (e.g. `["Ip", "dalpha"]`).
-- **n_background_per_shot**: Number of background (negative) windows sampled per training shot.
 - **max_shapelets**: Maximum number of shapelets to extract per class.
 - **n_shapelet_samples**: Number of candidate shapelet samples to evaluate.
 - **batch_size**: Batch size for shapelet fitting.

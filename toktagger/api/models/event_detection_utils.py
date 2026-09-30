@@ -59,6 +59,24 @@ def compute_window_size(ann_time_pairs: list[tuple], class_label: str = "") -> i
     return max(2, int(np.median(durations)))
 
 
+def infer_background_counts(pos_counts: Sequence[int]) -> list[int]:
+    """Return, per shot, how many background windows to sample during training.
+
+    A shot with N positive (event) windows gets N background windows, so the
+    two classes stay balanced. A shot with none — already validated as pure
+    background rather than merely unreviewed — gets the average positive
+    count of shots that do have events, so it still contributes a comparable
+    share of negatives without needing a user-specified count.
+    """
+    positive_counts = [c for c in pos_counts if c > 0]
+    fallback = (
+        max(1, round(sum(positive_counts) / len(positive_counts)))
+        if positive_counts
+        else 1
+    )
+    return [c if c > 0 else fallback for c in pos_counts]
+
+
 def extract_segment(
     time_array: np.ndarray,
     values: np.ndarray,
