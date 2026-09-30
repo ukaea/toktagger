@@ -59,8 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // know whether one is held.
   useEffect(() => {
     const validate = async () => {
-      // One-off cleanup: sessions predating the cookie left a readable token behind.
-      localStorage.removeItem("tt_access_token");
       try {
         setUser(await fetchCurrentUser());
       } catch {
