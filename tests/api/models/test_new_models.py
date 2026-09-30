@@ -514,6 +514,55 @@ def test_shapelet_train_predict(sktime):
     assert all(isinstance(a, AnnotationBase) for a in result[0])
 
 
+def test_shapelet_train_uses_background_only_sample_as_negatives(sktime):
+    from toktagger.api.models.shapelet import (
+        ShapeletTrainParams,
+        ShapeletTransformModel,
+    )
+
+    model = make_model_instance(ShapeletTransformModel)
+    data = make_mv_data(["Ip"], n=300)
+    model.data_loader.get_sample.return_value = data
+    event_sample = make_sample()
+    background_sample = make_sample()
+    ann = make_annotation(2.0, 3.0)
+    params = ShapeletTrainParams(
+        signal_names=["Ip"],
+        n_background_per_shot=5,
+        max_shapelets=2,
+        n_shapelet_samples=20,
+        batch_size=10,
+        class_label="Event",
+    )
+    # background_sample has no annotations because it was reviewed and confirmed to hold no events, so it should still contribute negative windows.
+    score = model.train([event_sample, background_sample], [[ann], []], params)
+    assert isinstance(score, float)
+
+
+def test_shapelet_train_raises_without_negative_windows(sktime):
+    from toktagger.api.models.shapelet import (
+        ShapeletTrainParams,
+        ShapeletTransformModel,
+    )
+
+    model = make_model_instance(ShapeletTransformModel)
+    # Annotation spans almost the entire signal, so no window-sized gap is left to sample a background window from.
+    data = make_mv_data(["Ip"], n=60)
+    model.data_loader.get_sample.return_value = data
+    sample = make_sample()
+    ann = make_annotation(0.0, 10.0)
+    params = ShapeletTrainParams(
+        signal_names=["Ip"],
+        n_background_per_shot=3,
+        max_shapelets=2,
+        n_shapelet_samples=20,
+        batch_size=10,
+        class_label="Event",
+    )
+    with pytest.raises(ValueError, match="requires both event and background"):
+        model.train([sample], [[ann]], params)
+
+
 # --- Signal loading and alignment ---
 
 

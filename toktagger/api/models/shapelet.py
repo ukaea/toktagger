@@ -94,9 +94,10 @@ class ShapeletTransformModel(Model):
 
         self.log_progress(status="training", progress=0)
 
-        paired = [(s, a) for s, a in zip(samples, annotations) if a]
+        # A sample with no annotations has already been validated as pure background (see routers/models.py, which only trains on validated samples) rather than being unreviewed, so it stays in as a source of negative windows.
+        paired = list(zip(samples, annotations))
         if not paired:
-            raise ValueError("No annotated samples found for training.")
+            raise ValueError("No samples provided for training.")
 
         ann_time_pairs: list[tuple] = []
         sample_data: list[tuple] = []
@@ -173,8 +174,15 @@ class ShapeletTransformModel(Model):
                     labels.append(0)
                     neg_added += 1
 
-        if not windows:
-            raise ValueError("Could not extract training windows.")
+        n_pos = int(np.sum(labels))
+        n_neg = len(labels) - n_pos
+        if n_pos == 0 or n_neg == 0:
+            raise ValueError(
+                "Training requires both event and background windows, got "
+                f"{n_pos} positive and {n_neg} negative. Ensure some samples "
+                f"carry a '{params.class_label}' annotation and others provide "
+                "background."
+            )
 
         X = np.array(windows, dtype=np.float32)  # (n_windows, n_channels, window_size)
         y = np.array(labels)
