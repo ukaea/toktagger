@@ -18,7 +18,6 @@ import {
   TextField,
   Picker,
   Item,
-  InlineAlert,
   ToastQueue,
 } from "@adobe/react-spectrum";
 import Edit from "@spectrum-icons/workflow/Edit";
@@ -39,7 +38,6 @@ export default function AdminUsersPage() {
     { key: "users", label: "Users" },
   ]);
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -48,7 +46,9 @@ export default function AdminUsersPage() {
       const data: CurrentUser[] = await res.json();
       setUsers(data.map((u) => ({ ...u, id: u._id })));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      ToastQueue.negative(e instanceof Error ? e.message : "Error", {
+        timeout: 2000,
+      });
     }
   }, []);
 
@@ -71,7 +71,9 @@ export default function AdminUsersPage() {
         timeout: 2000,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      ToastQueue.negative(e instanceof Error ? e.message : "Error", {
+        timeout: 2000,
+      });
     }
   };
 
@@ -88,7 +90,9 @@ export default function AdminUsersPage() {
       await refresh();
       ToastQueue.positive("User deleted", { timeout: 2000 });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      ToastQueue.negative(e instanceof Error ? e.message : "Error", {
+        timeout: 2000,
+      });
     }
   };
 
@@ -103,12 +107,6 @@ export default function AdminUsersPage() {
           >
             <Heading level={2}>User Management</Heading>
           </Flex>
-
-          {error && (
-            <InlineAlert variant="negative" marginBottom="size-200">
-              {error}
-            </InlineAlert>
-          )}
 
           <Flex marginBottom="size-200">
             <CreateUserDialog onCreated={refresh} />
@@ -199,10 +197,8 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"admin" | "user">("user");
-  const [error, setError] = useState<string | null>(null);
 
   const submit = async (close: () => void) => {
-    setError(null);
     try {
       const res = await apiFetch(`${BACKEND_API_URL}/users`, {
         method: "POST",
@@ -219,7 +215,9 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
       onCreated();
       ToastQueue.positive("User created", { timeout: 2000 });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      ToastQueue.negative(e instanceof Error ? e.message : "Error", {
+        timeout: 2000,
+      });
     }
   };
 
@@ -231,11 +229,6 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
           <Heading>Create User</Heading>
           <Divider />
           <Content>
-            {error && (
-              <InlineAlert variant="negative" marginBottom="size-100">
-                {error}
-              </InlineAlert>
-            )}
             <Flex direction="column" gap="size-100">
               <TextField
                 label="Username"
@@ -286,10 +279,8 @@ function ChangeRoleDialog({
   onChanged: () => void;
 }) {
   const [role, setRole] = useState<"admin" | "user">(user.global_role);
-  const [error, setError] = useState<string | null>(null);
 
   const save = async (close: () => void) => {
-    setError(null);
     try {
       const res = await apiFetch(`${BACKEND_API_URL}/users/${user.id}`, {
         method: "PUT",
@@ -303,7 +294,9 @@ function ChangeRoleDialog({
       onChanged();
       ToastQueue.positive("Role updated", { timeout: 2000 });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      ToastQueue.negative(e instanceof Error ? e.message : "Error", {
+        timeout: 2000,
+      });
     }
   };
 
@@ -317,11 +310,6 @@ function ChangeRoleDialog({
           <Heading>Edit {user.username}</Heading>
           <Divider />
           <Content>
-            {error && (
-              <InlineAlert variant="negative" marginBottom="size-100">
-                {error}
-              </InlineAlert>
-            )}
             <Picker
               label="Global Role"
               selectedKey={role}
