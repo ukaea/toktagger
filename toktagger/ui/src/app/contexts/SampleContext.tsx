@@ -76,8 +76,7 @@ interface SampleContextType {
   sample: Sample | null;
   data: Data | null;
   annotations: Annotation[];
-  // The annotations as the server last returned them, so a save can tell which of
-  // them the user removed locally.
+  // The annotations as the server last returned them, so a save can tell which the user removed locally.
   serverAnnotations: Annotation[];
   dataParams: DataParams;
   viewParams: ViewParams | Profile2DViewParams;
@@ -87,20 +86,14 @@ interface SampleContextType {
   isLoading: boolean;
   isValidated: boolean | null;
   error: string | null;
-  // HTTP status behind `error`, when it came from the API. Lets the page tell
-  // "no access" (403) apart from a genuine failure.
+  // HTTP status behind `error`, when it came from the API - lets the page tell "no access" (403) apart from a genuine failure.
   errorStatus: number | null;
-  // Sourced here, rather than each consumer calling useProjectRole itself, because
-  // the sample view/toolbar remount on every sample change (see the stale-render
-  // guard in page.tsx) - a component-local role hook would reset to its
-  // default-open state on every remount and briefly re-enable gated controls.
+  // Sourced here, not per-consumer, so remounts on sample change (see page.tsx) don't reset a local role hook and re-enable gated controls.
   canAnnotate: boolean;
   setAnnotations: React.Dispatch<React.SetStateAction<Annotation[]>>;
-  // Replaces the working set with a freshly fetched one, so `serverAnnotations`
-  // stays the baseline a save diffs against.
+  // Replaces the working set with a freshly fetched one, so `serverAnnotations` stays the baseline a save diffs against.
   syncAnnotationsFromServer: (annotations: Annotation[]) => void;
-  // Takes only other authors' annotations from a fetch, keeping the local working copy
-  // of the user's own, so a visibility change does not discard unsaved work.
+  // Takes only other authors' annotations from a fetch, keeping the local working copy of the user's own, so a visibility change does not discard unsaved work.
   mergeOthersFromServer: (
     annotations: Annotation[],
     username: string | undefined,
@@ -331,11 +324,7 @@ export function SampleProvider({
           } as Profile2DViewParams;
         }
 
-        // ------------------------------------------------------------
-        // video projects must request image data parameters.
-        // Backend ImageDataLoader requires params.name === "image".
-        // frame: null means "backend picks first frame automatically".
-        // ------------------------------------------------------------
+        // Video projects must request image data (backend ImageDataLoader requires name === "image"); frame: null means "backend picks first frame".
         let effectiveDataParams: DataParams = dataParams;
 
         if (projectData.task === TaskType.Video) {
@@ -391,8 +380,7 @@ export function SampleProvider({
               });
 
               setVideoFrameBounds((prev) => {
-                // Only tighten bounds for adjacent navigation attempts.
-                // Large jump probes (e.g. 0 -> 5000) should not clamp next/prev.
+                // Only tighten bounds for adjacent navigation attempts; large jump probes (e.g. 0 -> 5000) should not clamp next/prev.
                 if (Math.abs(requestedFrame - lastGood) !== 1) {
                   return prev;
                 }
@@ -449,8 +437,7 @@ export function SampleProvider({
             bootstrappedVideoSampleIdRef.current = sampleId;
             lastGoodVideoFrameRef.current = frame;
 
-            // Only the initial frame:null request needs the backend response to
-            // establish the requested frame. Explicit requests already carry it.
+            // Only the initial frame:null request needs the backend response to establish the requested frame; explicit requests already carry it.
             if (requestedFrame === null || requestedFrame === undefined) {
               setDataParams((prev) => {
                 if (prev.name === "image" && prev.frame === frame) {
@@ -480,8 +467,7 @@ export function SampleProvider({
           return;
         }
         if (err instanceof ApiError && err.status === 403) {
-          // Reported as a refusal rather than as a missing project, so a user who
-          // has lost access - or was never given it - can act on the message.
+          // Reported as a refusal rather than as a missing project, so a user who lost access - or never had it - can act on the message.
           setError(err.message || "You are not a member of this project.");
           setErrorStatus(403);
         } else if (err instanceof ApiError && err.status === 404) {
