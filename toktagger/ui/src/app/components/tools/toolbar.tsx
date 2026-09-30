@@ -1,7 +1,5 @@
 "use client";
 import {
-  Provider,
-  defaultTheme,
   Flex,
   View,
   Header,
@@ -14,7 +12,6 @@ import {
   Key,
   Heading,
   InlineAlert,
-  ToastContainer,
 } from "@adobe/react-spectrum";
 import { MultiVariateTimeSeriesDataSchema, PlotProps, TaskType } from "@/types";
 import { getAnnotationsForSample } from "@/app/core";
@@ -245,9 +242,17 @@ export default function ToolBar() {
   return (
     // 100% (not 100vh) so the toolbar stops at the bottom of the window rather
     // than running on below it by the height of the top bar.
-    <Provider theme={defaultTheme} height="100%">
-      <ToastContainer placement="top" />
-      <View overflow="auto" height="100%" width="18vw" flexShrink={0}>
+    <View overflow="auto" height="100%" width="18vw" flexShrink={0}>
+      <Flex
+        direction="column"
+        alignItems="center"
+        justifyContent="center"
+        gap="size-100"
+        width="100%"
+      >
+        {isValidated !== null && (
+          <AnnotationStatusAlert isValidated={isValidated} />
+        )}
         <Flex
           direction="column"
           alignItems="center"
@@ -255,72 +260,61 @@ export default function ToolBar() {
           gap="size-100"
           width="100%"
         >
-          {isValidated !== null && (
-            <AnnotationStatusAlert isValidated={isValidated} />
-          )}
-          <Flex
-            direction="column"
-            alignItems="center"
-            justifyContent="center"
-            gap="size-100"
-            width="100%"
-          >
-            <Header height="size-300" marginBottom="size-100">
-              <span style={{ fontSize: "1.2rem" }}>Controls</span>
-            </Header>
-            <NavigationBar project_id={project_id} sample_id={sample_id} />
-            <Accordion allowsMultipleExpanded={true} width="100%">
-              <Disclosure>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
-                </DisclosureTitle>
-                <DisclosurePanel>
-                  <ExportTool project={project} sample={sample} />
-                </DisclosurePanel>
-              </Disclosure>
-              <Disclosure>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
-                </DisclosureTitle>
-                <DisclosurePanel>
-                  <ImportButton
-                    project={project}
-                    sample={sample}
-                    refreshAnnotations={refreshAnnotations}
-                    canAnnotate={canAnnotate}
-                  />
-                </DisclosurePanel>
-              </Disclosure>
-            </Accordion>
-          </Flex>
-          {tools.length > 0 && (
-            <>
-              <Flex justifyContent="center" alignItems="center">
-                <Header height="size-300" marginBottom="size-100">
-                  <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
-                </Header>
-              </Flex>
-
-              <Accordion
-                allowsMultipleExpanded={true}
-                defaultExpandedKeys={tools
-                  .filter((item) => item.defaultExpanded)
-                  .map((item) => item.name)}
-                width="100%"
-              >
-                {tools.map((item) => (
-                  <Disclosure key={item.name} id={item.name}>
-                    <DisclosureTitle>
-                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                    </DisclosureTitle>
-                    <DisclosurePanel>{item.component}</DisclosurePanel>
-                  </Disclosure>
-                ))}
-              </Accordion>
-            </>
-          )}
+          <Header height="size-300" marginBottom="size-100">
+            <span style={{ fontSize: "1.2rem" }}>Controls</span>
+          </Header>
+          <NavigationBar project_id={project_id} sample_id={sample_id} />
+          <Accordion allowsMultipleExpanded={true} width="100%">
+            <Disclosure>
+              <DisclosureTitle>
+                <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
+              </DisclosureTitle>
+              <DisclosurePanel>
+                <ExportTool project={project} sample={sample} />
+              </DisclosurePanel>
+            </Disclosure>
+            <Disclosure>
+              <DisclosureTitle>
+                <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
+              </DisclosureTitle>
+              <DisclosurePanel>
+                <ImportButton
+                  project={project}
+                  sample={sample}
+                  refreshAnnotations={refreshAnnotations}
+                  canAnnotate={canAnnotate}
+                />
+              </DisclosurePanel>
+            </Disclosure>
+          </Accordion>
         </Flex>
-      </View>
-    </Provider>
+        {tools.length > 0 && (
+          <>
+            <Flex justifyContent="center" alignItems="center">
+              <Header height="size-300" marginBottom="size-100">
+                <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+              </Header>
+            </Flex>
+
+            <Accordion
+              allowsMultipleExpanded={true}
+              defaultExpandedKeys={tools
+                .filter((item) => item.defaultExpanded)
+                .map((item) => item.name)}
+              width="100%"
+            >
+              {tools.map((item) => (
+                <Disclosure key={item.name} id={item.name}>
+                  <DisclosureTitle>
+                    <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                  </DisclosureTitle>
+                  <DisclosurePanel>{item.component}</DisclosurePanel>
+                </Disclosure>
+              ))}
+            </Accordion>
+          </>
+        )}
+      </Flex>
+    </View>
   );
 }
