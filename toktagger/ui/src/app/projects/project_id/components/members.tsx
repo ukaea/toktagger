@@ -128,9 +128,11 @@ export function ProjectMembersDialog({ projectId, isProjectAdmin }: Props) {
                         <Picker
                           aria-label="Role"
                           selectedKey={item.role}
-                          onSelectionChange={(k) =>
-                            updateRole(item.user_id, k as string)
-                          }
+                          onSelectionChange={(k) => {
+                            if (k !== null) {
+                              updateRole(item.user_id, String(k));
+                            }
+                          }}
                           width="100%"
                         >
                           <Item key="admin">Admin</Item>
