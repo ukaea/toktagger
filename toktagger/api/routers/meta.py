@@ -114,7 +114,7 @@ async def get_model_load_method_allowlist(load_method: LoadMethods) -> str | Non
 async def get_model_meta(model: str) -> dict[str, typing.Any]:
     """Get metadata (name, description, tasks) for a specific model type."""
     description = ModelRegistry.get_description(model)
-    tasks = [str(t) for t in ModelRegistry.tasks(model)]
+    tasks = [t.value for t in ModelRegistry.tasks(model)]
     return {"name": model, "description": description, "tasks": tasks}
 
 
