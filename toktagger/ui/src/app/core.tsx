@@ -329,6 +329,37 @@ export async function deleteSampleAnnotations(
   );
 }
 
+// "manual" is the placeholder created_by used until the auth context resolves.
+export function isOwnAnnotation(
+  annotation: Annotation,
+  username: string | undefined,
+): boolean {
+  return (
+    annotation._id === null ||
+    annotation.created_by === username ||
+    annotation.created_by === "manual"
+  );
+}
+
+/** True if the user has edited or removed another author's annotation since the last fetch. */
+export function othersHaveUnsavedEdits(
+  annotations: Annotation[],
+  serverAnnotations: Annotation[],
+  username: string | undefined,
+): boolean {
+  // afterSave marks local annotations validated without refreshing the baseline, so ignore it.
+  const signature = (annotation: Annotation) =>
+    JSON.stringify({ ...annotation, validated: null });
+  const local = new Map(
+    annotations
+      .filter((annotation) => !isOwnAnnotation(annotation, username))
+      .map((annotation) => [annotation._id, signature(annotation)]),
+  );
+  return serverAnnotations
+    .filter((annotation) => !isOwnAnnotation(annotation, username))
+    .some((annotation) => local.get(annotation._id) !== signature(annotation));
+}
+
 // IDs the user removed locally that the batch save cannot remove for them: the PUT
 // replaces only their own annotations, so another author's - or a model's - survives.
 export function removedAnnotationIds(

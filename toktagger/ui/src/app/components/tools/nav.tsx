@@ -34,6 +34,7 @@ import {
   getAnnotationsForSample,
   ApiError,
   AnnotationConflictError,
+  othersHaveUnsavedEdits,
 } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 import {
@@ -570,11 +571,18 @@ type NavigationBarInfo = {
   sample_id: string;
 };
 export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
-  const { setIsValidated, syncAnnotationsFromServer, canAnnotate } =
-    useSample();
+  const {
+    annotations,
+    serverAnnotations,
+    setIsValidated,
+    syncAnnotationsFromServer,
+    mergeOthersFromServer,
+    canAnnotate,
+  } = useSample();
   const { user } = useAuth();
   const navAdapter = useNavAdapter();
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [confirmHideOthers, setConfirmHideOthers] = useState(false);
 
   const {
     visitedSampleIds,
@@ -624,7 +632,7 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
     };
   }, [project_id, user]);
 
-  const toggleShowOthers = useCallback(
+  const applyShowOthers = useCallback(
     async (next: boolean) => {
       setShowOthers(next);
       if (user) {
@@ -651,12 +659,26 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           return;
         }
       }
-      // Re-fetch annotations with updated visibility
-      syncAnnotationsFromServer(
+      mergeOthersFromServer(
         await getAnnotationsForSample(project_id, sample_id),
+        user?.username,
       );
     },
-    [project_id, sample_id, user, syncAnnotationsFromServer],
+    [project_id, sample_id, user, mergeOthersFromServer],
+  );
+
+  const toggleShowOthers = useCallback(
+    async (next: boolean) => {
+      if (
+        !next &&
+        othersHaveUnsavedEdits(annotations, serverAnnotations, user?.username)
+      ) {
+        setConfirmHideOthers(true);
+        return;
+      }
+      await applyShowOthers(next);
+    },
+    [annotations, serverAnnotations, user, applyShowOthers],
   );
 
   return (
@@ -671,6 +693,24 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
           >
             You don't have permission to save annotations for this project. Your
             changes have not been saved.
+          </AlertDialog>
+        )}
+      </DialogContainer>
+      <DialogContainer onDismiss={() => setConfirmHideOthers(false)}>
+        {confirmHideOthers && (
+          <AlertDialog
+            title="Discard edits to others' annotations?"
+            variant="destructive"
+            primaryActionLabel="Hide and discard"
+            cancelLabel="Cancel"
+            onPrimaryAction={() => {
+              setConfirmHideOthers(false);
+              void applyShowOthers(false);
+            }}
+            onCancel={() => setConfirmHideOthers(false)}
+          >
+            You have unsaved edits to annotations made by other users. Hiding
+            them discards these edits. To keep them, save first.
           </AlertDialog>
         )}
       </DialogContainer>

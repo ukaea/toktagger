@@ -29,7 +29,13 @@ import {
   TaskType,
   DataParams,
 } from "@/types";
-import { ApiError, BACKEND_API_URL, apiFetch, ensureOk } from "@/app/core";
+import {
+  ApiError,
+  BACKEND_API_URL,
+  apiFetch,
+  ensureOk,
+  isOwnAnnotation,
+} from "@/app/core";
 import { getSignalNames } from "@/app/utils";
 import { useProjectRole } from "@/app/hooks/useProjectRole";
 
@@ -93,6 +99,12 @@ interface SampleContextType {
   // Replaces the working set with a freshly fetched one, so `serverAnnotations`
   // stays the baseline a save diffs against.
   syncAnnotationsFromServer: (annotations: Annotation[]) => void;
+  // Takes only other authors' annotations from a fetch, keeping the local working copy
+  // of the user's own, so a visibility change does not discard unsaved work.
+  mergeOthersFromServer: (
+    annotations: Annotation[],
+    username: string | undefined,
+  ) => void;
   setDataParams: React.Dispatch<React.SetStateAction<DataParams>>;
   setViewParams: React.Dispatch<
     React.SetStateAction<ViewParams | Profile2DViewParams>
@@ -498,6 +510,23 @@ export function SampleProvider({
     setServerAnnotations(fetched);
   }, []);
 
+  const mergeOthersFromServer = useCallback(
+    (fetched: Annotation[], username: string | undefined) => {
+      const others = fetched.filter(
+        (annotation) => !isOwnAnnotation(annotation, username),
+      );
+      const merge = (previous: Annotation[]) => [
+        ...previous.filter((annotation) =>
+          isOwnAnnotation(annotation, username),
+        ),
+        ...others,
+      ];
+      setAnnotations(merge);
+      setServerAnnotations(merge);
+    },
+    [],
+  );
+
   const annotationLabels =
     project?.task === TaskType.Video
       ? (project.video_bounding_box_labels || []).map((name, i) => ({
@@ -524,6 +553,7 @@ export function SampleProvider({
     canAnnotate,
     setAnnotations,
     syncAnnotationsFromServer,
+    mergeOthersFromServer,
     setPlotProps,
     setViewParams,
     setDataParams,
