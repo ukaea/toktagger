@@ -3,12 +3,12 @@ import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
   Heading,
-  InlineAlert,
   TextField,
   Button,
   Flex,
   View,
   Form,
+  ToastQueue,
 } from "@adobe/react-spectrum";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { PasswordField } from "@/app/components/ui/passwordField";
@@ -17,7 +17,6 @@ export default function LoginPage() {
   const { login, isLoading, user } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (!isLoading && user) {
@@ -26,15 +25,16 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      setError("Invalid username or password");
+      ToastQueue.negative("Invalid username or password", { timeout: 2000 });
       return;
     }
-    setError(null);
     setSubmitting(true);
     try {
       await login(username, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      ToastQueue.negative(err instanceof Error ? err.message : "Login failed", {
+        timeout: 2000,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -68,11 +68,6 @@ export default function LoginPage() {
         <Heading level={2} marginBottom="size-300">
           TokTagger — Sign In
         </Heading>
-        {error && (
-          <InlineAlert variant="negative" marginBottom="size-200" width="100%">
-            {error}
-          </InlineAlert>
-        )}
         <Form onSubmit={handleSubmit} width="100%">
           <Flex
             direction="column"
