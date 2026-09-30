@@ -202,7 +202,7 @@ export default function ProjectView() {
           ]
         : // Spectrum renders the last breadcrumb as the (unclickable) current
           // page, so a single "Projects" crumb here can't act as a link.
-          [{ key: "projects", label: "Projects", href: "/ui/projects" }],
+          [{ key: "projects", label: "Projects" }],
   );
 
   const refreshSamples = useCallback(async () => {
