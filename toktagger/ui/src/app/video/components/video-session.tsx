@@ -520,10 +520,9 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] =
     useState<ActiveDrawingTool>(videoDrawingTool);
-  // A viewer is pinned out of edit mode, so it starts false and cannot be turned on.
-  const [editMode, setEditModeState] = useState(
-    canAnnotate ? videoEditMode : false,
-  );
+  const [storedEditMode, setEditModeState] = useState(videoEditMode);
+  // Derived rather than clamped into state, so the saved choice survives canAnnotate resolving late.
+  const editMode = canAnnotate && storedEditMode;
   const [ctrlHeld, setCtrlHeld] = useState(false);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
   const hideAnnotationsRef = useRef(false);
@@ -808,15 +807,6 @@ export function VideoSessionProvider(props: {
     },
     [api, flushPendingOverlay, setVideoEditMode, canAnnotate],
   );
-
-  // canAnnotate defaults open and only corrects downward once the membership check
-  // resolves, so drop back out of edit mode if this turns out to be a viewer.
-  useEffect(() => {
-    if (!canAnnotate) {
-      setEditModeState(false);
-      setVideoEditMode(false);
-    }
-  }, [canAnnotate, setVideoEditMode]);
 
   useEffect(() => {
     const releaseCtrl = () => {
