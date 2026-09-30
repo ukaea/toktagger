@@ -8,7 +8,6 @@ import {
   Divider,
   Content,
   ButtonGroup,
-  InlineAlert,
   Flex,
   ToastQueue,
 } from "@adobe/react-spectrum";
@@ -50,23 +49,22 @@ export function PasswordChangeDialog({
 }: PasswordChangeDialogProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setPassword("");
     setConfirmPassword("");
-    setError(null);
   };
 
   const save = async (close: () => void) => {
-    setError(null);
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      ToastQueue.negative("Passwords do not match", { timeout: 2000 });
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      ToastQueue.negative("Password must be at least 8 characters", {
+        timeout: 2000,
+      });
       return;
     }
     setSaving(true);
@@ -87,7 +85,9 @@ export function PasswordChangeDialog({
       ToastQueue.positive(successMessage, { timeout: 2000 });
       await onSuccess?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      ToastQueue.negative(e instanceof Error ? e.message : "Error", {
+        timeout: 2000,
+      });
     } finally {
       setSaving(false);
     }
@@ -112,11 +112,6 @@ export function PasswordChangeDialog({
           <Heading>{heading}</Heading>
           <Divider />
           <Content>
-            {error && (
-              <InlineAlert variant="negative" marginBottom="size-100">
-                {error}
-              </InlineAlert>
-            )}
             <Flex direction="column" gap="size-100">
               <PasswordField
                 label="New password"
