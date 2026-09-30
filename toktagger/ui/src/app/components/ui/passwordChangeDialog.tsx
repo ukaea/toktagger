@@ -9,6 +9,7 @@ import {
   Content,
   ButtonGroup,
   Flex,
+  Text,
   ToastQueue,
 } from "@adobe/react-spectrum";
 import { BACKEND_API_URL, apiFetch } from "@/app/core";
@@ -128,9 +129,7 @@ export function PasswordChangeDialog({
               />
             </Flex>
             {helperText && (
-              <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                {helperText}
-              </p>
+              <Text marginTop="size-100">{helperText}</Text>
             )}
           </Content>
           <ButtonGroup>
