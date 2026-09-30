@@ -250,7 +250,11 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
               <Picker
                 label="Role"
                 selectedKey={role}
-                onSelectionChange={(k) => setRole(k as "admin" | "user")}
+                onSelectionChange={(k) => {
+                  if (k !== null) {
+                    setRole(k as "admin" | "user");
+                  }
+                }}
               >
                 <Item key="user">User</Item>
                 <Item key="admin">Admin</Item>
@@ -319,7 +323,11 @@ function ChangeRoleDialog({
             <Picker
               label="Global Role"
               selectedKey={role}
-              onSelectionChange={(k) => setRole(k as "admin" | "user")}
+              onSelectionChange={(k) => {
+                if (k !== null) {
+                  setRole(k as "admin" | "user");
+                }
+              }}
             >
               <Item key="user">User</Item>
               <Item key="admin">Admin</Item>
