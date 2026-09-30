@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUnauthorizedHandler(() => {
       if (!user) return;
       setUser(null);
-      navigate("/ui/login");
+      navigate("/ui/login", { replace: true });
     });
     return () => setUnauthorizedHandler(null);
   }, [user, navigate]);
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       () => {},
     );
     setUser(null);
-    navigate("/ui/login");
+    navigate("/ui/login", { replace: true });
   };
 
   return (
