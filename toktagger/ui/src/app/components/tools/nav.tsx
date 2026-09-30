@@ -1,11 +1,5 @@
 "use client";
-import {
-  Project,
-  ProjectMemberSchema,
-  type Annotation,
-  type NavAdapter,
-} from "@/types";
-import { z } from "zod/v4";
+import { Project, type Annotation, type NavAdapter } from "@/types";
 import {
   Flex,
   ActionButton,
@@ -32,6 +26,7 @@ import {
   BACKEND_API_URL,
   apiFetch,
   getAnnotationsForSample,
+  getMyMemberships,
   ApiError,
   AnnotationConflictError,
   othersHaveUnsavedEdits,
@@ -605,21 +600,14 @@ export function NavigationBar({ project_id, sample_id }: NavigationBarInfo) {
 
   const [showOthers, setShowOthers] = useState(true);
 
-  // The preference lives on the membership record, so read it back rather than
-  // assuming the default - the checkbox has to agree with the filter the server is
-  // applying, and the Clear button now acts on what it says. A user with no
-  // membership row (a global admin who is not a member) gets no filter server-side,
-  // which is the same as having it on.
+  // Read the preference back from the membership record so the checkbox agrees with the server's filter; no membership row means no filter, same as having it on.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    apiFetch(`${BACKEND_API_URL}/users/me/memberships`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data: unknown) => {
+    getMyMemberships()
+      .then((members) => {
         if (cancelled) return;
-        const parsed = z.array(ProjectMemberSchema).safeParse(data);
-        if (!parsed.success) return;
-        const membership = parsed.data.find(
+        const membership = members.find(
           (candidate) => candidate.project_id === project_id,
         );
         setShowOthers(membership?.show_others_annotations ?? true);

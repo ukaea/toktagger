@@ -1,8 +1,10 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
-import { AnnotationConflictSchema } from "@/types";
+import { z } from "zod/v4";
+import { AnnotationConflictSchema, ProjectMemberSchema } from "@/types";
 import type {
   Project,
+  ProjectMember,
   Sample,
   SamplesSummary,
   SampleUpdate,
@@ -104,6 +106,18 @@ export const getURL = async (url: string) => {
   const payload = await response.json();
   return payload;
 };
+
+// Fails closed to [] rather than throwing, since callers use this to derive a
+// per-project preference/role and have no user-facing way to retry a failed fetch.
+export async function getMyMemberships(): Promise<ProjectMember[]> {
+  const response = await apiFetch(`${BACKEND_API_URL}/users/me/memberships`);
+  if (!response.ok) {
+    return [];
+  }
+  const data = await response.json();
+  const parsed = z.array(ProjectMemberSchema).safeParse(data);
+  return parsed.success ? parsed.data : [];
+}
 
 export async function getSamplesSummary(
   project_id: string,

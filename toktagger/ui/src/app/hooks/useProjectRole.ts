@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { BACKEND_API_URL, apiFetch } from "@/app/core";
+import { BACKEND_API_URL, apiFetch, getMyMemberships } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 
 type ProjectRole = "admin" | "annotator" | "viewer" | null;
@@ -84,9 +84,8 @@ export function useMyProjectRoles(): MyProjectRoles {
       return;
     }
     setLoading(true);
-    apiFetch(`${BACKEND_API_URL}/users/me/memberships`)
-      .then((r) => r.json())
-      .then((memberships: Array<{ project_id: string; role: ProjectRole }>) => {
+    getMyMemberships()
+      .then((memberships) => {
         setRoles(
           Object.fromEntries(memberships.map((m) => [m.project_id, m.role])),
         );
