@@ -378,14 +378,18 @@ export default function ProjectView() {
                       aria-label="ML Model Help"
                     >
                       <Heading>
-                        {modelsEnabled
-                          ? "ML Model Controls"
-                          : "ML Models Disabled"}
+                        {!modelsEnabled
+                          ? "ML Models Disabled"
+                          : !canAnnotate
+                            ? "ML Models Restricted"
+                            : "ML Model Controls"}
                       </Heading>
                       <Content>
-                        {modelsEnabled
-                          ? "Use these inputs to train / load and make predictions with Machine Learning models. You can define custom ML models for your datasets using the TokTagger Python module."
-                          : "Model tools are disabled due to missing dependencies on the server."}
+                        {!modelsEnabled
+                          ? "Model tools are disabled due to missing dependencies on the server."
+                          : !canAnnotate
+                            ? "You do not have access to ML models since you are only a Viewer on this project."
+                            : "Use these inputs to train / load and make predictions with Machine Learning models. You can define custom ML models for your datasets using the TokTagger Python module."}
                       </Content>
                       <Footer>
                         <Link
