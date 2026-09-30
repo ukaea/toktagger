@@ -388,7 +388,11 @@ export default function ProjectView() {
                           : "Model tools are disabled due to missing dependencies on the server."}
                       </Content>
                       <Footer>
-                        <Link href="https://ukaea.github.io/toktagger/custom_models/">
+                        <Link
+                          href="https://ukaea.github.io/toktagger/custom_models/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           Learn more about ML models in TokTagger
                         </Link>
                       </Footer>
