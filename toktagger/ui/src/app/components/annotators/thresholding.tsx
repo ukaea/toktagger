@@ -107,6 +107,8 @@ export default function Profile2DThresholdTool({
       return;
     }
 
+    let cancelled = false;
+
     const fetchData = async () => {
       if (!signalName || !range) return;
 
@@ -133,6 +135,7 @@ export default function Profile2DThresholdTool({
       );
 
       const payload: Annotation[] = await response.json();
+      if (cancelled) return;
       setAnnotations((previousAnnotations: Annotation[]) => {
         // Replace only this annotator's unsaved output for the current signal.
         const otherAnnotations = previousAnnotations.filter(
@@ -148,6 +151,9 @@ export default function Profile2DThresholdTool({
     };
 
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [
     project_id,
     sample_id,
