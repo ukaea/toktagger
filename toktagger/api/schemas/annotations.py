@@ -157,7 +157,7 @@ def create_batch_model(base_class, name_suffix="Batch"):
     class_name = f"{base_class.__name__}{name_suffix}"
     return create_model(
         class_name,
-        __base__=(base_class, AnnotationBatch),
+        __base__=(AnnotationBatch, base_class),
     )
 
 

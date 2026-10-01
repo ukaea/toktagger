@@ -12,7 +12,7 @@ import {
   Text,
   ToastQueue,
 } from "@adobe/react-spectrum";
-import { BACKEND_API_URL, apiFetch } from "@/app/core";
+import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
 import { PasswordField } from "@/app/components/ui/passwordField";
 
 type PasswordChangeDialogProps = {
@@ -79,7 +79,7 @@ export function PasswordChangeDialog({
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? "Failed to change password");
+        throw new Error(formatApiDetail(d, "Failed to change password"));
       }
       reset();
       close();

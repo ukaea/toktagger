@@ -92,6 +92,18 @@ export class AnnotationConflictError extends ApiError {
   }
 }
 
+export function formatApiDetail(body: unknown, fallback: string): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((issue: unknown) => (issue as { msg?: unknown } | null)?.msg)
+      .filter((msg): msg is string => typeof msg === "string");
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return fallback;
+}
+
 // Fetch helpers below cast the response body directly, so a non-2xx response
 // (e.g. 403 for a project you're not a member of) would otherwise be silently
 // cast as if it were valid data. Call this before reading the body so callers

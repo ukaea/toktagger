@@ -22,7 +22,7 @@ import {
 } from "@adobe/react-spectrum";
 import Edit from "@spectrum-icons/workflow/Edit";
 import Delete from "@spectrum-icons/workflow/Delete";
-import { BACKEND_API_URL, apiFetch } from "@/app/core";
+import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
 import { PasswordChangeDialog } from "@/app/components/ui/passwordChangeDialog";
@@ -64,7 +64,7 @@ export default function AdminUsersPage() {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? "Failed to update user");
+        throw new Error(formatApiDetail(d, "Failed to update user"));
       }
       await refresh();
       ToastQueue.positive(isActive ? "User deactivated" : "User activated", {
@@ -84,7 +84,7 @@ export default function AdminUsersPage() {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? "Failed to delete user");
+        throw new Error(formatApiDetail(d, "Failed to delete user"));
       }
       close();
       await refresh();
@@ -212,7 +212,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? "Failed to create user");
+        throw new Error(formatApiDetail(d, "Failed to create user"));
       }
       setUsername("");
       setPassword("");
@@ -302,7 +302,7 @@ function ChangeRoleDialog({
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? "Failed to update role");
+        throw new Error(formatApiDetail(d, "Failed to update role"));
       }
       close();
       onChanged();
