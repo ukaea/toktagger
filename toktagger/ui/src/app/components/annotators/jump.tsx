@@ -44,6 +44,8 @@ export function JumpDetectionTool({
   const validSignalName = signalName && signalName in data.values;
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchData = async () => {
       if (!isEnabled) {
         // Remove previous annotations from this annotator
@@ -81,6 +83,7 @@ export function JumpDetectionTool({
       );
 
       const payload: Annotation[] = await response.json();
+      if (cancelled) return;
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
@@ -91,6 +94,9 @@ export function JumpDetectionTool({
       });
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [
     project_id,
     sample_id,
