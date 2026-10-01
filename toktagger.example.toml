@@ -63,6 +63,9 @@
 # The directory to use for storing entries in the Mongita database, if used.
 # cache_dir = '/home/runner/.cache/toktagger'
 
+# Whether to launch an MCP server for use with LLM agents.
+# mcp_enabled = true
+
 
 [uda]
 # Host name for the UDA server to connect to for MAST data loaders.

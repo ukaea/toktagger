@@ -121,7 +121,11 @@ router = APIRouter(
 )
 
 
-@router.get("/models")
+@router.get(
+    "/models",
+    operation_id="get_trained_models",
+    tags=["MCP"],
+)
 async def get_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -134,7 +138,41 @@ async def get_models(
         description="Index of the last model you want returned when sorted by version, leave blank to return all entries",
     ),
 ) -> list[Model]:
-    # Return details about models being used by this project
+    """
+    Return details about trained/loaded models being used by this project,
+    with version information and optional pagination.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get models for.
+    start : int
+        Index of the first model you want returned when sorted by version.
+    end : int | None
+        Index of the last model you want returned when sorted by version,
+        leave blank to return all entries.
+
+    Returns
+    -------
+    list[Model]
+        A list of Model objects with: id, type, version, status, progress,
+        score, project_id.
+
+    Notes
+    -----
+    Use When:
+        - You want to see which models have been trained or loaded for a project
+        - You need to know available model versions before making predictions
+    Do Not Use When:
+        - You need a specific model instance's details - use get_model instead
+        - You want to start training - use start_model_training instead
+        - You are querying metadata about the project itself - use get_projects instead
+        - You need to know which models are available to be trained/loaded within this project/task - use get_model_types instead
+    Example User Requests:
+        - "What models have been trained for this project?"
+        - "Show me all model versions available for disruption_cnn"
+        - "Did the most recent model training for this project complete successfully?"
+    """
     # Could be eg the ID, type of model, the accuracy, the version. link to mlflow / simvue instance, etc...
     db_client = request.app.state.db_client
     models = await utils.get_models(
@@ -147,7 +185,11 @@ async def get_models(
     return models
 
 
-@router.get("/models/{model_type}")
+@router.get(
+    "/models/{model_type}",
+    operation_id="get_model",
+    tags=["MCP"],
+)
 async def get_model(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -159,6 +201,38 @@ async def get_model(
         description="The version of the model to return, leave blank to return the latest model.",
     ),
 ) -> Model:
+    """
+    Get full details about a specific model type and version for a project.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get models for.
+    model_type : str
+        The type of model to return information about.
+    version : int | None
+        The version of the model to return, leave blank to return the latest
+        model.
+
+    Returns
+    -------
+    Model
+        A Model object with: id, type, version, status, progress, score,
+        project_id.
+
+    Notes
+    -----
+    Use When:
+        - You need the status, version, and score of a specific trained model
+        - You are checking if a model is ready for predictions (status = "completed")
+        - You want to verify a specific model version exists
+    Do Not Use When:
+        - You need all models - use get_trained_models instead
+        - You want to train a model - use start_model_training instead
+    Example User Requests:
+        - "What is the status of the disruption_cnn model?"
+        - "What accuracy score did version 1 of this model achieve?"
+    """
     db_client = request.app.state.db_client
     model = await utils.get_model(
         db_client, project_id=project_id, model_type=model_type, version=version
@@ -166,7 +240,7 @@ async def get_model(
     return model
 
 
-@router.delete("/models/{model_type}")
+@router.delete("/models/{model_type}", operation_id="delete_models")
 async def delete_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -176,6 +250,27 @@ async def delete_models(
         description="The version of the model to delete, leave blank to delete all models",
     ),
 ):
+    """
+    Delete a trained model version.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete models from.
+    model_type : str
+        The type of model to delete.
+    version : int | None
+        The version of the model to delete, leave blank to delete all models.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
+    """
     db_client = request.app.state.db_client
 
     await utils.get_project(db_client, project_id)
@@ -209,10 +304,44 @@ async def delete_models(
             shutil.rmtree(model_dir)
 
 
-@router.get("/models/{model_type}/train")
+@router.get(
+    "/models/{model_type}/train",
+    operation_id="get_model_training_info",
+    tags=["MCP"],
+)
 async def get_training_info(
     request: Request, project_id: str, model_type: str
 ) -> Model:
+    """
+    Get information about an in-progress model training job, checking whether
+    it is queued, training, or loading weights.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get training information for.
+    model_type : str
+        The type of model to get training information for.
+
+    Returns
+    -------
+    Model
+        A Model object if training is in progress; raises 404 if no training
+        is active.
+
+    Notes
+    -----
+    Use When:
+        - You started training and want to check progress
+        - You need to verify a training job is still running
+        - You are polling for training completion
+    Do Not Use When:
+        - You want to start training - use start_model_training instead
+        - The training is already complete - use get_model instead
+    Example User Requests:
+        - "How far along is the training of disruption_cnn?"
+        - "Is the model still training?"
+    """
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
     latest_model = await utils.get_model(
@@ -225,7 +354,11 @@ async def get_training_info(
     return latest_model
 
 
-@router.put("/models/{model_type}/train")
+@router.put(
+    "/models/{model_type}/train",
+    operation_id="start_model_training",
+    tags=["MCP"],
+)
 async def start_model_training(
     request: Request,
     project_id: str,
@@ -235,6 +368,43 @@ async def start_model_training(
         {}, description="Optional parameters for training the model", embed=True
     ),
 ):
+    """
+    Start training an ML model on validated annotations for a project.
+    The user should be prompted to provide relevant parameters, if required -
+    use get_model_training_schema to find required parameters.
+    Note that this is a non-blocking endpoint which will start the training
+    task but not wait for it to complete.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to train a model for.
+    model_type : str
+        The type of model to train.
+    use_gpu : bool
+        Whether to use GPU to train the model.
+    params : dict
+        Optional parameters for training the model.
+
+    Returns
+    -------
+    dict
+        A dict with task_id and model_id for tracking training progress.
+
+    Notes
+    -----
+    Use When:
+        - You are training up a model for future predictions
+        - You have enough validated samples/annotations to train a model
+    Do Not Use When:
+        - There are no validated annotations - the endpoint returns 404
+        - Training for this model type is already in progress - returns 409
+        - You want to load pre-trained weights instead - use one of the load_model_weights_* tools
+        - You need to know which parameters the model needs from the user to train - use get_model_training_schema first
+    Example User Requests:
+        - "Start training the disruption_cnn model"
+        - "Train this model on GPU with custom hidden layers"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -340,7 +510,11 @@ async def start_model_training(
     return {"task_id": task_id, "model_id": model_id}
 
 
-@router.delete("/models/{model_type}/train")
+@router.delete(
+    "/models/{model_type}/train",
+    operation_id="stop_model_training",
+    tags=["MCP"],
+)
 async def stop_model_training(
     request: Request,
     project_id: str,
@@ -349,6 +523,39 @@ async def stop_model_training(
         None, description="Version of model to use, leave blank for latest version"
     ),
 ):
+    """
+    Stop training ML model(s) which are currently in progress, by type and
+    (optionally) version.
+    If version is not specified, stops in progress training of all models of
+    that type.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to stop model training for.
+    model_type : str
+        The type of model to stop training.
+    version : int | None
+        Version of model to use, leave blank to stop all in progress models
+        of the given type.
+
+    Returns
+    -------
+    list[str]
+        A list of the aborted models' IDs.
+
+    Notes
+    -----
+    Use When:
+        - You need to cancel an ML model training run
+        - You need to cancel training of all ML models of a specified type
+    Do Not Use When:
+        - Training for this model type is not in progress - returns 409
+        - You want to delete a model instance - this is not supported by agentic workflows in TokTagger (use delete_models)
+    Example User Requests:
+        - "Stop training the disruption_cnn model"
+        - "Stop training disruption_cnn model version 3, if it is in progress."
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -399,10 +606,46 @@ async def stop_model_training(
     return [model.id for model in models]
 
 
-@router.post("/models/{model_type}/load/local")
+@router.post(
+    "/models/{model_type}/load/local",
+    operation_id="load_model_weights_local",
+    tags=["MCP"],
+)
 async def load_model_weights_local(
     request: Request, project_id: str, model_type: str, params: LocalLoadParams
 ):
+    """
+    Load pre-trained model weights from a local file system path.
+    Note that this is a non-blocking endpoint which will start the loading
+    task but not wait for it to complete.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to load a model for.
+    model_type : str
+        The type of model to load weights for.
+    params : LocalLoadParams
+        Parameters for loading weights from a local path.
+
+    Returns
+    -------
+    dict
+        A dict with task_id and model_id for tracking load progress.
+
+    Notes
+    -----
+    Use When:
+        - The user wishes to load pretrained model weights saved on the server's local disk
+        - You want to use a locally trained model for predictions
+        - You are running in an offline environment without GitLab/HuggingFace access
+    Do Not Use When:
+        - The weights file doesn't exist at the specified path — returns 422
+        - Local loading is disabled in config — returns 403
+        - You want to load from GitLab or HuggingFace - use load_model_weights_gitlab, or load_model_weights_hugging_face instead
+    Example User Requests:
+        - "Load model weights for disruption_cnn model from /path/to/model.pt"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -434,10 +677,49 @@ async def load_model_weights_local(
     return {"task_id": task_id, "model_id": model.id}
 
 
-@router.post("/models/{model_type}/load/gitlab")
+@router.post(
+    "/models/{model_type}/load/gitlab",
+    operation_id="load_model_weights_gitlab",
+    tags=["MCP"],
+)
 async def load_model_weights_gitlab(
     request: Request, project_id: str, model_type: str, params: GitlabLoadParams
 ):
+    """
+    Load pre-trained ML model weights from a GitLab project's model registry.
+    The user should be prompted to provide required input parameters.
+    The project_id which can be loaded from may be limited by the server -
+    check using get_model_load_method_allowlist first.
+    Note that this is a non-blocking endpoint which will start the loading
+    task but not wait for it to complete.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to load a model for.
+    model_type : str
+        The type of model to load weights for.
+    params : GitlabLoadParams
+        Parameters for loading weights from a GitLab project.
+
+    Returns
+    -------
+    dict
+        A dict with task_id and model_id for tracking load progress.
+
+    Notes
+    -----
+    Use When:
+        - You want to load weights hosted on a GitLab project
+        - You are using a shared model repository via GitLab
+        - GitLab loading is enabled and configured on the server
+    Do Not Use When:
+        - GitLab loading is disabled - returns 403
+        - Required env vars (GITLAB_URL, GITLAB_TOKEN) are not set on the server - returns 409
+        - You want to load from local files or HuggingFace - use load_model_weights_local, or load_model_weights_hugging_face instead
+    Example User Requests:
+        - "Import disruption_cnn weights from GitLab"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -482,10 +764,48 @@ async def load_model_weights_gitlab(
     return {"task_id": task_id, "model_id": model.id}
 
 
-@router.post("/models/{model_type}/load/hugging_face")
+@router.post(
+    "/models/{model_type}/load/hugging_face",
+    operation_id="load_model_weights_hugging_face",
+    tags=["MCP"],
+)
 async def load_model_weights_hugging_face(
     request: Request, project_id: str, model_type: str, params: HuggingfaceLoadParams
 ):
+    """
+    Load pre-trained model weights from a Hugging Face model repository.
+    The user should be prompted to provide required input parameters.
+    The userspace which can be loaded from may be limited by the server -
+    check using get_model_load_method_allowlist first.
+    Note that this is a non-blocking endpoint which will start the loading
+    task but not wait for it to complete.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to load a model for.
+    model_type : str
+        The type of model to load weights for.
+    params : HuggingfaceLoadParams
+        Parameters for loading weights from a Hugging Face repository.
+
+    Returns
+    -------
+    dict
+        A dict with task_id and model_id for tracking load progress.
+
+    Notes
+    -----
+    Use When:
+        - You want to load weights from a Hugging Face model hub repository
+        - HuggingFace loading is enabled and configured on the server
+    Do Not Use When:
+        - HuggingFace loading is disabled — returns 403
+        - Required userspace/organization is not configured — returns 422
+        - You want to load from local files or GitLab - use load_model_weights_local, or load_model_weights_gitlab instead
+    Example User Requests:
+        - "Load a disruption_cnn model from Hugging Face"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -523,13 +843,49 @@ async def load_model_weights_hugging_face(
     return {"task_id": task_id, "model_id": model.id}
 
 
-@router.get("/models/{model_type}/load/{task_id}")
+@router.get(
+    "/models/{model_type}/load/{task_id}",
+    operation_id="get_load_model_status",
+    tags=["MCP"],
+)
 async def get_load_model_status(
     request: Request,
     project_id: str = Path(description="The ID of the project to load a model for."),
     model_type: str = Path(description="The type of model to load."),
     task_id: str = Path(description="The load task to get results from."),
 ) -> bool | str:
+    """
+    Get the status of a model weight loading task, checking whether it is
+    still queued, in progress, or completed.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to load a model for.
+    model_type : str
+        The type of model to load.
+    task_id : str
+        The load task to get status from.
+
+    Returns
+    -------
+    bool | str
+        True on success, or HTTP 202 with {"message": "Load task in the
+        queue!"} while loading.
+
+    Notes
+    -----
+    Use When:
+        - You started loading weights and need to check if it's finished
+        - You are polling for load completion before making predictions
+        - You want to detect load failures
+    Do Not Use When:
+        - You want to actually load weights - use load_model_weights_* instead
+        - You want to check training status - use get_model_training_info instead
+    Example User Requests:
+        - "Has the model loading finished?"
+        - "Check the status of the weight loading task"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -593,7 +949,11 @@ async def get_load_model_status(
         raise HTTPException(status_code=404, detail="Load task not found with that ID!")
 
 
-@router.post("/models/{model_type}/predict")
+@router.post(
+    "/models/{model_type}/predict",
+    operation_id="create_model_predictions",
+    tags=["MCP"],
+)
 async def predict(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -616,6 +976,52 @@ async def predict(
         {}, description="Optional parameters for training the model", embed=True
     ),
 ):
+    """
+    Predict on a set of samples with an ML model, running inference with a
+    trained model to generate predicted annotations.
+    The user should be prompted to provide relevant parameters, if required -
+    use get_model_prediction_schema to find required parameters.
+    Note that this is a non-blocking endpoint which will start the
+    predictions task but not wait for it to complete.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get models for.
+    model_type : str
+        The type of model to use for predictions.
+    version : int | None
+        Version of model to use, leave blank for latest version.
+    num_predictions : int
+        The maximum number of samples to make predictions for, default is 20.
+    sample_ids : list[str] | None
+        A list of specific sample IDs to make predictions for, leave blank
+        for random selection.
+    use_gpu : bool
+        Whether to use GPU to create these predictions.
+    params : dict
+        Optional parameters for the prediction task.
+
+    Returns
+    -------
+    dict
+        A dict with task_id for tracking prediction progress.
+
+    Notes
+    -----
+    Use When:
+        - You have a trained model and want to generate predictions on unannotated samples
+        - You want to pre-populate annotations for human review
+        - You need model-assisted labeling for batch samples
+        - You want to evaluate model performance on new data
+    Do Not Use When:
+        - The model isn't trained - use start_model_training first
+        - You want quick, automated annotations from built in annotators - use create_automated_sample_annotations instead
+        - You want predictions for a single specific sample - use create_sample_model_predictions instead
+        - You are querying model info - use get_trained_models instead
+    Example User Requests:
+        - "Generate predictions using the disruption_cnn model on 20 samples"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -691,7 +1097,7 @@ async def predict(
     return {"task_id": task_id}
 
 
-@router.delete("/models/{model_type}/predict")
+@router.delete("/models/{model_type}/predict", operation_id="delete_model_predictions")
 async def delete_predictions(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
@@ -720,7 +1126,11 @@ async def delete_predictions(
         )
 
 
-@router.post("/samples/{sample_id}/models/{model_type}/predict")
+@router.post(
+    "/samples/{sample_id}/models/{model_type}/predict",
+    operation_id="create_sample_model_predictions",
+    tags=["MCP"],
+)
 async def create_sample_predictions(
     request: Request,
     project_id: str = Path(
@@ -740,6 +1150,47 @@ async def create_sample_predictions(
         DataParams(), description="Data parameters fort this sample", embed=True
     ),
 ) -> dict[str, str]:
+    """
+    Create model predictions for a single specific sample, running inference
+    to generate predicted annotations.
+
+    Note that this is a non-blocking endpoint which will start the
+    predictions task but not wait for it to complete.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to make model predictions for.
+    sample_id : str
+        The ID of the sample to make model predictions for.
+    model_type : str
+        The type of model to make predictions from.
+    use_gpu : bool
+        Whether to use GPU to create these predictions.
+    params : dict
+        Optional parameters for the prediction task.
+    data_params : DataParamTypes
+        Data parameters for this sample.
+
+    Returns
+    -------
+    dict[str, str]
+        A dict with task_id for tracking prediction progress.
+
+    Notes
+    -----
+    Use When:
+        - You want predictions for one specific sample
+        - You are comparing model predictions against your own annotations for a sample
+    Do Not Use When:
+        - You don't know the required parameters to start predictions - use get_model_prediction_schema to find required parameters.
+        - You need batch predictions across many samples - use create_model_predictions instead
+        - You want quick, automated annotations from built in annotators - use create_automated_sample_annotations instead
+        - The model isn't trained - use start_model_training first
+    Example User Requests:
+        - "Get predictions for shot 30421 using the disruption_cnn model"
+        - "Show me the model prediction for this sample before I annotate it"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -783,7 +1234,11 @@ async def create_sample_predictions(
     return {"task_id": task_id}
 
 
-@router.get("/samples/{sample_id}/models/{model_type}/predict/{task_id}")
+@router.get(
+    "/samples/{sample_id}/models/{model_type}/predict/{task_id}",
+    operation_id="get_sample_model_predictions",
+    tags=["MCP"],
+)
 async def get_sample_predictions(
     request: Request,
     project_id: str = Path(
@@ -795,6 +1250,39 @@ async def get_sample_predictions(
     model_type: str = Path(description="The type of model to get predictions from."),
     task_id: str = Path(description="The prediction task to get results from."),
 ) -> list[AnnotationBatchTypes]:
+    """
+    Get the model prediction results for a sample, retrieving the annotation
+    predictions produced by a model for it if they have been completed.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get model predictions for.
+    sample_id : str
+        The ID of the sample to get model predictions for.
+    model_type : str
+        The type of model to get predictions from.
+    task_id : str
+        The prediction task to get results from.
+
+    Returns
+    -------
+    list[AnnotationBatchTypes]
+        A list of predicted Annotation objects for the specified sample, or a
+        202 response if the predict task has not yet completed.
+
+    Notes
+    -----
+    Use When:
+        - You started a prediction task and need to check if it is complete
+        - You want to see model predictions before human annotation
+    Do Not Use When:
+        - You want to create predictions - use create_model_predictions or create_sample_model_predictions instead
+        - You want to retrieve all annotations for a sample - use get_sample_annotations instead (optionally filtering by created_by with the model name)
+    Example User Requests:
+        - "Has the disruption_cnn model completed its predictions for this sample?"
+        - "Did the most recent model prediction task create predictions for this sample?"
+    """
     db_client = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
@@ -860,7 +1348,7 @@ async def get_sample_predictions(
         )
 
 
-@router.put("/models/{model_id}")
+@router.put("/models/{model_id}", operation_id="update_model_status")
 async def update_model(
     request: Request,
     model_updates: ModelUpdate,
@@ -871,7 +1359,28 @@ async def update_model(
         description="The ID of the model to update information about."
     ),
 ) -> None:
-    # Update model status
+    """
+    Update the information stored about a model.
+
+    Parameters
+    ----------
+    model_updates : ModelUpdate
+        The fields to update on the model.
+    project_id : str
+        The ID of the project the model belongs to.
+    model_id : str
+        The ID of the model to update information about.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is for internal TokTagger use and is not exposed to the MCP
+    server.
+    """
     db_client = request.app.state.db_client
     await utils.get_project(db_client, project_id)
     await utils.update_model(
@@ -879,9 +1388,9 @@ async def update_model(
     )
 
 
-@router.get("/models/{model_id}/evaluate")
-async def evaluate(project_id: str, model_id: str):
-    # Get evaluation of model by comparing model predictions to human evaluations
-    # Specify samples to use via filters
-    # Return overall statistics, as well as correct/incorrect for each sample ID
-    pass
+# @router.get("/models/{model_id}/evaluate", operation_id="evaluate")
+# async def evaluate(project_id: str, model_id: str):
+#     # Get evaluation of model by comparing model predictions to human evaluations
+#     # Specify samples to use via filters
+#     # Return overall statistics, as well as correct/incorrect for each sample ID
+#     pass

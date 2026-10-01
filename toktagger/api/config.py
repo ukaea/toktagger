@@ -57,6 +57,10 @@ class Server(pydantic.BaseModel):
         description="The directory to use for storing entries in the Mongita database, if used.",
         validate_default=True,
     )
+    mcp_enabled: bool = pydantic.Field(
+        True,
+        description="Whether to launch an MCP server for use with LLM agents.",
+    )
 
 
 class Models(pydantic.BaseModel):
