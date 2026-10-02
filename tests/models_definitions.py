@@ -42,6 +42,9 @@ class MockDisruptionCNN(Model):
     def save(self, results_dir: pathlib.Path):
         results_dir.joinpath("weights.model").write_text(self.model)
 
+    def weights_exist(self, results_dir: pathlib.Path) -> bool:
+        return results_dir.joinpath("weights.model").exists()
+
     def load(self, results_dir: pathlib.Path, weights_filename: str | None = None):
         if weights_filename:
             results_file = results_dir.joinpath(weights_filename)
@@ -100,6 +103,9 @@ class TimeSeriesCNN(Model):
 
     def save(self, results_dir: pathlib.Path):
         results_dir.joinpath("weights.model").write_text(self.model)
+
+    def weights_exist(self, results_dir: pathlib.Path) -> bool:
+        return results_dir.joinpath("weights.model").exists()
 
     def load(self, results_dir: pathlib.Path, weights_filename: str | None = None):
         if weights_filename:

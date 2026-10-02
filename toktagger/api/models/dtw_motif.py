@@ -243,6 +243,9 @@ class DTWMotifModel(Model):
         with open(results_dir.joinpath("weights.model"), "wb") as f:
             pickle.dump(self.model, f)
 
+    def weights_exist(self, results_dir: pathlib.Path) -> bool:
+        return results_dir.joinpath("weights.model").exists()
+
     def load(
         self, results_dir: pathlib.Path, weights_filename: str | None = None
     ) -> None:

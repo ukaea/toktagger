@@ -325,6 +325,22 @@ class Model(ABC):
         """
         pass
 
+    @abstractmethod
+    def weights_exist(self, results_dir: pathlib.Path) -> bool:
+        """Check whether saved model state exists which load() can restore.
+
+        Parameters
+        ----------
+        results_dir : pathlib.Path
+            The path to a directory in the model cache where your model weights are saved.
+
+        Returns
+        -------
+        bool
+            True if load() can restore the model from results_dir.
+        """
+        pass
+
 
 class ModelRegistry:
     _registry: dict[str, typing.Type[Model]] = {}

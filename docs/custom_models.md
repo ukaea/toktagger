@@ -111,6 +111,21 @@ class MyCustomModel(Model):
         """
         # Your load logic here
 
+    def weights_exist(self, results_dir: pathlib.Path) -> bool:
+        """Check whether saved model state exists which load() can restore.
+
+        Parameters
+        ----------
+        results_dir : pathlib.Path
+            The path to a directory in the model cache where your model weights are saved.
+
+        Returns
+        -------
+        bool
+            True if load() can restore the model from results_dir.
+        """
+        # Your check logic here, for the files that save() writes
+
 ```
 
 ### Step 3: Optionally define required parameters
