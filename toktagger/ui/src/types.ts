@@ -235,6 +235,15 @@ export const ProjectSchema = z.object({
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
+export const ProjectUpdateSchema = ProjectSchema.omit({
+  _id: true,
+  task: true,
+  data_loader: true,
+  timestamp: true,
+  model_types: true,
+});
+export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
+
 export const FileDataSchema = z.object({
   file_name: z.string(),
   type: z.string(),

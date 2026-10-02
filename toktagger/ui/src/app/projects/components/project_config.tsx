@@ -1,4 +1,4 @@
-import { Project, TaskType } from "@/types";
+import { Project, ProjectUpdate, TaskType } from "@/types";
 import {
   Button,
   ActionButton,
@@ -78,9 +78,11 @@ const LabelsForm = ({
 export function ProjectConfigEditor({
   project: _project,
   onModify,
+  isDisabled,
 }: {
   project?: Project;
   onModify?: () => void;
+  isDisabled?: boolean;
 }) {
   const isEditing = !!_project;
   const titleText = isEditing ? "Edit Project" : "Create Project";
@@ -213,13 +215,9 @@ export function ProjectConfigEditor({
         return;
       }
 
-      // Build project object
-      const newProject: Partial<Project> = {
+      const projectUpdate: ProjectUpdate = {
         name: projectName,
-        task: task as TaskType,
         query_strategy: queryStrategy,
-        data_loader: dataLoader,
-        timestamp: new Date().toISOString(),
         time_min: timeMin,
         time_max: timeMax,
         min_time_step: minTimeStep,
@@ -230,10 +228,12 @@ export function ProjectConfigEditor({
         polygon_labels: polygonLabels,
         video_bounding_box_labels: videoBoundingBoxLabels,
       };
-
-      if (isEditing && _project?._id) {
-        newProject._id = _project._id;
-      }
+      const newProject: Partial<Project> = {
+        ...projectUpdate,
+        task: task as TaskType,
+        data_loader: dataLoader,
+        timestamp: new Date().toISOString(),
+      };
 
       let url = `${BACKEND_API_URL}/projects`;
       let method: "POST" | "PUT" = "POST";
@@ -248,7 +248,7 @@ export function ProjectConfigEditor({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(newProject),
+        body: JSON.stringify(method === "PUT" ? projectUpdate : newProject),
       });
 
       if (!response.ok) {
@@ -256,9 +256,12 @@ export function ProjectConfigEditor({
         throw new Error(error.detail || "Error creating project");
       }
 
-      ToastQueue.positive("Project created successfully!", {
-        timeout: 3000,
-      });
+      ToastQueue.positive(
+        `Project ${isEditing ? "updated" : "created"} successfully!`,
+        {
+          timeout: 3000,
+        },
+      );
 
       if (onModify) {
         onModify();
@@ -273,7 +276,7 @@ export function ProjectConfigEditor({
   return (
     <DialogTrigger>
       {isEditing ? (
-        <Button aria-label="Edit" variant="accent">
+        <Button aria-label="Edit" variant="accent" isDisabled={isDisabled}>
           {icon}
         </Button>
       ) : (

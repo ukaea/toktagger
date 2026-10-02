@@ -136,6 +136,22 @@ class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
 
 
+class ProjectUpdate(BaseModel):
+    """The project fields which can change after creation."""
+
+    name: str | None = None
+    query_strategy: QueryStrategyType | None = None
+    time_min: float | None = None
+    time_max: float | None = None
+    min_time_step: float | None = None
+    shot_labels: list[str] | None = None
+    time_region_labels: list[str] | None = None
+    time_point_labels: list[str] | None = None
+    bounding_box_labels: list[str] | None = None
+    polygon_labels: list[str] | None = None
+    video_bounding_box_labels: list[str] | None = None
+
+
 class ProjectMember(ConfiguredModel):
     role: Literal["admin", "annotator", "viewer"] = "annotator"
     show_others_annotations: bool = True

@@ -21,6 +21,7 @@ from toktagger.api.schemas.projects import (
     ProjectMember,
     ProjectMemberOut,
     ProjectMemberUpdate,
+    ProjectUpdate,
 )
 from toktagger.api.schemas.samples import FileData, Sample, SampleSummary, SampleUpdate
 from toktagger.api.schemas.users import (
@@ -253,7 +254,7 @@ async def delete_model(
 
 
 async def update_project(
-    db_client: MongoDBClient, project_id: str, project: Project
+    db_client: MongoDBClient, project_id: str, project: ProjectUpdate
 ) -> None:
     project_id = convert_to_objectid(project_id, "projects")
 

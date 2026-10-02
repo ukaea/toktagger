@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.end_to_end.conftest import login_as
-from tests.endpoints import create_project, create_user, session
+from tests.endpoints import add_project_member, create_project, create_user, session
 
 
 def check_base_page(page):
@@ -584,3 +584,16 @@ def test_create_project(
     for label_type in non_expected_annotation_label_types:
         # These are assigned default values by the server
         assert project[f"{label_type.lower().replace(' ', '_')}"] != [label_type]
+
+
+def test_edit_button_disabled_for_annotator(server_setup, admin_token, browser):
+    create_user("edit_annotator", "annotator_pass123")
+    project_id = create_project("Annotator Edit Project", "time-series", "tabular")
+    add_project_member(project_id, "edit_annotator", role="annotator")
+
+    annotator_page = login_as(browser, "edit_annotator", "annotator_pass123")
+    annotator_page.goto("http://localhost:8002/ui/projects")
+    row = annotator_page.get_by_role("row").filter(has_text="Annotator Edit Project")
+    expect(row.get_by_role("button", name="Edit")).to_be_disabled()
+
+    annotator_page.context.close()

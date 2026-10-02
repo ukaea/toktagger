@@ -397,21 +397,32 @@ export function InstancePanel({
                   <div className="w-14 flex flex-col items-stretch gap-1 shrink-0">
                     <span
                       role="button"
-                      tabIndex={0}
+                      tabIndex={canAnnotate ? 0 : -1}
+                      aria-disabled={!canAnnotate}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (!canAnnotate) return;
                         onRequestBulkDelete(p);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           e.stopPropagation();
+                          if (!canAnnotate) return;
                           onRequestBulkDelete(p);
                         }
                       }}
-                      className="w-full cursor-pointer select-none rounded-md border border-red-300 px-2 py-1 text-center text-[10px] text-red-700 hover:bg-red-50 dark:border-red-400/60 dark:text-red-200 dark:hover:bg-red-500/15"
-                      title="Delete this instance across all frames"
+                      className={`w-full select-none rounded-md border px-2 py-1 text-center text-[10px] ${
+                        canAnnotate
+                          ? "cursor-pointer border-red-300 text-red-700 hover:bg-red-50 dark:border-red-400/60 dark:text-red-200 dark:hover:bg-red-500/15"
+                          : "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-500"
+                      }`}
+                      title={
+                        canAnnotate
+                          ? "Delete this instance across all frames"
+                          : "You have view-only access to this project — annotations cannot be deleted."
+                      }
                       aria-label={`Delete ${p.class_name} ${p.track_id}`}
                     >
                       Delete

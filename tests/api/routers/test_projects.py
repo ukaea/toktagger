@@ -25,17 +25,24 @@ async def test_update_project(api_client, setup_db):
     response = await api_client.get(f"/projects/{setup_db['project_id_1']}")
     assert response.status_code == 200
 
-    project = response.json()
-    project["name"] = "updated_project_name"
+    original = response.json()
 
     response = await api_client.put(
-        f"/projects/{setup_db['project_id_1']}", json=project
+        f"/projects/{setup_db['project_id_1']}",
+        json={
+            "name": "updated_project_name",
+            "task": "video",
+            "data_loader": "does_not_exist",
+        },
     )
     assert response.status_code == 200
 
     result = await api_client.get(f"/projects/{setup_db['project_id_1']}")
     assert result.status_code == 200
-    assert result.json().get("name") == "updated_project_name"
+    updated = result.json()
+    assert updated["name"] == "updated_project_name"
+    assert updated["task"] == original["task"]
+    assert updated["data_loader"] == original["data_loader"]
 
 
 @pytest.mark.asyncio

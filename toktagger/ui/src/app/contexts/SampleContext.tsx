@@ -91,6 +91,7 @@ interface SampleContextType {
   // Sourced here, not per-consumer, so remounts on sample change (see page.tsx) don't reset a local role hook and re-enable gated controls.
   canAnnotate: boolean;
   setAnnotations: React.Dispatch<React.SetStateAction<Annotation[]>>;
+  setServerAnnotations: React.Dispatch<React.SetStateAction<Annotation[]>>;
   // Replaces the working set with a freshly fetched one, so `serverAnnotations` stays the baseline a save diffs against.
   syncAnnotationsFromServer: (annotations: Annotation[]) => void;
   // Takes only other authors' annotations from a fetch, keeping the local working copy of the user's own, so a visibility change does not discard unsaved work.
@@ -538,6 +539,7 @@ export function SampleProvider({
     errorStatus,
     canAnnotate,
     setAnnotations,
+    setServerAnnotations,
     syncAnnotationsFromServer,
     mergeOthersFromServer,
     setPlotProps,

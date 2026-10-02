@@ -22,11 +22,43 @@ def test_admin_can_create_user(server_setup, page):
 
     page.get_by_role("button", name="Add User").click()
     page.get_by_role("textbox", name="Username").fill("newuser")
-    page.get_by_role("textbox", name="Password").fill("newpass123")
+    page.get_by_role("textbox", name="Password", exact=True).fill("newpass123")
+    page.get_by_role("textbox", name="Confirm password").fill("newpass123")
     page.get_by_role("button", name="Create").click()
 
     row = _user_row(page, "newuser")
     expect(row).to_be_visible()
+
+
+@pytest.mark.parametrize(
+    ("password", "confirm", "message"),
+    [
+        ("newpass123", "different123", "Passwords do not match"),
+        ("short", "short", "Password must be at least 8 characters"),
+    ],
+)
+def test_admin_create_user_invalid_password_rejected_locally(
+    server_setup, page, password, confirm, message
+):
+    create_requests = []
+    page.on(
+        "request",
+        lambda r: (
+            create_requests.append(r)
+            if r.method == "POST" and r.url.endswith("/users")
+            else None
+        ),
+    )
+    page.goto("http://localhost:8002/ui/admin/users")
+
+    page.get_by_role("button", name="Add User").click()
+    page.get_by_role("textbox", name="Username").fill("baduser")
+    page.get_by_role("textbox", name="Password", exact=True).fill(password)
+    page.get_by_role("textbox", name="Confirm password").fill(confirm)
+    page.get_by_role("button", name="Create").click()
+
+    expect(page.get_by_role("alert")).to_contain_text(message)
+    assert create_requests == []
 
 
 def test_admin_can_change_user_role(server_setup, admin_token, page):
@@ -93,7 +125,8 @@ def test_admin_created_user_forced_to_change_password(server_setup, browser, pag
     page.goto("http://localhost:8002/ui/admin/users")
     page.get_by_role("button", name="Add User").click()
     page.get_by_role("textbox", name="Username").fill("freshgina")
-    page.get_by_role("textbox", name="Password").fill("initial_pass123")
+    page.get_by_role("textbox", name="Password", exact=True).fill("initial_pass123")
+    page.get_by_role("textbox", name="Confirm password").fill("initial_pass123")
     page.get_by_role("button", name="Create").click()
     expect(_user_row(page, "freshgina")).to_be_visible()
 

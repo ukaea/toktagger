@@ -6,7 +6,6 @@ from toktagger.api.auth.dependencies import (
     get_current_user,
     require_global_admin,
     require_password_changed,
-    require_project_annotator,
     require_project_viewer,
     require_project_admin_role,
 )
@@ -19,6 +18,7 @@ from toktagger.api.schemas.projects import (
     ProjectMemberOut,
     ProjectMemberCreate,
     ProjectMemberUpdate,
+    ProjectUpdate,
 )
 from toktagger.api.schemas.users import UserOut
 
@@ -112,9 +112,9 @@ async def get_project(
 )
 async def update_project(
     request: Request,
-    project: Project,
+    project: ProjectUpdate,
     project_id: str = Path(description="The ID of the project to update"),
-    current_user: UserOut = Depends(require_project_annotator),
+    current_user: UserOut = Depends(require_project_admin_role),
 ):
     """Update a project's information."""
     await utils.update_project(request.app.state.db_client, project_id, project)

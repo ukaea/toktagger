@@ -49,7 +49,14 @@ export function useSyncRemovals(): () => Promise<void> {
 
 export function useNavAdapter(): NavAdapter {
   const navAdapter = useNavAdapterOptional();
-  const { annotations, setAnnotations, project, sample } = useSample();
+  const {
+    annotations,
+    serverAnnotations,
+    setAnnotations,
+    setServerAnnotations,
+    project,
+    sample,
+  } = useSample();
   const { user } = useAuth();
   const syncRemovals = useSyncRemovals();
 
@@ -61,6 +68,7 @@ export function useNavAdapter(): NavAdapter {
     getAnnotations: () => annotations,
     syncRemovals,
     afterSave: () => {
+      setServerAnnotations(annotations);
       // Mirrors the server-side validation so saved annotator output isn't discarded.
       setAnnotations((previousAnnotations: Annotation[]) =>
         previousAnnotations.map((annotation: Annotation) => ({
@@ -80,12 +88,22 @@ export function useNavAdapter(): NavAdapter {
       }
 
       // "manual" is the placeholder created_by used until the auth context resolves.
+      const isOthers = (annotation: Annotation) =>
+        annotation.created_by !== user?.username &&
+        annotation.created_by !== "manual";
+
+      const ownIds = serverAnnotations
+        .filter((annotation) => !isOthers(annotation))
+        .map((annotation) => annotation._id)
+        .filter((id): id is string => Boolean(id));
+      if (project?._id && sample?._id && ownIds.length > 0) {
+        await deleteAnnotationsByIds(project._id, sample._id, ownIds);
+      }
+      setServerAnnotations((previousAnnotations: Annotation[]) =>
+        previousAnnotations.filter(isOthers),
+      );
       setAnnotations((previousAnnotations: Annotation[]) =>
-        previousAnnotations.filter(
-          (annotation) =>
-            annotation.created_by !== user?.username &&
-            annotation.created_by !== "manual",
-        ),
+        previousAnnotations.filter(isOthers),
       );
     },
   };

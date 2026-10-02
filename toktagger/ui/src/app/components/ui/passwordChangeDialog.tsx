@@ -8,12 +8,14 @@ import {
   Divider,
   Content,
   ButtonGroup,
-  Flex,
   Text,
   ToastQueue,
 } from "@adobe/react-spectrum";
 import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
-import { PasswordField } from "@/app/components/ui/passwordField";
+import {
+  NewPasswordFields,
+  validateNewPassword,
+} from "@/app/components/ui/newPasswordFields";
 
 type PasswordChangeDialogProps = {
   userId: string;
@@ -58,14 +60,9 @@ export function PasswordChangeDialog({
   };
 
   const save = async (close: () => void) => {
-    if (password !== confirmPassword) {
-      ToastQueue.negative("Passwords do not match", { timeout: 2000 });
-      return;
-    }
-    if (password.length < 8) {
-      ToastQueue.negative("Password must be at least 8 characters", {
-        timeout: 2000,
-      });
+    const validationError = validateNewPassword(password, confirmPassword);
+    if (validationError) {
+      ToastQueue.negative(validationError, { timeout: 2000 });
       return;
     }
     setSaving(true);
@@ -113,21 +110,15 @@ export function PasswordChangeDialog({
           <Heading>{heading}</Heading>
           <Divider />
           <Content>
-            <Flex direction="column" gap="size-100">
-              <PasswordField
-                label="New password"
-                value={password}
-                onChange={setPassword}
-                isRequired
-                autoFocus
-              />
-              <PasswordField
-                label="Confirm new password"
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-                isRequired
-              />
-            </Flex>
+            <NewPasswordFields
+              password={password}
+              confirmPassword={confirmPassword}
+              onPasswordChange={setPassword}
+              onConfirmPasswordChange={setConfirmPassword}
+              passwordLabel="New password"
+              confirmLabel="Confirm new password"
+              autoFocus
+            />
             {helperText && <Text marginTop="size-100">{helperText}</Text>}
           </Content>
           <ButtonGroup>

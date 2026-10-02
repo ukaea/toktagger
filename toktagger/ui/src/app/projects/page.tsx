@@ -30,24 +30,30 @@ import type { Project } from "@/types";
 type ProjectActionsProps = {
   project: Project;
   canAnnotate: boolean;
+  isAdmin: boolean;
   onModify?: () => void;
 };
 
 // Per-row: whether the current user can edit/delete a given project depends on
 // their membership role for that specific project, not just their global role.
-// Annotators and project admins may both edit and delete a project; viewers may not.
+// Only project admins may edit or delete a project; annotators see the buttons disabled.
 // The role comes from the table so the whole page costs one membership request.
 const ProjectActions = ({
   project,
   canAnnotate,
+  isAdmin,
   onModify,
 }: ProjectActionsProps) => {
   if (!canAnnotate) return null;
   return (
     <Flex direction="row" gap="size-100">
-      <ProjectConfigEditor project={project} onModify={onModify} />
+      <ProjectConfigEditor
+        project={project}
+        onModify={onModify}
+        isDisabled={!isAdmin}
+      />
       <DialogTrigger>
-        <Button aria-label="Delete" variant="negative">
+        <Button aria-label="Delete" variant="negative" isDisabled={!isAdmin}>
           <Delete />
         </Button>
         {(close) => (
@@ -96,7 +102,7 @@ const ProjectsTable = ({
   onModify,
 }: ProjectsTableProps) => {
   const rows = projects.map(({ _id, ...rest }) => ({ ...rest, id: _id, _id }));
-  const { canAnnotateIn } = useMyProjectRoles();
+  const { canAnnotateIn, isAdminIn } = useMyProjectRoles();
 
   return (
     <Flex height="size-5000" width="100%" direction="column">
@@ -134,6 +140,7 @@ const ProjectsTable = ({
                 <ProjectActions
                   project={item}
                   canAnnotate={canAnnotateIn(item._id)}
+                  isAdmin={isAdminIn(item._id)}
                   onModify={onModify}
                 />
               </Cell>

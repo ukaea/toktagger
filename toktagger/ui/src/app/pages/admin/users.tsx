@@ -26,6 +26,10 @@ import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
 import { PasswordChangeDialog } from "@/app/components/ui/passwordChangeDialog";
+import {
+  NewPasswordFields,
+  validateNewPassword,
+} from "@/app/components/ui/newPasswordFields";
 import { CurrentUserSchema, type CurrentUser } from "@/types";
 
 type UserRow = CurrentUser & { id: string };
@@ -202,9 +206,15 @@ export default function AdminUsersPage() {
 function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"admin" | "user">("user");
 
   const submit = async (close: () => void) => {
+    const validationError = validateNewPassword(password, confirmPassword);
+    if (validationError) {
+      ToastQueue.negative(validationError, { timeout: 2000 });
+      return;
+    }
     try {
       const res = await apiFetch(`${BACKEND_API_URL}/users`, {
         method: "POST",
@@ -216,6 +226,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
       }
       setUsername("");
       setPassword("");
+      setConfirmPassword("");
       setRole("user");
       close();
       onCreated();
@@ -242,12 +253,13 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
                 onChange={setUsername}
                 isRequired
               />
-              <TextField
-                label="Password"
-                type="password"
-                value={password}
-                onChange={setPassword}
-                isRequired
+              <NewPasswordFields
+                password={password}
+                confirmPassword={confirmPassword}
+                onPasswordChange={setPassword}
+                onConfirmPasswordChange={setConfirmPassword}
+                passwordLabel="Password"
+                confirmLabel="Confirm password"
               />
               <Picker
                 label="Role"
@@ -271,7 +283,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
             </Button>
             <Button
               variant="cta"
-              isDisabled={!username || !password}
+              isDisabled={!username || !password || !confirmPassword}
               onPress={() => submit(close)}
             >
               Create
