@@ -200,7 +200,7 @@ async def delete_models(
 
     # Delete from DB
     for model in models_to_delete:
-        # Validated annotations are human-owned now, so they outlive their model.
+        # Validated annotations are treated as finalized, so they outlive their model.
         await utils.delete_annotations(
             db_client,
             project_id=project_id,
