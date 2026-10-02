@@ -46,6 +46,8 @@ export function OutlierDetectionTool({
   const validSignalName = signalName && signalName in data?.values;
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchData = async () => {
       if (!isEnabled) {
         // Remove previous annotations from this annotator
@@ -82,6 +84,7 @@ export function OutlierDetectionTool({
       );
 
       const payload: Annotation[] = await response.json();
+      if (cancelled) return;
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
@@ -92,6 +95,9 @@ export function OutlierDetectionTool({
       });
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [
     project_id,
     sample_id,
