@@ -56,6 +56,8 @@ export function ChangePointDetectionTool({
   const validSignalName = signalName && signalName in data.values;
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchData = async () => {
       if (!isEnabled) {
         // Remove previous annotations from this annotator
@@ -94,6 +96,7 @@ export function ChangePointDetectionTool({
       );
 
       const payload: Annotation[] = await response.json();
+      if (cancelled) return;
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
@@ -105,6 +108,9 @@ export function ChangePointDetectionTool({
       });
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [
     project_id,
     sample_id,

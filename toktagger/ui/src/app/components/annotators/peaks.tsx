@@ -61,6 +61,8 @@ export function PeakDetectionTool({
   }, [data, signalName]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchData = async () => {
       if (!isEnabled) {
         // Remove previous annotations from this annotator
@@ -99,6 +101,7 @@ export function PeakDetectionTool({
       );
 
       const payload: Annotation[] = await response.json();
+      if (cancelled) return;
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
@@ -111,6 +114,9 @@ export function PeakDetectionTool({
     };
 
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [
     project_id,
     sample_id,
