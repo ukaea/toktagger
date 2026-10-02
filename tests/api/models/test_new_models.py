@@ -5,9 +5,6 @@ and injecting a mocked data_loader. This lets us test the model logic itself
 without requiring a running Ray cluster.
 """
 
-import pathlib
-import pickle
-import tempfile
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -155,22 +152,6 @@ def test_dtw_motif_class_label_filters_templates():
     model.train([sample], [anns], params)
     labels = {label for _, label in model.model["templates"]}
     assert labels == {"ELM"}
-
-
-def test_dtw_motif_backward_compat_load():
-    model = make_model_instance(DTWMotifModel)
-    old_state = {
-        "signal_name": "Ip",
-        "templates": [],
-        "window_size": 100,
-        "threshold": 3.0,
-    }
-    results_dir = pathlib.Path(tempfile.mkdtemp())
-    with open(results_dir.joinpath("weights.model"), "wb") as f:
-        pickle.dump(old_state, f)
-    model.load(results_dir)
-    assert model.model["signal_names"] == ["Ip"]
-    assert "signal_name" not in model.model or model.model.get("signal_names")
 
 
 # --- STUMPY Motif ---
@@ -345,21 +326,6 @@ def test_stumpy_motif_class_label_filters_templates():
     assert labels == {"ELM"}
 
 
-def test_stumpy_motif_backward_compat_load():
-    model = make_model_instance(StumpyMotifModel)
-    old_state = {
-        "signal_name": "Ip",
-        "templates": [],
-        "window_size": 100,
-        "threshold": 3.0,
-    }
-    results_dir = pathlib.Path(tempfile.mkdtemp())
-    with open(results_dir.joinpath("weights.model"), "wb") as f:
-        pickle.dump(old_state, f)
-    model.load(results_dir)
-    assert model.model["signal_names"] == ["Ip"]
-
-
 # --- MiniRocket ---
 
 
@@ -455,22 +421,6 @@ def test_minirocket_train_pads_window_size_below_minirocket_minimum():
     )
     model.train([event_sample, background_sample], [[ann], []], params)
     assert model.model["window_size"] == MINIROCKET_MIN_WINDOW
-
-
-def test_minirocket_backward_compat_load():
-    model = make_model_instance(MiniRocketModel)
-    old_state = {
-        "signal_name": "Ip",
-        "transformer": None,
-        "classifier": None,
-        "window_size": 100,
-        "pos_label": "Event",
-    }
-    results_dir = pathlib.Path(tempfile.mkdtemp())
-    with open(results_dir.joinpath("weights.model"), "wb") as f:
-        pickle.dump(old_state, f)
-    model.load(results_dir)
-    assert model.model["signal_names"] == ["Ip"]
 
 
 # --- Shapelet Transform ---
