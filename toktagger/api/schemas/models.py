@@ -1,17 +1,24 @@
 from typing import Literal, Annotated, Optional
 from pydantic import Field, field_validator
 from toktagger.api.schemas import ConfiguredModel
+from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from enum import Enum
 import pydantic
 
 
 class ModelIn(ConfiguredModel):
     type: str
+    name: Optional[str] = None
     version: int
     status: Literal["queued", "training", "loading", "failed", "completed", "aborted"]
     progress: Annotated[float, Field(strict=True, ge=0, le=100)]
     score: float
     task_id: Optional[str] | None = None
+
+    @property
+    def display_name(self) -> str:
+        """Label stored in created_by; pretrained models have no name, so fall back to type."""
+        return self.name or self.type
 
     @field_validator("type")
     def check_model_type(cls, value):
@@ -64,3 +71,14 @@ class GitlabLoadParams(RemoteLoadParams):
 
 class HuggingfaceLoadParams(RemoteLoadParams):
     huggingface_userspace: str | None = None
+
+
+class PredictionBatch(ConfiguredModel):
+    """A model's complete set of predictions for a group of samples.
+
+    Samples with no annotations still belong in `sample_ids`, so that the model
+    finding nothing for a sample also clears what it found there before.
+    """
+
+    sample_ids: list[str]
+    annotations: list[AnnotationBatchTypes]

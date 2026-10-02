@@ -33,6 +33,7 @@ import {
   getModelPredictSchema,
 } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
+import { formatTimestamp } from "@/app/utils";
 
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
@@ -257,16 +258,20 @@ export function ModelPredictModal({
                 aria-label="Model Prediction Table"
               >
                 <TableHeader>
+                  <Column>Name</Column>
                   <Column>Model Type</Column>
                   <Column>Version</Column>
+                  <Column>Created</Column>
                   <Column>Status</Column>
                   <Column>Score</Column>
                 </TableHeader>
                 <TableBody items={models}>
                   {(item) => (
                     <Row key={item["_id"]}>
+                      <Cell>{item["name"] ?? item["type"]}</Cell>
                       <Cell>{item["type"]}</Cell>
                       <Cell>{item["version"]}</Cell>
+                      <Cell>{formatTimestamp(item["timestamp"])}</Cell>
                       <Cell>
                         {item["status"] === "training"
                           ? "Training: " + Math.round(item["progress"]) + "%"

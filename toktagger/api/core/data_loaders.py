@@ -13,6 +13,7 @@ import pandas as pd
 import pydantic
 import xarray as xr
 from PIL import Image
+import glob as _glob
 
 from toktagger.api.schemas.data import (
     DataResponseType,
@@ -290,26 +291,46 @@ class TabularDataLoader(DataLoader):
             )
 
         item: TimeSeriesFileData = sample.data
-        file_path = pathlib.Path(item.file_name).resolve()
 
-        if not file_path.exists():
-            raise FileNotFoundError(f"Could not find file at '{file_path}'")
+        # Resolve file_name: either a literal path or a glob pattern.
+        file_name = item.file_name
+        is_glob = any(c in file_name for c in ("*", "?", "["))
 
-        if file_path.suffix == ".csv":
-            df = pd.read_csv(file_path, usecols=item.signal_names)
-        elif file_path.suffix == ".tsv":
-            df = pd.read_csv(file_path, sep="\t", usecols=item.signal_names)
-        elif file_path.suffix == ".parquet":
-            df = pd.read_parquet(file_path, columns=item.signal_names)
-        elif file_path.suffix == ".json":
-            df = pd.read_json(file_path)
-            df = df[item.signal_names]
-        elif file_path.suffix == ".xlsx":
-            df = pd.read_excel(file_path, usecols=item.signal_names)
-        elif file_path.suffix == ".feather":
-            df = pd.read_feather(file_path, columns=item.signal_names)
+        if is_glob:
+            matched = sorted(_glob.glob(file_name, recursive=True))
+            if not matched:
+                raise FileNotFoundError(
+                    f"Glob pattern '{file_name}' matched no files "
+                    f"(cwd: {pathlib.Path().cwd()})"
+                )
+            if len(matched) > 1:
+                raise ValueError(
+                    f"Glob pattern '{file_name}' matched {len(matched)} files "
+                    f"({matched}), but a sample expects exactly one file"
+                )
         else:
-            raise ValueError("Unsupported file format {}".format(file_path.suffix))
+            if not pathlib.Path(file_name).exists():
+                raise FileNotFoundError(
+                    f"Could not find file at '{file_name}', relative to {pathlib.Path().cwd()}"
+                )
+            matched = [file_name]
+
+        path = matched[0]
+        if path.endswith(".csv"):
+            df = pd.read_csv(path, usecols=item.signal_names)
+        elif path.endswith(".tsv"):
+            df = pd.read_csv(path, sep="\t", usecols=item.signal_names)
+        elif path.endswith(".parquet"):
+            df = pd.read_parquet(path, columns=item.signal_names)
+        elif path.endswith(".json"):
+            df = pd.read_json(path)
+            df = df[item.signal_names]
+        elif path.endswith(".xlsx"):
+            df = pd.read_excel(path, usecols=item.signal_names)
+        elif path.endswith(".feather"):
+            df = pd.read_feather(path, columns=item.signal_names)
+        else:
+            raise ValueError("Unsupported file format {}".format(Path(path).suffix))
 
         df = df.fillna(0)
 
