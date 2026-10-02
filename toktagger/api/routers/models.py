@@ -307,11 +307,13 @@ async def start_model_training(
             detail=f"Training of {model_type} model already in progress!",
         )
 
-    if len(db_models) == 0:
-        # This is the first time a model has been saved for this project, so version = 1
+    # Versioning is scoped to this name, so differently-named models of the same
+    # type each start again at v1 instead of sharing one counter.
+    same_name_models = [db_model for db_model in db_models if db_model.name == name]
+    if len(same_name_models) == 0:
         version = 1
     else:
-        version = db_models[0].version + 1
+        version = same_name_models[0].version + 1
 
     model_in = ModelIn(
         type=model_type,

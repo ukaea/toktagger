@@ -513,6 +513,39 @@ async def test_model_start_training_without_name_defaults_to_none(
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
+async def test_model_start_training_version_scoped_by_name(
+    models_api_client, db_client, setup_model_db
+):
+    # setup_model_db already seeds mock_disruption_cnn with an unnamed v1
+    # (MODEL_1) and a v2 named "Latest Disruption Detector" (MODEL_2).
+
+    # A new name for this type should start again at v1, not continue from v2.
+    response = await models_api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train",
+        json={"name": "Brand New Detector"},
+    )
+    await collect_train_results(models_api_client, response.json()["task_id"])
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(response.json()["model_id"])
+    )
+    assert model["name"] == "Brand New Detector"
+    assert model["version"] == 1
+
+    # Training again with no name should continue from the unnamed v1 (MODEL_1),
+    # unaffected by the named model trained above.
+    response = await models_api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
+    )
+    await collect_train_results(models_api_client, response.json()["task_id"])
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(response.json()["model_id"])
+    )
+    assert model["name"] is None
+    assert model["version"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("method", ["train", "predict", "sample"])
 async def test_model_wrong_params(models_api_client, db_client, setup_model_db, method):
     if method == "sample":
