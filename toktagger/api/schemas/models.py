@@ -16,9 +16,8 @@ class ModelIn(ConfiguredModel):
     task_id: Optional[str] | None = None
 
     @property
-    def annotator_name(self) -> str:
-        """Display label recorded against the annotations this model produces. Models
-        loaded from pretrained weights have no name, so fall back to their type."""
+    def display_name(self) -> str:
+        """Label stored in created_by; pretrained models have no name, so fall back to type."""
         return self.name or self.type
 
     @field_validator("type")

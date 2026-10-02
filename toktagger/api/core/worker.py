@@ -201,7 +201,7 @@ def get_predictions(
             annotation["sample_id"] = sample.id
             annotation["project_id"] = project.id
             annotation["shot_id"] = sample.shot_id
-            annotation["created_by"] = model.annotator_name
+            annotation["created_by"] = model.display_name
             annotation["model_id"] = model.id
             try:
                 annotation = AnnotationBatchTypeAdapter.validate_python(annotation)

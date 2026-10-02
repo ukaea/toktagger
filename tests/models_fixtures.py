@@ -165,7 +165,7 @@ async def setup_model_predictions(setup_model_db, db_client):
             validated=index == 3,
             label="Disruption",
             time=50 + index,
-            created_by=db_definitions.MODEL_3.annotator_name,
+            created_by=db_definitions.MODEL_3.display_name,
             model_id=model_id,
         )
         annotation_ids.append(
