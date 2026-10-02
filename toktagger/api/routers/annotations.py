@@ -1,16 +1,39 @@
 from typing import Literal
-from fastapi import APIRouter, Request, Path, Query
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
+
+from toktagger.api.auth.dependencies import (
+    require_password_changed,
+    require_project_admin_role,
+    require_project_annotator,
+    require_project_viewer,
+)
 from toktagger.api.crud import utils
-from toktagger.api.schemas.samples import SampleUpdate
+from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.annotations import (
+    RESERVED_CREATED_BY_PREFIXES,
     AnnotationBatchTypes,
     AnnotationOutTypes,
 )
+from toktagger.api.schemas.samples import SampleUpdate
+from toktagger.api.schemas.users import UserOut
 
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Annotations"],
+    dependencies=[Depends(require_password_changed)],
 )
+
+
+def stale_annotations_conflict(stale_ids: list[str]) -> HTTPException:
+    """A 409 naming the edited annotations that no longer exist, so a client can drop them."""
+    return HTTPException(
+        status_code=409,
+        detail={
+            "message": "Annotations were deleted since this sample was loaded.",
+            "stale_ids": stale_ids,
+        },
+    )
 
 
 @router.get(
@@ -46,20 +69,27 @@ async def get_all_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
+    current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
-    """
-    Retrieve all annotations for this project, subject to specified filters.
-    ------------------------------------------------------------------------
-    """
-    db_client = request.app.state.db_client
-    # Check project exists
+    """Retrieve all annotations for this project."""
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
 
-    # Get annotations
+    # require_project_viewer already checked access; re-fetch to read this user's
+    # show_others_annotations preference (None for a non-member admin, who sees everything).
+    membership = await utils.get_project_membership(
+        db_client, project_id, current_user.id
+    )
+
+    created_by = None
+    if membership and not membership.show_others_annotations:
+        created_by = current_user.username
+
     annotations = await utils.get_annotations(
         db_client=db_client,
         project_id=project_id,
         validated=validated,
+        created_by=created_by,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
@@ -82,12 +112,20 @@ async def import_annotations(
     project_id: str = Path(
         description="The ID of the project to update annotations for"
     ),
+    current_user: UserOut = Depends(require_project_annotator),
 ) -> None:
-    """
-    Update or add annotations for this project.
-    -------------------------------------------
-    """
-    db_client = request.app.state.db_client
+    """Update or add annotations for this project."""
+    db_client: MongoDBClient = request.app.state.db_client
+    # Every human caller — admins included — is recorded as the author of the
+    # annotations they import, so authorship is always auditable. Machine authorship
+    # is kept as-is, matching the sample-level save, so re-importing an export does
+    # not reassign every prediction to whoever imported it.
+    if current_user.username != "__internal__":
+        for annotation in annotations:
+            if not (annotation.created_by or "").startswith(
+                RESERVED_CREATED_BY_PREFIXES
+            ):
+                annotation.created_by = current_user.username
     await utils.import_annotations(db_client, project_id, annotations)
 
 
@@ -103,15 +141,11 @@ async def delete_all_annotations(
     project_id: str = Path(
         description="The ID of the project to delete all annotations for"
     ),
+    current_user: UserOut = Depends(require_project_admin_role),
 ):
-    """
-    Delete ALL annotations for the given project.
-    ---------------------------------------------
-    """
-    db_client = request.app.state.db_client
-    # Check project exists
+    """Delete ALL annotations for the given project."""
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
-    # Delete all annotations for this project
     await utils.delete_annotations(db_client=db_client, project_id=project_id)
 
 
@@ -119,7 +153,7 @@ async def delete_all_annotations(
     "/samples/{sample_id}/annotations",
     response_model=list[AnnotationOutTypes],
     responses={
-        200: {"description": "Annotations for this sample deleted successfully."},
+        200: {"description": "Annotations for this sample returned successfully."},
         404: {"description": "Project or Sample not found with that ID."},
     },
 )
@@ -151,30 +185,37 @@ async def get_annotations(
         None,
         description="Whether to only return annotations created by a specific model or by a human.",
     ),
+    current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
-    # Return annotations available for this project and sample, if any
-    # Can filter by params, eg specific camera or frame being returned (or return all annotations for this sample at once and store client side?)
-    # Should return whether these are validated as a boolean
-    db_client = request.app.state.db_client
-    # Check project and sample exist
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
 
-    # Get annotations
+    # require_project_viewer already checked access; re-fetch to read this user's
+    # show_others_annotations preference (None for a non-member admin, who sees everything).
+    membership = await utils.get_project_membership(
+        db_client, project_id, current_user.id
+    )
+
+    # Apply per-user annotation visibility filter
+    effective_created_by = created_by
+    if membership and not membership.show_others_annotations:
+        # Only show the current user's own annotations
+        effective_created_by = current_user.username
+
     annotations = await utils.get_annotations(
         db_client=db_client,
         project_id=project_id,
         sample_id=sample_id,
         validated=validated,
-        created_by=created_by,
+        created_by=effective_created_by,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,
         count=count,
     )
-
     return annotations
 
 
@@ -183,6 +224,7 @@ async def get_annotations(
     responses={
         200: {"description": "Annotations for this sample updated successfully."},
         404: {"description": "Project or Sample not found with that ID."},
+        409: {"description": "An edited annotation no longer exists."},
     },
 )
 async def update_annotations(
@@ -198,34 +240,89 @@ async def update_annotations(
         None,
         description="Whether to set sample to validated (useful if no annotations present).",
     ),
-):
-    """
-    Update the list of annotations to a given sample for a specified project. Will overwrite existing annotations.
-    ---------------------------------------------------------------------
-    """
-    # Add human annotations to this project and sample
-    # Again dont know what form this data will take so have set to a Request for now
-    # This data could be for one or more events per task, ie multiple ELMs or UFOs per pulse
-    # This should be added into the database, with validated=True
-    # Delete predictions from model, if they exist, since they are being replaced by human validated ones
-    db_client = request.app.state.db_client
+    current_user: UserOut = Depends(require_project_annotator),
+) -> list[str]:
+    """Update the annotations for a sample.
 
-    # Check project and sample exist
+    The caller's own annotations are replaced wholesale. Annotations belonging to
+    another user or to a model are edited in place instead, keeping their author, so
+    a client that cannot see them (show_others_annotations=false) can never delete them.
+    """
+    db_client: MongoDBClient = request.app.state.db_client
+
     await utils.get_project(db_client=db_client, project_id=project_id)
     sample = await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
 
-    # Set shot_id for each annotation
-    for annotation in annotations:
-        annotation.shot_id = sample.shot_id
-
-    # Delete previous annotations, if they exist, and add new ones
-    result = await utils.update_annotations(
-        db_client, project_id, sample_id, annotations
+    is_internal = current_user.username == "__internal__"
+    # Whose an existing annotation is comes from the database, never from the body -
+    # a client claiming someone else's row as its own would otherwise route it into
+    # the replace step below and have it re-inserted as a second copy.
+    stored_authors = await utils.get_annotation_authors(
+        db_client, project_id, sample_id
     )
+    owned_annotations = []
+    others_annotations = []
+    machine_authors: set[str] = set()
+    for annotation in annotations:
+        is_other_authors = (
+            annotation.id is not None
+            and not is_internal
+            and stored_authors.get(annotation.id, annotation.created_by)
+            != current_user.username
+        )
+        if is_other_authors:
+            # The replace step below is scoped to the caller's own created_by, so
+            # re-saving another author's annotation there would duplicate it under
+            # the caller's name.
+            others_annotations.append(annotation)
+            continue
 
-    # Update sample to show that annotations are validated
+        if not is_internal:
+            # A just-run model prediction or annotator suggestion keeps its synthetic
+            # author; otherwise the server is authoritative for identity.
+            if annotation.id is None and (annotation.created_by or "").startswith(
+                RESERVED_CREATED_BY_PREFIXES
+            ):
+                machine_authors.add(annotation.created_by)
+            else:
+                annotation.created_by = current_user.username
+
+        annotation.shot_id = sample.shot_id
+        owned_annotations.append(annotation)
+
+    # Checked before any write, so a stale client saves nothing rather than only part.
+    stale_ids = [a.id for a in others_annotations if a.id not in stored_authors]
+    if stale_ids:
+        raise stale_annotations_conflict(stale_ids)
+
+    edited_ids = []
+    for annotation in others_annotations:
+        if not await utils.update_annotation_by_id(
+            db_client=db_client,
+            project_id=project_id,
+            sample_id=sample_id,
+            annotation_id=annotation.id,
+            annotation=annotation,
+        ):
+            raise stale_annotations_conflict([annotation.id])
+        edited_ids.append(annotation.id)
+
+    # Machine rows arrive with no id - /annotator/{type} and the predict endpoints
+    # return them unsaved - so the client can never send one back for in-place edit,
+    # and a delete scoped only to the caller would leave the previous save behind and
+    # stack up another copy on every save. Replace them by author instead, which is
+    # well defined because the prefix names the annotator or model, not a user.
+    result = await utils.update_annotations(
+        db_client,
+        project_id,
+        sample_id,
+        owned_annotations,
+        created_by={current_user.username, *machine_authors},
+    )
+    result.extend(edited_ids)
+
     if validated or any(annotation.validated for annotation in annotations):
         await utils.update_sample(
             db_client=db_client,
@@ -249,22 +346,89 @@ async def remove_annotations(
     sample_id: str = Path(
         description="The ID of the sample to delete annotations from."
     ),
+    current_user: UserOut = Depends(require_project_annotator),
 ):
-    """
-    Delete ALL annotations for a given sample from a given project.
-    ---------------------------------------------------------------
-    """
-    # Remove annotations for this project and sample
-    # Probably dont need to be able to specify params here, don't envisage how/why the UI would allow you to remove specific annotations
-
-    db_client = request.app.state.db_client
-    # Check project and sample exist
+    """Delete ALL annotations for a given sample from a given project."""
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
-
-    # Delete all annotations for this project and sample
     await utils.delete_annotations(
         db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+
+
+@router.delete(
+    "/samples/{sample_id}/annotations/{annotation_id}",
+    responses={
+        200: {"description": "Annotation deleted successfully."},
+        404: {"description": "Project, Sample or Annotation not found with that ID."},
+    },
+)
+async def remove_annotation(
+    request: Request,
+    project_id: str = Path(description="The ID of the project to delete from."),
+    sample_id: str = Path(
+        description="The ID of the sample to delete an annotation from."
+    ),
+    annotation_id: str = Path(description="The ID of the annotation to delete."),
+    current_user: UserOut = Depends(require_project_annotator),
+):
+    """Delete a single annotation, whoever created it.
+
+    The batch save (PUT above) carries no "deleted ids" signal and its replace step is
+    scoped to the caller's own annotations, so removing someone else's annotation --
+    or a model's prediction -- has to be an explicit call.
+    """
+    db_client: MongoDBClient = request.app.state.db_client
+    await utils.get_project(db_client=db_client, project_id=project_id)
+    await utils.get_sample(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+    deleted = await utils.delete_annotations(
+        db_client=db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        annotation_id=annotation_id,
+    )
+    if not deleted:
+        raise HTTPException(
+            status_code=404, detail="Annotation not found for that project and sample."
+        )
+
+
+@router.post(
+    "/samples/{sample_id}/annotations/delete",
+    responses={
+        200: {"description": "Matching annotations deleted; unknown ids are ignored."},
+        404: {"description": "Project or Sample not found with that ID."},
+    },
+)
+async def remove_annotations_bulk(
+    request: Request,
+    project_id: str = Path(description="The ID of the project to delete from."),
+    sample_id: str = Path(
+        description="The ID of the sample to delete annotations from."
+    ),
+    annotation_ids: list[str] = Body(
+        ..., description="The IDs of the annotations to delete."
+    ),
+    current_user: UserOut = Depends(require_project_annotator),
+) -> int:
+    """Delete a batch of annotations by id, whoever created them, in one call.
+
+    Mirrors remove_annotation's 404 tolerance: an id already gone is the state being
+    asked for, so unknown ids are silently ignored rather than failing the whole batch.
+    """
+    db_client: MongoDBClient = request.app.state.db_client
+    await utils.get_project(db_client=db_client, project_id=project_id)
+    await utils.get_sample(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+    return await utils.delete_annotations(
+        db_client=db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        annotation_ids=annotation_ids,
     )

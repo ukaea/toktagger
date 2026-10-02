@@ -9,8 +9,8 @@ import {
   Switch,
 } from "@adobe/react-spectrum";
 import { Annotation } from "@/types";
-import { AnnotatorTypes } from "./types";
-import { BACKEND_API_URL } from "@/app/core";
+import { AnnotatorTypes, annotatorCreatedBy } from "./types";
+import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
 
 type OutlierDetectionType = {
@@ -31,7 +31,8 @@ export function OutlierDetectionTool({
 
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
-      (ann) => ann.created_by === AnnotatorTypes.OUTLIER_DETECTION,
+      (ann) =>
+        ann.created_by === annotatorCreatedBy(AnnotatorTypes.OUTLIER_DETECTION),
     );
   });
 
@@ -54,7 +55,8 @@ export function OutlierDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION ||
+              annotation.created_by !==
+                annotatorCreatedBy(AnnotatorTypes.OUTLIER_DETECTION) ||
               annotation.validated,
           );
           return otherAnnotations;
@@ -64,7 +66,7 @@ export function OutlierDetectionTool({
         return;
       }
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/outlier_detection`,
         {
           method: "POST",
@@ -88,7 +90,8 @@ export function OutlierDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.OUTLIER_DETECTION ||
+            annotation.created_by !==
+              annotatorCreatedBy(AnnotatorTypes.OUTLIER_DETECTION) ||
             annotation.validated,
         );
         return otherAnnotations.concat(payload);

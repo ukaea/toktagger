@@ -51,7 +51,6 @@ services:
       SERVER_HOST: api_app
       SERVER_PORT: 8002
       SERVER_RELOAD: "true"
-      CUSTOM_SCRIPT: ${CUSTOM_SCRIPT}
     working_dir: /app
     command: ["python", "run.py"]
     networks:

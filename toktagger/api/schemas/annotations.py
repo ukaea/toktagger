@@ -1,8 +1,11 @@
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import Field, TypeAdapter, create_model, field_validator, model_validator
 
 from toktagger.api.schemas import ConfiguredModel
+
+# Server-generated authorship prefixes for machine annotations; routers/users.py refuses them as usernames so a real user can never collide with them.
+RESERVED_CREATED_BY_PREFIXES = ("model::", "annotators::")
 
 
 class AnnotationBase(ConfiguredModel):
@@ -11,13 +14,13 @@ class AnnotationBase(ConfiguredModel):
     label: str
     created_by: str
     validated: bool = False
-    signal_name: Optional[str] = None
-    uncertainty: Optional[float] = 1
+    signal_name: str | None = None
+    uncertainty: float | None = 1
 
     @model_validator(mode="before")
     def set_uncertainty(cls, values):
         if isinstance(values, dict):
-            if "validated" in values and values["validated"]:
+            if values.get("validated"):
                 values["uncertainty"] = 0
             elif values.get("uncertainty") is None:
                 values["uncertainty"] = 1
@@ -121,10 +124,14 @@ class VideoPoint(VideoAnnotationBase):
 class AnnotationBatch(AnnotationBase):
     """Base class for batch annotation inputs, with or without IDs."""
 
-    id: Optional[str] = Field(None, alias="_id")
-    project_id: Optional[str] = None
-    sample_id: Optional[str] = None
-    shot_id: Optional[int] = None
+    id: str | None = Field(None, alias="_id")
+    project_id: str | None = None
+    sample_id: str | None = None
+    shot_id: int | None = None
+    # Optional here (unlike AnnotationBase) so imported/saved annotations don't need to
+    # supply it — every route that accepts a batch stamps the caller's own identity over
+    # whatever's provided anyway.
+    created_by: str | None = None
 
 
 class AnnotationOut(AnnotationBatch):
@@ -150,7 +157,7 @@ def create_batch_model(base_class, name_suffix="Batch"):
     class_name = f"{base_class.__name__}{name_suffix}"
     return create_model(
         class_name,
-        __base__=(base_class, AnnotationBatch),
+        __base__=(AnnotationBatch, base_class),
     )
 
 
@@ -178,41 +185,41 @@ ClassLabelBatch = create_batch_model(ClassLabel)
 
 
 # Union types for annotations
-AnnotationTypes = Union[
-    TimePoint,
-    TimeRegion,
-    BoundingBox,
-    Polygon,
-    VideoBoundingBox,
-    VideoPolygon,
-    VideoPoint,
-    VideoFrameLabel,
-    ClassLabel,
-]
+AnnotationTypes = (
+    TimePoint
+    | TimeRegion
+    | BoundingBox
+    | Polygon
+    | VideoBoundingBox
+    | VideoPolygon
+    | VideoPoint
+    | VideoFrameLabel
+    | ClassLabel
+)
 
-AnnotationOutTypes = Union[
-    TimePointOut,
-    TimeRegionOut,
-    BoundingBoxOut,
-    PolygonOut,
-    VideoBoundingBoxOut,
-    VideoPolygonOut,
-    VideoPointOut,
-    VideoFrameLabelOut,
-    ClassLabelOut,
-]
+AnnotationOutTypes = (
+    TimePointOut
+    | TimeRegionOut
+    | BoundingBoxOut
+    | PolygonOut
+    | VideoBoundingBoxOut
+    | VideoPolygonOut
+    | VideoPointOut
+    | VideoFrameLabelOut
+    | ClassLabelOut
+)
 
-AnnotationBatchTypes = Union[
-    TimePointBatch,
-    TimeRegionBatch,
-    BoundingBoxBatch,
-    PolygonBatch,
-    VideoBoundingBoxBatch,
-    VideoPolygonBatch,
-    VideoPointBatch,
-    VideoFrameLabelBatch,
-    ClassLabelBatch,
-]
+AnnotationBatchTypes = (
+    TimePointBatch
+    | TimeRegionBatch
+    | BoundingBoxBatch
+    | PolygonBatch
+    | VideoBoundingBoxBatch
+    | VideoPolygonBatch
+    | VideoPointBatch
+    | VideoFrameLabelBatch
+    | ClassLabelBatch
+)
 
 # TypeAdapters for annotations
 AnnotationTypeAdapter = TypeAdapter(AnnotationTypes)

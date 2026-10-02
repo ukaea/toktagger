@@ -2,7 +2,8 @@
 
 import pytest
 from bson.objectid import ObjectId
-from tests.db_definitions import SAMPLE_1, ANNOTATION_1
+
+from tests.db_definitions import ANNOTATION_1, SAMPLE_1
 
 
 def create_endpoint(
@@ -71,6 +72,8 @@ async def make_request(api_client, request_method, endpoint, request_body):
                 ANNOTATION_1.model_dump(mode="json"),
             ],
         ),
+        ("/projects/id/samples/id/annotations/delete", "project", "post", []),
+        ("/projects/id/samples/id/annotations/delete", "sample", "post", []),
         ("/projects/id/samples/id/data", "project", "post", {}),
         ("/projects/id/samples/id/data", "sample", "post", {}),
         ("/projects/id", "project", "get", {}),
@@ -99,6 +102,8 @@ async def make_request(api_client, request_method, endpoint, request_body):
         "delete_sample_annotations-wrong_sample_id",
         "put_sample_annotations-wrong_project_id",
         "put_sample_annotations-wrong_sample_id",
+        "delete_bulk_annotations-wrong_project_id",
+        "delete_bulk_annotations-wrong_sample_id",
         "get_data-wrong_project_id",
         "get_data-wrong_sample_id",
         "get_project-wrong_project_id",

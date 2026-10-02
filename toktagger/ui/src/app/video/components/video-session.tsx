@@ -107,6 +107,9 @@ type VideoSessionCtx = {
   setDrawingTool: (tool: ActiveDrawingTool) => void;
   editMode: boolean;
   setEditMode: (v: boolean) => void;
+  // Project admin or annotator. False for a viewer, who is pinned out of edit mode and
+  // must not be offered any control that creates, edits or deletes annotations.
+  canAnnotate: boolean;
   drawIntent: boolean;
   canDrawShape: boolean;
   canDrawPoint: boolean;
@@ -440,6 +443,7 @@ export function VideoSessionProvider(props: {
     annotations,
     isLoading,
     setAnnotations: setSampleAnnotations,
+    canAnnotate,
   } = useSample();
   const {
     videoEditMode,
@@ -516,7 +520,9 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] =
     useState<ActiveDrawingTool>(videoDrawingTool);
-  const [editMode, setEditModeState] = useState(videoEditMode);
+  const [storedEditMode, setEditModeState] = useState(videoEditMode);
+  // Derived rather than clamped into state, so the saved choice survives canAnnotate resolving late.
+  const editMode = canAnnotate && storedEditMode;
   const [ctrlHeld, setCtrlHeld] = useState(false);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
   const hideAnnotationsRef = useRef(false);
@@ -786,9 +792,12 @@ export function VideoSessionProvider(props: {
     [api, flushPendingOverlay, setVideoDrawingTool],
   );
 
+  // Gate the setter rather than only the toolbar button, so the "e" shortcut cannot
+  // enter edit mode either. Mirrors TimeSeriesContext's setEditMode wrapper.
   const setEditMode = useCallback(
     (v: boolean) => {
       if (hideAnnotationsRef.current) return;
+      if (!canAnnotate) return;
       api?.cancelDrawing?.();
       api?.setSelected?.();
       flushPendingOverlay();
@@ -796,7 +805,7 @@ export function VideoSessionProvider(props: {
       setEditModeState(v);
       setVideoEditMode(v);
     },
-    [api, flushPendingOverlay, setVideoEditMode],
+    [api, flushPendingOverlay, setVideoEditMode, canAnnotate],
   );
 
   useEffect(() => {
@@ -848,6 +857,7 @@ export function VideoSessionProvider(props: {
   }, [api, editMode, setEditMode]);
 
   const clearCurrentFrame = useCallback(() => {
+    if (!canAnnotate) return;
     api?.setSelected?.();
     flushPendingOverlay();
     pendingFocusRef.current = null;
@@ -867,6 +877,7 @@ export function VideoSessionProvider(props: {
     }
   }, [
     api,
+    canAnnotate,
     finishProgrammaticAnnotationSync,
     flushPendingOverlay,
     frame,
@@ -875,6 +886,7 @@ export function VideoSessionProvider(props: {
   ]);
 
   const clearAllFrames = useCallback(() => {
+    if (!canAnnotate) return;
     api?.setSelected?.();
     flushPendingOverlay();
     pendingFocusRef.current = null;
@@ -894,6 +906,7 @@ export function VideoSessionProvider(props: {
     }
   }, [
     api,
+    canAnnotate,
     finishProgrammaticAnnotationSync,
     flushPendingOverlay,
     setSampleAnnotations,
@@ -941,13 +954,17 @@ export function VideoSessionProvider(props: {
     hideAnnotations,
   ]);
 
-  const createNewInstanceForClass = useCallback((className: string) => {
-    const cname = (className || "").trim();
-    const trackId = allocateNextTrackId(nextTrackNumsRef.current, cname);
+  const createNewInstanceForClass = useCallback(
+    (className: string) => {
+      if (!canAnnotate) return;
+      const cname = (className || "").trim();
+      const trackId = allocateNextTrackId(nextTrackNumsRef.current, cname);
 
-    setSelectionState({ className: cname, trackId, source: "auto" });
-    return { className: cname, trackId };
-  }, []);
+      setSelectionState({ className: cname, trackId, source: "auto" });
+      return { className: cname, trackId };
+    },
+    [canAnnotate],
+  );
 
   /**
    * Delete a specific (className, trackId) across all frames.
@@ -955,6 +972,7 @@ export function VideoSessionProvider(props: {
    */
   const deleteInstanceAcrossFrames = useCallback(
     (className: string, trackId: string) => {
+      if (!canAnnotate) return;
       const cls = (className || "").trim();
       const tid = canonicalizeTrackId(trackId || "");
       if (!cls || !tid) return;
@@ -984,7 +1002,7 @@ export function VideoSessionProvider(props: {
         return prev;
       });
     },
-    [setSampleAnnotations, updateByFrame],
+    [setSampleAnnotations, updateByFrame, canAnnotate],
   );
 
   /**
@@ -992,9 +1010,15 @@ export function VideoSessionProvider(props: {
    * Now implemented via deleteInstanceAcrossFrames to avoid stale selection issues.
    */
   const deleteSelectedInstanceAcrossFrames = useCallback(() => {
+    if (!canAnnotate) return;
     if (!selection.className || !selection.trackId) return;
     deleteInstanceAcrossFrames(selection.className, selection.trackId);
-  }, [deleteInstanceAcrossFrames, selection.className, selection.trackId]);
+  }, [
+    deleteInstanceAcrossFrames,
+    selection.className,
+    selection.trackId,
+    canAnnotate,
+  ]);
 
   /** Append missing manual instances from the current frame to `nextFrame` in Edit mode. */
   const forwardPropMissingManualToNext = useCallback(
@@ -1035,6 +1059,7 @@ export function VideoSessionProvider(props: {
 
   const createPointAnnotation = useCallback(
     (point: { x: number; y: number }) => {
+      if (!canAnnotate) return;
       if (!api?.getAnnotations) return;
 
       const cls = (selection.className ?? "").trim();
@@ -1097,6 +1122,7 @@ export function VideoSessionProvider(props: {
     [
       api,
       applyAnnotatorInteractionMode,
+      canAnnotate,
       collectUsedTrackIdsForClass,
       finishProgrammaticAnnotationSync,
       frame,
@@ -1566,11 +1592,12 @@ export function VideoSessionProvider(props: {
 
   const deleteAnnotation = useCallback(
     (id: string) => {
+      if (!canAnnotate) return;
       if (!id) return;
       api?.removeAnnotation?.(id);
       api?.setSelected?.();
     },
-    [api],
+    [api, canAnnotate],
   );
 
   useEffect(() => {
@@ -1611,6 +1638,7 @@ export function VideoSessionProvider(props: {
       setDrawingTool,
       editMode,
       setEditMode,
+      canAnnotate,
       drawIntent,
       canDrawShape,
       canDrawPoint,
@@ -1653,6 +1681,7 @@ export function VideoSessionProvider(props: {
       setDrawingTool,
       editMode,
       setEditMode,
+      canAnnotate,
       drawIntent,
       canDrawShape,
       canDrawPoint,
