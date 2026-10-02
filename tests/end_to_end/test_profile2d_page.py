@@ -282,7 +282,9 @@ def test_profile2d_annotations_locked_in_view_mode(server_setup, page: Page):
     )
 
     # Annotations have pointer events disabled in View Mode, so dragging one does not move it...
-    zone_box = page.get_by_label("time-zone").first.bounding_box()
+    zone = page.get_by_label("time-zone").first
+    expect(zone).to_be_visible()
+    zone_box = zone.bounding_box()
     assert zone_box is not None
     center_x = zone_box["x"] + zone_box["width"] / 2
     center_y = zone_box["y"] + zone_box["height"] / 2
