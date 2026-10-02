@@ -252,6 +252,3 @@ class DTWMotifModel(Model):
         weights_path = results_dir.joinpath(weights_filename or "weights.model")
         with open(weights_path, "rb") as f:
             self.model = pickle.load(f)
-        # Backward compat: old models stored signal_name (singular)
-        if "signal_name" in self.model and "signal_names" not in self.model:
-            self.model["signal_names"] = [self.model["signal_name"]]
