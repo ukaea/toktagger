@@ -293,7 +293,7 @@ export function ModelTrainModal({
         <Tooltip>"Train Model"</Tooltip>
       </TooltipTrigger>
       {(close) => (
-        <Dialog>
+        <Dialog width="960px" maxWidth="95vw">
           <Heading>
             <Flex alignItems="center" gap="size-100">
               <WorkflowAdd size="S" />
@@ -362,25 +362,27 @@ export function ModelTrainModal({
                         onSortChange={setSortDescriptor}
                       >
                         <TableHeader>
-                          <Column key="name" allowsSorting>
+                          <Column key="name" allowsSorting width={220}>
                             Name
                           </Column>
-                          <Column key="type" allowsSorting>
+                          <Column key="type" allowsSorting width={180}>
                             Type
                           </Column>
-                          <Column key="version" allowsSorting>
+                          <Column key="version" allowsSorting width={110}>
                             Version
                           </Column>
-                          <Column key="timestamp" allowsSorting>
+                          <Column key="timestamp" allowsSorting width={200}>
                             Created
                           </Column>
-                          <Column key="status" allowsSorting>
+                          <Column key="status" allowsSorting width={150}>
                             Status
                           </Column>
-                          <Column key="score" allowsSorting>
+                          <Column key="score" allowsSorting width={100}>
                             Score
                           </Column>
-                          <Column key="actions">Actions</Column>
+                          <Column key="actions" width={130}>
+                            Actions
+                          </Column>
                         </TableHeader>
                         <TableBody items={sortedModels}>
                           {(item) => (
