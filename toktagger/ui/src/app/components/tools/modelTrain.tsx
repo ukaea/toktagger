@@ -43,19 +43,9 @@ import {
   stopTraining,
 } from "@/app/core";
 import ModelForm from "@/app/components/ui/schemaForm";
+import { formatTimestamp } from "@/app/utils";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
-
-function formatTimestamp(ts: string): string {
-  try {
-    return new Date(ts).toLocaleString(undefined, {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-  } catch {
-    return ts;
-  }
-}
 
 export function ModelTrainModal({
   project,

@@ -399,6 +399,17 @@ export function getSignalNames(sample: Sample | null): string[] {
   return sampleDataType.parse(sample.data).signal_names;
 }
 
+export function formatTimestamp(ts: string): string {
+  try {
+    return new Date(ts).toLocaleString(undefined, {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return ts;
+  }
+}
+
 export function shallowEqual(
   a: Record<string, unknown>,
   b: Record<string, unknown>,
