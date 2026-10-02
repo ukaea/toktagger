@@ -71,23 +71,6 @@ def send_batch_samples(
         return send_updates("samples", url, samples)
 
 
-def send_batch_annotations(
-    project_id: str, annotations: list[AnnotationBatchTypes]
-) -> requests.Response | None:
-    """Send a batch of new annotations from worker node to server via API.
-
-    Parameters
-    ----------
-    project_id : str
-        The ID of the project to update annotations for
-    annotations : list[AnnotationBatchInputTypes]
-        Annotations to be sent to the server
-    """
-    if api_url := os.environ.get("API_URL"):
-        url = f"{api_url}/projects/{project_id}/annotations"
-        return send_updates("annotations", url, annotations)
-
-
 def send_batch_predictions(
     project_id: str, model_id: str, predictions: PredictionBatch
 ) -> requests.Response | None:
