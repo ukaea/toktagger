@@ -373,18 +373,11 @@ class ToktaggerDetectionTrainer(DetectionTrainer):
         """
         del dataset_path, rank
 
-        if mode == "train":
+        # Ultralytics always builds a val loader; validate() never iterates it without a val dataset.
+        if mode == "train" or self._tok_val_dataset is None:
             dataset = self._tok_train_dataset
         else:
             dataset = self._tok_val_dataset
-
-        # This version does not create a validation dataset.
-        # Ultralytics simply doesn't need it for training.
-        # if we want to avail things like patience and validation loss
-        # we might consider splitting the validated dataset into training and val.
-
-        if dataset is None:
-            dataset = self._tok_train_dataset
 
         return DataLoader(
             dataset,
@@ -393,6 +386,12 @@ class ToktaggerDetectionTrainer(DetectionTrainer):
             num_workers=self.args.workers,
             collate_fn=dataset.collate_fn,
         )
+
+    def validate(self) -> tuple[dict[str, float], float | None]:
+        """Skip validation when no validation dataset was provided."""
+        if self._tok_val_dataset is None:
+            return self.metrics, None
+        return super().validate()
 
     def final_eval(self) -> None:
         """Skip final validation until a validation dataset is implemented."""
