@@ -105,7 +105,7 @@ def _find_first_useful_frame(
                     ),
                 )
             except FrameNotFoundError:
-                return initial_frame
+                return fallback_frame
 
             if _is_useful_frame(refinement_frame):
                 return refinement_frame
