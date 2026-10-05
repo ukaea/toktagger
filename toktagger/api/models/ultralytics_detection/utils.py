@@ -27,6 +27,22 @@ _BLACK_FRAME_STD_THRESHOLD = 5
 _BLACK_FRAME_COARSE_STEP = 25
 _BLACK_FRAME_MAX_SCAN = 500
 
+# Pretrained checkpoints available from the Ultralytics v8.4.0 assets release.
+_ULTRALYTICS_ASSET_BASE_URL = (
+    "https://github.com/ultralytics/assets/releases/download/v8.4.0"
+)
+
+MODEL_FAMILIES = {
+    "yolov8n.pt": "yolo",
+    "yolo11n.pt": "yolo",
+    "yolo26n.pt": "yolo",
+    "yolo26m.pt": "yolo",
+    "yolo26l.pt": "yolo",
+    "yolo26x.pt": "yolo",
+    "rtdetr-x.pt": "rtdetr",
+    "rtdetr-l.pt": "rtdetr",
+}
+
 
 def decode_frame_image(frame_image: ImageData) -> np.ndarray:
     """Decode raw TokTagger image bytes for Ultralytics prediction."""
@@ -113,23 +129,6 @@ def _find_first_useful_frame(
         return fallback_frame
 
     return initial_frame
-
-
-# Pretrained checkpoints available from the Ultralytics v8.4.0 assets release.
-_ULTRALYTICS_ASSET_BASE_URL = (
-    "https://github.com/ultralytics/assets/releases/download/v8.4.0"
-)
-
-MODEL_FAMILIES = {
-    "yolov8n.pt": "yolo",
-    "yolo11n.pt": "yolo",
-    "yolo26n.pt": "yolo",
-    "yolo26m.pt": "yolo",
-    "yolo26l.pt": "yolo",
-    "yolo26x.pt": "yolo",
-    "rtdetr-x.pt": "rtdetr",
-    "rtdetr-l.pt": "rtdetr",
-}
 
 
 def check_pretrained_model_availability(
