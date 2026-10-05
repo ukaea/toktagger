@@ -323,13 +323,6 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
     ) -> list[list[AnnotationBase]]:
         """Predict bounding boxes for the requested video frames."""
 
-        if (
-            params.this_frame_only
-            and data_params is not None
-            and not isinstance(data_params, ImageParams)
-        ):
-            raise TypeError("this_frame_only requires image data parameters.")
-
         # if load() was called self._prediction_model should exist
         # else we borrow self._trained_weights_path from self.train()
         if not hasattr(self, "_prediction_model"):
@@ -348,7 +341,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
         for sample in samples:
             sample_predictions: list[AnnotationBase] = []
 
-            if params.this_frame_only and data_params is not None:
+            if params.this_frame_only and isinstance(data_params, ImageParams):
                 frame_image = self.data_loader.get_sample(
                     sample,
                     ImageParams(
