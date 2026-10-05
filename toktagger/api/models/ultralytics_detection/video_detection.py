@@ -1,4 +1,4 @@
-from __future__ import annotations  # store type hints as strings
+from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
@@ -158,8 +158,7 @@ def build_video_frame_manifest(
         annotations,
         strict=True,
     ):
-        # A frame can contain several objects. Grouping annotations once gives
-        # constant-time lookup while every video frame is loaded.
+        # Group annotations by frame, since a frame can contain several objects.
         annotations_by_frame: dict[int, list[Annotation]] = {}
 
         for annotation in sample_annotations:
@@ -280,8 +279,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
                 "No video bounding-box labels were found in the training annotations."
             )
 
-        # Use a stable ordering so every annotation label maps to the same class ID
-        # throughout manifest construction and checkpoint creation.
+        # Labels are sorted, so each label always gets the same class ID.
         self.class_map = {label: class_id for class_id, label in enumerate(labels)}
 
         return build_video_frame_manifest(
@@ -323,8 +321,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
     ) -> list[list[AnnotationBase]]:
         """Predict bounding boxes for the requested video frames."""
 
-        # if load() was called self._prediction_model should exist
-        # else we borrow self._trained_weights_path from self.train()
+        # Build the model from the trained weights if load() hasn't been called.
         if not hasattr(self, "_prediction_model"):
             self._prediction_model = self.prediction_model_class(
                 str(self._trained_weights_path)
@@ -335,9 +332,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
 
         all_predictions: list[list[AnnotationBase]] = []
 
-        # Keep the OpenCV-decoded image in BGR order. Ultralytics expects NumPy
-        # prediction sources in BGR and converts them to RGB internally.
-        # https://github.com/ultralytics/ultralytics/blob/9ea768a302d8865b1a16c9ef81a441d0e1714ad1/ultralytics/engine/predictor.py#L173
+        # Keep images in OpenCV's BGR order, as Ultralytics expects NumPy input in BGR.
         for sample in samples:
             sample_predictions: list[AnnotationBase] = []
 
@@ -410,13 +405,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
                     if width == 0 or height == 0:
                         continue
 
-                    # Class names are stored in the Ultralytics checkpoint and
-                    # can be restored when the trained model is loaded.
-                    # >>> model = YOLO("path/to/best.pt")
-                    # >>> model.names
-                    # {0: 'UFO'}
-                    # this gets transferred to results = model.predict()
-                    # when doing prediction
+                    # Class names are stored in the checkpoint, so class_map isn't needed here.
                     label = result.names[int(class_id)]
 
                     sample_predictions.append(
