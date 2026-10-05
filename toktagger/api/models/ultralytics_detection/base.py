@@ -20,7 +20,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 
 from toktagger.api.models.base import Model
-from toktagger.api.schemas.annotations import Annotation, AnnotationBase
+from toktagger.api.schemas.annotations import Annotation
 from toktagger.api.schemas.samples import Sample
 
 from toktagger.api.models.ultralytics_detection.utils import (
@@ -614,14 +614,3 @@ class BaseUltralyticsDetection(Model):
             shutil.copy2(source_path, target_path)
 
         self._trained_weights_path = target_path
-
-    def predict(
-        self,
-        samples: list[Sample],
-        params: pydantic.BaseModel | None = None,
-        data_params=None,
-    ) -> list[list[AnnotationBase]]:
-        """Prediction doesn't need the manifest and custom dataloader.
-        All the custom overrides are in this file.
-        """
-        raise NotImplementedError
