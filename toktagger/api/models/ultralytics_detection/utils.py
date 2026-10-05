@@ -188,19 +188,13 @@ def check_pretrained_model_availability(
     return model_path
 
 
-def get_torch_device(use_cuda: bool) -> torch.device:
-    """Select CUDA when requested and available, then MPS or CPU.
-
-    Ray controls NVIDIA GPU visibility for its workers, but it does not manage
-    Apple Metal as a GPU resource. CUDA is selected only when requested and
-    available; MPS is selected next when available, followed by the CPU.
-    """
-    if use_cuda and torch.cuda.is_available():
-        return torch.device("cuda")
-
-    # check if the torch version is compatible with mps
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
+def get_torch_device(use_gpu: bool) -> torch.device:
+    """Return CUDA or MPS when a GPU was allocated to this task, otherwise CPU."""
+    if use_gpu:
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
 
     return torch.device("cpu")
 
