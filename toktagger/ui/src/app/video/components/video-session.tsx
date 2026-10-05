@@ -810,7 +810,10 @@ export function VideoSessionProvider(props: {
       if (isEditableEventTarget(event.target)) return;
 
       if (event.key === "Control") {
-        if (!event.repeat) setCtrlHeld(true);
+        if (event.repeat) return;
+        // Commit an in-progress edit first so the overlay sync doesn't revert it.
+        if (editMode) flushCurrentFrameOverlay();
+        setCtrlHeld(true);
         return;
       }
 
@@ -845,7 +848,7 @@ export function VideoSessionProvider(props: {
       window.removeEventListener("blur", releaseCtrl);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [api, editMode, setEditMode]);
+  }, [api, editMode, flushCurrentFrameOverlay, setEditMode]);
 
   const clearCurrentFrame = useCallback(() => {
     api?.setSelected?.();
