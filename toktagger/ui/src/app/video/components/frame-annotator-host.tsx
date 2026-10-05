@@ -630,7 +630,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       ? readPointGeometry(annotation)
       : null;
     if (point) {
-      return `x=${Math.round(point.x)}, y=${Math.round(point.y)}`;
+      return `x=${Math.floor(point.x)}, y=${Math.floor(point.y)}`;
     }
 
     const rect = isRectangleAnno(annotation)
