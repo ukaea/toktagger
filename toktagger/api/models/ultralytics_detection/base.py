@@ -1,4 +1,4 @@
-from __future__ import annotations  # store type hints as strings
+from __future__ import annotations 
 
 import logging
 from pathlib import Path
@@ -15,7 +15,6 @@ from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.models.rtdetr.train import RTDETRTrainer
 from ultralytics.utils import LOGGER as ULTRALYTICS_LOGGER, RANK
 
-# Callable to pass functions in another function
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 
@@ -159,7 +158,6 @@ class UltralyticsDetectionDataset(Dataset):
     Each record contains encoded image bytes and the bounding boxes associated
     with that frame. Images remain PNG/JPEG encoded in the manifest and are
     decoded only when requested by the PyTorch data loader.
-    This can be improved later by loading the images lazily.
     """
 
     def __init__(
@@ -306,8 +304,7 @@ class ToktaggerDetectionTrainer(DetectionTrainer):
         progress_callback: Callable[..., None] | None = None,
         **kwargs,
     ) -> None:
-        # These must be assigned before DetectionTrainer.__init__ calls
-        # the overridden get_dataset() method.
+        # Assign these first because DetectionTrainer.__init__ calls get_dataset().
         self._tok_train_dataset = train_dataset
         self._tok_val_dataset = val_dataset
         self._tok_class_names = class_names
@@ -315,8 +312,7 @@ class ToktaggerDetectionTrainer(DetectionTrainer):
 
         super().__init__(*args, **kwargs)
 
-        # https://docs.ultralytics.com/usage/callbacks
-        # Executes after the end of the epoch.
+        # Runs after each epoch: https://docs.ultralytics.com/usage/callbacks
         self.add_callback(
             "on_fit_epoch_end",
             self._log_progress,
@@ -333,11 +329,7 @@ class ToktaggerDetectionTrainer(DetectionTrainer):
         It is worth including the metrics in future.
         """
 
-        # https://github.com/ultralytics/ultralytics/blob/c3576e753264563eddeb1a3df0ce9565c3eb6b4c/ultralytics/engine/trainer.py#L142
-        # RANK is the process rank used for PyTorch DistributedDataParallel (DDP)
-        # Run this block on single process mode RANK = -1
-        # or on main/leader DDP process RANK 0
-        # to avoid duplication of the print message.
+        # Only report progress from the main process, so DDP workers don't duplicate it.
         if RANK not in {-1, 0} or self._tok_progress_callback is None:
             return
 
@@ -496,8 +488,7 @@ class BaseUltralyticsDetection(Model):
         }
         if learning_rate > 0:
             overrides["lr0"] = learning_rate
-            # optimizer="auto" will ignore all values.
-            # So set it to Adam or something else
+            # Ultralytics ignores lr0 when optimizer="auto", so pick one explicitly.
             overrides["optimizer"] = "AdamW"
         # for Yolo P2 model
         if pretrained_weights is not None:
@@ -585,8 +576,7 @@ class BaseUltralyticsDetection(Model):
                 "Ultralytics training completed without producing weights."
             )
 
-        # Ensure the next prediction loads the newly trained checkpoint rather than
-        # reusing an inference model containing older weights.
+        # Drop the cached inference model so the next prediction uses the new weights.
         if hasattr(self, "_prediction_model"):
             del self._prediction_model
 
@@ -595,8 +585,7 @@ class BaseUltralyticsDetection(Model):
             progress=100,
         )
 
-        # Validation is intentionally postponed, so no meaningful score is
-        # available yet.
+        # No validation yet, so there is no meaningful score to return.
         return 0.0
 
     def save(self, results_dir: Path) -> None:
