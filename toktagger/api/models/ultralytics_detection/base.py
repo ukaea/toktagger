@@ -364,7 +364,7 @@ class ToktaggerDetectionTrainer(DetectionTrainer):
         dataset_path=None,
         batch_size: int = 16,
         rank: int = 0,
-        mode: str = "train",
+        mode: Literal["train", "val"] = "train",
     ) -> DataLoader:
         """Return a data loader for the injected TokTagger dataset.
         ``dataset_path`` and ``rank`` are required by the Ultralytics trainer
