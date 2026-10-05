@@ -35,6 +35,7 @@ def form_check(page: Page, submit_button_name):
     expect(page.get_by_role("checkbox", name="Test Bool")).to_be_checked()
 
     # Combobox should have two possible options
+    page.set_viewport_size({"width": 1280, "height": 1000})
     page.get_by_role("button", name="Test Selection").scroll_into_view_if_needed()
     page.get_by_role("button", name="Test Selection").click()
     expect(page.get_by_role("option", name="selection_1", exact=True)).to_be_visible()

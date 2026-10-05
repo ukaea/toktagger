@@ -31,6 +31,7 @@ if MODELS_ENABLED:
         ray_session as ray_session,
         setup_model_samples as setup_model_samples,
         setup_model_db as setup_model_db,
+        setup_model_predictions as setup_model_predictions,
         models_api_client as models_api_client,
     )
 
@@ -51,6 +52,10 @@ else:
 
     @pytest.fixture()
     def setup_model_db():
+        raise pytest.UsageError(error_msg)
+
+    @pytest.fixture()
+    def setup_model_predictions():
         raise pytest.UsageError(error_msg)
 
     @pytest.fixture()
