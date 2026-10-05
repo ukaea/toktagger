@@ -141,9 +141,8 @@ def check_pretrained_model_availability(
     available. Setting ``force_download`` replaces an existing cached model.
     """
     if model_name not in MODEL_FAMILIES:
-        available_models = ", ".join(MODEL_FAMILIES)
         raise ValueError(
-            f"Unknown model '{model_name}'. Available models: {available_models}"
+            f"Unknown model '{model_name}'. Available models: {', '.join(MODEL_FAMILIES)}"
         )
 
     model_family = MODEL_FAMILIES[model_name]
