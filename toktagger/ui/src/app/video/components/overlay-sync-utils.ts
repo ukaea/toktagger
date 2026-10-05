@@ -1,4 +1,8 @@
-import { boundsFromPoints, type ImageAnnotation } from "@annotorious/react";
+import {
+  boundsFromPoints,
+  type AnnotoriousOpenSeadragonAnnotator,
+  type ImageAnnotation,
+} from "@annotorious/react";
 import {
   getLabelTrack,
   isEllipseAnno,
@@ -157,6 +161,15 @@ export function sameOverlay(
   const bs = b.map(annoSig).sort();
   for (let i = 0; i < as.length; i++) if (as[i] !== bs[i]) return false;
   return true;
+}
+
+/** Replaces the Annotorious overlay via an empty set first, since a same-id replace leaves stale hit regions. */
+export function replaceAnnotoriousOverlay(
+  api: AnnotoriousOpenSeadragonAnnotator,
+  annotations: ImageAnnotation[],
+) {
+  api.setAnnotations([], true);
+  api.setAnnotations(annotations, true);
 }
 
 export function clampRectToImage(
