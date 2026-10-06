@@ -62,9 +62,14 @@ def decode_frame_image(frame_image: ImageData) -> np.ndarray:
     return image
 
 
-def is_useful_frame(frame_image: ImageData, threshold: int) -> bool:
+def frame_brightness(frame_image: ImageData) -> float:
+    """Return the grayscale brightness exceeded by the brightest 1% of a frame's pixels."""
     gray = cv2.cvtColor(decode_frame_image(frame_image), cv2.COLOR_BGR2GRAY)
-    return bool(np.percentile(gray, _BLACK_FRAME_PERCENTILE) > threshold)
+    return float(np.percentile(gray, _BLACK_FRAME_PERCENTILE))
+
+
+def is_useful_frame(frame_image: ImageData, threshold: int) -> bool:
+    return frame_brightness(frame_image) > threshold
 
 
 def find_first_useful_frame(

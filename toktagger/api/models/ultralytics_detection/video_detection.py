@@ -27,6 +27,7 @@ from toktagger.api.models.ultralytics_detection.utils import (
     check_pretrained_model_availability,
     decode_frame_image,
     find_first_useful_frame,
+    frame_brightness,
     is_useful_frame,
     resolve_weights_path,
 )
@@ -65,7 +66,7 @@ class UltralyticsPredictParams(pydantic.BaseModel):
         description="Skip black frames before and after the plasma for full-video prediction; ignored for individual-frame predictions.",
     )
     black_frame_threshold: int = pydantic.Field(
-        default=50,
+        default=70,
         ge=0,
         le=255,
         description="Brightness (0-255) that at least 1% of pixels must exceed for a frame to count as non-black. Raise it for noisy cameras. Only used when skipping black frames.",
@@ -125,9 +126,11 @@ def iter_sample_frames(
         )
         if selected_frame.frame != frame_image.frame:
             logger.info(
-                "Skipping initial black frames; starting at frame %s for shot %s.",
+                "Skipping initial black frames; starting at frame %s for shot %s (brightness %.1f, threshold %s).",
                 selected_frame.frame,
                 sample.shot_id,
+                frame_brightness(selected_frame),
+                black_frame_threshold,
             )
         frame_image = selected_frame
 
@@ -136,9 +139,11 @@ def iter_sample_frames(
             frame_image, black_frame_threshold
         ):
             logger.info(
-                "Stopping at black frame %s for shot %s.",
+                "Stopping at black frame %s for shot %s (brightness %.1f, threshold %s).",
                 frame_image.frame,
                 sample.shot_id,
+                frame_brightness(frame_image),
+                black_frame_threshold,
             )
             break
 
