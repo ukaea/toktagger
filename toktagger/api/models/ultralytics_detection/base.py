@@ -29,7 +29,7 @@ from toktagger.api.models.ultralytics_detection.utils import (
     prepare_ultralytics_amp_weights,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("ray")
 
 
 YoloModelName = Literal[

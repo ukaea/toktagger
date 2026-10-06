@@ -17,7 +17,7 @@ from toktagger.api.core.data_loaders import FrameNotFoundError
 from toktagger.api.schemas.data import ImageData, ImageParams
 from toktagger.api.schemas.samples import Sample
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("ray")
 
 _CANONICAL_WEIGHTS_FILENAMES = ("best.pt", "last.pt")
 

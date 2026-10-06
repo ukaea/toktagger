@@ -37,7 +37,7 @@ from toktagger.api.schemas.annotations import (
 from toktagger.api.schemas.data import DataParamTypes, ImageData, ImageParams
 from toktagger.api.schemas.samples import Sample
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("ray")
 
 
 class UltralyticsPredictParams(pydantic.BaseModel):
