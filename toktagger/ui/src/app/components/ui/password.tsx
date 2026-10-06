@@ -1,21 +1,125 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import {
+  ActionButton,
   Button,
-  DialogTrigger,
-  Dialog,
-  Heading,
-  Divider,
-  Content,
   ButtonGroup,
+  Content,
+  Dialog,
+  DialogTrigger,
+  Divider,
+  Flex,
+  Heading,
   Text,
+  TextField,
   ToastQueue,
+  View,
 } from "@adobe/react-spectrum";
+import Visibility from "@spectrum-icons/workflow/Visibility";
+import VisibilityOff from "@spectrum-icons/workflow/VisibilityOff";
 import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
-import {
-  NewPasswordFields,
-  validateNewPassword,
-} from "@/app/components/ui/newPasswordFields";
+
+type PasswordFieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoFocus?: boolean;
+  isRequired?: boolean;
+  width?: string;
+};
+
+/** A password TextField with a button that shows or hides the typed characters.
+ *
+ * Each field keeps its own visibility state, so a page with several password
+ * fields reveals only the one the user asks for. The button label includes the
+ * field label to keep it unambiguous on such a page.
+ */
+export function PasswordField({
+  label,
+  value,
+  onChange,
+  autoFocus,
+  isRequired,
+  width = "100%",
+}: PasswordFieldProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  return (
+    <View position="relative" width={width}>
+      <TextField
+        label={label}
+        type={isVisible ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        autoFocus={autoFocus}
+        isRequired={isRequired}
+        width="100%"
+      />
+      <View position="absolute" right="size-50" bottom="size-0">
+        <ActionButton
+          isQuiet
+          UNSAFE_className="hover:!bg-transparent active:!border-transparent active:!bg-transparent"
+          aria-label={isVisible ? `Hide ${label}` : `Show ${label}`}
+          onPress={() => setIsVisible((prev) => !prev)}
+        >
+          {isVisible ? <VisibilityOff /> : <Visibility />}
+        </ActionButton>
+      </View>
+    </View>
+  );
+}
+
+const MIN_PASSWORD_LENGTH = 8;
+
+/** Returns an error message for an invalid new password pair, or null if valid. */
+export function validateNewPassword(
+  password: string,
+  confirmPassword: string,
+): string | null {
+  if (password !== confirmPassword) return "Passwords do not match";
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+  }
+  return null;
+}
+
+type NewPasswordFieldsProps = {
+  password: string;
+  confirmPassword: string;
+  onPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
+  passwordLabel: string;
+  confirmLabel: string;
+  autoFocus?: boolean;
+};
+
+export function NewPasswordFields({
+  password,
+  confirmPassword,
+  onPasswordChange,
+  onConfirmPasswordChange,
+  passwordLabel,
+  confirmLabel,
+  autoFocus,
+}: NewPasswordFieldsProps) {
+  return (
+    <Flex direction="column" gap="size-100">
+      <PasswordField
+        label={passwordLabel}
+        value={password}
+        onChange={onPasswordChange}
+        isRequired
+        autoFocus={autoFocus}
+      />
+      <PasswordField
+        label={confirmLabel}
+        value={confirmPassword}
+        onChange={onConfirmPasswordChange}
+        isRequired
+      />
+    </Flex>
+  );
+}
 
 type PasswordChangeDialogProps = {
   userId: string;

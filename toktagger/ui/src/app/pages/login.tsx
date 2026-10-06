@@ -11,7 +11,7 @@ import {
   ToastQueue,
 } from "@adobe/react-spectrum";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { PasswordField } from "@/app/components/ui/passwordField";
+import { PasswordField } from "@/app/components/ui/password";
 
 export default function LoginPage() {
   const { login, isLoading, user } = useAuth();

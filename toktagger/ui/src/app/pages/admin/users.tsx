@@ -25,11 +25,11 @@ import Delete from "@spectrum-icons/workflow/Delete";
 import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
-import { PasswordChangeDialog } from "@/app/components/ui/passwordChangeDialog";
 import {
   NewPasswordFields,
+  PasswordChangeDialog,
   validateNewPassword,
-} from "@/app/components/ui/newPasswordFields";
+} from "@/app/components/ui/password";
 import { CurrentUserSchema, type CurrentUser } from "@/types";
 
 type UserRow = CurrentUser & { id: string };

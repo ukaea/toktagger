@@ -4,7 +4,7 @@ import { Flex, InlineAlert, Heading, Content } from "@adobe/react-spectrum";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
-import { PasswordChangeDialog } from "@/app/components/ui/passwordChangeDialog";
+import { PasswordChangeDialog } from "@/app/components/ui/password";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
