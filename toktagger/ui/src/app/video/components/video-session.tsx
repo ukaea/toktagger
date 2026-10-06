@@ -66,7 +66,11 @@ import {
   normalizeOverlayForSession,
   toAnnotoriousDrawingTool,
 } from "./anno-utils";
-import { clampOverlayToNaturalImage, sameOverlay } from "./overlay-sync-utils";
+import {
+  clampOverlayToNaturalImage,
+  replaceAnnotoriousOverlay,
+  sameOverlay,
+} from "./overlay-sync-utils";
 
 /**
  * Session state for the frame-by-frame annotation workflow.
@@ -810,7 +814,10 @@ export function VideoSessionProvider(props: {
       if (isEditableEventTarget(event.target)) return;
 
       if (event.key === "Control") {
-        if (!event.repeat) setCtrlHeld(true);
+        if (event.repeat) return;
+        // Commit an in-progress edit first so the overlay sync doesn't revert it.
+        if (editMode) flushCurrentFrameOverlay();
+        setCtrlHeld(true);
         return;
       }
 
@@ -845,7 +852,7 @@ export function VideoSessionProvider(props: {
       window.removeEventListener("blur", releaseCtrl);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [api, editMode, setEditMode]);
+  }, [api, editMode, flushCurrentFrameOverlay, setEditMode]);
 
   const clearCurrentFrame = useCallback(() => {
     api?.setSelected?.();
@@ -1088,7 +1095,7 @@ export function VideoSessionProvider(props: {
       try {
         api.cancelDrawing?.();
         api.setSelected?.();
-        api.setAnnotations?.(normalized, true);
+        replaceAnnotoriousOverlay(api, normalized);
         applyAnnotatorInteractionMode();
       } finally {
         finishProgrammaticAnnotationSync();
@@ -1204,7 +1211,7 @@ export function VideoSessionProvider(props: {
             }
           } else {
             api.setSelected?.();
-            api.setAnnotations?.(normalized, true);
+            replaceAnnotoriousOverlay(api, normalized);
           }
 
           applyAnnotatorInteractionMode();
@@ -1380,7 +1387,7 @@ export function VideoSessionProvider(props: {
     try {
       // Clear selection so popup closes when switching frames / overlays
       api.setSelected();
-      api.setAnnotations(desiredOverlay, true);
+      replaceAnnotoriousOverlay(api, desiredOverlay);
       applyAnnotatorInteractionMode();
       rafId = requestAnimationFrame(() => {
         tryFocusPending();
