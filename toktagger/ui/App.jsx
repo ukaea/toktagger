@@ -21,10 +21,6 @@ import { BreadcrumbProvider } from "./src/app/contexts/BreadcrumbContext";
 
 function SpectrumProvider({ children }) {
   const navigate = useNavigate();
-  // Our own Link/Item hrefs are already fully-qualified app paths (e.g. "/ui/projects/123")
-  // or absolute external URLs, never route "to" descriptors — so we don't pass react-router's
-  // useHref here. It resolves every href relative to the current route, which mangles
-  // external URLs (e.g. "https://ukaea.github.io/...") into broken in-app paths.
   return (
     <Provider theme={defaultTheme} router={{ navigate }}>
       <ToastContainer placement="top" />
