@@ -75,13 +75,14 @@ def test_find_first_useful_frame_refines_coarse_probe(monkeypatch):
     monkeypatch.setattr(
         ultralytics_utils,
         "_is_useful_frame",
-        lambda frame_image: frame_image.frame >= 10,
+        lambda frame_image, threshold: frame_image.frame >= 10,
     )
 
     selected_frame = ultralytics_utils.find_first_useful_frame(
         data_loader,
         sample,
         initial_frame,
+        50,
     )
 
     assert selected_frame.frame == 10
@@ -95,13 +96,14 @@ def test_find_first_useful_frame_scans_short_video_boundary(monkeypatch):
     monkeypatch.setattr(
         ultralytics_utils,
         "_is_useful_frame",
-        lambda frame_image: frame_image.frame >= 10,
+        lambda frame_image, threshold: frame_image.frame >= 10,
     )
 
     selected_frame = ultralytics_utils.find_first_useful_frame(
         data_loader,
         sample,
         initial_frame,
+        50,
     )
 
     assert selected_frame.frame == 10
@@ -243,9 +245,9 @@ def test_this_frame_only_is_ignored_without_data_params(monkeypatch):
     def iter_frames(
         loader,
         iterated_sample,
-        skip_initial_black_frames: bool = False,
+        black_frame_threshold: int | None = None,
     ):
-        iterator_calls.append((loader, iterated_sample, skip_initial_black_frames))
+        iterator_calls.append((loader, iterated_sample, black_frame_threshold))
         return iter(frames)
 
     def decode_frame(frame):
@@ -262,7 +264,7 @@ def test_this_frame_only_is_ignored_without_data_params(monkeypatch):
     )
 
     assert predictions == [[]]
-    assert iterator_calls == [(data_loader, sample, False)]
+    assert iterator_calls == [(data_loader, sample, None)]
     assert decoded_frames == frames
     assert len(prediction_model.calls) == 2
 
@@ -288,7 +290,7 @@ def test_predict_converts_yolo_boxes_to_video_annotations(monkeypatch):
     def iter_frames(
         loader,
         iterated_sample,
-        skip_initial_black_frames: bool = False,
+        black_frame_threshold: int | None = None,
     ):
         return iter((frame_image,))
 

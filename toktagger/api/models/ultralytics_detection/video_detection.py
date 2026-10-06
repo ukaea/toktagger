@@ -63,6 +63,12 @@ class UltralyticsPredictParams(pydantic.BaseModel):
         default=False,
         description="Use a coarse-to-fine search to skip initial black frames for full-video prediction; ignored for individual-frame predictions.",
     )
+    black_frame_threshold: int = pydantic.Field(
+        default=50,
+        ge=0,
+        le=255,
+        description="Brightness (0-255) that at least 1% of pixels must exceed for a frame to count as non-black. Raise it for noisy cameras. Only used when skipping initial black frames.",
+    )
 
 
 class YoloPredictParams(UltralyticsPredictParams):
@@ -83,7 +89,7 @@ class RTDETRPredictParams(UltralyticsPredictParams):
 def iter_sample_frames(
     data_loader: TokTaggerDataLoader,
     sample: Sample,
-    skip_initial_black_frames: bool = False,
+    black_frame_threshold: int | None = None,
 ) -> Iterator[ImageData]:
     """Yield every contiguous frame in a TokTagger video sample.
 
@@ -107,11 +113,12 @@ def iter_sample_frames(
         )
         return
 
-    if skip_initial_black_frames:
+    if black_frame_threshold is not None:
         selected_frame = find_first_useful_frame(
             data_loader,
             sample,
             frame_image,
+            black_frame_threshold,
         )
         if selected_frame.frame != frame_image.frame:
             logger.info(
@@ -345,7 +352,9 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
                 frame_images = iter_sample_frames(
                     self.data_loader,
                     sample,
-                    skip_initial_black_frames=params.skip_initial_black_frames,
+                    black_frame_threshold=params.black_frame_threshold
+                    if params.skip_initial_black_frames
+                    else None,
                 )
 
             for frame_image in frame_images:

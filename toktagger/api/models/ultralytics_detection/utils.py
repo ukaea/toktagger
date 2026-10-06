@@ -21,9 +21,7 @@ logger = logging.getLogger("ray")
 
 _CANONICAL_WEIGHTS_FILENAMES = ("best.pt", "last.pt")
 
-_BLACK_FRAME_MEAN_THRESHOLD = 13
-_BLACK_FRAME_MAX_THRESHOLD = 50
-_BLACK_FRAME_STD_THRESHOLD = 5
+_BLACK_FRAME_PERCENTILE = 99
 _BLACK_FRAME_COARSE_STEP = 25
 _BLACK_FRAME_MAX_SCAN = 500
 
@@ -64,21 +62,18 @@ def decode_frame_image(frame_image: ImageData) -> np.ndarray:
     return image
 
 
-def _is_useful_frame(frame_image: ImageData) -> bool:
-    image = decode_frame_image(frame_image)
-    return bool(
-        image.mean() > _BLACK_FRAME_MEAN_THRESHOLD
-        or image.max() > _BLACK_FRAME_MAX_THRESHOLD
-        or image.std() > _BLACK_FRAME_STD_THRESHOLD
-    )
+def _is_useful_frame(frame_image: ImageData, threshold: int) -> bool:
+    gray = cv2.cvtColor(decode_frame_image(frame_image), cv2.COLOR_BGR2GRAY)
+    return bool(np.percentile(gray, _BLACK_FRAME_PERCENTILE) > threshold)
 
 
 def find_first_useful_frame(
     data_loader: TokTaggerDataLoader,
     sample: Sample,
     initial_frame: ImageData,
+    threshold: int,
 ) -> ImageData:
-    if _is_useful_frame(initial_frame):
+    if _is_useful_frame(initial_frame, threshold):
         return initial_frame
 
     previous_coarse_offset = 0
@@ -101,7 +96,7 @@ def find_first_useful_frame(
         except FrameNotFoundError:
             fallback_frame = initial_frame
         else:
-            if not _is_useful_frame(coarse_frame):
+            if not _is_useful_frame(coarse_frame, threshold):
                 previous_coarse_offset = coarse_offset
                 continue
             fallback_frame = coarse_frame
@@ -123,7 +118,7 @@ def find_first_useful_frame(
             except FrameNotFoundError:
                 return fallback_frame
 
-            if _is_useful_frame(refinement_frame):
+            if _is_useful_frame(refinement_frame, threshold):
                 return refinement_frame
 
         return fallback_frame
