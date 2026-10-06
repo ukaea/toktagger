@@ -131,12 +131,9 @@ def test_iter_sample_frames_stops_at_end_of_video():
     assert all(params.return_raw for _, params in calls)
 
 
-def test_build_video_frame_manifest_includes_negative_frames_and_boxes(monkeypatch):
+def test_build_video_frame_manifest_only_uses_annotated_frames():
     sample = make_sample()
-    frames = [
-        ImageData(frame=0, values=[1, 2]),
-        ImageData(frame=1, values=[3, 4]),
-    ]
+    requested_frames = []
     annotations = [
         [
             VideoBoundingBox(
@@ -162,34 +159,26 @@ def test_build_video_frame_manifest_includes_negative_frames_and_boxes(monkeypat
         ]
     ]
 
-    def iter_frames(
-        data_loader,
-        iterated_sample,
-        skip_initial_black_frames: bool = False,
-    ):
-        return iter(frames)
-
-    monkeypatch.setattr(video_detection, "iter_sample_frames", iter_frames)
+    def get_sample(requested_sample, params):
+        requested_frames.append(params.frame)
+        return ImageData(frame=params.frame, values=[3, 4])
 
     manifest = video_detection.build_video_frame_manifest(
         samples=[sample],
         annotations=annotations,
         class_map={"alpha": 7, "beta": 3},
-        data_loader=object(),
+        data_loader=SimpleNamespace(get_sample=get_sample),
     )
 
-    assert len(manifest) == 2
-    assert manifest[0].frame == 0
-    assert manifest[0].image == bytes([1, 2])
-    assert manifest[0].boxes == []
-    assert manifest[0].classes == []
-    assert manifest[1].frame == 1
-    assert manifest[1].image == bytes([3, 4])
-    assert manifest[1].boxes == [
+    assert requested_frames == [1]
+    assert len(manifest) == 1
+    assert manifest[0].frame == 1
+    assert manifest[0].image == bytes([3, 4])
+    assert manifest[0].boxes == [
         (10.0, 20.0, 40.0, 60.0),
         (2.0, 3.0, 6.0, 8.0),
     ]
-    assert manifest[1].classes == [7, 3]
+    assert manifest[0].classes == [7, 3]
 
 
 def test_decode_frame_image_returns_bgr_array():
