@@ -73,7 +73,7 @@ def _is_useful_frame(frame_image: ImageData) -> bool:
     )
 
 
-def _find_first_useful_frame(
+def find_first_useful_frame(
     data_loader: TokTaggerDataLoader,
     sample: Sample,
     initial_frame: ImageData,

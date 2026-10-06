@@ -26,7 +26,7 @@ from toktagger.api.models.ultralytics_detection.base import (
 from toktagger.api.models.ultralytics_detection.utils import (
     check_pretrained_model_availability,
     decode_frame_image,
-    _find_first_useful_frame,
+    find_first_useful_frame,
     resolve_weights_path,
 )
 from toktagger.api.schemas.annotations import (
@@ -108,7 +108,7 @@ def iter_sample_frames(
         return
 
     if skip_initial_black_frames:
-        selected_frame = _find_first_useful_frame(
+        selected_frame = find_first_useful_frame(
             data_loader,
             sample,
             frame_image,

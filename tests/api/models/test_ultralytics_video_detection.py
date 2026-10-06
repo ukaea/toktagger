@@ -78,7 +78,7 @@ def test_find_first_useful_frame_refines_coarse_probe(monkeypatch):
         lambda frame_image: frame_image.frame >= 10,
     )
 
-    selected_frame = ultralytics_utils._find_first_useful_frame(
+    selected_frame = ultralytics_utils.find_first_useful_frame(
         data_loader,
         sample,
         initial_frame,
@@ -98,7 +98,7 @@ def test_find_first_useful_frame_scans_short_video_boundary(monkeypatch):
         lambda frame_image: frame_image.frame >= 10,
     )
 
-    selected_frame = ultralytics_utils._find_first_useful_frame(
+    selected_frame = ultralytics_utils.find_first_useful_frame(
         data_loader,
         sample,
         initial_frame,
