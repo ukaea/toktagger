@@ -516,8 +516,8 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     # the last of the two requests the save issues, so waiting on it covers the PUT too.
     with page.expect_response(
         lambda r: (
-            f"samples/{sample_id}/annotations/delete" in r.url
-            and r.request.method == "POST"
+            r.url.endswith(f"samples/{sample_id}/annotations")
+            and r.request.method == "DELETE"
         )
     ):
         page.get_by_role("button", name="Save").click(force=True)

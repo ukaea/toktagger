@@ -336,26 +336,37 @@ async def update_annotations(
 @router.delete(
     "/samples/{sample_id}/annotations",
     responses={
-        200: {"description": "Annotations for this project deleted successfully."},
-        404: {"description": "Project not found with that ID."},
+        200: {"description": "Matching annotations deleted; unknown ids are ignored."},
+        404: {"description": "Project or Sample not found with that ID."},
     },
 )
 async def remove_annotations(
     request: Request,
-    project_id: str = Path(description="The ID of the project to delete samples from."),
+    project_id: str = Path(description="The ID of the project to delete from."),
     sample_id: str = Path(
         description="The ID of the sample to delete annotations from."
     ),
+    annotation_ids: list[str] | None = Body(
+        None,
+        description="The IDs of the annotations to delete. Omit to delete ALL annotations for the sample.",
+    ),
     current_user: UserOut = Depends(require_project_annotator),
-):
-    """Delete ALL annotations for a given sample from a given project."""
+) -> int:
+    """Delete the given annotations for a sample, or ALL of them if no ids are given.
+
+    Mirrors remove_annotation's 404 tolerance: an id already gone is the state being
+    asked for, so unknown ids are silently ignored rather than failing the whole batch.
+    """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.get_sample(
         db_client=db_client, project_id=project_id, sample_id=sample_id
     )
-    await utils.delete_annotations(
-        db_client=db_client, project_id=project_id, sample_id=sample_id
+    return await utils.delete_annotations(
+        db_client=db_client,
+        project_id=project_id,
+        sample_id=sample_id,
+        annotation_ids=annotation_ids,
     )
 
 
@@ -396,39 +407,3 @@ async def remove_annotation(
         raise HTTPException(
             status_code=404, detail="Annotation not found for that project and sample."
         )
-
-
-@router.post(
-    "/samples/{sample_id}/annotations/delete",
-    responses={
-        200: {"description": "Matching annotations deleted; unknown ids are ignored."},
-        404: {"description": "Project or Sample not found with that ID."},
-    },
-)
-async def remove_annotations_bulk(
-    request: Request,
-    project_id: str = Path(description="The ID of the project to delete from."),
-    sample_id: str = Path(
-        description="The ID of the sample to delete annotations from."
-    ),
-    annotation_ids: list[str] = Body(
-        ..., description="The IDs of the annotations to delete."
-    ),
-    current_user: UserOut = Depends(require_project_annotator),
-) -> int:
-    """Delete a batch of annotations by id, whoever created them, in one call.
-
-    Mirrors remove_annotation's 404 tolerance: an id already gone is the state being
-    asked for, so unknown ids are silently ignored rather than failing the whole batch.
-    """
-    db_client: MongoDBClient = request.app.state.db_client
-    await utils.get_project(db_client=db_client, project_id=project_id)
-    await utils.get_sample(
-        db_client=db_client, project_id=project_id, sample_id=sample_id
-    )
-    return await utils.delete_annotations(
-        db_client=db_client,
-        project_id=project_id,
-        sample_id=sample_id,
-        annotation_ids=annotation_ids,
-    )

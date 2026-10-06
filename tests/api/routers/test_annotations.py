@@ -198,8 +198,9 @@ async def test_delete_sample_annotations(api_client, setup_db, db_client):
 
 @pytest.mark.asyncio
 async def test_delete_annotations_bulk(api_client, setup_db, db_client):
-    response = await api_client.post(
-        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+    response = await api_client.request(
+        "DELETE",
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations",
         json=[setup_db["annotation_id_1"], setup_db["annotation_id_2"]],
     )
     assert response.status_code == 200
@@ -219,8 +220,9 @@ async def test_delete_annotations_bulk_ignores_unknown_ids(
     api_client, setup_db, db_client
 ):
     unknown_id = str(ObjectId())
-    response = await api_client.post(
-        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+    response = await api_client.request(
+        "DELETE",
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations",
         json=[setup_db["annotation_id_1"], unknown_id],
     )
     assert response.status_code == 200
@@ -241,8 +243,9 @@ async def test_delete_annotations_bulk_ignores_unknown_ids(
 
 @pytest.mark.asyncio
 async def test_delete_annotations_bulk_empty_list(api_client, setup_db, db_client):
-    response = await api_client.post(
-        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+    response = await api_client.request(
+        "DELETE",
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations",
         json=[],
     )
     assert response.status_code == 200
@@ -259,8 +262,9 @@ async def test_delete_annotations_bulk_scoped_to_sample(
     # annotation_id_4 belongs to sample_id_2, so naming it while deleting from
     # sample_id_1 must not delete it - the endpoint is scoped by its path, not
     # solely by the ids in the body.
-    response = await api_client.post(
-        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/delete",
+    response = await api_client.request(
+        "DELETE",
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations",
         json=[setup_db["annotation_id_4"]],
     )
     assert response.status_code == 200

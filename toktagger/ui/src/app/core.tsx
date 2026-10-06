@@ -416,9 +416,9 @@ export async function deleteAnnotationsByIds(
   annotation_ids: string[],
 ): Promise<void> {
   const response = await apiFetch(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations/delete`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotations`,
     {
-      method: "POST",
+      method: "DELETE",
       headers: {
         "Content-Type": "application/json",
       },
