@@ -586,14 +586,20 @@ def test_create_project(
         assert project[f"{label_type.lower().replace(' ', '_')}"] != [label_type]
 
 
-def test_edit_button_disabled_for_annotator(server_setup, admin_token, browser):
-    create_user("edit_annotator", "annotator_pass123")
-    project_id = create_project("Annotator Edit Project", "time-series", "tabular")
-    add_project_member(project_id, "edit_annotator", role="annotator")
+@pytest.mark.parametrize("role", ["annotator", "viewer"])
+def test_project_actions_disabled_for_non_admin(
+    server_setup, admin_token, browser, role
+):
+    username = f"edit_{role}"
+    project_name = f"{role.title()} Edit Project"
+    create_user(username, f"{role}_pass123")
+    project_id = create_project(project_name, "time-series", "tabular")
+    add_project_member(project_id, username, role=role)
 
-    annotator_page = login_as(browser, "edit_annotator", "annotator_pass123")
-    annotator_page.goto("http://localhost:8002/ui/projects")
-    row = annotator_page.get_by_role("row").filter(has_text="Annotator Edit Project")
+    member_page = login_as(browser, username, f"{role}_pass123")
+    member_page.goto("http://localhost:8002/ui/projects")
+    row = member_page.get_by_role("row").filter(has_text=project_name)
     expect(row.get_by_role("button", name="Edit")).to_be_disabled()
+    expect(row.get_by_role("button", name="Delete")).to_be_disabled()
 
-    annotator_page.context.close()
+    member_page.context.close()

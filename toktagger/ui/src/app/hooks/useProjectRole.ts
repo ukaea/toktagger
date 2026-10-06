@@ -10,12 +10,11 @@ export type ProjectRoleInfo = {
   // admin who bypasses membership entirely. null while loading or if the user has
   // no membership and isn't a global admin.
   role: ProjectRole;
-  // Global admin, or a project-level admin - can manage members and delete a trained
-  // model artifact. Mirrors the backend's require_project_admin_role.
+  // Global admin, or a project-level admin - can manage members, edit or delete the
+  // project, and delete a trained model artifact. Mirrors require_project_admin_role.
   isAdmin: boolean;
   // Global admin, or a project-level admin/annotator - can create, edit and delete
-  // annotations and samples, and edit or delete the project itself. Mirrors the
-  // backend's require_project_annotator.
+  // annotations and samples. Mirrors the backend's require_project_annotator.
   canAnnotate: boolean;
   loading: boolean;
 };

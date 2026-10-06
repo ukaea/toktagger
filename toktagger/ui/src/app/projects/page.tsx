@@ -29,64 +29,59 @@ import type { Project } from "@/types";
 
 type ProjectActionsProps = {
   project: Project;
-  canAnnotate: boolean;
   isAdmin: boolean;
   onModify?: () => void;
 };
 
 // Per-row: whether the current user can edit/delete a given project depends on
 // their membership role for that specific project, not just their global role.
-// Only project admins may edit or delete a project; annotators see the buttons disabled.
+// Only project admins may edit or delete a project; everyone else sees the buttons disabled.
 // The role comes from the table so the whole page costs one membership request.
 const ProjectActions = ({
   project,
-  canAnnotate,
   isAdmin,
   onModify,
-}: ProjectActionsProps) => {
-  if (!canAnnotate) return null;
-  return (
-    <Flex direction="row" gap="size-100">
-      <ProjectConfigEditor
-        project={project}
-        onModify={onModify}
-        isDisabled={!isAdmin}
-      />
-      <DialogTrigger>
-        <Button aria-label="Delete" variant="negative" isDisabled={!isAdmin}>
-          <Delete />
-        </Button>
-        {(close) => (
-          <Dialog>
-            <Heading>Confirm Deletion</Heading>
-            <Divider />
-            <Content>
-              Are you sure you want to delete project{" "}
-              <strong>{project["name"]}</strong>? You will also lose{" "}
-              <strong>all annotations</strong> associated with this project.
-              This action cannot be undone.
-            </Content>
-            <ButtonGroup>
-              <Button variant="secondary" onPress={close}>
-                Cancel
-              </Button>
-              <Button
-                variant="negative"
-                onPress={async () => {
-                  await deleteProject(project._id);
-                  onModify?.();
-                  close();
-                }}
-              >
-                Delete
-              </Button>
-            </ButtonGroup>
-          </Dialog>
-        )}
-      </DialogTrigger>
-    </Flex>
-  );
-};
+}: ProjectActionsProps) => (
+  <Flex direction="row" gap="size-100">
+    <ProjectConfigEditor
+      project={project}
+      onModify={onModify}
+      isDisabled={!isAdmin}
+    />
+    <DialogTrigger>
+      <Button aria-label="Delete" variant="negative" isDisabled={!isAdmin}>
+        <Delete />
+      </Button>
+      {(close) => (
+        <Dialog>
+          <Heading>Confirm Deletion</Heading>
+          <Divider />
+          <Content>
+            Are you sure you want to delete project{" "}
+            <strong>{project["name"]}</strong>? You will also lose{" "}
+            <strong>all annotations</strong> associated with this project. This
+            action cannot be undone.
+          </Content>
+          <ButtonGroup>
+            <Button variant="secondary" onPress={close}>
+              Cancel
+            </Button>
+            <Button
+              variant="negative"
+              onPress={async () => {
+                await deleteProject(project._id);
+                onModify?.();
+                close();
+              }}
+            >
+              Delete
+            </Button>
+          </ButtonGroup>
+        </Dialog>
+      )}
+    </DialogTrigger>
+  </Flex>
+);
 
 type ProjectsTableProps = {
   projects: Project[];
@@ -102,7 +97,7 @@ const ProjectsTable = ({
   onModify,
 }: ProjectsTableProps) => {
   const rows = projects.map(({ _id, ...rest }) => ({ ...rest, id: _id, _id }));
-  const { canAnnotateIn, isAdminIn } = useMyProjectRoles();
+  const { isAdminIn } = useMyProjectRoles();
 
   return (
     <Flex height="size-5000" width="100%" direction="column">
@@ -139,7 +134,6 @@ const ProjectsTable = ({
               <Cell>
                 <ProjectActions
                   project={item}
-                  canAnnotate={canAnnotateIn(item._id)}
                   isAdmin={isAdminIn(item._id)}
                   onModify={onModify}
                 />
