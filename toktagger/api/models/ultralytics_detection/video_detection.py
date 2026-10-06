@@ -142,12 +142,8 @@ def build_video_frame_manifest(
     annotations: list[list[Annotation]],
     class_map: dict[str, int],
     data_loader: TokTaggerDataLoader,
-    skip_initial_black_frames: bool = False,
 ) -> list[DetectionRecord]:
-    """
-    Convert validated video samples into frame-level training records.
-    Hash table has been used to speed up things.
-    """
+    """Convert the annotated frames of validated video samples into training records."""
     if len(samples) != len(annotations):
         raise ValueError("Samples and annotations must have the same length.")
 
@@ -171,23 +167,22 @@ def build_video_frame_manifest(
                 [],
             ).append(annotation)
 
-        sample_record_count = 0
+        for frame, frame_annotations in annotations_by_frame.items():
+            frame_image = data_loader.get_sample(
+                sample,
+                ImageParams(
+                    name="image",
+                    frame=frame,
+                    return_raw=True,
+                ),
+            )
+            if not isinstance(frame_image, ImageData):
+                raise TypeError("Expected the data loader to return ImageData.")
 
-        for frame_image in iter_sample_frames(
-            data_loader,
-            sample,
-            skip_initial_black_frames=skip_initial_black_frames,
-        ):
             if isinstance(frame_image.values, str):
                 raise TypeError(
                     "Expected raw image bytes but received a base64 string."
                 )
-
-            frame = int(frame_image.frame)
-            frame_annotations = annotations_by_frame.get(
-                frame,
-                [],
-            )
 
             boxes: list[tuple[float, float, float, float]] = []
             classes: list[int] = []
@@ -219,11 +214,10 @@ def build_video_frame_manifest(
                     classes=classes,
                 )
             )
-            sample_record_count += 1
 
         logger.info(
             "Added %s frames from shot %s to the manifest.",
-            sample_record_count,
+            len(annotations_by_frame),
             sample.shot_id,
         )
 
@@ -287,7 +281,6 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
             annotations=annotations,
             class_map=self.class_map,
             data_loader=self.data_loader,
-            skip_initial_black_frames=params.skip_initial_black_frames,
         )
 
     def load(

@@ -72,10 +72,6 @@ class UltralyticsTrainParams(pydantic.BaseModel):
         default=False,
         description="Enable detailed Ultralytics logging during training.",
     )
-    skip_initial_black_frames: bool = pydantic.Field(
-        default=False,
-        description="Use a coarse-to-fine search to skip initial black frames before building the training dataset.",
-    )
 
 
 class YoloTrainParams(UltralyticsTrainParams):
