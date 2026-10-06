@@ -252,6 +252,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
                 value={username}
                 onChange={setUsername}
                 isRequired
+                width="100%"
               />
               <NewPasswordFields
                 password={password}
@@ -263,6 +264,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
               />
               <Picker
                 label="Role"
+                width="100%"
                 selectedKey={role}
                 onSelectionChange={(k) => {
                   const parsed =
