@@ -156,6 +156,9 @@ def run_with_gunicorn(host: str, port: int, workers: int) -> None:
         str(workers),
         "--bind",
         f"{host}:{port}",
+        # Gunicorn drops uvicorn's per-request access logs unless an access log target is set
+        "--access-logfile",
+        "-",
     ]
     process = subprocess.Popen(args)
     try:
