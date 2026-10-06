@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from importlib.metadata import PackageNotFoundError, version
 
 from fastapi import APIRouter, Request
@@ -7,7 +9,9 @@ from toktagger.api.crud import utils
 from toktagger.api.models import models_dependencies_installed
 
 if models_dependencies_installed():
-    import ray
+    from ray.exceptions import RayError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="",
@@ -44,9 +48,12 @@ async def health_check(request: Request) -> dict:
     # If available, check whether GPUs enabled for model tasks
     model_gpu_available = False
     if models_dependencies_installed() and hasattr(request.app.state, "task_registry"):
-        model_gpu_available = ray.get(
-            request.app.state.task_registry.gpu_enabled.remote()
-        )
+        try:
+            model_gpu_available = await asyncio.wait_for(
+                request.app.state.task_registry.gpu_enabled.remote(), timeout=2
+            )
+        except (asyncio.TimeoutError, RayError):
+            logger.warning("Task registry did not respond to the health check")
 
     # Return info
     return {

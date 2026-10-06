@@ -6,6 +6,9 @@ from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.models import ModelUpdate
 from toktagger.api.schemas.samples import SampleUpdateBatchItem
 
+# Bounds how long a worker or actor blocks on a stalled API before giving up
+REQUEST_TIMEOUT_SECONDS = 60
+
 
 def send_updates(
     object_type: str,
@@ -36,7 +39,9 @@ def send_updates(
     if api_token := os.environ.get("API_TOKEN"):
         headers["Authorization"] = f"Bearer {api_token}"
 
-    response = requests.put(url=url, json=payload, headers=headers)
+    response = requests.put(
+        url=url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS
+    )
 
     return response
 

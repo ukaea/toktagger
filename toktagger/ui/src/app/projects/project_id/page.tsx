@@ -181,7 +181,11 @@ export default function ProjectView() {
     forbidden: boolean;
     message: string;
   } | null>(null);
-  const { modelsEnabled } = useServerHealth();
+  const {
+    modelsEnabled,
+    isLoading: healthLoading,
+    error: healthError,
+  } = useServerHealth();
   useBreadcrumbs(
     project
       ? [
@@ -378,18 +382,26 @@ export default function ProjectView() {
                       aria-label="ML Model Help"
                     >
                       <Heading>
-                        {!modelsEnabled
-                          ? "ML Models Disabled"
-                          : !canAnnotate
-                            ? "ML Models Restricted"
-                            : "ML Model Controls"}
+                        {healthLoading
+                          ? "Checking ML Models"
+                          : healthError
+                            ? "ML Models Unavailable"
+                            : !modelsEnabled
+                              ? "ML Models Disabled"
+                              : !canAnnotate
+                                ? "ML Models Restricted"
+                                : "ML Model Controls"}
                       </Heading>
                       <Content>
-                        {!modelsEnabled
-                          ? "Model tools are disabled due to missing dependencies on the server."
-                          : !canAnnotate
-                            ? "You do not have access to ML models since you are only a Viewer on this project."
-                            : "Use these inputs to train / load and make predictions with Machine Learning models. You can define custom ML models for your datasets using the TokTagger Python module."}
+                        {healthLoading
+                          ? "Checking whether the server supports ML models."
+                          : healthError
+                            ? "Could not contact the server to check ML model support. Refresh the page to try again."
+                            : !modelsEnabled
+                              ? "Model tools are disabled due to missing dependencies on the server."
+                              : !canAnnotate
+                                ? "You do not have access to ML models since you are only a Viewer on this project."
+                                : "Use these inputs to train / load and make predictions with Machine Learning models. You can define custom ML models for your datasets using the TokTagger Python module."}
                       </Content>
                       <Footer>
                         <Link
