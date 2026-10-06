@@ -27,6 +27,7 @@ from toktagger.api.models.ultralytics_detection.utils import (
     check_pretrained_model_availability,
     decode_frame_image,
     find_first_useful_frame,
+    is_useful_frame,
     resolve_weights_path,
 )
 from toktagger.api.schemas.annotations import (
@@ -59,15 +60,15 @@ class UltralyticsPredictParams(pydantic.BaseModel):
         default=False,
         description="Predict only the current frame for individual-sample predictions; ignored for multi-sample predictions.",
     )
-    skip_initial_black_frames: bool = pydantic.Field(
+    skip_black_frames: bool = pydantic.Field(
         default=False,
-        description="Use a coarse-to-fine search to skip initial black frames for full-video prediction; ignored for individual-frame predictions.",
+        description="Skip black frames before and after the plasma for full-video prediction; ignored for individual-frame predictions.",
     )
     black_frame_threshold: int = pydantic.Field(
         default=50,
         ge=0,
         le=255,
-        description="Brightness (0-255) that at least 1% of pixels must exceed for a frame to count as non-black. Raise it for noisy cameras. Only used when skipping initial black frames.",
+        description="Brightness (0-255) that at least 1% of pixels must exceed for a frame to count as non-black. Raise it for noisy cameras. Only used when skipping black frames.",
     )
 
 
@@ -95,7 +96,9 @@ def iter_sample_frames(
 
     TokTagger's image loader returns the first available frame when ``frame`` is
     ``None``. Version one then requests successive frame numbers until the
-    loader reports that the next frame does not exist.
+    loader reports that the next frame does not exist. With
+    ``black_frame_threshold``, it starts at the first non-black frame and stops
+    at the next black frame.
     """
     try:
         frame_image = data_loader.get_sample(
@@ -129,6 +132,16 @@ def iter_sample_frames(
         frame_image = selected_frame
 
     while True:
+        if black_frame_threshold is not None and not is_useful_frame(
+            frame_image, black_frame_threshold
+        ):
+            logger.info(
+                "Stopping at black frame %s for shot %s.",
+                frame_image.frame,
+                sample.shot_id,
+            )
+            break
+
         yield frame_image
 
         try:
@@ -353,7 +366,7 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
                     self.data_loader,
                     sample,
                     black_frame_threshold=params.black_frame_threshold
-                    if params.skip_initial_black_frames
+                    if params.skip_black_frames
                     else None,
                 )
 

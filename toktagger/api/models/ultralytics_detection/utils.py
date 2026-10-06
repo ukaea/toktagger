@@ -62,7 +62,7 @@ def decode_frame_image(frame_image: ImageData) -> np.ndarray:
     return image
 
 
-def _is_useful_frame(frame_image: ImageData, threshold: int) -> bool:
+def is_useful_frame(frame_image: ImageData, threshold: int) -> bool:
     gray = cv2.cvtColor(decode_frame_image(frame_image), cv2.COLOR_BGR2GRAY)
     return bool(np.percentile(gray, _BLACK_FRAME_PERCENTILE) > threshold)
 
@@ -73,7 +73,7 @@ def find_first_useful_frame(
     initial_frame: ImageData,
     threshold: int,
 ) -> ImageData:
-    if _is_useful_frame(initial_frame, threshold):
+    if is_useful_frame(initial_frame, threshold):
         return initial_frame
 
     previous_coarse_offset = 0
@@ -96,7 +96,7 @@ def find_first_useful_frame(
         except FrameNotFoundError:
             fallback_frame = initial_frame
         else:
-            if not _is_useful_frame(coarse_frame, threshold):
+            if not is_useful_frame(coarse_frame, threshold):
                 previous_coarse_offset = coarse_offset
                 continue
             fallback_frame = coarse_frame
@@ -118,7 +118,7 @@ def find_first_useful_frame(
             except FrameNotFoundError:
                 return fallback_frame
 
-            if _is_useful_frame(refinement_frame, threshold):
+            if is_useful_frame(refinement_frame, threshold):
                 return refinement_frame
 
         return fallback_frame

@@ -74,7 +74,7 @@ def test_find_first_useful_frame_refines_coarse_probe(monkeypatch):
     initial_frame = ImageData(frame=0, values=[])
     monkeypatch.setattr(
         ultralytics_utils,
-        "_is_useful_frame",
+        "is_useful_frame",
         lambda frame_image, threshold: frame_image.frame >= 10,
     )
 
@@ -95,7 +95,7 @@ def test_find_first_useful_frame_scans_short_video_boundary(monkeypatch):
     initial_frame = ImageData(frame=0, values=[])
     monkeypatch.setattr(
         ultralytics_utils,
-        "_is_useful_frame",
+        "is_useful_frame",
         lambda frame_image, threshold: frame_image.frame >= 10,
     )
 
