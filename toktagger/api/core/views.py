@@ -90,9 +90,7 @@ class Profile2DView:
         profile_data = data.values.get(self.params.signal_name, None)
 
         if profile_data is None:
-            raise RuntimeError(
-                f"Profile data for {self.params.signal_name} does not exist."
-            )
+            return Profile2DData(time=[], dim_1=[], values=[])
 
         return self.convert_profile_to_view(profile_data)
 

@@ -130,7 +130,8 @@ export const TimeSeriesDataSchema = z.object({
 export type TimeSeriesData = z.infer<typeof TimeSeriesDataSchema>;
 
 export const MultiVariateTimeSeriesDataSchema = z.object({
-  values: z.record(z.string(), TimeSeriesDataSchema),
+  // Null marks a signal the server could not load.
+  values: z.record(z.string(), TimeSeriesDataSchema.nullable()),
 });
 export type MultiVariateTimeSeriesData = z.infer<
   typeof MultiVariateTimeSeriesDataSchema

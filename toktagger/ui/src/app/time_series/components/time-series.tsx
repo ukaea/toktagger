@@ -39,11 +39,11 @@ export const TimeSeriesView = () => {
 
     let plotData: Partial<Plotly.PlotData>[] = Object.entries(
       viewData.values,
-    ).map(([key, value]: [string, TimeSeriesData]) => {
+    ).map(([key, value]: [string, TimeSeriesData | null]) => {
       return {
         name: key,
-        x: value.time,
-        y: value.values,
+        x: value?.time ?? [],
+        y: value?.values ?? [],
         mode: "lines",
       };
     });

@@ -12,10 +12,14 @@ from toktagger.api.schemas.samples import (
 from toktagger.api.schemas.data import (
     TimeSeriesData,
     MultiVariateTimeSeriesData,
+    MultiProfile2DData,
     ImageData,
     ImageParams,
     DataParams,
+    Profile2DData,
 )
+from toktagger.api.core.views import Profile2DView
+from toktagger.api.schemas.views import Profile2DViewParams
 import pathlib
 import numpy
 import xarray
@@ -760,3 +764,89 @@ def test_loader_registry(name, data_loader, sample_data_model):
         data_loaders.LoaderRegistry.get_data_schema(name)
         == sample_data_model.model_json_schema()
     )
+
+
+def test_uda_loader_keeps_missing_signal_as_none(monkeypatch):
+    present = TimeSeriesData(time=[0.0, 1.0], values=[1.0, 2.0])
+
+    def fake_get_uda_signal(name, *args, **kwargs):
+        if name == "missing":
+            raise RuntimeError("signal not found")
+        return present
+
+    monkeypatch.setattr(data_loaders, "_get_uda_signal", fake_get_uda_signal)
+    sample = Sample(
+        shot_id=1,
+        data=ShotData(protocol="uda", signal_names=["ip", "missing"]),
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+
+    data = data_loaders.UDADataLoader().get_sample(sample, params=DataParams())
+
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    assert data.values == {"ip": present, "missing": None}
+
+
+def test_profile_view_returns_empty_profile_for_missing_signal():
+    view = Profile2DView(Profile2DViewParams(signal_name="missing"))
+    data = MultiVariateTimeSeriesData(values={"missing": None})
+
+    assert view(data) == Profile2DData(time=[], dim_1=[], values=[])
+
+
+def test_profile_view_missing_signal_in_multi_profile_data():
+    profile = Profile2DData(time=[0.0, 1.0], dim_1=[0.0, 1.0], values=[[1.0, 2.0]] * 2)
+    data = MultiProfile2DData(values={"a": profile, "missing": None})
+
+    view = Profile2DView(Profile2DViewParams(signal_name="missing"))
+    assert view(data) == Profile2DData(time=[], dim_1=[], values=[])
+
+    loaded = Profile2DView(Profile2DViewParams(signal_name="a"))(data)
+    assert loaded.time == [0.0, 1.0]
+
+
+def test_combine_signals_time_series_with_missing():
+    ts = TimeSeriesData(time=[0.0], values=[1.0])
+    result = data_loaders._combine_signals({"a": ts, "b": None}, "none", "mixed")
+    assert isinstance(result, MultiVariateTimeSeriesData)
+    assert result.values == {"a": ts, "b": None}
+
+
+def test_combine_signals_profiles_with_missing():
+    profile = Profile2DData(time=[0.0], dim_1=[0.0], values=[[1.0]])
+    result = data_loaders._combine_signals({"a": profile, "b": None}, "none", "mixed")
+    assert isinstance(result, MultiProfile2DData)
+    assert result.values == {"a": profile, "b": None}
+
+
+def test_combine_signals_all_missing_raises():
+    with pytest.raises(data_loaders.DataLoaderError, match="none"):
+        data_loaders._combine_signals({"a": None, "b": None}, "none", "mixed")
+
+
+def test_combine_signals_mixed_types_raises():
+    ts = TimeSeriesData(time=[0.0], values=[1.0])
+    profile = Profile2DData(time=[0.0], dim_1=[0.0], values=[[1.0]])
+    with pytest.raises(data_loaders.DataLoaderError, match="mixed"):
+        data_loaders._combine_signals(
+            {"a": ts, "b": profile, "c": None}, "none", "mixed"
+        )
+
+
+def test_uda_loader_all_signals_missing_raises(monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("signal not found")
+
+    monkeypatch.setattr(data_loaders, "_get_uda_signal", fail)
+    sample = Sample(
+        shot_id=1,
+        data=ShotData(protocol="uda", signal_names=["a", "b"]),
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+
+    with pytest.raises(data_loaders.DataLoaderError):
+        data_loaders.UDADataLoader().get_sample(sample, params=DataParams())
