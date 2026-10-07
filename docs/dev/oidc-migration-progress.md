@@ -117,6 +117,16 @@ Status: done.
 - `test_profile2d_edit_mode_relabel_and_delete` fails on `slj/multi-user-support` too (checked in a worktree).
 - `toktagger/api/static` is CI-built, so the local build output was not committed.
 
+## Phase 6: audit and script tokens
+
+Status: done.
+
+- `scripts/setup.py` and `scripts/create_mock_data.py` read `TOKTAGGER_API_TOKEN`. The username, password and password-change code is removed.
+- The grep for password symbols finds only the legacy-user adoption in `crud/utils.py` and its tests, and the test that `/auth/token` is gone.
+- The stale `POST /auth/token` entry is removed from the public-route test.
+- Open question: the managed Canaille client has only the authorization-code and refresh grants. A script has no easy way to get an access token from it.
+- Results: ruff clean; 675 passed, 28 skipped without the models extra; 736 passed, 23 skipped with it.
+
 ### Next
 
-Phase 6: audit and script tokens.
+Phase 7: production Docker.

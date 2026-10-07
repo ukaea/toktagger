@@ -178,6 +178,12 @@ Set `KEYCLOAK_CLIENT_SECRET` in your environment to replace the default developm
 
 A script can call the API with a Bearer token. Send the **access token** of the identity provider in the header `Authorization: Bearer <token>`. TokTagger checks the signature, the issuer, the expiry and the audience of the token. It then uses the same rules as for a browser user.
 
+The scripts `scripts/setup.py` and `scripts/create_mock_data.py` read the token from the environment variable `TOKTAGGER_API_TOKEN`:
+
+```sh
+TOKTAGGER_API_TOKEN=<access token> python scripts/setup.py
+```
+
 ---
 
 ## Multi-User Deployment

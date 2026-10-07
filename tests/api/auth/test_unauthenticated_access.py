@@ -26,7 +26,6 @@ _PUBLIC_PATHS = {
     "/openapi.json",
 }
 _PUBLIC_METHOD_PATHS = {
-    ("POST", "/auth/token"),
     ("GET", "/auth/config"),
     ("GET", "/auth/login"),
     ("GET", "/auth/callback"),
