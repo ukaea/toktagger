@@ -8,7 +8,11 @@ from fastapi.responses import RedirectResponse
 
 from toktagger.api import config
 from toktagger.api.auth import oidc
-from toktagger.api.auth.cookies import clear_session_cookies, set_session_cookies
+from toktagger.api.auth.cookies import (
+    ID_TOKEN_COOKIE_NAME,
+    clear_session_cookies,
+    set_session_cookies,
+)
 from toktagger.api.auth.core import create_access_token
 from toktagger.api.auth.dependencies import get_current_user
 from toktagger.api.crud.db import MongoDBClient
@@ -103,7 +107,7 @@ async def callback(request: Request):
     csrf = secrets.token_urlsafe(32)
     session_token = create_access_token({"sub": user.username, "csrf": csrf})
     response = RedirectResponse(return_to, status_code=303)
-    set_session_cookies(request, response, session_token, csrf)
+    set_session_cookies(request, response, session_token, csrf, token.get("id_token"))
     return response
 
 
@@ -112,7 +116,7 @@ async def get_me(current_user: UserOut = Depends(get_current_user)):
     return current_user
 
 
-async def _end_session_url() -> str | None:
+async def _end_session_url(id_token: str | None) -> str | None:
     try:
         metadata = await oidc.get_metadata()
     except oidc.IDP_ERRORS:
@@ -121,12 +125,13 @@ async def _end_session_url() -> str | None:
     endpoint = metadata.get("end_session_endpoint")
     if not endpoint:
         return None
-    query = urlencode(
-        {
-            "client_id": config.settings.auth.client_id,
-            "post_logout_redirect_uri": f"{config.settings.public_url}{LOGIN_PATH}",
-        }
-    )
+    params = {
+        "client_id": config.settings.auth.client_id,
+        "post_logout_redirect_uri": f"{config.settings.public_url}{LOGIN_PATH}",
+    }
+    if id_token:
+        params["id_token_hint"] = id_token
+    query = urlencode(params)
     return f"{endpoint}?{query}"
 
 
@@ -138,8 +143,11 @@ async def logout(
 ) -> LogoutResponse:
     """Clear the session cookies and return the provider sign-out URL, if it has one.
 
+    The URL carries the ID token as `id_token_hint`, so the provider signs out without asking.
+
     The TokTagger token itself stays valid until it expires.
     """
+    id_token = request.cookies.get(ID_TOKEN_COOKIE_NAME)
     clear_session_cookies(request, response)
-    logout_url = await _end_session_url() if oidc.idp_registered() else None
+    logout_url = await _end_session_url(id_token) if oidc.idp_registered() else None
     return LogoutResponse(logout_url=logout_url)

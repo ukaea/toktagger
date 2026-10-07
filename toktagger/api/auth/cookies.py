@@ -4,6 +4,7 @@ from toktagger.api import config
 from toktagger.api.auth.core import ACCESS_TOKEN_EXPIRE_SECONDS
 
 CSRF_COOKIE_NAME = "tt_csrf"
+ID_TOKEN_COOKIE_NAME = "tt_id_token"
 
 
 def _cookie_secure(request: Request) -> bool:
@@ -17,8 +18,16 @@ def _cookie_secure(request: Request) -> bool:
     )
 
 
-def set_session_cookies(request: Request, response: Response, token: str, csrf: str):
+def set_session_cookies(
+    request: Request,
+    response: Response,
+    token: str,
+    csrf: str,
+    id_token: str | None = None,
+):
     """Store the session token and its CSRF partner on the response.
+
+    The provider ID token is kept httpOnly so logout can send it as `id_token_hint`.
 
     The session cookie is httpOnly so no script can read it; the CSRF cookie is
     deliberately readable, because the frontend must echo it back in a header.
@@ -43,6 +52,16 @@ def set_session_cookies(request: Request, response: Response, token: str, csrf: 
         samesite=samesite,
         path="/",
     )
+    if id_token:
+        response.set_cookie(
+            ID_TOKEN_COOKIE_NAME,
+            id_token,
+            max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
+            httponly=True,
+            secure=secure,
+            samesite=samesite,
+            path="/",
+        )
 
 
 def _drop_queued_cookies(response: Response, names: tuple[str, ...]):
@@ -56,10 +75,10 @@ def _drop_queued_cookies(response: Response, names: tuple[str, ...]):
 
 
 def clear_session_cookies(request: Request, response: Response):
-    """Expire both session cookies, matching the attributes they were set with."""
+    """Expire the session cookies, matching the attributes they were set with."""
     secure = _cookie_secure(request)
     samesite = config.settings.auth.cookie_samesite
-    names = (config.settings.auth.cookie_name, CSRF_COOKIE_NAME)
+    names = (config.settings.auth.cookie_name, CSRF_COOKIE_NAME, ID_TOKEN_COOKIE_NAME)
     # A renewal queued by get_current_user would otherwise sit alongside the expiry
     # below and keep the session alive through logout.
     _drop_queued_cookies(response, names)
