@@ -34,6 +34,10 @@ type ColorAxis = {
 
 type ProfileValues = (number | null)[][];
 
+// An empty profile (signal not loaded) has no min/max, so fall back to a default.
+const finiteOr = (value: number, fallback: number) =>
+  Number.isFinite(value) ? value : fallback;
+
 const colorMapInterpolators: Record<string, (value: number) => string> = {
   Viridis: d3.interpolateViridis,
   Plasma: d3.interpolatePlasma,
@@ -67,8 +71,14 @@ const createLinearScalePlot = (
   return {
     values,
     colorAxis: {
-      cmin: Math.max(smallPrecisionFactor, arrayMin(values.flat())),
-      cmax: Math.max(smallPrecisionFactor, arrayMax(values.flat())),
+      cmin: Math.max(
+        smallPrecisionFactor,
+        finiteOr(arrayMin(values.flat()), 0),
+      ),
+      cmax: Math.max(
+        smallPrecisionFactor,
+        finiteOr(arrayMax(values.flat()), 1),
+      ),
       colorscale: buildColorScale(interpFunc, smallPrecisionFactor),
       colorbar: { ticks: "outside", tickfont: { size: 10 } },
     },
@@ -123,8 +133,14 @@ const createLogScalePlot = (
   const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
   const rawValues = data.values as ProfileValues;
 
-  const cmin = Math.max(smallPrecisionFactor, arrayMin(rawValues.flat()));
-  const cmax = Math.max(smallPrecisionFactor, arrayMax(rawValues.flat()));
+  const cmin = Math.max(
+    smallPrecisionFactor,
+    finiteOr(arrayMin(rawValues.flat()), 0),
+  );
+  const cmax = Math.max(
+    smallPrecisionFactor,
+    finiteOr(arrayMax(rawValues.flat()), 1),
+  );
 
   const values: ProfileValues = rawValues.map((row) =>
     row.map((x) =>
@@ -137,8 +153,8 @@ const createLogScalePlot = (
   return {
     values,
     colorAxis: {
-      cmin: arrayMin(values.flat()),
-      cmax: arrayMax(values.flat()),
+      cmin: finiteOr(arrayMin(values.flat()), 0),
+      cmax: finiteOr(arrayMax(values.flat()), 1),
       colorscale: buildColorScale(interpFunc, smallPrecisionFactor),
       colorbar: {
         ticks: "outside",
