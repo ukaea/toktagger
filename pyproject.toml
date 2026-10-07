@@ -43,6 +43,10 @@ dependencies = [
   "itsdangerous>=2.0.0",
   "python-multipart>=0.0.7",
   "uda-mast>=1.4.1",
+  "authlib>=1.8.0",
+  "httpx>=0.28.1",
+  "canaille[front,oidc,server,sqlite]>=0.2.7",
+  "joserfc>=1.6,<1.7",
 ]
 [project.optional-dependencies]
 models = [
@@ -94,12 +98,12 @@ extend-immutable-calls = [
 dev = [
     "zensical",
     "pooch>=1.8.2",
-    "httpx>=0.28.1",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "ruff>=0.12.9,<0.16",
     "pre-commit>=4.3.0",
     "pytest-playwright>=0.7.1",
+    "respx>=0.23.1",
 ]
 
 [project.scripts]
