@@ -104,6 +104,19 @@ Decisions and deviations:
 - `docker-compose.dev.yml`: the Mongo volume path is `/data/db`; `api` waits for a healthy Keycloak.
 - Docs: `user_management.md` rewritten; `configuration.md` has the new `auth` fields and `server.cors_origins`; `index.md`, `README.md` updated; `user_management.md` added to the nav in `zensical.toml`.
 
+## Phase 5: frontend
+
+Status: done.
+
+- Login page: one Sign In button, error messages for `?error=` codes, `return_to` support. `RequireAuth` and `RequireAdmin` redirect to `/ui/login?return_to=`.
+- `AuthContext.login(returnTo)` navigates to `/auth/login`; `logout` follows the `logout_url` from the server.
+- Profile page: read-only data and a Manage account link from `/auth/config`. Admin users page: no create, role edit or password reset; read-only role.
+- `password.tsx` deleted; `CurrentUserSchema` has no `must_change_password`.
+- `tsc --noEmit` reports 24 errors on this branch and before it. None is in the changed files.
+- e2e: login, profile, admin users and unauthorized-access tests rewritten; a real Playwright sign-in through Canaille is tested. Canaille's same-second token collision applies here too, so the regular-user sign-in test uses a user that was not signed in by a helper.
+- `test_profile2d_edit_mode_relabel_and_delete` fails on `slj/multi-user-support` too (checked in a worktree).
+- `toktagger/api/static` is CI-built, so the local build output was not committed.
+
 ### Next
 
-Phase 5: frontend. It must also restore the e2e suite.
+Phase 6: audit and script tokens.

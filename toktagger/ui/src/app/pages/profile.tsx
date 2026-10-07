@@ -1,37 +1,35 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  Content,
   Divider,
   Flex,
   Heading,
-  InlineAlert,
+  Link,
   Text,
   View,
 } from "@adobe/react-spectrum";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
-import { PasswordChangeDialog } from "@/app/components/ui/password";
+import { BACKEND_API_URL, apiFetch } from "@/app/core";
+import { AuthConfigSchema, type AuthConfig } from "@/types";
 
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   useBreadcrumbs([
     { key: "projects", label: "Projects", href: "/ui/projects/" },
     { key: "profile", label: "Profile" },
   ]);
-
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
 
   useEffect(() => {
-    if (user?.must_change_password) setIsPasswordDialogOpen(true);
-  }, [user]);
-
-  const onPasswordChanged = async () => {
-    await refreshUser();
-    if (user?.must_change_password) navigate("/ui/projects");
-  };
+    const loadConfig = async () => {
+      const res = await apiFetch(`${BACKEND_API_URL}/auth/config`);
+      if (!res.ok) return;
+      const parsed = AuthConfigSchema.safeParse(await res.json());
+      if (parsed.success) setAuthConfig(parsed.data);
+    };
+    loadConfig().catch(() => {});
+  }, []);
 
   return (
     <Flex height="100%" justifyContent="center" alignItems="center">
@@ -55,32 +53,28 @@ export default function ProfilePage() {
               <Text>Username</Text>
               <Text>{user?.username}</Text>
             </Flex>
+            {user?.display_name && (
+              <Flex justifyContent="space-between">
+                <Text>Name</Text>
+                <Text>{user.display_name}</Text>
+              </Flex>
+            )}
+            {user?.email && (
+              <Flex justifyContent="space-between">
+                <Text>Email</Text>
+                <Text>{user.email}</Text>
+              </Flex>
+            )}
             <Flex justifyContent="space-between">
               <Text>Role</Text>
               <Text>{user?.global_role}</Text>
             </Flex>
           </Flex>
 
-          {user?.must_change_password && (
-            <InlineAlert variant="notice" width="100%">
-              <Heading>Password change required</Heading>
-              <Content>You must set a new password before continuing.</Content>
-            </InlineAlert>
-          )}
-
-          {user && (
-            <PasswordChangeDialog
-              userId={user._id}
-              triggerLabel="Change Password"
-              heading="Change Password"
-              forceChangeOnNextLogin={false}
-              successMessage="Password changed"
-              triggerVariant="cta"
-              isOpen={isPasswordDialogOpen}
-              onOpenChange={setIsPasswordDialogOpen}
-              isDismissable={!user.must_change_password}
-              onSuccess={onPasswordChanged}
-            />
+          {authConfig?.account_url && (
+            <Link href={authConfig.account_url} target="_blank">
+              Manage account
+            </Link>
           )}
         </Flex>
       </View>
