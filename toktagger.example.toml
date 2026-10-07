@@ -15,6 +15,45 @@
 # SameSite policy for the auth cookie. Only use none if the frontend is served from a different site to the API; this also forces the cookie to be Secure.
 # cookie_samesite = 'lax'
 
+# Identity provider. canaille starts and manages a local Canaille OpenID Connect server for you. oidc uses an external provider (for example Keycloak) set by issuer_url, client_id and client_secret.
+# provider = 'canaille'
+
+# Issuer URL of the OpenID Connect provider. Required when provider is oidc. It must be the same URL for the browser and for the TokTagger server. Set automatically when provider is canaille.
+# issuer_url = '<your value here>'
+
+# OpenID Connect client ID registered for TokTagger at the provider.
+# client_id = 'toktagger'
+
+# OpenID Connect client secret. Required when provider is oidc. Generated and stored automatically when provider is canaille.
+# client_secret = '<your value here>'
+
+# Space-separated OpenID Connect scopes to request. Add the scope that makes the provider return the roles_claim if it needs one (for example groups for Canaille).
+# scopes = 'openid profile email'
+
+# Dotted path to the claim with the user's groups or roles, for example groups or realm_access.roles. The claim can be a list or a single string.
+# roles_claim = 'groups'
+
+# Value in roles_claim that gives a user the global admin role. The role is set again from the provider at every sign-in.
+# admin_group = 'toktagger-admins'
+
+# URL at which users reach TokTagger, used for the OpenID Connect redirect URI. If unset, it is http://<server.host>:<server.port>.
+# public_url = '<your value here>'
+
+# Maximum age of a browser session in seconds. After this time the user must sign in again. Sign-in reads the global role from the provider again.
+# session_max_age_seconds = 43200
+
+# Whether to require the client_id in the audience of provider access tokens sent as Bearer tokens.
+# verify_bearer_audience = true
+
+# Port for the managed Canaille server. Only used when provider is canaille.
+# canaille_port = 8003
+
+# URL at which the browser reaches the managed Canaille server, and the issuer URL. If unset, it is http://<server.host>:<canaille_port>. Only used when provider is canaille.
+# canaille_public_url = '<your value here>'
+
+# Password for the first Canaille admin user. If unset, a random password is generated and printed at first start. Only used when provider is canaille.
+# canaille_bootstrap_password = '<your value here>'
+
 
 [database]
 # URL of the MongoDB server to connect to as a backend. If not set, uses a local mongita client.
@@ -79,6 +118,15 @@
 
 # The directory to use for storing entries in the Mongita database, if used.
 # cache_dir = '/home/runner/.cache/toktagger'
+
+# Comma-separated addresses of reverse proxies whose X-Forwarded-* headers TokTagger trusts. Use `*` only when the proxy is the only host that can reach TokTagger.
+# forwarded_allow_ips = '127.0.0.1'
+
+# Seconds after which Gunicorn restarts a silent worker, and the graceful shutdown period.
+# gunicorn_timeout = 120
+
+# Origins allowed to make cross-origin requests to the API, for example the frontend dev server. Set to an empty list when the frontend is served by TokTagger itself.
+# cors_origins = ['http://localhost:5173']
 
 
 [uda]
