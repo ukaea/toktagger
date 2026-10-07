@@ -53,6 +53,9 @@ Annotators = "annotators.md"
 "User Management" = "user_management.md"
 
 [[project.nav]]
+Deployment = "deployment.md"
+
+[[project.nav]]
 "Machine Learning Models" = "ml_models.md"
 
 [[project.nav]]

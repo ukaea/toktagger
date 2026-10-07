@@ -35,6 +35,18 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check toktagger tests --ignore=C901 && uv run ruff format --check toktagger tests
 
+  compose:
+    name: Compose Config
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate the production stack
+        run: docker compose --env-file .env.example config -q
+
   eslint:
     name: ESLint
     runs-on: ubuntu-latest

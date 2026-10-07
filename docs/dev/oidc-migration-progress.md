@@ -136,6 +136,13 @@ Status: done.
 - Verified: `docker build --target production .` builds. The container starts Canaille, passes the healthcheck, serves `/ui/login` and runs as uid 10001. The first build installed without `uv.lock` and got SQLAlchemy 2.1, which breaks `sqlalchemy-utils`. The Dockerfile now uses `uv sync --frozen`.
 - Tests: ruff clean; `tests/api` passes (a stale-`settings` import in the new launch tests was fixed).
 
+### Phase 7, commit B
+
+- `docker-compose.yml` is now the production stack: Caddy (the only published ports), TokTagger (production image, `oidc` provider), Keycloak 26.8.0, Postgres 17, Mongo 8.0. The old dev-style stack is gone from this file; `docker-compose.dev.yml` is unchanged.
+- `deploy/keycloak/toktagger-realm.json` (no users, `${TOKTAGGER_PUBLIC_URL}` and `${KEYCLOAK_CLIENT_SECRET}` placeholders), `deploy/caddy/Caddyfile`, `.env.example`, `docs/deployment.md`, `scripts/compose_smoke_test.sh`, CI job `compose` (`docker compose config -q`), nav entry.
+- No `deploy/mongo`: nothing needed it.
+- Verified: `scripts/compose_smoke_test.sh` passes locally (healthy stack, `/health` and `/auth/config` through Caddy, Keycloak issuer on the public name, `/auth/login` redirect to Keycloak, only Caddy publishes ports). A full browser sign-in through the stack was not run.
+
 ### Next
 
-Commit B: production `docker-compose.yml`, `.env.example`, `deploy/`, `docs/deployment.md`, smoke test, CI step.
+Final step: audits, CHANGELOG, delete this note, open the PR.

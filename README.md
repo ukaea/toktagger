@@ -101,10 +101,6 @@ python -m gunicorn toktagger.api.asgi:app \
     --bind 0.0.0.0:8002
 ```
 
-With Docker Compose, the production stack defaults to 4 workers. Override with the `SERVER_WORKERS` environment variable:
-
-```sh
-SERVER_WORKERS=8 docker compose up
-```
+`docker-compose.yml` is the production stack. It runs TokTagger with Keycloak, MongoDB and a Caddy proxy that handles TLS. See the [Deployment](docs/deployment.md) guide.
 
 See the [User Management](docs/user_management.md) guide for creating accounts, assigning roles, and managing project membership.
