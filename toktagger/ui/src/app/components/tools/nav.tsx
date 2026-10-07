@@ -14,7 +14,7 @@ import {
   AlertDialog,
   DialogContainer,
 } from "@adobe/react-spectrum";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import StepForward from "@spectrum-icons/workflow/StepForward";
 import StepBackward from "@spectrum-icons/workflow/StepBackward";
 import SaveFloppy from "@spectrum-icons/workflow/SaveFloppy";
@@ -169,20 +169,30 @@ async function persistAnnotations(
   return { saved, discarded: annotations.length - saved.length };
 }
 
-function NextButton({
+type SaveThenNavigateButtonInfo = ButtonInfo & {
+  label: string;
+  icon: ReactNode;
+  shortcutKey: "ArrowLeft" | "ArrowRight";
+  saveOnNavigate?: boolean;
+  isDisabled?: boolean;
+  navigateAway: () => Promise<void> | void;
+};
+
+function SaveThenNavigateButton({
   project_id,
   sample_id,
   setIsValidated,
-  visitedSampleIds,
-  sortDescriptor,
-  saveOnNavigate,
   navAdapter,
   onPermissionError,
   username,
-}: NextButtonInfo) {
-  const navigate = useNavigate();
-
-  const moveNextShot = useCallback(async () => {
+  label,
+  icon,
+  shortcutKey,
+  saveOnNavigate,
+  isDisabled,
+  navigateAway,
+}: SaveThenNavigateButtonInfo) {
+  const handlePress = useCallback(async () => {
     try {
       await persistAnnotations(
         project_id,
@@ -205,44 +215,73 @@ function NextButton({
       // Don't navigate away with unsaved annotations still sitting in the editor.
       return;
     }
-    await navigateToNextSample(
-      project_id,
-      navigate,
-      visitedSampleIds,
-      sortDescriptor,
-    );
+    await navigateAway();
   }, [
     project_id,
     sample_id,
-    navigate,
-    saveOnNavigate,
-    setIsValidated,
-    visitedSampleIds,
-    sortDescriptor,
     navAdapter,
-    onPermissionError,
+    saveOnNavigate,
     username,
+    setIsValidated,
+    onPermissionError,
+    navigateAway,
   ]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Check for Shift + Right Arrow
-      if (e.shiftKey && e.key === "ArrowRight") {
+      if (e.shiftKey && e.key === shortcutKey) {
         e.preventDefault();
-        moveNextShot();
+        handlePress();
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [sample_id, project_id, navigate, moveNextShot]);
+  }, [shortcutKey, handlePress]);
 
   return (
     <View marginStart="size-100">
-      <ActionButton aria-label="Next Sample" onPress={moveNextShot}>
-        <StepForward />
+      <ActionButton
+        isDisabled={isDisabled}
+        aria-label={label}
+        onPress={handlePress}
+      >
+        {icon}
       </ActionButton>
     </View>
+  );
+}
+
+function NextButton({
+  visitedSampleIds,
+  sortDescriptor,
+  ...buttonProps
+}: Omit<
+  NextButtonInfo,
+  "label" | "icon" | "shortcutKey" | "navigateAway" | "isDisabled"
+>) {
+  const navigate = useNavigate();
+  const { project_id } = buttonProps;
+
+  const navigateAway = useCallback(
+    () =>
+      navigateToNextSample(
+        project_id,
+        navigate,
+        visitedSampleIds,
+        sortDescriptor,
+      ),
+    [project_id, navigate, visitedSampleIds, sortDescriptor],
+  );
+
+  return (
+    <SaveThenNavigateButton
+      {...buttonProps}
+      label="Next Sample"
+      icon={<StepForward />}
+      shortcutKey="ArrowRight"
+      navigateAway={navigateAway}
+    />
   );
 }
 
@@ -275,88 +314,39 @@ export function JumpToNextButton({
 }
 
 function PreviousButton({
-  project_id,
-  sample_id,
-  setIsValidated,
   isDisabled,
   popVisitedSampleId,
-  saveOnNavigate,
   sortDescriptor,
-  navAdapter,
-  onPermissionError,
-  username,
+  ...buttonProps
 }: PreviousButtonInfo) {
   const navigate = useNavigate();
+  const { project_id } = buttonProps;
 
-  const movePreviousShot = useCallback(async () => {
-    try {
-      await persistAnnotations(
-        project_id,
-        sample_id,
-        navAdapter,
-        saveOnNavigate ?? false,
-        username,
-      );
-      if (saveOnNavigate) {
-        navAdapter.afterSave?.();
-        setIsValidated(true);
-      }
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        onPermissionError();
-      } else {
-        const message = err instanceof Error ? err.message : String(err);
-        ToastQueue.negative(message, { timeout: TOAST_TIMEOUT });
-      }
-      // Don't navigate away with unsaved annotations still sitting in the editor.
-      return;
-    }
-
-    const previous_sample_id: string | null = popVisitedSampleId();
-
+  const navigateAway = useCallback(() => {
+    const previous_sample_id = popVisitedSampleId();
     if (!previous_sample_id) {
       ToastQueue.negative("No earlier samples available!", {
         timeout: TOAST_TIMEOUT,
       });
       return;
     }
-    navigateToSample(project_id, previous_sample_id, navigate, sortDescriptor);
-  }, [
-    project_id,
-    sample_id,
-    navigate,
-    saveOnNavigate,
-    popVisitedSampleId,
-    sortDescriptor,
-    setIsValidated,
-    navAdapter,
-    onPermissionError,
-    username,
-  ]);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      // Check for Shift + Left Arrow
-      if (e.shiftKey && e.key === "ArrowLeft") {
-        e.preventDefault();
-        movePreviousShot();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [sample_id, project_id, navigate, movePreviousShot]);
+    return navigateToSample(
+      project_id,
+      previous_sample_id,
+      navigate,
+      sortDescriptor,
+    );
+  }, [project_id, navigate, popVisitedSampleId, sortDescriptor]);
 
   return (
-    <View marginStart="size-100">
-      <ActionButton
-        isDisabled={isDisabled}
-        aria-label="Previous Sample"
-        onPress={movePreviousShot}
-      >
-        <StepBackward />
-      </ActionButton>
-    </View>
+    <SaveThenNavigateButton
+      {...buttonProps}
+      label="Previous Sample"
+      icon={<StepBackward />}
+      shortcutKey="ArrowLeft"
+      isDisabled={isDisabled}
+      navigateAway={navigateAway}
+    />
   );
 }
 
