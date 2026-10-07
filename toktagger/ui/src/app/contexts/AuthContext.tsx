@@ -66,7 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (returnTo?: string) => {
-    const query = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : "";
+    const query = returnTo?.startsWith("/ui/")
+      ? `?return_to=${encodeURIComponent(returnTo)}`
+      : "";
     window.location.assign(`${BACKEND_API_URL}/auth/login${query}`);
   };
 
