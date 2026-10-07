@@ -13,11 +13,15 @@ class UserBase(ConfiguredModel):
     global_role: Literal["admin", "user"] = "user"
     is_active: bool = True
     must_change_password: bool = False
+    email: str | None = None
+    display_name: str | None = None
 
 
 class UserIn(UserBase):
     username: str
-    hashed_password: str
+    hashed_password: str | None = None
+    oidc_issuer: str | None = None
+    oidc_sub: str | None = None
 
 
 class UserOut(UserBase):
