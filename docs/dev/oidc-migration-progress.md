@@ -127,6 +127,15 @@ Status: done.
 - Open question: the managed Canaille client has only the authorization-code and refresh grants. A script has no easy way to get an access token from it.
 - Results: ruff clean; 675 passed, 28 skipped without the models extra; 736 passed, 23 skipped with it.
 
+## Phase 7: production Docker
+
+### Commit A: code and Dockerfile
+
+- `server.forwarded_allow_ips` (default `127.0.0.1`) and `server.gunicorn_timeout` (default 120) are wired into Gunicorn (`--forwarded-allow-ips`, `--timeout`, `--graceful-timeout`) and uvicorn. `warn_if_insecure()` warns about plain-HTTP `public_url` on a non-local host.
+- New multi-stage `Dockerfile` (`ui`, `builder`, `dev`, `production`). `api.dockerfile` is deleted. `docker-compose.dev.yml` builds the `dev` target.
+- NOT VERIFIED: the image was never built. Docker could not reach Docker Hub or PyPI from this machine. Build `docker build --target production .` before merge.
+- Tests: ruff clean; `tests/api` passes (a stale-`settings` import in the new launch tests was fixed).
+
 ### Next
 
-Phase 7: production Docker.
+Commit B: production `docker-compose.yml`, `.env.example`, `deploy/`, `docs/deployment.md`, smoke test, CI step.

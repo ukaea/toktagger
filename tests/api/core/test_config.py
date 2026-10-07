@@ -20,6 +20,8 @@ ENV_VARS = [
     "SERVER_WORKERS",
     "SERVER_CACHE_DIR",
     "SERVER_CORS_ORIGINS",
+    "SERVER_FORWARDED_ALLOW_IPS",
+    "SERVER_GUNICORN_TIMEOUT",
     "DATABASE_MONGO_URL",
     "AUTH_SECRET_KEY",
     "AUTH_COOKIE_NAME",
@@ -231,6 +233,20 @@ def test_cors_origins_default_and_override(monkeypatch, setup_test_settings):
         "https://a.example",
         "https://b.example",
     ]
+
+
+def test_proxy_and_timeout_defaults_and_override(monkeypatch, setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    server = TestSettings().server
+    assert server.forwarded_allow_ips == "127.0.0.1"
+    assert server.gunicorn_timeout == 120
+
+    monkeypatch.setenv("SERVER_FORWARDED_ALLOW_IPS", "10.0.0.5")
+    monkeypatch.setenv("SERVER_GUNICORN_TIMEOUT", "300")
+    server = TestSettings().server
+    assert server.forwarded_allow_ips == "10.0.0.5"
+    assert server.gunicorn_timeout == 300
 
 
 def test_public_urls_default_from_server_settings(setup_test_settings):

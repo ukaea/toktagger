@@ -65,7 +65,8 @@ services:
   api:
     build:
       context: ./
-      dockerfile: ./api.dockerfile
+      dockerfile: ./Dockerfile
+      target: dev
     container_name: api_app
     restart: always
     ports:

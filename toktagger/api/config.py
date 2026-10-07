@@ -144,6 +144,15 @@ class Server(pydantic.BaseModel):
         description="The directory to use for storing entries in the Mongita database, if used.",
         validate_default=True,
     )
+    forwarded_allow_ips: str = pydantic.Field(
+        "127.0.0.1",
+        description="Comma-separated addresses of reverse proxies whose X-Forwarded-* headers TokTagger trusts. Use `*` only when the proxy is the only host that can reach TokTagger.",
+    )
+    gunicorn_timeout: int = pydantic.Field(
+        120,
+        description="Seconds after which Gunicorn restarts a silent worker, and the graceful shutdown period.",
+        gt=0,
+    )
     cors_origins: list[str] = pydantic.Field(
         ["http://localhost:5173"],
         description="Origins allowed to make cross-origin requests to the API, for example the frontend dev server. Set to an empty list when the frontend is served by TokTagger itself.",

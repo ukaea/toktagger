@@ -1,3 +1,4 @@
+import logging
 import os
 
 # Ray (>=2.43) detects when the driver is launched under `uv` and re-runs its
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -94,6 +96,9 @@ async def lifespan(app: FastAPI):
 # actors (WorkerModelRegistry, TaskRegistry, per-model actors) created by
 # other workers, even when all workers share the same underlying cluster.
 RAY_NAMESPACE = "toktagger"
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+logger = logging.getLogger(__name__)
 
 
 def _ray_runtime_env() -> dict:
@@ -138,6 +143,16 @@ def start_ray_head() -> None:
     )
 
 
+def warn_if_insecure() -> None:
+    """Warn when the public URL uses plain HTTP on a host other than localhost."""
+    public_url = urlparse(config.settings.public_url)
+    if public_url.scheme == "http" and public_url.hostname not in LOCAL_HOSTS:
+        logger.warning(
+            "public_url %s uses plain HTTP. Use HTTPS for any deployment that is not on localhost.",
+            config.settings.public_url,
+        )
+
+
 def run_with_gunicorn(host: str, port: int, workers: int) -> None:
     """Launch the app under Gunicorn with the given number of worker processes.
 
@@ -162,6 +177,12 @@ def run_with_gunicorn(host: str, port: int, workers: int) -> None:
         str(workers),
         "--bind",
         f"{host}:{port}",
+        "--forwarded-allow-ips",
+        config.settings.server.forwarded_allow_ips,
+        "--timeout",
+        str(config.settings.server.gunicorn_timeout),
+        "--graceful-timeout",
+        str(config.settings.server.gunicorn_timeout),
         # Gunicorn drops uvicorn's per-request access logs unless an access log target is set
         "--access-logfile",
         "-",

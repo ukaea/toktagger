@@ -1,5 +1,6 @@
-# .dockerignore
 *
 !toktagger/
 !pyproject.toml
 !README.md
+**/node_modules
+**/__pycache__

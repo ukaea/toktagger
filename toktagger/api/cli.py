@@ -7,7 +7,7 @@ import uvicorn
 
 from toktagger.api.auth.canaille import managed_idp
 from toktagger.api.config import settings
-from toktagger.api.main import Server, run_with_gunicorn
+from toktagger.api.main import Server, run_with_gunicorn, warn_if_insecure
 from toktagger.api.models import models_dependencies_installed
 
 
@@ -72,6 +72,7 @@ def main():
     apply_cli_overrides(settings, args)
 
     with managed_idp():
+        warn_if_insecure()
         if not args.no_browser:
             threading.Thread(
                 target=do_open_browser,
@@ -93,6 +94,7 @@ def main():
                 host=settings.server.host,
                 port=settings.server.port,
                 reload=settings.server.reload,
+                forwarded_allow_ips=settings.server.forwarded_allow_ips,
             )
 
 
