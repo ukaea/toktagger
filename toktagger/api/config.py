@@ -144,6 +144,10 @@ class Server(pydantic.BaseModel):
         description="The directory to use for storing entries in the Mongita database, if used.",
         validate_default=True,
     )
+    cors_origins: list[str] = pydantic.Field(
+        ["http://localhost:5173"],
+        description="Origins allowed to make cross-origin requests to the API, for example the frontend dev server. Set to an empty list when the frontend is served by TokTagger itself.",
+    )
 
 
 class Models(pydantic.BaseModel):

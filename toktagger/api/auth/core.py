@@ -58,19 +58,18 @@ def _read_or_create_secret(cache_dir: Path) -> str:
         return secret
 
 
+def get_signing_secret() -> str:
+    if config.settings.auth.secret_key:
+        return config.settings.auth.secret_key
+    cache_dir = Path(config.settings.server.cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return _read_or_create_secret(cache_dir)
+
+
 def _get_serializer() -> URLSafeTimedSerializer:
     global _serializer
-    if _serializer is not None:
-        return _serializer
-
-    if config.settings.auth.secret_key:
-        secret = config.settings.auth.secret_key
-    else:
-        cache_dir = Path(config.settings.server.cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        secret = _read_or_create_secret(cache_dir)
-
-    _serializer = URLSafeTimedSerializer(secret, salt=_SALT)
+    if _serializer is None:
+        _serializer = URLSafeTimedSerializer(get_signing_secret(), salt=_SALT)
     return _serializer
 
 

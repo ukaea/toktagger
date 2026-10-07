@@ -19,6 +19,7 @@ ENV_VARS = [
     "SERVER_RELOAD",
     "SERVER_WORKERS",
     "SERVER_CACHE_DIR",
+    "SERVER_CORS_ORIGINS",
     "DATABASE_MONGO_URL",
     "AUTH_SECRET_KEY",
     "AUTH_COOKIE_NAME",
@@ -213,6 +214,23 @@ def test_auth_env_overrides(monkeypatch, setup_test_settings):
     assert settings.auth.admin_group == "tt-admins"
     assert settings.auth.verify_bearer_audience is False
     assert settings.auth.canaille_port == 9003
+
+
+def test_cors_origins_default_and_override(monkeypatch, setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    assert TestSettings().server.cors_origins == ["http://localhost:5173"]
+
+    monkeypatch.setenv("SERVER_CORS_ORIGINS", "[]")
+    assert TestSettings().server.cors_origins == []
+
+    monkeypatch.setenv(
+        "SERVER_CORS_ORIGINS", '["https://a.example", "https://b.example"]'
+    )
+    assert TestSettings().server.cors_origins == [
+        "https://a.example",
+        "https://b.example",
+    ]
 
 
 def test_public_urls_default_from_server_settings(setup_test_settings):

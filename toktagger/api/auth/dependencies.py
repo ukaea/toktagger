@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordBearer
 
 from toktagger.api import config
+from toktagger.api.auth import oidc
 from toktagger.api.auth.core import (
     ACCESS_TOKEN_RENEW_AFTER_SECONDS,
     create_access_token,
@@ -57,6 +58,19 @@ def _renew_session(request: Request, response: Response, payload: dict):
     set_session_cookies(request, response, create_access_token(dict(payload)), csrf)
 
 
+async def _user_from_idp_token(request: Request, token: str) -> UserOut:
+    try:
+        claims = await oidc.verify_access_token(token)
+        user = await oidc.provision_user(
+            request.app.state.db_client, claims["iss"], claims
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account is inactive")
+    return user
+
+
 async def get_current_user(
     request: Request,
     response: Response,
@@ -78,7 +92,9 @@ async def get_current_user(
         if not username or not isinstance(username, str):
             raise ValueError("Token is missing a subject claim")
     except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+        if header_token is None or not oidc.idp_registered():
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        return await _user_from_idp_token(request, token)
 
     # A bearer header cannot be attached by a cross-site caller, so only the ambient
     # cookie credential needs CSRF cover.

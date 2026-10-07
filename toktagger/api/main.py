@@ -20,9 +20,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from toktagger.api import config
-from toktagger.api.auth.core import get_internal_token
+from toktagger.api.auth import oidc
+from toktagger.api.auth.core import get_internal_token, get_signing_secret
 from toktagger.api.auth.first_run import ensure_admin_user
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
@@ -70,6 +72,10 @@ async def lifespan(app: FastAPI):
 
     # Bootstrap admin user on first run.
     await ensure_admin_user(app.state.db_client)
+
+    if config.settings.auth.issuer_url:
+        oidc.register_idp()
+        await oidc.connect_idp()
 
     yield
 
@@ -286,17 +292,26 @@ class Server:
         self.app = FastAPI(lifespan=lifespan)
         self.app.add_exception_handler(LockTimeoutError, lock_timeout_handler)
 
-        # Allow requests from the frontend dev server
-        origins = [
-            "http://localhost:5173",
-        ]
-
         self.app.add_middleware(
             CORSMiddleware,
-            allow_origins=origins,  # or ["*"] to allow all
+            allow_origins=config.settings.server.cors_origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+        )
+        cookie_secure = config.settings.auth.cookie_secure
+        self.app.add_middleware(
+            SessionMiddleware,
+            secret_key=get_signing_secret(),
+            session_cookie="tt_oidc_flow",
+            path="/auth",
+            same_site="lax",
+            https_only=(
+                config.settings.public_url.startswith("https://")
+                if cookie_secure is None
+                else cookie_secure
+            ),
+            max_age=600,
         )
 
         # Static front end files

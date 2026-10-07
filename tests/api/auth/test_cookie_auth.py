@@ -89,7 +89,8 @@ async def test_logout_clears_both_cookies(setup_db_auth, unauthenticated_api_cli
         "/auth/logout", headers={"X-CSRF-Token": csrf}
     )
 
-    assert resp.status_code == 204, resp.text
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"logout_url": None}
     for name in (settings.auth.cookie_name, CSRF_COOKIE_NAME):
         assert "Max-Age=0" in set_cookie_header(resp, name)
     assert (await unauthenticated_api_client.get("/auth/me")).status_code == 401
@@ -290,7 +291,7 @@ async def test_logout_clears_cookies_when_a_renewal_is_due(
         headers={"X-CSRF-Token": unauthenticated_api_client.cookies[CSRF_COOKIE_NAME]},
     )
 
-    assert resp.status_code == 204, resp.text
+    assert resp.status_code == 200, resp.text
     assert (await unauthenticated_api_client.get("/auth/me")).status_code == 401
 
 

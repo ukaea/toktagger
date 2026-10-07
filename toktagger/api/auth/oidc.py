@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import logging
@@ -5,6 +6,7 @@ import time
 from typing import Any, Literal
 
 import httpx
+from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth, StarletteOAuth2App
 from fastapi import HTTPException
 from joserfc import jwt
@@ -35,6 +37,14 @@ SIGNING_ALGORITHMS = [
 ]
 RESERVED_USERNAME_PREFIXES = ("model::", "annotators::", "__")
 
+try:
+    import httpx2
+except ImportError:
+    httpx2 = httpx
+
+# Authlib uses httpx2 when it is installed, so its network errors are not httpx errors
+IDP_ERRORS = (OAuthError, httpx.HTTPError, httpx2.HTTPError)
+
 _oauth: OAuth | None = None
 _jwks: KeySet | None = None
 _jwks_fetched_at = 0.0
@@ -57,6 +67,10 @@ def register_idp() -> None:
     _jwks_fetched_at = 0.0
 
 
+def idp_registered() -> bool:
+    return _oauth is not None
+
+
 def get_idp() -> StarletteOAuth2App:
     if _oauth is None:
         raise RuntimeError("The identity provider is not registered")
@@ -65,6 +79,24 @@ def get_idp() -> StarletteOAuth2App:
 
 async def get_metadata() -> dict[str, Any]:
     return await get_idp().load_server_metadata()
+
+
+async def connect_idp(timeout_seconds: float = 20) -> None:
+    """Wait for the provider discovery document, which a managed server may be slow to serve."""
+    deadline = time.monotonic() + timeout_seconds
+    delay = 0.5
+    while True:
+        try:
+            await get_metadata()
+            return
+        except IDP_ERRORS as error:
+            if time.monotonic() + delay > deadline:
+                issuer = config.settings.auth.issuer_url
+                raise RuntimeError(
+                    f"Could not reach the identity provider at {issuer}: {error}"
+                ) from error
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 4)
 
 
 async def fetch_jwks(force: bool = False) -> KeySet:
