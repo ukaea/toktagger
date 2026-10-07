@@ -1,4 +1,3 @@
-import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -71,29 +70,6 @@ def _get_serializer() -> URLSafeTimedSerializer:
     if _serializer is None:
         _serializer = URLSafeTimedSerializer(get_signing_secret(), salt=_SALT)
     return _serializer
-
-
-def _pbkdf2_hash(password: str, salt_hex: str) -> str:
-    dk = hashlib.pbkdf2_hmac(
-        "sha256", password.encode(), bytes.fromhex(salt_hex), 260000
-    )
-    return dk.hex()
-
-
-def hash_password(plain: str) -> str:
-    salt = secrets.token_hex(16)
-    hashed = _pbkdf2_hash(plain, salt)
-    return f"pbkdf2:{salt}:{hashed}"
-
-
-def verify_password(plain: str, stored: str) -> bool:
-    if not stored.startswith("pbkdf2:"):
-        return False
-    try:
-        _, salt, expected = stored.split(":")
-    except ValueError:
-        return False
-    return secrets.compare_digest(_pbkdf2_hash(plain, salt), expected)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:

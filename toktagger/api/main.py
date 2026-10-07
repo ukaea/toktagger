@@ -25,7 +25,6 @@ from starlette.middleware.sessions import SessionMiddleware
 from toktagger.api import config
 from toktagger.api.auth import oidc
 from toktagger.api.auth.core import get_internal_token, get_signing_secret
-from toktagger.api.auth.first_run import ensure_admin_user
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
@@ -70,12 +69,13 @@ async def lifespan(app: FastAPI):
     )
     app.state.project = None
 
-    # Bootstrap admin user on first run.
-    await ensure_admin_user(app.state.db_client)
-
-    if config.settings.auth.issuer_url:
-        oidc.register_idp()
-        await oidc.connect_idp()
+    if not config.settings.auth.issuer_url:
+        raise RuntimeError(
+            "auth.provider=canaille requires launching via `toktagger` or run.py; "
+            "for a standalone ASGI deployment set auth.provider=oidc"
+        )
+    oidc.register_idp()
+    await oidc.connect_idp()
 
     yield
 

@@ -3,12 +3,14 @@ import time
 
 import httpx
 import pytest
+from bson import ObjectId
 from joserfc import jwt
 from joserfc.jwk import KeySet, OctKey, RSAKey
 
 from tests.api.auth.conftest import CLIENT_ID, ISSUER, JWKS_URL, mint_token
 from toktagger.api.auth import oidc
-from toktagger.api.schemas.users import UserIn
+from toktagger.api.crud import utils
+from toktagger.api.schemas.projects import ProjectMember
 
 
 def test_extract_roles_reads_a_list():
@@ -271,26 +273,70 @@ async def test_provision_keeps_a_locally_deactivated_user_inactive(
 async def test_provision_adopts_a_legacy_user_with_the_same_username(
     db_client, oidc_settings
 ):
-    legacy_id = await db_client.insert(
-        "users",
-        UserIn(
-            username="legacy",
-            hashed_password="pbkdf2:salt:hash",
-            must_change_password=True,
-        ),
+    legacy = await db_client.db["users"].insert_one(
+        {
+            "username": "legacy",
+            "hashed_password": "pbkdf2:salt:hash",
+            "must_change_password": True,
+            "global_role": "user",
+            "is_active": True,
+        }
     )
 
     user = await oidc.provision_user(
         db_client, ISSUER, {"sub": "sub-1", "preferred_username": "legacy"}
     )
 
-    assert user.id == legacy_id
+    assert user.id == str(legacy.inserted_id)
     assert user.username == "legacy"
-    assert user.must_change_password is False
     document = (await db_client.get_filtered_documents("users"))[0]
     assert document["oidc_issuer"] == ISSUER
     assert document["oidc_sub"] == "sub-1"
     assert document["hashed_password"] is None
+    assert document["must_change_password"] is False
+
+
+@pytest.mark.asyncio
+async def test_provision_keeps_memberships_of_an_adopted_user(
+    db_client, oidc_settings, setup_db_auth
+):
+    await db_client.db["users"].update_one(
+        {"username": "alice"}, {"$set": {"oidc_sub": None, "oidc_issuer": None}}
+    )
+    await db_client.insert(
+        "project_members",
+        ProjectMember(role="annotator"),
+        ids={
+            "project_id": ObjectId(setup_db_auth["project_id"]),
+            "user_id": ObjectId(setup_db_auth["alice_id"]),
+        },
+    )
+
+    user = await oidc.provision_user(
+        db_client, ISSUER, {"sub": "new-sub", "preferred_username": "alice"}
+    )
+
+    assert user.id == setup_db_auth["alice_id"]
+    memberships = await utils.get_user_memberships(db_client, user.id)
+    assert [member.role for member in memberships] == ["annotator"]
+
+
+@pytest.mark.asyncio
+async def test_provision_concurrent_logins_with_one_username_get_distinct_names(
+    db_client, oidc_settings
+):
+    users = await asyncio.gather(
+        *(
+            oidc.provision_user(
+                db_client,
+                ISSUER,
+                {"sub": f"sub-{index}", "preferred_username": "carol"},
+            )
+            for index in range(3)
+        )
+    )
+
+    assert sorted(user.username for user in users) == ["carol", "carol2", "carol3"]
 
 
 @pytest.mark.asyncio

@@ -6,64 +6,18 @@ import pytest
 from authlib.integrations.base_client.errors import OAuthError
 from joserfc.jwk import RSAKey
 
-from tests.api.auth.conftest import ISSUER, mint_token
+from tests.api.auth.conftest import (
+    AUTHORIZE_URL,
+    END_SESSION_URL,
+    ISSUER,
+    PUBLIC_URL,
+    mint_token,
+    sign_in,
+)
 from toktagger.api import config
 from toktagger.api.auth import oidc
 from toktagger.api.auth.core import create_access_token, get_internal_token
 from toktagger.api.auth.cookies import CSRF_COOKIE_NAME
-
-AUTHORIZE_URL = f"{ISSUER}/protocol/openid-connect/auth"
-END_SESSION_URL = f"{ISSUER}/protocol/openid-connect/logout"
-PUBLIC_URL = "http://localhost:8002"
-
-
-@pytest.fixture
-def idp(oidc_settings, monkeypatch):
-    """The registered Authlib client with discovery preloaded and its token calls faked."""
-    client = oidc.get_idp()
-    client.server_metadata = {
-        "issuer": ISSUER,
-        "authorization_endpoint": AUTHORIZE_URL,
-        "token_endpoint": f"{ISSUER}/protocol/openid-connect/token",
-        "jwks_uri": f"{ISSUER}/protocol/openid-connect/certs",
-        "end_session_endpoint": END_SESSION_URL,
-        "_loaded_at": time.time(),
-    }
-
-    async def get_metadata():
-        return client.server_metadata
-
-    monkeypatch.setattr(oidc, "get_metadata", get_metadata)
-    client.fake_token = {
-        "userinfo": {
-            "sub": "sub-1",
-            "preferred_username": "alice",
-            "email": "alice@example.com",
-            "name": "Alice Example",
-            "groups": [],
-        }
-    }
-    client.fake_userinfo = {}
-
-    async def authorize_access_token(request):
-        if isinstance(client.fake_token, Exception):
-            raise client.fake_token
-        return client.fake_token
-
-    async def userinfo(token=None):
-        return client.fake_userinfo
-
-    monkeypatch.setattr(client, "authorize_access_token", authorize_access_token)
-    monkeypatch.setattr(client, "userinfo", userinfo)
-    return client
-
-
-async def sign_in(client, return_to: str | None = "/ui/projects/7"):
-    """Start the flow, so the flow cookie holds return_to, then hit the callback."""
-    params = {} if return_to is None else {"return_to": return_to}
-    start = await client.get("/auth/login", params=params)
-    assert start.status_code == 302, start.text
-    return await client.get("/auth/callback", params={"code": "c", "state": "s"})
 
 
 @pytest.mark.asyncio

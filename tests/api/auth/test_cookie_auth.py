@@ -6,21 +6,25 @@ callers keep using a bearer header. Both paths run through get_current_user.
 
 import pytest
 
-from tests.api.auth.conftest import get_auth_token
-from toktagger.api.auth import dependencies
+from tests.api.auth.conftest import END_SESSION_URL, get_auth_token, sign_in
+from toktagger.api.auth import dependencies, oidc
 from toktagger.api.auth.core import decode_token_with_age, get_internal_token
 from toktagger.api.auth.cookies import CSRF_COOKIE_NAME
 from toktagger.api.config import settings
 
 
-async def login(client, username: str = "admin", password: str = "admin_pass"):
-    """Log in and keep the cookies, unlike the header-oriented get_auth_token helper."""
-    resp = await client.post(
-        "/auth/token",
-        data={"username": username, "password": password},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert resp.status_code == 200, resp.text
+@pytest.fixture(autouse=True)
+def _identity_provider(idp):
+    """Every test here signs in through the OIDC callback, so a provider must be registered."""
+
+
+async def login(client, username: str = "admin"):
+    """Sign in through the OIDC callback and keep the cookies, unlike get_auth_token."""
+    oidc.get_idp().fake_token = {
+        "userinfo": {"sub": f"{username}-sub", "preferred_username": username}
+    }
+    resp = await sign_in(client)
+    assert resp.status_code == 303, resp.text
     return resp
 
 
@@ -90,7 +94,7 @@ async def test_logout_clears_both_cookies(setup_db_auth, unauthenticated_api_cli
     )
 
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"logout_url": None}
+    assert resp.json()["logout_url"].startswith(END_SESSION_URL)
     for name in (settings.auth.cookie_name, CSRF_COOKIE_NAME):
         assert "Max-Age=0" in set_cookie_header(resp, name)
     assert (await unauthenticated_api_client.get("/auth/me")).status_code == 401
@@ -167,7 +171,7 @@ async def test_header_auth_skips_csrf(setup_db_auth, unauthenticated_api_client)
     scripts and most of this suite. A header cannot be attached by a cross-site caller,
     so it needs no CSRF cover — do not "tighten" this into requiring one for everybody.
     """
-    token = await get_auth_token(unauthenticated_api_client, "admin", "admin_pass")
+    token = get_auth_token("admin")
 
     resp = await unauthenticated_api_client.delete(
         f"/projects/{setup_db_auth['project_id']}",
@@ -180,10 +184,8 @@ async def test_header_auth_skips_csrf(setup_db_auth, unauthenticated_api_client)
 @pytest.mark.asyncio
 async def test_header_beats_ambient_cookie(setup_db_auth, unauthenticated_api_client):
     """An explicit bearer header wins over whatever session the client happens to hold."""
-    alice_token = await get_auth_token(
-        unauthenticated_api_client, "alice", "alice_pass"
-    )
-    await login(unauthenticated_api_client, "admin", "admin_pass")
+    alice_token = get_auth_token("alice")
+    await login(unauthenticated_api_client, "admin")
 
     resp = await unauthenticated_api_client.get(
         "/auth/me", headers={"Authorization": f"Bearer {alice_token}"}
@@ -269,7 +271,7 @@ async def test_bearer_caller_is_never_renewed(
     setup_db_auth, unauthenticated_api_client, renewal_due
 ):
     """Scripts and Ray callbacks hold their own token; handing them a cookie is wrong."""
-    token = await get_auth_token(unauthenticated_api_client, "admin", "admin_pass")
+    token = get_auth_token("admin")
 
     resp = await unauthenticated_api_client.get(
         "/auth/me", headers={"Authorization": f"Bearer {token}"}
@@ -303,12 +305,8 @@ async def test_session_of_a_deleted_user_is_401(
 
     On anything else the browser keeps a logged-in UI in which every request fails.
     """
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
-    alice_token = await get_auth_token(
-        unauthenticated_api_client, "alice", "alice_pass"
-    )
+    admin_token = get_auth_token("admin")
+    alice_token = get_auth_token("alice")
 
     resp = await unauthenticated_api_client.delete(
         f"/users/{setup_db_auth['alice_id']}",
@@ -327,12 +325,8 @@ async def test_session_of_a_deactivated_user_is_401(
     setup_db_auth, unauthenticated_api_client
 ):
     """Same reasoning as a deleted user: the credential no longer authenticates."""
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
-    alice_token = await get_auth_token(
-        unauthenticated_api_client, "alice", "alice_pass"
-    )
+    admin_token = get_auth_token("admin")
+    alice_token = get_auth_token("alice")
 
     resp = await unauthenticated_api_client.put(
         f"/users/{setup_db_auth['alice_id']}",

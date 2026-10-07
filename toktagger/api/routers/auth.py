@@ -5,17 +5,15 @@ from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
-from fastapi.security import OAuth2PasswordRequestForm
 
 from toktagger.api import config
 from toktagger.api.auth import oidc
 from toktagger.api.auth.cookies import clear_session_cookies, set_session_cookies
-from toktagger.api.auth.core import create_access_token, verify_password
+from toktagger.api.auth.core import create_access_token
 from toktagger.api.auth.dependencies import get_current_user
-from toktagger.api.crud import utils
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.auth import AuthConfig, LogoutResponse
-from toktagger.api.schemas.users import TokenResponse, UserOut
+from toktagger.api.schemas.users import UserOut
 
 logger = logging.getLogger(__name__)
 
@@ -101,31 +99,6 @@ async def callback(request: Request):
     response = RedirectResponse(return_to, status_code=303)
     set_session_cookies(request, response, session_token, csrf)
     return response
-
-
-@router.post("/token", response_model=TokenResponse)
-async def login(
-    request: Request,
-    response: Response,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-):
-    db_client: MongoDBClient = request.app.state.db_client
-    # Raw doc lookup is intentional: UserOut deliberately omits hashed_password.
-    user_doc = await utils.get_user_doc_by_username(db_client, form_data.username)
-    if not user_doc:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-
-    if not verify_password(form_data.password, user_doc.get("hashed_password") or ""):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-
-    if not user_doc.get("is_active", True):
-        raise HTTPException(status_code=403, detail="Account is inactive")
-
-    csrf = secrets.token_urlsafe(32)
-    token = create_access_token({"sub": user_doc["username"], "csrf": csrf})
-    set_session_cookies(request, response, token, csrf)
-    # Browsers use the cookie; the body keeps scripted and server-to-server clients working.
-    return TokenResponse(access_token=token)
 
 
 @router.get("/me", response_model=UserOut)

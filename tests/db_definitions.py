@@ -1,7 +1,6 @@
 import importlib
 import pathlib
 
-from toktagger.api.auth.core import hash_password
 from toktagger.api.schemas.annotations import (
     TimePointBatch,
     TimeRegionBatch,
@@ -136,21 +135,26 @@ ANNOTATION_5 = TimePointBatch(
 )
 
 
+TEST_ISSUER = "https://idp.example.com/realms/toktagger"
+
 USER_ADMIN = UserIn(
     username="admin",
-    hashed_password=hash_password("admin_pass"),
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="admin-sub",
     global_role="admin",
     is_active=True,
 )
 USER_ALICE = UserIn(
     username="alice",
-    hashed_password=hash_password("alice_pass"),
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="alice-sub",
     global_role="user",
     is_active=True,
 )
 USER_BOB = UserIn(
     username="bob",
-    hashed_password=hash_password("bob_pass"),
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="bob-sub",
     global_role="user",
     is_active=True,
 )

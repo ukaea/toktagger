@@ -1,19 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 
-from toktagger.api.auth.core import hash_password
 from toktagger.api.auth.dependencies import (
     get_current_user,
     require_global_admin,
-    require_password_changed,
 )
 from toktagger.api.crud import utils
 from toktagger.api.crud.db import MongoDBClient
-from toktagger.api.schemas.users import (
-    UserCreate,
-    UserIn,
-    UserOut,
-    UserUpdate,
-)
+from toktagger.api.schemas.users import UserOut, UserUpdate
 from toktagger.api.schemas.projects import ProjectMemberOut
 
 router = APIRouter(
@@ -21,11 +14,7 @@ router = APIRouter(
 )
 
 
-@router.get(
-    "",
-    response_model=list[UserOut],
-    dependencies=[Depends(require_password_changed)],
-)
+@router.get("", response_model=list[UserOut])
 async def list_users(
     request: Request,
     _: UserOut = Depends(require_global_admin),
@@ -33,38 +22,7 @@ async def list_users(
     return await utils.get_all_users(request.app.state.db_client)
 
 
-@router.post("", response_model=dict, dependencies=[Depends(require_password_changed)])
-async def create_user(
-    request: Request,
-    body: UserCreate,
-    _: UserOut = Depends(require_global_admin),
-) -> dict[str, str]:
-    # Reserved prefixes protect the internal worker namespace and the synthetic
-    # created_by values stamped on ML-model predictions (worker.py) and built-in
-    # annotator suggestions (core/annotators.py), so a real user can't collide with them.
-    if (
-        body.username.startswith("model::")
-        or body.username.startswith("annotators::")
-        or body.username.startswith("__")
-    ):
-        raise HTTPException(status_code=422, detail="Username uses a reserved prefix")
-    # The creating admin knows the password they just typed in, so the new owner
-    # always has to replace it on first login.
-    user = UserIn(
-        username=body.username,
-        hashed_password=hash_password(body.password),
-        global_role=body.global_role,
-        must_change_password=True,
-    )
-    user_id = await utils.create_user(request.app.state.db_client, user)
-    return {"_id": user_id}
-
-
-@router.get(
-    "/me/memberships",
-    response_model=list[ProjectMemberOut],
-    dependencies=[Depends(require_password_changed)],
-)
+@router.get("/me/memberships", response_model=list[ProjectMemberOut])
 async def list_my_memberships(
     request: Request,
     current_user: UserOut = Depends(get_current_user),
@@ -80,11 +38,7 @@ async def list_my_memberships(
     )
 
 
-@router.get(
-    "/{user_id}",
-    response_model=UserOut,
-    dependencies=[Depends(require_password_changed)],
-)
+@router.get("/{user_id}", response_model=UserOut)
 async def get_user(
     request: Request,
     user_id: str = Path(...),
@@ -103,53 +57,19 @@ async def update_user(
     request: Request,
     body: UserUpdate,
     user_id: str = Path(...),
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(require_global_admin),
 ) -> None:
-    if current_user.global_role != "admin" and current_user.id != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # Self-edit is allowed for password (profile page), but a non-admin
-    # must not be able to change global_role or is_active — even on their own
-    # account. Without this, self != other-user check above lets any user
-    # PUT their own record with global_role="admin" and self-promote.
-    if current_user.global_role != "admin" and (
-        body.global_role is not None or body.is_active is not None
-    ):
+    if current_user.id == user_id and body.is_active is False:
         raise HTTPException(
-            status_code=403,
-            detail="Only an admin can change global_role or is_active",
-        )
-
-    # An admin demoting themselves loses access to this very endpoint's admin-only
-    # sibling (GET /users) the moment the change lands, breaking the admin UI they're
-    # sitting on. Require a different admin to do it instead of racing a redirect.
-    if current_user.id == user_id and body.global_role == "user":
-        raise HTTPException(
-            status_code=422,
-            detail="You cannot demote yourself from admin; ask another admin to change your role",
-        )
-
-    # Clearing your own forced change without supplying a password would leave the
-    # account on the password someone else handed you - the bootstrap admin on the
-    # public default, in the worst case. Applies whatever your global role is, so an
-    # admin cannot excuse itself; clearing it for somebody else stays allowed.
-    if (
-        current_user.id == user_id
-        and body.must_change_password is False
-        and body.password is None
-    ):
-        raise HTTPException(
-            status_code=422,
-            detail="A new password is required to clear a forced password change",
+            status_code=422, detail="You cannot deactivate your own account"
         )
 
     db_client: MongoDBClient = request.app.state.db_client
-
-    if body.global_role != "user" and body.is_active is not False:
+    if body.is_active is not False:
         await utils.update_user(db_client, user_id, body)
         return
 
-    # Held across check and write so two admins cannot demote each other at once.
+    # Held across check and write so two admins cannot deactivate each other at once.
     async with db_client.lock("users:admins"):
         all_users = await utils.get_all_users(db_client)
         remaining_admins = [
@@ -160,12 +80,12 @@ async def update_user(
         if not remaining_admins:
             raise HTTPException(
                 status_code=422,
-                detail="Cannot demote or deactivate the last active admin account",
+                detail="Cannot deactivate the last active admin account",
             )
         await utils.update_user(db_client, user_id, body)
 
 
-@router.delete("/{user_id}", dependencies=[Depends(require_password_changed)])
+@router.delete("/{user_id}")
 async def delete_user(
     request: Request,
     user_id: str = Path(...),
@@ -173,8 +93,7 @@ async def delete_user(
 ) -> None:
     db_client: MongoDBClient = request.app.state.db_client
 
-    # Prevent deleting the last active admin (mirrors the demote/deactivate guard
-    # in update_user — otherwise the account list becomes unmanageable).
+    # Prevent deleting the last active admin, otherwise the account list becomes unmanageable.
     async with db_client.lock("users:admins"):
         all_users = await utils.get_all_users(db_client)
         target = next((u for u in all_users if u.id == user_id), None)

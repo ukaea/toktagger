@@ -52,6 +52,25 @@ Status: done.
 - `Server.cors_origins` is added in Phase 2, with the CORS wiring. `forwarded_allow_ips` and `gunicorn_timeout` are added in Phase 7.
 - `uv run --all-extras pytest tests/api` was not run for this phase (config-only change; the models extra is not touched). Run it before the final PR.
 
+## Phase 2: backend OIDC (3 commits)
+
+Status: done (API side). Frontend and e2e still use password login until Phases 3 and 5, so `tests/end_to_end` is broken on this branch until then.
+
+Decisions and deviations:
+- Provisioning keys users on (`oidc_issuer`, `oidc_sub`). The issuer is taken from discovery metadata, not from config.
+- Legacy adoption runs inside provisioning (`crud.utils.adopt_legacy_user`). It sets `hashed_password` to None, because mongita has no `$unset`. Users with no `oidc_sub` are otherwise left alone.
+- `/auth/logout` now returns 200 `{logout_url}` (was 204).
+- Bearer auth uses `HTTPBearer` instead of `OAuth2PasswordBearer`.
+- `require_password_changed` was the only auth dependency on 7 routers, so it was replaced by `get_current_user`, not deleted.
+- Role editing is removed from `PUT /users/{id}`, which is admin-only and takes only `is_active`. Kept: admin cannot deactivate self; last active admin cannot be deactivated or deleted (lock `users:admins`).
+- `lifespan` raises when no issuer is configured. Phase 3 sets the issuer before workers start.
+- The flow cookie `tt_oidc_flow` is scoped to path `/auth`, max age 600 s.
+- Authlib's async client uses `httpx2`; `oidc.IDP_ERRORS` covers both httpx and httpx2 errors.
+- JWKS refresh on unknown `kid` is limited to once per 30 s.
+- Tests: deleted `test_first_run.py`, the six password tests in `test_core.py`, `/auth/token` tests in `routers/test_auth.py`, create/password/held/role-edit tests in `routers/test_users.py`, `get_user_doc_by_username`/password tests in `crud/test_utils.py`, the "held" role in `test_endpoint_guards.py`, and the user-creation reserved-prefix tests (ported to provisioning). `get_auth_token(username)` now mints a session token.
+- Not done: unique index on (`oidc_issuer`, `oidc_sub`); the lock covers it.
+- `models` extra: `uv run --all-extras pytest tests/api` passes (710 passed, 27 skipped).
+
 ### Next
 
-Phase 2, commit 1: schemas, CRUD and legacy-user migration.
+Phase 3: managed Canaille (`auth/canaille.py`), launch from `cli.main()` and `run.py`, e2e fixtures.

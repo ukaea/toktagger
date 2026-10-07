@@ -1,7 +1,7 @@
 import secrets
 
 from fastapi import Depends, HTTPException, Request, Response
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from toktagger.api import config
 from toktagger.api.auth import oidc
@@ -16,7 +16,7 @@ from toktagger.api.crud import utils
 from toktagger.api.schemas.projects import ProjectMember
 from toktagger.api.schemas.users import UserOut
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -74,8 +74,9 @@ async def _user_from_idp_token(request: Request, token: str) -> UserOut:
 async def get_current_user(
     request: Request,
     response: Response,
-    header_token: str | None = Depends(oauth2_scheme),
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> UserOut:
+    header_token = bearer.credentials if bearer else None
     # Header first: Ray-worker callbacks, scripts and tests never send a cookie, and an
     # explicit header should beat whatever session the same browser happens to hold.
     token = header_token or request.cookies.get(config.settings.auth.cookie_name)
@@ -114,24 +115,6 @@ async def get_current_user(
     if header_token is None and token_age >= ACCESS_TOKEN_RENEW_AFTER_SECONDS:
         _renew_session(request, response, payload)
     return user
-
-
-async def require_password_changed(
-    current_user: UserOut = Depends(get_current_user),
-) -> UserOut:
-    """Hold an account on a forced password change until it supplies a new one.
-
-    The bootstrap admin ships with a public default password, so until it is replaced
-    the account is treated as not yet usable. Applied to the data routers rather than
-    inside get_current_user, so /auth/me and the self-service password change stay
-    reachable for the account being held.
-    """
-    if current_user.must_change_password:
-        raise HTTPException(
-            status_code=403,
-            detail="You must change your password before using TokTagger.",
-        )
-    return current_user
 
 
 async def require_global_admin(

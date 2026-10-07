@@ -7,7 +7,6 @@ from bson import ObjectId
 from fastapi import HTTPException
 from pydantic import TypeAdapter
 
-from toktagger.api.auth.core import hash_password
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
 from toktagger.api.schemas.annotations import (
@@ -655,18 +654,6 @@ async def get_user_by_username(
     return UserOut.model_validate(docs[0]) if docs else None
 
 
-async def get_user_doc_by_username(
-    db_client: MongoDBClient, username: str
-) -> dict | None:
-    """Return the raw user document, including fields UserOut omits (e.g.
-    hashed_password). Use this only where those fields are required, such as
-    password verification during login."""
-    docs = await db_client.get_filtered_documents(
-        "users", filters={"username": username}
-    )
-    return docs[0] if docs else None
-
-
 async def get_user_by_oidc_identity(
     db_client: MongoDBClient, issuer: str, sub: str
 ) -> UserOut | None:
@@ -754,9 +741,8 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     update_dict = updates.model_dump(exclude_none=True)
-    if "password" in update_dict:
-        update_dict["hashed_password"] = hash_password(update_dict.pop("password"))
-    await db_client.db["users"].update_one({"_id": obj_id}, {"$set": update_dict})
+    if update_dict:
+        await db_client.db["users"].update_one({"_id": obj_id}, {"$set": update_dict})
 
 
 async def delete_user(db_client: MongoDBClient, user_id: str) -> None:
