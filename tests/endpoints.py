@@ -3,12 +3,16 @@ import pathlib
 import requests
 
 from tests import db_definitions
+from tests.identity import session_cookies
+from toktagger.api import config
+from toktagger.api.auth.canaille import ManagedCanaille
 from toktagger.api.schemas.annotations import TimeRegion
 
 # Shared session for all e2e helper requests below, so auth only needs to be
 # configured once (see set_auth_token) rather than threaded through every
 # helper function's signature and every call site across the e2e test files.
 session = requests.Session()
+identity_provider: ManagedCanaille
 
 
 def set_auth_token(token: str) -> None:
@@ -16,34 +20,23 @@ def set_auth_token(token: str) -> None:
     session.headers.update({"Authorization": f"Bearer {token}"})
 
 
-def create_user(
-    username: str,
-    password: str,
-    role: str = "user",
-    must_change_password: bool = False,
-) -> str:
-    response = session.post(
-        "http://localhost:8002/users",
-        json={
-            "username": username,
-            "password": password,
-            "global_role": role,
-        },
-    )
+def set_identity_provider(provider: ManagedCanaille) -> None:
+    global identity_provider
+    identity_provider = provider
+
+
+def create_user(username: str, password: str, role: str = "user") -> str:
+    """Create the user in the identity provider, sign them in once and return their id.
+
+    TokTagger only creates its own record on a user's first sign-in, so the sign-in is
+    what lets later calls such as add_project_member find them by username.
+    """
+    groups = (config.settings.auth.admin_group,) if role == "admin" else ()
+    identity_provider.create_user(username, password, groups=groups)
+    session_cookies(username, password)
+    response = session.get("http://localhost:8002/users")
     assert response.status_code == 200, response.text
-    user_id = response.json()["_id"]
-
-    # POST /users always forces a password change. Test-created accounts should be
-    # usable immediately rather than stuck behind that redirect, so clear it here;
-    # pass must_change_password=True to test the redirect itself.
-    if not must_change_password:
-        response = session.put(
-            f"http://localhost:8002/users/{user_id}",
-            json={"must_change_password": False},
-        )
-        assert response.status_code == 200, response.text
-
-    return user_id
+    return next(user["_id"] for user in response.json() if user["username"] == username)
 
 
 def get_user(user_id: str) -> dict:

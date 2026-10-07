@@ -1,5 +1,6 @@
 import uvicorn
 
+from toktagger.api.auth.canaille import managed_idp
 from toktagger.api.config import settings
 from toktagger.api.main import run_with_gunicorn
 
@@ -9,13 +10,14 @@ if __name__ == "__main__":
     workers = settings.server.workers
     reload = settings.server.reload
 
-    if workers > 1:
-        run_with_gunicorn(host, port, workers)
-    else:
-        uvicorn.run(
-            "toktagger.api.cli:create_app",
-            factory=True,
-            host=host,
-            port=port,
-            reload=reload,
-        )
+    with managed_idp():
+        if workers > 1:
+            run_with_gunicorn(host, port, workers)
+        else:
+            uvicorn.run(
+                "toktagger.api.cli:create_app",
+                factory=True,
+                host=host,
+                port=port,
+                reload=reload,
+            )

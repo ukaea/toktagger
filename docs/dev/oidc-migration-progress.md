@@ -71,6 +71,27 @@ Decisions and deviations:
 - Not done: unique index on (`oidc_issuer`, `oidc_sub`); the lock covers it.
 - `models` extra: `uv run --all-extras pytest tests/api` passes (710 passed, 27 skipped).
 
+## Phase 3: managed Canaille
+
+Status: done for the backend and test fixtures. `tests/end_to_end` still fails until Phase 5, because the built UI still validates `/auth/me` against a schema that requires `must_change_password` and shows the old login form. Sign-in through Canaille itself works in the e2e fixtures.
+
+Decisions and deviations:
+- The Canaille config is rendered from our own template on every start, not from `canaille config dump`. A minimal config is enough. `[CANAILLE.ACL.DEFAULT]` must exist as an empty table: without it nobody has `use_oidc` and sign-in returns 403.
+- Secret key and private JWK are stored in `keys.json` (0600), not in `client.json`. `client.json` holds client id, secret and the `public_url` the client was registered with.
+- `create client --audience` does not resolve. Use `set client <id> --audience <id>` after creating the client.
+- `create user --groups <display name>` works and `get group` shows the membership. The admin group is created first, then the admin user joins it.
+- A failed first provisioning deletes the SQLite file and `client.json`, so the next start retries from clean.
+- Canaille runs in its own session (`start_new_session`) and is stopped with SIGTERM to its process group, then SIGKILL after 5 s.
+- `managed_idp()` installs a SIGTERM handler for its duration so `kill`/`docker stop` also stop Canaille. `run_with_gunicorn` terminates gunicorn on SystemExit.
+- `start()` refuses a port already in use. A stale Canaille from a killed process shows up here.
+- `Settings.public_url` and `canaille_public_url` map host `0.0.0.0` to `localhost`.
+- Known Canaille 0.2.7 limitation: two sign-ins by one user in the same second produce an identical access token and a 500 (`UNIQUE constraint failed: token.access_token`), which TokTagger reports as `?error=idp_unavailable`. The e2e helper `tests/identity.py::session_cookies` signs each user in once.
+- On macOS, forking after the parent used the system proxy lookup crashes the child. The e2e fixture sets `no_proxy=localhost,127.0.0.1`; the readiness probe uses `trust_env=False`.
+- e2e fixtures sign in over plain HTTP (`tests/identity.py`), not with Playwright. A Playwright sign-in test comes with the Phase 5 login test.
+- `endpoints.create_user(username, password, role)` creates the Canaille user, signs in once to provision the TokTagger user, and returns its id. The `must_change_password` argument is gone.
+- Gate checked by hand with `python -m toktagger.api.cli` on an empty cache dir: banner printed once, login redirects to Canaille, restart reuses the database without a banner, `--workers 2` works, SIGTERM leaves no listeners.
+- `uv run` uses the installed copy of `toktagger`, not the working tree, when a script is run from another directory. Use `PYTHONPATH=.`.
+
 ### Next
 
-Phase 3: managed Canaille (`auth/canaille.py`), launch from `cli.main()` and `run.py`, e2e fixtures.
+Phase 4: Keycloak dev stack and docs. Phase 5 must also restore the e2e suite.

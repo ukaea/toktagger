@@ -229,15 +229,19 @@ class Settings(BaseSettings):
     )
 
     @property
+    def _browser_host(self) -> str:
+        return "localhost" if self.server.host == "0.0.0.0" else self.server.host
+
+    @property
     def public_url(self) -> str:
-        url = self.auth.public_url or f"http://{self.server.host}:{self.server.port}"
+        url = self.auth.public_url or f"http://{self._browser_host}:{self.server.port}"
         return url.rstrip("/")
 
     @property
     def canaille_public_url(self) -> str:
         url = (
             self.auth.canaille_public_url
-            or f"http://{self.server.host}:{self.auth.canaille_port}"
+            or f"http://{self._browser_host}:{self.auth.canaille_port}"
         )
         return url.rstrip("/")
 

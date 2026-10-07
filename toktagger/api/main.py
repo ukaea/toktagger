@@ -180,6 +180,10 @@ def run_with_gunicorn(host: str, port: int, workers: int) -> None:
             # workers - left unable to reach GCS once we shut down the Ray
             # head below, they only notice and self-terminate ~60s later.
             returncode = process.wait()
+        except SystemExit:
+            process.terminate()
+            process.wait()
+            raise
         else:
             if returncode:
                 raise subprocess.CalledProcessError(returncode, args)
