@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 pytest.importorskip("playwright")
@@ -14,13 +16,16 @@ def test_profile_shows_own_details_read_only(server_setup, admin_token, browser)
     user_page = login_as(browser, "profuser1", "profuser1_pass")
     user_page.goto(PROFILE_URL)
 
-    for label, value in [
-        ("Username", "profuser1"),
-        ("Email", "profuser1@localhost"),
-        ("Role", "user"),
+    for text in [
+        "Username",
+        "profuser1",
+        "Email",
+        "profuser1@localhost",
+        "Role",
+        "user",
     ]:
-        field = user_page.get_by_text(label, exact=True).locator("..")
-        expect(field).to_contain_text(value)
+        field = user_page.get_by_role("none").filter(has_text=re.compile(f"^{text}$"))
+        expect(field).to_be_visible()
     expect(user_page.get_by_role("textbox")).to_have_count(0)
     expect(user_page.get_by_role("button", name="Change Password")).to_have_count(0)
 
