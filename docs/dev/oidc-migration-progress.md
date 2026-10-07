@@ -43,6 +43,15 @@ Status: done. Gate passed.
 - Admin rights in Canaille: the default `[CANAILLE.ACL.ADMIN]` FILTER is `[{user_name = "admin"}, {groups = "admin"}]`. Setting `FILTER = [{groups = "toktagger-admins"}]` was verified: `/users`, `/groups`, `/admin/client` load for a member of that group. The profile page is `/profile/<user_name>`.
 - Process note: `canaille run` starts a child process. Stopping it needs a signal to the whole process group, or a check that the port is free afterwards.
 
+## Phase 1: configuration
+
+Status: done.
+
+- `Auth` gained the OIDC fields from the plan plus `canaille_bootstrap_password` (used for deterministic e2e logins).
+- Defaults for `public_url` and `canaille_public_url` cannot live on `Auth`, because `Auth` cannot see `Server` and the CLI changes host and port after load. They are `Settings.public_url` and `Settings.canaille_public_url` properties, computed on use, without a trailing slash.
+- `Server.cors_origins` is added in Phase 2, with the CORS wiring. `forwarded_allow_ips` and `gunicorn_timeout` are added in Phase 7.
+- `uv run --all-extras pytest tests/api` was not run for this phase (config-only change; the models extra is not touched). Run it before the final PR.
+
 ### Next
 
-Phase 1: configuration (`Auth` fields, validator, config tests).
+Phase 2, commit 1: schemas, CRUD and legacy-user migration.

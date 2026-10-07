@@ -24,6 +24,18 @@ ENV_VARS = [
     "AUTH_COOKIE_NAME",
     "AUTH_COOKIE_SECURE",
     "AUTH_COOKIE_SAMESITE",
+    "AUTH_PROVIDER",
+    "AUTH_ISSUER_URL",
+    "AUTH_CLIENT_ID",
+    "AUTH_CLIENT_SECRET",
+    "AUTH_SCOPES",
+    "AUTH_ROLES_CLAIM",
+    "AUTH_ADMIN_GROUP",
+    "AUTH_PUBLIC_URL",
+    "AUTH_VERIFY_BEARER_AUDIENCE",
+    "AUTH_CANAILLE_PORT",
+    "AUTH_CANAILLE_PUBLIC_URL",
+    "AUTH_CANAILLE_BOOTSTRAP_PASSWORD",
     "UDA_HOST",
     "UDA_META_PLUGINNAME",
     "UDA_METANEW_PLUGINNAME",
@@ -78,6 +90,16 @@ def test_default_settings(setup_test_settings):
     assert settings.database.mongo_url == "./toktagger_db"
 
     assert settings.auth.secret_key is None
+    assert settings.auth.provider == "canaille"
+    assert settings.auth.issuer_url is None
+    assert settings.auth.client_id == "toktagger"
+    assert settings.auth.client_secret is None
+    assert settings.auth.scopes == "openid profile email"
+    assert settings.auth.roles_claim == "groups"
+    assert settings.auth.admin_group == "toktagger-admins"
+    assert settings.auth.verify_bearer_audience is True
+    assert settings.auth.canaille_port == 8003
+    assert settings.auth.canaille_bootstrap_password is None
 
     assert settings.uda.host == "uda2.mast.l"
     assert settings.uda.meta_pluginname == "MASTU_DB"
@@ -125,6 +147,95 @@ def test_env_overrides_simple_nested_fields(
     assert settings.auth.secret_key == "test-secret"
     assert settings.uda.host == "uda-test-host"
     assert settings.sal.host == "https://sal.example.com"
+
+
+def test_oidc_provider_requires_issuer_and_secret(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    with pytest.raises(pydantic.ValidationError, match="issuer_url and auth.client"):
+        TestSettings(auth={"provider": "oidc"})
+
+    with pytest.raises(pydantic.ValidationError, match="auth.client_secret"):
+        TestSettings(auth={"provider": "oidc", "issuer_url": "https://idp.example.com"})
+
+    with pytest.raises(pydantic.ValidationError, match="auth.issuer_url"):
+        TestSettings(auth={"provider": "oidc", "client_secret": "secret"})
+
+
+def test_oidc_provider_accepts_complete_settings(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(
+        auth={
+            "provider": "oidc",
+            "issuer_url": "https://idp.example.com/realms/toktagger",
+            "client_secret": "secret",
+        }
+    )
+
+    assert settings.auth.provider == "oidc"
+
+
+def test_canaille_provider_needs_no_issuer(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(auth={"provider": "canaille"})
+
+    assert settings.auth.issuer_url is None
+
+
+def test_unknown_auth_provider_rejected(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    with pytest.raises(pydantic.ValidationError):
+        TestSettings(auth={"provider": "ldap"})
+
+
+def test_auth_env_overrides(monkeypatch, setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    monkeypatch.setenv("AUTH_PROVIDER", "oidc")
+    monkeypatch.setenv("AUTH_ISSUER_URL", "https://idp.example.com/realms/tt")
+    monkeypatch.setenv("AUTH_CLIENT_ID", "my-client")
+    monkeypatch.setenv("AUTH_CLIENT_SECRET", "env-secret")
+    monkeypatch.setenv("AUTH_ROLES_CLAIM", "realm_access.roles")
+    monkeypatch.setenv("AUTH_ADMIN_GROUP", "tt-admins")
+    monkeypatch.setenv("AUTH_VERIFY_BEARER_AUDIENCE", "false")
+    monkeypatch.setenv("AUTH_CANAILLE_PORT", "9003")
+
+    settings = TestSettings()
+
+    assert settings.auth.provider == "oidc"
+    assert settings.auth.issuer_url == "https://idp.example.com/realms/tt"
+    assert settings.auth.client_id == "my-client"
+    assert settings.auth.client_secret == "env-secret"
+    assert settings.auth.roles_claim == "realm_access.roles"
+    assert settings.auth.admin_group == "tt-admins"
+    assert settings.auth.verify_bearer_audience is False
+    assert settings.auth.canaille_port == 9003
+
+
+def test_public_urls_default_from_server_settings(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(server={"host": "example.org", "port": 9000})
+
+    assert settings.public_url == "http://example.org:9000"
+    assert settings.canaille_public_url == "http://example.org:8003"
+
+
+def test_public_urls_use_explicit_values_without_trailing_slash(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(
+        auth={
+            "public_url": "https://toktagger.example.com/",
+            "canaille_public_url": "https://auth.example.com/",
+        }
+    )
+
+    assert settings.public_url == "https://toktagger.example.com"
+    assert settings.canaille_public_url == "https://auth.example.com"
 
 
 def test_env_overrides_fields_with_underscores(
