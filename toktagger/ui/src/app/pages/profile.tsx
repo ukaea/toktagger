@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Flex, InlineAlert, Heading, Content } from "@adobe/react-spectrum";
+import {
+  Content,
+  Divider,
+  Flex,
+  Heading,
+  InlineAlert,
+  Text,
+  View,
+} from "@adobe/react-spectrum";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
@@ -26,52 +34,56 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="h-full">
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 dark:from-gray-700 dark:via-gray-800 dark:to-gray-900">
-        <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
-          <Heading level={1} marginBottom="size-200">
+    <Flex height="100%" justifyContent="center" alignItems="center">
+      <View
+        backgroundColor="gray-100"
+        borderWidth="thin"
+        borderColor="dark"
+        borderRadius="medium"
+        padding="size-300"
+        width="size-6000"
+        maxWidth="90%"
+      >
+        <Flex direction="column" gap="size-200">
+          <Heading level={1} margin={0}>
             Profile
           </Heading>
-          <Flex direction="column" alignItems="center">
-            <Flex
-              direction="column"
-              gap="size-300"
-              width="size-6000"
-              maxWidth="100%"
-            >
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Username:</strong> {user?.username}
-                &nbsp;&nbsp;|&nbsp;&nbsp;
-                <strong>Role:</strong> {user?.global_role}
-              </p>
+          <Divider size="S" />
 
-              {user?.must_change_password && (
-                <InlineAlert variant="notice" width="100%">
-                  <Heading>Password change required</Heading>
-                  <Content>
-                    You must set a new password before continuing.
-                  </Content>
-                </InlineAlert>
-              )}
-
-              {user && (
-                <PasswordChangeDialog
-                  userId={user._id}
-                  triggerLabel="Change Password"
-                  heading="Change Password"
-                  forceChangeOnNextLogin={false}
-                  successMessage="Password changed"
-                  triggerVariant="cta"
-                  isOpen={isPasswordDialogOpen}
-                  onOpenChange={setIsPasswordDialogOpen}
-                  isDismissable={!user.must_change_password}
-                  onSuccess={onPasswordChanged}
-                />
-              )}
+          <Flex direction="column" gap="size-100">
+            <Flex justifyContent="space-between">
+              <Text>Username</Text>
+              <Text>{user?.username}</Text>
+            </Flex>
+            <Flex justifyContent="space-between">
+              <Text>Role</Text>
+              <Text>{user?.global_role}</Text>
             </Flex>
           </Flex>
-        </div>
-      </div>
-    </div>
+
+          {user?.must_change_password && (
+            <InlineAlert variant="notice" width="100%">
+              <Heading>Password change required</Heading>
+              <Content>You must set a new password before continuing.</Content>
+            </InlineAlert>
+          )}
+
+          {user && (
+            <PasswordChangeDialog
+              userId={user._id}
+              triggerLabel="Change Password"
+              heading="Change Password"
+              forceChangeOnNextLogin={false}
+              successMessage="Password changed"
+              triggerVariant="cta"
+              isOpen={isPasswordDialogOpen}
+              onOpenChange={setIsPasswordDialogOpen}
+              isDismissable={!user.must_change_password}
+              onSuccess={onPasswordChanged}
+            />
+          )}
+        </Flex>
+      </View>
+    </Flex>
   );
 }

@@ -117,18 +117,11 @@ export default function ToolBar() {
     defaultExpanded?: boolean;
   }[] = [];
 
-  const showShotLabels =
-    project.task === TaskType.Profile2D ||
-    project.task === TaskType.TimeSeries ||
-    project.task === TaskType.Video;
-
-  if (showShotLabels) {
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels} canAnnotate={canAnnotate} />,
-    });
-  }
+  const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
+  tools.push({
+    name: "Shot Labels",
+    component: <ShotLabels labels={labels} canAnnotate={canAnnotate} />,
+  });
 
   if (data && project.task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
