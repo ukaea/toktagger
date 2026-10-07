@@ -1,3 +1,5 @@
+import re
+
 import pytest
 import requests
 
@@ -15,12 +17,9 @@ def test_profile_shows_own_username_and_role_read_only(
     user_page = login_as(browser, "profuser1", "profuser1_pass")
     user_page.goto("http://localhost:8002/ui/profile")
 
-    # Username/Role are rendered as one combined, read-only paragraph.
-    summary = user_page.locator("p").filter(has_text="Username:")
-    expect(summary).to_be_visible()
-    expect(summary).to_contain_text("profuser1")
-    expect(summary).to_contain_text("Role:")
-    expect(summary).to_contain_text("user")
+    for text in ["Username", "profuser1", "Role", "user"]:
+        field = user_page.get_by_role("none").filter(has_text=re.compile(f"^{text}$"))
+        expect(field).to_be_visible()
     # No form control for username/role — only password fields exist.
     expect(user_page.get_by_role("textbox", name="Username")).to_be_hidden()
 
