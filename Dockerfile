@@ -10,18 +10,17 @@ ARG EXTRAS=""
 WORKDIR /src
 RUN pip install --no-cache-dir uv
 ENV UV_LINK_MODE=copy UV_HTTP_TIMEOUT=120
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY toktagger ./toktagger
 COPY --from=ui /src/toktagger/api/static ./toktagger/api/static
-RUN uv venv /opt/venv && \
-    VIRTUAL_ENV=/opt/venv uv pip install ".${EXTRAS:+[$EXTRAS]}"
+RUN UV_PROJECT_ENVIRONMENT=/opt/venv uv sync --frozen --no-dev --no-editable ${EXTRAS:+--extra $EXTRAS}
 
 FROM python:3.12 AS dev
 WORKDIR /app
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY toktagger ./toktagger
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system -e ".[models]"
+    UV_PROJECT_ENVIRONMENT=/usr/local uv sync --frozen --no-dev --extra models
 CMD ["bash"]
 
 FROM python:3.12-slim AS production

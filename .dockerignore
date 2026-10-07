@@ -1,6 +1,7 @@
 *
 !toktagger/
 !pyproject.toml
+!uv.lock
 !README.md
 **/node_modules
 **/__pycache__

@@ -133,7 +133,7 @@ Status: done.
 
 - `server.forwarded_allow_ips` (default `127.0.0.1`) and `server.gunicorn_timeout` (default 120) are wired into Gunicorn (`--forwarded-allow-ips`, `--timeout`, `--graceful-timeout`) and uvicorn. `warn_if_insecure()` warns about plain-HTTP `public_url` on a non-local host.
 - New multi-stage `Dockerfile` (`ui`, `builder`, `dev`, `production`). `api.dockerfile` is deleted. `docker-compose.dev.yml` builds the `dev` target.
-- NOT VERIFIED: the image was never built. Docker could not reach Docker Hub or PyPI from this machine. Build `docker build --target production .` before merge.
+- Verified: `docker build --target production .` builds. The container starts Canaille, passes the healthcheck, serves `/ui/login` and runs as uid 10001. The first build installed without `uv.lock` and got SQLAlchemy 2.1, which breaks `sqlalchemy-utils`. The Dockerfile now uses `uv sync --frozen`.
 - Tests: ruff clean; `tests/api` passes (a stale-`settings` import in the new launch tests was fixed).
 
 ### Next
