@@ -1,6 +1,7 @@
 import logging
 import re
 import secrets
+import time
 from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -105,9 +106,14 @@ async def callback(request: Request):
 
     request.session.clear()
     csrf = secrets.token_urlsafe(32)
-    session_token = create_access_token({"sub": user.username, "csrf": csrf})
+    auth_time = int(time.time())
+    session_token = create_access_token(
+        {"sub": user.username, "csrf": csrf, "auth_time": auth_time}
+    )
     response = RedirectResponse(return_to, status_code=303)
-    set_session_cookies(request, response, session_token, csrf, token.get("id_token"))
+    set_session_cookies(
+        request, response, session_token, csrf, auth_time, token.get("id_token")
+    )
     return response
 
 

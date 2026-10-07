@@ -649,44 +649,6 @@ async def test_update_user_not_found(db_client):
 
 
 @pytest.mark.asyncio
-async def test_adopt_legacy_user_links_the_identity_and_drops_the_password(db_client):
-    legacy = await db_client.db["users"].insert_one(
-        {
-            "username": "legacy",
-            "hashed_password": "pbkdf2:salt:hash",
-            "must_change_password": True,
-            "global_role": "user",
-            "is_active": True,
-        }
-    )
-
-    user = await utils.adopt_legacy_user(db_client, "legacy", "https://idp", "sub-1")
-
-    assert user is not None
-    assert user.id == str(legacy.inserted_id)
-    found = await utils.get_user_by_oidc_identity(db_client, "https://idp", "sub-1")
-    assert found is not None and found.id == user.id
-    document = (await db_client.get_filtered_documents("users"))[0]
-    assert document["hashed_password"] is None
-    assert document["must_change_password"] is False
-
-
-@pytest.mark.asyncio
-async def test_adopt_legacy_user_ignores_unknown_and_already_linked_users(
-    db_client, setup_db_auth
-):
-    unknown = await utils.adopt_legacy_user(db_client, "ghost", "https://idp", "s")
-    linked = await utils.adopt_legacy_user(db_client, "alice", "https://idp", "s")
-
-    assert unknown is None
-    assert linked is None
-    alice = await utils.get_user_by_oidc_identity(
-        db_client, USER_ADMIN.oidc_issuer, "alice-sub"
-    )
-    assert alice is not None
-
-
-@pytest.mark.asyncio
 async def test_sync_user_from_idp_updates_role_and_profile(db_client, setup_db_auth):
     user = await utils.sync_user_from_idp(
         db_client, setup_db_auth["alice_id"], "admin", "a@example.com", "Alice A"

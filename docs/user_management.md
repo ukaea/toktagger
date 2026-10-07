@@ -33,6 +33,13 @@ TokTagger has two layers of roles.
 
 The identity provider sets the global role. A user is an `admin` when the user belongs to the group `toktagger-admins`. TokTagger reads the groups again at every sign-in. To change a global role, change the group membership in the identity provider.
 
+A change in the identity provider takes effect at the next sign-in of the user. A browser session lasts for a maximum of `auth.session_max_age_seconds` (default 12 hours). After this time, the user must sign in again. A deactivation in TokTagger takes effect immediately.
+
+TokTagger does not read the role from an access token that a script sends. Only a sign-in in the browser changes the role.
+
+!!! warning
+    If the identity provider removes the last TokTagger admin from the admin group, TokTagger has no admin. TokTagger writes a warning to the server log. To give admin access again, add a user to the admin group in the identity provider. Then that user signs in.
+
 ### Project roles (per-project membership)
 
 | Project Role | Permissions |
@@ -82,6 +89,8 @@ The user can now sign in to TokTagger.
 Open `http://<host>:<port>/ui/login` (or the root URL). Click **Sign in**. The identity provider shows its sign-in page. After you sign in, you return to TokTagger.
 
 TokTagger creates its own record for a user at the first sign-in. The record contains the user name, the email address and the display name. TokTagger takes the user name from the identity provider claim `preferred_username`. If that name is already in use, TokTagger adds a number. TokTagger never changes a user name after the first sign-in, because annotations store it.
+
+TokTagger does not connect an identity provider account to a user from the old password login, also when the user names are the same. The identity provider account gets a new record, for example `admin2`. An admin must add the project memberships of the new record again.
 
 !!! note
     A user does not appear in the TokTagger user list or in the project member list until the first sign-in.
@@ -144,7 +153,7 @@ In the identity provider, create a **confidential** client for TokTagger. Use th
 1. **Flow:** Enable the authorization code flow with PKCE (method `S256`). Disable the other flows.
 2. **Redirect URI:** Set `<public_url>/auth/callback`.
 3. **Sign-out redirect URI:** Set `<public_url>/ui/login`.
-4. **Groups claim:** Add a mapper that puts the groups of the user in the ID token, the access token and the userinfo. Set `roles_claim` to the name of the claim. For a nested claim, use a dotted path, for example `realm_access.roles`.
+4. **Groups claim:** Add a mapper that puts the groups of the user in the userinfo. Set `roles_claim` to the name of the claim. For a nested claim, use a dotted path, for example `realm_access.roles`. You can also put the groups in the ID token. Do not do this if users have many groups: TokTagger keeps the ID token in a cookie, and a browser cannot keep a cookie larger than approximately 4 KB.
 5. **Admin group:** Create the group named in `admin_group`. Add the TokTagger admins to it. TokTagger removes a leading `/` from group names.
 6. **Audience:** Add the client ID to the audience of access tokens. TokTagger needs this to accept access tokens from scripts.
 

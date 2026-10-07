@@ -124,6 +124,8 @@ def _token_key_id(token: str) -> str | None:
     header_segment = token.split(".")[0]
     padded = header_segment + "=" * (-len(header_segment) % 4)
     header = json.loads(base64.urlsafe_b64decode(padded))
+    if not isinstance(header, dict):
+        raise ValueError("Invalid token")
     key_id = header.get("kid")
     return key_id if isinstance(key_id, str) else None
 
@@ -229,14 +231,38 @@ async def _create_with_free_username(db_client: MongoDBClient, user: UserIn) -> 
             suffix += 1
 
 
+async def _warn_if_last_admin_demoted(
+    db_client: MongoDBClient, user: UserOut, global_role: Literal["admin", "user"]
+) -> None:
+    if user.global_role != "admin" or not user.is_active or global_role == "admin":
+        return
+    other_admins = [
+        other
+        for other in await utils.get_all_users(db_client)
+        if other.global_role == "admin" and other.is_active and other.id != user.id
+    ]
+    if not other_admins:
+        logger.warning(
+            "The identity provider removed %s from %s, so TokTagger has no active "
+            "admin. Add a user to %s at the provider to give admin access again.",
+            user.username,
+            config.settings.auth.admin_group,
+            config.settings.auth.admin_group,
+        )
+
+
 async def provision_user(
-    db_client: MongoDBClient, issuer: str, claims: dict[str, Any]
+    db_client: MongoDBClient,
+    issuer: str,
+    claims: dict[str, Any],
+    sync_profile: bool = True,
 ) -> UserOut:
     """Create or update the local user for an identity provider account.
 
     The username is chosen at first sign-in and never changed afterwards, because
-    annotations store it in created_by. The global role follows the provider's
-    groups on every call. A local is_active=False is not changed here.
+    annotations store it in created_by. With sync_profile, the global role, email
+    and display name follow the claims; access tokens often omit those claims, so
+    bearer callers turn it off. A local is_active=False is not changed here.
     """
     sub = claims.get("sub")
     if not isinstance(sub, str) or not sub:
@@ -250,29 +276,30 @@ async def provision_user(
     email = claims.get("email") if isinstance(claims.get("email"), str) else None
     display_name = claims.get("name") if isinstance(claims.get("name"), str) else None
 
+    if not sync_profile:
+        existing = await utils.get_user_by_oidc_identity(db_client, issuer, sub)
+        if existing is not None:
+            return existing
+
     async with db_client.lock(f"users:oidc:{issuer}:{sub}"):
         user = await utils.get_user_by_oidc_identity(db_client, issuer, sub)
         if user is None:
-            base_name = derive_username(claims)
-            user = await utils.adopt_legacy_user(db_client, base_name, issuer, sub)
-            if user is not None:
-                logger.info(
-                    "Linked existing user %s to identity %s", user.username, sub
-                )
-            else:
-                new_user = UserIn(
-                    username=base_name,
-                    oidc_issuer=issuer,
-                    oidc_sub=sub,
-                    global_role=global_role,
-                    email=email,
-                    display_name=display_name,
-                )
-                user_id = await _create_with_free_username(db_client, new_user)
-                created = await utils.get_user_by_id(db_client, user_id)
-                if created is None:
-                    raise RuntimeError("Created user could not be read back")
-                return created
+            new_user = UserIn(
+                username=derive_username(claims),
+                oidc_issuer=issuer,
+                oidc_sub=sub,
+                global_role=global_role,
+                email=email,
+                display_name=display_name,
+            )
+            user_id = await _create_with_free_username(db_client, new_user)
+            created = await utils.get_user_by_id(db_client, user_id)
+            if created is None:
+                raise RuntimeError("Created user could not be read back")
+            return created
+        if not sync_profile:
+            return user
+        await _warn_if_last_admin_demoted(db_client, user, global_role)
         return await utils.sync_user_from_idp(
             db_client, user.id, global_role, email, display_name
         )

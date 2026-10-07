@@ -385,6 +385,44 @@ async def test_bearer_idp_token_is_accepted_and_provisions_the_user(
 
 
 @pytest.mark.asyncio
+async def test_bearer_idp_token_does_not_change_the_role_or_profile(
+    unauthenticated_api_client, oidc_settings, jwks_route, idp_key, db_client
+):
+    await oidc.provision_user(
+        db_client,
+        ISSUER,
+        {
+            "sub": "user-1",
+            "preferred_username": "carol",
+            "groups": ["toktagger-admins"],
+            "email": "carol@example.com",
+            "name": "Carol",
+        },
+    )
+
+    resp = await unauthenticated_api_client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {mint_token(idp_key)}"}
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["global_role"] == "admin"
+    assert resp.json()["email"] == "carol@example.com"
+    assert resp.json()["display_name"] == "Carol"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("token", ["W10.e30.x", "bnVsbA.e30.x"])
+async def test_bearer_with_a_non_object_jwt_header_is_401(
+    unauthenticated_api_client, oidc_settings, jwks_route, token
+):
+    resp = await unauthenticated_api_client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "overrides",
     [

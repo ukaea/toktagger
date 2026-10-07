@@ -1,16 +1,14 @@
 import asyncio
+import logging
 import time
 
 import httpx
 import pytest
-from bson import ObjectId
 from joserfc import jwt
 from joserfc.jwk import KeySet, OctKey, RSAKey
 
 from tests.api.auth.conftest import CLIENT_ID, ISSUER, JWKS_URL, mint_token
 from toktagger.api.auth import oidc
-from toktagger.api.crud import utils
-from toktagger.api.schemas.projects import ProjectMember
 
 
 def test_extract_roles_reads_a_list():
@@ -270,55 +268,95 @@ async def test_provision_keeps_a_locally_deactivated_user_inactive(
 
 
 @pytest.mark.asyncio
-async def test_provision_adopts_a_legacy_user_with_the_same_username(
-    db_client, oidc_settings
-):
+async def test_provision_never_takes_over_an_unlinked_user(db_client, oidc_settings):
     legacy = await db_client.db["users"].insert_one(
         {
-            "username": "legacy",
+            "username": "admin",
             "hashed_password": "pbkdf2:salt:hash",
-            "must_change_password": True,
-            "global_role": "user",
+            "global_role": "admin",
             "is_active": True,
         }
     )
 
     user = await oidc.provision_user(
-        db_client, ISSUER, {"sub": "sub-1", "preferred_username": "legacy"}
+        db_client, ISSUER, {"sub": "sub-1", "preferred_username": "admin"}
     )
 
-    assert user.id == str(legacy.inserted_id)
-    assert user.username == "legacy"
-    document = (await db_client.get_filtered_documents("users"))[0]
-    assert document["oidc_issuer"] == ISSUER
-    assert document["oidc_sub"] == "sub-1"
-    assert document["hashed_password"] is None
-    assert document["must_change_password"] is False
+    assert user.id != str(legacy.inserted_id)
+    assert user.username == "admin2"
+    assert user.global_role == "user"
+    document = await db_client.get_document_by_id("users", legacy.inserted_id)
+    assert document["global_role"] == "admin"
+    assert "oidc_sub" not in document
 
 
 @pytest.mark.asyncio
-async def test_provision_keeps_memberships_of_an_adopted_user(
-    db_client, oidc_settings, setup_db_auth
-):
-    await db_client.db["users"].update_one(
-        {"username": "alice"}, {"$set": {"oidc_sub": None, "oidc_issuer": None}}
-    )
-    await db_client.insert(
-        "project_members",
-        ProjectMember(role="annotator"),
-        ids={
-            "project_id": ObjectId(setup_db_auth["project_id"]),
-            "user_id": ObjectId(setup_db_auth["alice_id"]),
+async def test_provision_without_sync_keeps_role_and_profile(db_client, oidc_settings):
+    identity = {"sub": "sub-1", "preferred_username": "alice"}
+    await oidc.provision_user(
+        db_client,
+        ISSUER,
+        {
+            **identity,
+            "groups": ["toktagger-admins"],
+            "email": "alice@example.com",
+            "name": "Alice",
         },
     )
 
+    user = await oidc.provision_user(db_client, ISSUER, identity, sync_profile=False)
+
+    assert user.global_role == "admin"
+    assert user.email == "alice@example.com"
+    assert user.display_name == "Alice"
+
+
+@pytest.mark.asyncio
+async def test_provision_without_sync_still_creates_a_new_user(
+    db_client, oidc_settings
+):
     user = await oidc.provision_user(
-        db_client, ISSUER, {"sub": "new-sub", "preferred_username": "alice"}
+        db_client,
+        ISSUER,
+        {"sub": "sub-1", "preferred_username": "alice"},
+        sync_profile=False,
     )
 
-    assert user.id == setup_db_auth["alice_id"]
-    memberships = await utils.get_user_memberships(db_client, user.id)
-    assert [member.role for member in memberships] == ["annotator"]
+    assert user.username == "alice"
+    assert user.global_role == "user"
+
+
+@pytest.mark.asyncio
+async def test_provision_warns_when_the_last_admin_is_demoted(
+    db_client, oidc_settings, caplog
+):
+    identity = {"sub": "sub-1", "preferred_username": "alice"}
+    await oidc.provision_user(
+        db_client, ISSUER, {**identity, "groups": ["toktagger-admins"]}
+    )
+
+    with caplog.at_level(logging.WARNING, logger=oidc.logger.name):
+        demoted = await oidc.provision_user(db_client, ISSUER, identity)
+
+    assert demoted.global_role == "user"
+    assert "no active admin" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_provision_does_not_warn_while_another_admin_remains(
+    db_client, oidc_settings, caplog
+):
+    admin_claims = {"groups": ["toktagger-admins"]}
+    await oidc.provision_user(
+        db_client, ISSUER, {"sub": "sub-1", "preferred_username": "bob", **admin_claims}
+    )
+    alice = {"sub": "sub-2", "preferred_username": "alice"}
+    await oidc.provision_user(db_client, ISSUER, {**alice, **admin_claims})
+
+    with caplog.at_level(logging.WARNING, logger=oidc.logger.name):
+        await oidc.provision_user(db_client, ISSUER, alice)
+
+    assert "no active admin" not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -337,22 +375,6 @@ async def test_provision_concurrent_logins_with_one_username_get_distinct_names(
     )
 
     assert sorted(user.username for user in users) == ["carol", "carol2", "carol3"]
-
-
-@pytest.mark.asyncio
-async def test_provision_does_not_adopt_a_user_already_linked_to_another_identity(
-    db_client, oidc_settings
-):
-    first = await oidc.provision_user(
-        db_client, ISSUER, {"sub": "sub-1", "preferred_username": "alice"}
-    )
-
-    second = await oidc.provision_user(
-        db_client, ISSUER, {"sub": "sub-2", "preferred_username": "alice"}
-    )
-
-    assert second.id != first.id
-    assert second.username == "alice2"
 
 
 @pytest.mark.asyncio
@@ -448,7 +470,9 @@ async def test_verify_rejects_a_symmetric_token(oidc_settings, jwks_route, idp_k
         await oidc.verify_access_token(token)
 
 
-@pytest.mark.parametrize("token", ["", "not-a-jwt", "a.b.c", "....."])
+@pytest.mark.parametrize(
+    "token", ["", "not-a-jwt", "a.b.c", ".....", "W10.e30.x", "bnVsbA.e30.x"]
+)
 @pytest.mark.asyncio
 async def test_verify_rejects_malformed_tokens(oidc_settings, jwks_route, token):
     with pytest.raises(ValueError):

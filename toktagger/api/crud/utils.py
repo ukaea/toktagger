@@ -663,33 +663,6 @@ async def get_user_by_oidc_identity(
     return UserOut.model_validate(docs[0]) if docs else None
 
 
-async def adopt_legacy_user(
-    db_client: MongoDBClient, username: str, issuer: str, sub: str
-) -> UserOut | None:
-    """Link a password-era user with this username to an OIDC identity.
-
-    Returns None when there is no such user or it is already linked.
-    """
-    async with db_client.lock(f"users:username:{username}"):
-        docs = await db_client.get_filtered_documents(
-            "users", filters={"username": username}
-        )
-        if not docs or docs[0].get("oidc_sub"):
-            return None
-        await db_client.db["users"].update_one(
-            {"_id": docs[0]["_id"]},
-            {
-                "$set": {
-                    "oidc_issuer": issuer,
-                    "oidc_sub": sub,
-                    "hashed_password": None,
-                    "must_change_password": False,
-                }
-            },
-        )
-        return await get_user_by_id(db_client, str(docs[0]["_id"]))
-
-
 async def sync_user_from_idp(
     db_client: MongoDBClient,
     user_id: str,

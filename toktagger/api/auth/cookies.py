@@ -1,10 +1,16 @@
+import logging
+import time
+
 from fastapi import Request, Response
 
 from toktagger.api import config
 from toktagger.api.auth.core import ACCESS_TOKEN_EXPIRE_SECONDS
 
+logger = logging.getLogger(__name__)
+
 CSRF_COOKIE_NAME = "tt_csrf"
 ID_TOKEN_COOKIE_NAME = "tt_id_token"
+MAX_ID_TOKEN_COOKIE_BYTES = 3800
 
 
 def _cookie_secure(request: Request) -> bool:
@@ -18,11 +24,18 @@ def _cookie_secure(request: Request) -> bool:
     )
 
 
+def session_seconds_left(auth_time: int) -> int:
+    """Seconds until a session that started at `auth_time` reaches its maximum age."""
+    max_age = config.settings.auth.session_max_age_seconds
+    return auth_time + max_age - int(time.time())
+
+
 def set_session_cookies(
     request: Request,
     response: Response,
     token: str,
     csrf: str,
+    auth_time: int,
     id_token: str | None = None,
 ):
     """Store the session token and its CSRF partner on the response.
@@ -34,10 +47,11 @@ def set_session_cookies(
     """
     secure = _cookie_secure(request)
     samesite = config.settings.auth.cookie_samesite
+    max_age = max(0, min(ACCESS_TOKEN_EXPIRE_SECONDS, session_seconds_left(auth_time)))
     response.set_cookie(
         config.settings.auth.cookie_name,
         token,
-        max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
+        max_age=max_age,
         httponly=True,
         secure=secure,
         samesite=samesite,
@@ -46,17 +60,25 @@ def set_session_cookies(
     response.set_cookie(
         CSRF_COOKIE_NAME,
         csrf,
-        max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
+        max_age=max_age,
         httponly=False,
         secure=secure,
         samesite=samesite,
         path="/",
     )
-    if id_token:
+    if id_token and len(id_token) > MAX_ID_TOKEN_COOKIE_BYTES:
+        # Browsers drop cookies over about 4 KB, so logout goes without id_token_hint.
+        logger.warning(
+            "The provider ID token is %d bytes, too large for a cookie. Sign-out will "
+            "not include id_token_hint. Remove large claims, such as groups, from the "
+            "ID token at the provider.",
+            len(id_token),
+        )
+    elif id_token:
         response.set_cookie(
             ID_TOKEN_COOKIE_NAME,
             id_token,
-            max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
+            max_age=max_age,
             httponly=True,
             secure=secure,
             samesite=samesite,
