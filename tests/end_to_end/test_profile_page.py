@@ -16,16 +16,13 @@ def test_profile_shows_own_details_read_only(server_setup, admin_token, browser)
     user_page = login_as(browser, "profuser1", "profuser1_pass")
     user_page.goto(PROFILE_URL)
 
-    for text in [
-        "Username",
-        "profuser1",
-        "Email",
-        "profuser1@localhost",
-        "Role",
-        "user",
-    ]:
-        field = user_page.get_by_role("none").filter(has_text=re.compile(f"^{text}$"))
-        expect(field).to_be_visible()
+    def field(text: str):
+        return user_page.get_by_role("none").filter(has_text=re.compile(f"^{text}$"))
+
+    for text in ["Username", "Name", "Email", "profuser1@localhost", "Role", "user"]:
+        expect(field(text)).to_be_visible()
+    # Shown as both username and name, because Canaille sets the formatted name to it.
+    expect(field("profuser1")).to_have_count(2)
     expect(user_page.get_by_role("textbox")).to_have_count(0)
     expect(user_page.get_by_role("button", name="Change Password")).to_have_count(0)
 
