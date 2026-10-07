@@ -160,8 +160,11 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       } else if (response.ok) {
         setAnnotations((previousAnnotations: Annotations) => {
           const predictedFrames = new Set(
-            (payload as Annotation[]).flatMap((a) =>
-              "frame" in a && typeof a.frame === "number" ? [a.frame] : [],
+            (payload as Annotation[]).flatMap((predictedAnnotation) =>
+              "frame" in predictedAnnotation &&
+              typeof predictedAnnotation.frame === "number"
+                ? [predictedAnnotation.frame]
+                : [],
             ),
           );
           const otherAnnotations = previousAnnotations.filter(
