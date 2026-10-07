@@ -1,7 +1,6 @@
 import re
 
 import pytest
-import requests
 
 pytest.importorskip("playwright")
 from playwright.sync_api import expect
@@ -9,139 +8,29 @@ from playwright.sync_api import expect
 from tests.end_to_end.conftest import login_as
 from tests.endpoints import create_user
 
+PROFILE_URL = "http://localhost:8002/ui/profile"
 
-def test_profile_shows_own_username_and_role_read_only(
-    server_setup, admin_token, browser
-):
+
+def test_profile_shows_own_details_read_only(server_setup, admin_token, browser):
     create_user("profuser1", "profuser1_pass")
     user_page = login_as(browser, "profuser1", "profuser1_pass")
-    user_page.goto("http://localhost:8002/ui/profile")
+    user_page.goto(PROFILE_URL)
 
-    for text in ["Username", "profuser1", "Role", "user"]:
-        field = user_page.get_by_role("none").filter(has_text=re.compile(f"^{text}$"))
-        expect(field).to_be_visible()
-    # No form control for username/role — only password fields exist.
-    expect(user_page.get_by_role("textbox", name="Username")).to_be_hidden()
+    def field(text: str):
+        return user_page.get_by_role("none").filter(has_text=re.compile(f"^{text}$"))
 
-    user_page.context.close()
-
-
-def test_password_mismatch_is_rejected(server_setup, admin_token, browser):
-    create_user("profuser3", "profuser3_pass")
-    user_page = login_as(browser, "profuser3", "profuser3_pass")
-    user_page.goto("http://localhost:8002/ui/profile")
-
-    user_page.get_by_role("button", name="Change Password").click()
-    dialog = user_page.get_by_role("dialog")
-    dialog.get_by_role("textbox", name="New password", exact=True).fill(
-        "newpassword123"
-    )
-    dialog.get_by_role("textbox", name="Confirm new password").fill("different123")
-    dialog.get_by_role("button", name="Change Password").click()
-    alert = user_page.get_by_role("alert")
-    expect(alert).to_be_visible()
-    expect(alert).to_contain_text("Passwords do not match")
+    for text in ["Username", "Name", "Email", "profuser1@localhost", "Role", "user"]:
+        expect(field(text)).to_be_visible()
+    # Shown as both username and name, because Canaille sets the formatted name to it.
+    expect(field("profuser1")).to_have_count(2)
+    expect(user_page.get_by_role("textbox")).to_have_count(0)
+    expect(user_page.get_by_role("button", name="Change Password")).to_have_count(0)
 
     user_page.context.close()
 
 
-def test_password_too_short_is_rejected(server_setup, admin_token, browser):
-    create_user("profuser4", "profuser4_pass")
-    user_page = login_as(browser, "profuser4", "profuser4_pass")
-    user_page.goto("http://localhost:8002/ui/profile")
-
-    user_page.get_by_role("button", name="Change Password").click()
-    dialog = user_page.get_by_role("dialog")
-    dialog.get_by_role("textbox", name="New password", exact=True).fill("short1")
-    dialog.get_by_role("textbox", name="Confirm new password").fill("short1")
-    dialog.get_by_role("button", name="Change Password").click()
-    alert = user_page.get_by_role("alert")
-    expect(alert).to_be_visible()
-    expect(alert).to_contain_text("Password must be at least 8 characters")
-
-    user_page.context.close()
-
-
-@pytest.mark.parametrize("role", ["user", "admin"])
-def test_forced_password_change_holds_user_on_profile(
-    role, server_setup, admin_token, browser
-):
-    """An account flagged for a password change cannot go anywhere else until it has
-    set one. Parametrised over the global role because admin accounts — including the
-    bootstrap `admin` created on a fresh startup — are held to this too.
-    """
-    username = f"forced_{role}"
-    create_user(username, f"{username}_pass", role=role, must_change_password=True)
-    user_page = login_as(browser, username, f"{username}_pass")
-
-    # Any other page bounces straight back to the profile page.
-    user_page.goto("http://localhost:8002/ui/projects/")
-    expect(user_page).to_have_url("http://localhost:8002/ui/profile", timeout=5000)
-    expect(user_page.get_by_text("Password change required")).to_be_visible()
-
-    # The dialog opens itself for a forced change, and its confirm button shares the
-    # trigger's name, so scope to the dialog rather than the page.
-    dialog = user_page.get_by_role("dialog")
-    dialog.get_by_role("textbox", name="New password", exact=True).fill(
-        "newpassword123"
-    )
-    dialog.get_by_role("textbox", name="Confirm new password").fill("newpassword123")
-    dialog.get_by_role("button", name="Change Password").click()
-
-    # Once changed, the user is released to the projects page.
-    expect(user_page).to_have_url("http://localhost:8002/ui/projects", timeout=5000)
-    user_page.context.close()
-
-
-def test_password_visibility_can_be_toggled(server_setup, admin_token, browser):
-    create_user("profuser6", "profuser6_pass")
-    user_page = login_as(browser, "profuser6", "profuser6_pass")
-    user_page.goto("http://localhost:8002/ui/profile")
-
-    user_page.get_by_role("button", name="Change Password").click()
-    dialog = user_page.get_by_role("dialog")
-    new_password = dialog.get_by_role("textbox", name="New password", exact=True)
-    confirm_password = dialog.get_by_role("textbox", name="Confirm new password")
-    expect(new_password).to_have_attribute("type", "password")
-    expect(confirm_password).to_have_attribute("type", "password")
-
-    # Each field has its own toggle, so revealing one leaves the other hidden.
-    dialog.get_by_role("button", name="Show New password").click()
-    expect(new_password).to_have_attribute("type", "text")
-    expect(confirm_password).to_have_attribute("type", "password")
-
-    dialog.get_by_role("button", name="Hide New password").click()
-    expect(new_password).to_have_attribute("type", "password")
-
-    user_page.context.close()
-
-
-def test_user_can_change_own_password(server_setup, admin_token, browser):
-    create_user("profuser5", "profuser5_pass")
-    user_page = login_as(browser, "profuser5", "profuser5_pass")
-    user_page.goto("http://localhost:8002/ui/profile")
-
-    user_page.get_by_role("button", name="Change Password").click()
-    dialog = user_page.get_by_role("dialog")
-    dialog.get_by_role("textbox", name="New password", exact=True).fill(
-        "newpassword123"
-    )
-    dialog.get_by_role("textbox", name="Confirm new password").fill("newpassword123")
-    dialog.get_by_role("button", name="Change Password").click()
-    expect(user_page.get_by_text("Password changed")).to_be_visible()
-    user_page.context.close()
-
-    resp = requests.post(
-        "http://localhost:8002/auth/token",
-        data={"username": "profuser5", "password": "newpassword123"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert resp.status_code == 200
-
-    # The old password no longer works.
-    resp = requests.post(
-        "http://localhost:8002/auth/token",
-        data={"username": "profuser5", "password": "profuser5_pass"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert resp.status_code == 401
+def test_profile_links_to_account_management(server_setup, admin_token, page):
+    page.goto(PROFILE_URL)
+    link = page.get_by_role("link", name="Manage account")
+    expect(link).to_be_visible()
+    expect(link).to_have_attribute("href", "http://localhost:8003/")

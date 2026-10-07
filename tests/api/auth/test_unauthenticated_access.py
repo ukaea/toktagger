@@ -25,7 +25,11 @@ _PUBLIC_PATHS = {
     "/redoc",
     "/openapi.json",
 }
-_PUBLIC_METHOD_PATHS = {("POST", "/auth/token")}
+_PUBLIC_METHOD_PATHS = {
+    ("GET", "/auth/config"),
+    ("GET", "/auth/login"),
+    ("GET", "/auth/callback"),
+}
 
 
 def _iter_leaf_routes(routes):

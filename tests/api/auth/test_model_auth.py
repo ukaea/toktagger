@@ -4,15 +4,17 @@ Tests for model × auth interactions:
   2. Unauthenticated sender is rejected when auth is required.
   3. Non-admin bulk import enforces created_by = current user.
   4. Global admin bulk import allows arbitrary created_by.
-  5. Usernames with reserved prefixes ("model::", "annotators::", "__") are rejected.
+  5. Usernames with reserved prefixes ("model::", "annotators::", "__") are never provisioned.
   6. A user whose username matches a model-type string cannot corrupt
      "model::<type>" prefixed predictions.
 """
 
 import pytest
 
-from tests.api.auth.conftest import get_auth_token
+from tests.api.auth.conftest import ISSUER, get_auth_token
+from toktagger.api.auth import oidc
 from toktagger.api.auth.core import get_internal_token
+from toktagger.api.schemas.users import UserIn
 
 
 def annotation_payload(
@@ -74,9 +76,7 @@ async def test_import_non_admin_created_by_overwritten(
 ):
     """An annotator importing with a spoofed created_by should have it replaced."""
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     await client.post(
@@ -84,7 +84,7 @@ async def test_import_non_admin_created_by_overwritten(
         json={"username": "alice", "role": "annotator"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    alice_token = get_auth_token("alice")
 
     resp = await client.put(
         f"/projects/{project_id}/annotations",
@@ -111,9 +111,7 @@ async def test_import_admin_is_attributed_as_self(
     """A global admin importing annotations is recorded as the author; a
     supplied created_by is ignored so authorship stays auditable."""
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     resp = await client.put(
@@ -138,9 +136,7 @@ async def test_internal_token_preserves_arbitrary_created_by(
 ):
     """The internal token (Ray worker) can import with model:: prefixed created_by."""
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     internal_token = get_internal_token()
@@ -161,61 +157,28 @@ async def test_internal_token_preserves_arbitrary_created_by(
 
 
 @pytest.mark.asyncio
-async def test_username_with_model_prefix_rejected(
-    unauthenticated_api_client, setup_db_auth
+@pytest.mark.parametrize(
+    "preferred_username",
+    [
+        "model::disruption_cnn",
+        "annotators::peak_detection",
+        "__internal__",
+        "__user__",
+        "__admin",
+    ],
+)
+async def test_provisioned_username_never_uses_a_reserved_prefix(
+    preferred_username, db_client, oidc_settings
 ):
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    resp = await client.post(
-        "/users",
-        json={
-            "username": "model::disruption_cnn",
-            "password": "pass1234",
-            "global_role": "user",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
+    """Real users must not collide with the namespaces of models, annotators and the internal user."""
+    user = await oidc.provision_user(
+        db_client,
+        ISSUER,
+        {"sub": "sub-1", "preferred_username": preferred_username},
     )
-    assert resp.status_code == 422
-    assert resp.json()["detail"] == "Username uses a reserved prefix"
 
-
-@pytest.mark.asyncio
-async def test_username_with_annotators_prefix_rejected(
-    unauthenticated_api_client, setup_db_auth
-):
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    resp = await client.post(
-        "/users",
-        json={
-            "username": "annotators::peak_detection",
-            "password": "pass1234",
-            "global_role": "user",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert resp.status_code == 422
-    assert resp.json()["detail"] == "Username uses a reserved prefix"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("username", ["__internal__", "__user__", "__admin"])
-async def test_username_with_dunder_prefix_rejected(
-    username, unauthenticated_api_client, setup_db_auth
-):
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    resp = await client.post(
-        "/users",
-        json={
-            "username": username,
-            "password": "pass1234",
-            "global_role": "user",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert resp.status_code == 422
-    assert resp.json()["detail"] == "Username uses a reserved prefix"
+    assert not user.username.startswith(oidc.RESERVED_USERNAME_PREFIXES)
+    assert user.username
 
 
 @pytest.mark.asyncio
@@ -227,7 +190,7 @@ async def test_username_with_dunder_prefix_rejected(
     ],
 )
 async def test_user_save_does_not_corrupt_prefixed_predictions(
-    prefix, matching_name, setup_db_auth, unauthenticated_api_client
+    prefix, matching_name, setup_db_auth, unauthenticated_api_client, db_client
 ):
     """A human user whose name matches a reserved-prefix type (a model type like
     'disruption_cnn', or a built-in annotator type like 'peak_detection') saving
@@ -245,32 +208,19 @@ async def test_user_save_does_not_corrupt_prefixed_predictions(
     """
     prefixed_created_by = f"{prefix}{matching_name}"
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
     sample_id = setup_db_auth["sample_id"]
 
-    # Create a human user whose name matches a reserved-prefix type (the collision scenario).
-    create_resp = await client.post(
-        "/users",
-        json={
-            "username": matching_name,
-            "password": "pass1234",
-            "global_role": "user",
-        },
-        headers={"Authorization": f"Bearer {admin_token}"},
+    # A human user whose name matches a reserved-prefix type (the collision scenario).
+    await db_client.insert(
+        "users",
+        UserIn(
+            username=matching_name,
+            oidc_issuer=ISSUER,
+            oidc_sub=f"{matching_name}-sub",
+        ),
     )
-    assert create_resp.status_code == 200
-
-    # Disable must change password
-    user_id = create_resp.json()["_id"]
-    resp = await client.put(
-        f"/users/{user_id}",
-        json={"must_change_password": False},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert resp.status_code == 200
 
     # Insert a machine-made annotation via the internal token.
     internal_token = get_internal_token()
@@ -286,7 +236,7 @@ async def test_user_save_does_not_corrupt_prefixed_predictions(
         json={"username": matching_name, "role": "annotator"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    human_token = await get_auth_token(client, matching_name, "pass1234")
+    human_token = get_auth_token(matching_name)
     save_resp = await client.put(
         f"/projects/{project_id}/samples/{sample_id}/annotations",
         json=[
@@ -324,9 +274,7 @@ async def test_import_preserves_machine_created_by(
     Matches the sample-level save, which already exempts the reserved prefixes.
     """
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     await client.post(
@@ -334,7 +282,7 @@ async def test_import_preserves_machine_created_by(
         json={"username": "alice", "role": "annotator"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    alice_token = get_auth_token("alice")
 
     resp = await client.put(
         f"/projects/{project_id}/annotations",

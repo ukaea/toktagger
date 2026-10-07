@@ -1,49 +1,31 @@
 "use client";
-import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import {
   Heading,
-  TextField,
   Button,
   Flex,
   View,
-  Form,
-  ToastQueue,
+  InlineAlert,
+  Content,
 } from "@adobe/react-spectrum";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { PasswordField } from "@/app/components/ui/password";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  inactive: "This account is deactivated. Ask an administrator for access.",
+  idp_unavailable:
+    "The identity provider is not available. Try again in a moment.",
+};
+const DEFAULT_ERROR = "Sign-in failed. Try again.";
 
 export default function LoginPage() {
   const { login, isLoading, user } = useAuth();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("return_to") ?? undefined;
+  const errorCode = searchParams.get("error");
 
   if (!isLoading && user) {
-    return <Navigate to="/ui/projects/" replace />;
+    return <Navigate to={returnTo ?? "/ui/projects/"} replace />;
   }
-
-  const handleLogin = async () => {
-    if (!username || !password) {
-      ToastQueue.negative("Invalid username or password", { timeout: 2000 });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await login(username, password);
-    } catch (err) {
-      ToastQueue.negative(err instanceof Error ? err.message : "Login failed", {
-        timeout: 2000,
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    handleLogin();
-  };
 
   return (
     <Flex
@@ -65,40 +47,25 @@ export default function LoginPage() {
           boxShadow: "var(--spectrum-alias-dropshadow-color) 0 10px 40px",
         }}
       >
-        <Heading level={2} marginBottom="size-300">
-          TokTagger — Sign In
-        </Heading>
-        <Form onSubmit={handleSubmit} width="100%">
-          <Flex
-            direction="column"
-            alignItems="center"
-            gap="size-200"
+        <Flex direction="column" gap="size-200">
+          <Heading level={2} margin={0}>
+            TokTagger — Sign In
+          </Heading>
+          {errorCode && (
+            <InlineAlert variant="negative" width="100%">
+              <Heading>Could not sign in</Heading>
+              <Content>{ERROR_MESSAGES[errorCode] ?? DEFAULT_ERROR}</Content>
+            </InlineAlert>
+          )}
+          <Button
+            variant="cta"
             width="100%"
+            isDisabled={isLoading}
+            onPress={() => login(returnTo)}
           >
-            <TextField
-              label="Username"
-              value={username}
-              onChange={setUsername}
-              autoFocus
-              width="100%"
-            />
-            <PasswordField
-              label="Password"
-              value={password}
-              onChange={setPassword}
-            />
-            <Button
-              type="submit"
-              variant="cta"
-              isPending={submitting}
-              isDisabled={submitting || !username || !password}
-              width="100%"
-              marginTop="size-100"
-            >
-              Sign In
-            </Button>
-          </Flex>
-        </Form>
+            Sign In
+          </Button>
+        </Flex>
       </View>
     </Flex>
   );

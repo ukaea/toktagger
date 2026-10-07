@@ -6,14 +6,18 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { apiFetch, BACKEND_API_URL, setUnauthorizedHandler } from "@/app/core";
-import { CurrentUserSchema, type CurrentUser } from "@/types";
+import {
+  CurrentUserSchema,
+  LogoutResponseSchema,
+  type CurrentUser,
+} from "@/types";
 
 interface AuthContextType {
   user: CurrentUser | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (returnTo?: string) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -31,19 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const location = useLocation();
 
   const refreshUser = async () => {
     setUser(await fetchCurrentUser());
   };
-
-  // Force a password change before anything else - an admin knows the password they
-  // just set on a new account, so the new owner must replace it on first login.
-  useEffect(() => {
-    if (user?.must_change_password && location.pathname !== "/ui/profile") {
-      navigate("/ui/profile", { replace: true });
-    }
-  }, [user, location.pathname, navigate]);
 
   // Re-registered as `user` changes so the check below sees the current value.
   useEffect(() => {
@@ -70,33 +65,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validate();
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const body = new URLSearchParams({ username, password });
-    // The response sets the session cookie; its body is for non-browser clients.
-    const res = await apiFetch(`${BACKEND_API_URL}/auth/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.detail ?? "Login failed");
-    }
-
-    const me = await fetchCurrentUser();
-    if (!me) {
-      throw new Error("Login failed: could not load user profile");
-    }
-    setUser(me);
+  const login = (returnTo?: string) => {
+    const query = returnTo?.startsWith("/ui/")
+      ? `?return_to=${encodeURIComponent(returnTo)}`
+      : "";
+    window.location.assign(`${BACKEND_API_URL}/auth/login${query}`);
   };
 
   const logout = async () => {
-    // Only the server can clear an httpOnly cookie, but a failed call must not strand
-    // the user in a logged-in UI, so sign out locally regardless.
-    await apiFetch(`${BACKEND_API_URL}/auth/logout`, { method: "POST" }).catch(
-      () => {},
+    // A failed call must not strand the user in a logged-in UI, so sign out locally regardless.
+    const res = await apiFetch(`${BACKEND_API_URL}/auth/logout`, {
+      method: "POST",
+    }).catch(() => null);
+    const parsed = LogoutResponseSchema.safeParse(
+      await res?.json().catch(() => null),
     );
     setUser(null);
+    if (parsed.success && parsed.data.logout_url) {
+      window.location.assign(parsed.data.logout_url);
+      return;
+    }
     navigate("/ui/login", { replace: true });
   };
 

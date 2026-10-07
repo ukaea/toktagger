@@ -1,3 +1,4 @@
+import logging
 import os
 
 # Ray (>=2.43) detects when the driver is launched under `uv` and re-runs its
@@ -14,16 +15,18 @@ import subprocess
 import sys
 import tempfile
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from toktagger.api import config
-from toktagger.api.auth.core import get_internal_token
-from toktagger.api.auth.first_run import ensure_admin_user
+from toktagger.api.auth import oidc
+from toktagger.api.auth.core import get_internal_token, get_signing_secret
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
@@ -68,8 +71,13 @@ async def lifespan(app: FastAPI):
     )
     app.state.project = None
 
-    # Bootstrap admin user on first run.
-    await ensure_admin_user(app.state.db_client)
+    if not config.settings.auth.issuer_url:
+        raise RuntimeError(
+            "auth.provider=canaille requires launching via `toktagger` or run.py; "
+            "for a standalone ASGI deployment set auth.provider=oidc"
+        )
+    oidc.register_idp()
+    await oidc.connect_idp()
 
     yield
 
@@ -88,6 +96,9 @@ async def lifespan(app: FastAPI):
 # actors (WorkerModelRegistry, TaskRegistry, per-model actors) created by
 # other workers, even when all workers share the same underlying cluster.
 RAY_NAMESPACE = "toktagger"
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+logger = logging.getLogger(__name__)
 
 
 def _ray_runtime_env() -> dict:
@@ -132,6 +143,16 @@ def start_ray_head() -> None:
     )
 
 
+def warn_if_insecure() -> None:
+    """Warn when the public URL uses plain HTTP on a host other than localhost."""
+    public_url = urlparse(config.settings.public_url)
+    if public_url.scheme == "http" and public_url.hostname not in LOCAL_HOSTS:
+        logger.warning(
+            "public_url %s uses plain HTTP. Use HTTPS for any deployment that is not on localhost.",
+            config.settings.public_url,
+        )
+
+
 def run_with_gunicorn(host: str, port: int, workers: int) -> None:
     """Launch the app under Gunicorn with the given number of worker processes.
 
@@ -156,6 +177,12 @@ def run_with_gunicorn(host: str, port: int, workers: int) -> None:
         str(workers),
         "--bind",
         f"{host}:{port}",
+        "--forwarded-allow-ips",
+        config.settings.server.forwarded_allow_ips,
+        "--timeout",
+        str(config.settings.server.gunicorn_timeout),
+        "--graceful-timeout",
+        str(config.settings.server.gunicorn_timeout),
         # Gunicorn drops uvicorn's per-request access logs unless an access log target is set
         "--access-logfile",
         "-",
@@ -174,6 +201,10 @@ def run_with_gunicorn(host: str, port: int, workers: int) -> None:
             # workers - left unable to reach GCS once we shut down the Ray
             # head below, they only notice and self-terminate ~60s later.
             returncode = process.wait()
+        except SystemExit:
+            process.terminate()
+            process.wait()
+            raise
         else:
             if returncode:
                 raise subprocess.CalledProcessError(returncode, args)
@@ -286,17 +317,26 @@ class Server:
         self.app = FastAPI(lifespan=lifespan)
         self.app.add_exception_handler(LockTimeoutError, lock_timeout_handler)
 
-        # Allow requests from the frontend dev server
-        origins = [
-            "http://localhost:5173",
-        ]
-
         self.app.add_middleware(
             CORSMiddleware,
-            allow_origins=origins,  # or ["*"] to allow all
+            allow_origins=config.settings.server.cors_origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+        )
+        cookie_secure = config.settings.auth.cookie_secure
+        self.app.add_middleware(
+            SessionMiddleware,
+            secret_key=get_signing_secret(),
+            session_cookie="tt_oidc_flow",
+            path="/auth",
+            same_site="lax",
+            https_only=(
+                config.settings.public_url.startswith("https://")
+                if cookie_secure is None
+                else cookie_secure
+            ),
+            max_age=600,
         )
 
         # Static front end files

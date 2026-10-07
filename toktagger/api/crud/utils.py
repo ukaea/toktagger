@@ -7,7 +7,6 @@ from bson import ObjectId
 from fastapi import HTTPException
 from pydantic import TypeAdapter
 
-from toktagger.api.auth.core import hash_password
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
 from toktagger.api.schemas.annotations import (
@@ -655,16 +654,37 @@ async def get_user_by_username(
     return UserOut.model_validate(docs[0]) if docs else None
 
 
-async def get_user_doc_by_username(
-    db_client: MongoDBClient, username: str
-) -> dict | None:
-    """Return the raw user document, including fields UserOut omits (e.g.
-    hashed_password). Use this only where those fields are required, such as
-    password verification during login."""
+async def get_user_by_oidc_identity(
+    db_client: MongoDBClient, issuer: str, sub: str
+) -> UserOut | None:
     docs = await db_client.get_filtered_documents(
-        "users", filters={"username": username}
+        "users", filters={"oidc_issuer": issuer, "oidc_sub": sub}
     )
-    return docs[0] if docs else None
+    return UserOut.model_validate(docs[0]) if docs else None
+
+
+async def sync_user_from_idp(
+    db_client: MongoDBClient,
+    user_id: str,
+    global_role: Literal["admin", "user"],
+    email: str | None,
+    display_name: str | None,
+) -> UserOut:
+    obj_id = convert_to_objectid(user_id, "users")
+    await db_client.db["users"].update_one(
+        {"_id": obj_id},
+        {
+            "$set": {
+                "global_role": global_role,
+                "email": email,
+                "display_name": display_name,
+            }
+        },
+    )
+    user = await get_user_by_id(db_client, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 async def get_user_by_id(db_client: MongoDBClient, user_id: str) -> UserOut | None:
@@ -694,9 +714,8 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     update_dict = updates.model_dump(exclude_none=True)
-    if "password" in update_dict:
-        update_dict["hashed_password"] = hash_password(update_dict.pop("password"))
-    await db_client.db["users"].update_one({"_id": obj_id}, {"$set": update_dict})
+    if update_dict:
+        await db_client.db["users"].update_one({"_id": obj_id}, {"$set": update_dict})
 
 
 async def delete_user(db_client: MongoDBClient, user_id: str) -> None:

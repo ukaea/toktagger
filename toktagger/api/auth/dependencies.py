@@ -1,21 +1,26 @@
 import secrets
 
 from fastapi import Depends, HTTPException, Request, Response
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from toktagger.api import config
+from toktagger.api.auth import oidc
 from toktagger.api.auth.core import (
     ACCESS_TOKEN_RENEW_AFTER_SECONDS,
     create_access_token,
     decode_token_with_age,
     get_internal_token,
 )
-from toktagger.api.auth.cookies import set_session_cookies
+from toktagger.api.auth.cookies import (
+    ID_TOKEN_COOKIE_NAME,
+    session_seconds_left,
+    set_session_cookies,
+)
 from toktagger.api.crud import utils
 from toktagger.api.schemas.projects import ProjectMember
 from toktagger.api.schemas.users import UserOut
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -45,23 +50,55 @@ def _require_csrf(request: Request, payload: dict):
         )
 
 
-def _renew_session(request: Request, response: Response, payload: dict):
+def _require_session_age(payload: dict) -> int:
+    """Return the sign-in time, or reject a session past its maximum age.
+
+    The cap makes the browser sign in again, which reads the role from the provider.
+    """
+    auth_time = payload.get("auth_time")
+    if not isinstance(auth_time, int) or session_seconds_left(auth_time) <= 0:
+        raise HTTPException(status_code=401, detail="Session expired. Sign in again.")
+    return auth_time
+
+
+def _renew_session(request: Request, response: Response, payload: dict, auth_time: int):
     """Slide the session window by re-issuing the cookies on the current response.
 
-    The csrf claim is carried over unchanged, so a request already in flight with the
-    old header still validates against the new token.
+    The csrf and auth_time claims are carried over unchanged, so a request already in
+    flight with the old header still validates and the maximum age still applies.
     """
     csrf = payload.get("csrf")
     if not isinstance(csrf, str):
         return
-    set_session_cookies(request, response, create_access_token(dict(payload)), csrf)
+    set_session_cookies(
+        request,
+        response,
+        create_access_token(dict(payload)),
+        csrf,
+        auth_time,
+        request.cookies.get(ID_TOKEN_COOKIE_NAME),
+    )
+
+
+async def _user_from_idp_token(request: Request, token: str) -> UserOut:
+    try:
+        claims = await oidc.verify_access_token(token)
+        user = await oidc.provision_user(
+            request.app.state.db_client, claims["iss"], claims, sync_profile=False
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account is inactive")
+    return user
 
 
 async def get_current_user(
     request: Request,
     response: Response,
-    header_token: str | None = Depends(oauth2_scheme),
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> UserOut:
+    header_token = bearer.credentials if bearer else None
     # Header first: Ray-worker callbacks, scripts and tests never send a cookie, and an
     # explicit header should beat whatever session the same browser happens to hold.
     token = header_token or request.cookies.get(config.settings.auth.cookie_name)
@@ -78,12 +115,16 @@ async def get_current_user(
         if not username or not isinstance(username, str):
             raise ValueError("Token is missing a subject claim")
     except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+        if header_token is None or not oidc.idp_registered():
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        return await _user_from_idp_token(request, token)
 
     # A bearer header cannot be attached by a cross-site caller, so only the ambient
     # cookie credential needs CSRF cover.
+    auth_time: int | None = None
     if header_token is None:
         _require_csrf(request, payload)
+        auth_time = _require_session_age(payload)
 
     db_client = request.app.state.db_client
     user = await utils.get_user_by_username(db_client, username)
@@ -95,27 +136,9 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Account is inactive")
 
     # Only the ambient cookie slides; a bearer caller manages its own token.
-    if header_token is None and token_age >= ACCESS_TOKEN_RENEW_AFTER_SECONDS:
-        _renew_session(request, response, payload)
+    if auth_time is not None and token_age >= ACCESS_TOKEN_RENEW_AFTER_SECONDS:
+        _renew_session(request, response, payload, auth_time)
     return user
-
-
-async def require_password_changed(
-    current_user: UserOut = Depends(get_current_user),
-) -> UserOut:
-    """Hold an account on a forced password change until it supplies a new one.
-
-    The bootstrap admin ships with a public default password, so until it is replaced
-    the account is treated as not yet usable. Applied to the data routers rather than
-    inside get_current_user, so /auth/me and the self-service password change stay
-    reachable for the account being held.
-    """
-    if current_user.must_change_password:
-        raise HTTPException(
-            status_code=403,
-            detail="You must change your password before using TokTagger.",
-        )
-    return current_user
 
 
 async def require_global_admin(

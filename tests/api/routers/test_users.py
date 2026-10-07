@@ -10,7 +10,7 @@ from tests.api.auth.conftest import add_member, get_auth_token
 @pytest.mark.asyncio
 async def test_list_users_as_admin(unauthenticated_api_client, setup_db_auth):
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "admin", "admin_pass")
+    token = get_auth_token("admin")
     response = await client.get("/users", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     users = response.json()
@@ -25,97 +25,15 @@ async def test_list_users_non_admin_forbidden(
     unauthenticated_api_client, setup_db_auth
 ):
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
+    token = get_auth_token("alice")
     response = await client.get("/users", headers={"Authorization": f"Bearer {token}"})
-    assert response.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_create_user_as_admin(unauthenticated_api_client, setup_db_auth):
-    client = unauthenticated_api_client
-    token = await get_auth_token(client, "admin", "admin_pass")
-    response = await client.post(
-        "/users",
-        json={
-            "username": "newuser",
-            "password": "newpass123",
-            "global_role": "user",
-        },
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200
-    body = response.json()
-    # Endpoint returns {"_id": "<new_user_id>"}
-    assert "_id" in body
-    assert len(body["_id"]) > 0
-
-
-@pytest.mark.asyncio
-async def test_create_user_password_too_short_rejected(
-    unauthenticated_api_client, setup_db_auth
-):
-    client = unauthenticated_api_client
-    token = await get_auth_token(client, "admin", "admin_pass")
-    response = await client.post(
-        "/users",
-        json={
-            "username": "newuser",
-            "password": "short1",
-            "global_role": "user",
-        },
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_created_user_must_change_password(
-    unauthenticated_api_client, setup_db_auth
-):
-    """A new account always has to replace the password the admin chose for it."""
-    client = unauthenticated_api_client
-    token = await get_auth_token(client, "admin", "admin_pass")
-    response = await client.post(
-        "/users",
-        json={
-            "username": "newuser",
-            "password": "newpass123",
-            "must_change_password": False,
-        },
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200, response.text
-
-    response = await client.get(
-        f"/users/{response.json()['_id']}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["must_change_password"] is True
-
-
-@pytest.mark.asyncio
-async def test_create_user_non_admin_forbidden(
-    unauthenticated_api_client, setup_db_auth
-):
-    client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
-    response = await client.post(
-        "/users",
-        json={
-            "username": "sneaky",
-            "password": "sneaky_pass123",
-            "global_role": "admin",
-        },
-        headers={"Authorization": f"Bearer {token}"},
-    )
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_get_user_by_id_self(unauthenticated_api_client, setup_db_auth):
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
+    token = get_auth_token("alice")
     alice_id = setup_db_auth["alice_id"]
     response = await client.get(
         f"/users/{alice_id}",
@@ -130,34 +48,13 @@ async def test_get_other_user_as_non_admin_forbidden(
     unauthenticated_api_client, setup_db_auth
 ):
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
+    token = get_auth_token("alice")
     bob_id = setup_db_auth["bob_id"]
     response = await client.get(
         f"/users/{bob_id}",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_update_own_user(unauthenticated_api_client, setup_db_auth):
-    client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
-    alice_id = setup_db_auth["alice_id"]
-    response = await client.put(
-        f"/users/{alice_id}",
-        json={"password": "alice_new_pass123"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200
-
-    # Verify the new password works for login
-    login_resp = await client.post(
-        "/auth/token",
-        data={"username": "alice", "password": "alice_new_pass123"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert login_resp.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -168,7 +65,7 @@ async def test_user_cannot_self_promote_global_role(
     global_role — self-edit bypasses the "editing someone else" check, so
     this has to be enforced separately or any user could self-promote."""
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
+    token = get_auth_token("alice")
     alice_id = setup_db_auth["alice_id"]
     response = await client.put(
         f"/users/{alice_id}",
@@ -190,7 +87,7 @@ async def test_user_cannot_self_reactivate_via_is_active(
     """Same guard, is_active side: a non-admin must not be able to flip their
     own is_active flag either."""
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
+    token = get_auth_token("alice")
     alice_id = setup_db_auth["alice_id"]
     response = await client.put(
         f"/users/{alice_id}",
@@ -201,50 +98,11 @@ async def test_user_cannot_self_reactivate_via_is_active(
 
 
 @pytest.mark.asyncio
-async def test_update_other_user_as_non_admin_forbidden(
-    unauthenticated_api_client, setup_db_auth
-):
-    """Uses a password change, not global_role, so this actually exercises the
-    "editing someone else" check rather than the separate self-promote guard
-    (which forbids global_role/is_active regardless of whose id is targeted
-    and would mask a broken "editing someone else" check)."""
-    client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
-    bob_id = setup_db_auth["bob_id"]
-    response = await client.put(
-        f"/users/{bob_id}",
-        json={"password": "new_bob_password"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_update_other_user_as_admin(unauthenticated_api_client, setup_db_auth):
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    bob_id = setup_db_auth["bob_id"]
-    response = await client.put(
-        f"/users/{bob_id}",
-        json={"global_role": "admin"},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert response.status_code == 200
-
-    # Verify the update via GET /users/{bob_id}
-    get_resp = await client.get(
-        f"/users/{bob_id}", headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert get_resp.status_code == 200
-    assert get_resp.json()["global_role"] == "admin"
-
-
-@pytest.mark.asyncio
 async def test_delete_user_as_non_admin_forbidden(
     unauthenticated_api_client, setup_db_auth
 ):
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
+    token = get_auth_token("alice")
     bob_id = setup_db_auth["bob_id"]
     response = await client.delete(
         f"/users/{bob_id}",
@@ -260,7 +118,7 @@ async def test_delete_own_user_as_non_admin_forbidden(
     """Delete requires global admin unconditionally — there's no self-service
     exception the way update_user has (current_user.id == user_id)."""
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "alice", "alice_pass")
+    token = get_auth_token("alice")
     alice_id = setup_db_auth["alice_id"]
     response = await client.delete(
         f"/users/{alice_id}",
@@ -269,152 +127,224 @@ async def test_delete_own_user_as_non_admin_forbidden(
     assert response.status_code == 403
 
 
+async def _make_admin(db_client, username: str) -> None:
+    """Role changes come from the identity provider, so tests set them directly."""
+    await db_client.db["users"].update_one(
+        {"username": username}, {"$set": {"global_role": "admin"}}
+    )
+
+
+def _bearer(username: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {get_auth_token(username)}"}
+
+
+@pytest.mark.asyncio
+async def test_users_cannot_be_created_through_the_api(
+    unauthenticated_api_client, setup_db_auth, db_client
+):
+    """Accounts appear on first sign-in through the identity provider, never by POST."""
+    response = await unauthenticated_api_client.post(
+        "/users",
+        json={"username": "newuser", "global_role": "admin"},
+        headers=_bearer("admin"),
+    )
+
+    assert not response.is_success
+    assert (
+        await db_client.get_filtered_documents("users", {"username": "newuser"}) == []
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_other_user_as_non_admin_forbidden(
+    unauthenticated_api_client, setup_db_auth
+):
+    """Checks the admin-only rule itself, apart from the self-edit guards above."""
+    response = await unauthenticated_api_client.put(
+        f"/users/{setup_db_auth['bob_id']}",
+        json={"is_active": False},
+        headers=_bearer("alice"),
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_update_user_ignores_global_role(
+    unauthenticated_api_client, setup_db_auth
+):
+    """Roles come from the identity provider, so an admin cannot set one here."""
+    client = unauthenticated_api_client
+    bob_id = setup_db_auth["bob_id"]
+
+    response = await client.put(
+        f"/users/{bob_id}", json={"global_role": "admin"}, headers=_bearer("admin")
+    )
+
+    assert response.status_code == 200
+    get_resp = await client.get(f"/users/{bob_id}", headers=_bearer("admin"))
+    assert get_resp.json()["global_role"] == "user"
+
+
+@pytest.mark.asyncio
+async def test_admin_can_deactivate_and_reactivate_another_user(
+    unauthenticated_api_client, setup_db_auth
+):
+    client = unauthenticated_api_client
+    bob_id = setup_db_auth["bob_id"]
+
+    response = await client.put(
+        f"/users/{bob_id}", json={"is_active": False}, headers=_bearer("admin")
+    )
+    assert response.status_code == 200
+    get_resp = await client.get(f"/users/{bob_id}", headers=_bearer("admin"))
+    assert get_resp.json()["is_active"] is False
+    me_resp = await client.get("/auth/me", headers=_bearer("bob"))
+    assert me_resp.status_code == 401
+
+    response = await client.put(
+        f"/users/{bob_id}", json={"is_active": True}, headers=_bearer("admin")
+    )
+    assert response.status_code == 200
+    me_resp = await client.get("/auth/me", headers=_bearer("bob"))
+    assert me_resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_update_user_with_an_empty_body_changes_nothing(
+    unauthenticated_api_client, setup_db_auth
+):
+    bob_id = setup_db_auth["bob_id"]
+
+    response = await unauthenticated_api_client.put(
+        f"/users/{bob_id}", json={}, headers=_bearer("admin")
+    )
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_update_unknown_user_is_404(unauthenticated_api_client, setup_db_auth):
+    response = await unauthenticated_api_client.put(
+        "/users/000000000000000000000099",
+        json={"is_active": False},
+        headers=_bearer("admin"),
+    )
+    assert response.status_code == 404
+
+
 @pytest.mark.asyncio
 async def test_delete_user_as_admin(unauthenticated_api_client, setup_db_auth):
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "admin", "admin_pass")
-    bob_id = setup_db_auth["bob_id"]
+
     response = await client.delete(
-        f"/users/{bob_id}",
-        headers={"Authorization": f"Bearer {token}"},
+        f"/users/{setup_db_auth['bob_id']}", headers=_bearer("admin")
     )
-    assert response.status_code == 200
 
-    # Bob can no longer log in
-    login_resp = await client.post(
-        "/auth/token",
-        data={"username": "bob", "password": "bob_pass"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert login_resp.status_code == 401
+    assert response.status_code == 200
+    me_resp = await client.get("/auth/me", headers=_bearer("bob"))
+    assert me_resp.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_admin_cannot_demote_self_even_with_another_admin(
-    unauthenticated_api_client, setup_db_auth
+async def test_admin_cannot_deactivate_self_even_with_another_admin(
+    unauthenticated_api_client, setup_db_auth, db_client
 ):
-    """An admin must not be able to demote themselves, even when another admin
-    exists to keep the account list manageable — otherwise they immediately lose
-    access to GET /users (admin-only) and the admin UI they're sitting on breaks.
-    A different admin has to make the change instead."""
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    admin_id = setup_db_auth["admin_id"]
+    """Deactivating yourself would cut off the admin UI you are using.
 
-    # Promote alice to admin so the sole-remaining-admin guard alone wouldn't
-    # have blocked this.
-    promote_resp = await client.put(
-        f"/users/{setup_db_auth['alice_id']}",
-        json={"global_role": "admin"},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert promote_resp.status_code == 200
+    A different admin has to do it, even when one exists.
+    """
+    client = unauthenticated_api_client
+    admin_id = setup_db_auth["admin_id"]
+    await _make_admin(db_client, "alice")
 
     response = await client.put(
-        f"/users/{admin_id}",
-        json={"global_role": "user"},
-        headers={"Authorization": f"Bearer {admin_token}"},
+        f"/users/{admin_id}", json={"is_active": False}, headers=_bearer("admin")
     )
+
     assert response.status_code == 422
-
-    get_resp = await client.get(
-        f"/users/{admin_id}", headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert get_resp.json()["global_role"] == "admin"
+    get_resp = await client.get(f"/users/{admin_id}", headers=_bearer("admin"))
+    assert get_resp.json()["is_active"] is True
 
 
 @pytest.mark.asyncio
-async def test_admin_can_be_demoted_by_a_different_admin(
-    unauthenticated_api_client, setup_db_auth
+async def test_admin_can_be_deactivated_by_a_different_admin(
+    unauthenticated_api_client, setup_db_auth, db_client
 ):
-    """The self-demotion guard must not block a *different* admin from doing it."""
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
     admin_id = setup_db_auth["admin_id"]
-
-    promote_resp = await client.put(
-        f"/users/{setup_db_auth['alice_id']}",
-        json={"global_role": "admin"},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert promote_resp.status_code == 200
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    await _make_admin(db_client, "alice")
 
     response = await client.put(
-        f"/users/{admin_id}",
-        json={"global_role": "user"},
-        headers={"Authorization": f"Bearer {alice_token}"},
+        f"/users/{admin_id}", json={"is_active": False}, headers=_bearer("alice")
     )
-    assert response.status_code == 200
 
-    get_resp = await client.get(
-        f"/users/{admin_id}", headers={"Authorization": f"Bearer {alice_token}"}
-    )
-    assert get_resp.json()["global_role"] == "user"
+    assert response.status_code == 200
+    get_resp = await client.get(f"/users/{admin_id}", headers=_bearer("alice"))
+    assert get_resp.json()["is_active"] is False
 
 
 @pytest.mark.asyncio
 async def test_admin_cannot_delete_own_user_as_last_admin(
     unauthenticated_api_client, setup_db_auth
 ):
-    """Deleting the sole active admin must be blocked — mirrors the
-    demote/deactivate guard in update_user. Without it, the account list
-    becomes unmanageable (no admin left to fix it)."""
+    """Deleting the sole active admin must be blocked, or nobody could fix the account list."""
     client = unauthenticated_api_client
-    token = await get_auth_token(client, "admin", "admin_pass")
-    admin_id = setup_db_auth["admin_id"]
-    response = await client.delete(
-        f"/users/{admin_id}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 422
 
-    # Admin still exists and can still log in
-    login_resp = await client.post(
-        "/auth/token",
-        data={"username": "admin", "password": "admin_pass"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    response = await client.delete(
+        f"/users/{setup_db_auth['admin_id']}", headers=_bearer("admin")
     )
-    assert login_resp.status_code == 200
+
+    assert response.status_code == 422
+    assert (await client.get("/auth/me", headers=_bearer("admin"))).status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_admin_can_delete_own_user_when_another_admin_remains(
-    unauthenticated_api_client, setup_db_auth
+    unauthenticated_api_client, setup_db_auth, db_client
 ):
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    admin_id = setup_db_auth["admin_id"]
-
-    # Promote alice to admin so deleting the original admin is no longer
-    # deleting the *last* one.
-    promote_resp = await client.put(
-        f"/users/{setup_db_auth['alice_id']}",
-        json={"global_role": "admin"},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert promote_resp.status_code == 200
+    await _make_admin(db_client, "alice")
 
     response = await client.delete(
-        f"/users/{admin_id}",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        f"/users/{setup_db_auth['admin_id']}", headers=_bearer("admin")
     )
-    assert response.status_code == 200
 
-    login_resp = await client.post(
-        "/auth/token",
-        data={"username": "admin", "password": "admin_pass"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    assert response.status_code == 200
+    assert (await client.get("/auth/me", headers=_bearer("admin"))).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_concurrent_mutual_deactivation_keeps_an_admin(
+    unauthenticated_api_client, setup_db_auth, db_client
+):
+    client = unauthenticated_api_client
+    await _make_admin(db_client, "alice")
+
+    responses = await asyncio.gather(
+        client.put(
+            f"/users/{setup_db_auth['alice_id']}",
+            json={"is_active": False},
+            headers=_bearer("admin"),
+        ),
+        client.put(
+            f"/users/{setup_db_auth['admin_id']}",
+            json={"is_active": False},
+            headers=_bearer("alice"),
+        ),
     )
-    assert login_resp.status_code == 401
+
+    assert sorted(r.status_code for r in responses) == [200, 422]
+    users = await db_client.get_filtered_documents("users")
+    active_admins = [
+        user for user in users if user["global_role"] == "admin" and user["is_active"]
+    ]
+    assert len(active_admins) == 1
 
 
 @pytest.mark.asyncio
 async def test_add_and_list_project_members(setup_db_auth, unauthenticated_api_client):
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     # Add alice as annotator (uses username, not user_id)
@@ -442,7 +372,7 @@ async def test_add_member_non_admin_forbidden(
 ):
     client = unauthenticated_api_client
     project_id = setup_db_auth["project_id"]
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    alice_token = get_auth_token("alice")
 
     resp = await client.post(
         f"/projects/{project_id}/members",
@@ -457,11 +387,9 @@ async def test_update_member_show_others_annotations(
     setup_db_auth, unauthenticated_api_client
 ):
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    alice_token = get_auth_token("alice")
 
     # Add alice as annotator (uses username, not user_id)
     await client.post(
@@ -490,9 +418,7 @@ async def test_update_member_show_others_annotations(
 @pytest.mark.asyncio
 async def test_remove_project_member(setup_db_auth, unauthenticated_api_client):
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     await client.post(
@@ -527,14 +453,12 @@ async def test_member_cannot_self_promote_project_role(
     own membership and becomes a project admin.
     """
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
     alice_id = setup_db_auth["alice_id"]
 
     await add_member(client, admin_token, project_id, "alice", role)
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    alice_token = get_auth_token("alice")
 
     resp = await client.put(
         f"/projects/{project_id}/members/{alice_id}",
@@ -558,13 +482,11 @@ async def test_project_admin_can_manage_members_without_global_admin(
 ):
     """A project admin whose global_role is only "user" can still manage members."""
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     await add_member(client, admin_token, project_id, "alice", "admin")
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
+    alice_token = get_auth_token("alice")
 
     # alice is a project admin but a plain global user
     me_resp = await client.get(
@@ -601,14 +523,12 @@ async def test_list_my_memberships_is_self_scoped(
 ):
     """/users/me/memberships reports only the caller's own memberships."""
     client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
+    admin_token = get_auth_token("admin")
     project_id = setup_db_auth["project_id"]
 
     await add_member(client, admin_token, project_id, "alice", "viewer")
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
-    bob_token = await get_auth_token(client, "bob", "bob_pass")
+    alice_token = get_auth_token("alice")
+    bob_token = get_auth_token("bob")
 
     alice_resp = await client.get(
         "/users/me/memberships", headers={"Authorization": f"Bearer {alice_token}"}
@@ -629,197 +549,3 @@ async def test_list_my_memberships_is_self_scoped(
 
     # "me" must not be read as a user_id by GET /users/{user_id}
     assert (await client.get("/users/me/memberships")).status_code == 401
-
-
-async def _hold_account(client, admin_token, user_id) -> None:
-    """Put a user behind a forced password change, as an admin would."""
-    response = await client.put(
-        f"/users/{user_id}",
-        json={"must_change_password": True},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert response.status_code == 200, response.text
-
-
-@pytest.mark.asyncio
-async def test_held_account_can_still_read_its_own_profile(
-    setup_db_auth, unauthenticated_api_client
-):
-    """/auth/me stays reachable, or the UI cannot tell the user why they are held."""
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
-    alice_id = setup_db_auth["alice_id"]
-    await _hold_account(client, admin_token, alice_id)
-
-    token = await get_auth_token(client, "alice", "alice_pass")
-    response = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["must_change_password"] is True
-
-
-@pytest.mark.asyncio
-async def test_held_account_can_change_its_own_password(
-    setup_db_auth, unauthenticated_api_client
-):
-    """The one write a held account must be able to make."""
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
-    alice_id = setup_db_auth["alice_id"]
-    await _hold_account(client, admin_token, alice_id)
-
-    token = await get_auth_token(client, "alice", "alice_pass")
-    response = await client.put(
-        f"/users/{alice_id}",
-        json={"password": "alice_new_pass123", "must_change_password": False},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200, response.text
-
-    token = await get_auth_token(client, "alice", "alice_new_pass123")
-    response = await client.get("/users", headers={"Authorization": f"Bearer {token}"})
-    assert response.status_code == 403, "alice is not an admin, but is no longer held"
-
-
-@pytest.mark.asyncio
-async def test_cannot_clear_own_forced_change_without_a_new_password(
-    setup_db_auth, unauthenticated_api_client
-):
-    """Otherwise the flag is decorative: clear it and keep the handed-over password.
-
-    Worst case is the bootstrap admin, whose default password is public knowledge.
-    """
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
-    alice_id = setup_db_auth["alice_id"]
-    await _hold_account(client, admin_token, alice_id)
-
-    token = await get_auth_token(client, "alice", "alice_pass")
-    response = await client.put(
-        f"/users/{alice_id}",
-        json={"must_change_password": False},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 422, response.text
-
-    response = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
-    assert response.json()["must_change_password"] is True
-
-
-@pytest.mark.asyncio
-async def test_an_admin_cannot_clear_its_own_forced_change_either(
-    setup_db_auth, unauthenticated_api_client
-):
-    """The guard is about the account being held, not about its role."""
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
-    admin_id = setup_db_auth["admin_id"]
-    await _hold_account(client, admin_token, admin_id)
-
-    response = await client.put(
-        f"/users/{admin_id}",
-        json={"must_change_password": False},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert response.status_code == 422, response.text
-
-
-@pytest.mark.asyncio
-async def test_an_admin_can_clear_someone_elses_forced_change(
-    setup_db_auth, unauthenticated_api_client
-):
-    """Waiving the requirement for another account is a normal admin action."""
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(
-        unauthenticated_api_client, "admin", "admin_pass"
-    )
-    alice_id = setup_db_auth["alice_id"]
-    await _hold_account(client, admin_token, alice_id)
-
-    response = await client.put(
-        f"/users/{alice_id}",
-        json={"must_change_password": False},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert response.status_code == 200, response.text
-
-    token = await get_auth_token(client, "alice", "alice_pass")
-    response = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
-    assert response.json()["must_change_password"] is False
-
-
-@pytest.mark.asyncio
-async def test_concurrent_create_same_username_creates_one_user(
-    unauthenticated_api_client, setup_db_auth
-):
-    client = unauthenticated_api_client
-    token = await get_auth_token(client, "admin", "admin_pass")
-    responses = await asyncio.gather(
-        *(
-            client.post(
-                "/users",
-                json={
-                    "username": "carol",
-                    "password": "carolpass1",
-                    "global_role": "user",
-                },
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            for _ in range(3)
-        )
-    )
-    assert sorted(r.status_code for r in responses) == [200, 409, 409]
-
-    users = await client.get("/users", headers={"Authorization": f"Bearer {token}"})
-    assert [u["username"] for u in users.json()].count("carol") == 1
-
-
-@pytest.mark.asyncio
-async def test_concurrent_mutual_demotion_keeps_an_admin(
-    unauthenticated_api_client, setup_db_auth
-):
-    client = unauthenticated_api_client
-    admin_token = await get_auth_token(client, "admin", "admin_pass")
-    promote = await client.put(
-        f"/users/{setup_db_auth['alice_id']}",
-        json={"global_role": "admin"},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert promote.status_code == 200
-    alice_token = await get_auth_token(client, "alice", "alice_pass")
-
-    responses = await asyncio.gather(
-        client.put(
-            f"/users/{setup_db_auth['alice_id']}",
-            json={"global_role": "user"},
-            headers={"Authorization": f"Bearer {admin_token}"},
-        ),
-        client.put(
-            f"/users/{setup_db_auth['admin_id']}",
-            json={"global_role": "user"},
-            headers={"Authorization": f"Bearer {alice_token}"},
-        ),
-    )
-    assert sorted(r.status_code for r in responses) == [200, 422]
-
-    users = await client.get(
-        "/users", headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    if users.status_code == 403:
-        users = await client.get(
-            "/users", headers={"Authorization": f"Bearer {alice_token}"}
-        )
-    assert any(u["global_role"] == "admin" for u in users.json())

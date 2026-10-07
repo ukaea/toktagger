@@ -16,64 +16,16 @@ def _user_row(page, username):
     )
 
 
-def test_admin_can_create_user(server_setup, page):
+def test_admin_users_page_is_read_only_for_roles(server_setup, admin_token, page):
+    create_user("listed", "pass1234")
     page.goto("http://localhost:8002/ui/admin/users")
     expect(page.get_by_role("heading", name="User Management")).to_be_visible()
 
-    page.get_by_role("button", name="Add User").click()
-    page.get_by_role("textbox", name="Username").fill("newuser")
-    page.get_by_role("textbox", name="Password", exact=True).fill("newpass123")
-    page.get_by_role("textbox", name="Confirm password").fill("newpass123")
-    page.get_by_role("button", name="Create").click()
-
-    row = _user_row(page, "newuser")
-    expect(row).to_be_visible()
-
-
-@pytest.mark.parametrize(
-    ("password", "confirm", "message"),
-    [
-        ("newpass123", "different123", "Passwords do not match"),
-        ("short", "short", "Password must be at least 8 characters"),
-    ],
-)
-def test_admin_create_user_invalid_password_rejected_locally(
-    server_setup, page, password, confirm, message
-):
-    create_requests = []
-    page.on(
-        "request",
-        lambda r: (
-            create_requests.append(r)
-            if r.method == "POST" and r.url.endswith("/users")
-            else None
-        ),
-    )
-    page.goto("http://localhost:8002/ui/admin/users")
-
-    page.get_by_role("button", name="Add User").click()
-    page.get_by_role("textbox", name="Username").fill("baduser")
-    page.get_by_role("textbox", name="Password", exact=True).fill(password)
-    page.get_by_role("textbox", name="Confirm password").fill(confirm)
-    page.get_by_role("button", name="Create").click()
-
-    expect(page.get_by_role("alert")).to_contain_text(message)
-    assert create_requests == []
-
-
-def test_admin_can_change_user_role(server_setup, admin_token, page):
-    create_user("promoteme", "pass1234")
-    page.goto("http://localhost:8002/ui/admin/users")
-
-    row = _user_row(page, "promoteme")
-    expect(row.get_by_text("user")).to_be_visible()
-
-    row.get_by_role("button", name="Edit").click()
-    page.get_by_role("button", name="Global Role").click()
-    page.get_by_role("option", name="Admin", exact=True).click()
-    page.get_by_role("button", name="Save").click()
-
-    expect(row.get_by_text("admin")).to_be_visible()
+    row = _user_row(page, "listed")
+    expect(row.get_by_text("user", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Add User")).to_have_count(0)
+    expect(row.get_by_role("button", name="Edit")).to_have_count(0)
+    expect(row.get_by_role("button", name="Reset Password")).to_have_count(0)
 
 
 def test_admin_can_deactivate_and_reactivate_user(server_setup, admin_token, page):
@@ -117,59 +69,3 @@ def test_non_admin_cannot_access_admin_users_page(server_setup, admin_token, bro
     regular_page.goto("http://localhost:8002/ui/admin/users")
     expect(regular_page).to_have_url("http://localhost:8002/ui/projects/", timeout=3000)
     regular_page.context.close()
-
-
-def test_admin_created_user_forced_to_change_password(server_setup, browser, page):
-    # Admin-created accounts default to must_change_password=True - unlike
-    # tests.endpoints.create_user, which explicitly opts test fixtures out of it.
-    page.goto("http://localhost:8002/ui/admin/users")
-    page.get_by_role("button", name="Add User").click()
-    page.get_by_role("textbox", name="Username").fill("freshgina")
-    page.get_by_role("textbox", name="Password", exact=True).fill("initial_pass123")
-    page.get_by_role("textbox", name="Confirm password").fill("initial_pass123")
-    page.get_by_role("button", name="Create").click()
-    expect(_user_row(page, "freshgina")).to_be_visible()
-
-    gina_page = login_as(browser, "freshgina", "initial_pass123")
-    gina_page.goto("http://localhost:8002/ui/projects/")
-
-    # Redirected straight to the profile page before reaching anything else.
-    expect(gina_page).to_have_url("http://localhost:8002/ui/profile", timeout=3000)
-    expect(gina_page.get_by_text("Password change required")).to_be_visible()
-
-    dialog = gina_page.get_by_role("dialog")
-    dialog.get_by_role("textbox", name="New password", exact=True).fill(
-        "gina_new_pass456"
-    )
-    dialog.get_by_role("textbox", name="Confirm new password").fill("gina_new_pass456")
-    dialog.get_by_role("button", name="Change Password").click()
-
-    # Once changed, the redirect stops firing and normal navigation works.
-    expect(gina_page).to_have_url("http://localhost:8002/ui/projects", timeout=3000)
-    gina_page.goto("http://localhost:8002/ui/projects/")
-    expect(gina_page).to_have_url("http://localhost:8002/ui/projects/", timeout=3000)
-    gina_page.context.close()
-
-
-def test_admin_can_reset_user_password(server_setup, admin_token, browser, page):
-    create_user("resetme_hank", "old_pass123")
-    page.goto("http://localhost:8002/ui/admin/users")
-
-    row = _user_row(page, "resetme_hank")
-    row.get_by_role("button", name="Reset Password").click()
-    dialog = page.get_by_role("dialog")
-    dialog.get_by_role("textbox", name="New password", exact=True).fill(
-        "hank_reset_pass456"
-    )
-    dialog.get_by_role("textbox", name="Confirm new password").fill(
-        "hank_reset_pass456"
-    )
-    dialog.get_by_role("button", name="Reset", exact=True).click()
-
-    expect(page.get_by_text("Password reset for resetme_hank")).to_be_visible()
-
-    # The old password no longer works; the new one does, and forces a change.
-    hank_page = login_as(browser, "resetme_hank", "hank_reset_pass456")
-    hank_page.goto("http://localhost:8002/ui/projects/")
-    expect(hank_page).to_have_url("http://localhost:8002/ui/profile", timeout=3000)
-    hank_page.context.close()

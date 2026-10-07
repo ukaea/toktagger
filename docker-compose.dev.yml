@@ -11,7 +11,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     volumes:
-      - mongodb_data:/tmp/db
+      - mongodb_data:/data/db
     networks:
       - app-network
 
@@ -30,16 +30,52 @@ services:
     networks:
       - app-network
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    container_name: keycloak
+    restart: always
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "8080:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      # The browser reaches Keycloak at localhost:8080 and the api container at keycloak:8080.
+      # The dynamic backchannel keeps the public issuer and sign-in URLs on localhost for both.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-dev-client-secret-change-me}
+    volumes:
+      - ./deploy/keycloak/toktagger-realm.dev.json:/opt/keycloak/data/import/toktagger-realm.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/localhost/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - app-network
+
   api:
     build:
       context: ./
-      dockerfile: ./api.dockerfile
+      dockerfile: ./Dockerfile
+      target: dev
     container_name: api_app
     restart: always
     ports:
       - "8002:8002"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
     volumes:
       - ./data/:/app/data
       - ./toktagger:/app/toktagger
@@ -51,6 +87,12 @@ services:
       SERVER_HOST: api_app
       SERVER_PORT: 8002
       SERVER_RELOAD: "true"
+      AUTH_PROVIDER: oidc
+      AUTH_ISSUER_URL: http://keycloak:8080/realms/toktagger
+      AUTH_CLIENT_ID: toktagger
+      AUTH_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-dev-client-secret-change-me}
+      AUTH_PUBLIC_URL: http://localhost:8002
+      AUTH_ROLES_CLAIM: groups
     working_dir: /app
     command: ["python", "run.py"]
     networks:

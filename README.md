@@ -64,7 +64,7 @@ To start a local single-user instance:
 toktagger
 ```
 
-This starts a single-process instance at `http://localhost:8002`. On first launch an `admin` account is created automatically and the credentials are printed to the terminal.
+This starts a single-process instance at `http://localhost:8002`. On the first start, TokTagger creates a local identity provider and prints the user name and the password of the first administrator to the terminal. See [User Management](docs/user_management.md).
 
 ### Options
 
@@ -101,10 +101,6 @@ python -m gunicorn toktagger.api.asgi:app \
     --bind 0.0.0.0:8002
 ```
 
-With Docker Compose, the production stack defaults to 4 workers. Override with the `SERVER_WORKERS` environment variable:
-
-```sh
-SERVER_WORKERS=8 docker compose up
-```
+`docker-compose.yml` is the production stack. It runs TokTagger with Keycloak, MongoDB and a Caddy proxy that handles TLS. See the [Deployment](docs/deployment.md) guide.
 
 See the [User Management](docs/user_management.md) guide for creating accounts, assigning roles, and managing project membership.

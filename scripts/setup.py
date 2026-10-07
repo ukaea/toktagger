@@ -1,4 +1,3 @@
-import getpass
 import os
 import sys
 from argparse import ArgumentParser
@@ -24,24 +23,18 @@ def _raise_for_status(response: requests.Response) -> None:
     except (ValueError, AttributeError):
         detail = None
 
-    if response.status_code == 403 and detail and "change your password" in detail:
-        raise SetupError(
-            f"{detail} Log in to the TokTagger UI once and set a new password, "
-            "then re-run this script."
-        )
     if detail:
         raise SetupError(f"{response.status_code} error from {response.url}: {detail}")
     response.raise_for_status()
 
 
-def get_token(base_url: str, username: str, password: str) -> str:
-    r = requests.post(
-        f"{base_url}/auth/token",
-        data={"username": username, "password": password},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    _raise_for_status(r)
-    return r.json()["access_token"]
+def get_token() -> str:
+    token = os.environ.get("TOKTAGGER_API_TOKEN")
+    if not token:
+        raise SetupError(
+            "Set TOKTAGGER_API_TOKEN to an access token from the identity provider."
+        )
+    return token
 
 
 def _auth(token: str) -> dict:
@@ -255,16 +248,9 @@ def main():
         default=BASE_URL,
         help="Base URL of the TokTagger API",
     )
-    parser.add_argument(
-        "--username",
-        default=os.environ.get("TOKTAGGER_USERNAME", "admin"),
-        help="Username for authentication",
-    )
     args = parser.parse_args()
 
-    password = os.environ.get("TOKTAGGER_PASSWORD") or getpass.getpass("Password: ")
-
-    token = get_token(args.url, args.username, password)
+    token = get_token()
 
     base_path = Path(args.base_path)
 

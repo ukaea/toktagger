@@ -10,6 +10,8 @@ URL into the address bar without the credentials/membership to see it.
     "Project not found.".
 """
 
+import re
+
 import pytest
 
 pytest.importorskip("playwright")
@@ -29,7 +31,9 @@ def test_logged_out_project_url_redirects_to_login(
 ):
     project_id = create_project("Logged Out Project", "time-series", "tabular")
     guest_page.goto(f"http://localhost:8002/ui/projects/{project_id}")
-    expect(guest_page).to_have_url("http://localhost:8002/ui/login", timeout=3000)
+    expect(guest_page).to_have_url(
+        re.compile(r"http://localhost:8002/ui/login\?return_to="), timeout=3000
+    )
 
 
 def test_logged_out_sample_url_redirects_to_login(
@@ -40,7 +44,9 @@ def test_logged_out_sample_url_redirects_to_login(
     guest_page.goto(
         f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_ids[0]}"
     )
-    expect(guest_page).to_have_url("http://localhost:8002/ui/login", timeout=3000)
+    expect(guest_page).to_have_url(
+        re.compile(r"http://localhost:8002/ui/login\?return_to="), timeout=3000
+    )
 
 
 def test_non_member_sees_access_denied_not_blank_page(

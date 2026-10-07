@@ -13,7 +13,9 @@ from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
 
 from tests import db_definitions, endpoints
+from tests.identity import session_cookies
 from toktagger.api import config
+from toktagger.api.auth.canaille import ManagedCanaille, managed_idp
 from toktagger.api.auth.core import create_access_token
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.main import Server
@@ -69,6 +71,9 @@ else:
         raise pytest.UsageError(_error_msg)
 
 
+E2E_ADMIN_PASSWORD = "e2e-admin-password-1"
+
+
 @pytest.fixture(scope="session")
 def uda_env_vars():
     os.environ.setdefault("UDA_HOST", "uda2.mast.l")
@@ -101,6 +106,7 @@ def settings():
             server=config.Server(cache_dir=tempd),
             models=config.Models(cache_dir=models_dir, max_actors=1),
             database=config.Database(mongo_url="./toktagger_test_db"),
+            auth=config.Auth(canaille_bootstrap_password=E2E_ADMIN_PASSWORD),
             uda=config.UDA(),
             sal=config.SAL(),
         )
@@ -295,7 +301,22 @@ def run_server():
 
 
 @pytest.fixture(scope="package")
-def start_server(settings):
+def identity_provider(settings) -> ManagedCanaille:
+    """The managed Canaille server the end-to-end TokTagger server signs users in with.
+
+    Started before the TokTagger server forks, so the child inherits the provider
+    settings that managed_idp exports.
+    """
+    # On macOS, a proxy lookup in a forked child crashes when the parent has made one
+    os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
+    with managed_idp() as idp:
+        assert idp is not None
+        endpoints.set_identity_provider(idp)
+        yield idp
+
+
+@pytest.fixture(scope="package")
+def start_server(settings, identity_provider):
     # Explicit "fork" context (not just multiprocessing.Process, which defaults
     # to "spawn" on macOS since Python 3.8): "spawn" re-imports this module in
     # a fresh interpreter, so run_server() never sees the settings fixture's
@@ -340,59 +361,24 @@ def start_server(settings):
 
 
 @pytest.fixture(scope="package")
-def admin_token(start_server) -> str:
-    """Log in as the bootstrap admin (created by ensure_admin_user on first
-    server start, see toktagger/api/auth/first_run.py) and authenticate all
-    tests.endpoints.* requests as them for the rest of this server's lifetime.
+def admin_cookies(start_server) -> dict[str, str]:
+    """The admin's TokTagger session cookies, for seeding browser contexts.
+
+    Signs in through the managed Canaille login, as a user would. The admin belongs to
+    the admin group there, so TokTagger makes this a global admin.
     """
-    response = requests.post(
-        "http://localhost:8002/auth/token",
-        data={"username": "admin", "password": "admin1234"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert response.status_code == 200, response.text
-    token = response.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # The bootstrap admin ships with must_change_password set, so a real first login
-    # is held until the default password is replaced. Clear it here so this session
-    # behaves like any other logged-in admin — the same opt-out
-    # tests.endpoints.create_user applies to the accounts it creates. The forced
-    # change itself is covered in tests/end_to_end/test_profile_page.py and
-    # tests/api/auth/test_first_run.py.
-    response = requests.get("http://localhost:8002/auth/me", headers=headers)
-    assert response.status_code == 200, response.text
-    admin_id = response.json()["_id"]
-    response = requests.put(
-        f"http://localhost:8002/users/{admin_id}",
-        # Re-sends the same password because clearing your own flag requires one; the
-        # rest of the suite keeps logging in as admin/admin1234.
-        json={"password": "admin1234", "must_change_password": False},
-        headers=headers,
-    )
-    assert response.status_code == 200, response.text
-
-    endpoints.set_auth_token(token)
-    return token
+    return session_cookies("admin", E2E_ADMIN_PASSWORD)
 
 
 @pytest.fixture(scope="package")
-def admin_cookies(admin_token) -> dict[str, str]:
-    """The bootstrap admin's session cookies, for seeding browser contexts.
+def admin_token(admin_cookies) -> str:
+    """The admin's session token, used as a bearer token for tests.endpoints.* requests.
 
-    The browser authenticates by cookie, and the httpOnly session cookie cannot be
-    rebuilt from the token string, so log in again and keep what the server set.
-    Depends on admin_token so must_change_password is already cleared and the seeded
-    session doesn't get held on the profile page.
+    The session cookie holds the same signed token a bearer header accepts.
     """
-    session = requests.Session()
-    response = session.post(
-        "http://localhost:8002/auth/token",
-        data={"username": "admin", "password": "admin1234"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert response.status_code == 200, response.text
-    return dict(session.cookies)
+    token = admin_cookies[config.settings.auth.cookie_name]
+    endpoints.set_auth_token(token)
+    return token
 
 
 @pytest.fixture(scope="function")

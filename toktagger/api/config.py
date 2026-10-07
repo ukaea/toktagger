@@ -57,6 +57,73 @@ class Auth(pydantic.BaseModel):
         "lax",
         description="SameSite policy for the auth cookie. Only use none if the frontend is served from a different site to the API; this also forces the cookie to be Secure.",
     )
+    provider: typing.Literal["canaille", "oidc"] = pydantic.Field(
+        "canaille",
+        description="Identity provider. canaille starts and manages a local Canaille OpenID Connect server for you. oidc uses an external provider (for example Keycloak) set by issuer_url, client_id and client_secret.",
+    )
+    issuer_url: str | None = pydantic.Field(
+        None,
+        description="Issuer URL of the OpenID Connect provider. Required when provider is oidc. It must be the same URL for the browser and for the TokTagger server. Set automatically when provider is canaille.",
+    )
+    client_id: str = pydantic.Field(
+        "toktagger",
+        description="OpenID Connect client ID registered for TokTagger at the provider.",
+    )
+    client_secret: str | None = pydantic.Field(
+        None,
+        description="OpenID Connect client secret. Required when provider is oidc. Generated and stored automatically when provider is canaille.",
+    )
+    scopes: str = pydantic.Field(
+        "openid profile email",
+        description="Space-separated OpenID Connect scopes to request. Add the scope that makes the provider return the roles_claim if it needs one (for example groups for Canaille).",
+    )
+    roles_claim: str = pydantic.Field(
+        "groups",
+        description="Dotted path to the claim with the user's groups or roles, for example groups or realm_access.roles. The claim can be a list or a single string.",
+    )
+    admin_group: str = pydantic.Field(
+        "toktagger-admins",
+        description="Value in roles_claim that gives a user the global admin role. The role is set again from the provider at every sign-in.",
+    )
+    public_url: str | None = pydantic.Field(
+        None,
+        description="URL at which users reach TokTagger, used for the OpenID Connect redirect URI. If unset, it is http://<server.host>:<server.port>.",
+    )
+    session_max_age_seconds: int = pydantic.Field(
+        12 * 60 * 60,
+        description="Maximum age of a browser session in seconds. After this time the user must sign in again. Sign-in reads the global role from the provider again.",
+        gt=0,
+    )
+    verify_bearer_audience: bool = pydantic.Field(
+        True,
+        description="Whether to require the client_id in the audience of provider access tokens sent as Bearer tokens.",
+    )
+    canaille_port: int = pydantic.Field(
+        8003,
+        description="Port for the managed Canaille server. Only used when provider is canaille.",
+    )
+    canaille_public_url: str | None = pydantic.Field(
+        None,
+        description="URL at which the browser reaches the managed Canaille server, and the issuer URL. If unset, it is http://<server.host>:<canaille_port>. Only used when provider is canaille.",
+    )
+    canaille_bootstrap_password: str | None = pydantic.Field(
+        None,
+        description="Password for the first Canaille admin user. If unset, a random password is generated and printed at first start. Only used when provider is canaille.",
+    )
+
+    @pydantic.model_validator(mode="after")
+    def _require_oidc_settings(self) -> typing.Self:
+        if self.provider == "oidc":
+            missing = [
+                f"auth.{name}"
+                for name in ("issuer_url", "client_secret")
+                if not getattr(self, name)
+            ]
+            if missing:
+                raise ValueError(
+                    f"{' and '.join(missing)} must be set when auth.provider is 'oidc'"
+                )
+        return self
 
 
 class Server(pydantic.BaseModel):
@@ -81,6 +148,19 @@ class Server(pydantic.BaseModel):
         user_cache_dir("toktagger", "ukaea"),
         description="The directory to use for storing entries in the Mongita database, if used.",
         validate_default=True,
+    )
+    forwarded_allow_ips: str = pydantic.Field(
+        "127.0.0.1",
+        description="Comma-separated addresses of reverse proxies whose X-Forwarded-* headers TokTagger trusts. Use `*` only when the proxy is the only host that can reach TokTagger.",
+    )
+    gunicorn_timeout: int = pydantic.Field(
+        120,
+        description="Seconds after which Gunicorn restarts a silent worker, and the graceful shutdown period.",
+        gt=0,
+    )
+    cors_origins: list[str] = pydantic.Field(
+        ["http://localhost:5173"],
+        description="Origins allowed to make cross-origin requests to the API, for example the frontend dev server. Set to an empty list when the frontend is served by TokTagger itself.",
     )
 
 
@@ -161,6 +241,23 @@ class Settings(BaseSettings):
         env_nested_delimiter="_",
         env_nested_max_split=1,
     )
+
+    @property
+    def _browser_host(self) -> str:
+        return "localhost" if self.server.host == "0.0.0.0" else self.server.host
+
+    @property
+    def public_url(self) -> str:
+        url = self.auth.public_url or f"http://{self._browser_host}:{self.server.port}"
+        return url.rstrip("/")
+
+    @property
+    def canaille_public_url(self) -> str:
+        url = (
+            self.auth.canaille_public_url
+            or f"http://{self._browser_host}:{self.auth.canaille_port}"
+        )
+        return url.rstrip("/")
 
     @classmethod
     def settings_customise_sources(

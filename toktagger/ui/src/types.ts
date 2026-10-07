@@ -429,9 +429,20 @@ export const CurrentUserSchema = z.object({
   username: z.string(),
   global_role: z.enum(["admin", "user"]),
   is_active: z.boolean(),
-  must_change_password: z.boolean(),
+  email: z.string().nullish(),
+  display_name: z.string().nullish(),
 });
 export type CurrentUser = z.infer<typeof CurrentUserSchema>;
+
+export const AuthConfigSchema = z.object({
+  provider: z.enum(["canaille", "oidc"]),
+  account_url: z.string().nullable(),
+});
+export type AuthConfig = z.infer<typeof AuthConfigSchema>;
+
+export const LogoutResponseSchema = z.object({
+  logout_url: z.string().nullable(),
+});
 
 // Mirrors the backend's ProjectMember, as GET /users/me/memberships returns it.
 export const ProjectMemberSchema = z.object({

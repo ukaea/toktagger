@@ -1,5 +1,14 @@
 # Change Log
 
+## Unreleased
+* Replaced the built-in password login with OpenID Connect. TokTagger no longer stores passwords. `auth.provider` is `canaille` (default, TokTagger runs a local Canaille identity provider) or `oidc` (Keycloak or any other provider). See `docs/user_management.md`.
+* Global roles come from the identity provider group `auth.admin_group`. Users are created at their first sign-in.
+* TokTagger does not connect identity provider accounts to users from the old password login. A user with the same name gets a new record.
+* Added `auth.session_max_age_seconds`. A browser session ends after this time (default 12 hours), and the user signs in again. Access tokens from scripts do not change the global role.
+* Removed `POST /auth/token`. Scripts send an identity provider access token and read it from `TOKTAGGER_API_TOKEN`.
+* Added `server.forwarded_allow_ips`, `server.gunicorn_timeout` and `server.cors_origins`.
+* Replaced `api.dockerfile` with a multi-stage `Dockerfile`. `docker-compose.yml` is now the production stack (Caddy, TokTagger, Keycloak, Postgres, MongoDB). The old development stack is in `docker-compose.dev.yml`. See `docs/deployment.md`.
+
 ## [v0.3.1](https://github.com/ukaea/toktagger/releases/tag/v0.3.1) - 2025-07-03
 * Fixed bug related to loading float numpy arrays as images
 
