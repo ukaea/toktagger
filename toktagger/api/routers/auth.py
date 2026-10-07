@@ -37,18 +37,24 @@ def _validate_return_to(return_to: str) -> str:
     return return_to
 
 
-def _account_url() -> str | None:
+async def _account_url() -> str | None:
     auth = config.settings.auth
     if auth.provider == "canaille":
         return f"{config.settings.canaille_public_url}/"
-    issuer = str(auth.issuer_url).rstrip("/")
+    issuer = str(auth.issuer_url)
+    if oidc.idp_registered():
+        try:
+            issuer = (await oidc.get_metadata())["issuer"]
+        except oidc.IDP_ERRORS:
+            pass
+    issuer = issuer.rstrip("/")
     return f"{issuer}/account" if "/realms/" in issuer else None
 
 
 @router.get("/config", response_model=AuthConfig)
 async def get_auth_config() -> AuthConfig:
     return AuthConfig(
-        provider=config.settings.auth.provider, account_url=_account_url()
+        provider=config.settings.auth.provider, account_url=await _account_url()
     )
 
 

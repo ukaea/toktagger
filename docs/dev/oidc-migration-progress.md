@@ -92,6 +92,18 @@ Decisions and deviations:
 - Gate checked by hand with `python -m toktagger.api.cli` on an empty cache dir: banner printed once, login redirects to Canaille, restart reuses the database without a banner, `--workers 2` works, SIGTERM leaves no listeners.
 - `uv run` uses the installed copy of `toktagger`, not the working tree, when a script is run from another directory. Use `PYTHONPATH=.`.
 
+## Phase 4: Keycloak dev stack and docs
+
+Status: done.
+
+Decisions and deviations:
+- Keycloak is pinned to 26.8.0 and starts with `start-dev --import-realm`. The realm file `deploy/keycloak/toktagger-realm.dev.json` takes the client secret from `${KEYCLOAK_CLIENT_SECRET}`.
+- Issuer hostname: `KC_HOSTNAME=http://localhost:8080` with `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true`. The issuer and browser endpoints use `localhost:8080`. Token and JWKS endpoints use `keycloak:8080` inside the Docker network.
+- The "Manage account" link is built from the issuer in the discovery metadata, not from `issuer_url`, so a container setup does not show `keycloak:8080` to the browser. The link is only given for issuers that contain `/realms/`.
+- Keycloak sets `Secure` cookies on plain HTTP, so Python `requests` cannot sign in. Verification used a real browser (Playwright) against the stack: admin is `admin`, a user outside the group is `user`, the account link and the logout URL work.
+- `docker-compose.dev.yml`: the Mongo volume path is `/data/db`; `api` waits for a healthy Keycloak.
+- Docs: `user_management.md` rewritten; `configuration.md` has the new `auth` fields and `server.cors_origins`; `index.md`, `README.md` updated; `user_management.md` added to the nav in `zensical.toml`.
+
 ### Next
 
-Phase 4: Keycloak dev stack and docs. Phase 5 must also restore the e2e suite.
+Phase 5: frontend. It must also restore the e2e suite.

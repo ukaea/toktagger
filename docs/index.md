@@ -57,7 +57,7 @@ To start a local single-user instance:
 toktagger
 ```
 
-This starts the application at `http://localhost:8002`. On first launch an `admin` account is created automatically with username `admin` and password `admin1234`, and the credentials are printed to the terminal.
+This starts the application at `http://localhost:8002`. On the first start, TokTagger creates a local identity provider and prints the user name and the password of the first administrator to the terminal. Open the application and click **Sign in**.
 
 !!! warning
     **This is an insecure default password.** Change it immediately after first login from the **Profile** page.

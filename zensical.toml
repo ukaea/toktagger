@@ -50,6 +50,9 @@ Home = "index.md"
 Annotators = "annotators.md"
 
 [[project.nav]]
+"User Management" = "user_management.md"
+
+[[project.nav]]
 "Machine Learning Models" = "ml_models.md"
 
 [[project.nav]]

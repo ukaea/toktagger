@@ -285,6 +285,37 @@ async def test_config_for_keycloak_links_to_the_account_console(
 
 
 @pytest.mark.asyncio
+async def test_config_account_link_uses_the_public_issuer_from_discovery(
+    unauthenticated_api_client, oidc_settings, monkeypatch
+):
+    """The configured issuer URL may be a container-internal name the browser cannot reach."""
+    monkeypatch.setattr(oidc_settings, "issuer_url", "http://keycloak:8080/realms/tt")
+
+    async def get_metadata():
+        return {"issuer": "http://localhost:8080/realms/tt"}
+
+    monkeypatch.setattr(oidc, "get_metadata", get_metadata)
+
+    resp = await unauthenticated_api_client.get("/auth/config")
+
+    assert resp.json()["account_url"] == "http://localhost:8080/realms/tt/account"
+
+
+@pytest.mark.asyncio
+async def test_config_account_link_falls_back_to_the_configured_issuer(
+    unauthenticated_api_client, oidc_settings, monkeypatch
+):
+    async def unreachable():
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(oidc, "get_metadata", unreachable)
+
+    resp = await unauthenticated_api_client.get("/auth/config")
+
+    assert resp.json()["account_url"] == f"{ISSUER}/account"
+
+
+@pytest.mark.asyncio
 async def test_config_for_another_provider_has_no_account_link(
     unauthenticated_api_client, monkeypatch
 ):
