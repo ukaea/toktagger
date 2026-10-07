@@ -90,6 +90,19 @@ async function navigateToNextSample(
   navigateToSample(project_id, sample._id, navigate, sortDescriptor);
 }
 
+function reportFailure(
+  err: unknown,
+  onPermissionError: () => void,
+  messagePrefix = "",
+) {
+  if (err instanceof ApiError && err.status === 403) {
+    onPermissionError();
+    return;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  ToastQueue.negative(`${messagePrefix}${message}`, { timeout: TOAST_TIMEOUT });
+}
+
 type ButtonInfo = {
   project_id: string;
   sample_id: string;
@@ -206,12 +219,7 @@ function SaveThenNavigateButton({
         setIsValidated(true);
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        onPermissionError();
-      } else {
-        const message = err instanceof Error ? err.message : String(err);
-        ToastQueue.negative(message, { timeout: TOAST_TIMEOUT });
-      }
+      reportFailure(err, onPermissionError);
       // Don't navigate away with unsaved annotations still sitting in the editor.
       return;
     }
@@ -382,14 +390,7 @@ function SaveButton({
       });
       setIsValidated(true);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        onPermissionError();
-      } else {
-        const message = err instanceof Error ? err.message : String(err);
-        ToastQueue.negative(`Failed to save annotations: ${message}`, {
-          timeout: TOAST_TIMEOUT,
-        });
-      }
+      reportFailure(err, onPermissionError, "Failed to save annotations: ");
     }
   };
 
@@ -432,14 +433,7 @@ function ClearButton({
       // display, only their own when they are not.
       await navAdapter.clear(showOthers);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        onPermissionError();
-      } else {
-        const message = err instanceof Error ? err.message : String(err);
-        ToastQueue.negative(`Failed to clear annotations: ${message}`, {
-          timeout: TOAST_TIMEOUT,
-        });
-      }
+      reportFailure(err, onPermissionError, "Failed to clear annotations: ");
       return;
     }
     // Mark as unvalidated annotations
