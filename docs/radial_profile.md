@@ -4,6 +4,11 @@ Use the radial profile interface to annotate profile diagnostics, for example Th
 
 ## Overview
 
+<figure markdown="span">
+   ![Radial Profile Interface](assets/radial-profile.png)
+  <figcaption>The radial profile interface. The radial plot shows Thomson scattering electron temperature. The time plot shows plasma current. Both plots show annotations.</figcaption>
+</figure>
+
 The interface has two plots:
 
 - **Radial Plot (Top)**: Shows one line for each time slice of the profile signal. The horizontal axis is radius. The colour of each line shows the time of the slice.
