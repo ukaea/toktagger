@@ -8,21 +8,22 @@ import React, {
   useRef,
 } from "react";
 import { ToastQueue } from "@adobe/react-spectrum";
-import { z } from "zod/v4";
 import {
   Project,
   Sample,
   Data,
   Annotation,
   ViewParams,
-  ViewParamsSchema,
+  AnyViewParams,
+  AnyViewParamsSchema,
   PlotProps,
   Profile2DViewParams,
-  Profile2DViewParamsSchema,
   MultiVariateTimeSeriesData,
   Profile2DData,
   MultiVariateTimeSeriesDataSchema,
   Profile2DDataSchema,
+  RadialProfileData,
+  RadialProfileDataSchema,
   ImageData,
   ImageDataSchema,
   TaskType,
@@ -35,9 +36,7 @@ const viewParamsKey = (projectId: string) => `view-params-${projectId}`;
 const colorMapKey = (projectId: string) => `color-map-${projectId}`;
 
 // Reads persisted view params, discarding anything that fails schema validation.
-function readSavedViewParams(
-  projectId: string,
-): ViewParams | Profile2DViewParams {
+function readSavedViewParams(projectId: string): AnyViewParams {
   const fallback: ViewParams = { name: "identity" };
   if (!projectId) return fallback;
 
@@ -46,9 +45,7 @@ function readSavedViewParams(
 
   try {
     const parsed: unknown = JSON.parse(saved);
-    const result = z
-      .union([ViewParamsSchema, Profile2DViewParamsSchema])
-      .safeParse(parsed);
+    const result = AnyViewParamsSchema.safeParse(parsed);
     if (result.success) return result.data;
   } catch {
     // Malformed JSON - fall through and discard.
@@ -69,7 +66,7 @@ interface SampleContextType {
   data: Data | null;
   annotations: Annotation[];
   dataParams: DataParams;
-  viewParams: ViewParams | Profile2DViewParams;
+  viewParams: AnyViewParams;
   plotProps: PlotProps;
   annotationLabels: { id: number; name: string }[];
   videoFrameBounds: { min: number | null; max: number | null };
@@ -78,9 +75,7 @@ interface SampleContextType {
   error: string | null;
   setAnnotations: React.Dispatch<React.SetStateAction<Annotation[]>>;
   setDataParams: React.Dispatch<React.SetStateAction<DataParams>>;
-  setViewParams: React.Dispatch<
-    React.SetStateAction<ViewParams | Profile2DViewParams>
-  >;
+  setViewParams: React.Dispatch<React.SetStateAction<AnyViewParams>>;
   setPlotProps: (props: PlotProps) => void;
   setIsValidated: (validated: boolean) => void;
 }
@@ -134,7 +129,13 @@ async function getAnnotations(
 async function parseData(
   data: Data,
   task: TaskType,
-): Promise<MultiVariateTimeSeriesData | Profile2DData | ImageData | undefined> {
+): Promise<
+  | MultiVariateTimeSeriesData
+  | Profile2DData
+  | RadialProfileData
+  | ImageData
+  | undefined
+> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {
@@ -146,6 +147,12 @@ async function parseData(
     const result = Profile2DDataSchema.safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for profile 2D view");
+    }
+    return result.data;
+  } else if (task == TaskType.RadialProfile) {
+    const result = RadialProfileDataSchema.safeParse(data);
+    if (!result.success) {
+      throw new Error("Invalid data for radial profile view");
     }
     return result.data;
   } else if (task == TaskType.Video) {
@@ -169,9 +176,9 @@ export function SampleProvider({
   const [data, setData] = useState<Data | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
-  const [viewParams, setViewParams] = useState<
-    ViewParams | Profile2DViewParams
-  >(() => readSavedViewParams(projectId));
+  const [viewParams, setViewParams] = useState<AnyViewParams>(() =>
+    readSavedViewParams(projectId),
+  );
 
   const [dataParams, setDataParams] = useState<DataParams>({
     name: "identity",
@@ -296,6 +303,12 @@ export function SampleProvider({
             name: "profile_2d",
             signal_name: getSignalNames(sampleData)[0],
           } as Profile2DViewParams;
+        } else if (
+          projectData.task === TaskType.RadialProfile &&
+          params.name !== "radial_profile"
+        ) {
+          // The server picks the first 2D signal as the profile.
+          params = { name: "radial_profile" };
         }
 
         // ------------------------------------------------------------

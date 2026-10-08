@@ -5,7 +5,13 @@ import { TimeSeriesProvider } from "@/app/contexts/TimeSeriesContext";
 import { TimeRegion } from "@/app/components/tools/timeRegion";
 import "react-contexify/ReactContexify.css";
 
-import { applyGlobalStyle, arrayMax, arrayMin } from "@/app/utils";
+import {
+  applyGlobalStyle,
+  arrayMax,
+  arrayMin,
+  assignStackedYAxes,
+  buildStackedYAxesLayout,
+} from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -35,9 +41,7 @@ export const TimeSeriesView = () => {
   useEffect(() => {
     if (!viewData) return;
 
-    const numRows = Object.keys(viewData.values).length;
-
-    let plotData: Partial<Plotly.PlotData>[] = Object.entries(
+    const plotData: Partial<Plotly.PlotData>[] = Object.entries(
       viewData.values,
     ).map(([key, value]: [string, TimeSeriesData]) => {
       return {
@@ -48,17 +52,7 @@ export const TimeSeriesView = () => {
       };
     });
 
-    const yAxesNames = Array.from(
-      { length: numRows },
-      (_, i) => `y${i === 0 ? "" : i + 1}`,
-    ).reverse();
-
-    // Dynamically generate y-axis titles based on plotData names
-    plotData = plotData.map((trace, index) => ({
-      ...trace,
-      yaxis: yAxesNames[index],
-    }));
-    setPlotData(plotData);
+    setPlotData(assignStackedYAxes(plotData));
   }, [data, viewData]);
 
   const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
@@ -75,35 +69,8 @@ export const TimeSeriesView = () => {
       }
     }
 
-    const numRows = plotData.length;
-    const domainHeight = 1 / numRows;
-    // Dynamically generate y-axis domains based on numRows
-    const yAxisDomains = Array.from({ length: numRows }, (_, i) => {
-      const start = i * domainHeight;
-      const end = (i + 1) * domainHeight;
-      return [start, end];
-    });
-
-    // Build yaxis layout object dynamically
-    const yAxesLayout = yAxisDomains.reduce(
-      (acc, domain, idx) => {
-        const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
-        acc[`yaxis${axisNum}`] = {
-          domain,
-          autorange: true,
-          fixedrange: true,
-          title: {
-            text: plotData[numRows - idx - 1].name || "",
-            font: {
-              family: "Courier New, monospace",
-              size: 12,
-              color: "#7f7f7f",
-            },
-          },
-        };
-        return acc;
-      },
-      {} as Record<string, unknown>,
+    const yAxesLayout = buildStackedYAxesLayout(
+      plotData.map((trace) => trace.name ?? ""),
     );
 
     return applyGlobalStyle(

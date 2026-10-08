@@ -403,6 +403,13 @@ export function ProjectConfigEditor({
                       />
                     </>
                   )}
+                  {task === TaskType.RadialProfile && (
+                    <LabelsForm
+                      label="Radial Range Labels"
+                      defaultLabels={boundingBoxLabels}
+                      setLabels={setBoundingBoxLabels}
+                    />
+                  )}
                   {task === TaskType.Profile2D && (
                     <>
                       <LabelsForm

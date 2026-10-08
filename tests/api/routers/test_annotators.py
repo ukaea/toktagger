@@ -50,3 +50,31 @@ async def test_annotators_not_supported_for_project(api_client, setup_db):
     # Should throw a 409 conflict error since Disruption project does not support Find Peaks annotator
     assert response.status_code == 409
     assert "The selected annotator cannot be used" in response.json().get("detail")
+
+
+@pytest.mark.asyncio
+async def test_annotators_not_supported_for_radial_profile(api_client, setup_db):
+    response = await api_client.post(
+        "/projects",
+        json={
+            "name": "radial",
+            "task": "radial-profile",
+            "query_strategy": "random",
+            "data_loader": "synthetic_radial",
+        },
+    )
+    project_id = response.json()["_id"]
+    response = await api_client.post(
+        f"/projects/{project_id}/samples",
+        json=[{"shot_id": 1, "data": {"protocol": "uda", "signal_names": ["ip"]}}],
+    )
+    sample_id = response.json()[0]
+    params = {
+        "annotator_params": {"signal_name": "ip", "prominence": 10, "distance": 5},
+        "data_params": {"name": "identity"},
+    }
+    response = await api_client.post(
+        f"/projects/{project_id}/samples/{sample_id}/annotator/peak_detection",
+        json=params,
+    )
+    assert response.status_code == 409

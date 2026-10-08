@@ -26,6 +26,18 @@ class MultiProfile2DData(Data):
     values: dict[str, Profile2DData | None]
 
 
+class MultiSignalData(Data):
+    values: dict[str, TimeSeriesData | Profile2DData | None]
+
+
+class RadialProfileData(Data):
+    profile_signal: str
+    time: list[float]
+    radius: list[list[float | None]]  # [time][channel]
+    values: list[list[float | None]]  # [time][channel]
+    time_series: dict[str, TimeSeriesData]
+
+
 class ImageData(Data):
     frame: int
     values: str | list[int]  # Base64-encoded string or raw encoded file bytes
@@ -48,6 +60,8 @@ DataResponseType = Union[
     MultiVariateTimeSeriesData,
     Profile2DData,
     MultiProfile2DData,
+    MultiSignalData,
+    RadialProfileData,
 ]
 
 DataParamTypes = Union[DataParams, ImageParams]

@@ -22,7 +22,7 @@ async def test_get_data_schema(api_client, setup_db):
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-@pytest.mark.parametrize("task", ["time-series", "video"])
+@pytest.mark.parametrize("task", ["time-series", "video", "radial-profile"])
 async def test_get_model_types(api_client, setup_db, task):
     response = await api_client.get(f"/meta/models?task={task}")
     assert response.status_code == 200
@@ -101,7 +101,7 @@ async def test_get_model_schema(api_client, setup_db, model_name, method):
 
 @pytest.mark.asyncio
 @pytest.mark.models_disabled
-@pytest.mark.parametrize("task", ["time-series", "video"])
+@pytest.mark.parametrize("task", ["time-series", "video", "radial-profile"])
 async def test_get_model_types_disabled(api_client, setup_db, task):
     response = await api_client.get(f"/meta/models?task={task}")
     assert response.status_code == 503

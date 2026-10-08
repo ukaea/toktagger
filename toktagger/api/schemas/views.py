@@ -6,6 +6,7 @@ from toktagger.api.schemas import ConfiguredModel
 class ViewType(str, Enum):
     IDENTITY = "identity"
     PROFILE_2D = "profile_2d"
+    RADIAL_PROFILE = "radial_profile"
 
 
 class ViewParams(ConfiguredModel):
@@ -24,4 +25,10 @@ class Profile2DViewParams(ViewParams):
     log_scale: bool = False
 
 
-ViewParamTypes = Union[ViewParams, Profile2DViewParams]
+class RadialProfileViewParams(ViewParams):
+    name: Literal[ViewType.RADIAL_PROFILE] = ViewType.RADIAL_PROFILE
+    profile_signal: Optional[str] = None
+    radius_signal: Optional[str] = None
+
+
+ViewParamTypes = Union[ViewParams, Profile2DViewParams, RadialProfileViewParams]

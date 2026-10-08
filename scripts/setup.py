@@ -220,6 +220,15 @@ def main():
         shot_ids,
         signals=["/XMB/SANX13-01/CH13", "/XMB/SANX13-01/CH14", "/XMB/SANX13-01/CH15"],
     )
+
+    project_id = create_project(
+        "UDA Thomson Project",
+        "radial-profile",
+        "uda",
+        "sequential",
+        min_time_step=None,
+    )
+    create_uda_samples(project_id, [30421], signals=["AYC_TE", "AYC_R", "ip"])
     # ---- Image / UFO demo project ----
     project_id = create_project("Frame Project", "video", "image", "random")
     create_image_samples(project_id, [10101], Path("./data/test/video/"))

@@ -5,10 +5,17 @@ from toktagger.api.schemas.data import (
     Profile2DData,
     MultiVariateTimeSeriesData,
     MultiProfile2DData,
+    MultiSignalData,
     Data,
+    RadialProfileData,
     TimeSeriesData,
 )
-from toktagger.api.schemas.views import Profile2DViewParams, ViewParams, ViewType
+from toktagger.api.schemas.views import (
+    Profile2DViewParams,
+    RadialProfileViewParams,
+    ViewParams,
+    ViewType,
+)
 
 
 class IdentityView:
@@ -97,7 +104,63 @@ class Profile2DView:
         return self.convert_profile_to_view(profile_data)
 
 
+def _finite_or_none(values: np.ndarray) -> list[list[float | None]]:
+    """Convert a 2D array to nested lists, replacing NaN/inf with None for JSON."""
+    return np.where(np.isfinite(values), values, None).tolist()
+
+
+class RadialProfileView:
+    def __init__(self, params: RadialProfileViewParams):
+        self.params = params
+
+    def __call__(
+        self, data: MultiSignalData | MultiProfile2DData | MultiVariateTimeSeriesData
+    ) -> RadialProfileData:
+        profiles = {
+            name: value
+            for name, value in data.values.items()
+            if isinstance(value, Profile2DData)
+        }
+        profile_signal = self.params.profile_signal or next(iter(profiles), None)
+        if profile_signal is None:
+            raise RuntimeError("No 2D profile signal found for radial profile view")
+        if profile_signal not in profiles:
+            raise RuntimeError(f"Profile data for {profile_signal} does not exist.")
+
+        profile = profiles[profile_signal]
+        values = np.array(profile.values, dtype=float)
+
+        if self.params.radius_signal is None:
+            radius = np.broadcast_to(np.array(profile.dim_1, dtype=float), values.shape)
+        else:
+            radius_data = profiles.get(self.params.radius_signal)
+            if radius_data is None:
+                raise RuntimeError(
+                    f"Radius data for {self.params.radius_signal} does not exist."
+                )
+            radius = np.array(radius_data.values, dtype=float)
+            if radius.shape != values.shape:
+                raise RuntimeError(
+                    f"Radius signal shape {radius.shape} does not match profile shape {values.shape}"
+                )
+
+        time_series = {
+            name: value
+            for name, value in data.values.items()
+            if isinstance(value, TimeSeriesData)
+        }
+
+        return RadialProfileData(
+            profile_signal=profile_signal,
+            time=profile.time,
+            radius=_finite_or_none(radius),
+            values=_finite_or_none(values),
+            time_series=time_series,
+        )
+
+
 DATA_VIEWS = {
     ViewType.IDENTITY: IdentityView,
     ViewType.PROFILE_2D: Profile2DView,
+    ViewType.RADIAL_PROFILE: RadialProfileView,
 }
