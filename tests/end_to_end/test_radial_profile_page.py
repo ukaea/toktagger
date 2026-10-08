@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import requests
-from playwright.sync_api import Page, expect
+from playwright.sync_api import FloatRect, Page, expect
 
 from tests.endpoints import create_project, create_uda_samples
 from tests.radial_definitions import RADIAL_TIME
@@ -66,6 +66,20 @@ def ctrl_drag(page: Page, plot_id: str, start: float, end: float) -> None:
     page.mouse.move(box["x"] + box["width"] * end, y, steps=20)
     page.mouse.up()
     page.keyboard.up("Control")
+
+
+def last_box(page: Page, selector: str) -> FloatRect:
+    """Measure the last match in one JS call, as the D3 overlays re-create their rects on each render."""
+    return page.wait_for_function(
+        """(selector) => {
+            const el = [...document.querySelectorAll(selector)].at(-1);
+            const r = el?.getBoundingClientRect();
+            return r && r.width > 0 && r.height > 0
+                ? { x: r.x, y: r.y, width: r.width, height: r.height }
+                : null;
+        }""",
+        arg=selector,
+    ).json_value()
 
 
 def save(page: Page, sample_id: str) -> None:
@@ -138,10 +152,8 @@ def test_radial_profile_draw_and_edit_radial_range(server_setup, page: Page):
     expect(page.get_by_role("gridcell", name="NTM")).to_be_visible()
 
     # Narrow the time span by dragging the right-hand time edge to the middle of the shot.
-    handle = page.get_by_label("radial-range-time-handle-1").last
-    handle_box = handle.bounding_box()
-    plot_box = page.locator(f"#{TIME_PLOT_ID} .nsewdrag").last.bounding_box()
-    assert handle_box is not None and plot_box is not None
+    handle_box = last_box(page, "[aria-label='radial-range-time-handle-1']")
+    plot_box = last_box(page, f"#{TIME_PLOT_ID} .nsewdrag")
     y = handle_box["y"] + handle_box["height"] / 2
     page.mouse.move(handle_box["x"] + handle_box["width"] / 2, y)
     page.mouse.down()
