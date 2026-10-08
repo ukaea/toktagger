@@ -143,6 +143,10 @@ export const Profile2DDataSchema = z.object({
   values: z.array(z.array(z.number().nullable())),
 });
 export type Profile2DData = z.infer<typeof Profile2DDataSchema>;
+export const SpectrogramDataSchema = Profile2DDataSchema.extend({
+  kind: z.literal("spectrogram"),
+});
+export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
 export const ImageDataSchema = z.object({
   frame: z.number(),
   values: z.string(), // base64 PNG
@@ -152,6 +156,7 @@ export type ImageData = z.infer<typeof ImageDataSchema>;
 export const DataSchema = z.union([
   TimeSeriesDataSchema,
   MultiVariateTimeSeriesDataSchema,
+  SpectrogramDataSchema,
   Profile2DDataSchema,
   ImageDataSchema,
 ]);
@@ -326,6 +331,22 @@ export const ViewParamsSchema = z.object({
 });
 export type ViewParams = z.infer<typeof ViewParamsSchema>;
 
+export const STFTWindowSchema = z.enum([
+  "hann",
+  "hamming",
+  "blackman",
+  "boxcar",
+]);
+export type STFTWindow = z.infer<typeof STFTWindowSchema>;
+
+export const STFTParamsSchema = z.object({
+  nperseg: z.number().int(),
+  noverlap: z.number().int(),
+  window: STFTWindowSchema,
+  nfft: z.number().int().nullable().optional(),
+});
+export type STFTParams = z.infer<typeof STFTParamsSchema>;
+
 export const Profile2DViewParamsSchema = ViewParamsSchema.extend({
   name: z.literal("profile_2d"),
   signal_name: z.string(),
@@ -336,6 +357,7 @@ export const Profile2DViewParamsSchema = ViewParamsSchema.extend({
   dim_1_max: z.number().optional(),
   values_min: z.number().optional(),
   values_max: z.number().optional(),
+  stft: STFTParamsSchema.optional(),
 });
 export type Profile2DViewParams = z.infer<typeof Profile2DViewParamsSchema>;
 

@@ -23,6 +23,8 @@ import {
   Profile2DData,
   MultiVariateTimeSeriesDataSchema,
   Profile2DDataSchema,
+  SpectrogramData,
+  SpectrogramDataSchema,
   ImageData,
   ImageDataSchema,
   TaskType,
@@ -134,7 +136,13 @@ async function getAnnotations(
 async function parseData(
   data: Data,
   task: TaskType,
-): Promise<MultiVariateTimeSeriesData | Profile2DData | ImageData | undefined> {
+): Promise<
+  | MultiVariateTimeSeriesData
+  | SpectrogramData
+  | Profile2DData
+  | ImageData
+  | undefined
+> {
   if (task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
     if (!result.success) {
@@ -143,7 +151,10 @@ async function parseData(
     return result.data;
   } else if (task == TaskType.Profile2D) {
     // The server selects the signal, so the response is a single profile.
-    const result = Profile2DDataSchema.safeParse(data);
+    // Spectrogram first so its `kind` marker is not stripped by the plain profile schema.
+    const result = z
+      .union([SpectrogramDataSchema, Profile2DDataSchema])
+      .safeParse(data);
     if (!result.success) {
       throw new Error("Invalid data for profile 2D view");
     }

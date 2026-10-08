@@ -25,6 +25,7 @@ from shapely.geometry import Polygon
 
 from toktagger.api.schemas.data import TimeSeriesData
 from toktagger.api.schemas.annotations import TimeRegion
+from toktagger.api.schemas.views import STFTParams
 from toktagger.api.schemas.annotations import (
     # Aliased to avoid clashing with shapely's Polygon, used below for geometry.
     Polygon as PolygonAnnotation,
@@ -169,7 +170,10 @@ def _coords_to_flat_list(coords: Iterable[Tuple[float, float]]) -> List[float]:
     return flat
 
 
-def compute_stft(data: TimeSeriesData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def compute_stft(
+    data: TimeSeriesData, params: STFTParams | None = None
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    params = params if params is not None else STFTParams()
     time = np.array(data.time)
     values = np.array(data.values)
 
@@ -189,8 +193,10 @@ def compute_stft(data: TimeSeriesData) -> tuple[np.ndarray, np.ndarray, np.ndarr
     freq, ts, Zxx = stft(
         values,
         fs=int(sample_rate),
-        nperseg=256,
-        noverlap=128,
+        window=params.window.value,
+        nperseg=params.nperseg,
+        noverlap=params.noverlap,
+        nfft=params.nfft,
     )
     freq /= 1000
     ts += time[0]
