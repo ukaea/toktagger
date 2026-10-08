@@ -554,7 +554,8 @@ export const BaseTimeSeriesPlot = ({
   ]);
 
   return (
-    <div className="w-full px-6 py-3 space-y-3 flex-col">
+    // No vertical padding: the caller sizes the plot to this container.
+    <div className="w-full h-full px-6">
       {/* Div where plot is inserted */}
       <div id={plotId} className="" aria-label={ariaLabel}>
         <>

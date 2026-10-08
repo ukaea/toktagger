@@ -51,6 +51,8 @@ export type ByFrameMap = Map<FrameIndex, ImageAnnotation[]>;
  */
 export type VideoBoundingBox = {
   type: "video_bounding_box";
+  /** Backend _id when this annotation already exists; absent for a new shape. */
+  _id?: string | null;
   frame: number;
   track_id: string;
   label: string;
@@ -65,6 +67,8 @@ export type VideoBoundingBox = {
 
 export type VideoPolygon = {
   type: "video_polygon";
+  /** Backend _id when this annotation already exists; absent for a new shape. */
+  _id?: string | null;
   frame: number;
   track_id: string;
   label: string;
@@ -76,6 +80,8 @@ export type VideoPolygon = {
 
 export type VideoPoint = {
   type: "video_point";
+  /** Backend _id when this annotation already exists; absent for a new shape. */
+  _id?: string | null;
   frame: number;
   track_id: string;
   label: string;

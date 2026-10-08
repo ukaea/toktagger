@@ -13,6 +13,7 @@ These settings should be defined under the `[server]` heading in the TOML file:
 | host            | SERVER_HOST             | str          | localhost                               | Address of the host to launch TokTagger on.                              |
 | port            | SERVER_PORT             | int          | 8002                                    | The port to use for the TokTagger Rest API.                              |
 | reload          | SERVER_RELOAD           | bool         | False                                   | Whether to hot reload the TokTagger server on changes to files.          |
+| workers         | SERVER_WORKERS          | int          | 1                                        | The number of Gunicorn worker processes to use. If set to 1, runs a single-process uvicorn server instead. |
 | cache_dir       | SERVER_CACHE_DIR        | pathlib.Path | ~/.cache/toktagger                      | The directory to use for storing entries in the Mongita database.        |
 
 ## Database Settings
@@ -21,6 +22,20 @@ These settings should be defined under the `[database]` heading in the TOML file
 | Setting         | Environment Variable    | Type         | Default                                 | Description                                                                                 |
 |-----------------|-------------------------|--------------|-----------------------------------------|---------------------------------------------------------------------------------------------|
 | mongo_url       | DATABASE_MONGO_URL      | str          | ./toktagger_db                          | URL of the MongoDB server to connect to as a backend, by default uses local Mongita client. |
+
+## Auth Settings
+These settings should be defined under the `[auth]` heading in the TOML file:
+
+| Setting         | Environment Variable    | Type         | Default                                 | Description                                                              |
+|-----------------|-------------------------|--------------|-----------------------------------------|--------------------------------------------------------------------------|
+| secret_key      | AUTH_SECRET_KEY         | str          | None                                    | Secret key used to sign auth tokens. If unset, a key is generated and persisted to `secret.key` under the server `cache_dir` on first run. Set this explicitly for multi-worker/multi-process deployments so all processes share the same signing key. |
+| cookie_name     | AUTH_COOKIE_NAME        | str          | tt_access_token                         | Name of the httpOnly cookie that holds the session token. Set to `__Host-tt_access_token` on an HTTPS-only deployment for extra hardening. |
+| cookie_secure   | AUTH_COOKIE_SECURE      | bool         | None                                    | Whether to mark the auth cookie `Secure` (HTTPS only). If unset, it is derived from the scheme of the login request, so local HTTP development works and an HTTPS deployment is hardened automatically. |
+| cookie_samesite | AUTH_COOKIE_SAMESITE    | str          | lax                                     | `SameSite` policy for the auth cookie: `lax`, `strict` or `none`. Only use `none` if the frontend is served from a different site to the API; this also forces the cookie to be `Secure`. |
+
+The server reads the request scheme to decide whether the auth cookie is `Secure`.
+If TLS is terminated by a proxy on a different host, the server sees plain HTTP and
+the cookie is sent without `Secure`. Set `AUTH_COOKIE_SECURE=true` for that topology.
 
 ## Models Settings
 

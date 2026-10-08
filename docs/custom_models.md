@@ -472,10 +472,7 @@ from toktagger.api.main import Server
 from my_models import MyCustomModel  # Import to register
 
 server = Server()
-server.run(
-    host="0.0.0.0",
-    port=8002
-)
+server.run()
 ```
 
 Then provide the path to your script when running docker compose:

@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+
+from toktagger.api.auth.dependencies import require_password_changed
 from toktagger.api.crud import utils
 
-router = APIRouter(prefix="/paths", tags=["Paths"])
+router = APIRouter(
+    prefix="/paths", tags=["Paths"], dependencies=[Depends(require_password_changed)]
+)
 
 
 @router.get("/files", response_model=list[str])

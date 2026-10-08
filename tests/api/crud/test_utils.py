@@ -1,13 +1,23 @@
+import os
+import tempfile
+from pathlib import Path
+
 import pytest
 from bson.objectid import ObjectId
-from tests.db_definitions import PROJECT_1, SAMPLE_1, ANNOTATION_1, ANNOTATION_2
-from toktagger.api.schemas.samples import SampleUpdate
-from toktagger.api.schemas.models import ModelUpdate, ModelIn
-import toktagger.api.crud.utils as utils
 from fastapi import HTTPException
-import tempfile
-import os
-from pathlib import Path
+
+from tests.db_definitions import (
+    ANNOTATION_1,
+    ANNOTATION_2,
+    PROJECT_1,
+    SAMPLE_1,
+    USER_ADMIN,
+)
+from toktagger.api.crud import utils
+from toktagger.api.schemas.models import ModelIn, ModelUpdate
+from toktagger.api.schemas.projects import ProjectMemberUpdate
+from toktagger.api.schemas.samples import SampleUpdate
+from toktagger.api.schemas.users import UserIn, UserUpdate
 
 
 @pytest.mark.asyncio
@@ -16,7 +26,7 @@ async def test_get_projects(db_client, setup_db):
     # Check three projects returned
     assert len(projects) == 3
     # Check returned in correct order - reverse order of created
-    assert [project["name"] for project in projects] == [
+    assert [project.name for project in projects] == [
         "project_2",
         "test_project_1",
         "test_project_0",
@@ -29,7 +39,7 @@ async def test_get_projects_by_name(db_client, setup_db):
     # Should fuzzy search for any names including 'test'
     # Case insensitive
     assert len(projects) == 2
-    assert [project["name"] for project in projects] == [
+    assert [project.name for project in projects] == [
         "test_project_1",
         "test_project_0",
     ]
@@ -290,6 +300,45 @@ async def test_delete_specific_annotation(db_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_delete_specific_annotations_bulk(db_client, setup_db):
+    # Delete a batch of annotations by id in a single call
+    deleted_count = await utils.delete_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
+        annotation_ids=[setup_db["annotation_id_1"], setup_db["annotation_id_2"]],
+    )
+    assert deleted_count == 2
+
+    annotations = await db_client.get_filtered_documents("annotations")
+    remaining_ids = {str(annotation["_id"]) for annotation in annotations}
+    assert remaining_ids == {
+        setup_db["annotation_id_3"],
+        setup_db["annotation_id_4"],
+        setup_db["annotation_id_5"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_delete_specific_annotations_bulk_ignores_unknown_ids(
+    db_client, setup_db
+):
+    unknown_id = str(ObjectId())
+    deleted_count = await utils.delete_annotations(
+        db_client,
+        project_id=setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
+        annotation_ids=[setup_db["annotation_id_1"], unknown_id],
+    )
+    # Only the real id is counted; the unknown one matches nothing.
+    assert deleted_count == 1
+
+    annotations = await db_client.get_filtered_documents("annotations")
+    remaining_ids = {str(annotation["_id"]) for annotation in annotations}
+    assert setup_db["annotation_id_1"] not in remaining_ids
+
+
+@pytest.mark.asyncio
 async def test_import_annotations_success(db_client, setup_db):
     # Create new annotations with sample_id references
     new_annotations = [
@@ -453,7 +502,10 @@ async def test_get_model_doesnt_exist(db_client, setup_model_db):
 async def test_update_model(db_client, setup_model_db):
     model_updates = ModelUpdate(status="completed", progress=100, score=80)
     await utils.update_model(
-        db_client, model_id=setup_model_db["model_id_3"], updates=model_updates
+        db_client,
+        project_id=setup_model_db["project_id"],
+        model_id=setup_model_db["model_id_3"],
+        updates=model_updates,
     )
     # Check model has been updated
     model_updated = await db_client.get_document_by_id(
@@ -462,6 +514,24 @@ async def test_update_model(db_client, setup_model_db):
     assert model_updated["status"] == "completed"
     assert model_updated["progress"] == 100
     assert model_updated["score"] == 80
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_update_model_wrong_project(db_client, setup_model_db):
+    with pytest.raises(
+        HTTPException, match="Model not found belonging to this Project"
+    ):
+        await utils.update_model(
+            db_client,
+            project_id=str(ObjectId()),
+            model_id=setup_model_db["model_id_3"],
+            updates=ModelUpdate(status="completed"),
+        )
+    model = await db_client.get_document_by_id(
+        "models", ObjectId(setup_model_db["model_id_3"])
+    )
+    assert model["status"] == "training"
 
 
 @pytest.mark.asyncio
@@ -491,3 +561,275 @@ async def test_delete_model(db_client, setup_model_db):
     models = await db_client.get_filtered_documents("models")
     assert len(models) == 3
     assert setup_model_db["model_id_1"] not in [model["_id"] for model in models]
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_username_not_found(db_client):
+    user = await utils.get_user_by_username(db_client, "nonexistent")
+    assert user is None
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_username_found(db_client, setup_db_auth):
+    user = await utils.get_user_by_username(db_client, "alice")
+    assert user is not None
+    assert user.username == "alice"
+    assert user.id == setup_db_auth["alice_id"]
+
+
+@pytest.mark.asyncio
+async def test_get_user_doc_by_username_not_found(db_client):
+    doc = await utils.get_user_doc_by_username(db_client, "nonexistent")
+    assert doc is None
+
+
+@pytest.mark.asyncio
+async def test_get_user_doc_by_username_found(db_client, setup_db_auth):
+    doc = await utils.get_user_doc_by_username(db_client, "admin")
+    assert doc is not None
+    assert doc["username"] == "admin"
+    assert "hashed_password" in doc
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_id_not_found(db_client):
+    user = await utils.get_user_by_id(db_client, str(ObjectId()))
+    assert user is None
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_id_found(db_client, setup_db_auth):
+    user = await utils.get_user_by_id(db_client, setup_db_auth["bob_id"])
+    assert user is not None
+    assert user.username == "bob"
+    assert user.global_role == "user"
+
+
+@pytest.mark.asyncio
+async def test_get_all_users(db_client, setup_db_auth):
+    users = await utils.get_all_users(db_client)
+    assert len(users) == 3
+    usernames = {u.username for u in users}
+    assert usernames == {"admin", "alice", "bob"}
+
+
+@pytest.mark.asyncio
+async def test_create_user(db_client):
+    new_user = UserIn(
+        username="charlie",
+        hashed_password="charlie_pass",
+        global_role="user",
+    )
+    user_id = await utils.create_user(db_client, new_user)
+    assert user_id is not None
+
+    user = await utils.get_user_by_username(db_client, "charlie")
+    assert user is not None
+    assert user.id == user_id
+
+
+@pytest.mark.asyncio
+async def test_create_user_duplicate_username(db_client):
+    await db_client.insert("users", USER_ADMIN)
+    duplicate = UserIn(
+        username="admin",
+        hashed_password="other_pass",
+        global_role="user",
+    )
+    with pytest.raises(HTTPException, match="Username already exists"):
+        await utils.create_user(db_client, duplicate)
+
+
+@pytest.mark.asyncio
+async def test_update_user(db_client, setup_db_auth):
+    # Record the original hashed password
+    original_doc = await utils.get_user_doc_by_username(db_client, "alice")
+    original_hash = original_doc["hashed_password"]
+
+    # Update both role and password at once
+    updates = UserUpdate(global_role="admin", password="newpassword")
+    await utils.update_user(db_client, setup_db_auth["alice_id"], updates)
+
+    # Check role updated
+    user = await utils.get_user_by_id(db_client, setup_db_auth["alice_id"])
+    assert user.global_role == "admin"
+
+    # Check password was hashed (hash differs from plaintext and from original)
+    new_doc = await utils.get_user_doc_by_username(db_client, "alice")
+    assert new_doc["hashed_password"] != "newpassword"
+    assert new_doc["hashed_password"] != original_hash
+
+
+@pytest.mark.asyncio
+async def test_update_user_not_found(db_client):
+    updates = UserUpdate(global_role="admin")
+    with pytest.raises(HTTPException, match="User not found"):
+        await utils.update_user(db_client, str(ObjectId()), updates)
+
+
+@pytest.mark.asyncio
+async def test_delete_user(db_client, setup_db_auth):
+    await utils.delete_user(db_client, setup_db_auth["alice_id"])
+
+    user = await utils.get_user_by_id(db_client, setup_db_auth["alice_id"])
+    assert user is None
+
+    # Verify project memberships were also removed
+    members = await db_client.get_filtered_documents("project_members")
+    assert setup_db_auth["alice_id"] not in [str(m["user_id"]) for m in members]
+
+
+@pytest.mark.asyncio
+async def test_delete_user_not_found(db_client):
+    with pytest.raises(HTTPException, match="User not found"):
+        await utils.delete_user(db_client, str(ObjectId()))
+
+
+@pytest.mark.asyncio
+async def test_get_project_members(db_client, setup_db_auth):
+    # setup_db_auth already has admin as member of project_id
+    members = await utils.get_project_members(db_client, setup_db_auth["project_id"])
+    assert len(members) == 1
+    assert members[0].username == "admin"
+    assert members[0].role == "admin"
+
+
+@pytest.mark.asyncio
+async def test_get_project_members_empty(db_client, setup_db):
+    members = await utils.get_project_members(db_client, setup_db["project_id_1"])
+    assert len(members) == 0
+
+
+@pytest.mark.asyncio
+async def test_get_user_memberships(db_client, setup_db_auth):
+    memberships = await utils.get_user_memberships(db_client, setup_db_auth["admin_id"])
+    assert len(memberships) == 2
+    project_ids = {m.project_id for m in memberships}
+    assert project_ids == {
+        setup_db_auth["project_id"],
+        setup_db_auth["other_project_id"],
+    }
+    assert all(m.username == "admin" and m.role == "admin" for m in memberships)
+
+
+@pytest.mark.asyncio
+async def test_get_user_memberships_empty(db_client, setup_db_auth):
+    memberships = await utils.get_user_memberships(db_client, setup_db_auth["alice_id"])
+    assert len(memberships) == 0
+
+
+@pytest.mark.asyncio
+async def test_get_project_membership(db_client, setup_db_auth):
+    membership = await utils.get_project_membership(
+        db_client, setup_db_auth["project_id"], setup_db_auth["admin_id"]
+    )
+    assert membership is not None
+    assert membership.username == "admin"
+    assert membership.role == "admin"
+
+
+@pytest.mark.asyncio
+async def test_get_project_membership_not_found(db_client, setup_db_auth):
+    membership = await utils.get_project_membership(
+        db_client, setup_db_auth["project_id"], setup_db_auth["alice_id"]
+    )
+    assert membership is None
+
+
+@pytest.mark.asyncio
+async def test_add_project_member(db_client, setup_db_auth):
+    member_id = await utils.add_project_member(
+        db_client, setup_db_auth["project_id"], setup_db_auth["bob_id"]
+    )
+    assert member_id is not None
+
+    members = await utils.get_project_members(db_client, setup_db_auth["project_id"])
+    assert len(members) == 2
+    usernames = {m.username for m in members}
+    assert usernames == {"admin", "bob"}
+
+
+@pytest.mark.asyncio
+async def test_add_project_member_duplicate(db_client, setup_db_auth):
+    # setup_db_auth already has admin as member of project_id
+    with pytest.raises(HTTPException, match="User is already a member of this project"):
+        await utils.add_project_member(
+            db_client, setup_db_auth["project_id"], setup_db_auth["admin_id"]
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_project_member(db_client, setup_db_auth):
+    await utils.update_project_member(
+        db_client,
+        setup_db_auth["project_id"],
+        setup_db_auth["admin_id"],
+        ProjectMemberUpdate(role="annotator"),
+    )
+
+    membership = await utils.get_project_membership(
+        db_client, setup_db_auth["project_id"], setup_db_auth["admin_id"]
+    )
+    assert membership.role == "annotator"
+
+
+@pytest.mark.asyncio
+async def test_update_project_member_not_found(db_client, setup_db_auth):
+    with pytest.raises(HTTPException, match="Membership not found"):
+        await utils.update_project_member(
+            db_client,
+            setup_db_auth["project_id"],
+            setup_db_auth["alice_id"],
+            ProjectMemberUpdate(role="viewer"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_remove_project_member(db_client, setup_db_auth):
+    await utils.remove_project_member(
+        db_client, setup_db_auth["project_id"], setup_db_auth["admin_id"]
+    )
+
+    membership = await utils.get_project_membership(
+        db_client, setup_db_auth["project_id"], setup_db_auth["admin_id"]
+    )
+    assert membership is None
+
+
+@pytest.mark.asyncio
+async def test_remove_project_member_not_found(db_client, setup_db_auth):
+    with pytest.raises(HTTPException, match="Membership not found"):
+        await utils.remove_project_member(
+            db_client, setup_db_auth["project_id"], setup_db_auth["alice_id"]
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_user_projects_as_member(db_client, setup_db_auth):
+    projects = await utils.get_user_projects(
+        db_client, setup_db_auth["admin_id"], global_role="user"
+    )
+    assert len(projects) == 2
+    project_ids = {p.id for p in projects}
+    assert project_ids == {
+        setup_db_auth["project_id"],
+        setup_db_auth["other_project_id"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_user_projects_as_member_empty(db_client, setup_db_auth):
+    projects = await utils.get_user_projects(
+        db_client, setup_db_auth["alice_id"], global_role="user"
+    )
+    assert len(projects) == 0
+
+
+@pytest.mark.asyncio
+async def test_get_user_projects_as_admin(db_client, setup_db_auth, setup_db):
+    # Admin role ignores memberships and returns all projects in the db
+    projects = await utils.get_user_projects(
+        db_client, setup_db_auth["admin_id"], global_role="admin"
+    )
+    # setup_db adds 3 projects + setup_db_auth adds 2 more = 5 total
+    assert len(projects) == 5

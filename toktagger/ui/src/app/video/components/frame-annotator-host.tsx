@@ -168,6 +168,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     canDrawPoint,
     canTagFrame,
     hideAnnotations,
+    canAnnotate,
     toggleFrameLabel,
     createPointAnnotation,
     deleteAnnotation,
@@ -375,7 +376,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       stopEvent(event);
       api.cancelDrawing?.();
 
-      if (!annotation?.id && classItems.length > 0) {
+      // The menu only arms a class for drawing, so a viewer gets no menu.
+      if (!annotation?.id && classItems.length > 0 && canAnnotate) {
         showCanvasMenu({ event });
       }
     };
@@ -408,7 +410,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         target.removeEventListener("auxclick", blockSecondaryMouse, true);
       }
     };
-  }, [api, classItems.length, hideAnnotations, showCanvasMenu]);
+  }, [api, classItems.length, hideAnnotations, showCanvasMenu, canAnnotate]);
 
   useEffect(() => {
     if (!api?.viewer || hideAnnotations) return;
@@ -417,7 +419,12 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     const warnInvalidDraw = (event: PointerEvent) => {
       if (event.button !== 0 || !event.ctrlKey) return;
 
-      if (!editMode) {
+      if (!canAnnotate) {
+        ToastQueue.info(
+          "You have view-only access to this project - annotations cannot be edited",
+          { timeout: 5000 },
+        );
+      } else if (!editMode) {
         ToastQueue.info(
           "Change to Edit Mode to draw annotations - see help popup in annotation toolbar for more info",
           { timeout: 5000 },
@@ -434,7 +441,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     return () => {
       viewerElement.removeEventListener("pointerdown", warnInvalidDraw, true);
     };
-  }, [api, drawingTool, editMode, hideAnnotations]);
+  }, [api, drawingTool, editMode, hideAnnotations, canAnnotate]);
 
   const annotoriousDrawingTool = drawingTool
     ? toAnnotoriousDrawingTool(drawingTool)
