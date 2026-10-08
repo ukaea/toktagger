@@ -41,6 +41,12 @@ export function Profile2DViewParamsWidget() {
   const [stft, setStft] = useState<STFTParams>(
     initialParams?.stft ?? DEFAULT_STFT_PARAMS,
   );
+  const [frequencyMin, setFrequencyMin] = useState<number | undefined>(
+    initialParams?.dim_1_min,
+  );
+  const [frequencyMax, setFrequencyMax] = useState<number | undefined>(
+    initialParams?.dim_1_max,
+  );
 
   const signalNames = useMemo(() => getSignalNames(sample), [sample]);
   const isSpectrogram = useMemo(
@@ -64,12 +70,21 @@ export function Profile2DViewParamsWidget() {
         signal_name: selectedSignal,
         log_scale: logScale,
         stft: stft,
+        dim_1_min: frequencyMin,
+        dim_1_max: frequencyMax,
       };
 
       // Only update if the params actually changed
       return shallowEqual(prevParams, nextParams) ? prevParams : nextParams;
     });
-  }, [selectedSignal, logScale, stft, setViewParams]);
+  }, [
+    selectedSignal,
+    logScale,
+    stft,
+    frequencyMin,
+    frequencyMax,
+    setViewParams,
+  ]);
 
   const onWindowSizeChange = (nperseg: number) => {
     if (isNaN(nperseg) || nperseg < 2) return;
@@ -95,6 +110,18 @@ export function Profile2DViewParamsWidget() {
       ...prev,
       nfft: isNaN(nfft) ? null : Math.max(nfft, prev.nperseg),
     }));
+  };
+
+  const onFrequencyMinChange = (value: number) => {
+    if (isNaN(value)) return setFrequencyMin(undefined);
+    if (frequencyMax !== undefined && value >= frequencyMax) return;
+    setFrequencyMin(value);
+  };
+
+  const onFrequencyMaxChange = (value: number) => {
+    if (isNaN(value)) return setFrequencyMax(undefined);
+    if (frequencyMin !== undefined && value <= frequencyMin) return;
+    setFrequencyMax(value);
   };
 
   const onWindowChange = (key: unknown) => {
@@ -155,6 +182,25 @@ export function Profile2DViewParamsWidget() {
             minValue={stft.nperseg}
             step={1}
             onChange={onFftLengthChange}
+          />
+          <NumberField
+            label="Min frequency (kHz)"
+            width="100%"
+            description="Leave empty for no lower limit."
+            value={frequencyMin ?? NaN}
+            minValue={0}
+            maxValue={frequencyMax}
+            formatOptions={{ maximumFractionDigits: 6 }}
+            onChange={onFrequencyMinChange}
+          />
+          <NumberField
+            label="Max frequency (kHz)"
+            width="100%"
+            description="Leave empty for no upper limit."
+            value={frequencyMax ?? NaN}
+            minValue={frequencyMin ?? 0}
+            formatOptions={{ maximumFractionDigits: 6 }}
+            onChange={onFrequencyMaxChange}
           />
         </>
       )}

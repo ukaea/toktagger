@@ -392,3 +392,29 @@ def test_profile2d_stft_params_persist_between_shots(server_setup, page: Page):
 
     page.get_by_role("button", name="View Parameters").click()
     expect(page.get_by_role("textbox", name="Window size")).to_have_value("64")
+
+
+def test_profile2d_frequency_range_crops_spectrogram(server_setup, page: Page):
+    _project_id, sample_id, _reload = setup_project(page)
+
+    page.get_by_role("button", name="View Parameters").click()
+    min_frequency_field = page.get_by_role("textbox", name="Min frequency (kHz)")
+    max_frequency_field = page.get_by_role("textbox", name="Max frequency (kHz)")
+    expect(min_frequency_field).to_have_value("")
+    expect(max_frequency_field).to_have_value("")
+
+    # The fixture is sampled at 1 Hz, so its Nyquist frequency is 0.0005 kHz.
+    with page.expect_response(
+        lambda response: (
+            is_data_request(response, sample_id)
+            and response.request.post_data_json["view"].get("dim_1_max") == 0.00025
+        )
+    ) as response_info:
+        max_frequency_field.fill("0.00025")
+        max_frequency_field.press("Enter")
+    assert response_info.value.ok
+    assert response_info.value.request.post_data_json["view"].get("dim_1_min") is None
+    frequencies = response_info.value.json()["dim_1"]
+    assert 0 < len(frequencies) and max(frequencies) <= 0.00025
+    expect(max_frequency_field).to_have_value("0.00025")
+    expect(page.get_by_label("profile-2d")).to_be_visible()
