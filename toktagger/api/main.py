@@ -186,6 +186,10 @@ class Server:
             self._mcp_app = None
             self.app = FastAPI(lifespan=lifespan)
 
+        # MCP tools reach routes through the sub-app, so share the outer app's
+        # state object so request.app.state resolves in both
+        self._api_app.state = self.app.state
+
         # Allow requests from the frontend dev server
         origins = [
             "http://localhost:5173",
