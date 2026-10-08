@@ -331,3 +331,90 @@ def test_profile2d_edit_mode_relabel_and_delete(server_setup, page: Page):
     page.get_by_role("menuitem", name="Delete").click(force=True)
 
     expect(page.get_by_label("time-zone")).to_have_count(0)
+
+
+def is_data_request(response, sample_id: str) -> bool:
+    return response.request.method == "POST" and response.url.endswith(
+        f"/samples/{sample_id}/data"
+    )
+
+
+def set_window_size(page: Page, sample_id: str, window_size: int) -> None:
+    window_size_field = page.get_by_role("textbox", name="Window size")
+    with page.expect_response(
+        lambda response: (
+            is_data_request(response, sample_id)
+            and response.request.post_data_json["view"]["stft"]["nperseg"]
+            == window_size
+        )
+    ) as response_info:
+        window_size_field.fill(str(window_size))
+        window_size_field.press("Enter")
+    assert response_info.value.ok
+
+
+def test_profile2d_stft_params_refetch_spectrogram(server_setup, page: Page):
+    _project_id, sample_id, _reload = setup_project(page)
+
+    page.get_by_role("button", name="View Parameters").click()
+    expect(page.get_by_role("textbox", name="Window size")).to_have_value("256")
+    expect(page.get_by_role("textbox", name="Overlap")).to_have_value("128")
+
+    set_window_size(page, sample_id, 64)
+
+    # Overlap is clamped so it stays below the new window size.
+    expect(page.get_by_role("textbox", name="Overlap")).to_have_value("63")
+    expect(page.get_by_label("profile-2d")).to_be_visible()
+
+
+def test_profile2d_stft_params_persist_between_shots(server_setup, page: Page):
+    project_id = create_project("Test Profile2D Project", "profile-2d", "tabular")
+    first_sample_id, second_sample_id = create_local_samples(
+        project_id,
+        [10000, 10001],
+        pathlib.Path(__file__).parents[1],
+        ["Ip"],
+        file_names=["profile2d.parquet", "profile2d.parquet"],
+    )
+    page.goto(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{first_sample_id}"
+    )
+    expect(page.get_by_label("profile-2d")).to_be_visible()
+
+    page.get_by_role("button", name="View Parameters").click()
+    set_window_size(page, first_sample_id, 64)
+
+    with page.expect_response(
+        lambda response: is_data_request(response, second_sample_id)
+    ) as response_info:
+        page.get_by_role("button", name="Next Sample").click()
+    assert response_info.value.request.post_data_json["view"]["stft"]["nperseg"] == 64
+
+    page.get_by_role("button", name="View Parameters").click()
+    expect(page.get_by_role("textbox", name="Window size")).to_have_value("64")
+
+
+def test_profile2d_frequency_range_crops_spectrogram(server_setup, page: Page):
+    _project_id, sample_id, _reload = setup_project(page)
+
+    page.get_by_role("button", name="View Parameters").click()
+    min_frequency_field = page.get_by_role("textbox", name="Min frequency (kHz)")
+    max_frequency_field = page.get_by_role("textbox", name="Max frequency (kHz)")
+    expect(min_frequency_field).to_have_value("")
+    expect(max_frequency_field).to_have_value("")
+
+    # The fixture is sampled at 1 Hz, so its Nyquist frequency is 0.0005 kHz.
+    with page.expect_response(
+        lambda response: (
+            is_data_request(response, sample_id)
+            and response.request.post_data_json["view"].get("dim_1_max") == 0.00025
+        )
+    ) as response_info:
+        max_frequency_field.fill("0.00025")
+        max_frequency_field.press("Enter")
+    assert response_info.value.ok
+    assert response_info.value.request.post_data_json["view"].get("dim_1_min") is None
+    frequencies = response_info.value.json()["dim_1"]
+    assert 0 < len(frequencies) and max(frequencies) <= 0.00025
+    expect(max_frequency_field).to_have_value("0.00025")
+    expect(page.get_by_label("profile-2d")).to_be_visible()

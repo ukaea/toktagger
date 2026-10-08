@@ -25,6 +25,7 @@ from shapely.geometry import Polygon
 
 from toktagger.api.schemas.data import TimeSeriesData
 from toktagger.api.schemas.annotations import TimeRegion
+from toktagger.api.schemas.views import STFTParams
 from toktagger.api.schemas.annotations import (
     # Aliased to avoid clashing with shapely's Polygon, used below for geometry.
     Polygon as PolygonAnnotation,
@@ -169,7 +170,21 @@ def _coords_to_flat_list(coords: Iterable[Tuple[float, float]]) -> List[float]:
     return flat
 
 
-def compute_stft(data: TimeSeriesData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _longest_uniform_run(time_steps: np.ndarray, time_step: float) -> slice:
+    """Return the sample slice of the longest run sampled at ``time_step``."""
+    is_uniform = np.isclose(np.abs(time_steps), time_step, rtol=0.01)
+    edges = np.flatnonzero(np.diff(np.r_[0, is_uniform.astype(int), 0]))
+    if len(edges) == 0:
+        return slice(None)
+    run_starts, run_ends = edges[::2], edges[1::2]
+    longest = np.argmax(run_ends - run_starts)
+    return slice(run_starts[longest], run_ends[longest] + 1)
+
+
+def compute_stft(
+    data: TimeSeriesData, params: STFTParams | None = None
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    params = params if params is not None else STFTParams()
     time = np.array(data.time)
     values = np.array(data.values)
 
@@ -178,19 +193,26 @@ def compute_stft(data: TimeSeriesData) -> tuple[np.ndarray, np.ndarray, np.ndarr
             "At least two time samples are required to compute a sample rate."
         )
 
-    time_step = np.abs(np.median(np.diff(time)))
+    time_steps = np.diff(time)
+    time_step = np.abs(np.median(time_steps))
     if time_step == 0:
         raise ValueError(
             "Cannot compute a sample rate: the median time step between samples is zero."
         )
+
+    # The STFT assumes uniform sampling, so drop sections recorded at a different rate.
+    uniform = _longest_uniform_run(time_steps, time_step)
+    time, values = time[uniform], values[uniform]
 
     sample_rate = 1 / time_step
 
     freq, ts, Zxx = stft(
         values,
         fs=int(sample_rate),
-        nperseg=256,
-        noverlap=128,
+        window=params.window.value,
+        nperseg=params.nperseg,
+        noverlap=params.noverlap,
+        nfft=params.nfft,
     )
     freq /= 1000
     ts += time[0]
