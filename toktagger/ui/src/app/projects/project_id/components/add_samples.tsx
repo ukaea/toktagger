@@ -27,6 +27,7 @@ import {
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import { useState, useEffect } from "react";
+import * as d3 from "d3";
 import { BACKEND_API_URL } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
@@ -124,23 +125,22 @@ export const AddSamplesEditor = ({
       reader.onload = (e) => {
         try {
           const content = e.target?.result as string;
-          // Parse CSV: split by lines, skip header (first line), get first column
-          const lines = content.split(/\r?\n/).filter((line) => line.trim());
-          if (lines.length <= 1) {
+          // Parse CSV properly so quoted fields containing newlines stay in one row
+          const rows = d3
+            .csvParseRows(content)
+            .filter((row) => row.some((cell) => cell.trim()));
+          if (rows.length <= 1) {
             ToastQueue.negative("CSV file is empty or has no data rows", {
               timeout: 3000,
             });
             return;
           }
-          // Skip header (index 0), parse remaining lines
-          const ids = lines
+          // Skip header (index 0), take the first column of remaining rows
+          const ids = rows
             .slice(1)
-            .map((line) => {
-              // Get first column (split by comma, take first element)
-              const firstColumn = line.split(",")[0].trim();
-              return parseInt(firstColumn, 10);
-            })
-            .filter((id) => !isNaN(id));
+            .map((row) => row[0].trim())
+            .filter((firstColumn) => /^\d+$/.test(firstColumn))
+            .map((firstColumn) => parseInt(firstColumn, 10));
 
           if (ids.length === 0) {
             ToastQueue.negative("No valid shot IDs found in first column", {
