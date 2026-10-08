@@ -48,6 +48,9 @@ type TimeSeriesActions = {
   findSelectedAnnotations: (range: SelectionRange | null) => void;
   setEditMode: (turnOn: boolean) => void;
   setOngoingAction: (state: boolean) => void;
+  setAnnotationsHidden: (ids: string[], hidden: boolean) => void;
+  showAllAnnotations: () => void;
+  removeAnnotations: (ids: string[]) => void;
 };
 
 type TimeSeriesState = {
@@ -59,6 +62,8 @@ type TimeSeriesState = {
   ongoingAction: boolean;
   categories: Map<string, TimeSeriesCategory>;
   editMode: boolean;
+  hiddenIds: ReadonlySet<string>;
+  visibleAnnotations: TimeSeriesAnnotation[];
 };
 
 const TimeSeriesActionsContext = createContext<TimeSeriesActions | null>(null);
@@ -128,6 +133,8 @@ function readSavedTool(projectId: string): TimeSeriesToolDefinition | null {
   return null;
 }
 
+const EMPTY_HIDDEN_IDS: ReadonlySet<string> = new Set();
+
 export const TimeSeriesProvider = ({
   signalName = null,
   children,
@@ -140,11 +147,13 @@ export const TimeSeriesProvider = ({
     annotations: rawAnnotations,
     setAnnotations: setRawAnnotations,
     project,
+    sample,
   } = useSample();
 
   // project is guaranteed non-null here: TimeSeriesProvider is only rendered
   // after SampleView confirms project is loaded.
   const projectId = project?._id ?? "";
+  const sampleId = sample?._id;
 
   const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
   const [toolingCallbacks, setToolingCallbacks] = useState<
@@ -168,6 +177,15 @@ export const TimeSeriesProvider = ({
     () => sessionStorage.getItem(`ts-edit-mode-${projectId}`) === "true",
   );
   const [ongoingAction, setOngoingAction] = useState(false);
+  // Keyed by sample so hidden rows are dropped on navigation without a reset effect
+  const [hiddenIdsState, setHiddenIdsState] = useState<{
+    sampleId: string | undefined;
+    ids: ReadonlySet<string>;
+  }>({ sampleId, ids: EMPTY_HIDDEN_IDS });
+  const hiddenIds =
+    hiddenIdsState.sampleId === sampleId
+      ? hiddenIdsState.ids
+      : EMPTY_HIDDEN_IDS;
 
   // Persist editMode to sessionStorage on every change
   useEffect(() => {
@@ -191,13 +209,19 @@ export const TimeSeriesProvider = ({
 
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncCount = useRef<number>(0);
+  // Raw annotations have no id, so keep the id of each one written here stable across re-parses
+  const rawAnnotationIds = useRef(new WeakMap<Annotation, string>());
 
   const parseRawAnnotations = useCallback(
     (annotations: Annotation[]): TimeSeriesAnnotation[] => {
       const parsedAnnotations: TimeSeriesAnnotation[] = [];
       annotations.forEach((annotation) => {
         const parsedAnnotation = convertRawAnnotationsToTimeSeries(annotation);
-        if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
+        if (!parsedAnnotation) return;
+        parsedAnnotations.push({
+          ...parsedAnnotation,
+          id: rawAnnotationIds.current.get(annotation) ?? parsedAnnotation.id,
+        });
       });
       return parsedAnnotations;
     },
@@ -222,9 +246,14 @@ export const TimeSeriesProvider = ({
   const mergeTimeSeriesAnnotations = useCallback(
     (previous: Annotation[], updated: TimeSeriesAnnotation[]): Annotation[] => [
       ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
-      ...parseTimeSeriesAnnotations(updated),
+      ...updated.flatMap((annotation) => {
+        const raw = convertTimeSeriesToRawAnnotations(annotation);
+        if (!raw) return [];
+        rawAnnotationIds.current.set(raw, annotation.id);
+        return [raw];
+      }),
     ],
-    [parseTimeSeriesAnnotations],
+    [],
   );
 
   // Discards any in-progress annotation for the currently active tool and clears the
@@ -456,13 +485,45 @@ export const TimeSeriesProvider = ({
     setUpdateCounter((prev) => (prev + 1) % 100);
   }, []);
 
+  const isAnnotationHidden = useCallback(
+    (annotation: TimeSeriesAnnotation) => hiddenIds.has(annotation.id),
+    [hiddenIds],
+  );
+
+  const visibleAnnotations = useMemo(
+    () => annotations.filter((annotation) => !isAnnotationHidden(annotation)),
+    [annotations, isAnnotationHidden],
+  );
+
+  const setAnnotationsHidden = useCallback(
+    (ids: string[], hidden: boolean) => {
+      const next = new Set(hiddenIds);
+      ids.forEach((id) => (hidden ? next.add(id) : next.delete(id)));
+      setHiddenIdsState({ sampleId, ids: next });
+
+      if (hidden) {
+        const changed = new Set(ids);
+        setAnnotations((prev) =>
+          prev.map((a) =>
+            a.selected && changed.has(a.id) ? { ...a, selected: false } : a,
+          ),
+        );
+      }
+    },
+    [hiddenIds, sampleId],
+  );
+
+  const showAllAnnotations = useCallback(() => {
+    setHiddenIdsState({ sampleId, ids: EMPTY_HIDDEN_IDS });
+  }, [sampleId]);
+
   const selectAnnotations = useCallback(
     (ids: string[]) => {
       if (!editMode) return;
 
       const updated_state: TimeSeriesAnnotation[] = annotations.map(
         (annotation) => {
-          if (ids.includes(annotation.id)) {
+          if (ids.includes(annotation.id) && !isAnnotationHidden(annotation)) {
             return { ...annotation, selected: true };
           }
           return { ...annotation, selected: false };
@@ -471,7 +532,7 @@ export const TimeSeriesProvider = ({
 
       setAnnotations(updated_state);
     },
-    [annotations, editMode],
+    [annotations, editMode, isAnnotationHidden],
   );
 
   const findSelectedAnnotations = useCallback(
@@ -488,6 +549,9 @@ export const TimeSeriesProvider = ({
 
       const updated_state: TimeSeriesAnnotation[] = annotations.map(
         (annotation) => {
+          if (isAnnotationHidden(annotation)) {
+            return { ...annotation, selected: false };
+          }
           if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
             if (
               annotation.points[0].x > range.x.low &&
@@ -539,7 +603,7 @@ export const TimeSeriesProvider = ({
 
       setAnnotations(updated_state);
     },
-    [annotations, editMode],
+    [annotations, editMode, isAnnotationHidden],
   );
 
   const batchUpdateLabels = useCallback(
@@ -568,6 +632,19 @@ export const TimeSeriesProvider = ({
     setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, updatedState));
   }, [annotations, mergeTimeSeriesAnnotations, setRawAnnotations]);
 
+  const removeAnnotations = useCallback(
+    (ids: string[]) => {
+      const removed = new Set(ids);
+      const updatedState = annotations.filter(
+        (annotation) => !removed.has(annotation.id),
+      );
+      setRawAnnotations((prev) =>
+        mergeTimeSeriesAnnotations(prev, updatedState),
+      );
+    },
+    [annotations, mergeTimeSeriesAnnotations, setRawAnnotations],
+  );
+
   const actionsValue: TimeSeriesActions = useMemo(
     () => ({
       setAnnotations,
@@ -583,6 +660,9 @@ export const TimeSeriesProvider = ({
       findSelectedAnnotations,
       setEditMode,
       setOngoingAction,
+      setAnnotationsHidden,
+      showAllAnnotations,
+      removeAnnotations,
     }),
     [
       createAnnotation,
@@ -595,6 +675,9 @@ export const TimeSeriesProvider = ({
       triggerUpdate,
       selectAnnotations,
       findSelectedAnnotations,
+      setAnnotationsHidden,
+      showAllAnnotations,
+      removeAnnotations,
     ],
   );
 
@@ -608,6 +691,8 @@ export const TimeSeriesProvider = ({
       ongoingAction,
       categories,
       editMode,
+      hiddenIds,
+      visibleAnnotations,
     }),
     [
       annotations,
@@ -618,6 +703,8 @@ export const TimeSeriesProvider = ({
       ongoingAction,
       categories,
       editMode,
+      hiddenIds,
+      visibleAnnotations,
     ],
   );
 
