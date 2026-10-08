@@ -26,7 +26,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
     setOngoingAction,
     selectAnnotations,
   } = useTimeSeriesActions();
-  const { annotations, forceUpdate, isDrawing, categories, editMode } =
+  const { visibleAnnotations, forceUpdate, isDrawing, categories, editMode } =
     useTimeSeriesState();
 
   const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -150,7 +150,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
       graphGroup.selectAll(".time-point").remove(); // All VSpans are removed each render cycle
 
       // Create a line and a transparent drag handle for each VSpan
-      for (const vspan of annotations) {
+      for (const vspan of visibleAnnotations) {
         if (vspan.type !== TimeSeriesAnnotationType.TIME_POINT) continue;
         const opacity = vspan.selected ? 0.8 : 0.5;
 
@@ -208,7 +208,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
       }
     });
   }, [
-    annotations,
+    visibleAnnotations,
     isDrawing,
     plotId,
     plotReady,
