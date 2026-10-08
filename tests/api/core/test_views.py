@@ -50,6 +50,20 @@ def test_compute_stft_custom_params(ts_data):
     np.testing.assert_allclose(values, np.abs(expected_zxx))
 
 
+def test_compute_stft_uses_longest_uniformly_sampled_region():
+    # Mirrors UDA signals with a slow 1 ms base around a fast 5 us window.
+    slow_before = np.arange(-2.5, -0.1, 1e-3)
+    fast = np.arange(-0.1, 0.2, 5e-6)
+    slow_after = np.arange(0.2, 1.0, 1e-3)
+    time = np.concatenate([slow_before, fast, slow_after])
+    values = np.random.default_rng(0).normal(size=len(time))
+
+    _, ts, _ = compute_stft(TimeSeriesData(time=time.tolist(), values=values.tolist()))
+
+    assert ts[0] == pytest.approx(fast[0])
+    assert ts[-1] == pytest.approx(fast[-1], abs=256 * 5e-6)
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -73,6 +87,25 @@ def test_profile_2d_view_returns_spectrogram_for_time_series(ts_data):
     assert isinstance(result, SpectrogramData)
     assert result.kind == "spectrogram"
     assert len(result.dim_1) == 64 // 2 + 1
+
+
+def test_profile_2d_view_spectrogram_time_axis_for_mixed_sample_rates():
+    # Mirrors UDA signals with a slow 1 ms base around a fast 5 us window.
+    slow_before = np.arange(-2.5, -0.1, 1e-3)
+    fast = np.arange(-0.1, 0.2, 5e-6)
+    slow_after = np.arange(0.2, 1.0, 1e-3)
+    time = np.concatenate([slow_before, fast, slow_after])
+    values = np.random.default_rng(0).normal(size=len(time))
+    signal = TimeSeriesData(time=time.tolist(), values=values.tolist())
+
+    result = Profile2DView(Profile2DViewParams(signal_name="Ip"))(
+        MultiVariateTimeSeriesData(values={"Ip": signal})
+    )
+
+    assert isinstance(result, SpectrogramData)
+    assert result.time[0] == pytest.approx(fast[0])
+    assert result.time[-1] == pytest.approx(fast[-1], abs=256 * 5e-6)
+    assert max(result.dim_1) == pytest.approx(1 / (2 * 5e-6) / 1000, rel=1e-4)
 
 
 def test_profile_2d_view_returns_profile_for_profile_data():
