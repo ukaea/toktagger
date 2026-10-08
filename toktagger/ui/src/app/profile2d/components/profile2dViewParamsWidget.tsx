@@ -25,6 +25,11 @@ const DEFAULT_STFT_PARAMS: STFTParams = {
   nfft: null,
 };
 
+// A stable reference, because NumberField resets the typed text when formatOptions changes identity.
+const FREQUENCY_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
+  maximumFractionDigits: 6,
+};
+
 export function Profile2DViewParamsWidget() {
   const { sample, data, viewParams, setViewParams } = useSample();
   // Seed from any already-restored value in context instead of starting blank.
@@ -190,7 +195,7 @@ export function Profile2DViewParamsWidget() {
             value={frequencyMin ?? NaN}
             minValue={0}
             maxValue={frequencyMax}
-            formatOptions={{ maximumFractionDigits: 6 }}
+            formatOptions={FREQUENCY_FORMAT_OPTIONS}
             onChange={onFrequencyMinChange}
           />
           <NumberField
@@ -199,7 +204,7 @@ export function Profile2DViewParamsWidget() {
             description="Leave empty for no upper limit."
             value={frequencyMax ?? NaN}
             minValue={frequencyMin ?? 0}
-            formatOptions={{ maximumFractionDigits: 6 }}
+            formatOptions={FREQUENCY_FORMAT_OPTIONS}
             onChange={onFrequencyMaxChange}
           />
         </>
