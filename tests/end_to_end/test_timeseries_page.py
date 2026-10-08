@@ -194,7 +194,7 @@ def test_timeseries_drag_time_zone(
     # Check added to list
     expect(page.get_by_role("gridcell", name=zone_type)).to_be_visible()
     bounds_text = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").last.inner_text()
     )
     initial_left_position, initial_right_position = map(float, bounds_text.split(" - "))
 
@@ -205,7 +205,7 @@ def test_timeseries_drag_time_zone(
     time.sleep(0.1)
     # Check values in table correctly updated
     bounds_text = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").last.inner_text()
     )
     updated_left_position, updated_right_position = map(float, bounds_text.split(" - "))
 
@@ -292,7 +292,7 @@ def test_timeseries_drag_vspan(
     # Check added to list
     expect(page.get_by_role("gridcell", name=time_point_type)).to_be_visible()
     initial_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").last.inner_text()
     )
 
     page.get_by_role("button", name="View Mode").click()
@@ -302,7 +302,7 @@ def test_timeseries_drag_vspan(
     time.sleep(0.1)
     # Check values in table correctly updated
     updated_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").last.inner_text()
     )
 
     if drag_to == ".wdrag":
@@ -321,7 +321,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     # Check added to list
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
     bounds_text = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").last.inner_text()
     )
     time_zone_left_position, time_zone_right_position = map(
         float, bounds_text.split(" - ")
@@ -334,7 +334,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     # Check added to list
     expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
     disruption_position = float(
-        page.get_by_role("row").nth(2).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(2).get_by_role("gridcell").last.inner_text()
     )
 
     # Press Save and wait for the PUT request to the server to complete
@@ -405,12 +405,12 @@ def test_timeseries_load_annotations(server_setup, page: Page):
     row = page.get_by_role("row").filter(
         has=page.get_by_role("gridcell", name="Disruption")
     )
-    assert float(row.get_by_role("gridcell").nth(4).inner_text()) == disruption.time
+    assert float(row.get_by_role("gridcell").last.inner_text()) == disruption.time
 
     row = page.get_by_role("row").filter(
         has=page.get_by_role("gridcell", name="Ramp Up")
     )
-    bounds_text = row.get_by_role("gridcell").nth(4).inner_text()
+    bounds_text = row.get_by_role("gridcell").last.inner_text()
     left_position, right_position = map(float, bounds_text.split(" - "))
     assert float(left_position) == rampup.time_min
     assert float(right_position) == rampup.time_max
@@ -418,7 +418,7 @@ def test_timeseries_load_annotations(server_setup, page: Page):
     row = page.get_by_role("row").filter(
         has=page.get_by_role("gridcell", name="Flat Top")
     )
-    bounds_text = row.get_by_role("gridcell").nth(4).inner_text()
+    bounds_text = row.get_by_role("gridcell").last.inner_text()
     left_position, right_position = map(float, bounds_text.split(" - "))
     assert float(left_position) == flattop.time_min
     assert float(right_position) == flattop.time_max
@@ -426,7 +426,7 @@ def test_timeseries_load_annotations(server_setup, page: Page):
     row = page.get_by_role("row").filter(
         has=page.get_by_role("gridcell", name="Ramp Down")
     )
-    bounds_text = row.get_by_role("gridcell").nth(4).inner_text()
+    bounds_text = row.get_by_role("gridcell").last.inner_text()
     left_position, right_position = map(float, bounds_text.split(" - "))
     assert float(left_position) == rampdown.time_min
     assert float(right_position) == rampdown.time_max
@@ -473,7 +473,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     row = page.get_by_role("row").filter(
         has=page.get_by_role("gridcell", name="Disruption")
     )
-    updated_disruption_time = float(row.get_by_role("gridcell").nth(4).inner_text())
+    updated_disruption_time = float(row.get_by_role("gridcell").last.inner_text())
 
     # Press Save and wait for the PUT request to the server to complete
     with page.expect_response(
@@ -676,10 +676,10 @@ def test_timeseries_model_predict(
     )
     if model_name == "mock_params_timeseries_cnn":
         # Check disruption has the value of params.final_score + 1
-        assert float(row.get_by_role("gridcell").nth(4).inner_text()) == 51
+        assert float(row.get_by_role("gridcell").last.inner_text()) == 51
     else:
         # Hardcoded time to 60+1 inside mock model
-        assert float(row.get_by_role("gridcell").nth(4).inner_text()) == 61
+        assert float(row.get_by_role("gridcell").last.inner_text()) == 61
 
     # Disable tool, it should disappear
     model_predict.get_by_role("switch", name="Enable Tool").click()

@@ -267,7 +267,7 @@ def test_profile2d_annotations_locked_in_view_mode(server_setup, page: Page):
     # add_time_annotation leaves us back in View Mode.
 
     bounds_before = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").last.inner_text()
     )
 
     # Annotations have pointer events disabled in View Mode, so dragging one does not move it...
@@ -281,7 +281,7 @@ def test_profile2d_annotations_locked_in_view_mode(server_setup, page: Page):
     page.mouse.up()
 
     bounds_after = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(4).inner_text()
+        page.get_by_role("row").nth(1).get_by_role("gridcell").last.inner_text()
     )
     assert bounds_after == bounds_before
 

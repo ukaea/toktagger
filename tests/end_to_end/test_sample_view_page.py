@@ -551,7 +551,7 @@ def test_clear_button(server_setup, page: Page):
     expect(page.get_by_text("Annotations Validated")).to_be_visible()
 
     # Press Clear
-    page.get_by_role("button", name="Clear").click()
+    page.get_by_role("button", name="Clear", exact=True).click()
 
     # Check no annotations visible
     expect(page.get_by_label("time-point").first).to_be_hidden()
