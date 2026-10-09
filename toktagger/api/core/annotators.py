@@ -716,4 +716,5 @@ ANNOTATORS_PER_TASK = {
     ],
     Task.PROFILE_2D: [AnnotatorTypes.PROFILE_2D_THRESHOLD],
     Task.VIDEO: [],
+    Task.RADIAL_PROFILE: [],
 }

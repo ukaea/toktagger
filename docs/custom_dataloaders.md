@@ -175,7 +175,7 @@ radius or channel:
 class Profile2DData(Data):
     time: list[float]
     dim_1: list[float]
-    values: list[list[float]]  # 2D array, indexed [dim_1][time]
+    values: list[list[float]]  # 2D array, indexed [time][dim_1]
 ```
 
 #### `MultiProfile2DData`
@@ -185,6 +185,16 @@ For multiple 2D profiles:
 class MultiProfile2DData(Data):
     values: dict[str, Profile2DData | None]  # Signal name -> profile
 ```
+
+#### `MultiSignalData`
+For a sample that has both 1D and 2D signals, for example a `radial-profile` project:
+
+```python
+class MultiSignalData(Data):
+    values: dict[str, TimeSeriesData | Profile2DData | None]  # Signal name -> data
+```
+
+The `uda`, `sal` and `fair_mast` loaders return this type when a sample has both 1D and 2D signals.
 
 
 ## Complete Example: CSV Time Series Loader

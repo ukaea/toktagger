@@ -5,10 +5,17 @@ from toktagger.api.schemas.data import (
     Profile2DData,
     MultiVariateTimeSeriesData,
     MultiProfile2DData,
+    MultiSignalData,
     Data,
+    RadialProfileData,
     TimeSeriesData,
 )
-from toktagger.api.schemas.views import Profile2DViewParams, ViewParams, ViewType
+from toktagger.api.schemas.views import (
+    Profile2DViewParams,
+    RadialProfileViewParams,
+    ViewParams,
+    ViewType,
+)
 
 
 class IdentityView:
@@ -97,7 +104,60 @@ class Profile2DView:
         return self.convert_profile_to_view(profile_data)
 
 
+def _finite_or_none(values: np.ndarray) -> list[list[float | None]]:
+    """Convert a 2D array to nested lists, replacing NaN/inf with None for JSON."""
+    return np.where(np.isfinite(values), values, None).tolist()
+
+
+class RadialProfileView:
+    def __init__(self, params: RadialProfileViewParams):
+        self.params = params
+
+    def __call__(
+        self, data: MultiSignalData | MultiProfile2DData | MultiVariateTimeSeriesData
+    ) -> RadialProfileData:
+        profiles = {
+            name: value
+            for name, value in data.values.items()
+            if isinstance(value, Profile2DData)
+        }
+        profile_signals = list(profiles)
+        if not profile_signals:
+            raise RuntimeError("No 2D profile signal found for radial profile view")
+
+        profile = profiles[profile_signals[0]]
+        values = np.array(profile.values, dtype=float)
+        profile_values = {profile_signals[0]: values}
+        for name in profile_signals[1:]:
+            other = np.array(profiles[name].values, dtype=float)
+            if other.shape != values.shape or not np.array_equal(
+                profiles[name].time, profile.time
+            ):
+                raise RuntimeError(
+                    f"Profile {name} is not on the same grid as {profile_signals[0]}"
+                )
+            profile_values[name] = other
+
+        radius = np.broadcast_to(np.array(profile.dim_1, dtype=float), values.shape)
+
+        time_series = {
+            name: value
+            for name, value in data.values.items()
+            if isinstance(value, TimeSeriesData)
+        }
+
+        return RadialProfileData(
+            time=profile.time,
+            radius=_finite_or_none(radius),
+            profiles={
+                name: _finite_or_none(value) for name, value in profile_values.items()
+            },
+            time_series=time_series,
+        )
+
+
 DATA_VIEWS = {
     ViewType.IDENTITY: IdentityView,
     ViewType.PROFILE_2D: Profile2DView,
+    ViewType.RADIAL_PROFILE: RadialProfileView,
 }

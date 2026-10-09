@@ -1,6 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Annotation, MultiVariateTimeSeriesData } from "@/types";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Annotation,
+  MultiVariateTimeSeriesData,
+  MultiVariateTimeSeriesDataSchema,
+} from "@/types";
 import {
   Provider,
   defaultTheme,
@@ -25,6 +29,10 @@ export function PeakDetectionTool({
   sample_id,
 }: PeakDetectionType) {
   const { annotations, setAnnotations, dataParams, data } = useSample();
+  const signals = useMemo(() => {
+    const parsed = MultiVariateTimeSeriesDataSchema.safeParse(data);
+    return parsed.success ? parsed.data.values : {};
+  }, [data]);
 
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
@@ -42,22 +50,22 @@ export function PeakDetectionTool({
     end: 100,
   });
   const [signalName, setSignalName] = useState<string | null>(null);
-  const signalOptions = Object.keys(data.values).map((value, index) => ({
+  const signalOptions = Object.keys(signals).map((value, index) => ({
     id: index,
     name: value,
   }));
 
-  const validSignal = signalName !== null && signalName in data.values;
+  const validSignal = signalName !== null && signalName in signals;
 
   useEffect(() => {
-    if (data && signalName !== null && signalName in data.values) {
-      const time = data.values[signalName].time;
+    if (signalName !== null && signalName in signals) {
+      const time = signals[signalName].time;
       const tmin = Math.min(...time);
       const tmax = Math.max(...time);
       setTimeMinDefault(tmin);
       setTimeMaxDefault(tmax);
     }
-  }, [data, signalName]);
+  }, [signals, signalName]);
 
   useEffect(() => {
     let cancelled = false;

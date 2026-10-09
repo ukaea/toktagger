@@ -18,6 +18,7 @@ import {
   ExtendedPlotlyHTMLElement,
   SelectionRange,
   TimeSeriesAnnotationPoint,
+  TimeSeriesAnnotationType,
 } from "@/types";
 import React from "react";
 import { arrayMax, arrayMin } from "@/app/utils";
@@ -54,6 +55,11 @@ type TimeSeriesPlotProps = {
   ariaLabel?: string;
   // Hides the hover tooltip while drawing (Ctrl held) so it doesn't obscure the shape.
   muteHoverWhileDrawing?: boolean;
+  // Restricts which tools can draw on this plot (all by default), for plots whose x-axis is not time.
+  tools?: TimeSeriesAnnotationType[];
+  // "x" selects on time alone (y spans other units); "none" for plots whose x-axis is not time.
+  selection?: "xy" | "x" | "none";
+  onXRangeChange?: (range: [number, number] | null) => void;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -65,6 +71,9 @@ export const BaseTimeSeriesPlot = ({
   rescaleOnZoom = true,
   ariaLabel = "time-series",
   muteHoverWhileDrawing = false,
+  tools,
+  selection: selectionMode = "xy",
+  onXRangeChange,
   children,
 }: TimeSeriesPlotProps) => {
   const [plotReady, setPlotReady] = useState(false);
@@ -90,6 +99,11 @@ export const BaseTimeSeriesPlot = ({
   const lockedSubplotElementRef = useRef<HTMLElement | null>(null); // used to track which subplot an annotation was started on
 
   const plotId = externalId || "time-series";
+  const drawingTool =
+    activeAnnotationTool &&
+    (!tools || tools.includes(activeAnnotationTool.type))
+      ? activeAnnotationTool
+      : null;
 
   if (!isDrawing) isDraggingRef.current = false;
 
@@ -138,6 +152,8 @@ export const BaseTimeSeriesPlot = ({
 
       // Use setTimeout to ensure DOM has fully updated before signaling ready
       setPlotReady(true);
+      // Tools may have drawn into the overlays this re-render just replaced.
+      triggerUpdate();
     };
 
     // Sets the y axis range required for the current x range for each subplot
@@ -211,6 +227,21 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
+      if (onXRangeChange) {
+        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
+          onXRangeChange([
+            eventData["xaxis.range[0]"] as number,
+            eventData["xaxis.range[1]"] as number,
+          ]);
+        } else if (eventData["xaxis.range"]?.length === 2) {
+          onXRangeChange([
+            eventData["xaxis.range"][0] as number,
+            eventData["xaxis.range"][1] as number,
+          ]);
+        } else if (eventData["xaxis.autorange"]) {
+          onXRangeChange(null);
+        }
+      }
       if (rescaleOnZoom) {
         // This makes use of the first graph displayed but this should be fine
         // Note that the event fired by plotly is a bit strange hence the different handlers
@@ -250,10 +281,18 @@ export const BaseTimeSeriesPlot = ({
       });
       setPlotReady(false); // reset ready state
     };
-  }, [config, data, layout, plotId, rescaleOnZoom, triggerUpdate]);
+  }, [
+    config,
+    data,
+    layout,
+    plotId,
+    rescaleOnZoom,
+    onXRangeChange,
+    triggerUpdate,
+  ]);
 
   useEffect(() => {
-    if (!plotReady) {
+    if (!plotReady || selectionMode === "none") {
       // Plot may not have loaded yet - this will rerun after loading
       return;
     }
@@ -286,10 +325,13 @@ export const BaseTimeSeriesPlot = ({
               low: Math.min(xRange[0], xRange[1]),
               high: Math.max(xRange[0], xRange[1]),
             },
-            y: {
-              low: Math.min(yRange[0], yRange[1]),
-              high: Math.max(yRange[0], yRange[1]),
-            },
+            y:
+              selectionMode === "x"
+                ? { low: -Infinity, high: Infinity }
+                : {
+                    low: Math.min(yRange[0], yRange[1]),
+                    high: Math.max(yRange[0], yRange[1]),
+                  },
           };
           findSelectedAnnotations(selection);
         }
@@ -302,7 +344,7 @@ export const BaseTimeSeriesPlot = ({
     return () => {
       plot.removeAllListeners("plotly_selected");
     };
-  }, [editMode, findSelectedAnnotations, plotId, plotReady]);
+  }, [editMode, findSelectedAnnotations, plotId, plotReady, selectionMode]);
 
   // The subplot lock whilst drawing is cleared once an action is no longer ongoing
   useEffect(() => {
@@ -423,7 +465,7 @@ export const BaseTimeSeriesPlot = ({
           );
           return;
         }
-        if (activeAnnotationTool) {
+        if (drawingTool) {
           // If a subplot has not been locked yet (e.g the annotation has just started) the current subplot should be stored
           if (!lockedSubplotElementRef.current) {
             lockedSubplotElementRef.current =
@@ -437,13 +479,18 @@ export const BaseTimeSeriesPlot = ({
             lockedSubplotElementRef.current,
           );
           toolingCallbacks
-            .get(activeAnnotationTool.type)
+            .get(drawingTool.type)
             ?.start(
               clickLocation.x,
               clickLocation.y,
-              activeAnnotationTool.label,
+              drawingTool.label,
               clickLocation.axisSize,
             );
+        } else if (activeAnnotationTool) {
+          ToastQueue.info(
+            `${activeAnnotationTool.type} annotations cannot be drawn on this plot`,
+            { timeout: 5000 },
+          );
         } else {
           ToastQueue.info(
             "Select a tool to draw annotation - see help popup in annotation toolbar for more info",
@@ -454,20 +501,20 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const updateAnnotation = (event: PointerEvent) => {
-      if (activeAnnotationTool && isDraggingRef.current) {
+      if (drawingTool && isDraggingRef.current) {
         const clickLocation = getClickData(
           event,
           plot,
           lockedSubplotElementRef.current,
         );
         toolingCallbacks
-          .get(activeAnnotationTool.type)
+          .get(drawingTool.type)
           ?.move(clickLocation.x, clickLocation.y);
       }
     };
 
     const hoverAnnotation = (event: PointerEvent) => {
-      if (!activeAnnotationTool) return;
+      if (!drawingTool) return;
       const now = Date.now();
       if (now - lastHoverTime.current < 20) return;
       lastHoverTime.current = now;
@@ -477,7 +524,7 @@ export const BaseTimeSeriesPlot = ({
         lockedSubplotElementRef.current,
       );
       toolingCallbacks
-        .get(activeAnnotationTool.type)
+        .get(drawingTool.type)
         ?.hover?.(clickLocation.x, clickLocation.y, clickLocation.axisSize);
     };
 
@@ -485,13 +532,13 @@ export const BaseTimeSeriesPlot = ({
       isDraggingRef.current = false;
       // Subplot lock release is handled by the ongoingAction effect above -
       // for hover-based tools (e.g. polygon) the session continues past this pointerup
-      if (activeAnnotationTool) {
+      if (drawingTool) {
         const clickLocation = getClickData(
           event,
           plot,
           lockedSubplotElementRef.current,
         );
-        const callback = toolingCallbacks.get(activeAnnotationTool.type);
+        const callback = toolingCallbacks.get(drawingTool.type);
 
         // If hover behaviour is specified the callbacks should handle finishing the ongoing action
         if (!callback?.hover) {
@@ -506,14 +553,14 @@ export const BaseTimeSeriesPlot = ({
 
     // Double-click to finish a shape (e.g. close a polygon), same gating as starting one
     const doubleClickAnnotation = (event: MouseEvent) => {
-      if (!event.ctrlKey || !editMode || !activeAnnotationTool) return;
+      if (!event.ctrlKey || !editMode || !drawingTool) return;
       const clickLocation = getClickData(
         event,
         plot,
         lockedSubplotElementRef.current,
       );
       toolingCallbacks
-        .get(activeAnnotationTool.type)
+        .get(drawingTool.type)
         ?.doubleClick?.(clickLocation.x, clickLocation.y);
     };
 
@@ -543,6 +590,7 @@ export const BaseTimeSeriesPlot = ({
     };
   }, [
     activeAnnotationTool,
+    drawingTool,
     addAnnotation,
     createAnnotation,
     editMode,

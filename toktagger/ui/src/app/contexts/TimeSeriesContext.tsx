@@ -322,6 +322,13 @@ export const TimeSeriesProvider = ({
     syncAnnotations();
   }, [syncAnnotations, syncCounter]);
 
+  // Leaving edit mode commits pending edits now, so a quick Save cannot miss the sync debounce.
+  const wasEditMode = useRef(editMode);
+  useEffect(() => {
+    if (wasEditMode.current && !editMode) triggerSync();
+    wasEditMode.current = editMode;
+  }, [editMode, triggerSync]);
+
   const createAnnotation = useCallback(
     (type: TimeSeriesAnnotationType, label: string): TimeSeriesAnnotation => {
       const id = uuidv4();

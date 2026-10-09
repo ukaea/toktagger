@@ -154,12 +154,15 @@ async def test_delete_project(api_client, setup_db, db_client):
 
 
 @pytest.mark.asyncio
-async def test_create_project(api_client, db_client):
+@pytest.mark.parametrize(
+    "task,data_loader", [(Task.VIDEO, "image"), (Task.RADIAL_PROFILE, "uda")]
+)
+async def test_create_project(api_client, db_client, task, data_loader):
     in_project = {
         "name": "test_project",
-        "task": Task.VIDEO,
+        "task": task,
         "query_strategy": "random",
-        "data_loader": "image",
+        "data_loader": data_loader,
     }
     response = await api_client.post("/projects", json=in_project)
     assert response.status_code == 200

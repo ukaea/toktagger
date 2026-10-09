@@ -24,6 +24,7 @@ from toktagger.api.schemas.data import (
     TimeSeriesData,
     Profile2DData,
     MultiProfile2DData,
+    MultiSignalData,
 )
 from toktagger.api.schemas.samples import (
     FileData,
@@ -335,6 +336,18 @@ class TabularDataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+def _combine_signals(
+    results: dict[str, TimeSeriesData | Profile2DData | None],
+) -> MultiVariateTimeSeriesData | MultiProfile2DData | MultiSignalData:
+    """Wrap loaded signals in the narrowest multi-signal data type."""
+    loaded = [value for value in results.values() if value is not None]
+    if all(isinstance(value, TimeSeriesData) for value in loaded):
+        return MultiVariateTimeSeriesData(values=results)
+    if all(isinstance(value, Profile2DData) for value in loaded):
+        return MultiProfile2DData(values=results)
+    return MultiSignalData(values=results)
+
+
 @LoaderRegistry.register("uda")
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
@@ -351,7 +364,7 @@ class UDADataLoader(DataLoader):
         time_max: Optional[float] = None,
         min_time_step: Optional[float] = None,
         **kwargs,
-    ) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+    ) -> MultiVariateTimeSeriesData | MultiProfile2DData | MultiSignalData:
         if not isinstance(sample.data, ShotData):
             raise TypeError(
                 f"Expected sample data of type 'ShotData' but got '{type(sample.data)}'"
@@ -376,14 +389,7 @@ class UDADataLoader(DataLoader):
                 f"Could not load any signals for shot ID '{sample.shot_id}'. Check UDA connectivity and signal names."
             )
 
-        if all(isinstance(value, TimeSeriesData) for value in results.values()):
-            return MultiVariateTimeSeriesData(values=results)
-        elif all(isinstance(value, Profile2DData) for value in results.values()):
-            return MultiProfile2DData(values=results)
-        else:
-            raise DataLoaderError(
-                f"Mixed data types found for shot ID '{sample.shot_id}'. Check UDA signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles)."
-            )
+        return _combine_signals(results)
 
 
 @lru_cache(maxsize=128)
@@ -398,8 +404,10 @@ def _get_uda_signal(
     ds = ds.sel(time=slice(time_min, time_max))
 
     time = ds["time"].values
+    # Interpolating 2D profiles (e.g. Thomson) would invent time slices
     if (
         min_time_step is not None
+        and len(ds.data.shape) == 1
         and len(time) > 1
         and np.diff(time).mean() < min_time_step
     ):
@@ -538,7 +546,7 @@ class SALDataLoader(DataLoader):
         time_max: Optional[float] = None,
         min_time_step: Optional[float] = None,
         **kwargs,
-    ) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+    ) -> MultiVariateTimeSeriesData | MultiProfile2DData | MultiSignalData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
 
@@ -570,14 +578,7 @@ class SALDataLoader(DataLoader):
                 f"Could not load any signals for shot ID '{sample.shot_id}' from SAL. Check SAL connectivity and signal names."
             )
 
-        if all(isinstance(value, TimeSeriesData) for value in results.values()):
-            return MultiVariateTimeSeriesData(values=results)
-        elif all(isinstance(value, Profile2DData) for value in results.values()):
-            return MultiProfile2DData(values=results)
-        else:
-            raise DataLoaderError(
-                f"Mixed data types found for shot ID '{sample.shot_id}' from SAL. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles)."
-            )
+        return _combine_signals(results)
 
 
 @lru_cache(maxsize=128)
@@ -595,8 +596,10 @@ def _get_sal_signal(
     ds = ds.sel(time=slice(time_min, time_max))
 
     time = ds["time"].values
+    # Interpolating 2D profiles (e.g. Thomson) would invent time slices
     if (
         min_time_step is not None
+        and len(ds.data.shape) == 1
         and len(time) > 1
         and np.diff(time).mean() < min_time_step
     ):
@@ -636,7 +639,7 @@ class FAIRMASTDataLoader(DataLoader):
         time_max: Optional[float] = None,
         min_time_step: Optional[float] = None,
         **kwargs,
-    ) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+    ) -> MultiVariateTimeSeriesData | MultiProfile2DData | MultiSignalData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
 
@@ -657,7 +660,7 @@ def _get_fair_mast_signals(
     time_min: Optional[float] = None,
     time_max: Optional[float] = None,
     min_time_step: Optional[float] = None,
-) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+) -> MultiVariateTimeSeriesData | MultiProfile2DData | MultiSignalData:
     kwargs = {"chunks": None}
     # Disable default index creation if supported, to avoid performance issues on large datasets
     sig = inspect.signature(xr.open_dataset)
@@ -680,6 +683,7 @@ def _get_fair_mast_signals(
 
         if (
             min_time_step is not None
+            and len(ds.data.shape) == 1
             and len(time) > 1
             and np.diff(time).mean() < min_time_step
         ):
@@ -709,11 +713,4 @@ def _get_fair_mast_signals(
             f"Could not load any signals from FAIR-MAST file at '{file_path}'. Check signal names and file accessibility."
         )
 
-    if all(isinstance(value, TimeSeriesData) for value in results.values()):
-        return MultiVariateTimeSeriesData(values=results)
-    elif all(isinstance(value, Profile2DData) for value in results.values()):
-        return MultiProfile2DData(values=results)
-    else:
-        raise DataLoaderError(
-            f"Mixed data types found for file '{file_path}'. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles)."
-        )
+    return _combine_signals(results)

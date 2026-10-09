@@ -202,6 +202,19 @@ export default function ToolBar() {
         <Profile2DThresholdTool project_id={project_id} sample_id={sample_id} />
       ),
     });
+  } else if (project.task === TaskType.RadialProfile) {
+    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
+    tools.push({
+      name: "Shot Labels",
+      component: <ShotLabels labels={labels}></ShotLabels>,
+    });
+
+    tools.push({
+      name: "Color Map",
+      component: (
+        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
+      ),
+    });
   } else if (data && project.task === TaskType.Video) {
     const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
 

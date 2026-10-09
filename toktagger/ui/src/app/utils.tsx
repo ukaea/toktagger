@@ -16,6 +16,7 @@ import {
   ShotDataSchema,
 } from "@/types";
 import { v4 as uuidv4 } from "uuid";
+import * as d3 from "d3";
 import { Icon } from "@adobe/react-spectrum";
 import z from "zod/v4";
 
@@ -327,6 +328,67 @@ export function sumOverFirstAxis(arr: (number | null)[][]): number[] {
   }
 
   return sums;
+}
+
+export const colorMapInterpolators: Record<string, (value: number) => string> =
+  {
+    Viridis: d3.interpolateViridis,
+    Plasma: d3.interpolatePlasma,
+    Inferno: d3.interpolateInferno,
+    Magma: d3.interpolateMagma,
+    Cividis: d3.interpolateCividis,
+  };
+
+export const getColorMapInterpolator = (name?: string) =>
+  colorMapInterpolators[name ?? ""] ?? d3.interpolateCividis;
+
+const STACKED_AXIS_TITLE_FONT = {
+  family: "Courier New, monospace",
+  size: 12,
+  color: "#7f7f7f",
+};
+
+export const stackedAxisNumber = (index: number, offset: number) => {
+  const n = offset + index + 1;
+  return n === 1 ? "" : `${n}`;
+};
+
+/** Gives each trace its own y-axis, with the first trace on the top row. */
+export function assignStackedYAxes(
+  traces: Partial<Plotly.PlotData>[],
+  offset = 0,
+): Partial<Plotly.PlotData>[] {
+  return traces.map((trace, index) => ({
+    ...trace,
+    yaxis: `y${stackedAxisNumber(traces.length - index - 1, offset)}`,
+  }));
+}
+
+/** Builds evenly stacked y-axis layouts within domain, matching assignStackedYAxes. */
+export function buildStackedYAxesLayout(
+  names: string[],
+  domain: [number, number] = [0, 1],
+  offset = 0,
+): Record<string, unknown> {
+  const rowHeight = (domain[1] - domain[0]) / names.length;
+  return names.reduce(
+    (acc, _, idx) => {
+      acc[`yaxis${stackedAxisNumber(idx, offset)}`] = {
+        domain: [
+          domain[0] + idx * rowHeight,
+          domain[0] + (idx + 1) * rowHeight,
+        ],
+        autorange: true,
+        fixedrange: true,
+        title: {
+          text: names[names.length - idx - 1] || "",
+          font: STACKED_AXIS_TITLE_FONT,
+        },
+      };
+      return acc;
+    },
+    {} as Record<string, unknown>,
+  );
 }
 
 // Plotly supports layout.coloraxis, but @types/plotly.js does not declare it.

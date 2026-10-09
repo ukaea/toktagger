@@ -143,6 +143,16 @@ export const Profile2DDataSchema = z.object({
   values: z.array(z.array(z.number().nullable())),
 });
 export type Profile2DData = z.infer<typeof Profile2DDataSchema>;
+
+export const RadialProfileDataSchema = z.object({
+  time: z.array(z.number()),
+  // Indexed [time][channel]; radius is per slice since channel positions can drift.
+  radius: z.array(z.array(z.number().nullable())),
+  // Profiles on the same grid as radius, in subplot order.
+  profiles: z.record(z.string(), z.array(z.array(z.number().nullable()))),
+  time_series: z.record(z.string(), TimeSeriesDataSchema),
+});
+export type RadialProfileData = z.infer<typeof RadialProfileDataSchema>;
 export const ImageDataSchema = z.object({
   frame: z.number(),
   values: z.string(), // base64 PNG
@@ -153,6 +163,7 @@ export const DataSchema = z.union([
   TimeSeriesDataSchema,
   MultiVariateTimeSeriesDataSchema,
   Profile2DDataSchema,
+  RadialProfileDataSchema,
   ImageDataSchema,
 ]);
 export type Data = z.infer<typeof DataSchema>;
@@ -194,12 +205,14 @@ export enum TaskType {
   TimeSeries = "time-series",
   Profile2D = "profile-2d",
   Video = "video",
+  RadialProfile = "radial-profile",
 }
 
 export const TaskSchema = z.enum([
   TaskType.TimeSeries,
   TaskType.Profile2D,
   TaskType.Video,
+  TaskType.RadialProfile,
 ]);
 
 export const ProjectSchema = z.object({
@@ -339,6 +352,20 @@ export const Profile2DViewParamsSchema = ViewParamsSchema.extend({
 });
 export type Profile2DViewParams = z.infer<typeof Profile2DViewParamsSchema>;
 
+export const RadialProfileViewParamsSchema = ViewParamsSchema.extend({
+  name: z.literal("radial_profile"),
+});
+export type RadialProfileViewParams = z.infer<
+  typeof RadialProfileViewParamsSchema
+>;
+
+export const AnyViewParamsSchema = z.union([
+  ViewParamsSchema,
+  Profile2DViewParamsSchema,
+  RadialProfileViewParamsSchema,
+]);
+export type AnyViewParams = z.infer<typeof AnyViewParamsSchema>;
+
 export const HealthInfoSchema = z.object({
   name: z.string(),
   version: z.string(),
@@ -424,6 +451,8 @@ type PlotlyAxisTransforms = {
   d2p: (value: number) => number;
   _tmax: number;
   _tmin: number;
+  // Axis length in pixels
+  _length: number;
   range: [number, number];
 };
 export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {

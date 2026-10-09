@@ -3,6 +3,7 @@ import pytest_asyncio
 from toktagger.api.main import Server
 from toktagger.api.crud.db import MongoDBClient
 import tests.db_definitions as db_definitions
+import tests.radial_definitions  # noqa: F401  registers the synthetic_radial loader
 from bson.objectid import ObjectId
 import asyncio
 from httpx import AsyncClient, ASGITransport

@@ -5,6 +5,7 @@ import {
   applyGlobalStyle,
   arrayMax,
   arrayMin,
+  getColorMapInterpolator,
   sumOverFirstAxis,
 } from "@/app/utils";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
@@ -19,7 +20,6 @@ import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
-import * as d3 from "d3";
 
 // The subplot annotations with real y values should be restricted to.
 const HEATMAP_SUBPLOT = "xy2";
@@ -33,14 +33,6 @@ type ColorAxis = {
 };
 
 type ProfileValues = (number | null)[][];
-
-const colorMapInterpolators: Record<string, (value: number) => string> = {
-  Viridis: d3.interpolateViridis,
-  Plasma: d3.interpolatePlasma,
-  Inferno: d3.interpolateInferno,
-  Magma: d3.interpolateMagma,
-  Cividis: d3.interpolateCividis,
-};
 
 // Leaves the lowest values fully transparent so the background shows through.
 const buildColorScale = (
@@ -258,8 +250,7 @@ export const Profile2dView = () => {
   // Memoised so an annotation drag doesn't tear down and rebuild the plot mid-draw.
   const plot = useMemo(() => {
     if (!viewData || !plotProps) return null;
-    const interpFunc =
-      colorMapInterpolators[plotProps.colorMap ?? ""] ?? d3.interpolateCividis;
+    const interpFunc = getColorMapInterpolator(plotProps.colorMap);
     const createPlotFunc = logScale
       ? createLogScalePlot
       : createLinearScalePlot;

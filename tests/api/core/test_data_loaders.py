@@ -15,6 +15,9 @@ from toktagger.api.schemas.data import (
     ImageData,
     ImageParams,
     DataParams,
+    MultiProfile2DData,
+    MultiSignalData,
+    Profile2DData,
 )
 import pathlib
 import numpy
@@ -272,6 +275,80 @@ def test_uda_camera_loader_frame_metadata_and_missing_frame(uda_test):
             sample,
             params=ImageParams(name="image", frame=int(n_frames)),
         )
+
+
+def test_uda_loader_radial_profile(uda_test):
+    uda_shot = ShotData(protocol="uda", signal_names=["AYC_TE", "AYC_R", "ip"])
+    sample = Sample(
+        shot_id=30421,
+        data=uda_shot,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data = data_loaders.UDADataLoader().get_sample(
+        sample, params=DataParams(name="identity")
+    )
+    assert isinstance(data, MultiSignalData)
+    assert isinstance(data.values["AYC_TE"], Profile2DData)
+    assert isinstance(data.values["ip"], TimeSeriesData)
+    te = numpy.array(data.values["AYC_TE"].values)
+    radius = numpy.array(data.values["AYC_R"].values)
+    assert te.shape == radius.shape == (len(data.values["AYC_TE"].time), 130)
+
+
+def _fake_uda_dataset(name: str) -> xarray.Dataset:
+    time = numpy.linspace(0, 0.1, 11)
+    if name == "TE":
+        values = numpy.arange(33, dtype=float).reshape(11, 3)
+        return xarray.Dataset(
+            {"data": xarray.DataArray(values, dims=["time", "channel"])},
+            coords={"time": time, "channel": [1.0, 2.0, 3.0]},
+        )
+    return xarray.Dataset(
+        {"data": xarray.DataArray(numpy.sin(time), dims=["time"])},
+        coords={"time": time},
+    )
+
+
+@pytest.mark.parametrize(
+    "signal_names,expected_type",
+    [
+        (["TE", "ip"], MultiSignalData),
+        (["TE"], MultiProfile2DData),
+        (["ip"], MultiVariateTimeSeriesData),
+    ],
+)
+def test_uda_loader_combines_signal_types(monkeypatch, signal_names, expected_type):
+    data_loaders._get_uda_signal.cache_clear()
+    monkeypatch.setattr(
+        data_loaders.xr,
+        "open_dataset",
+        lambda path, **kwargs: _fake_uda_dataset(path.split("//")[1].split(":")[0]),
+    )
+    sample = Sample(
+        shot_id=1,
+        data=ShotData(protocol="uda", signal_names=signal_names),
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    data = data_loaders.UDADataLoader().get_sample(
+        sample, params=DataParams(name="identity"), min_time_step=0.05
+    )
+    assert type(data) is expected_type
+    if "TE" in signal_names:
+        # 2D profiles keep their original time slices, never interpolated
+        assert len(data.values["TE"].time) == 11
+    if "ip" in signal_names:
+        assert len(data.values["ip"].time) == 2
+    data_loaders._get_uda_signal.cache_clear()
+
+
+def test_combine_signals_ignores_missing_signals():
+    ts = TimeSeriesData(time=[0, 1], values=[1, 2])
+    data = data_loaders._combine_signals({"ip": ts, "missing": None})
+    assert isinstance(data, MultiVariateTimeSeriesData)
 
 
 def test_uda_camera_loader_bit_depth_scaling(monkeypatch):
