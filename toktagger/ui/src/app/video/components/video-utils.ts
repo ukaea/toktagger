@@ -14,8 +14,18 @@ import type {
   InstanceProfile,
   TrackKey,
 } from "./types";
-import { classIdForName, makeTrackKey, buildSourceKey } from "./types";
-import { getAnnotationCreator, getLabelTrack } from "./anno-utils";
+import {
+  classIdForName,
+  makeTrackKey,
+  buildSourceKey,
+  VideoAnnotationType,
+} from "./types";
+import {
+  getAnnotationCreator,
+  getLabelTrack,
+  isPointAnno,
+  isPolygonAnno,
+} from "./anno-utils";
 
 /** True when global annotation shortcuts should yield to text entry controls. */
 export function isEditableEventTarget(target: EventTarget | null): boolean {
@@ -291,6 +301,13 @@ export function flattenByFrame(byFrame: ByFrameMap): ImageAnnotation[] {
   return out;
 }
 
+function shapeAnnotationType(a: ImageAnnotation): VideoAnnotationType {
+  if (isPointAnno(a)) return VideoAnnotationType.POINT;
+  return isPolygonAnno(a)
+    ? VideoAnnotationType.POLYGON
+    : VideoAnnotationType.BOUNDING_BOX;
+}
+
 /**
  * Derive instance profiles from the per-frame overlays.
  * Profiles are keyed by (className, trackId) and include counts + which frames they appear in.
@@ -320,6 +337,8 @@ export function deriveInstances(
           className,
           classId: classIdForName(className),
           trackId,
+          type: shapeAnnotationType(a),
+          createdBy: getAnnotationCreator(a),
           frames: [frame],
           count: 1,
         });
@@ -436,7 +455,12 @@ export function deriveFrameLabelInstances(
 ): InstanceProfile[] {
   const framesByKey = new Map<
     TrackKey,
-    { className: string; trackId: string; frames: Set<number> }
+    {
+      className: string;
+      trackId: string;
+      createdBy: string;
+      frames: Set<number>;
+    }
   >();
 
   for (const annotation of annotations) {
@@ -450,6 +474,7 @@ export function deriveFrameLabelInstances(
     const entry = framesByKey.get(key) ?? {
       className,
       trackId,
+      createdBy: annotation.created_by,
       frames: new Set<number>(),
     };
     entry.frames.add(annotation.frame);
@@ -463,6 +488,8 @@ export function deriveFrameLabelInstances(
       className: entry.className,
       classId: classIdForName(entry.className),
       trackId: entry.trackId,
+      type: VideoAnnotationType.FRAME_LABEL,
+      createdBy: entry.createdBy,
       frames,
       count: frames.length,
     };

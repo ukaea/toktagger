@@ -29,15 +29,25 @@ export type Selection = {
   source: SelectionSource;
 };
 
+export enum VideoAnnotationType {
+  BOUNDING_BOX = "BOUNDING BOX",
+  POLYGON = "POLYGON",
+  POINT = "POINT",
+  FRAME_LABEL = "FRAME LABEL",
+}
+
 /**
  * UI summary for one tracked instance across frames.
  * `frames` is unique + sorted; `count` is total boxes across all frames.
+ * `type` and `createdBy` come from the instance's first annotation.
  */
 export type InstanceProfile = {
   key: TrackKey;
   className: string;
   classId: number;
   trackId: string;
+  type: VideoAnnotationType;
+  createdBy: string;
   frames: number[]; // unique, sorted
   count: number; // total boxes across frames
 };

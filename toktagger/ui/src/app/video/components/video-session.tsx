@@ -154,6 +154,9 @@ type VideoSessionCtx = {
    */
   deleteInstanceAcrossFrames: (className: string, trackId: string) => void;
 
+  /** Delete a specific instance on the current frame only, leaving its other frames intact. */
+  deleteInstanceOnCurrentFrame: (className: string, trackId: string) => void;
+
   /** Delete the currently selected instance across all frames. */
   deleteSelectedInstanceAcrossFrames: () => void;
 
@@ -994,6 +997,32 @@ export function VideoSessionProvider(props: {
     [setSampleAnnotations, updateByFrame],
   );
 
+  const deleteInstanceOnCurrentFrame = useCallback(
+    (className: string, trackId: string) => {
+      const cls = (className || "").trim();
+      const tid = canonicalizeTrackId(trackId || "");
+      if (!cls || !tid) return;
+
+      updateByFrame(
+        (prev) =>
+          mapSetFrame(
+            prev,
+            frame,
+            (prev.get(frame) ?? []).filter((annotation) => {
+              const got = getLabelTrack(annotation);
+              return !(
+                (got.className ?? "").trim() === cls &&
+                canonicalizeTrackId(got.trackId ?? "") === tid
+              );
+            }),
+          ),
+        { markDirty: true },
+      );
+      removeFrameLabel(cls, tid);
+    },
+    [frame, removeFrameLabel, updateByFrame],
+  );
+
   /**
    * Backwards-compatible helper: delete the currently selected instance.
    * Now implemented via deleteInstanceAcrossFrames to avoid stale selection issues.
@@ -1642,6 +1671,7 @@ export function VideoSessionProvider(props: {
       clearAllFrames,
       createNewInstanceForClass,
       deleteInstanceAcrossFrames,
+      deleteInstanceOnCurrentFrame,
       deleteSelectedInstanceAcrossFrames,
       forwardPropMissingManualToNext,
     }),
@@ -1684,6 +1714,7 @@ export function VideoSessionProvider(props: {
       clearAllFrames,
       createNewInstanceForClass,
       deleteInstanceAcrossFrames,
+      deleteInstanceOnCurrentFrame,
       deleteSelectedInstanceAcrossFrames,
       forwardPropMissingManualToNext,
     ],

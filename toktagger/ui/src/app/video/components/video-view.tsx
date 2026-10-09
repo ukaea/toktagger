@@ -19,6 +19,7 @@ import {
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 import { VideoAnnotationToolbar } from "@/app/video/components/video-annotation-toolbar";
 import { FrameJumpField } from "@/app/video/components/ui_elements";
+import { VideoAnnotationsTable } from "@/app/video/components/video-annotations-table";
 import { useSample } from "@/app/contexts/SampleContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
 import {
@@ -340,12 +341,15 @@ export function VideoView() {
     <div className="min-w-0 flex-1">
       <div className="flex w-full justify-between">
         <div className="min-w-0 flex-1 px-4 py-3">
-          <VideoFrameAnnotator
-            imageBase64={imageBase64}
-            desiredFrame={desiredFrame}
-            goToFrame={goToFrame}
-            goToRelativeFrame={goToRelativeFrame}
-          />
+          <Flex direction="column" gap="size-200">
+            <VideoFrameAnnotator
+              imageBase64={imageBase64}
+              desiredFrame={desiredFrame}
+              goToFrame={goToFrame}
+              goToRelativeFrame={goToRelativeFrame}
+            />
+            <VideoAnnotationsTable />
+          </Flex>
         </div>
         <VideoAnnotationToolbar desiredFrame={desiredFrame} />
       </div>

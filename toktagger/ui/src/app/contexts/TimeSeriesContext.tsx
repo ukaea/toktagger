@@ -48,6 +48,7 @@ type TimeSeriesActions = {
   findSelectedAnnotations: (range: SelectionRange | null) => void;
   setEditMode: (turnOn: boolean) => void;
   setOngoingAction: (state: boolean) => void;
+  setFocusXRange: (range: [number, number] | null) => void;
 };
 
 type TimeSeriesState = {
@@ -59,6 +60,7 @@ type TimeSeriesState = {
   ongoingAction: boolean;
   categories: Map<string, TimeSeriesCategory>;
   editMode: boolean;
+  focusXRange: [number, number] | null;
 };
 
 const TimeSeriesActionsContext = createContext<TimeSeriesActions | null>(null);
@@ -168,6 +170,7 @@ export const TimeSeriesProvider = ({
     () => sessionStorage.getItem(`ts-edit-mode-${projectId}`) === "true",
   );
   const [ongoingAction, setOngoingAction] = useState(false);
+  const [focusXRange, setFocusXRange] = useState<[number, number] | null>(null);
 
   // Persist editMode to sessionStorage on every change
   useEffect(() => {
@@ -583,6 +586,7 @@ export const TimeSeriesProvider = ({
       findSelectedAnnotations,
       setEditMode,
       setOngoingAction,
+      setFocusXRange,
     }),
     [
       createAnnotation,
@@ -608,6 +612,7 @@ export const TimeSeriesProvider = ({
       ongoingAction,
       categories,
       editMode,
+      focusXRange,
     }),
     [
       annotations,
@@ -618,6 +623,7 @@ export const TimeSeriesProvider = ({
       ongoingAction,
       categories,
       editMode,
+      focusXRange,
     ],
   );
 

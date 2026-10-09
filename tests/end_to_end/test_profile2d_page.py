@@ -4,6 +4,7 @@ from typing import Callable, Literal, Tuple
 import requests
 from playwright.sync_api import Page, expect
 
+from tests.end_to_end import save_annotations
 from tests.endpoints import create_local_samples, create_project
 
 # The id of the div the Profile2D plot renders into (see base-plot.tsx).
@@ -261,14 +262,12 @@ def test_profile2d_save_time_annotations(server_setup, page: Page):
 
 def test_profile2d_annotations_locked_in_view_mode(server_setup, page: Page):
     """Selecting, dragging or deleting an annotation is an edit-mode-only action."""
-    setup_project(page)
+    project_id, sample_id, _reload = setup_project(page)
 
     add_time_annotation(page, "TIME REGION", "NTM")
     # add_time_annotation leaves us back in View Mode.
 
-    bounds_before = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
-    )
+    [before] = save_annotations(page, project_id, sample_id)
 
     # Annotations have pointer events disabled in View Mode, so dragging one does not move it...
     zone_box = page.get_by_label("time-zone").first.bounding_box()
@@ -280,10 +279,9 @@ def test_profile2d_annotations_locked_in_view_mode(server_setup, page: Page):
     page.mouse.move(center_x + 100, center_y, steps=10)
     page.mouse.up()
 
-    bounds_after = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
-    )
-    assert bounds_after == bounds_before
+    [after] = save_annotations(page, project_id, sample_id)
+    assert after["time_min"] == before["time_min"]
+    assert after["time_max"] == before["time_max"]
 
     # A right-click also can't reach it to open its context menu.
     page.get_by_label("time-zone").first.click(button="right", force=True)

@@ -59,13 +59,15 @@ When reviewing completed annotations, remain in View mode whenever you do not in
 - **Hide Annotations toggle**: Allows you to temporarily hide annotations from the image - useful to see the image underneath an annotation to check if it is accurate.
 - **Class label**: The label to associate with the next annotation that is drawn. This can also be edited by right clicking on the image and selecting a new label from the menu.
 
-#### Instances List 
-The instances list within the video tools lets you interact with different annotations. You can:
+#### Annotations Table
+Below the frame, the annotations table lists one row per instance (a class label and track ID), sorted by the frame it first appears in. Use the **All Frames / This Frame** toggle above the table to list every instance, or only those present in the current frame. The columns are the annotation's marker, class label, type, track ID, first frame and who created it.
 
-- **Click on an annotation** in the list to highlight that annotation on the image, if it is present in the current frame.
-- **Delete**: Delete a given annotation across all frames where it is present.
-- **Jump to Frame**: Jump to the first frame where this annotation is present.
-- **Delete All Instances**: Delete all annotations across all frames.
+- **Click on a row** to select that instance and highlight it on the image, if it is present in the current frame. Annotations you then draw on other frames continue the same track. Click the row again to deselect it.
+- **Jump to annotation**: In All Frames, jump to the first frame where the instance is present. In This Frame, select the instance on the current frame.
+- **Delete annotation**: In All Frames, delete the instance across all frames where it is present. In This Frame, delete it from the current frame only.
+- **Delete all**: In All Frames, delete all annotations across all frames. In This Frame, delete all annotations on the current frame.
+
+Deleting requires Edit mode, and asks for confirmation unless you are deleting a single instance from the current frame.
 
 
 **Keyboard Shortcuts:**
@@ -100,7 +102,7 @@ To edit an existing annotation, make sure that you are in Edit mode, and then se
 ## Delete Annotations
 To delete a single instance of an annotation in a specific frame, click on that annotation and then press the 'Delete' button in the popup which appears. 
 
-To delete all instances of an annotation, or to delete all instances of all annotations, use the `Instances` list within the `Video Tools` in the left hand toolbar.
+To delete all instances of an annotation, or to delete all instances of all annotations, use the annotations table below the frame.
 
 ## Import / Export Annotations
 In the left hand toolbar, there are dropdowns which allow you to either import or export sets of annotations from the selected sample. 
