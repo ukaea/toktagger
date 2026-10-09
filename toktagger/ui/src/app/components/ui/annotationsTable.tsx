@@ -24,53 +24,13 @@ import {
   useTimeSeriesActions,
   useTimeSeriesState,
 } from "@/app/contexts/TimeSeriesContext";
-
-interface MarkerProps {
-  color: string;
-}
-
-const MARKER_VIEWBOX = "0 0 24 24";
-
-// Shape mirrors how each annotation type actually renders on the plot, so the
-// marker doubles as a legend for the tool - stroked/filled with the category color
-const TimePointMarker = ({ color }: MarkerProps) => (
-  <svg width="10" height="20" viewBox={MARKER_VIEWBOX}>
-    <line x1="12" y1="1" x2="12" y2="40" stroke={color} strokeWidth="4" />
-  </svg>
-);
-
-const TimeRegionMarker = ({ color }: MarkerProps) => (
-  <svg width="20" height="20" viewBox={MARKER_VIEWBOX}>
-    <rect x="6" y="6" width="12" height="20" rx="2" fill={color} />
-  </svg>
-);
-
-const BoundingBoxMarker = ({ color }: MarkerProps) => (
-  <svg width="20" height="20" viewBox={MARKER_VIEWBOX}>
-    <rect
-      x="3"
-      y="5"
-      width="18"
-      height="14"
-      rx="1"
-      fill="none"
-      stroke={color}
-      strokeWidth="2.5"
-    />
-  </svg>
-);
-
-const PolygonMarker = ({ color }: MarkerProps) => (
-  <svg width="20" height="20" viewBox={MARKER_VIEWBOX}>
-    <polygon
-      points="12,2 22,9.5 18,21 6,21 2,9.5"
-      fill="none"
-      stroke={color}
-      strokeWidth="2.5"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+import {
+  BoundingBoxMarker,
+  MarkerProps,
+  PolygonMarker,
+  TimePointMarker,
+  TimeRegionMarker,
+} from "@/app/components/ui/annotationMarkers";
 
 // One marker per annotation type - set when the annotation's category/type is resolved below
 const MARKER_ICONS: Record<
