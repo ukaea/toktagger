@@ -61,7 +61,8 @@ type TimeSeriesPlotProps = {
   selection?: "xy" | "x" | "none";
   onXRangeChange?: (range: [number, number] | null) => void;
   children:
-    React.ReactElement<InjectedProps> | React.ReactElement<InjectedProps>[];
+    | React.ReactElement<InjectedProps>
+    | React.ReactElement<InjectedProps>[];
 };
 
 export const BaseTimeSeriesPlot = ({
