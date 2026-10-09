@@ -434,8 +434,8 @@ export function annoToVideoPoint(
     track_id: String(trackId),
     label: String(className),
     class_id: classIdForName(className),
-    x: Math.round(g.x),
-    y: Math.round(g.y),
+    x: Math.floor(g.x),
+    y: Math.floor(g.y),
     created_by: getAnnotationCreator(a),
   };
 }
@@ -555,8 +555,9 @@ export function videoPointToAnno(
   p: VideoPoint,
   frameKey: string,
 ): ImageAnnotation {
-  const x = Number(p.x);
-  const y = Number(p.y);
+  // Points are pixel indices; draw at the pixel centre.
+  const cx = Number(p.x) + 0.5;
+  const cy = Number(p.y) + 0.5;
   const half = POINT_MARKER_SIZE / 2;
 
   const id =
@@ -564,15 +565,15 @@ export function videoPointToAnno(
     `anno-${Math.random().toString(36).slice(2)}`;
 
   const geometry: EllipseGeometry = {
-    cx: x,
-    cy: y,
+    cx,
+    cy,
     rx: half,
     ry: half,
     bounds: {
-      minX: x - half,
-      minY: y - half,
-      maxX: x + half,
-      maxY: y + half,
+      minX: cx - half,
+      minY: cy - half,
+      maxX: cx + half,
+      maxY: cy + half,
     },
   };
 

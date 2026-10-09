@@ -347,8 +347,8 @@ export function clampOverlayToNaturalImage(
         continue;
       }
 
-      const x = Math.max(0, Math.min(natural.w, point.x));
-      const y = Math.max(0, Math.min(natural.h, point.y));
+      const x = Math.max(0.5, Math.min(natural.w - 0.5, point.x));
+      const y = Math.max(0.5, Math.min(natural.h - 0.5, point.y));
 
       if (x === point.x && y === point.y) out.push(a);
       else {

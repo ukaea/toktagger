@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import OpenSeadragon from "openseadragon";
 import {
   OpenSeadragonAnnotator,
@@ -234,6 +234,10 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     [imageBase64],
   );
   const viewer = api?.viewer;
+  const savedViewRef = useRef<{
+    bounds: OpenSeadragon.Rect;
+    size: OpenSeadragon.Point;
+  } | null>(null);
 
   useEffect(() => {
     if (!api?.viewer) return;
@@ -311,6 +315,35 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       removeDots();
     };
   }, [viewer, byFrame, frame, hideAnnotations, editMode, selectedPointId]);
+
+  useEffect(() => {
+    if (!viewer) return;
+
+    const saveView = (event: OpenSeadragon.RemoveItemWorldEvent) => {
+      savedViewRef.current = {
+        bounds: viewer.viewport.getBounds(),
+        size: event.item.getContentSize(),
+      };
+    };
+
+    const restoreView = (event: OpenSeadragon.AddItemWorldEvent) => {
+      const saved = savedViewRef.current;
+      if (!saved || !saved.size.equals(event.item.getContentSize())) return;
+
+      // Deferred so it lands after the Annotorious wrapper's goHome() in addTiledImage's success callback.
+      queueMicrotask(() =>
+        viewer.viewport.fitBoundsWithConstraints(saved.bounds, true),
+      );
+    };
+
+    viewer.world.addHandler("remove-item", saveView);
+    viewer.world.addHandler("add-item", restoreView);
+
+    return () => {
+      viewer.world.removeHandler("remove-item", saveView);
+      viewer.world.removeHandler("add-item", restoreView);
+    };
+  }, [viewer]);
 
   useEffect(() => {
     if (!api?.viewer) return;
@@ -581,12 +614,13 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         url: dataUrl,
       },
       minZoomImageRatio: 0.8,
-      maxZoomPixelRatio: 10,
+      maxZoomPixelRatio: 100,
       visibilityRatio: 0.5,
       constrainDuringPan: true,
       animationTime: 0.3,
       showNavigationControl: false,
       mouseNavEnabled: false,
+      imageSmoothingEnabled: false,
     }),
     [dataUrl],
   );
@@ -596,7 +630,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       ? readPointGeometry(annotation)
       : null;
     if (point) {
-      return `x=${Math.round(point.x)}, y=${Math.round(point.y)}`;
+      return `x=${Math.floor(point.x)}, y=${Math.floor(point.y)}`;
     }
 
     const rect = isRectangleAnno(annotation)

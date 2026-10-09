@@ -1061,8 +1061,12 @@ export function VideoSessionProvider(props: {
         return { w, h };
       })();
       const natural = imageNatural ?? viewerNatural;
-      const x = natural ? Math.max(0, Math.min(natural.w, rawX)) : rawX;
-      const y = natural ? Math.max(0, Math.min(natural.h, rawY)) : rawY;
+      const x = natural
+        ? Math.max(0, Math.min(natural.w - 1, Math.floor(rawX)))
+        : Math.floor(rawX);
+      const y = natural
+        ? Math.max(0, Math.min(natural.h - 1, Math.floor(rawY)))
+        : Math.floor(rawY);
 
       const raw = api.getAnnotations();
       const used = collectUsedTrackIdsForClass(cls, raw);
@@ -1073,8 +1077,8 @@ export function VideoSessionProvider(props: {
         frame,
         track_id: String(trackId),
         label: cls,
-        x: Math.round(x),
-        y: Math.round(y),
+        x,
+        y,
         created_by: "manual",
       };
       const pointAnnotation = videoPointToAnno(dbPoint, frameKey);
