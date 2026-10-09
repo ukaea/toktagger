@@ -348,7 +348,7 @@ const STACKED_AXIS_TITLE_FONT = {
   color: "#7f7f7f",
 };
 
-const stackedAxisNumber = (index: number, offset: number) => {
+export const stackedAxisNumber = (index: number, offset: number) => {
   const n = offset + index + 1;
   return n === 1 ? "" : `${n}`;
 };

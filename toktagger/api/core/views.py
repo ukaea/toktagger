@@ -121,28 +121,24 @@ class RadialProfileView:
             for name, value in data.values.items()
             if isinstance(value, Profile2DData)
         }
-        profile_signal = self.params.profile_signal or next(iter(profiles), None)
-        if profile_signal is None:
+        profile_signals = list(profiles)
+        if not profile_signals:
             raise RuntimeError("No 2D profile signal found for radial profile view")
-        if profile_signal not in profiles:
-            raise RuntimeError(f"Profile data for {profile_signal} does not exist.")
 
-        profile = profiles[profile_signal]
+        profile = profiles[profile_signals[0]]
         values = np.array(profile.values, dtype=float)
+        profile_values = {profile_signals[0]: values}
+        for name in profile_signals[1:]:
+            other = np.array(profiles[name].values, dtype=float)
+            if other.shape != values.shape or not np.array_equal(
+                profiles[name].time, profile.time
+            ):
+                raise RuntimeError(
+                    f"Profile {name} is not on the same grid as {profile_signals[0]}"
+                )
+            profile_values[name] = other
 
-        if self.params.radius_signal is None:
-            radius = np.broadcast_to(np.array(profile.dim_1, dtype=float), values.shape)
-        else:
-            radius_data = profiles.get(self.params.radius_signal)
-            if radius_data is None:
-                raise RuntimeError(
-                    f"Radius data for {self.params.radius_signal} does not exist."
-                )
-            radius = np.array(radius_data.values, dtype=float)
-            if radius.shape != values.shape:
-                raise RuntimeError(
-                    f"Radius signal shape {radius.shape} does not match profile shape {values.shape}"
-                )
+        radius = np.broadcast_to(np.array(profile.dim_1, dtype=float), values.shape)
 
         time_series = {
             name: value
@@ -151,10 +147,11 @@ class RadialProfileView:
         }
 
         return RadialProfileData(
-            profile_signal=profile_signal,
             time=profile.time,
             radius=_finite_or_none(radius),
-            values=_finite_or_none(values),
+            profiles={
+                name: _finite_or_none(value) for name, value in profile_values.items()
+            },
             time_series=time_series,
         )
 

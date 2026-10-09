@@ -44,16 +44,16 @@ async def _create_radial_sample(api_client, signal_names: list[str]) -> tuple[st
 
 @pytest.mark.asyncio
 async def test_get_radial_profile_data(api_client, setup_db):
-    project_id, sample_id = await _create_radial_sample(api_client, ["TE", "R", "ip"])
+    project_id, sample_id = await _create_radial_sample(api_client, ["TE", "NE", "ip"])
     response = await api_client.post(
         f"/projects/{project_id}/samples/{sample_id}/data",
-        json={"view": {"name": "radial_profile", "radius_signal": "R"}},
+        json={"view": {"name": "radial_profile"}},
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["profile_signal"] == "TE"
-    assert len(data["radius"]) == len(data["values"]) == len(data["time"])
-    assert None in data["values"][0]
+    assert list(data["profiles"]) == ["TE", "NE"]
+    assert len(data["radius"]) == len(data["profiles"]["NE"]) == len(data["time"])
+    assert None in data["profiles"]["TE"][0]
     assert list(data["time_series"]) == ["ip"]
 
 

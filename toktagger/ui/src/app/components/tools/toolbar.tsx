@@ -29,7 +29,6 @@ import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
 import Profile2DThresholdTool from "../annotators/thresholding";
 import { Profile2DViewParamsWidget } from "@/app/profile2d/components/profile2dViewParamsWidget";
-import { RadialProfileViewParamsWidget } from "@/app/radial_profile/components/radialProfileViewParamsWidget";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
 import { useServerHealth } from "@/app/contexts/healthContext";
 
@@ -204,16 +203,10 @@ export default function ToolBar() {
       ),
     });
   } else if (project.task === TaskType.RadialProfile) {
-    // Not gated on data so the signal pickers still let the user recover.
     const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
     tools.push({
       name: "Shot Labels",
       component: <ShotLabels labels={labels}></ShotLabels>,
-    });
-
-    tools.push({
-      name: "View Parameters",
-      component: <RadialProfileViewParamsWidget />,
     });
 
     tools.push({

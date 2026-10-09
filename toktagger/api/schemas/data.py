@@ -31,10 +31,9 @@ class MultiSignalData(Data):
 
 
 class RadialProfileData(Data):
-    profile_signal: str
     time: list[float]
     radius: list[list[float | None]]  # [time][channel]
-    values: list[list[float | None]]  # [time][channel]
+    profiles: dict[str, list[list[float | None]]]  # name -> [time][channel]
     time_series: dict[str, TimeSeriesData]
 
 

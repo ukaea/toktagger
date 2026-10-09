@@ -228,7 +228,7 @@ def main():
         "sequential",
         min_time_step=None,
     )
-    create_uda_samples(project_id, [30421], signals=["AYC_TE", "AYC_R", "ip"])
+    create_uda_samples(project_id, [30421], signals=["AYC_TE", "AYC_NE", "ip"])
     # ---- Image / UFO demo project ----
     project_id = create_project("Frame Project", "video", "image", "random")
     create_image_samples(project_id, [10101], Path("./data/test/video/"))

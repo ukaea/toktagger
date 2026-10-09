@@ -8,16 +8,18 @@ from tests.radial_definitions import RADIAL_TIME
 
 RADIAL_PLOT_ID = "RadialProfileRadial"
 TIME_PLOT_ID = "RadialProfileTime"
-# One radial subplot, plus the slice strip and one subplot per 1D signal ("ip").
-NUM_SUBPLOTS = 3
+# One radial subplot per profile ("TE", "NE"), plus the slice strip and one subplot per 1D signal ("ip").
+NUM_RADIAL_SUBPLOTS = 2
 NUM_TIME_SUBPLOTS = 2
+NUM_SUBPLOTS = NUM_RADIAL_SUBPLOTS + NUM_TIME_SUBPLOTS
+NUM_RADIAL_TRACES = NUM_RADIAL_SUBPLOTS * len(RADIAL_TIME)
 
 
 def setup_project(page: Page) -> Tuple[str, str]:
     project_id = create_project(
         "Test Radial Profile Project", "radial-profile", "synthetic_radial"
     )
-    sample_id = create_uda_samples(project_id, [1], signal_names=["TE", "R", "ip"])[0]
+    sample_id = create_uda_samples(project_id, [1], signal_names=["TE", "NE", "ip"])[0]
 
     page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
     expect(page.get_by_label("radial-profile", exact=True)).to_be_visible()
@@ -93,7 +95,7 @@ def save(page: Page, sample_id: str) -> None:
 
 def test_radial_profile_renders_all_slices(server_setup, page: Page):
     setup_project(page)
-    assert radial_trace_count(page) == len(RADIAL_TIME)
+    assert radial_trace_count(page) == NUM_RADIAL_TRACES
 
 
 def zoom_time_plot(page: Page) -> None:
@@ -108,7 +110,7 @@ def zoom_time_plot(page: Page) -> None:
     page.mouse.up()
     page.wait_for_function(
         "([plotId, total]) => document.getElementById(plotId).data.length < total",
-        arg=[RADIAL_PLOT_ID, len(RADIAL_TIME)],
+        arg=[RADIAL_PLOT_ID, NUM_RADIAL_TRACES],
     )
 
 
@@ -124,7 +126,9 @@ def test_radial_profile_range_uses_zoomed_time_window(server_setup, page: Page):
     enter_edit_mode(page)
     select_tool(page, "BOUNDING BOX", "NTM")
     ctrl_drag(page, RADIAL_PLOT_ID, 0.3, 0.6)
-    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(1)
+    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(
+        NUM_RADIAL_SUBPLOTS
+    )
 
     page.get_by_role("button", name="Edit Mode").click()
     expect(page.get_by_role("button", name="View Mode")).to_be_enabled()
@@ -145,7 +149,9 @@ def test_radial_profile_draw_and_edit_radial_range(server_setup, page: Page):
     select_tool(page, "BOUNDING BOX", "NTM")
     ctrl_drag(page, RADIAL_PLOT_ID, 0.3, 0.6)
 
-    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(1)
+    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(
+        NUM_RADIAL_SUBPLOTS
+    )
     expect(page.get_by_label("radial-range-time", exact=True)).to_have_count(
         NUM_TIME_SUBPLOTS
     )
@@ -171,7 +177,8 @@ def test_radial_profile_draw_and_edit_radial_range(server_setup, page: Page):
     box = annotations[0]
     assert box["type"] == "bounding_box"
     assert box["label"] == "NTM"
-    assert box["signal_name"] == "TE"
+    # One range covers every profile on the shared grid.
+    assert box["signal_name"] is None
     # Time span starts at the first slice and now ends mid-shot.
     assert box["x_min"] == RADIAL_TIME[0]
     assert box["x_min"] + box["width"] < RADIAL_TIME[-1] * 0.75
@@ -179,7 +186,9 @@ def test_radial_profile_draw_and_edit_radial_range(server_setup, page: Page):
     assert 1 <= box["y_min"] and box["y_min"] + box["height"] <= 20
 
     page.reload()
-    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(1)
+    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(
+        NUM_RADIAL_SUBPLOTS
+    )
 
 
 def test_radial_profile_range_survives_time_zoom_reset(server_setup, page: Page):
@@ -189,14 +198,18 @@ def test_radial_profile_range_survives_time_zoom_reset(server_setup, page: Page)
     enter_edit_mode(page)
     select_tool(page, "BOUNDING BOX", "NTM")
     ctrl_drag(page, RADIAL_PLOT_ID, 0.3, 0.6)
-    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(1)
+    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(
+        NUM_RADIAL_SUBPLOTS
+    )
 
     page.locator(f"#{TIME_PLOT_ID} [data-title='Reset axes']").click()
     page.wait_for_function(
         "([plotId, total]) => document.getElementById(plotId).data.length === total",
-        arg=[RADIAL_PLOT_ID, len(RADIAL_TIME)],
+        arg=[RADIAL_PLOT_ID, NUM_RADIAL_TRACES],
     )
-    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(1)
+    expect(page.get_by_label("radial-range-radius", exact=True)).to_have_count(
+        NUM_RADIAL_SUBPLOTS
+    )
     expect(page.get_by_label("radial-range-time", exact=True)).to_have_count(
         NUM_TIME_SUBPLOTS
     )

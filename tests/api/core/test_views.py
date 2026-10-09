@@ -12,44 +12,39 @@ from tests.radial_definitions import (
     RADIAL_CHANNELS,
     RADIAL_GAP_CHANNEL,
     RADIAL_TIME,
-    synthetic_radius,
+    synthetic_ne,
     synthetic_signals,
 )
 
 
-def test_radial_profile_view_defaults_to_first_profile():
-    data = MultiSignalData(values=synthetic_signals())
-    result = RadialProfileView(RadialProfileViewParams())(data)
+def signal_data(*names: str) -> MultiSignalData:
+    signals = synthetic_signals()
+    return MultiSignalData(values={name: signals[name] for name in names})
 
-    assert result.profile_signal == "TE"
+
+def test_radial_profile_view_shows_all_profiles_in_order():
+    result = RadialProfileView(RadialProfileViewParams())(signal_data("TE", "NE", "ip"))
+
+    assert list(result.profiles) == ["TE", "NE"]
     assert result.time == RADIAL_TIME.tolist()
     # Without a radius signal, dim_1 is broadcast to every slice
     assert all(row == RADIAL_CHANNELS.tolist() for row in result.radius)
     assert list(result.time_series) == ["ip"]
 
 
-def test_radial_profile_view_uses_radius_signal_and_nulls_nan():
-    data = MultiSignalData(values=synthetic_signals())
-    result = RadialProfileView(
-        RadialProfileViewParams(profile_signal="TE", radius_signal="R")
-    )(data)
+def test_radial_profile_view_nulls_nan():
+    result = RadialProfileView(RadialProfileViewParams())(signal_data("TE", "NE"))
 
-    assert numpy.allclose(numpy.array(result.radius, dtype=float), synthetic_radius())
-    assert all(row[RADIAL_GAP_CHANNEL] is None for row in result.values)
-    assert len(result.values) == len(RADIAL_TIME)
+    assert numpy.allclose(
+        numpy.array(result.profiles["NE"], dtype=float), synthetic_ne()
+    )
+    assert all(row[RADIAL_GAP_CHANNEL] is None for row in result.profiles["TE"])
+    assert len(result.profiles["TE"]) == len(RADIAL_TIME)
 
 
-@pytest.mark.parametrize(
-    "params,message",
-    [
-        (RadialProfileViewParams(profile_signal="ip"), "does not exist"),
-        (RadialProfileViewParams(radius_signal="nope"), "does not exist"),
-    ],
-)
-def test_radial_profile_view_invalid_signals(params, message):
-    data = MultiSignalData(values=synthetic_signals())
-    with pytest.raises(RuntimeError, match=message):
-        RadialProfileView(params)(data)
+def test_radial_profile_view_rejects_mismatched_grids():
+    with pytest.raises(RuntimeError, match="not on the same grid"):
+        RadialProfileView(RadialProfileViewParams())(signal_data("TE", "NE_COARSE"))
 
 
 def test_radial_profile_view_requires_profile():

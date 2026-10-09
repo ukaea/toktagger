@@ -27,8 +27,6 @@ class Profile2DViewParams(ViewParams):
 
 class RadialProfileViewParams(ViewParams):
     name: Literal[ViewType.RADIAL_PROFILE] = ViewType.RADIAL_PROFILE
-    profile_signal: Optional[str] = None
-    radius_signal: Optional[str] = None
 
 
 ViewParamTypes = Union[ViewParams, Profile2DViewParams, RadialProfileViewParams]

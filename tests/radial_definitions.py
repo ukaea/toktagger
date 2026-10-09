@@ -33,14 +33,26 @@ def synthetic_te() -> np.ndarray:
     return te
 
 
+def synthetic_ne() -> np.ndarray:
+    """Flatter density profile on the same grid as synthetic_te."""
+    radius = synthetic_radius()
+    shape = np.clip(1 - ((radius - 0.85) / 0.75) ** 4, 0, None)
+    return 3 * shape * (0.5 + RADIAL_TIME[:, None] / RADIAL_TIME.max())
+
+
 def synthetic_signals() -> dict[str, TimeSeriesData | Profile2DData]:
     ip_time = np.linspace(0, 0.6, 300)
     return {
         "TE": Profile2DData(
             time=RADIAL_TIME, dim_1=RADIAL_CHANNELS, values=synthetic_te()
         ),
-        "R": Profile2DData(
-            time=RADIAL_TIME, dim_1=RADIAL_CHANNELS, values=synthetic_radius()
+        "NE": Profile2DData(
+            time=RADIAL_TIME, dim_1=RADIAL_CHANNELS, values=synthetic_ne()
+        ),
+        "NE_COARSE": Profile2DData(
+            time=RADIAL_TIME,
+            dim_1=RADIAL_CHANNELS[::2],
+            values=synthetic_ne()[:, ::2],
         ),
         "ip": TimeSeriesData(time=ip_time, values=np.sin(np.pi * ip_time / 0.6)),
     }

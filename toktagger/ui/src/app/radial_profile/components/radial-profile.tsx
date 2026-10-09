@@ -11,6 +11,7 @@ import {
   arrayMin,
   assignStackedYAxes,
   buildStackedYAxesLayout,
+  stackedAxisNumber,
 } from "@/app/utils";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
 import { TimeSeriesProvider } from "@/app/contexts/TimeSeriesContext";
@@ -25,7 +26,7 @@ import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 
 const RADIAL_TOOLS = [TimeSeriesAnnotationType.BOUNDING_BOX];
@@ -98,61 +99,79 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
   const { visibleSlices, sliceColor, setTimeWindow } = useRadialProfile();
   const isDarkMode = useIsDarkMode();
 
+  const profileNames = useMemo(() => Object.keys(data.profiles), [data]);
+  // The first profile is on the top row, as in assignStackedYAxes.
+  const axisNumber = useCallback(
+    (profileIndex: number) =>
+      stackedAxisNumber(profileNames.length - profileIndex - 1, 0),
+    [profileNames],
+  );
+
   // Fixed ranges so the axes don't jump as the time window changes.
   const radialRanges = useMemo(
     () => ({
       x: paddedRange(finite(data.radius.flat()), 0.02),
-      y: paddedRange([0, robustMax(finite(data.values.flat()))]),
+      y: Object.values(data.profiles).map((values) =>
+        paddedRange([0, robustMax(finite(values.flat()))]),
+      ),
     }),
     [data],
   );
 
   const radialData = useMemo<Partial<Plotly.PlotData>[]>(
     () =>
-      visibleSlices.map((index) => {
-        const time = data.time[index];
-        const color = sliceColor(time);
-        return {
-          name: `t = ${time.toFixed(4)} s`,
-          x: data.radius[index],
-          y: data.values[index],
-          mode: "lines+markers",
-          line: { color, width: 1 },
-          marker: { color, size: 4 },
-          hovertemplate: `t: ${time.toFixed(4)} s<br>radius: %{x:.4g}<br>value: %{y:.4g}<extra></extra>`,
-        } as Partial<Plotly.PlotData>;
-      }),
-    [data, visibleSlices, sliceColor],
+      Object.entries(data.profiles).flatMap(([name, values], profileIndex) =>
+        visibleSlices.map((index) => {
+          const time = data.time[index];
+          const color = sliceColor(time);
+          return {
+            name: `${name} t = ${time.toFixed(4)} s`,
+            x: data.radius[index],
+            y: values[index],
+            yaxis: `y${axisNumber(profileIndex)}`,
+            mode: "lines+markers",
+            line: { color, width: 1 },
+            marker: { color, size: 4 },
+            hovertemplate: `${name}<br>t: ${time.toFixed(4)} s<br>radius: %{x:.4g}<br>value: %{y:.4g}<extra></extra>`,
+          } as Partial<Plotly.PlotData>;
+        }),
+      ),
+    [data, visibleSlices, sliceColor, axisNumber],
   );
 
-  const radialLayout = useMemo<Partial<Plotly.Layout>>(
-    () =>
-      applyGlobalStyle(
-        {
-          autosize: true,
-          height: window.innerHeight * 0.5,
-          margin: { t: 30, b: 50 },
-          showlegend: false,
-          dragmode: "pan",
-          uirevision: "true",
-          hovermode: "closest",
-          xaxis: {
-            title: { text: "Radius", font: AXIS_TITLE_FONT },
-            range: radialRanges.x,
-            showgrid: false,
-            linewidth: 1,
-          },
-          yaxis: {
-            title: { text: data.profile_signal, font: AXIS_TITLE_FONT },
-            range: radialRanges.y,
-            showgrid: false,
-            linewidth: 1,
-          },
+  const radialLayout = useMemo<Partial<Plotly.Layout>>(() => {
+    const yAxes = buildStackedYAxesLayout(profileNames);
+    profileNames.forEach((_, profileIndex) => {
+      const key = `yaxis${axisNumber(profileIndex)}`;
+      yAxes[key] = {
+        ...(yAxes[key] as object),
+        range: radialRanges.y[profileIndex],
+        autorange: false,
+        fixedrange: false,
+        showgrid: false,
+        linewidth: 1,
+      };
+    });
+    return applyGlobalStyle(
+      {
+        autosize: true,
+        height: window.innerHeight * Math.max(0.5, 0.3 * profileNames.length),
+        margin: { t: 30, b: 50 },
+        showlegend: false,
+        dragmode: "pan",
+        uirevision: "true",
+        hovermode: "closest",
+        xaxis: {
+          title: { text: "Radius", font: AXIS_TITLE_FONT },
+          range: radialRanges.x,
+          showgrid: false,
+          linewidth: 1,
         },
-        isDarkMode,
-      ),
-    [data.profile_signal, radialRanges, isDarkMode],
-  );
+        ...yAxes,
+      },
+      isDarkMode,
+    );
+  }, [profileNames, axisNumber, radialRanges, isDarkMode]);
 
   const timeData = useMemo<Partial<Plotly.PlotData>[]>(() => {
     const signals = Object.entries(data.time_series).map(
@@ -270,7 +289,7 @@ export const RadialProfileView = () => {
     <View width="100%">
       <Flex justifyContent="center" alignItems="center">
         <RadialProfileProvider data={viewData} colorMap={plotProps.colorMap}>
-          <TimeSeriesProvider signalName={viewData.profile_signal}>
+          <TimeSeriesProvider>
             <Flex direction="row" flex justifyContent="space-between">
               <Flex direction="column" flex gap="size-100">
                 <RadialProfilePlots data={viewData} />

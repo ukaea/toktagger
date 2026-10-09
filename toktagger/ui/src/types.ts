@@ -145,11 +145,11 @@ export const Profile2DDataSchema = z.object({
 export type Profile2DData = z.infer<typeof Profile2DDataSchema>;
 
 export const RadialProfileDataSchema = z.object({
-  profile_signal: z.string(),
   time: z.array(z.number()),
   // Indexed [time][channel]; radius is per slice since channel positions can drift.
   radius: z.array(z.array(z.number().nullable())),
-  values: z.array(z.array(z.number().nullable())),
+  // Profiles on the same grid as radius, in subplot order.
+  profiles: z.record(z.string(), z.array(z.array(z.number().nullable()))),
   time_series: z.record(z.string(), TimeSeriesDataSchema),
 });
 export type RadialProfileData = z.infer<typeof RadialProfileDataSchema>;
@@ -354,8 +354,6 @@ export type Profile2DViewParams = z.infer<typeof Profile2DViewParamsSchema>;
 
 export const RadialProfileViewParamsSchema = ViewParamsSchema.extend({
   name: z.literal("radial_profile"),
-  profile_signal: z.string().optional(),
-  radius_signal: z.string().optional(),
 });
 export type RadialProfileViewParams = z.infer<
   typeof RadialProfileViewParamsSchema
