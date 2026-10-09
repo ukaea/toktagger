@@ -1,8 +1,13 @@
 "use client";
 
-import { TimeSeriesAnnotationType, TimeSeriesCategory } from "@/types";
+import {
+  TimeSeriesAnnotation,
+  TimeSeriesAnnotationType,
+  TimeSeriesCategory,
+} from "@/types";
 import { ComponentType, useMemo } from "react";
 import {
+  ActionButton,
   TableView,
   TableHeader,
   Column,
@@ -10,8 +15,15 @@ import {
   Row,
   Cell,
   Flex,
+  Tooltip,
+  TooltipTrigger,
 } from "@adobe/react-spectrum";
-import { useTimeSeriesState } from "@/app/contexts/TimeSeriesContext";
+import Crosshairs from "@spectrum-icons/workflow/Crosshairs";
+import Delete from "@spectrum-icons/workflow/Delete";
+import {
+  useTimeSeriesActions,
+  useTimeSeriesState,
+} from "@/app/contexts/TimeSeriesContext";
 
 interface MarkerProps {
   color: string;
@@ -73,68 +85,72 @@ const MARKER_ICONS: Record<
 
 interface TableEntry {
   id: string;
+  annotation: TimeSeriesAnnotation;
   category: TimeSeriesCategory;
-  data: string;
   marker: ComponentType<MarkerProps>;
 }
+
+// Separate component because Spectrum caches rows by item, so editMode must be read here to stay fresh
+const AnnotationRowActions = ({
+  annotation,
+}: {
+  annotation: TimeSeriesAnnotation;
+}) => {
+  const { editMode } = useTimeSeriesState();
+  const { removeAnnotation, selectAnnotations, setFocusXRange } =
+    useTimeSeriesActions();
+
+  const jumpToAnnotation = () => {
+    const xs = annotation.points.map((point) => point.x);
+    setFocusXRange([Math.min(...xs), Math.max(...xs)]);
+    selectAnnotations([annotation.id]);
+  };
+
+  return (
+    <>
+      <TooltipTrigger delay={350}>
+        <ActionButton
+          isQuiet
+          aria-label="Jump to annotation"
+          onPress={jumpToAnnotation}
+        >
+          <Crosshairs />
+        </ActionButton>
+        <Tooltip>Jump to annotation</Tooltip>
+      </TooltipTrigger>
+      <TooltipTrigger delay={350}>
+        <ActionButton
+          isQuiet
+          isDisabled={!editMode}
+          aria-label="Delete annotation"
+          onPress={() => removeAnnotation(annotation.id)}
+        >
+          <Delete />
+        </ActionButton>
+        <Tooltip>Delete annotation</Tooltip>
+      </TooltipTrigger>
+    </>
+  );
+};
 
 export const AnnotationsTable = () => {
   const { annotations, categories } = useTimeSeriesState();
 
-  const entries = useMemo<TableEntry[]>(() => {
-    const entriesBuffer: TableEntry[] = [];
-    annotations.forEach((annotation) => {
-      const categoryId = `${annotation.type}_${annotation.label}`;
-      // Fall back to a category built from the annotation itself if none is configured.
-      const category = categories.get(categoryId) ?? {
-        label: annotation.label,
-        color: "black",
-        type: annotation.type,
-      };
-
-      let data: string;
-      switch (annotation.type) {
-        case TimeSeriesAnnotationType.TIME_POINT:
-          data = `${annotation.points[0].x.toFixed(4)}`;
-          break;
-        case TimeSeriesAnnotationType.TIME_REGION: {
-          const timeRegionPoints: string[] = [];
-          annotation.points.forEach((point) => {
-            timeRegionPoints.push(`${point.x.toFixed(4)}`);
-          });
-          data = `${timeRegionPoints[0]} - ${timeRegionPoints[1]}`;
-          break;
-        }
-        case TimeSeriesAnnotationType.BOUNDING_BOX: {
-          const boundingBoxPoints: string[] = [];
-          annotation.points.forEach((point) => {
-            boundingBoxPoints.push(
-              `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`,
-            );
-          });
-          data = `${boundingBoxPoints[0]} ${boundingBoxPoints[1]}`;
-          break;
-        }
-        case TimeSeriesAnnotationType.POLYGON:
-          data = `(${annotation.points[0].x.toFixed(2)}, ${annotation.points[0].y.toFixed(2)}) [${annotation.points.length}]`;
-          break;
-        default:
-          console.warn(
-            `Could not parse data for ${annotation.type} when adding to table`,
-          );
-          data = "";
-      }
-
-      entriesBuffer.push({
+  const entries = useMemo<TableEntry[]>(
+    () =>
+      annotations.map((annotation) => ({
         id: annotation.id,
-        category,
-        data,
+        annotation,
+        // Fall back to a category built from the annotation itself if none is configured.
+        category: categories.get(`${annotation.type}_${annotation.label}`) ?? {
+          label: annotation.label,
+          color: "black",
+          type: annotation.type,
+        },
         marker: MARKER_ICONS[annotation.type],
-      });
-    });
-
-    return entriesBuffer;
-  }, [annotations, categories]);
+      })),
+    [annotations, categories],
+  );
 
   return (
     <div className="relative w-[70%] overflow-x-auto shadow-md sm:rounded-lg ml-auto mr-auto p-4">
@@ -144,17 +160,14 @@ export const AnnotationsTable = () => {
       </Flex>
       <TableView aria-label="Annotations table" width="100%" height="200px">
         <TableHeader>
-          <Column key="marker" width="2%">
-            <></>
+          <Column key="marker" width={56} hideHeader>
+            Marker
           </Column>
-          <Column key="category" width="28%">
-            Category
-          </Column>
-          <Column key="type" width="20%">
-            Type
-          </Column>
-          <Column key="data" width="50%">
-            Data
+          <Column key="label">Class Label</Column>
+          <Column key="type">Type</Column>
+          <Column key="created_by">Created By</Column>
+          <Column key="actions" width={112} hideHeader align="end">
+            Actions
           </Column>
         </TableHeader>
         <TableBody items={entries}>
@@ -162,14 +175,19 @@ export const AnnotationsTable = () => {
             <Row key={item.id}>
               <Cell>
                 <Flex justifyContent="center">
-                  <item.marker color={item.category.color} />
+                  <span role="img" aria-label={item.annotation.type}>
+                    <item.marker color={item.category.color} />
+                  </span>
                 </Flex>
               </Cell>
               <Cell>
                 <span>{item.category.label}</span>
               </Cell>
-              <Cell>{item.category.type}</Cell>
-              <Cell>{item.data}</Cell>
+              <Cell>{item.annotation.type}</Cell>
+              <Cell>{item.annotation.created_by}</Cell>
+              <Cell>
+                <AnnotationRowActions annotation={item.annotation} />
+              </Cell>
             </Row>
           )}
         </TableBody>
