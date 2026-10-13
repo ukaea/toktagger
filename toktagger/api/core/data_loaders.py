@@ -6,7 +6,7 @@ import os
 import pathlib
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Type
+from typing import ClassVar, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -58,6 +58,8 @@ class FrameNotFoundError(DataLoaderError):
 
 
 class DataLoader(ABC):
+    signal_name_help: ClassVar[str | None] = None
+
     @classmethod
     @abstractmethod
     def sample_data_type(
@@ -119,6 +121,10 @@ class LoaderRegistry:
             raise ValueError(f"No DataLoader class called '{name}' found in registry!")
         return loader_class.sample_data_type().model_json_schema()
 
+    @classmethod
+    def get_signal_name_help(cls, name: str) -> str | None:
+        return cls.get(name).signal_name_help
+
 
 @LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
@@ -179,6 +185,11 @@ class ImageDataLoader(DataLoader):
 @LoaderRegistry.register("image-array")
 class ArrayDataLoader(DataLoader):
     """DataLoader for retrieving data using Numpy array files."""
+
+    signal_name_help = (
+        "Use the name of one array in the .npz file. Leave this field empty if the "
+        "file contains only one array."
+    )
 
     @classmethod
     def sample_data_type(cls) -> Type[ImageArrayFileData]:
@@ -270,6 +281,10 @@ class ArrayDataLoader(DataLoader):
 class TabularDataLoader(DataLoader):
     """DataLoader for retrieving data from a tabular file format (e.g., CSV, Parquet)"""
 
+    signal_name_help = (
+        "Use the column names in the file. Leave this field empty to load all columns."
+    )
+
     @classmethod
     def sample_data_type(cls) -> Type[TimeSeriesFileData]:
         return TimeSeriesFileData
@@ -338,6 +353,11 @@ class TabularDataLoader(DataLoader):
 @LoaderRegistry.register("uda")
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
+
+    signal_name_help = (
+        "Use MAST or MAST-U signal names or aliases from UDA. All signals must be "
+        "time series or all signals must be 2D profiles. Do not mix them."
+    )
 
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
@@ -429,6 +449,8 @@ def _get_uda_signal(
 @LoaderRegistry.register("uda_camera")
 class UDACameraDataLoader(DataLoader):
     """DataLoader for retrieving camera image data using the UDA access layer"""
+
+    signal_name_help = "Use exactly one MAST or MAST-U camera signal name from UDA."
 
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
@@ -525,6 +547,11 @@ class UDACameraDataLoader(DataLoader):
 @LoaderRegistry.register("sal")
 class SALDataLoader(DataLoader):
     """DataLoader for retrieving data using the SAL access layer"""
+
+    signal_name_help = (
+        "Use the JET SAL path that follows pulse/<shot_id>/, in the format "
+        "ppf/signal/<owner>/<dda>/<dtype>."
+    )
 
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
@@ -624,6 +651,11 @@ def _get_sal_signal(
 
 @LoaderRegistry.register("fair_mast")
 class FAIRMASTDataLoader(DataLoader):
+    signal_name_help = (
+        "Use the <group>/<variable> path of the signal in the FAIR MAST Level 2 "
+        "shot file."
+    )
+
     @classmethod
     def sample_data_type(self) -> Type[ShotData]:
         return ShotData

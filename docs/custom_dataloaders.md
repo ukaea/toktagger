@@ -30,6 +30,8 @@ Create a class that inherits from `DataLoader` and implement the required method
 @LoaderRegistry.register("my_custom_loader")
 class MyCustomLoader(DataLoader):
     """DataLoader for retrieving data from my custom data source"""
+
+    signal_name_help = "Use the sensor names from my data source, for example temp_1, temp_2."
     
     def __init__(self, params):
         # Initialize your data source connection here
@@ -56,6 +58,10 @@ class MyCustomLoader(DataLoader):
         # Your implementation here
         pass
 ```
+
+#### Signal name help (optional)
+
+Set the `signal_name_help` class attribute to tell users which signal names your data loader accepts. The **Add Samples** dialog shows this text in the help tooltip next to the **Signal Names** field. You can include example signal names in this text. If you do not set `signal_name_help`, the dialog shows a general help text.
 
 ### Step 3: Register the Loader
 

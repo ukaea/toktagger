@@ -64,7 +64,7 @@ A sample represents a single unit of data to be labeled—typically a tokamak sh
 
 **For Signal Data (UDA, SAL, etc.)**
 
-- **Signal Names**: Comma-separated list of signal names to load for annotation (e.g., `ip, ANE_DENSITY, etc.`)
+- **Signal Names**: Comma-separated list of signal names to load for annotation. For examples for each data loader, refer to [Data Loaders](data_loaders.md).
 - **Shot ID Input**:
     - **Numerical Range**: Specify a start and end shot ID
     - **Text File**: Upload a `.txt` or `.csv` file with one shot ID per line as the first column (additional columns are ignored)

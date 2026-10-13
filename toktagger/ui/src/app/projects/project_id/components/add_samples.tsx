@@ -16,6 +16,7 @@ import {
   ToastQueue,
   RadioGroup,
   Radio,
+  ContextualHelp,
 } from "@adobe/react-spectrum";
 import {
   Project,
@@ -27,10 +28,26 @@ import {
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import { useState, useEffect } from "react";
+import { z } from "zod/v4";
 import { BACKEND_API_URL } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
 } from "@/app/components/ui/numerical_range";
+
+const DEFAULT_SIGNAL_NAME_HELP =
+  "Use the signal names that the data loader expects.";
+
+const SignalNameHelp = ({ helpText }: { helpText: string | null }) => (
+  <ContextualHelp>
+    <Heading>Signal names</Heading>
+    <Content>
+      <Text>
+        {helpText ?? DEFAULT_SIGNAL_NAME_HELP} Refer to the Data Loaders
+        documentation for examples.
+      </Text>
+    </Content>
+  </ContextualHelp>
+);
 
 export const AddSamplesEditor = ({
   project,
@@ -48,6 +65,7 @@ export const AddSamplesEditor = ({
   const [fileTypes, setFileTypes] = useState<{ key: string; value: string }[]>(
     [],
   );
+  const [signalNameHelp, setSignalNameHelp] = useState<string | null>(null);
 
   // Form state
   const [shotInputMethod, setShotInputMethod] = useState<string>("range"); // "range" or "file"
@@ -77,6 +95,15 @@ export const AddSamplesEditor = ({
           // The schema has a "title" field that indicates the type
           // e.g., "ShotData", "FileData", "TimeSeriesFileData"
           setDataSchema(schema);
+
+          const helpResponse = await fetch(
+            `${BACKEND_API_URL}/meta/dataloader/${dataLoader}/help`,
+          );
+          const helpText = z
+            .string()
+            .nullable()
+            .safeParse(helpResponse.ok ? await helpResponse.json() : null);
+          setSignalNameHelp(helpText.success ? helpText.data : null);
 
           if (schema.title === "ShotData") {
             return;
@@ -353,7 +380,8 @@ export const AddSamplesEditor = ({
                   isRequired
                   value={signalNames}
                   onChange={setSignalNames}
-                  description="Signal names to load as a comma-separated list, e.g., ip, dalpha, ANE_DENSITY"
+                  description="Comma-separated list of signals to load."
+                  contextualHelp={<SignalNameHelp helpText={signalNameHelp} />}
                 />
                 <RadioGroup
                   label="Shot ID Input Method"
@@ -468,6 +496,7 @@ export const AddSamplesEditor = ({
                   value={columnNames}
                   onChange={setColumnNames}
                   description="Optional: Specify signal names to load data for."
+                  contextualHelp={<SignalNameHelp helpText={signalNameHelp} />}
                 />
               </Form>
             )}

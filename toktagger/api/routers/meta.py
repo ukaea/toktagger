@@ -23,6 +23,12 @@ async def get_data_schema(loader: str) -> dict[str, typing.Any]:
     return LoaderRegistry.get_data_schema(loader)
 
 
+@router.get("/dataloader/{loader}/help")
+async def get_signal_name_help(loader: str) -> str | None:
+    """Get help text which describes the signal names this dataloader expects."""
+    return LoaderRegistry.get_signal_name_help(loader)
+
+
 @router.get(
     "/models",
     dependencies=[Depends(check_models_enabled)],
