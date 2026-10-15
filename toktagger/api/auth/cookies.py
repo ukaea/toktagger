@@ -1,7 +1,6 @@
 from fastapi import Request, Response
 
 from toktagger.api import config
-from toktagger.api.auth.core import ACCESS_TOKEN_EXPIRE_SECONDS
 
 CSRF_COOKIE_NAME = "tt_csrf"
 
@@ -25,10 +24,11 @@ def set_session_cookies(request: Request, response: Response, token: str, csrf: 
     """
     secure = _cookie_secure(request)
     samesite = config.settings.auth.cookie_samesite
+    max_age = config.settings.auth.session_idle_timeout_seconds
     response.set_cookie(
         config.settings.auth.cookie_name,
         token,
-        max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
+        max_age=max_age,
         httponly=True,
         secure=secure,
         samesite=samesite,
@@ -37,7 +37,7 @@ def set_session_cookies(request: Request, response: Response, token: str, csrf: 
     response.set_cookie(
         CSRF_COOKIE_NAME,
         csrf,
-        max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
+        max_age=max_age,
         httponly=False,
         secure=secure,
         samesite=samesite,
@@ -56,7 +56,7 @@ def _drop_queued_cookies(response: Response, names: tuple[str, ...]):
 
 
 def clear_session_cookies(request: Request, response: Response):
-    """Expire both session cookies, matching the attributes they were set with."""
+    """Expire the session cookies, matching the attributes they were set with."""
     secure = _cookie_secure(request)
     samesite = config.settings.auth.cookie_samesite
     names = (config.settings.auth.cookie_name, CSRF_COOKIE_NAME)

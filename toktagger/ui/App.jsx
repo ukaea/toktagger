@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import { Provider, defaultTheme, ToastContainer } from "@adobe/react-spectrum";
 import { useNavigate } from "react-router-dom";
@@ -40,17 +41,22 @@ function AuthenticatedLayout({ children }) {
   );
 }
 
+const loginPath = ({ pathname, search }) =>
+  `/ui/login?return_to=${encodeURIComponent(pathname + search)}`;
+
 function RequireAuth({ children }) {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
   if (isLoading) return null;
-  if (!user) return <Navigate to="/ui/login" replace />;
+  if (!user) return <Navigate to={loginPath(location)} replace />;
   return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
 }
 
 function RequireAdmin({ children }) {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
   if (isLoading) return null;
-  if (!user) return <Navigate to="/ui/login" replace />;
+  if (!user) return <Navigate to={loginPath(location)} replace />;
   if (user.global_role !== "admin")
     return <Navigate to="/ui/projects/" replace />;
   return <AuthenticatedLayout>{children}</AuthenticatedLayout>;

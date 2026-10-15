@@ -260,7 +260,7 @@ def test_profile2d_save_time_annotations(server_setup, page: Page):
     for annotation in annotations:
         # Manually drawn annotations are stamped with the saving user's identity -
         # the e2e page fixture is pre-authenticated as the bootstrap admin.
-        assert annotation["created_by"] == "admin"
+        assert annotation["created_by_name"] == "admin"
         assert annotation["validated"]
 
     time_region = next(a for a in annotations if a["type"] == "time_region")

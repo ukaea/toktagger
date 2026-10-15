@@ -4,7 +4,7 @@ from pydantic import Field, TypeAdapter, create_model, field_validator, model_va
 
 from toktagger.api.schemas import ConfiguredModel
 
-# Server-generated authorship prefixes for machine annotations; routers/users.py refuses them as usernames so a real user can never collide with them.
+# Server-generated authorship prefixes for machine annotations; a human author is stored by user ID instead.
 RESERVED_CREATED_BY_PREFIXES = ("model::", "annotators::")
 
 
@@ -141,6 +141,9 @@ class AnnotationOut(AnnotationBatch):
     project_id: str
     sample_id: str
     shot_id: int
+    # Resolved from created_by when read; None for a deleted user or a legacy placeholder.
+    created_by_name: str | None = None
+    created_by_deleted: bool = False
 
 
 def create_out_model(base_class, name_suffix="Out"):

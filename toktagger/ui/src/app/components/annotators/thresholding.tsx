@@ -9,7 +9,7 @@ import {
   Switch,
 } from "@adobe/react-spectrum";
 import { useEffect, useState } from "react";
-import { AnnotatorTypes, annotatorCreatedBy } from "./types";
+import { AnnotatorTypes, annotatorCreatedBy } from "@/types";
 import { getSignalNames } from "@/app/utils";
 
 // Defaults for the thresholding parameters. The range of interest is replaced

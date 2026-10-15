@@ -11,7 +11,7 @@ import {
   RangeSlider,
   Switch,
 } from "@adobe/react-spectrum";
-import { AnnotatorTypes, annotatorCreatedBy } from "./types";
+import { AnnotatorTypes, annotatorCreatedBy } from "@/types";
 import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
 

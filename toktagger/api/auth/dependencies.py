@@ -1,21 +1,22 @@
 import secrets
 
 from fastapi import Depends, HTTPException, Request, Response
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from toktagger.api import config
+from toktagger.api.auth import api_tokens, oidc, sessions
 from toktagger.api.auth.core import (
-    ACCESS_TOKEN_RENEW_AFTER_SECONDS,
     create_access_token,
     decode_token_with_age,
     get_internal_token,
 )
 from toktagger.api.auth.cookies import set_session_cookies
 from toktagger.api.crud import utils
+from toktagger.api.crud.db import LockTimeoutError
 from toktagger.api.schemas.projects import ProjectMember
 from toktagger.api.schemas.users import UserOut
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -45,75 +46,120 @@ def _require_csrf(request: Request, payload: dict):
         )
 
 
-def _renew_session(request: Request, response: Response, payload: dict):
-    """Slide the session window by re-issuing the cookies on the current response.
+async def _refresh_session(request: Request, response: Response, payload: dict):
+    """Read the account from the provider again, then slide the session window.
 
     The csrf claim is carried over unchanged, so a request already in flight with the
-    old header still validates against the new token.
+    old header still validates.
     """
+    session_id = payload.get("sid")
     csrf = payload.get("csrf")
-    if not isinstance(csrf, str):
-        return
+    if not isinstance(session_id, str) or not isinstance(csrf, str):
+        raise HTTPException(status_code=401, detail="Invalid session. Sign in again.")
+    try:
+        await sessions.refresh_session(
+            request.app.state.db_client, oidc.get_idp(request), session_id
+        )
+    except (sessions.SessionEndedError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    # Fail closed but keep the session, so it works again once the provider is back.
+    except (*oidc.IDP_ERRORS, LockTimeoutError) as exc:
+        raise HTTPException(
+            status_code=503, detail="The identity provider is not available."
+        ) from exc
     set_session_cookies(request, response, create_access_token(dict(payload)), csrf)
+
+
+def _require_active(user: UserOut) -> UserOut:
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account is inactive")
+    return user
+
+
+async def _get_user_from_api_token(request: Request, token: str) -> UserOut:
+    db_client = request.app.state.db_client
+    user_id = await api_tokens.authenticate_api_token(db_client, token)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired API token")
+    user = await utils.get_user_by_id(db_client, user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User no longer exists")
+    return _require_active(user)
+
+
+async def _get_user_from_bearer(request: Request, token: str) -> UserOut:
+    """Authenticate a bearer header: the internal token, an API token or an IdP token.
+
+    A bearer header cannot be attached by a cross-site caller, so it needs no CSRF
+    cover, and the caller manages its own token, so the session does not slide.
+    """
+    # Internal server-to-server token used by Ray-worker callbacks (sender.py).
+    if secrets.compare_digest(token, get_internal_token()):
+        return _INTERNAL_USER
+    if api_tokens.is_api_token(token):
+        return await _get_user_from_api_token(request, token)
+
+    idp: oidc.IdentityProvider | None = request.app.state.idp
+    if idp is None:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+    try:
+        claims = await idp.verify_access_token(token)
+        user = await oidc.provision_user(
+            request.app.state.db_client, claims["iss"], claims, sync_profile=False
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return _require_active(user)
+
+
+async def _get_user_from_cookie(request: Request, response: Response) -> UserOut:
+    """Authenticate the browser session cookie, and refresh it when it is old enough."""
+    token = request.cookies.get(config.settings.auth.cookie_name)
+    if token is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        payload, token_age = decode_token_with_age(token)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    username = payload.get("sub")
+    if not username or not isinstance(username, str):
+        raise HTTPException(status_code=401, detail="Token is missing a subject claim")
+
+    _require_csrf(request, payload)
+    request.state.session_id = payload.get("sid")
+    if token_age >= config.settings.auth.session_refresh_seconds:
+        await _refresh_session(request, response, payload)
+
+    user = await utils.get_user_by_username(request.app.state.db_client, username)
+    # 401 rather than 404/403: the signature is good but the credential no longer
+    # identifies a usable account, and 401 is what the frontend signs out on.
+    if not user:
+        raise HTTPException(status_code=401, detail="User no longer exists")
+    return _require_active(user)
 
 
 async def get_current_user(
     request: Request,
     response: Response,
-    header_token: str | None = Depends(oauth2_scheme),
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> UserOut:
-    # Header first: Ray-worker callbacks, scripts and tests never send a cookie, and an
+    # Header first: Ray-worker callbacks and scripts never send a cookie, and an
     # explicit header should beat whatever session the same browser happens to hold.
-    token = header_token or request.cookies.get(config.settings.auth.cookie_name)
-    if token is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    # Internal server-to-server token used by Ray-worker callbacks (sender.py).
-    if secrets.compare_digest(token, get_internal_token()):
-        return _INTERNAL_USER
-
-    try:
-        payload, token_age = decode_token_with_age(token)
-        username = payload.get("sub")
-        if not username or not isinstance(username, str):
-            raise ValueError("Token is missing a subject claim")
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-
-    # A bearer header cannot be attached by a cross-site caller, so only the ambient
-    # cookie credential needs CSRF cover.
-    if header_token is None:
-        _require_csrf(request, payload)
-
-    db_client = request.app.state.db_client
-    user = await utils.get_user_by_username(db_client, username)
-    # 401 rather than 404/403: the signature is good but the credential no longer
-    # identifies a usable account, and 401 is what the frontend signs out on.
-    if not user:
-        raise HTTPException(status_code=401, detail="User no longer exists")
-    if not user.is_active:
-        raise HTTPException(status_code=401, detail="Account is inactive")
-
-    # Only the ambient cookie slides; a bearer caller manages its own token.
-    if header_token is None and token_age >= ACCESS_TOKEN_RENEW_AFTER_SECONDS:
-        _renew_session(request, response, payload)
-    return user
+    if bearer is not None:
+        request.state.via_session = False
+        return await _get_user_from_bearer(request, bearer.credentials)
+    request.state.via_session = True
+    return await _get_user_from_cookie(request, response)
 
 
-async def require_password_changed(
-    current_user: UserOut = Depends(get_current_user),
+async def require_session_user(
+    request: Request, current_user: UserOut = Depends(get_current_user)
 ) -> UserOut:
-    """Hold an account on a forced password change until it supplies a new one.
-
-    The bootstrap admin ships with a public default password, so until it is replaced
-    the account is treated as not yet usable. Applied to the data routers rather than
-    inside get_current_user, so /auth/me and the self-service password change stay
-    reachable for the account being held.
-    """
-    if current_user.must_change_password:
+    """Allow only a browser session, so a leaked API token cannot create more tokens."""
+    if not request.state.via_session:
         raise HTTPException(
-            status_code=403,
-            detail="You must change your password before using TokTagger.",
+            status_code=403, detail="Sign in with a browser to manage API tokens"
         )
     return current_user
 

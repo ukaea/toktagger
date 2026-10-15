@@ -369,7 +369,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     assert len(annotations) == 2
 
     for annotation in annotations:
-        assert annotation["created_by"] == "admin"
+        assert annotation["created_by_name"] == "admin"
         assert annotation["validated"]  # == True
         assert annotation["uncertainty"] == 0
 
@@ -912,7 +912,7 @@ def test_editing_a_sample_keeps_another_users_validated_flag(
     stored = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     ).json()
-    by_author = {a["created_by"]: a for a in stored}
+    by_author = {a["created_by_name"]: a for a in stored}
     assert set(by_author) == {"annotator_hazel", "admin"}, stored
     assert by_author["annotator_hazel"]["validated"] is True, (
         "hazel's validated flag must survive an edit by somebody else"

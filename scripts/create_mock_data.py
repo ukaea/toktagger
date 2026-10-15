@@ -1,5 +1,3 @@
-import getpass
-import os
 import random
 import sys
 from argparse import ArgumentParser
@@ -68,16 +66,9 @@ def main():
         default=BASE_URL,
         help="Base URL of the TokTagger API",
     )
-    parser.add_argument(
-        "--username",
-        default=os.environ.get("TOKTAGGER_USERNAME", "admin"),
-        help="Username for authentication",
-    )
     args = parser.parse_args()
 
-    password = os.environ.get("TOKTAGGER_PASSWORD") or getpass.getpass("Password: ")
-
-    token = get_token(args.url, args.username, password)
+    token = get_token()
 
     num_samples = 200
     base_path = Path(__file__).parents[1].joinpath("data", "test", "mock_disruptions")

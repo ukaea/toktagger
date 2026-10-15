@@ -1,5 +1,6 @@
 import pytest
-import requests
+
+from tests.identity import session_cookies
 
 try:
     from playwright.sync_api import Page
@@ -20,28 +21,22 @@ def _cookie_args(cookies: dict[str, str]) -> list[dict[str, str]]:
 
 
 def login_as(browser, username: str, password: str) -> Page:
-    """Return a fresh page authenticated as a specific (non-default) user.
+    """Return a fresh page signed in as a specific (non-default) user.
 
-    Logs in via the real API (not the UI form) and copies the session cookies it set
-    into a brand-new context, so they're in place before that context's first
-    navigation. Deliberately a new context rather than reusing `page`, whose own
-    cookies (below) are already seeded as the bootstrap admin.
+    Runs the real sign-in through the identity provider over HTTP and copies the session
+    cookies it set into a brand-new context, so they are in place before that context's
+    first navigation. Deliberately a new context rather than reusing `page`, whose own
+    cookies (below) are already seeded as the admin.
     """
-    session = requests.Session()
-    response = session.post(
-        "http://localhost:8002/auth/token",
-        data={"username": username, "password": password},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert response.status_code == 200, response.text
+    cookies = session_cookies(username, password)
     context = browser.new_context()
-    context.add_cookies(_cookie_args(dict(session.cookies)))
+    context.add_cookies(_cookie_args(cookies))
     return context.new_page()
 
 
 @pytest.fixture
 def page(page: Page, admin_cookies: dict[str, str]) -> Page:
-    """pytest-playwright's page, pre-authenticated as the bootstrap admin.
+    """pytest-playwright's page, pre-authenticated as the admin.
 
     Every existing/new e2e test that just needs *some* logged-in session
     gets one for free via this override — no per-test login boilerplate.

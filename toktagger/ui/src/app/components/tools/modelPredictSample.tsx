@@ -20,7 +20,7 @@ import { useSample } from "@/app/contexts/SampleContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
-import { modelCreatedBy } from "@/app/components/annotators/types";
+import { modelCreatedBy } from "@/types";
 
 type ModelPredictInfo = {
   project_id: string;

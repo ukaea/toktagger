@@ -3,7 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
 
 from toktagger.api.auth.dependencies import (
-    require_password_changed,
+    get_current_user,
     require_project_admin_role,
     require_project_annotator,
     require_project_viewer,
@@ -21,7 +21,7 @@ from toktagger.api.schemas.users import UserOut
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Annotations"],
-    dependencies=[Depends(require_password_changed)],
+    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -83,7 +83,7 @@ async def get_all_annotations(
 
     created_by = None
     if membership and not membership.show_others_annotations:
-        created_by = current_user.username
+        created_by = current_user.id
 
     annotations = await utils.get_annotations(
         db_client=db_client,
@@ -95,7 +95,7 @@ async def get_all_annotations(
         start=start,
         count=count,
     )
-    return annotations
+    return await utils.add_author_names(db_client, annotations)
 
 
 @router.put(
@@ -125,7 +125,7 @@ async def import_annotations(
             if not (annotation.created_by or "").startswith(
                 RESERVED_CREATED_BY_PREFIXES
             ):
-                annotation.created_by = current_user.username
+                annotation.created_by = current_user.id
     await utils.import_annotations(db_client, project_id, annotations)
 
 
@@ -183,7 +183,7 @@ async def get_annotations(
     ),
     created_by: str = Query(
         None,
-        description="Whether to only return annotations created by a specific model or by a human.",
+        description="Only return annotations by this author: a user ID, or a model:: or annotators:: value.",
     ),
     current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
@@ -203,7 +203,7 @@ async def get_annotations(
     effective_created_by = created_by
     if membership and not membership.show_others_annotations:
         # Only show the current user's own annotations
-        effective_created_by = current_user.username
+        effective_created_by = current_user.id
 
     annotations = await utils.get_annotations(
         db_client=db_client,
@@ -216,7 +216,7 @@ async def get_annotations(
         start=start,
         count=count,
     )
-    return annotations
+    return await utils.add_author_names(db_client, annotations)
 
 
 @router.put(
@@ -270,7 +270,7 @@ async def update_annotations(
             annotation.id is not None
             and not is_internal
             and stored_authors.get(annotation.id, annotation.created_by)
-            != current_user.username
+            != current_user.id
         )
         if is_other_authors:
             # The replace step below is scoped to the caller's own created_by, so
@@ -287,7 +287,7 @@ async def update_annotations(
             ):
                 machine_authors.add(annotation.created_by)
             else:
-                annotation.created_by = current_user.username
+                annotation.created_by = current_user.id
 
         annotation.shot_id = sample.shot_id
         owned_annotations.append(annotation)
@@ -319,7 +319,7 @@ async def update_annotations(
         project_id,
         sample_id,
         owned_annotations,
-        created_by={current_user.username, *machine_authors},
+        created_by={current_user.id, *machine_authors},
     )
     result.extend(edited_ids)
 

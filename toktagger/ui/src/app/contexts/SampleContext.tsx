@@ -97,7 +97,7 @@ interface SampleContextType {
   // Takes only other authors' annotations from a fetch, keeping the local working copy of the user's own, so a visibility change does not discard unsaved work.
   mergeOthersFromServer: (
     annotations: Annotation[],
-    username: string | undefined,
+    userId: string | undefined,
   ) => void;
   setDataParams: React.Dispatch<React.SetStateAction<DataParams>>;
   setViewParams: React.Dispatch<
@@ -498,14 +498,12 @@ export function SampleProvider({
   }, []);
 
   const mergeOthersFromServer = useCallback(
-    (fetched: Annotation[], username: string | undefined) => {
+    (fetched: Annotation[], userId: string | undefined) => {
       const others = fetched.filter(
-        (annotation) => !isOwnAnnotation(annotation, username),
+        (annotation) => !isOwnAnnotation(annotation, userId),
       );
       const merge = (previous: Annotation[]) => [
-        ...previous.filter((annotation) =>
-          isOwnAnnotation(annotation, username),
-        ),
+        ...previous.filter((annotation) => isOwnAnnotation(annotation, userId)),
         ...others,
       ];
       setAnnotations(merge);

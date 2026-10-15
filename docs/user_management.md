@@ -1,171 +1,257 @@
 # User Management
 
-TokTagger supports multiple concurrent users with role-based access control. An **admin** user manages accounts and project membership; regular **users** annotate within the projects they are assigned to.
+TokTagger supports many users at the same time. An **identity provider** keeps the accounts and the passwords. TokTagger does not store passwords. TokTagger keeps the project roles and the annotations.
+
+---
+
+## Identity Providers
+
+TokTagger signs users in with OpenID Connect. Set `auth.provider` to choose the identity provider.
+
+| `auth.provider` | Who runs the identity provider | Use it for |
+|---|---|---|
+| `canaille` (default) | TokTagger starts a local [Canaille](https://canaille.readthedocs.io) server for you | A laptop or a small team. `pip install toktagger` is all you need. For remote users, see [Multi-User Deployment](#multi-user-deployment). |
+| `oidc` | You. Use Keycloak, Microsoft Entra ID, or your organisation single sign-on | A shared server, or a Docker deployment |
+
+Both modes use the same sign-in flow. In `canaille` mode, TokTagger also creates and starts the identity provider.
+
+!!! warning
+    Use TLS (HTTPS) for every deployment that is not on `localhost`. This applies to all providers. Without TLS, passwords and session cookies cross the network in plain text.
 
 ---
 
 ## User Roles
 
-TokTagger has two layers of roles:
+TokTagger has two layers of roles.
 
 ### Global roles (account-level)
 
 | Global Role | Permissions |
 |---|---|
-| `admin` | Full access: create/edit/delete any project, manage all user accounts, view all annotations |
-| `user` | Access only to projects they are a member of |
+| `admin` | Full access: create, edit and delete any project, manage user accounts, view all annotations |
+| `user` | Access only to projects the user is a member of |
+
+The identity provider sets the global role. A user is an `admin` when the user belongs to the group `toktagger-admins`. TokTagger reads the groups at sign-in, and again during the session. To change a global role, change the group membership in the identity provider.
+
+A browser session reads the account from the identity provider again after `auth.session_refresh_seconds` (default 5 minutes). Thus a change to the groups, or a disabled account, takes effect in the browser within this time. If the identity provider ends its session, the user must sign in again. A session with no requests ends after `auth.session_idle_timeout_seconds` (default 24 hours). A deactivation in TokTagger takes effect immediately.
+
+TokTagger does not read the role from an access token that a script sends. Only a sign-in in the browser changes the role.
+
+!!! warning
+    If the identity provider removes the last TokTagger admin from the admin group, TokTagger has no admin. TokTagger writes a warning to the server log. To give admin access again, add a user to the admin group in the identity provider. Then that user signs in.
 
 ### Project roles (per-project membership)
 
 | Project Role | Permissions |
 |---|---|
-| `admin` | Manage project membership, add and delete samples, and everything an `annotator` can do |
-| `annotator` | Submit, update and delete annotations for the project's samples |
-| `viewer` | Read-only access to the project's samples and annotations |
+| `admin` | Manage project membership, add and delete samples, and do everything an `annotator` can do |
+| `annotator` | Submit, update and delete annotations for the project samples |
+| `viewer` | Read-only access to the project samples and annotations |
 
-Which samples a project contains is part of its configuration, so only a project
-admin can add or delete them. An `annotator` gets the samples the project admin
-selects and annotates them. In the UI, the **Add Samples**, **Clear Samples** and
-per-row **Delete** buttons are greyed out for annotators and viewers.
+The project configuration decides which samples a project contains. Only a project admin can add or delete samples. In the UI, the **Add Samples**, **Clear Samples** and per-row **Delete** buttons are grey for annotators and viewers.
 
-A global `admin` automatically has unrestricted access to all projects regardless of project role.
+A global `admin` has full access to all projects, whatever the project role is.
 
 ---
 
-## First-Run Setup
+## First Start With Canaille
 
-On first launch TokTagger automatically creates an `admin` account with a fixed default password and prints the credentials to the terminal:
+On the first start, TokTagger creates the local identity provider. It prints the address and the password of the first administrator:
 
 ```
-Username : admin
-Password : admin1234
+First start: a local identity provider (Canaille) was created.
+  Address:  http://localhost:8003
+  Username: admin
+  Password: <random password>
+Change the password at http://localhost:8003/profile/admin
 ```
+
+TokTagger prints the password one time only. Write it down. Then open the address and change the password.
+
+TokTagger keeps the Canaille data in the `canaille` folder of the server `cache_dir`. A restart uses the same data and prints no password.
+
+!!! note
+    Canaille sends no email unless you configure it. Password reset emails are not available. An administrator sets a new password in the Canaille user pages.
+
+### Add a user
+
+1. Sign in to Canaille at `http://localhost:8003` as `admin`.
+2. Open **Users** and click **Add a user**.
+3. Enter the user name, the email address and a password.
+4. To make the user a TokTagger admin, add the user to the group `toktagger-admins`.
+
+The user can now sign in to TokTagger.
+
+---
+
+## Use Keycloak or Another Identity Provider
+
+To use an identity provider, add an `[auth]` section to the `toktagger.toml` file in your working directory. Set `provider` to `oidc` and give TokTagger the details of your provider:
+
+```toml
+# toktagger.toml
+[auth]
+provider = "oidc"
+issuer_url = "https://auth.example.com/realms/toktagger"
+client_id = "toktagger"
+client_secret = "<client secret>"
+public_url = "https://toktagger.example.com"
+roles_claim = "groups"
+admin_group = "toktagger-admins"
+```
+
+In the identity provider, create a **confidential** client for TokTagger. Use this checklist:
+
+1. **Flow:** Enable the authorization code flow with PKCE (method `S256`) and refresh tokens. Disable the other flows. TokTagger uses the refresh token to read the groups of the user again during the session.
+2. **Redirect URI:** Set `<public_url>/auth/callback`.
+3. **Sign-out redirect URI:** Set `<public_url>/ui/login`.
+4. **Groups claim:** Add a mapper that puts the groups of the user in the userinfo. Set `roles_claim` to the name of the claim. For a nested claim, use a dotted path, for example `realm_access.roles`. During a session, TokTagger reads the groups from the userinfo only.
+5. **Admin group:** Create the group named in `admin_group`. Add the TokTagger admins to it. TokTagger removes a leading `/` from group names.
+6. **Audience:** Add the client ID to the audience of access tokens. TokTagger needs this to accept access tokens from scripts.
+
+!!! note
+    TokTagger must reach the provider at the issuer URL, and the issuer in the provider metadata must match the URL the browser uses. If the two differ, set the provider hostname options. The Keycloak development stack in `docker-compose.dev.yml` shows how to do this.
+
+### Keycloak development stack
+
+`docker-compose.dev.yml` starts Keycloak with a ready realm from `deploy/keycloak/toktagger-realm.dev.json`. The realm contains:
+
+- the client `toktagger`, with PKCE and the group and audience mappers
+- the group `toktagger-admins`
+- one user `admin` with the temporary password `admin`, who is a member of `toktagger-admins`
+
+Start the stack:
+
+```sh
+docker compose -f docker-compose.dev.yml up
+```
+
+Open `http://localhost:5173` or `http://localhost:8002` and sign in as `admin`. Keycloak asks for a new password. The Keycloak administration console is at `http://localhost:8003` (user `admin`, password `admin`).
+
+Set `KEYCLOAK_CLIENT_SECRET` in your environment to replace the default development client secret.
 
 !!! warning
-    This is an insecure default password. TokTagger holds this account on the **Profile** page at first login until you set a new password. The server refuses every other request from the account until then, so you cannot work around the prompt. This applies to every account, admin accounts included.
+    The development stack uses fixed passwords and plain HTTP. Do not use it for a shared server.
 
 ---
 
 ## Signing In
 
-Navigate to `http://<host>:<port>/ui/login` (or the root URL, which redirects there automatically). Enter your username and password to sign in.
+Open `http://<host>:<port>/ui/login` (or the root URL). Click **Sign in**. The identity provider shows its sign-in page. After you sign in, you return to TokTagger.
+
+TokTagger creates its own record for a user at the first sign-in. The record contains the user name, the email address and the display name. TokTagger takes the user name from the identity provider claim `preferred_username`. If that name is already in use, TokTagger adds a number. TokTagger never changes a user name after the first sign-in, because annotations store it.
+
+!!! note
+    A user does not appear in the TokTagger user list or in the project member list until the first sign-in.
+
+To sign out, use **Sign out** in TokTagger. TokTagger then opens the sign-out page of the identity provider.
 
 ---
 
 ## Admin Panel
 
-The admin panel is accessible from the **Admin Panel** button on the Projects page (visible to admin users only).
+The admin panel is on the **Admin Panel** button on the Projects page. Only admin users see it.
 
 ### Viewing Users
 
-The panel lists all registered accounts with their username, role, and active status.
+The panel lists all users that signed in at least one time. It shows the user name, the email address, the global role and the active status.
 
-### Creating a User
+TokTagger shows the global role as read-only. Change it in the identity provider.
 
-1. Click **Add User**.
-2. Fill in **Username** and **Password**.
-3. Select a **Role** (`user` or `admin`).
-4. Click **Create**.
+### Deactivating and Reactivating a User
 
-!!! warning
-    You set the initial password. Give it to the new user through a secure channel. Do not send it by email or chat. TokTagger asks the new user to change the password at their next login.
-
-### Resetting a User's Password
-
-1. Find the user in the table and click **Reset Password**.
-2. Type a new password.
-3. Click **Reset**.
-
-TokTagger asks the user to change this password at their next login. Give the new password to the user through a secure channel.
-
-### Changing a User's Role
-
-1. Find the user in the table and click **Edit**.
-2. Select the new **Global Role**.
-3. Click **Save**.
-
-!!! note
-    TokTagger prevents demoting or deactivating the last remaining active admin account to avoid an unrecoverable lockout.
-
-### Deactivating / Reactivating a User
-
-Click **Deactivate** (or **Activate**) next to the user. Deactivated accounts cannot sign in but their annotations are preserved. You cannot deactivate your own account.
+Click **Deactivate** (or **Activate**) next to the user. A deactivated user cannot use TokTagger. The identity provider cannot override this setting. TokTagger keeps the annotations of the user. You cannot deactivate your own account. You cannot deactivate the last active admin.
 
 ### Deleting a User
 
-Click **Delete** next to the user and confirm. This is permanent. You cannot delete your own account.
+Click **Delete** next to the user and confirm. This deletes the TokTagger record and the project memberships of the user. It does not delete the account in the identity provider. The user can sign in again and TokTagger creates a new record. You cannot delete the last active admin.
 
 ---
 
 ## Profile Page
 
-Any signed-in user can update their own profile. Click **Profile** from the Projects page.
-
-### Changing Password
-
-1. Enter a new password in **New password** (minimum 8 characters).
-2. Confirm it in **Confirm new password**.
-3. Click **Change Password**.
-
-Each field has a button that shows or hides the characters you type, as on the sign-in page.
-
-If TokTagger asks you to change your password, it keeps you on this page until you do.
+Each signed-in user can open **Profile** from the Projects page. The page shows the user name, the email address and the display name.
 
 ---
 
 ## Project Membership
 
-Access to a project is controlled per-project. From the project's Samples page, an admin can click **Members** to add or remove users.
+Access to a project is set for each project. On the project Samples page, an admin clicks **Members** to add or remove users.
 
-Only members (and admins) can view samples and submit annotations for a given project. If you open the URL of a project you are not a member of, the page shows a **403 - Forbidden** message. Ask a project admin to add you as a member.
+Only members and admins can view samples and submit annotations. If you open the URL of a project you are not a member of, the page shows **403 - Forbidden**. Ask a project admin to add you.
 
 ---
 
-## Scripted User & Project Setup
+## Scripts
 
-For automated deployments, the helper script `scripts/setup.py` can create projects and samples via the API using token-based auth:
+A script can call the API with a Bearer token. Send the token in the header `Authorization: Bearer <token>`. TokTagger then uses the same rules as for a browser user.
+
+### Personal API tokens
+
+Use a personal API token for scripts. To create a token:
+
+1. Sign in to TokTagger.
+2. Open **Profile** from the Projects page.
+3. In **API tokens**, enter a name for the token and select when the token expires.
+4. Click **Create token**.
+5. Copy the token. TokTagger shows the token one time only.
+
+A token has the same access as your account. Keep it secret. If a person gets your token, revoke it immediately: click the **Revoke** button next to the token.
+
+A token stops working when:
+
+- it expires
+- you revoke it
+- an admin deactivates or deletes your account.
+
+You cannot use an API token to create or revoke API tokens. Use a browser session for this.
+
+The longest lifetime of a token is `auth.api_token_max_lifetime_days` (default 365 days).
+
+The scripts `scripts/setup.py` and `scripts/create_mock_data.py` read the token from the environment variable `TOKTAGGER_API_TOKEN`:
 
 ```sh
-python scripts/setup.py \
-  --url http://localhost:8002 \
-  --username admin \
-  --password <password>
+export TOKTAGGER_API_TOKEN=<API token>
+python scripts/setup.py
 ```
 
-The script authenticates, obtains a JWT token, and creates projects and sample sets using the REST API. You can adapt it to pre-create user accounts with the `POST /users` endpoint:
+### Identity provider access tokens
 
-```python
-import requests
-
-token = get_token(base_url, "admin", admin_password)
-requests.post(
-    f"{base_url}/users",
-    json={"username": "alice", "password": "s3cr3t", "global_role": "user"},
-    headers={"Authorization": f"Bearer {token}"},
-)
-```
+A script can also send an access token of the identity provider. TokTagger checks the signature, the issuer, the expiry and the audience of the token. The identity provider must let the script get an access token. The default TokTagger clients in Canaille and in the Keycloak development realm do not do this.
 
 ---
 
 ## Multi-User Deployment
 
-For team use, run the API under **Gunicorn** so multiple requests can be served concurrently:
+For team use, run the API under **Gunicorn**. Then the server can serve many requests at the same time:
 
 ```sh
 # Command-line (installed package)
 toktagger --workers 4 --host 0.0.0.0 --port 8002
-
-# Direct Gunicorn invocation
-gunicorn toktagger.api.asgi:app \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --workers 4 \
-    --bind 0.0.0.0:8002
 ```
 
-With Docker Compose the `SERVER_WORKERS` variable controls the worker count (default 4 in production, 1 in dev):
+Use the `toktagger` command or `python -m toktagger.api.run` for Gunicorn. These commands start the identity provider and the shared services one time, before the workers start. Do not start `toktagger.api.asgi:app` directly with `auth.provider = "canaille"`.
 
-```sh
-SERVER_WORKERS=8 docker compose up
-```
+Set `AUTH_SECRET_KEY` so that all workers sign sessions with the same key.
 
-A single Uvicorn worker (the default for `toktagger` without `--workers`) is sufficient for personal/local use but will serialise all requests, so concurrent annotators will experience latency under load.
+!!! warning
+    By default, the Canaille server listens on `127.0.0.1:8003`, so only the computer that runs TokTagger can reach it. Remote users cannot sign in until you make Canaille reachable.
+
+    Canaille also serves the admin pages. A person who knows the Canaille admin password can reset the password of any user. That person can also add themselves to the `toktagger-admins` group and become a global administrator of TokTagger.
+
+    To let remote users sign in:
+
+    1. Use a long, random Canaille admin password. Set `auth.canaille_bootstrap_password` before the first start.
+    2. Put a reverse proxy in front of Canaille. Allow only the sign-in paths from the network (see the paths below). Set `auth.canaille_public_url` to the proxy address.
+    3. Only if you cannot use a proxy, set `auth.canaille_bind_host = "0.0.0.0"` and `auth.canaille_public_url` to the address of your server. The admin pages are then open to the network.
+
+    For step 2, the proxy must allow these paths for sign-in:
+
+    - `/login`, `/logout`, `/auth/`, `/firstlogin/` and `/reset`
+    - `/oauth/`, but not `/oauth/register`
+    - `/.well-known/`
+    - `/consent/` and `/static/`
+
+    Block all other paths, for example `/users`, `/groups/`, `/profile`, `/admin/`, `/impersonate/` and `/scim/`. Then user management and password changes are possible only on the local computer, at `http://localhost:8003`. Test the sign-in flow after you set up the proxy.
+
+A single Uvicorn worker (the default) is enough for personal use. It handles one request at a time, so many annotators will see delays.

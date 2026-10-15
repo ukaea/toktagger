@@ -13,8 +13,10 @@ from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
 
 from tests import db_definitions, endpoints
+from tests.identity import get_auth_token, session_cookies, session_headers
 from toktagger.api import config
-from toktagger.api.auth.core import create_access_token
+from toktagger.api.auth.canaille import ManagedCanaille, managed_idp
+from toktagger.api.auth.cookies import CSRF_COOKIE_NAME
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.main import Server
 import toktagger.api.auth.core as auth_core
@@ -69,6 +71,9 @@ else:
         raise pytest.UsageError(_error_msg)
 
 
+E2E_ADMIN_PASSWORD = "e2e-admin-password-1"
+
+
 @pytest.fixture(scope="session")
 def uda_env_vars():
     os.environ.setdefault("UDA_HOST", "uda2.mast.l")
@@ -101,6 +106,7 @@ def settings():
             server=config.Server(cache_dir=tempd),
             models=config.Models(cache_dir=models_dir, max_actors=1),
             database=config.Database(mongo_url="./toktagger_test_db"),
+            auth=config.Auth(canaille_bootstrap_password=E2E_ADMIN_PASSWORD),
             uda=config.UDA(),
             sal=config.SAL(),
         )
@@ -122,6 +128,8 @@ async def db_client(settings):
     await db_client.delete_filtered_documents("models")
     await db_client.delete_filtered_documents("users")
     await db_client.delete_filtered_documents("project_members")
+    await db_client.db["sessions"].delete_many({})
+    await db_client.db["api_tokens"].delete_many({})
     await db_client.client.close()
 
 
@@ -129,6 +137,7 @@ async def db_client(settings):
 async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
     monkeypatch.setattr(config.settings.server, "cache_dir", tmp_path)
     monkeypatch.setattr(auth_core, "_serializer", None)
+    monkeypatch.setattr(auth_core, "_fernet", None)
 
     server = Server()
     server.testing_mode = True
@@ -137,6 +146,7 @@ async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
     app = server.app
     app.state.db_client = db_client
     app.state.project = None
+    app.state.idp = None
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -150,8 +160,7 @@ async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
 async def api_client(unauthenticated_api_client, db_client):
     # Auth is always required now — seed the admin user and authenticate as them
     await db_client.insert("users", db_definitions.USER_ADMIN)
-    admin_token = create_access_token({"sub": "admin"})
-    unauthenticated_api_client.headers["Authorization"] = f"Bearer {admin_token}"
+    unauthenticated_api_client.headers.update(session_headers(get_auth_token("admin")))
     yield unauthenticated_api_client
 
 
@@ -295,7 +304,22 @@ def run_server():
 
 
 @pytest.fixture(scope="package")
-def start_server(settings):
+def identity_provider(settings) -> ManagedCanaille:
+    """The managed Canaille server the end-to-end TokTagger server signs users in with.
+
+    Started before the TokTagger server forks, so the child inherits the provider
+    settings that managed_idp exports.
+    """
+    # On macOS, a proxy lookup in a forked child crashes when the parent has made one
+    os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
+    with managed_idp() as idp:
+        assert idp is not None
+        endpoints.set_identity_provider(idp)
+        yield idp
+
+
+@pytest.fixture(scope="package")
+def start_server(settings, identity_provider):
     # Explicit "fork" context (not just multiprocessing.Process, which defaults
     # to "spawn" on macOS since Python 3.8): "spawn" re-imports this module in
     # a fresh interpreter, so run_server() never sees the settings fixture's
@@ -340,63 +364,24 @@ def start_server(settings):
 
 
 @pytest.fixture(scope="package")
-def admin_token(start_server) -> str:
-    """Log in as the bootstrap admin (created by ensure_admin_user on first
-    server start, see toktagger/api/auth/first_run.py) and authenticate all
-    tests.endpoints.* requests as them for the rest of this server's lifetime.
+def admin_cookies(start_server) -> dict[str, str]:
+    """The admin's TokTagger session cookies, for seeding browser contexts.
+
+    Signs in through the managed Canaille login, as a user would. The admin belongs to
+    the admin group there, so TokTagger makes this a global admin.
     """
-    response = requests.post(
-        "http://localhost:8002/auth/token",
-        data={"username": "admin", "password": "admin1234"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert response.status_code == 200, response.text
-    token = response.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # The bootstrap admin ships with must_change_password set, so a real first login
-    # is held until the default password is replaced. Clear it here so this session
-    # behaves like any other logged-in admin — the same opt-out
-    # tests.endpoints.create_user applies to the accounts it creates. The forced
-    # change itself is covered in tests/end_to_end/test_profile_page.py and
-    # tests/api/auth/test_first_run.py.
-    response = requests.get("http://localhost:8002/auth/me", headers=headers)
-    assert response.status_code == 200, response.text
-    admin_id = response.json()["_id"]
-    response = requests.put(
-        f"http://localhost:8002/users/{admin_id}",
-        # Re-sends the same password because clearing your own flag requires one; the
-        # rest of the suite keeps logging in as admin/admin1234.
-        json={"password": "admin1234", "must_change_password": False},
-        headers=headers,
-    )
-    assert response.status_code == 200, response.text
-
-    endpoints.set_auth_token(token)
-    return token
+    return session_cookies("admin", E2E_ADMIN_PASSWORD)
 
 
 @pytest.fixture(scope="package")
-def admin_cookies(admin_token) -> dict[str, str]:
-    """The bootstrap admin's session cookies, for seeding browser contexts.
-
-    The browser authenticates by cookie, and the httpOnly session cookie cannot be
-    rebuilt from the token string, so log in again and keep what the server set.
-    Depends on admin_token so must_change_password is already cleared and the seeded
-    session doesn't get held on the profile page.
-    """
-    session = requests.Session()
-    response = session.post(
-        "http://localhost:8002/auth/token",
-        data={"username": "admin", "password": "admin1234"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    assert response.status_code == 200, response.text
-    return dict(session.cookies)
+def admin_token(admin_cookies) -> str:
+    """The admin's session token; also signs tests.endpoints.* requests in as the admin."""
+    endpoints.set_session(admin_cookies)
+    return admin_cookies[config.settings.auth.cookie_name]
 
 
 @pytest.fixture(scope="function")
-def server_setup(start_server, admin_token):
+def server_setup(start_server, admin_cookies, admin_token):
     yield
     response = requests.get(
         "http://localhost:8002/health",
@@ -406,6 +391,7 @@ def server_setup(start_server, admin_token):
     else:
         response = requests.delete(
             "http://localhost:8002/projects",
-            headers={"Authorization": f"Bearer {admin_token}"},
+            cookies=admin_cookies,
+            headers={"X-CSRF-Token": admin_cookies[CSRF_COOKIE_NAME]},
         )
         assert response.status_code == 200

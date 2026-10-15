@@ -294,7 +294,7 @@ export async function saveSampleAnnotations(
   sample_id: string,
   annotations: Annotation[],
   saveOnNavigate: boolean = true,
-  username?: string,
+  userId?: string,
 ) {
   if (!saveOnNavigate) {
     return;
@@ -303,7 +303,7 @@ export async function saveSampleAnnotations(
   const updatedAnnotations = annotations.map((annotation: Annotation) => ({
     ...annotation,
     validated:
-      !annotation._id || annotation.created_by === username
+      !annotation._id || annotation.created_by === userId
         ? true
         : annotation.validated,
   }));
@@ -353,11 +353,11 @@ export async function deleteSampleAnnotations(
 // "manual" is the placeholder created_by used until the auth context resolves.
 export function isOwnAnnotation(
   annotation: Annotation,
-  username: string | undefined,
+  userId: string | undefined,
 ): boolean {
   return (
     annotation._id === null ||
-    annotation.created_by === username ||
+    annotation.created_by === userId ||
     annotation.created_by === "manual"
   );
 }
@@ -366,7 +366,7 @@ export function isOwnAnnotation(
 export function othersHaveUnsavedEdits(
   annotations: Annotation[],
   serverAnnotations: Annotation[],
-  username: string | undefined,
+  userId: string | undefined,
 ): boolean {
   // afterSave marks local annotations validated, so ignore it. Keys are sorted before stringifying since the two annotations are built
   // through different code paths (a fresh fetch vs. round-tripped through the drawing
@@ -378,11 +378,11 @@ export function othersHaveUnsavedEdits(
     );
   const local = new Map(
     annotations
-      .filter((annotation) => !isOwnAnnotation(annotation, username))
+      .filter((annotation) => !isOwnAnnotation(annotation, userId))
       .map((annotation) => [annotation._id, signature(annotation)]),
   );
   return serverAnnotations
-    .filter((annotation) => !isOwnAnnotation(annotation, username))
+    .filter((annotation) => !isOwnAnnotation(annotation, userId))
     .some((annotation) => local.get(annotation._id) !== signature(annotation));
 }
 
@@ -391,7 +391,7 @@ export function othersHaveUnsavedEdits(
 export function removedAnnotationIds(
   serverAnnotations: Annotation[],
   keptAnnotations: Annotation[],
-  username: string | undefined,
+  userId: string | undefined,
 ): string[] {
   const keptIds = new Set(
     keptAnnotations.map((annotation) => annotation._id).filter(Boolean),
@@ -401,7 +401,7 @@ export function removedAnnotationIds(
       (annotation) =>
         annotation._id !== null &&
         !keptIds.has(annotation._id) &&
-        annotation.created_by !== username,
+        annotation.created_by !== userId,
     )
     .map((annotation) => annotation._id as string);
 }

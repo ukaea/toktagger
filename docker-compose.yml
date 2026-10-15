@@ -1,64 +1,115 @@
-version: '3.8'
-
 services:
-  mongo:
-    image: mongo:4.4.6
-    container_name: mongo
-    restart: always
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "80:80"
+      - "443:443"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      TOKTAGGER_HOST: ${TOKTAGGER_HOST:?}
+      KEYCLOAK_HOST: ${KEYCLOAK_HOST:?}
     volumes:
-      - mongodb_data:/tmp/db
-    networks:
-      - app-network
-
-  mongo-express:
-    image: mongo-express:latest
-    container_name: mongo_express
-    restart: always
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
-      - mongo
-    environment:
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017
-    ports:
-      - "8081:8081"
-    networks:
-      - app-network
+      - api
+      - keycloak
 
   api:
     build:
-      context: ./
-      dockerfile: ./api.dockerfile
-    container_name: api_app
-    restart: always
-    ports:
-      - "8002:8002"
+      context: .
+      target: production
+      args:
+        EXTRAS: ${TOKTAGGER_EXTRAS:-}
+    image: toktagger:latest
+    restart: unless-stopped
     depends_on:
-      - mongo
-    volumes:
-      - ./data/:/app/data
-      - ./toktagger:/app/toktagger
-      - ${CUSTOM_SCRIPT:-./toktagger/api/run.py}:/app/run.py
-      - ~/.sal/:/root/.sal
+      mongo:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
     environment:
-      DATABASE_MONGO_URL: "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017"
-      MODELS_CACHE_DIR: "/app/data/models"
-      SERVER_HOST: api_app
-      SERVER_PORT: 8002
-      SERVER_WORKERS: "${SERVER_WORKERS:-4}"
-    working_dir: /app
-    command: ["python", "run.py"]
-    networks:
-      - app-network
+      DATABASE_MONGO_URL: mongodb://${MONGO_USERNAME:-toktagger}:${MONGO_PASSWORD:?}@mongo:27017
+      SERVER_WORKERS: ${SERVER_WORKERS:-4}
+      SERVER_FORWARDED_ALLOW_IPS: "*"
+      AUTH_PROVIDER: oidc
+      AUTH_ISSUER_URL: http://keycloak:8080/realms/toktagger
+      AUTH_CLIENT_ID: toktagger
+      AUTH_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?}
+      AUTH_PUBLIC_URL: https://${TOKTAGGER_HOST:?}
+    volumes:
+      - toktagger_data:/data
 
-networks:
-  app-network:
-    driver: bridge
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-toktagger}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?}
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    restart: unless-stopped
+    command: ["start", "--import-realm"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?}
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KC_HOSTNAME: https://${KEYCLOAK_HOST:?}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?}
+      TOKTAGGER_PUBLIC_URL: https://${TOKTAGGER_HOST:?}
+    volumes:
+      - ./deploy/keycloak/toktagger-realm.json:/opt/keycloak/data/import/toktagger-realm.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/localhost/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  mongodb_data:
+  caddy_data:
+  caddy_config:
+  toktagger_data:
+  mongo_data:
+  postgres_data:

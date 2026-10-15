@@ -415,8 +415,11 @@ async def test_import_annotations(api_client, setup_db, db_client):
     db_annotations = await db_client.get_filtered_documents(
         "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_2"])}
     )
+    (admin,) = await db_client.get_filtered_documents(
+        "users", filters={"username": "admin"}
+    )
     imported_annotations = [
-        ann for ann in db_annotations if ann["created_by"] == "admin"
+        ann for ann in db_annotations if ann["created_by"] == str(admin["_id"])
     ]
     assert len(imported_annotations) == 2
 

@@ -1,0 +1,7 @@
+{$TOKTAGGER_HOST} {
+	reverse_proxy api:8002
+}
+
+{$KEYCLOAK_HOST} {
+	reverse_proxy keycloak:8080
+}

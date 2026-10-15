@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
 
 from toktagger.api.auth.dependencies import (
-    require_password_changed,
+    get_current_user,
     require_project_admin_role,
     require_project_annotator,
     require_project_viewer,
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/projects/{project_id}/samples",
     tags=["Samples"],
-    dependencies=[Depends(require_password_changed)],
+    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -126,7 +126,7 @@ async def add_samples(
             if not is_internal and not (annotation.created_by or "").startswith(
                 RESERVED_CREATED_BY_PREFIXES
             ):
-                annotation.created_by = current_user.username
+                annotation.created_by = current_user.id
 
     # Insert new samples
     ids = await request.app.state.db_client.insert_many(

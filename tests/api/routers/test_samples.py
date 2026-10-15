@@ -304,7 +304,10 @@ async def test_create_samples_attributes_annotations_to_caller(
     by_time = {
         annotation["time"]: annotation["created_by"] for annotation in annotations
     }
-    assert by_time == {1.0: "admin", 2.0: "model::mock_disruption_cnn"}
+    (admin,) = await db_client.get_filtered_documents(
+        "users", filters={"username": "admin"}
+    )
+    assert by_time == {1.0: str(admin["_id"]), 2.0: "model::mock_disruption_cnn"}
 
 
 @pytest.mark.asyncio

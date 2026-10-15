@@ -35,6 +35,18 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check toktagger tests --ignore=C901 && uv run ruff format --check toktagger tests
 
+  compose:
+    name: Compose Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Smoke test the production stack
+        run: ./scripts/compose_smoke_test.sh
+
   eslint:
     name: ESLint
     runs-on: ubuntu-latest

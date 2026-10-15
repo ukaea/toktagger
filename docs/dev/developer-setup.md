@@ -77,16 +77,23 @@ This will run vite build and create a production-ready version of the applicatio
 
 ## Session lifetime
 
-A session stays valid for 24 hours. When a request arrives with a session cookie that is
-more than 12 hours old, the server sends a new cookie with a full 24-hour window. An
-active user thus stays signed in, but an idle session ends 24 hours after the last
-request. Only cookie sessions get a new window. A caller that sends a bearer token keeps
-the token it holds.
+At sign-in, the server keeps the refresh token and the ID token of the identity provider
+in the `sessions` collection. The session cookie holds only the session ID and the CSRF
+token. When a request arrives with a session cookie that is older than
+`auth.session_refresh_seconds`, the server uses the refresh token to get the userinfo
+from the provider again. Then it updates the user and sends a new cookie. A lock keeps
+two requests from using the same refresh token, because the provider can revoke a used
+refresh token.
+
+- If the provider refuses the refresh token, the server removes the session and sends 401.
+- If the provider cannot be reached, the server sends 503 and keeps the session.
+- A session with no requests ends after `auth.session_idle_timeout_seconds`.
+- A caller that sends a bearer token keeps the token it holds and gets no cookie.
 
 ## Authenticating against the API docs
 
 The browser sends its session in an httpOnly cookie, and requests that change data must
 also carry a matching `X-CSRF-Token` header. The Swagger UI at `/docs` does not send that
 header, so a `POST`, `PUT` or `DELETE` tried from there while you are signed in to the SPA
-is rejected with a 403. Click **Authorize** in Swagger first and it sends a bearer token
-instead, which needs no CSRF header.
+is rejected with a 403. Click **Authorize** in Swagger first and paste an access token from
+the identity provider. Swagger then sends it as a bearer token, which needs no CSRF header.

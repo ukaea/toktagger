@@ -66,8 +66,8 @@ export function ShotLabels({
             type: "class_label",
             label: item.name,
             // Authored by whoever selected the label; the server stamps the same
-            // username on save.
-            created_by: user?.username ?? "manual",
+            // user ID on save.
+            created_by: user?._id ?? "manual",
           } as ClassLabel);
         });
         return newAnnotations;

@@ -12,7 +12,7 @@ import {
   Flex,
 } from "@adobe/react-spectrum";
 import { useTimeSeriesState } from "@/app/contexts/TimeSeriesContext";
-import { displayCreatedBy } from "@/app/components/annotators/types";
+import { displayCreatedBy } from "@/types";
 
 interface MarkerProps {
   color: string;
@@ -76,7 +76,7 @@ interface TableEntry {
   id: string;
   category: TimeSeriesCategory;
   data: string;
-  created_by: string;
+  author: string;
   marker: ComponentType<MarkerProps>;
 }
 
@@ -131,7 +131,7 @@ export const AnnotationsTable = () => {
         id: annotation.id,
         category,
         data,
-        created_by: annotation.created_by,
+        author: displayCreatedBy(annotation),
         marker: MARKER_ICONS[annotation.type],
       });
     });
@@ -176,7 +176,7 @@ export const AnnotationsTable = () => {
               </Cell>
               <Cell>{item.category.type}</Cell>
               <Cell>{item.data}</Cell>
-              <Cell>{displayCreatedBy(item.created_by)}</Cell>
+              <Cell>{item.author}</Cell>
             </Row>
           )}
         </TableBody>

@@ -1,3 +1,4 @@
+import time
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
@@ -7,14 +8,15 @@ from bson import ObjectId
 from fastapi import HTTPException
 from pydantic import TypeAdapter
 
-from toktagger.api.auth.core import hash_password
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
 from toktagger.api.schemas.annotations import (
+    RESERVED_CREATED_BY_PREFIXES,
     AnnotationBatchTypes,
     AnnotationOutTypeAdapter,
     AnnotationOutTypes,
 )
+from toktagger.api.schemas.auth import ApiTokenOut
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.schemas.projects import (
     Project,
@@ -25,6 +27,7 @@ from toktagger.api.schemas.projects import (
 )
 from toktagger.api.schemas.samples import FileData, Sample, SampleSummary, SampleUpdate
 from toktagger.api.schemas.users import (
+    UserBase,
     UserIn,
     UserOut,
     UserUpdate,
@@ -377,6 +380,34 @@ async def get_annotations(
     return [AnnotationOutTypeAdapter.validate_python(a) for a in annotations]
 
 
+async def add_author_names(
+    db_client: MongoDBClient, annotations: list[AnnotationOutTypes]
+) -> list[AnnotationOutTypes]:
+    """Set created_by_name on each annotation from its created_by value.
+
+    A user ID resolves to that user's username and a model:: or annotators:: value to
+    the name after the prefix. A user ID with no user (a deleted account) keeps a None
+    name and sets created_by_deleted, and any other legacy value, such as "manual", is
+    shown as it is.
+    """
+    user_ids = {
+        annotation.created_by
+        for annotation in annotations
+        if annotation.created_by and ObjectId.is_valid(annotation.created_by)
+    }
+    usernames = await get_usernames_by_ids(db_client, user_ids)
+    for annotation in annotations:
+        author = annotation.created_by or ""
+        if author.startswith(RESERVED_CREATED_BY_PREFIXES):
+            annotation.created_by_name = author.split("::", 1)[1]
+        elif ObjectId.is_valid(author):
+            annotation.created_by_name = usernames.get(author)
+            annotation.created_by_deleted = author not in usernames
+        else:
+            annotation.created_by_name = author or None
+    return annotations
+
+
 async def get_annotation_authors(
     db_client: MongoDBClient, project_id: str, sample_id: str
 ) -> dict[str, str]:
@@ -655,16 +686,45 @@ async def get_user_by_username(
     return UserOut.model_validate(docs[0]) if docs else None
 
 
-async def get_user_doc_by_username(
-    db_client: MongoDBClient, username: str
-) -> dict | None:
-    """Return the raw user document, including fields UserOut omits (e.g.
-    hashed_password). Use this only where those fields are required, such as
-    password verification during login."""
+async def get_usernames_by_ids(
+    db_client: MongoDBClient, user_ids: Iterable[str]
+) -> dict[str, str]:
+    """Map each user ID that still exists to its username, in one query."""
+    object_ids = [ObjectId(user_id) for user_id in user_ids]
+    if not object_ids:
+        return {}
     docs = await db_client.get_filtered_documents(
-        "users", filters={"username": username}
+        "users", filters={"_id": {"$in": object_ids}}
     )
-    return docs[0] if docs else None
+    return {str(doc["_id"]): doc["username"] for doc in docs}
+
+
+async def get_user_by_oidc_identity(
+    db_client: MongoDBClient, issuer: str, sub: str
+) -> UserOut | None:
+    docs = await db_client.get_filtered_documents(
+        "users", filters={"oidc_issuer": issuer, "oidc_sub": sub}
+    )
+    return UserOut.model_validate(docs[0]) if docs else None
+
+
+async def sync_user_from_idp(
+    db_client: MongoDBClient,
+    user_id: str,
+    global_role: Literal["admin", "user"],
+    email: str | None,
+    display_name: str | None,
+) -> UserOut:
+    obj_id = convert_to_objectid(user_id, "users")
+    await db_client.update(
+        "users",
+        UserBase(global_role=global_role, email=email, display_name=display_name),
+        obj_id,
+    )
+    user = await get_user_by_id(db_client, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 async def get_user_by_id(db_client: MongoDBClient, user_id: str) -> UserOut | None:
@@ -676,6 +736,19 @@ async def get_user_by_id(db_client: MongoDBClient, user_id: str) -> UserOut | No
 async def get_all_users(db_client: MongoDBClient) -> list[UserOut]:
     docs = await db_client.get_all_documents("users")
     return [UserOut.model_validate(d) for d in docs]
+
+
+async def get_api_tokens(db_client: MongoDBClient, user_id: str) -> list[ApiTokenOut]:
+    await db_client.delete_filtered_documents(
+        "api_tokens", {"expires_at": {"$lt": time.time()}}
+    )
+    docs = await db_client.get_filtered_documents(
+        "api_tokens",
+        {"user_id": convert_to_objectid(user_id, "users")},
+        sort_by="created_at",
+        sort_direction="descending",
+    )
+    return [ApiTokenOut.model_validate({**d, "_id": str(d["_id"])}) for d in docs]
 
 
 async def create_user(db_client: MongoDBClient, user: UserIn) -> str:
@@ -693,10 +766,7 @@ async def update_user(
     user = await get_user_by_id(db_client, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    update_dict = updates.model_dump(exclude_none=True)
-    if "password" in update_dict:
-        update_dict["hashed_password"] = hash_password(update_dict.pop("password"))
-    await db_client.db["users"].update_one({"_id": obj_id}, {"$set": update_dict})
+    await db_client.update("users", updates, obj_id)
 
 
 async def delete_user(db_client: MongoDBClient, user_id: str) -> None:

@@ -369,6 +369,12 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     );
 
     const blockContextMenu = (event: MouseEvent) => {
+      // macOS fires contextmenu on Ctrl+primary click, which is the draw gesture here.
+      if (event.button === 0 && event.ctrlKey) {
+        event.preventDefault();
+        return;
+      }
+
       const annotation = hideAnnotations
         ? null
         : findAnnotationAtPointer(api, event);

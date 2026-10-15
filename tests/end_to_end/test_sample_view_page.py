@@ -485,7 +485,7 @@ def test_save_button(server_setup, page: Page, num_annotations: int):
     # annotators::peak_detection annotation (num_annotations >= 1) isn't the
     # admin's to touch, so saving must leave it as it was.
     for annotation in annotations:
-        if annotation["created_by"] == "admin":
+        if annotation["created_by_name"] == "admin":
             assert annotation["validated"]
         else:
             assert not annotation["validated"]
@@ -554,7 +554,7 @@ def test_save_on_navigate(
     # annotators::peak_detection annotation (num_annotations >= 1) isn't the
     # admin's to touch, so it's never validated regardless of save_on_navigate.
     for annotation in annotations:
-        if annotation["created_by"] == "admin":
+        if annotation["created_by_name"] == "admin":
             assert annotation["validated"] == bool(save_on_navigate)
         else:
             assert not annotation["validated"]
@@ -583,6 +583,11 @@ def test_new_annotation_is_attributed_to_signed_in_user(server_setup, page: Page
     annotations_table = page.get_by_role("grid", name="Annotations table")
     expect(annotations_table.get_by_role("gridcell", name="admin")).to_have_count(1)
     expect(annotations_table.get_by_role("gridcell", name="manual")).to_have_count(0)
+    expect(
+        annotations_table.get_by_role(
+            "gridcell", name="peak_detection (annotator)", exact=True
+        )
+    ).to_have_count(1)
 
 
 def test_deleting_another_authors_annotation_is_saved(server_setup, page: Page):

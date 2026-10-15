@@ -27,6 +27,7 @@ import {
 } from "@/app/contexts/VideoContext";
 import { useParams } from "react-router-dom";
 
+import { displayCreatedBy } from "@/types";
 import { AnnotationPopup } from "@/app/video/components/annotation-popup";
 
 function FrameLabelBadges() {
@@ -75,7 +76,7 @@ function FrameLabelBadges() {
                   className={frameLabel.label}
                   trackId={frameLabel.track_id}
                   heading="Frame label"
-                  details={`Frame ${frame} · ${frameLabel.created_by}`}
+                  details={`Frame ${frame} · ${displayCreatedBy(frameLabel)}`}
                   deleteDisabled={!editMode}
                   onDeleteBox={() => {
                     setSelectedBadgeKey(null);

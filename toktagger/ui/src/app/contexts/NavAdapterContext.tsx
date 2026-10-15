@@ -40,7 +40,7 @@ export function useSyncRemovals(): () => Promise<void> {
     const removed = removedAnnotationIds(
       serverAnnotations,
       annotations,
-      user?.username,
+      user?._id,
     );
     if (removed.length === 0) return;
     await deleteAnnotationsByIds(project._id, sample._id, removed);
@@ -89,7 +89,7 @@ export function useNavAdapter(): NavAdapter {
 
       // "manual" is the placeholder created_by used until the auth context resolves.
       const isOthers = (annotation: Annotation) =>
-        annotation.created_by !== user?.username &&
+        annotation.created_by !== user?._id &&
         annotation.created_by !== "manual";
 
       const ownIds = serverAnnotations
