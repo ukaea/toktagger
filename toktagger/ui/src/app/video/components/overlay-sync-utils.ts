@@ -1,3 +1,7 @@
+/**
+ * Helpers for working with Annotorious: compare overlays by content, replace an overlay,
+ * keep shapes inside the image and find the shape under the pointer.
+ */
 import {
   boundsFromPoints,
   type AnnotoriousOpenSeadragonAnnotator,
@@ -112,10 +116,7 @@ export function setViewerCursor(viewerElement: HTMLElement, cursor: string) {
   });
 }
 
-/**
- * Stable signature for comparing overlays by content (not by reference).
- * Used to avoid feedback loops when we programmatically call `setAnnotations`.
- */
+/** A content fingerprint of one shape. Overlays are compared this way because IDs change on every conversion. */
 function annoSig(a: ImageAnnotation): string {
   const sel = a.target.selector;
   const source = getTargetSource(a);
@@ -330,6 +331,7 @@ function withPolygonGeometry(
   };
 }
 
+/** Clamps every shape to the image. Shapes with no area left inside it are dropped. */
 export function clampOverlayToNaturalImage(
   list: ImageAnnotation[],
   natural: { w: number; h: number } | null,

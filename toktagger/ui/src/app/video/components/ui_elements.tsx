@@ -1,5 +1,6 @@
-"use client";
-
+/**
+ * Two small UI pieces with no session logic: the Class Label picker and the "Frame N" jump field.
+ */
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -10,18 +11,12 @@ import {
   View,
 } from "@adobe/react-spectrum";
 
-/**
- * Minimal class category shape consumed by the class picker.
- * Kept intentionally small so this file stays UI-only and decoupled from session/types.
- */
+/** One option in the class picker. */
 export type ClassCategoryItem = {
   name: string;
 };
 
-/**
- * Class selector used to "arm" drawing with a label.
- * When no class is selected, the annotator should disable drawing.
- */
+/** The Class Label picker. Drawing stays disabled until a class is picked. */
 export function ClassPanel({
   items,
   selectedClassName,
@@ -52,11 +47,7 @@ export function ClassPanel({
   );
 }
 
-/**
- * Center frame control:
- * - Default state: "Frame X" button
- * - Edit state: inline numeric input in the same pill footprint
- */
+/** A "Frame N" button that becomes a number input when clicked. Enter jumps; Escape or clicking away cancels. */
 export function FrameJumpField(props: {
   frame: number;
   onJump: (n: number) => void;
@@ -90,6 +81,7 @@ export function FrameJumpField(props: {
   }, [isEditing]);
 
   const startEdit = () => {
+    // Give the input the same width as the button it replaces, so the layout does not jump
     const width = displayPillRef.current?.offsetWidth ?? null;
     setPillWidth(width);
     setDraftValue(String(props.frame));

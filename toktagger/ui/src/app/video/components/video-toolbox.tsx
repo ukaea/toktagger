@@ -1,5 +1,6 @@
-"use client";
-
+/**
+ * The Video Tools panel in the left toolbox: Propagation, Hide annotations and the Class Label picker.
+ */
 import { useEffect, useMemo } from "react";
 import {
   Content,
@@ -39,7 +40,6 @@ export function VideoToolbox() {
     session.setSelection({
       className: nextClassName,
       trackId: null,
-      source: null,
     });
 
     if (nextClassName !== videoLastClassName) {
@@ -55,7 +55,8 @@ export function VideoToolbox() {
     const cls = (name ?? "").trim();
     if (!cls) return;
 
-    session.setSelection({ className: cls, trackId: null, source: "explicit" });
+    // No track ID, so the next shape starts a new track
+    session.setSelection({ className: cls, trackId: null });
     setVideoLastClassName(cls);
   };
 

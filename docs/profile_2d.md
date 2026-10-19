@@ -25,7 +25,7 @@ Both plots share a common time axis, enabling synchronized navigation and analys
 
 ### Color Scale
 
-The heatmap uses a continuous color scale to represent data values. The colorbar on the left side shows the mapping between colors and values:
+The heatmap uses a continuous color scale to represent data values. The colorbar on the right side shows the mapping between colors and values:
 
 - **Linear Scale**: Direct mapping of data values to colors
 - **Logarithmic Scale**: Useful for data spanning multiple orders of magnitude, with enhanced visibility of low-amplitude features
@@ -37,7 +37,6 @@ The heatmap uses a continuous color scale to represent data values. The colorbar
 - Plasma
 - Inferno
 - Magma
-- Cividis
 
 ### View Parameters
 
@@ -48,30 +47,31 @@ Access view parameters from the toolbar on the left:
 
 ### Navigation Controls
 
-At the top of the interface, you'll find navigation controls to move through your dataset:
+In the top left of the interface, you'll find navigation controls to move through your dataset:
 
-- **Previous Button** (◄): Navigate to the previous sample in your project
-- **Next Button** (►): Navigate to the next sample in your project  
+- **Annotations Validated / Not Validated**: Shows whether the annotations on this sample have been checked and saved. Saving marks the sample as validated, and Clear marks it as not validated
 - **Save Button**: Save your current annotations
-- **Clear Button**: Remove selected annotations, and mark annotations in the database as not validated
+- **Previous Button** (◄): Navigate to the previous sample in your project
+- **Next Button** (►): Navigate to the next sample in your project
+- **Clear Button**: Remove **all** annotations from the current sample, and mark the sample as not validated. The annotations are removed from the database the next time you save, including through Save on Navigate
 - **Save On Navigate**: Whether to automatically save any annotations to the database when you move to a different sample
 - **Jump to Shot**: Jump to a sample with a given shot ID
 
 **Keyboard Shortcuts:**
 
-- `Shift & ←`: Navigate to previous sample
-- `Shift & →`: Navigate to next sample
+- `Shift + ←`: Navigate to previous sample
+- `Shift + →`: Navigate to next sample
 
 ### Plot Toolbar
 
 The Plotly toolbar at the top of the plot provides navigation tools:
 
 - **Zoom**: Box zoom to a region of interest
-- **Box Select**: Click and drag to select multiple annotations within a region
+- **Box Select**: Click and drag to select multiple annotations within a region (Edit mode only)
 - **Pan**: Click and drag to pan the view (the default drag mode)
-- **Auto Scale**: Reset axes to show all data
-- **Reset View**: Return to the initial view
-- **Download Plot**: Export the current view as an image
+- **Autoscale**: Zoom out to show all data
+- **Reset axes**: Return to the initial view
+- **Download plot**: Export the current view as an image
 
 Annotations are drawn with the annotation toolbar described below rather than
 Plotly's own shape tools, so no draw or erase shape buttons appear here.
@@ -89,6 +89,10 @@ creation:
 
 Bounding boxes and polygons are restricted to the heatmap, since their vertical
 extent is only meaningful against the heatmap's axis.
+
+Annotations can only be created, selected, moved or deleted in edit mode. In view
+mode you can still zoom and pan freely without accidentally changing an annotation.
+Switching back to view mode clears any selection.
 
 ### Annotations Table
 
@@ -118,7 +122,7 @@ Time regions are vertical bands that mark time intervals of interest. They span 
 
 **Visual appearance:** Time regions appear as semi-transparent colored vertical bands spanning the full height of the heatmap.
 
-**Available categories:** configured per project - the list below is an example.
+**Available categories:** configured per project (see [Creating Projects](creating_projects.md)) - the list below is an example.
 
 - ELM (Edge Localized Mode)
 - L-mode (Low confinement mode)
@@ -143,7 +147,7 @@ Time points are vertical lines marking specific moments in time. They are useful
 
 **Visual appearance:** Time points appear as vertical colored lines extending through the entire heatmap.
 
-**Available categories:**
+**Available categories:** configured per project - the list below is an example.
 
 - Disruption
 - Thermal Quench
@@ -165,9 +169,9 @@ Bounding boxes are rectangular regions that mark specific areas in both time and
 **Editing bounding boxes:**
 
 - **Move**: Click and drag the rectangle to reposition it
-- **Resize**: Click and drag the handles to adjust the size
-- **Delete**: Right-click the annotation and choose delete, or select it and use
-  the delete control
+- **Resize**: Click and drag any edge of the rectangle to adjust its size
+- **Delete**: Right-click the annotation and choose "Delete", or select it and
+  press `Delete`
 
 ### Polygons
 
@@ -178,7 +182,9 @@ Polygons allow you to create freeform closed shapes to annotate irregular featur
 1. Enter edit mode and activate the **POLYGON** tool
 2. Choose a label from the dropdown
 3. Hold ctrl and click on the heatmap to place each vertex
-4. Click near the starting vertex to close the polygon
+4. Click near the starting vertex, or double-click, to close the polygon
+
+Press `Esc` to abandon a polygon part way through drawing it.
 
 **Visual appearance:** Polygons appear as semi-transparent colored closed shapes following your drawn path.
 
@@ -186,8 +192,11 @@ Polygons allow you to create freeform closed shapes to annotate irregular featur
 
 - **Move**: Click and drag the polygon to reposition it
 - **Reshape**: Click and drag individual vertices to adjust the shape
-- **Delete**: Right-click the annotation and choose delete, or select it and use
-  the delete control
+- **Add a vertex**: Click on an edge to add a new vertex at its midpoint
+- **Remove a vertex**: Press `Delete` while dragging the vertex. A polygon must
+  keep at least three vertices
+- **Delete**: Right-click the annotation and choose "Delete", or select it and
+  press `Delete`
 
 ### Thresholded Regions
 
@@ -210,12 +219,15 @@ be edited, relabelled and deleted exactly like hand-drawn ones.
 
 ## Modifying Annotations
 
+All of the actions below require edit mode.
+
 ### Selecting Annotations
 
 - **Click** on any annotation to select it
 - **Box Select**: enable the toolbar's Box Select tool, then drag a box to select multiple annotations at once
+- **Click on a row** in the annotations table to select that annotation
 - Selected annotations can be modified or deleted
-- For Zones and VSpans, right-click to access the context menu
+- Right-click on any annotation to access its context menu
 
 ### Moving and Resizing
 
@@ -226,23 +238,27 @@ be edited, relabelled and deleted exactly like hand-drawn ones.
 - These annotations are drawn as a D3 overlay on top of the plot, and are shared
   with the time series interface
 
-**Zones and VSpans:**
+**Time regions and time points:**
 
 - Click and drag to reposition along the time axis
-- For Zones, drag the edges to adjust the start or end time
+- For time regions, drag the edges to adjust the start or end time
 
 ### Changing Categories
 
 To change the category of an existing annotation:
 
-1. Right-click on the annotation (for Zones and VSpans)
-2. Select "Change Type" and choose the new category
-3. For drawing-based annotations, delete and recreate with the desired category
+1. Right-click on the annotation to open its context menu
+2. Select "Set type" and choose the new category
+
+If you right-click on a selected annotation, the new category is applied to every selected annotation of the same type.
 
 ### Deleting Annotations
 
-1. Right-click on the annotation to open the context menu
-2. Select "Delete"
+To remove an annotation, do one of the following:
+
+- Right-click on the annotation and select "Delete" from the context menu. If the annotation is selected, every selected annotation is deleted
+- Select one or more annotations and press `Delete` or `Backspace`
+- Click the bin icon on the annotation's row in the annotations table
 
 ## Plot Interaction
 
@@ -254,12 +270,12 @@ The 2D profile plot supports rich interactive exploration:
 - **Pan**: Click the pan button in the toolbar, then click and drag to pan the view
 - **Scroll Zoom**: Enabled - the mouse wheel zooms the time axis. The heatmap's
   vertical axis is fixed, so the wheel only changes the time range
-- **Reset View**: Click "Reset View" or "Auto Scale" to return to the initial view
+- **Reset View**: Click "Reset axes" or "Autoscale" in the toolbar, or double-click the plot, to return to the initial view
 
 ### Color Scale Adjustment
 
 - **Linear vs. Log Scale**: Toggle between linear and logarithmic color scaling using the switch in the View Parameters panel
-- **Colormap Selection**: Choose from different colormaps in the plot properties settings
+- **Colormap Selection**: Choose from different colormaps in the Color Map panel of the left toolbar
 - **Automatic Range**: The color scale automatically adjusts to the data range
 
 ### Working with the Integrated Plot
@@ -295,7 +311,7 @@ The thresholding tool automatically identifies regions in your 2D data that exce
 **Workflow:**
 
 1. Load your data sample
-2. Open the Threshold panel from the right toolbar and enable it
+2. Open the Threshold panel in the left toolbar and enable it
 3. Adjust the parameters and watch the outlines update on the heatmap
 4. Review and manually edit the generated polygons if needed
 5. Save to keep them

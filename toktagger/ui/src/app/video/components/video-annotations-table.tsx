@@ -1,5 +1,7 @@
-"use client";
-
+/**
+ * The annotations table below the frame, with one row per instance (class label + track ID).
+ * It only talks to the session, never to Annotorious directly.
+ */
 import { useMemo, useState } from "react";
 import {
   ActionButton,
@@ -45,6 +47,7 @@ const VIDEO_TYPE_ICONS: Record<VideoAnnotationType, typeof ImageMapRectangle> =
     [VideoAnnotationType.FRAME_LABEL]: Label,
   };
 
+// The tool that draws each type, so selecting a row can switch to it
 const VIDEO_TYPE_TOOLS: Record<VideoAnnotationType, DrawingTool> = {
   [VideoAnnotationType.BOUNDING_BOX]: "rectangle",
   [VideoAnnotationType.POLYGON]: "polygon",
@@ -91,6 +94,7 @@ type FocusOptions = Parameters<
   ReturnType<typeof useVideoSession>["requestFocusInstance"]
 >[2];
 
+/** Selects a row's instance: switches to its tool and track, and selects it on the image if it is there. */
 function useSelectInstance() {
   const { setSelection, requestFocusInstance, closePopup, setDrawingTool } =
     useVideoSession();
@@ -103,7 +107,6 @@ function useSelectInstance() {
     setSelection({
       className: instance.className,
       trackId: canonicalizeTrackId(instance.trackId),
-      source: "explicit",
     });
     setVideoLastClassName(instance.className);
     requestFocusInstance(instance.className, instance.trackId, focus);
@@ -195,8 +198,9 @@ export const VideoAnnotationsTable = () => {
     if (keys === "all") return;
 
     const row = rows.find((candidate) => keys.has(candidate.id));
+    // Deselecting a row keeps the class but stops continuing its track
     if (!row) {
-      session.setSelection({ className, trackId: null, source: "explicit" });
+      session.setSelection({ className, trackId: null });
       session.closePopup();
       return;
     }

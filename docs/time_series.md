@@ -17,18 +17,19 @@ The time series view displays multiple diagnostic signals stacked vertically, ea
 
 The main plot area displays your time series data as line plots. Each signal occupies its own subplot with:
 
-- **Independent Y-axis**: Each signal has its own vertical scale, optimized for its value range
+- **Independent Y-axis**: Each signal has its own vertical scale, which rescales automatically to fit the data in the visible time window
 - **Shared X-axis**: All signals share the same time axis at the bottom, measured in seconds
 - **Range Slider**: A range slider below the time axis allows quick navigation and zooming to specific time windows
 
 ### Navigation Controls
 
-At the top of the interface, you'll find navigation controls to move through your dataset:
+In the top left of the interface, you'll find navigation controls to move through your dataset:
 
-- **Previous Button** (◄): Navigate to the previous sample in your project
-- **Next Button** (►): Navigate to the next sample in your project  
+- **Annotations Validated / Not Validated**: Shows whether the annotations on this sample have been checked and saved. Saving marks the sample as validated, and Clear marks it as not validated
 - **Save Button**: Save your current annotations
-- **Clear Button**: Remove selected annotations, and mark annotations in the database as not validated
+- **Previous Button** (◄): Navigate to the previous sample in your project
+- **Next Button** (►): Navigate to the next sample in your project
+- **Clear Button**: Remove **all** annotations from the current sample, and mark the sample as not validated. The annotations are removed from the database the next time you save, including through Save on Navigate
 - **Save On Navigate**: Whether to automatically save any annotations to the database when you move to a different sample
 - **Jump to Shot**: Jump to a sample with a given shot ID
 
@@ -36,6 +37,32 @@ At the top of the interface, you'll find navigation controls to move through you
 
 - `Shift + ←`: Navigate to previous sample
 - `Shift + →`: Navigate to next sample
+
+### Plot Toolbar
+
+The Plotly toolbar at the top right of the plot provides navigation tools:
+
+- **Download plot**: Export the current view as an image
+- **Zoom**: Box zoom to a time window of interest
+- **Box Select**: Click and drag to select multiple annotations within a region (Edit mode only)
+- **Pan**: Click and drag to pan the view (the default drag mode)
+- **Autoscale**: Zoom out to show all data
+- **Reset axes**: Return to the initial view
+
+### Annotation Toolbar
+
+The annotation toolbar sits to the right of the plot and drives all annotation
+creation:
+
+1. Use the top button to switch between **edit mode** and **view mode**. Press
+   `e` to toggle quickly.
+2. Activate the desired tool from the list of buttons, then use the dropdown that
+   appears to select the label to apply.
+3. With a tool active, add annotations using **ctrl+drag** on the plot.
+
+Annotations can only be created, selected, moved or deleted in edit mode. In view
+mode you can still zoom and pan freely without accidentally changing an annotation.
+Switching back to view mode clears any selection.
 
 ### Annotations Table
 
@@ -63,13 +90,13 @@ Time regions are rectangular annotations that span a time interval and cover all
 
 **To create a time region:**
 
-1. Right-click anywhere on the plot to open the context menu
-2. Select "Add Time Region" and choose a category (e.g., "ELM", "L-mode", "H-mode")
-3. Alternatively, click and drag horizontally across the plot to create a time region interactively
+1. Enter edit mode and activate the **TIME REGION** tool
+2. Choose a label from the dropdown
+3. Ctrl+drag horizontally across the plot to span the interval
 
 **Visual appearance:** Time regions appear as semi-transparent colored rectangles spanning the full height of all subplots. The color corresponds to the category assigned.
 
-**Available categories:**
+**Available categories:** configured per project (see [Creating Projects](creating_projects.md)) - the list below is an example.
 
 - ELM
 - L-mode  
@@ -88,23 +115,30 @@ Time points are vertical line annotations marking specific moments in time. They
 
 **To create a time point:**
 
-1. Right-click anywhere on the plot to open the context menu
-2. Select "Add Time Region" and choose a category (e.g., "Disruption", "Thermal Quench")
+1. Enter edit mode and activate the **TIME POINT** tool
+2. Choose a label from the dropdown
+3. Ctrl+click at the moment of interest
 
 **Visual appearance:** Time points appear as vertical colored lines extending through all subplots.
 
-**Available categories:**
+**Available categories:** configured per project - the list below is an example.
 
 - Disruption
 - Thermal Quench
 - Current Quench
 - Control Loss
 
+To abandon an annotation part way through drawing it, press `Esc`.
+
 ## Modifying Annotations
+
+All of the actions below require edit mode.
 
 ### Selecting Annotations
 
 - **Click** on any annotation to select it
+- **Box Select**: enable the toolbar's Box Select tool, then drag a box to select multiple annotations at once
+- **Click on a row** in the annotations table to select that annotation
 - Selected annotations appear with increased opacity and can be modified
 
 ### Moving Annotations
@@ -126,16 +160,17 @@ Time regions have resize handles on their left and right edges:
 To change the category of an existing annotation:
 
 1. Right-click on the annotation to open its context menu
-2. Select "Change Type" and choose the new category
+2. Select "Set type" and choose the new category
+
+If you right-click on a selected annotation, the new category is applied to every selected annotation of the same type.
 
 ### Deleting Annotations
 
-To remove an annotation:
+To remove an annotation, do one of the following:
 
-1. Right-click on the annotation to open its context menu
-2. Select "Delete" from the context menu
-
-Alternatively, select the annotation and press the Delete button in the navigation controls.
+- Right-click on the annotation and select "Delete" from the context menu. If the annotation is selected, every selected annotation is deleted
+- Select one or more annotations and press `Delete` or `Backspace`
+- Click the bin icon on the annotation's row in the annotations table
 
 ## Plot Interaction
 
@@ -144,17 +179,10 @@ Alternatively, select the annotation and press the Delete button in the navigati
 The time series plot supports interactive zooming and panning:
 
 - **Pan**: Click and drag on the plot background to pan horizontally
-- **Zoom**: Use the range slider at the bottom to zoom into specific time windows
+- **Zoom**: Use the mouse wheel, the toolbar's Zoom tool, or the range slider at the bottom to zoom into specific time windows
 - **Reset**: Double-click on the plot to reset the view to show all data
 
-**Note:** Y-axes have fixed ranges and do not zoom, ensuring consistent signal scaling.
-
-### Disabling Interactions
-
-When holding the **Alt** (or **Option**) key:
-
-- All annotation interactions are temporarily disabled
-- This allows you to zoom and pan the plot without accidentally selecting or moving annotations
+**Note:** Only the time axis zooms. Each y-axis rescales automatically to fit the data in the visible time window.
 
 ## Working with Multiple Signals
 
