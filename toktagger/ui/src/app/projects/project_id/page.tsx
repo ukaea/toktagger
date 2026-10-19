@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   Provider,
   defaultTheme,
@@ -203,7 +203,7 @@ export default function ProjectView() {
     fetchData();
   }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
 
-  const refreshSamples = useCallback(async () => {
+  const refreshSamples = async () => {
     if (!hasId) {
       return;
     }
@@ -217,7 +217,7 @@ export default function ProjectView() {
     setSamples(samples);
     const project = await getProject(project_id);
     setProject(project);
-  }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
+  };
 
   useEffect(() => {
     refreshSamples();

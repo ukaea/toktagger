@@ -3,7 +3,7 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { getSignalNames, shallowEqual } from "@/app/utils";
 import { Profile2DViewParams } from "@/types";
 import { ComboBox, Flex, Item, Switch } from "@adobe/react-spectrum";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 export function Profile2DViewParamsWidget() {
   const { sample, viewParams, setViewParams } = useSample();
@@ -19,7 +19,7 @@ export function Profile2DViewParamsWidget() {
     initialParams?.log_scale ?? false,
   );
 
-  const signalNames = useMemo(() => getSignalNames(sample), [sample]);
+  const signalNames = getSignalNames(sample);
 
   useEffect(() => {
     if (signalNames.length > 0 && !selectedSignal) {

@@ -6,7 +6,7 @@ import { TimeRegion } from "@/app/components/tools/timeRegion";
 import "react-contexify/ReactContexify.css";
 
 import { applyGlobalStyle, arrayMax, arrayMin } from "@/app/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { useSample } from "@/app/contexts/SampleContext";
 import { Flex, View } from "@adobe/react-spectrum";
@@ -61,78 +61,76 @@ export const TimeSeriesView = () => {
     setPlotData(plotData);
   }, [data, viewData]);
 
-  const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
-    let maxTime = -Infinity;
-    let minTime = Infinity;
+  let maxTime = -Infinity;
+  let minTime = Infinity;
 
-    for (const trace of plotData) {
-      const xData = trace.x as number[];
-      if (xData && xData.length > 0) {
-        const traceMax = arrayMax(xData);
-        const traceMin = arrayMin(xData);
-        if (traceMax > maxTime) maxTime = traceMax;
-        if (traceMin < minTime) minTime = traceMin;
-      }
+  for (const trace of plotData) {
+    const xData = trace.x as number[];
+    if (xData && xData.length > 0) {
+      const traceMax = arrayMax(xData);
+      const traceMin = arrayMin(xData);
+      if (traceMax > maxTime) maxTime = traceMax;
+      if (traceMin < minTime) minTime = traceMin;
     }
+  }
 
-    const numRows = plotData.length;
-    const domainHeight = 1 / numRows;
-    // Dynamically generate y-axis domains based on numRows
-    const yAxisDomains = Array.from({ length: numRows }, (_, i) => {
-      const start = i * domainHeight;
-      const end = (i + 1) * domainHeight;
-      return [start, end];
-    });
+  const numRows = plotData.length;
+  const domainHeight = 1 / numRows;
+  // Dynamically generate y-axis domains based on numRows
+  const yAxisDomains = Array.from({ length: numRows }, (_, i) => {
+    const start = i * domainHeight;
+    const end = (i + 1) * domainHeight;
+    return [start, end];
+  });
 
-    // Build yaxis layout object dynamically
-    const yAxesLayout = yAxisDomains.reduce(
-      (acc, domain, idx) => {
-        const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
-        acc[`yaxis${axisNum}`] = {
-          domain,
-          autorange: true,
-          fixedrange: true,
-          title: {
-            text: plotData[numRows - idx - 1].name || "",
-            font: {
-              family: "Courier New, monospace",
-              size: 12,
-              color: "#7f7f7f",
-            },
-          },
-        };
-        return acc;
-      },
-      {} as Record<string, unknown>,
-    );
-
-    return applyGlobalStyle(
-      {
-        uirevision: "true",
-        //grid: { rows: 1, columns: 1, pattern: "independent" },
-        dragmode: "pan",
-        autosize: true,
-        xaxis: {
-          minallowed: minTime,
-          maxallowed: maxTime,
-          range: [minTime, maxTime],
-          fixedrange: false,
-          autorange: false,
-          rangeslider: { visible: true, thickness: 0.1 },
-          title: {
-            text: "Time [s]",
-            font: {
-              family: "Courier New, monospace",
-              size: 12,
-              color: "#7f7f7f",
-            },
+  // Build yaxis layout object dynamically
+  const yAxesLayout = yAxisDomains.reduce(
+    (acc, domain, idx) => {
+      const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
+      acc[`yaxis${axisNum}`] = {
+        domain,
+        autorange: true,
+        fixedrange: true,
+        title: {
+          text: plotData[numRows - idx - 1].name || "",
+          font: {
+            family: "Courier New, monospace",
+            size: 12,
+            color: "#7f7f7f",
           },
         },
-        ...yAxesLayout,
+      };
+      return acc;
+    },
+    {} as Record<string, unknown>,
+  );
+
+  const plotLayout: Partial<Plotly.Layout> = applyGlobalStyle(
+    {
+      uirevision: "true",
+      //grid: { rows: 1, columns: 1, pattern: "independent" },
+      dragmode: "pan",
+      autosize: true,
+      xaxis: {
+        minallowed: minTime,
+        maxallowed: maxTime,
+        range: [minTime, maxTime],
+        fixedrange: false,
+        autorange: false,
+        rangeslider: { visible: true, thickness: 0.1 },
+        title: {
+          text: "Time [s]",
+          font: {
+            family: "Courier New, monospace",
+            size: 12,
+            color: "#7f7f7f",
+          },
+        },
       },
-      isDarkMode,
-    );
-  }, [plotData, isDarkMode]);
+      ...yAxesLayout,
+    },
+    isDarkMode,
+  );
 
   if (!viewData) {
     return null;

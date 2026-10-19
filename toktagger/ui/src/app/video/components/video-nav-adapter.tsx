@@ -1,5 +1,7 @@
-"use client";
-
+/**
+ * Plugs the video view into the shared Save and Clear buttons in the left toolbox.
+ * Clear only clears the current frame.
+ */
 import React from "react";
 import { useSample } from "@/app/contexts/SampleContext";
 import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
@@ -34,9 +36,6 @@ export function VideoNavAdapterBridge({
     },
     clear: () => {
       session.clearCurrentFrame();
-    },
-    afterSave: () => {
-      session.markSaved();
     },
   };
 

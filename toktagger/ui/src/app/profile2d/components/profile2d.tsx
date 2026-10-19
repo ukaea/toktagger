@@ -17,7 +17,7 @@ import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 import * as d3 from "d3";
 
@@ -254,26 +254,22 @@ export const Profile2dView = () => {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
-  // Memoised so an annotation drag doesn't tear down and rebuild the plot mid-draw.
-  const plot = useMemo(() => {
-    if (!viewData || !plotProps) return null;
-    const interpFunc =
-      colorMapInterpolators[plotProps.colorMap ?? ""] ?? d3.interpolateCividis;
-    const createPlotFunc = logScale
-      ? createLogScalePlot
-      : createLinearScalePlot;
-    return createPlotFunc(viewData, plotProps, interpFunc);
-  }, [viewData, plotProps, logScale]);
+  const plot =
+    viewData && plotProps
+      ? (logScale ? createLogScalePlot : createLinearScalePlot)(
+          viewData,
+          plotProps,
+          colorMapInterpolators[plotProps.colorMap ?? ""] ??
+            d3.interpolateCividis,
+        )
+      : null;
 
-  const plotData = useMemo<Partial<Plotly.PlotData>[]>(() => {
-    if (!viewData || !plot) return [];
-    return buildPlotData(viewData, plot.values, plotProps?.thresholdActive);
-  }, [viewData, plot, plotProps?.thresholdActive]);
+  const plotData: Partial<Plotly.PlotData>[] =
+    viewData && plot
+      ? buildPlotData(viewData, plot.values, plotProps?.thresholdActive)
+      : [];
 
-  const plotLayout = useMemo(
-    () => (plot ? buildPlotLayout(plot.colorAxis, isDarkMode) : {}),
-    [plot, isDarkMode],
-  );
+  const plotLayout = plot ? buildPlotLayout(plot.colorAxis, isDarkMode) : {};
 
   if (!viewData || !profileViewParams || !plot) {
     return null;

@@ -5,7 +5,7 @@ import {
   TimeSeriesAnnotationType,
   TimeSeriesCategory,
 } from "@/types";
-import { ComponentType, useMemo } from "react";
+import { ComponentType } from "react";
 import {
   ActionButton,
   TableView,
@@ -78,21 +78,17 @@ export const AnnotationsTable = () => {
   const { annotations, categories } = useTimeSeriesState();
   const { selectAnnotations, setFocusXRange } = useTimeSeriesActions();
 
-  const entries = useMemo<TableEntry[]>(
-    () =>
-      annotations.map((annotation) => ({
-        id: annotation.id,
-        annotation,
-        // Fall back to a category built from the annotation itself if none is configured.
-        category: categories.get(`${annotation.type}_${annotation.label}`) ?? {
-          label: annotation.label,
-          color: "black",
-          type: annotation.type,
-        },
-        marker: MARKER_ICONS[annotation.type],
-      })),
-    [annotations, categories],
-  );
+  const entries: TableEntry[] = annotations.map((annotation) => ({
+    id: annotation.id,
+    annotation,
+    // Fall back to a category built from the annotation itself if none is configured.
+    category: categories.get(`${annotation.type}_${annotation.label}`) ?? {
+      label: annotation.label,
+      color: "black",
+      type: annotation.type,
+    },
+    marker: MARKER_ICONS[annotation.type],
+  }));
 
   const selectedKeys = annotations
     .filter((annotation) => annotation.selected)

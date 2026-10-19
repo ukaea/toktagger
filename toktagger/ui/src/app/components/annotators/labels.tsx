@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { ListView, Item } from "@adobe/react-spectrum";
 import { Annotation, ClassLabel } from "@/types";
 import { Selection } from "@react-types/shared";
@@ -27,42 +27,39 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
     setSelectedKeys(new Set(defaultSelectedKeys));
   }, [annotations, setSelectedKeys, labels]);
 
-  const onSelectionChange = useCallback(
-    (keys: Selection) => {
-      let newKeys = new Set<string>();
-      if (keys === "all") {
-        items.forEach((item) => newKeys.add(item.id.toString()));
-      } else {
-        newKeys = new Set(Array.from(keys).map((key) => key.toString()));
-      }
+  const onSelectionChange = (keys: Selection) => {
+    let newKeys = new Set<string>();
+    if (keys === "all") {
+      items.forEach((item) => newKeys.add(item.id.toString()));
+    } else {
+      newKeys = new Set(Array.from(keys).map((key) => key.toString()));
+    }
 
-      setAnnotations((prevAnnotations: Annotation[]) => {
-        let newAnnotations = prevAnnotations || [];
-        newAnnotations = newAnnotations.filter(
-          (annotation) => annotation.type !== "class_label",
-        );
-        newKeys.forEach((key: string) => {
-          const item = items.find((item) => item.id.toString() === key) || null;
+    setAnnotations((prevAnnotations: Annotation[]) => {
+      let newAnnotations = prevAnnotations || [];
+      newAnnotations = newAnnotations.filter(
+        (annotation) => annotation.type !== "class_label",
+      );
+      newKeys.forEach((key: string) => {
+        const item = items.find((item) => item.id.toString() === key) || null;
 
-          if (item === null) {
-            console.warn(`Label with key ${key} not found in items.`);
-            return;
-          }
+        if (item === null) {
+          console.warn(`Label with key ${key} not found in items.`);
+          return;
+        }
 
-          newAnnotations.push({
-            project_id: project?._id,
-            sample_id: sample?._id,
-            shot_id: sample?.shot_id,
-            type: "class_label",
-            label: item.name,
-            created_by: "manual",
-          } as ClassLabel);
-        });
-        return newAnnotations;
+        newAnnotations.push({
+          project_id: project?._id,
+          sample_id: sample?._id,
+          shot_id: sample?.shot_id,
+          type: "class_label",
+          label: item.name,
+          created_by: "manual",
+        } as ClassLabel);
       });
-    },
-    [project, sample, items, setAnnotations],
-  );
+      return newAnnotations;
+    });
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: { key: string }) => {
