@@ -35,6 +35,9 @@ npm run build    # writes into toktagger/api/static/, do not hand-edit that outp
 - Data loaders, ML models, and query strategies are added via their registry's `@Registry.register(...)` decorator (see `core/data_loaders.py`, `models/base.py`), not by special-casing a router.
 - A new annotation/schema shape should reuse an existing base+subclass pattern (e.g. how `BoundingBox`/`VideoBoundingBox` relate) rather than being bespoke — look for the analogous type before adding a new one.
 - New third-party dependencies need a real reason — don't add a second library that duplicates one already in use.
+- All documents should be a Pydantic BaseModel and defined in /schemas
+- All writes/reads to the db should be performed via MongoDBClient helper methods (db_client)
+- General helper functions should be added to utils.py
 
 ## Frontend conventions
 

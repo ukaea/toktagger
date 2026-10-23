@@ -1,14 +1,33 @@
 import { Config, PlotlyHTMLElement } from "plotly.js";
 import { z } from "zod/v4";
 
-export const BaseAnnotationSchema = z.object({
+// Display only; the raw created_by value is kept for ownership checks, filtering, etc.
+export const CreatedBySchema = z.object({
+  created_by: z.string().default("manual"),
+  // Read-only author name the backend resolves from created_by.
+  created_by_name: z.string().nullish(),
+  created_by_deleted: z.boolean().optional(),
+});
+export type CreatedByFields = z.infer<typeof CreatedBySchema>;
+
+export const pickCreatedBy = ({
+  created_by,
+  created_by_name,
+  created_by_deleted,
+}: CreatedByFields): CreatedByFields => ({
+  created_by,
+  created_by_name,
+  created_by_deleted,
+});
+
+export const BaseAnnotationSchema = CreatedBySchema.extend({
+  _id: z.string().nullable().default(null),
   project_id: z.string().nullable().default(null),
   sample_id: z.string().nullable().default(null),
   shot_id: z.number().optional(),
   timestamp: z.string().optional(),
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
-  created_by: z.string().default("manual"),
   signal_name: z.string().nullable().default(null),
   label: z.string(),
   type: z.string(),
@@ -114,9 +133,21 @@ export const AnnotationSchema = z.union([
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
+export const AnnotationConflictSchema = z.object({
+  detail: z.object({
+    message: z.string(),
+    stale_ids: z.array(z.string()),
+  }),
+});
+
 export type NavAdapter = {
   getAnnotations: () => Annotation[];
-  clear: () => void;
+  // includeOthers clears every annotation on the sample rather than only the
+  // caller's own. The Clear button passes the "Show Others' Annotations" state, so
+  // what the button discards is always what the user can see.
+  clear: (includeOthers?: boolean) => void | Promise<void>;
+  // Deletes the annotations the user removed that a save cannot remove for them.
+  syncRemovals?: () => Promise<void>;
   afterSave?: () => void;
 };
 
@@ -221,6 +252,15 @@ export const ProjectSchema = z.object({
   video_bounding_box_labels: z.array(z.string()).default([]),
 });
 export type Project = z.infer<typeof ProjectSchema>;
+
+export const ProjectUpdateSchema = ProjectSchema.omit({
+  _id: true,
+  task: true,
+  data_loader: true,
+  timestamp: true,
+  model_types: true,
+});
+export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 
 export const FileDataSchema = z.object({
   file_name: z.string(),
@@ -386,9 +426,13 @@ export type TimeSeriesAnnotationPoint = {
   y: number;
 };
 
-export type TimeSeriesAnnotation = {
+export type TimeSeriesAnnotation = CreatedByFields & {
   id: string;
-  created_by: string;
+  // The backend's own _id, when this annotation already exists in the DB (e.g. loaded
+  // via GET, possibly another user's). null for annotations drawn locally and not yet
+  // saved. Must round-trip back out on save so the server can tell "existing" from
+  // "new" and avoid re-stamping someone else's annotation under the saving user.
+  db_id: string | null;
   label: string;
   type: TimeSeriesAnnotationType;
   points: TimeSeriesAnnotationPoint[];
@@ -396,6 +440,50 @@ export type TimeSeriesAnnotation = {
   // Binds the annotation to a specific signal; null for single-signal views.
   signal_name?: string | null;
 };
+
+export const CurrentUserSchema = z.object({
+  _id: z.string(),
+  username: z.string(),
+  global_role: z.enum(["admin", "user"]),
+  is_active: z.boolean(),
+  email: z.string().nullish(),
+  display_name: z.string().nullish(),
+});
+export type CurrentUser = z.infer<typeof CurrentUserSchema>;
+
+export const LogoutResponseSchema = z.object({
+  logout_url: z.string().nullable(),
+});
+
+export const ApiTokenSchema = z.object({
+  _id: z.string(),
+  name: z.string(),
+  hint: z.string(),
+  created_at: z.string(),
+  expires_at: z.string(),
+  last_used_at: z.string().nullable(),
+});
+export type ApiToken = z.infer<typeof ApiTokenSchema>;
+
+export const ApiTokenCreatedSchema = ApiTokenSchema.extend({
+  token: z.string(),
+});
+
+// Mirrors the backend's ProjectMember, as GET /users/me/memberships returns it.
+export const ProjectMemberSchema = z.object({
+  project_id: z.string(),
+  user_id: z.string(),
+  role: z.enum(["admin", "annotator", "viewer"]),
+  show_others_annotations: z.boolean(),
+});
+export type ProjectMember = z.infer<typeof ProjectMemberSchema>;
+
+// Mirrors ProjectMemberOut: what GET /projects/{id}/members adds for the member list.
+export const ProjectMemberOutSchema = ProjectMemberSchema.extend({
+  _id: z.string(),
+  username: z.string(),
+});
+export type ProjectMemberOut = z.infer<typeof ProjectMemberOutSchema>;
 
 export type ToolingCallbacks = {
   start: (
@@ -441,3 +529,35 @@ export interface SelectionRange {
     high: number;
   };
 }
+
+export enum AnnotatorTypes {
+  PEAK_DETECTION = "peak_detection",
+  CHANGE_POINT_DETECTION = "change_point_detection",
+  JUMP_DETECTION = "jump_detection",
+  OUTLIER_DETECTION = "outlier_detection",
+  PROFILE_2D_THRESHOLD = "profile_2d_threshold",
+}
+
+export const annotatorCreatedBy = (type: AnnotatorTypes) =>
+  `annotators::${type}`;
+
+export const modelCreatedBy = (modelType: string) => `model::${modelType}`;
+
+const NON_HUMAN_AUTHOR_KINDS: Record<string, string> = {
+  model: "model",
+  annotators: "annotator",
+};
+
+export const displayCreatedBy = ({
+  created_by,
+  created_by_name,
+  created_by_deleted,
+}: CreatedByFields) => {
+  const [prefix, ...rest] = created_by.split("::");
+  const kind = rest.length > 0 ? NON_HUMAN_AUTHOR_KINDS[prefix] : undefined;
+  // Tag non-human authors so a user with the same name cannot be mistaken for them.
+  if (kind) return `${created_by_name || rest.join("::")} (${kind})`;
+  if (created_by_name) return created_by_name;
+  if (created_by_deleted) return "Deleted user";
+  return created_by;
+};

@@ -1,7 +1,12 @@
 from typing import Any
 
-import requests
-from playwright.sync_api import Page, expect
+from tests.endpoints import session
+
+try:
+    from playwright.sync_api import Page, expect
+except ImportError:
+    Page = None  # type: ignore[assignment,misc]
+    expect = None  # type: ignore[assignment]
 
 
 def save_annotations(
@@ -18,7 +23,7 @@ def save_annotations(
         page.get_by_role("button", name="Save").click(force=True)
     assert put_response.value.ok
 
-    response = requests.get(
+    response = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     )
     assert response.status_code == 200

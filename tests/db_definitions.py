@@ -1,27 +1,41 @@
+import importlib
 import pathlib
+
+from toktagger.api.schemas.annotations import (
+    TimePointBatch,
+    TimeRegionBatch,
+)
 from toktagger.api.schemas.annotators import AnnotatorTypes
-from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
+from toktagger.api.schemas.projects import ProjectIn, QueryStrategyType, Task
 from toktagger.api.schemas.samples import (
     SampleIn,
     ShotData,
     TimeSeriesFileData,
 )
-from toktagger.api.schemas.annotations import (
-    TimeRegionBatch,
-    TimePointBatch,
-)
-
-import importlib
+from toktagger.api.schemas.projects import ProjectMember
+from toktagger.api.schemas.users import UserIn
 
 if importlib.util.find_spec("ray") is not None:
     from tests.models_definitions import (
-        MockDisruptionCNN as MockDisruptionCNN,
-        MockParamsTimeSeriesCNN as MockParamsTimeSeriesCNN,
-        MockTimeSeriesCNN as MockTimeSeriesCNN,
         MODEL_1 as MODEL_1,
+    )
+    from tests.models_definitions import (
         MODEL_2 as MODEL_2,
+    )
+    from tests.models_definitions import (
         MODEL_3 as MODEL_3,
+    )
+    from tests.models_definitions import (
         MODEL_4 as MODEL_4,
+    )
+    from tests.models_definitions import (
+        MockDisruptionCNN as MockDisruptionCNN,
+    )
+    from tests.models_definitions import (
+        MockParamsTimeSeriesCNN as MockParamsTimeSeriesCNN,
+    )
+    from tests.models_definitions import (
+        MockTimeSeriesCNN as MockTimeSeriesCNN,
     )
 
 
@@ -119,3 +133,30 @@ ANNOTATION_5 = TimePointBatch(
     uncertainty=0.8,
     created_by=AnnotatorTypes.PEAK_DETECTION,
 )
+
+
+TEST_ISSUER = "https://idp.example.com/realms/toktagger"
+
+USER_ADMIN = UserIn(
+    username="admin",
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="admin-sub",
+    global_role="admin",
+    is_active=True,
+)
+USER_ALICE = UserIn(
+    username="alice",
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="alice-sub",
+    global_role="user",
+    is_active=True,
+)
+USER_BOB = UserIn(
+    username="bob",
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="bob-sub",
+    global_role="user",
+    is_active=True,
+)
+
+PROJECT_ADMIN = ProjectMember(role="admin")

@@ -6,7 +6,10 @@
 
 import React from "react";
 import { useSample } from "@/app/contexts/SampleContext";
-import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
+import {
+  NavAdapterProvider,
+  useSyncRemovals,
+} from "@/app/contexts/NavAdapterContext";
 import { type Annotation, type NavAdapter } from "@/types";
 import { useVideoSession } from "./video-session";
 
@@ -17,6 +20,7 @@ export function VideoNavAdapterBridge({
 }) {
   const session = useVideoSession();
   const { annotations } = useSample();
+  const syncRemovals = useSyncRemovals();
 
   const adapter: NavAdapter = {
     getAnnotations: () => {
@@ -36,6 +40,9 @@ export function VideoNavAdapterBridge({
         return { ...annotation };
       });
     },
+    syncRemovals,
+    // Frame-scoped, so it ignores includeOthers: Clear here means "clear the frame on
+    // screen", and a frame's annotations are only ever the ones being drawn on it.
     clear: () => {
       session.clearCurrentFrame();
     },

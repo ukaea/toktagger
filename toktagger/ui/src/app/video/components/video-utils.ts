@@ -5,8 +5,9 @@
 "use client";
 
 import type { ImageAnnotation } from "@annotorious/react";
-import type { Annotation } from "@/types";
+import type { Annotation, CreatedByFields } from "@/types";
 import {
+  pickCreatedBy,
   VideoBoundingBoxSchema,
   VideoFrameLabelSchema,
   VideoPointSchema,
@@ -25,6 +26,7 @@ import {
   VideoAnnotationType,
 } from "./types";
 import {
+  getAnnotationAuthor,
   getAnnotationCreator,
   getLabelTrack,
   isPointAnno,
@@ -316,7 +318,7 @@ export function deriveInstances(
           classId: classIdForName(className),
           trackId,
           type: shapeAnnotationType(a),
-          createdBy: getAnnotationCreator(a),
+          createdBy: getAnnotationAuthor(a),
           frames: [frame],
           count: 1,
         });
@@ -433,7 +435,7 @@ export function deriveFrameLabelInstances(
     {
       className: string;
       trackId: string;
-      createdBy: string;
+      createdBy: CreatedByFields;
       frames: Set<number>;
     }
   >();
@@ -449,7 +451,7 @@ export function deriveFrameLabelInstances(
     const entry = framesByKey.get(key) ?? {
       className,
       trackId,
-      createdBy: annotation.created_by,
+      createdBy: pickCreatedBy(annotation),
       frames: new Set<number>(),
     };
     entry.frames.add(annotation.frame);

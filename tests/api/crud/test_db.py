@@ -1,10 +1,13 @@
-import pytest
 import asyncio
-from bson.objectid import ObjectId
-from toktagger.api.crud import utils
-from toktagger.api.crud.db import MongoDBClient
-from tests.db_definitions import PROJECT_1, PROJECT_2, SAMPLE_1, SAMPLE_2
+
+import pytest
 import pytest_asyncio
+from bson.objectid import ObjectId
+
+from tests.db_definitions import PROJECT_1, PROJECT_2, SAMPLE_1, SAMPLE_2
+from toktagger.api.crud import utils
+from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
+from toktagger.api.schemas.models import ModelUpdate
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -252,3 +255,59 @@ async def test_delete_filtered_documents_filters(db_client, setup_db_for_filteri
 
     assert len(projects) == 1
     assert projects[0]["idx"] == 2
+
+
+@pytest.mark.asyncio
+async def test_lock_times_out_while_held(db_client):
+    async with db_client.lock("test-lock"):
+        with pytest.raises(LockTimeoutError):
+            async with db_client.lock("test-lock", timeout=0.2):
+                pass
+
+    async with db_client.lock("test-lock", timeout=0.2):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_lock_takes_over_expired_lock(db_client):
+    await db_client.db["locks"].insert_one(
+        {"_id": "stale-lock", "owner": "crashed-worker", "expires_at": 0.0}
+    )
+
+    async with db_client.lock("stale-lock", timeout=0.2):
+        held = await db_client.db["locks"].find_one({"_id": "stale-lock"})
+        assert held["owner"] != "crashed-worker"
+
+    assert await db_client.db["locks"].find_one({"_id": "stale-lock"}) is None
+
+
+@pytest.mark.asyncio
+async def test_update_writes_only_given_fields(db_client):
+    inserted = await db_client.db["models"].insert_one(
+        {"type": "cnn", "version": 1, "status": "training", "progress": 0, "score": 0}
+    )
+    model_id = str(inserted.inserted_id)
+    object_id = ObjectId(model_id)
+
+    await db_client.db["models"].update_one(
+        {"_id": object_id}, {"$set": {"status": "aborted"}}
+    )
+    await db_client.update("models", ModelUpdate(progress=50), object_id)
+
+    stored = await db_client.db["models"].find_one({"_id": object_id})
+    assert stored["status"] == "aborted"
+    assert stored["progress"] == 50
+
+
+@pytest.mark.asyncio
+async def test_update_with_no_fields_reports_match(db_client):
+    inserted = await db_client.db["models"].insert_one(
+        {"type": "cnn", "version": 1, "status": "training", "progress": 0, "score": 0}
+    )
+    model_id = str(inserted.inserted_id)
+
+    result = await db_client.update("models", ModelUpdate(), ObjectId(model_id))
+    assert result.matched_count == 1
+
+    result = await db_client.update("models", ModelUpdate(), ObjectId())
+    assert result.matched_count == 0

@@ -5,6 +5,7 @@
 "use client";
 
 import type { ImageAnnotation } from "@annotorious/react";
+import type { CreatedByFields } from "@/types";
 
 /** Frame number within a video (0-based). */
 export type FrameIndex = number;
@@ -40,7 +41,7 @@ export type InstanceProfile = {
   classId: number;
   trackId: string;
   type: VideoAnnotationType;
-  createdBy: string;
+  createdBy: CreatedByFields;
   frames: number[]; // unique, sorted
   count: number; // total shapes across frames
 };
@@ -49,8 +50,10 @@ export type InstanceProfile = {
 export type ByFrameMap = Map<FrameIndex, ImageAnnotation[]>;
 
 /** Backend payloads for video shapes. The same shapes also exist as Zod schemas in src/types.ts. */
-export type VideoBoundingBox = {
+export type VideoBoundingBox = Partial<CreatedByFields> & {
   type: "video_bounding_box";
+  /** Backend _id when this annotation already exists; absent for a new shape. */
+  _id?: string | null;
   frame: number;
   track_id: string;
   label: string;
@@ -58,30 +61,31 @@ export type VideoBoundingBox = {
   y_min: number;
   width: number;
   height: number;
-  created_by?: string;
   timestamp?: string;
   class_id?: number;
 };
 
-export type VideoPolygon = {
+export type VideoPolygon = Partial<CreatedByFields> & {
   type: "video_polygon";
+  /** Backend _id when this annotation already exists; absent for a new shape. */
+  _id?: string | null;
   frame: number;
   track_id: string;
   label: string;
   segmentation: number[][];
-  created_by?: string;
   timestamp?: string;
   class_id?: number;
 };
 
-export type VideoPoint = {
+export type VideoPoint = Partial<CreatedByFields> & {
   type: "video_point";
+  /** Backend _id when this annotation already exists; absent for a new shape. */
+  _id?: string | null;
   frame: number;
   track_id: string;
   label: string;
   x: number;
   y: number;
-  created_by?: string;
   timestamp?: string;
   class_id?: number;
 };

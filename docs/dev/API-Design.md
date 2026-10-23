@@ -30,7 +30,7 @@ Below is a brief outline of the design of the backend API and what each endpoint
 ## `/projects/{project_id}/samples/{sample_id}/annotations`
 - **GET**: Tell me the annotations already stored for this sample
 - **PUT**: Add human annotations for this sample
-- **DELETE**: Delete annotations for this sample
+- **DELETE**: Delete the annotations whose IDs are in the request body (a JSON list). If there is no body, delete ALL annotations for this sample
 
 ## `/projects/{project_id}/annotator/`
 - **GET**: Get a list of all annotators available for this task (not implemented)

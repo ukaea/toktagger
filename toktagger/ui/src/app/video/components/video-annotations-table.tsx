@@ -32,6 +32,7 @@ import Label from "@spectrum-icons/workflow/Label";
 import Target from "@spectrum-icons/workflow/Target";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/contexts/VideoContext";
+import { displayCreatedBy } from "@/types";
 import {
   DrawingTool,
   InstanceProfile,
@@ -294,7 +295,7 @@ export const VideoAnnotationsTable = () => {
                 <Cell>{instance.type}</Cell>
                 <Cell>{instance.trackId}</Cell>
                 <Cell>{instance.frames[0]}</Cell>
-                <Cell>{instance.createdBy}</Cell>
+                <Cell>{displayCreatedBy(instance.createdBy)}</Cell>
                 <Cell>
                   <VideoRowActions
                     instance={instance}

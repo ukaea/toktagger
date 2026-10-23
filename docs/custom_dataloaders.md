@@ -401,22 +401,63 @@ server.run()
 ```
 
 ## Using Docker
-If you are using the docker compose option to run the server, you can provide a custom script similar to the one above to add your own data loaders. To do this, create a file similar to the one above, but making sure to pass the following arguments into `server.run()`:
 
-```python
-server.run(
-    host="0.0.0.0",
-    port=8002
-)
+The production stack in `docker-compose.yml` runs the `api` service from the image `toktagger:latest`. That image does not contain your data loader. To add it, make a new image from `toktagger:latest`, and use a Compose override file to run your script in the `api` service. For the stack itself, read the [Deployment](deployment.md) guide.
+
+### Step 1: Put your files in one folder
+
+Make a folder `custom` next to `docker-compose.yml`. Put the files from the example above in it:
+
+```
+custom/
+├── Dockerfile
+├── loader.py
+├── run.py
+└── settings.py
 ```
 
-You can then provide the path to your script when running docker compose. For example, say we have the above script in a file called `custom_toktagger.py` - We simply need to add `CUSTOM_SCRIPT=./custom_toktagger.py` before the docker compose command, and a SQL URL as an environment variable:
+You do not need to set the host or the port in `run.py`. The image sets `SERVER_HOST=0.0.0.0` and `SERVER_PORT=8002`.
+
+### Step 2: Write the Dockerfile
+
+```dockerfile title="custom/Dockerfile"
+FROM toktagger:latest
+
+USER root
+# Install the packages that your data loader needs
+RUN pip --python /opt/venv/bin/python install --no-cache-dir sqlalchemy
+COPY . /opt/custom
+USER toktagger
+
+CMD ["python", "/opt/custom/run.py"]
+```
+
+If your data loader needs no other packages, remove the `RUN` line.
+
+### Step 3: Write the Compose override file
+
+```yaml title="docker-compose.custom.yml"
+services:
+  api:
+    build: !override
+      context: ./custom
+    image: toktagger-custom:latest
+    environment:
+      SQL_URL: ${SQL_URL:?}
+```
+
+Add the settings of your data loader to `environment`, and add their values to `.env`. For example, add `SQL_URL=<Your URL>` to `.env`.
+
+### Step 4: Start the stack
+
+Build the TokTagger image first. Your image starts from it:
 
 ```sh
-CUSTOM_SCRIPT=./custom_toktagger.py SQL_URL=<Your URL> docker compose --env-file .env.dev -f docker-compose.dev.yml up --build
+docker compose build api
+docker compose -f docker-compose.yml -f docker-compose.custom.yml up -d --build
 ```
 
-!!! tip
-    Make sure you provide the **path** to your script, and not a string. 
-    
-    e.g, provide `CUSTOM_SCRIPT=./custom_toktagger.py`, and **not** `CUSTOM_SCRIPT=custom_toktagger.py`.
+Do these two steps again after each update of TokTagger.
+
+!!! warning
+    `run.py` starts the server with `server.run()`, which uses one Uvicorn process. The stack ignores `SERVER_WORKERS` for this server. Gunicorn workers import `toktagger.api.asgi:app` and do not import your script, so they do not know your data loader.
