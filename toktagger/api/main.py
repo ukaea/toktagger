@@ -24,12 +24,17 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from fastmcp import FastMCP
+from fastmcp.server.providers.openapi import RouteMap, MCPType
+from fastmcp.utilities.lifespan import combine_lifespans
+
 from toktagger.api import config
 from toktagger.api.auth import oidc
 from toktagger.api.auth.core import get_internal_token, get_signing_secret
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
+from toktagger.api.routers.mcp import INSTRUCTIONS
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.auth import router as auth_router
@@ -82,9 +87,10 @@ async def lifespan(app: FastAPI):
     app.state.idp = oidc.IdentityProvider(config.settings.auth)
     await app.state.idp.connect()
 
-    yield
-
-    await app.state.db_client.client.close()
+    try:
+        yield
+    finally:
+        await app.state.db_client.client.close()
 
     # Tear down the Ray cluster we started so its raylet/worker processes don't
     # outlive the server on a graceful shutdown (Ctrl-C / SIGTERM). Guarded so
@@ -296,7 +302,52 @@ class Server:
                     "In testing mode, cache directories must be in temp directory!"
                 )
 
-        self.app = FastAPI(lifespan=lifespan)
+        self._api_app = FastAPI()
+
+        self._api_app.include_router(auth_router)
+        self._api_app.include_router(users_router)
+        self._api_app.include_router(annotations_router)
+        self._api_app.include_router(data_router)
+        self._api_app.include_router(models_router)
+        self._api_app.include_router(projects_router)
+        self._api_app.include_router(samples_router)
+        self._api_app.include_router(annotators_router)
+        self._api_app.include_router(paths_router)
+        self._api_app.include_router(meta_router)
+        self._api_app.include_router(base_router)
+
+        if config.settings.server.mcp_enabled:
+            self._mcp_app = FastMCP.from_fastapi(
+                self._api_app,
+                name="toktagger",
+                instructions=INSTRUCTIONS,
+                route_maps=[
+                    # Tagged routers turned into tools
+                    RouteMap(
+                        pattern=r"/.*",
+                        tags={"MCP"},
+                        mcp_type=MCPType.TOOL,
+                    ),
+                    # Routers without MCP tag are excluded
+                    RouteMap(
+                        pattern=r".*",
+                        mcp_type=MCPType.EXCLUDE,
+                    ),
+                ],
+            )
+
+            mcp_http_app = self._mcp_app.http_app("/")
+            self.app = FastAPI(
+                lifespan=combine_lifespans(lifespan, mcp_http_app.lifespan)
+            )
+        else:
+            self._mcp_app = None
+            self.app = FastAPI(lifespan=lifespan)
+
+        # MCP tools reach routes through the sub-app, so share the outer app's
+        # state object so request.app.state resolves in both
+        self._api_app.state = self.app.state
+
         self.app.add_exception_handler(LockTimeoutError, lock_timeout_handler)
 
         self.app.add_middleware(
@@ -330,17 +381,10 @@ class Server:
             name="assets",
         )
 
-        self.app.include_router(auth_router)
-        self.app.include_router(users_router)
-        self.app.include_router(annotations_router)
-        self.app.include_router(data_router)
-        self.app.include_router(models_router)
-        self.app.include_router(projects_router)
-        self.app.include_router(samples_router)
-        self.app.include_router(annotators_router)
-        self.app.include_router(paths_router)
-        self.app.include_router(meta_router)
-        self.app.include_router(base_router)
+        if config.settings.server.mcp_enabled:
+            self.app.mount("/mcp", mcp_http_app)
+
+        self.app.include_router(self._api_app.router)
 
     def run(self):
         """Launch the TokTagger server using the host/port from configuration."""
