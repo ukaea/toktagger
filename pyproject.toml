@@ -46,6 +46,7 @@ dependencies = [
   "httpx>=0.28.1",
   "canaille[front,oidc,server,sqlite]>=0.2.7",
   "joserfc>=1.6,<1.8",
+  "fastmcp>=4.1.6",
 ]
 [project.optional-dependencies]
 models = [

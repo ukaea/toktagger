@@ -11,6 +11,7 @@ import pytest_asyncio
 import requests
 from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
+from fastmcp import Client
 
 from tests import db_definitions, endpoints
 from tests.db_definitions import USER_ADMIN_ID
@@ -135,7 +136,7 @@ async def db_client(settings):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
+async def api_server(tmp_path, monkeypatch, db_client):
     monkeypatch.setattr(config.settings.server, "cache_dir", tmp_path)
     monkeypatch.setattr(auth_core, "_serializer", None)
     monkeypatch.setattr(auth_core, "_fernet", None)
@@ -144,7 +145,13 @@ async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
     server.testing_mode = True
     monkeypatch.setenv("API_URL", "http://test")
     server._setup_app()
-    app = server.app
+
+    yield server
+
+
+@pytest_asyncio.fixture(scope="function")
+async def unauthenticated_api_client(api_server, db_client):
+    app = api_server.app
     app.state.db_client = db_client
     app.state.project = None
     app.state.idp = None
@@ -169,6 +176,16 @@ async def api_client(unauthenticated_api_client, db_client):
         session_headers(get_auth_token(USER_ADMIN_ID))
     )
     yield unauthenticated_api_client
+
+
+@pytest_asyncio.fixture(scope="function")
+async def mcp_client(api_server, db_client):
+    # Lifespan
+    api_server._api_app.state.db_client = db_client
+    api_server._api_app.state.project = None
+
+    async with Client(api_server._mcp_app) as client:
+        yield client
 
 
 @pytest_asyncio.fixture(scope="function")
