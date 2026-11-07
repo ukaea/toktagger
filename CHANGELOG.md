@@ -1,5 +1,25 @@
 # Change Log
 
+## [v0.4.0](https://github.com/ukaea/toktagger/releases/tag/v0.4.0) - 2025-10-27
+* Added support for multi-user deployments
+* Added support for OIDC authentication layer
+* Added Profile2D UI
+* Added support for XY point annotations in Video UI
+* Added whole-frame label annotation to Video UI
+* Added support for Polygon and Bounding Box tooling using D3 and harmonize with Video tooling
+* Added support for model prediction from within Video UI toolbar
+* Added support for YOLO object detection ML models
+* Added support for loading ML model weights from GitLab and Hugging Face
+* Added support ML models which require more than one file to be saved/loaded
+* Added controls for adding & removing list items in dynamic schema UI forms
+* Added support for retrieving raw data from Image dataloaders
+* Fixed bug with rco camera loading in UDA camera dataloader
+* Fixed race condition during rapid frame navigation in Video view
+* Fixed shot label sticking bug within polygon tooling in Profile2D
+* Improved forward propagation of annotations within Video UI
+* Standardised annotation tables across all UI views & added annotation highlighting and deletion
+* Usability improvements to Add Samples, Time Series & Annotation Toolbar UIs
+
 ## [v0.3.1](https://github.com/ukaea/toktagger/releases/tag/v0.3.1) - 2025-07-03
 * Fixed bug related to loading float numpy arrays as images
 

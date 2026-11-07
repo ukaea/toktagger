@@ -3,8 +3,8 @@
  * There is no React here, so this is the easiest place to read the rules.
  */
 import type { ImageAnnotation } from "@annotorious/react";
-import type { Annotation } from "@/types";
-import { VideoFrameLabelSchema } from "@/types";
+import type { Annotation, CreatedByFields } from "@/types";
+import { pickCreatedBy, VideoFrameLabelSchema } from "@/types";
 import type {
   ByFrameMap,
   FrameIndex,
@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { makeTrackKey, buildSourceKey, VideoAnnotationType } from "./types";
 import {
+  getAnnotationAuthor,
   getAnnotationCreator,
   getLabelTrack,
   isPointAnno,
@@ -249,7 +250,7 @@ export function deriveInstances(
           className,
           trackId,
           type: shapeAnnotationType(a),
-          createdBy: getAnnotationCreator(a),
+          createdBy: getAnnotationAuthor(a),
           frames: [frame],
           count: 1,
         });
@@ -366,7 +367,7 @@ export function deriveFrameLabelInstances(
     {
       className: string;
       trackId: string;
-      createdBy: string;
+      createdBy: CreatedByFields;
       frames: Set<number>;
     }
   >();
@@ -382,7 +383,7 @@ export function deriveFrameLabelInstances(
     const entry = framesByKey.get(key) ?? {
       className,
       trackId,
-      createdBy: annotation.created_by,
+      createdBy: pickCreatedBy(annotation),
       frames: new Set<number>(),
     };
     entry.frames.add(annotation.frame);

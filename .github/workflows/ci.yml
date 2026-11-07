@@ -35,6 +35,25 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check toktagger tests --ignore=C901 && uv run ruff format --check toktagger tests
 
+  compose:
+    name: Compose Smoke Test (${{ matrix.extras || 'no extras' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        extras: ["", "models"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Smoke test the production stack
+        env:
+          TOKTAGGER_EXTRAS: ${{ matrix.extras }}
+        run: ./scripts/compose_smoke_test.sh
+
   eslint:
     name: ESLint
     runs-on: ubuntu-latest
@@ -86,8 +105,6 @@ jobs:
   test_models_disabled:
     name: Pytest (Models Disabled)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     strategy:
       matrix:
         python-version: [3.11]
@@ -105,19 +122,21 @@ jobs:
         run: pip install uv
 
       - name: Install playwright
-        run: uv run --group dev python -m playwright install --with-deps
+        # Chromium only (the e2e suite never runs another browser) keeps the apt download small; duration still swings with GitHub's apt/CDN throughput.
+        timeout-minutes: 20
+        run: uv run --group dev python -m playwright install --with-deps chromium
 
       - name: Run unit tests
+        timeout-minutes: 15
         run: uv run --group dev pytest tests/api
 
       - name: Run end to end tests
+        timeout-minutes: 15
         run: uv run --group dev pytest tests/end_to_end
 
   test_models_enabled:
     name: Pytest (Models Enabled)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     strategy:
       matrix:
         python-version: [3.11]
@@ -135,15 +154,20 @@ jobs:
         run: pip install uv
 
       - name: Install playwright
-        run: uv run --all-extras python -m playwright install --with-deps
+        # Chromium only (the e2e suite never runs another browser) keeps the apt download small; duration still swings with GitHub's apt/CDN throughput.
+        timeout-minutes: 20
+        run: uv run --all-extras python -m playwright install --with-deps chromium
 
       - name: Run unit tests
+        timeout-minutes: 15
         run: uv run --all-extras pytest tests/api
 
       - name: Run end to end tests
+        timeout-minutes: 15
         run: uv run --all-extras pytest tests/end_to_end
 
   build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

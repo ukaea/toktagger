@@ -3,13 +3,21 @@ import { ListView, Item } from "@adobe/react-spectrum";
 import { Annotation, ClassLabel } from "@/types";
 import { Selection } from "@react-types/shared";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useAuth } from "@/app/contexts/AuthContext";
 
 export type ShotLabelsType = {
   labels: string[];
+  // Supplied by the toolbar, which already resolves the project role, so this does
+  // not cost another membership request.
+  canAnnotate?: boolean;
 };
 
-export function ShotLabels({ labels = [] }: ShotLabelsType) {
+export function ShotLabels({
+  labels = [],
+  canAnnotate = true,
+}: ShotLabelsType) {
   const { project, sample, annotations, setAnnotations } = useSample();
+  const { user } = useAuth();
   const items = labels.map((label, index) => ({ id: index, name: label }));
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
@@ -28,6 +36,8 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
   }, [annotations, setSelectedKeys, labels]);
 
   const onSelectionChange = (keys: Selection) => {
+    // Gate the handler, not just the ListView: the number-key shortcut also routes through here.
+    if (!canAnnotate) return;
     let newKeys = new Set<string>();
     if (keys === "all") {
       items.forEach((item) => newKeys.add(item.id.toString()));
@@ -54,7 +64,9 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
           shot_id: sample?.shot_id,
           type: "class_label",
           label: item.name,
-          created_by: "manual",
+          // Authored by whoever selected the label; the server stamps the same
+          // user ID on save.
+          created_by: user?._id ?? "manual",
         } as ClassLabel);
       });
       return newAnnotations;
@@ -94,7 +106,7 @@ export function ShotLabels({ labels = [] }: ShotLabelsType) {
         items={items}
         selectedKeys={selectedKeys}
         onSelectionChange={onSelectionChange}
-        selectionMode="multiple"
+        selectionMode={canAnnotate ? "multiple" : "none"}
         aria-label="Labels"
         maxWidth="size-6000"
       >

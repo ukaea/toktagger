@@ -93,6 +93,9 @@ type VideoSessionCtx = {
   setDrawingTool: (tool: ActiveDrawingTool) => void;
   editMode: boolean;
   setEditMode: (v: boolean) => void;
+  // Project admin or annotator. False for a viewer, who is pinned out of edit mode and
+  // must not be offered any control that creates, edits or deletes annotations.
+  canAnnotate: boolean;
   drawIntent: boolean;
   canDrawShape: boolean;
   canDrawPoint: boolean;
@@ -372,7 +375,10 @@ function frameLabelMatchesInstance(
   );
 }
 
-function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
+function videoAnnotationsFromByFrame(
+  byFrame: ByFrameMap,
+  previousById: Map<string, Annotation>,
+): Annotation[] {
   const out: Annotation[] = [];
 
   for (const [frame, list] of byFrame.entries()) {
@@ -381,7 +387,21 @@ function videoAnnotationsFromByFrame(byFrame: ByFrameMap): Annotation[] {
       if (!shape) continue;
 
       const parsed = VideoShapeSchema.safeParse(shape);
-      if (parsed.success) out.push(parsed.data);
+      if (!parsed.success) continue;
+
+      // Annotorious keeps only geometry and identity, so a saved shape's review state comes from its previous copy.
+      const previous = parsed.data._id
+        ? previousById.get(parsed.data._id)
+        : undefined;
+      out.push(
+        previous
+          ? {
+              ...parsed.data,
+              validated: previous.validated,
+              uncertainty: previous.uncertainty,
+            }
+          : parsed.data,
+      );
     }
   }
 
@@ -393,11 +413,16 @@ function replaceVideoAnnotations(
   annotations: Annotation[],
   byFrame: ByFrameMap,
 ): Annotation[] {
+  const previousById = new Map(
+    (annotations ?? []).flatMap((annotation): [string, Annotation][] =>
+      annotation._id ? [[annotation._id, annotation]] : [],
+    ),
+  );
   return [
     ...(annotations ?? []).filter(
       (annotation) => !isVideoAnnotationType(annotation),
     ),
-    ...videoAnnotationsFromByFrame(byFrame),
+    ...videoAnnotationsFromByFrame(byFrame, previousById),
   ];
 }
 
@@ -425,6 +450,7 @@ export function VideoSessionProvider(props: {
     annotations,
     isLoading,
     setAnnotations: setSampleAnnotations,
+    canAnnotate,
   } = useSample();
   const {
     videoEditMode,
@@ -487,7 +513,9 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] =
     useState<ActiveDrawingTool>(videoDrawingTool);
-  const [editMode, setEditModeState] = useState(videoEditMode);
+  const [storedEditMode, setEditModeState] = useState(videoEditMode);
+  // Derived rather than clamped into state, so the saved choice survives canAnnotate resolving late.
+  const editMode = canAnnotate && storedEditMode;
   const [ctrlHeld, setCtrlHeld] = useState(false);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
   const hideAnnotationsRef = useRef(false);
@@ -707,8 +735,11 @@ export function VideoSessionProvider(props: {
     setVideoDrawingTool(tool);
   };
 
+  // Gate the setter rather than only the toolbar button, so the "e" shortcut cannot
+  // enter edit mode either. Mirrors TimeSeriesContext's setEditMode wrapper.
   const setEditMode = (v: boolean) => {
     if (hideAnnotationsRef.current) return;
+    if (!canAnnotate) return;
     api?.cancelDrawing?.();
     api?.setSelected?.();
     flushPendingOverlay();
@@ -770,6 +801,7 @@ export function VideoSessionProvider(props: {
   }, [api, editMode, flushCurrentFrameOverlay, setEditMode]);
 
   const clearFrames = (which: "current" | "all") => {
+    if (!canAnnotate) return;
     api?.setSelected?.();
     flushPendingOverlay();
     pendingFocusRef.current = null;
@@ -830,6 +862,7 @@ export function VideoSessionProvider(props: {
   };
 
   const deleteInstanceAcrossFrames = (className: string, trackId: string) => {
+    if (!canAnnotate) return;
     const cls = (className || "").trim();
     const tid = canonicalizeTrackId(trackId || "");
     if (!cls || !tid) return;
@@ -859,6 +892,7 @@ export function VideoSessionProvider(props: {
   };
 
   const deleteInstanceOnCurrentFrame = (className: string, trackId: string) => {
+    if (!canAnnotate) return;
     const cls = (className || "").trim();
     const tid = canonicalizeTrackId(trackId || "");
     if (!cls || !tid) return;
@@ -904,6 +938,7 @@ export function VideoSessionProvider(props: {
 
   // Annotorious has no point tool, so points are built here and pushed in directly
   const createPointAnnotation = (point: { x: number; y: number }) => {
+    if (!canAnnotate) return;
     if (!api?.getAnnotations) return;
 
     const cls = (selection.className ?? "").trim();
@@ -1311,6 +1346,7 @@ export function VideoSessionProvider(props: {
   };
 
   const deleteAnnotation = (id: string) => {
+    if (!canAnnotate) return;
     if (!id) return;
     api?.removeAnnotation?.(id);
     api?.setSelected?.();
@@ -1351,6 +1387,7 @@ export function VideoSessionProvider(props: {
     setDrawingTool,
     editMode,
     setEditMode,
+    canAnnotate,
     drawIntent,
     canDrawShape,
     canDrawPoint,

@@ -1,14 +1,23 @@
-from fastapi import APIRouter, Request, Depends
-from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.schemas.models import LoadMethods
-from toktagger.api.models import models_dependencies_installed, check_models_enabled
 import typing
-import toktagger.api.config as config
+
+from fastapi import APIRouter, Depends, Request
+
+from toktagger.api import config
+from toktagger.api.auth.dependencies import get_current_user
+from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.models import check_models_enabled, models_dependencies_installed
+from toktagger.api.schemas.models import LoadMethods
 
 if models_dependencies_installed():
     from toktagger.api.models.base import ModelRegistry
+else:
+    ModelRegistry = None
 
-router = APIRouter(prefix="/meta", tags=["Metadata"])
+router = APIRouter(
+    prefix="/meta",
+    tags=["Metadata"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/dataloader")
@@ -21,6 +30,12 @@ async def get_dataloaders(request: Request) -> list[str]:
 async def get_data_schema(loader: str) -> dict[str, typing.Any]:
     """Get schema which is required for getting data with this dataloader"""
     return LoaderRegistry.get_data_schema(loader)
+
+
+@router.get("/dataloader/{loader}/help")
+async def get_signal_name_help(loader: str) -> str | None:
+    """Get help text which describes the signal names this dataloader expects."""
+    return LoaderRegistry.get_signal_name_help(loader)
 
 
 @router.get(

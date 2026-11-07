@@ -1,17 +1,19 @@
-import toktagger.api.core.annotators as annotators
 import numpy
-from scipy.datasets import electrocardiogram
-from toktagger.api.schemas.annotations import Polygon as PolygonAnnotation
-from toktagger.api.schemas.data import TimeSeriesData, MultiVariateTimeSeriesData
 import numpy as np
+import pytest
+from scipy.datasets import electrocardiogram
+
+from toktagger.api.core import annotators
+from toktagger.api.schemas.annotations import Polygon as PolygonAnnotation
 from toktagger.api.schemas.annotators import (
     AnnotatorTypes,
-    PeakDetectionParams,
-    OutlierDetectionParams,
-    JumpDetectionParams,
-    Profile2DThresholdParams,
     ChangePointDetectionParams,
+    JumpDetectionParams,
+    OutlierDetectionParams,
+    PeakDetectionParams,
+    Profile2DThresholdParams,
 )
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
 
 
 def test_find_peaks():
@@ -192,9 +194,21 @@ def test_profile_2d_threshold():
     assert len(result) > 0
     for annotation in result:
         assert isinstance(annotation, PolygonAnnotation)
-        assert annotation.created_by == AnnotatorTypes.PROFILE_2D_THRESHOLD
+        assert (
+            annotation.created_by
+            == f"annotators::{AnnotatorTypes.PROFILE_2D_THRESHOLD.value}"
+        )
         assert annotation.signal_name == "Ip"
         # COCO segmentation: one ring of at least three (x, y) pairs.
         assert len(annotation.segmentation) == 1
         assert len(annotation.segmentation[0]) >= 6
         assert len(annotation.segmentation[0]) % 2 == 0
+
+
+def test_profile_2d_threshold_missing_signal_raises():
+    mv_data = MultiVariateTimeSeriesData(values={"Ip": None})
+    params = Profile2DThresholdParams(signal_name="Ip", percentile=95)
+    annotator = annotators.Profile2DThresholdAnnotator(params)
+
+    with pytest.raises(TypeError, match="does not exist"):
+        annotator.predict(mv_data)

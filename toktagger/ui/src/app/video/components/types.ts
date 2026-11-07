@@ -2,6 +2,7 @@
  * Types used across the video view: the drawing tools, the selection and one table row (InstanceProfile).
  */
 import type { ImageAnnotation } from "@annotorious/react";
+import type { CreatedByFields } from "@/types";
 
 /** Frame number within a video (0-based). */
 export type FrameIndex = number;
@@ -32,7 +33,7 @@ export type InstanceProfile = {
   className: string;
   trackId: string;
   type: VideoAnnotationType;
-  createdBy: string;
+  createdBy: CreatedByFields;
   frames: number[]; // unique, sorted
   count: number; // total shapes across frames
 };

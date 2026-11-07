@@ -18,6 +18,7 @@ import React, {
 } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useSample } from "./SampleContext";
+import { useAuth } from "./AuthContext";
 import {
   convertRawAnnotationsToTimeSeries,
   convertTimeSeriesToRawAnnotations,
@@ -58,6 +59,7 @@ type TimeSeriesState = {
   ongoingAction: boolean;
   categories: Map<string, TimeSeriesCategory>;
   editMode: boolean;
+  canAnnotate: boolean;
   focusXRange: [number, number] | null;
 };
 
@@ -140,11 +142,13 @@ export const TimeSeriesProvider = ({
     annotations: rawAnnotations,
     setAnnotations: setRawAnnotations,
     project,
+    canAnnotate,
   } = useSample();
 
   // project is guaranteed non-null here: TimeSeriesProvider is only rendered
   // after SampleView confirms project is loaded.
   const projectId = project?._id ?? "";
+  const { user } = useAuth();
 
   const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
   const [toolingCallbacks, setToolingCallbacks] = useState<
@@ -164,11 +168,27 @@ export const TimeSeriesProvider = ({
   const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(
     new Map(),
   );
-  const [editMode, setEditMode] = useState<boolean>(
+  const [editMode, setEditModeRaw] = useState<boolean>(
     () => sessionStorage.getItem(`ts-edit-mode-${projectId}`) === "true",
   );
   const [ongoingAction, setOngoingAction] = useState(false);
   const [focusXRange, setFocusXRange] = useState<[number, number] | null>(null);
+
+  // Viewers can't enter edit mode - gated here (rather than only disabling the
+  // toolbar button) so the "e" keyboard shortcut is blocked too.
+  const setEditMode = (update: boolean | ((prev: boolean) => boolean)) => {
+    setEditModeRaw((prev) => {
+      const next = typeof update === "function" ? update(prev) : update;
+      return canAnnotate ? next : false;
+    });
+  };
+
+  // If the role check resolves to "can't annotate" after edit mode was already on
+  // (e.g. restored from a previous session, or a mid-session role change), drop back
+  // to view mode.
+  useEffect(() => {
+    if (!canAnnotate) setEditModeRaw(false);
+  }, [canAnnotate]);
 
   // Persist editMode to sessionStorage on every change
   useEffect(() => {
@@ -231,10 +251,37 @@ export const TimeSeriesProvider = ({
   const mergeTimeSeriesAnnotations = (
     previous: Annotation[],
     updated: TimeSeriesAnnotation[],
-  ): Annotation[] => [
-    ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
-    ...parseTimeSeriesAnnotations(updated),
-  ];
+  ): Annotation[] => {
+    // TimeSeriesAnnotation carries none of project_id, sample_id, shot_id, timestamp,
+    // validated or uncertainty, so the conversion back has to invent them. Right for a
+    // shape drawn here, but for an annotation that already exists those invented values
+    // would be written over the stored ones - downgrading somebody else's validated
+    // work on any edit before a save, and making every untouched annotation look edited
+    // to othersHaveUnsavedEdits (see core.tsx), which diffs on the full object.
+    const stored = new Map(
+      previous
+        .filter((annotation) => annotation._id)
+        .map((annotation) => [annotation._id, annotation]),
+    );
+    return [
+      ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
+      ...parseTimeSeriesAnnotations(updated).map((annotation) => {
+        const existing = annotation._id
+          ? stored.get(annotation._id)
+          : undefined;
+        if (!existing) return annotation;
+        return {
+          ...annotation,
+          project_id: existing.project_id,
+          sample_id: existing.sample_id,
+          shot_id: existing.shot_id,
+          timestamp: existing.timestamp,
+          validated: existing.validated,
+          uncertainty: existing.uncertainty,
+        };
+      }),
+    ];
+  };
 
   // Discards any in-progress annotation for the currently active tool and clears the
   // ongoing-action flag - used whenever a draw is abandoned rather than completed normally
@@ -332,7 +379,9 @@ export const TimeSeriesProvider = ({
     const id = uuidv4();
     return {
       id,
-      created_by: "manual",
+      db_id: null,
+      created_by: user?._id ?? "manual",
+      created_by_name: user?.username,
       label,
       signal_name: signalName,
       type,
@@ -536,12 +585,21 @@ export const TimeSeriesProvider = ({
     setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, updatedState));
   };
 
-  const batchDeleteAnnotations = () => {
-    const updatedState = annotations.filter(
-      (annotation) => !annotation.selected,
+  // Writes straight through to the sample's annotations, unlike removeAnnotation,
+  // which only drops a half-drawn shape from this view's own working copy.
+  const deleteAnnotations = (
+    shouldDelete: (annotation: TimeSeriesAnnotation) => boolean,
+  ) => {
+    setRawAnnotations((prev) =>
+      mergeTimeSeriesAnnotations(
+        prev,
+        annotations.filter((annotation) => !shouldDelete(annotation)),
+      ),
     );
-    setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, updatedState));
   };
+
+  const batchDeleteAnnotations = () =>
+    deleteAnnotations((annotation) => annotation.selected ?? false);
 
   const actionsValue: TimeSeriesActions = {
     setAnnotations,
@@ -569,6 +627,7 @@ export const TimeSeriesProvider = ({
     ongoingAction,
     categories,
     editMode,
+    canAnnotate,
     focusXRange,
   };
 
@@ -594,6 +653,15 @@ export const TimeSeriesProvider = ({
     setRawAnnotations,
   ]);
 
+  // setEditMode is re-created whenever canAnnotate changes, so it's read through a ref
+  // rather than a dependency here - re-registering these listeners on that change would
+  // tear down the "Control" keydown/keyup pair mid-drag and break the ctrl-drag gesture
+  // tools rely on to draw. The ref always has the latest guard.
+  const setEditModeRef = useRef(setEditMode);
+  useEffect(() => {
+    setEditModeRef.current = setEditMode;
+  }, [setEditMode]);
+
   useEffect(() => {
     const keyDownHandler = (event: KeyboardEvent) => {
       if (isEditableEventTarget(event.target)) return;
@@ -603,7 +671,7 @@ export const TimeSeriesProvider = ({
       }
 
       if (event.key === "e") {
-        setEditMode((prev) => !prev);
+        setEditModeRef.current((prev) => !prev);
       }
     };
 
@@ -667,7 +735,9 @@ export const TimeSeriesProvider = ({
               }
 
               // If the annotation is not selected, only delete this one
-              removeAnnotation(props.annotation.id);
+              deleteAnnotations(
+                (candidate) => candidate.id === props.annotation.id,
+              );
             }}
           >
             Delete
