@@ -1,27 +1,32 @@
-import toktagger.api.core.data_loaders as data_loaders
-import pytest
-from toktagger.api.schemas.projects import Task
-from typing import Type
-from toktagger.api.schemas.samples import (
-    Sample,
-    TimeSeriesFileData,
-    ShotData,
-    ImageFileData,
-    ImageArrayFileData,
-)
-from toktagger.api.schemas.data import (
-    TimeSeriesData,
-    MultiVariateTimeSeriesData,
-    ImageData,
-    ImageParams,
-    DataParams,
-)
-import pathlib
-import numpy
-import xarray
-from PIL import Image
 import base64
 import io
+import pathlib
+
+import numpy
+import pytest
+import xarray
+from PIL import Image
+
+from toktagger.api.core import data_loaders
+from toktagger.api.core.views import Profile2DView
+from toktagger.api.schemas.data import (
+    DataParams,
+    ImageData,
+    ImageParams,
+    MultiProfile2DData,
+    MultiVariateTimeSeriesData,
+    Profile2DData,
+    TimeSeriesData,
+)
+from toktagger.api.schemas.projects import Task
+from toktagger.api.schemas.samples import (
+    ImageArrayFileData,
+    ImageFileData,
+    Sample,
+    ShotData,
+    TimeSeriesFileData,
+)
+from toktagger.api.schemas.views import Profile2DViewParams
 
 
 def test_image_file_loader_jpeg():
@@ -188,13 +193,6 @@ def test_parquet_file_loader():
 
 
 def test_uda_loader(uda_test):
-    try:
-        import pyuda
-
-        pyuda.Client().get("help::help()")
-    except Exception:
-        pytest.skip("Could not contact UDA server")
-
     uda_shot = ShotData(protocol="uda", signal_names=["ip", "ANE_DENSITY"])
     sample = Sample(
         shot_id=14892,
@@ -218,14 +216,7 @@ def test_uda_loader(uda_test):
     assert numpy.max(times) < 1.5
 
 
-def test_uda_camera_loader(uda_env_vars):
-    try:
-        import pyuda
-
-        pyuda.Client().get("help::help()")
-    except Exception:
-        pytest.skip("Could not contact UDA server")
-
+def test_uda_camera_loader(uda_test):
     camera_name = "rba"
     uda_shot = ShotData(protocol="uda", signal_names=[camera_name])
     sample = Sample(
@@ -536,14 +527,7 @@ def test_image_array_file_loader_upper_out_of_range_frame():
         )
 
 
-def test_uda_loader_data_doesnt_exist(uda_env_vars):
-    try:
-        import pyuda
-
-        pyuda.Client().get("help::help()")
-    except Exception:
-        pytest.skip("Could not contact UDA server")
-
+def test_uda_loader_data_doesnt_exist(uda_test):
     uda_shot = ShotData(protocol="uda", signal_names=["doesnt_exist"])
     sample = Sample(
         shot_id=10000,
@@ -568,7 +552,7 @@ def test_sal_loader():
         client = SALClient("https://sal.jetdata.eu")
         client.prompt_for_password = False
         client.authenticate()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- any failure means the external server is unreachable
         pytest.skip("Could not contact SAL server")
 
     sal_shot = ShotData(protocol="sal", signal_names=["ppf/signal/jetppf/magn/ipla"])
@@ -698,7 +682,7 @@ async def test_custom_data_loader(api_client):
     @data_loaders.LoaderRegistry.register("test")
     class CustomLoader(data_loaders.DataLoader):
         @classmethod
-        def sample_data_type(self) -> Type[ShotData]:
+        def sample_data_type(self) -> type[ShotData]:
             return ShotData
 
         def get_sample(self, sample: Sample, params: DataParams, **kwargs):
@@ -760,3 +744,89 @@ def test_loader_registry(name, data_loader, sample_data_model):
         data_loaders.LoaderRegistry.get_data_schema(name)
         == sample_data_model.model_json_schema()
     )
+
+
+def test_uda_loader_keeps_missing_signal_as_none(monkeypatch):
+    present = TimeSeriesData(time=[0.0, 1.0], values=[1.0, 2.0])
+
+    def fake_get_uda_signal(name, *args, **kwargs):
+        if name == "missing":
+            raise RuntimeError("signal not found")
+        return present
+
+    monkeypatch.setattr(data_loaders, "_get_uda_signal", fake_get_uda_signal)
+    sample = Sample(
+        shot_id=1,
+        data=ShotData(protocol="uda", signal_names=["ip", "missing"]),
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+
+    data = data_loaders.UDADataLoader().get_sample(sample, params=DataParams())
+
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    assert data.values == {"ip": present, "missing": None}
+
+
+def test_profile_view_returns_empty_profile_for_missing_signal():
+    view = Profile2DView(Profile2DViewParams(signal_name="missing"))
+    data = MultiVariateTimeSeriesData(values={"missing": None})
+
+    assert view(data) == Profile2DData(time=[], dim_1=[], values=[])
+
+
+def test_profile_view_missing_signal_in_multi_profile_data():
+    profile = Profile2DData(time=[0.0, 1.0], dim_1=[0.0, 1.0], values=[[1.0, 2.0]] * 2)
+    data = MultiProfile2DData(values={"a": profile, "missing": None})
+
+    view = Profile2DView(Profile2DViewParams(signal_name="missing"))
+    assert view(data) == Profile2DData(time=[], dim_1=[], values=[])
+
+    loaded = Profile2DView(Profile2DViewParams(signal_name="a"))(data)
+    assert loaded.time == [0.0, 1.0]
+
+
+def test_combine_signals_time_series_with_missing():
+    ts = TimeSeriesData(time=[0.0], values=[1.0])
+    result = data_loaders._combine_signals({"a": ts, "b": None}, "none", "mixed")
+    assert isinstance(result, MultiVariateTimeSeriesData)
+    assert result.values == {"a": ts, "b": None}
+
+
+def test_combine_signals_profiles_with_missing():
+    profile = Profile2DData(time=[0.0], dim_1=[0.0], values=[[1.0]])
+    result = data_loaders._combine_signals({"a": profile, "b": None}, "none", "mixed")
+    assert isinstance(result, MultiProfile2DData)
+    assert result.values == {"a": profile, "b": None}
+
+
+def test_combine_signals_all_missing_raises():
+    with pytest.raises(data_loaders.DataLoaderError, match="none"):
+        data_loaders._combine_signals({"a": None, "b": None}, "none", "mixed")
+
+
+def test_combine_signals_mixed_types_raises():
+    ts = TimeSeriesData(time=[0.0], values=[1.0])
+    profile = Profile2DData(time=[0.0], dim_1=[0.0], values=[[1.0]])
+    with pytest.raises(data_loaders.DataLoaderError, match="mixed"):
+        data_loaders._combine_signals(
+            {"a": ts, "b": profile, "c": None}, "none", "mixed"
+        )
+
+
+def test_uda_loader_all_signals_missing_raises(monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("signal not found")
+
+    monkeypatch.setattr(data_loaders, "_get_uda_signal", fail)
+    sample = Sample(
+        shot_id=1,
+        data=ShotData(protocol="uda", signal_names=["a", "b"]),
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+
+    with pytest.raises(data_loaders.DataLoaderError):
+        data_loaders.UDADataLoader().get_sample(sample, params=DataParams())

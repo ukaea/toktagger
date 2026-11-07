@@ -56,6 +56,12 @@ Annotators = "annotators.md"
 "Data Loaders" = "data_loaders.md"
 
 [[project.nav]]
+"User Management" = "user_management.md"
+
+[[project.nav]]
+Deployment = "deployment.md"
+
+[[project.nav]]
 Advanced = [
     {"Custom Data Loaders" = "custom_dataloaders.md"},
     {"Custom Models" = "custom_models.md"},

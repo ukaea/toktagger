@@ -1,19 +1,26 @@
+import asyncio
+import importlib
+import multiprocessing
+import os
+import pathlib
+import tempfile
+import time
+
 import pytest
 import pytest_asyncio
-from toktagger.api.main import Server
-from toktagger.api.crud.db import MongoDBClient
-import tests.db_definitions as db_definitions
-from bson.objectid import ObjectId
-import asyncio
-from httpx import AsyncClient, ASGITransport
-import os
-import multiprocessing
 import requests
-import time
-import tempfile
-import toktagger.api.config as config
-import importlib
-import pathlib
+from bson.objectid import ObjectId
+from httpx import ASGITransport, AsyncClient
+
+from tests import db_definitions, endpoints
+from tests.db_definitions import USER_ADMIN_ID
+from tests.identity import get_auth_token, session_cookies, session_headers
+from toktagger.api import config
+from toktagger.api.auth.canaille import ManagedCanaille, managed_idp
+from toktagger.api.auth.cookies import CSRF_COOKIE_NAME
+from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.main import Server
+import toktagger.api.auth.core as auth_core
 
 MODELS_ENABLED = importlib.util.find_spec("ray") is not None
 
@@ -28,34 +35,44 @@ def check_models_status(request):
 
 if MODELS_ENABLED:
     from tests.models_fixtures import (
-        ray_session as ray_session,
-        setup_model_samples as setup_model_samples,
-        setup_model_db as setup_model_db,
         models_api_client as models_api_client,
+    )
+    from tests.models_fixtures import (
+        ray_session as ray_session,
+    )
+    from tests.models_fixtures import (
+        setup_model_db as setup_model_db,
+    )
+    from tests.models_fixtures import (
+        setup_model_samples as setup_model_samples,
     )
 
 else:
-    error_msg = """ You have attempted to run a test which uses a fixture that requires models,
-            but the models optional dependencies (Ray) are not installed, 
-            and this test was not marked as a 'models_enabled' test.
-            Please review the fixture usage of this test, or mark it accurately.
-            """
+    _error_msg = (
+        "You have attempted to run a test which uses a fixture that requires models, "
+        "but the models optional dependencies (Ray) are not installed, "
+        "and this test was not marked as a 'models_enabled' test. "
+        "Please review the fixture usage of this test, or mark it accurately."
+    )
 
     @pytest.fixture()
     def ray_session():
-        raise pytest.UsageError(error_msg)
+        raise pytest.UsageError(_error_msg)
 
     @pytest.fixture()
     def setup_model_samples():
-        raise pytest.UsageError(error_msg)
+        raise pytest.UsageError(_error_msg)
 
     @pytest.fixture()
     def setup_model_db():
-        raise pytest.UsageError(error_msg)
+        raise pytest.UsageError(_error_msg)
 
     @pytest.fixture()
     def models_api_client():
-        raise pytest.UsageError(error_msg)
+        raise pytest.UsageError(_error_msg)
+
+
+E2E_ADMIN_PASSWORD = "e2e-admin-password-1"
 
 
 @pytest.fixture(scope="session")
@@ -71,25 +88,31 @@ def uda_test(uda_env_vars):
         import pyuda
 
         pyuda.Client().get("help::help()")
-    except Exception:
+    except Exception:  # noqa: BLE001 -- any failure means the external server is unreachable
         pytest.skip("Could not contact UDA server")
 
 
 @pytest.fixture(scope="session")
 def settings():
+    """Session-scoped config object with temp dirs for models storage.
+
+    Required by ray_session (models_fixtures.py) for MODEL_STORAGE env var.
+    Also patches the module-level config.settings so model fixtures that
+    reference config.settings.models.cache_dir work correctly.
+    """
     with tempfile.TemporaryDirectory(suffix="toktagger_") as tempd:
-        pathlib.Path(tempd).joinpath("models").mkdir(exist_ok=True)
-        settings = config.Settings(
+        models_dir = pathlib.Path(tempd) / "models"
+        models_dir.mkdir(exist_ok=True)
+        s = config.Settings(
             server=config.Server(cache_dir=tempd),
-            models=config.Models(
-                cache_dir=pathlib.Path(tempd).joinpath("models"), max_actors=1
-            ),
+            models=config.Models(cache_dir=models_dir, max_actors=1),
             database=config.Database(mongo_url="./toktagger_test_db"),
+            auth=config.Auth(canaille_bootstrap_password=E2E_ADMIN_PASSWORD),
             uda=config.UDA(),
             sal=config.SAL(),
         )
-        config.settings = settings
-        yield settings
+        config.settings = s
+        yield s
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -97,25 +120,26 @@ async def db_client(settings):
     db_client = MongoDBClient(
         settings.database.mongo_url, "annotate_db", settings.server.cache_dir
     )
+
     yield db_client
 
     await db_client.delete_filtered_documents("projects")
     await db_client.delete_filtered_documents("samples")
     await db_client.delete_filtered_documents("annotations")
     await db_client.delete_filtered_documents("models")
+    await db_client.delete_filtered_documents("users")
+    await db_client.delete_filtered_documents("project_members")
+    await db_client.delete_filtered_documents("sessions")
+    await db_client.delete_filtered_documents("api_tokens")
     await db_client.client.close()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def api_client(monkeypatch, db_client):
-    # Have hit various issues getting this setup
-    # Using fastAPI TestClient() doesn't play well with async pymongo as it tries to do stuff in different event loops
-    # So have to use this AsyncClient from httpx, but this no longer just accepts an app
-    # So have to wrap it in this Transport thing, but that for some reason doesnt run the lifespan in the app
-    # So have to run this manually, however trying to run the close after the yield to close the db connection gives errors
-    # So am just going to leave it open, since the db container will be deleted after anyway
-    # Any alternative solution ideas are welcome.....
-    os.environ["API_URL"] = "http://test"
+async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
+    monkeypatch.setattr(config.settings.server, "cache_dir", tmp_path)
+    monkeypatch.setattr(auth_core, "_serializer", None)
+    monkeypatch.setattr(auth_core, "_fernet", None)
+
     server = Server()
     server.testing_mode = True
     monkeypatch.setenv("API_URL", "http://test")
@@ -123,12 +147,28 @@ async def api_client(monkeypatch, db_client):
     app = server.app
     app.state.db_client = db_client
     app.state.project = None
+    app.state.idp = None
 
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app),
+        base_url="http://test",
     ) as client:
         client.app = app
         yield client
+
+
+@pytest_asyncio.fixture(scope="function")
+async def api_client(unauthenticated_api_client, db_client):
+    # Auth is always required now — seed the admin user and authenticate as them
+    await db_client.insert(
+        "users",
+        db_definitions.USER_ADMIN,
+        ids={"_id": ObjectId(db_definitions.USER_ADMIN_ID)},
+    )
+    unauthenticated_api_client.headers.update(
+        session_headers(get_auth_token(USER_ADMIN_ID))
+    )
+    yield unauthenticated_api_client
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -185,6 +225,7 @@ async def setup_db(db_client):
         ids={"project_id": ObjectId(project_id_2), "sample_id": ObjectId(sample_id_4)},
     )
     await asyncio.sleep(0.01)
+
     yield {
         "project_id_1": project_id_1,
         "project_id_2": project_id_2,
@@ -226,21 +267,90 @@ async def setup_db_small(db_client):
     await db_client.delete_filtered_documents("annotations")
 
 
-def run_server():
-    # Import to register mock model
+@pytest_asyncio.fixture(scope="function")
+async def setup_db_auth(db_client):
+    admin_id = await db_client.insert(
+        "users",
+        db_definitions.USER_ADMIN,
+        ids={"_id": ObjectId(db_definitions.USER_ADMIN_ID)},
+    )
+    alice_id = await db_client.insert(
+        "users",
+        db_definitions.USER_ALICE,
+        ids={"_id": ObjectId(db_definitions.USER_ALICE_ID)},
+    )
+    bob_id = await db_client.insert(
+        "users",
+        db_definitions.USER_BOB,
+        ids={"_id": ObjectId(db_definitions.USER_BOB_ID)},
+    )
 
+    # Create two projects and add admin as user
+    project_ids = []
+    sample_ids = []
+    for i in (0, 1):
+        project_ids.append(await db_client.insert("projects", db_definitions.PROJECT_1))
+        await db_client.insert(
+            "project_members",
+            db_definitions.PROJECT_ADMIN,
+            ids={"project_id": ObjectId(project_ids[i]), "user_id": ObjectId(admin_id)},
+        )
+
+        # Create sample
+        sample_ids.append(
+            await db_client.insert(
+                "samples",
+                db_definitions.SAMPLE_1,
+                ids={"project_id": ObjectId(project_ids[i])},
+            )
+        )
+
+    yield {
+        "admin_id": admin_id,
+        "alice_id": alice_id,
+        "bob_id": bob_id,
+        "project_id": project_ids[0],
+        "sample_id": sample_ids[0],
+        "other_project_id": project_ids[1],
+        "other_sample_id": sample_ids[1],
+    }
+
+
+def run_server():
     server = Server()
     server.testing_mode = True
     server.run()
 
 
 @pytest.fixture(scope="package")
-def start_server(settings):
-    proc = multiprocessing.Process(target=run_server)
+def identity_provider(settings) -> ManagedCanaille:
+    """The managed Canaille server the end-to-end TokTagger server signs users in with.
+
+    Started before the TokTagger server forks, so the child inherits the provider
+    settings that managed_idp exports.
+    """
+    # On macOS, a proxy lookup in a forked child crashes when the parent has made one
+    os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
+    with managed_idp() as idp:
+        assert idp is not None
+        endpoints.set_identity_provider(idp)
+        yield idp
+
+
+@pytest.fixture(scope="package")
+def start_server(settings, identity_provider):
+    # Explicit "fork" context (not just multiprocessing.Process, which defaults
+    # to "spawn" on macOS since Python 3.8): "spawn" re-imports this module in
+    # a fresh interpreter, so run_server() never sees the settings fixture's
+    # mutated config.settings (temp cache dirs) and _setup_app()'s safety check
+    # ("cache directories must be in temp directory") kills the child before it
+    # can bind the port. "fork" inherits the parent's memory, including that
+    # mutation, same as Linux's default start method (so this is a no-op on CI).
+    proc = multiprocessing.get_context("fork").Process(target=run_server)
     proc.start()
     # Wait for server to start
     server_up = False
-    for t in range(60):
+    for t in range(600):
         try:
             response = requests.get(
                 "http://localhost:8002/health",
@@ -272,8 +382,25 @@ def start_server(settings):
     proc.join()
 
 
+@pytest.fixture(scope="package")
+def admin_cookies(start_server) -> dict[str, str]:
+    """The admin's TokTagger session cookies, for seeding browser contexts.
+
+    Signs in through the managed Canaille login, as a user would. The admin belongs to
+    the admin group there, so TokTagger makes this a global admin.
+    """
+    return session_cookies("admin", E2E_ADMIN_PASSWORD)
+
+
+@pytest.fixture(scope="package")
+def admin_token(admin_cookies) -> str:
+    """The admin's session token; also signs tests.endpoints.* requests in as the admin."""
+    endpoints.set_session(admin_cookies)
+    return admin_cookies[config.settings.auth.cookie_name]
+
+
 @pytest.fixture(scope="function")
-def server_setup(start_server):
+def server_setup(start_server, admin_cookies, admin_token):
     yield
     response = requests.get(
         "http://localhost:8002/health",
@@ -283,5 +410,7 @@ def server_setup(start_server):
     else:
         response = requests.delete(
             "http://localhost:8002/projects",
+            cookies=admin_cookies,
+            headers={"X-CSRF-Token": admin_cookies[CSRF_COOKIE_NAME]},
         )
         assert response.status_code == 200

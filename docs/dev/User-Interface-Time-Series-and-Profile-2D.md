@@ -70,5 +70,5 @@ Each tool gives its shapes an `aria-label` (`time-zone`, `time-point`, `bounding
 ### How It Fits Together
 
 <figure markdown="span">
-   ![How annotations flow between SampleContext, TimeSeriesContext, the annotation tools and the Plotly plot](../assets/ui/plotly-d3-diagram.jpg)
+   ![How annotations flow between the backend, SampleContext, TimeSeriesContext, the annotation tools and the Plotly plot](../assets/ui/plotly-d3-diagram.jpg)
 </figure>

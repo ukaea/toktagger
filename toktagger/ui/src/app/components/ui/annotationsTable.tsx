@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  displayCreatedBy,
   TimeSeriesAnnotation,
   TimeSeriesAnnotationType,
   TimeSeriesCategory,
@@ -113,7 +114,7 @@ export const AnnotationsTable = () => {
   };
 
   return (
-    <div className="relative w-[70%] overflow-x-auto shadow-md sm:rounded-lg ml-auto mr-auto p-4">
+    <div className="relative ml-auto mr-auto w-[70%] shrink-0 overflow-x-auto px-4 pb-4 shadow-md sm:rounded-lg">
       {/* <ToolingControls /> */}
       <Flex justifyContent="center" marginBottom="size-200">
         <h1 className="text-xl font-bold">Annotations</h1>
@@ -152,7 +153,7 @@ export const AnnotationsTable = () => {
                 <span>{item.category.label}</span>
               </Cell>
               <Cell>{item.annotation.type}</Cell>
-              <Cell>{item.annotation.created_by}</Cell>
+              <Cell>{displayCreatedBy(item.annotation)}</Cell>
               <Cell>
                 <AnnotationRowActions annotation={item.annotation} />
               </Cell>

@@ -535,7 +535,11 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
                     : "GPU tasks are disabled. This may be because no GPU devices were detected. If you believe this was incorrect, you can force the number of GPU nodes to make available via configuration options."}
                 </Content>
                 <Footer>
-                  <Link href="https://ukaea.github.io/toktagger/custom_models#gpu-usage">
+                  <Link
+                    href="https://ukaea.github.io/toktagger/custom_models#gpu-usage"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Learn more about configuring GPU usage for ML Models in
                     TokTagger.
                   </Link>
