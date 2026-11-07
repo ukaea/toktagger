@@ -16,12 +16,13 @@ import {
 } from "@annotorious/react";
 import type { Ellipse, EllipseGeometry } from "@annotorious/annotorious";
 import type {
+  CreatedByFields,
   VideoBoundingBoxInput,
   VideoPointInput,
   VideoPolygonInput,
+  VideoShapeInput,
 } from "@/types";
 import type { AnnotoriousDrawingTool, DrawingTool } from "./types";
-import type { CreatedByFields } from "@/types";
 
 type UnknownRecord = Record<string, unknown>;
 // A point is an ellipse marked with a shape: point body, since Annotorious has no point shape
@@ -456,7 +457,7 @@ export function annoToVideoPoint(
 export function annoToVideoAnnotation(
   a: ImageAnnotation,
   frame: number,
-): VideoBoundingBoxInput | VideoPolygonInput | VideoPointInput | null {
+): VideoShapeInput | null {
   if (isPointAnno(a)) return annoToVideoPoint(a, frame);
   if (isRectangleAnno(a)) return annoToVideoBBox(a, frame);
   if (isPolygonAnno(a)) return annoToVideoPolygon(a, frame);
