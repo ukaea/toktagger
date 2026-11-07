@@ -279,6 +279,10 @@ export const Profile2dView = () => {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
+  // Before the plot is built: the compiler won't memoise across a hook, and a rebuilt plot drops mid-draw shapes.
+  const { ref: plotAreaRef, height: plotAreaHeight } =
+    useElementHeight<HTMLDivElement>();
+
   const plot =
     viewData && plotProps
       ? (logScale ? createLogScalePlot : createLinearScalePlot)(
@@ -294,10 +298,6 @@ export const Profile2dView = () => {
       ? buildPlotData(viewData, plot.values, plotProps?.thresholdActive)
       : [];
 
-  // The plot grows into spare height, but never shrinks below MIN_PLOT_HEIGHT -
-  // the column scrolls instead.
-  const { ref: plotAreaRef, height: plotAreaHeight } =
-    useElementHeight<HTMLDivElement>();
   const plotHeight = Math.max(plotAreaHeight, MIN_PLOT_HEIGHT);
 
   const plotLayout = plot
