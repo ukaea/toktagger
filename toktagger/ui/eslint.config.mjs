@@ -12,6 +12,29 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
+// React Compiler rules. At "error", a component the compiler would skip fails lint.
+const compilerRules = (level) =>
+  Object.fromEntries(
+    [
+      "static-components",
+      "use-memo",
+      "void-use-memo",
+      "component-hook-factories",
+      "preserve-manual-memoization",
+      "incompatible-library",
+      "immutability",
+      "globals",
+      "refs",
+      "error-boundaries",
+      "purity",
+      "set-state-in-render",
+      "unsupported-syntax",
+      "config",
+      "gating",
+      "todo",
+    ].map((rule) => [`react-hooks/${rule}`, level]),
+  );
+
 const eslintConfig = [
   {
     ignores: [
@@ -68,24 +91,9 @@ const eslintConfig = [
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
 
-      // React Compiler rules: warnings show where the compiler would skip a component
-      "react-hooks/static-components": "warn",
-      "react-hooks/use-memo": "warn",
-      "react-hooks/void-use-memo": "warn",
-      "react-hooks/component-hook-factories": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
-      "react-hooks/incompatible-library": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/globals": "warn",
-      "react-hooks/refs": "warn",
+      ...compilerRules("error"),
+      // Warn only: flags long-standing patterns, not a reason the compiler would skip a component
       "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/error-boundaries": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/set-state-in-render": "warn",
-      "react-hooks/unsupported-syntax": "warn",
-      "react-hooks/config": "warn",
-      "react-hooks/gating": "warn",
-      "react-hooks/todo": "warn",
 
       // JSX Accessibility rules
       "jsx-a11y/alt-text": "warn",
@@ -95,35 +103,25 @@ const eslintConfig = [
     },
   },
   {
-    // These files rely on the React Compiler for memoisation, so fail lint if it would skip them
+    // The compiler skips these files today, so they keep their manual memoisation. Remove a file once it compiles.
     files: [
-      "src/app/components/annotators/labels.tsx",
-      "src/app/projects/page.tsx",
-      "src/app/projects/project_id/page.tsx",
-      "src/app/profile2d/components/profile2dViewParamsWidget.tsx",
-      "src/app/profile2d/components/profile2d.tsx",
-      "src/app/time_series/components/time-series.tsx",
-      "src/app/video/components/video-toolbox.tsx",
-      "src/app/video/components/frame-annotator-host.tsx",
-      "src/app/contexts/VideoContext.tsx",
-      "src/app/contexts/TimeSeriesContext.tsx",
-      "src/app/components/ui/annotationsTable.tsx",
-      "src/app/video/components/video-session.tsx",
-      "src/app/video/components/video-annotations-table.tsx",
+      "src/app/components/plots/base-plot.tsx",
+      "src/app/components/tools/boundingBox.tsx",
+      "src/app/components/tools/nav.tsx",
+      "src/app/components/tools/polygon.tsx",
+      "src/app/components/tools/timePoint.tsx",
+      "src/app/components/tools/timeRegion.tsx",
+      "src/app/components/ui/apiTokens.tsx",
+      "src/app/contexts/AuthContext.tsx",
+      "src/app/contexts/SampleContext.tsx",
+      "src/app/contexts/apiSchema.tsx",
+      "src/app/contexts/healthContext.tsx",
+      "src/app/pages/admin/users.tsx",
+      "src/app/projects/components/project_config.tsx",
+      "src/app/projects/project_id/components/add_samples.tsx",
+      "src/app/projects/project_id/components/members.tsx",
     ],
-    rules: {
-      "react-hooks/todo": "error",
-      "react-hooks/refs": "error",
-      "react-hooks/immutability": "error",
-      "react-hooks/globals": "error",
-      "react-hooks/purity": "error",
-      "react-hooks/set-state-in-render": "error",
-      "react-hooks/unsupported-syntax": "error",
-      "react-hooks/static-components": "error",
-      "react-hooks/use-memo": "error",
-      "react-hooks/component-hook-factories": "error",
-      "react-hooks/incompatible-library": "error",
-    },
+    rules: compilerRules("warn"),
   },
 ];
 
