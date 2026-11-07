@@ -164,6 +164,7 @@ export const TimeSeriesProvider = ({
     useState<TimeSeriesToolDefinition | null>(() => readSavedTool(projectId));
   const [updateCounter, setUpdateCounter] = useState(0);
   const [syncCounter, setSyncCounter] = useState(0);
+  const [syncRequest, setSyncRequest] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(
     new Map(),
@@ -220,7 +221,6 @@ export const TimeSeriesProvider = ({
     }
   }, [activeTool, projectId, pendingTool]);
 
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncCount = useRef<number>(0);
 
   const parseRawAnnotations = (
@@ -350,19 +350,24 @@ export const TimeSeriesProvider = ({
     setAnnotations(parseRawAnnotations(rawAnnotations));
   }, [parseRawAnnotations, rawAnnotations]);
 
-  const triggerSync = () => {
-    setSyncCounter((prev) => (prev + 1) % 100);
+  // Each request restarts the timer; a ref-held timeout would stop the compiler memoising the callers.
+  const requestSync = () => {
+    setSyncRequest((prev) => prev + 1);
   };
+
+  useEffect(() => {
+    if (syncRequest === 0) return;
+    const timeout = setTimeout(() => {
+      setSyncCounter((prev) => (prev + 1) % 100);
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [syncRequest]);
 
   const syncAnnotations = () => {
     if (ongoingAction) {
-      if (syncTimeoutRef.current !== null) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-      syncTimeoutRef.current = setTimeout(triggerSync, 100);
+      requestSync();
       return;
     }
-    syncTimeoutRef.current = null;
     setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, annotations));
   };
 
@@ -391,21 +396,12 @@ export const TimeSeriesProvider = ({
   };
 
   const addAnnotation = (annotation: TimeSeriesAnnotation) => {
-    if (syncTimeoutRef.current !== null) {
-      clearTimeout(syncTimeoutRef.current);
-      syncTimeoutRef.current = null;
-    }
-    syncTimeoutRef.current = setTimeout(triggerSync, 100);
-
+    requestSync();
     setAnnotations((prev) => [...prev, annotation]);
   };
 
   const removeAnnotation = (id: string) => {
-    if (syncTimeoutRef.current !== null) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-    syncTimeoutRef.current = setTimeout(triggerSync, 100);
-
+    requestSync();
     setAnnotations((prev) => prev.filter((annotation) => annotation.id !== id));
   };
 
@@ -473,11 +469,7 @@ export const TimeSeriesProvider = ({
   }, [pendingTool, toolingCallbacks, categories, projectId, setAnnotationTool]);
 
   const updateAnnotation = (annotation: TimeSeriesAnnotation) => {
-    if (syncTimeoutRef.current !== null) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-    syncTimeoutRef.current = setTimeout(triggerSync, 100);
-
+    requestSync();
     setAnnotations((prev) =>
       prev.map((item) =>
         item.id === annotation.id

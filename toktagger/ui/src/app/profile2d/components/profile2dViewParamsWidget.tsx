@@ -20,12 +20,13 @@ export function Profile2DViewParamsWidget() {
   );
 
   const signalNames = getSignalNames(sample);
+  const firstSignal = signalNames[0];
 
   useEffect(() => {
-    if (signalNames.length > 0 && !selectedSignal) {
-      setSelectedSignal(signalNames[0]);
+    if (firstSignal && !selectedSignal) {
+      setSelectedSignal(firstSignal);
     }
-  }, [signalNames, selectedSignal]);
+  }, [firstSignal, selectedSignal]);
 
   useEffect(() => {
     if (!selectedSignal) return;
