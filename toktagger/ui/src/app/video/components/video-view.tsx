@@ -2,8 +2,6 @@
  * Entry point for the video view: the providers it needs and the page layout.
  * Also owns frame navigation, which works by asking SampleContext for a new frame.
  */
-"use client";
-
 import React, { useEffect } from "react";
 import { Annotorious } from "@annotorious/react";
 import { ImageDataSchema } from "@/types";
@@ -258,7 +256,7 @@ export function VideoView() {
 
   const parsed = ImageDataSchema.safeParse(data);
   if (!parsed.success) {
-    throw new Error("Invalid data for UFO view (expected ImageData)");
+    throw new Error("Invalid data for video view (expected ImageData)");
   }
 
   const imageBase64 = parsed.data.values;

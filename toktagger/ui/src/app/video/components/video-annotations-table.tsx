@@ -2,8 +2,6 @@
  * The annotations table below the frame, with one row per instance (class label + track ID).
  * It only talks to the session, never to Annotorious directly.
  */
-"use client";
-
 import { useMemo, useState } from "react";
 import {
   ActionButton,
@@ -110,7 +108,6 @@ function useSelectInstance() {
     setSelection({
       className: instance.className,
       trackId: canonicalizeTrackId(instance.trackId),
-      source: "explicit",
     });
     setVideoLastClassName(instance.className);
     requestFocusInstance(instance.className, instance.trackId, focus);
@@ -204,7 +201,7 @@ export const VideoAnnotationsTable = () => {
     const row = rows.find((candidate) => keys.has(candidate.id));
     // Deselecting a row keeps the class but stops continuing its track
     if (!row) {
-      session.setSelection({ className, trackId: null, source: "explicit" });
+      session.setSelection({ className, trackId: null });
       session.closePopup();
       return;
     }

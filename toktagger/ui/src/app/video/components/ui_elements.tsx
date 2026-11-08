@@ -1,8 +1,6 @@
 /**
  * Two small UI pieces with no session logic: the Class Label picker and the "Frame N" jump field.
  */
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import {
   Button,

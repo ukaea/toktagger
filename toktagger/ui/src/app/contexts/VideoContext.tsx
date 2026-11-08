@@ -1,5 +1,3 @@
-"use client";
-
 import React, { createContext, useCallback, useContext, useState } from "react";
 import type { ActiveDrawingTool } from "@/app/video/components/types";
 
