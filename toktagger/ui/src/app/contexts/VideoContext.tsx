@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import type { ActiveDrawingTool } from "@/app/video/components/types";
 
 type VideoUiStateContextType = {
@@ -40,25 +40,25 @@ export function VideoUiStateProvider({
   const [videoDrawingTool, setVideoDrawingToolState] =
     useState<ActiveDrawingTool>(() => videoUiStateSnapshot.videoDrawingTool);
 
-  const setVideoPropagate = useCallback((value: boolean) => {
+  const setVideoPropagate = (value: boolean) => {
     videoUiStateSnapshot.videoPropagate = value;
     setVideoPropagateState(value);
-  }, []);
+  };
 
-  const setVideoLastClassName = useCallback((value: string | null) => {
+  const setVideoLastClassName = (value: string | null) => {
     videoUiStateSnapshot.videoLastClassName = value;
     setVideoLastClassNameState(value);
-  }, []);
+  };
 
-  const setVideoEditMode = useCallback((value: boolean) => {
+  const setVideoEditMode = (value: boolean) => {
     videoUiStateSnapshot.videoEditMode = value;
     setVideoEditModeState(value);
-  }, []);
+  };
 
-  const setVideoDrawingTool = useCallback((value: ActiveDrawingTool) => {
+  const setVideoDrawingTool = (value: ActiveDrawingTool) => {
     videoUiStateSnapshot.videoDrawingTool = value;
     setVideoDrawingToolState(value);
-  }, []);
+  };
 
   return (
     <VideoUiStateContext.Provider

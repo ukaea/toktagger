@@ -1,7 +1,7 @@
 /**
  * The Video Tools panel in the left toolbox: Propagation, Hide annotations and the Class Label picker.
  */
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import {
   Content,
   ContextualHelp,
@@ -47,9 +47,7 @@ export function VideoToolbox() {
     }
   }, [labels, session, setVideoLastClassName, videoLastClassName]);
 
-  const classItems = useMemo(() => {
-    return labels.map((c) => ({ name: c.name }));
-  }, [labels]);
+  const classItems = labels.map((c) => ({ name: c.name }));
 
   const onSelectClassName = (name: string | null) => {
     const cls = (name ?? "").trim();

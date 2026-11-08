@@ -2,7 +2,7 @@
  * The annotations table below the frame, with one row per instance (class label + track ID).
  * It only talks to the session, never to Annotorious directly.
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActionButton,
   ActionGroup,
@@ -174,22 +174,17 @@ export const VideoAnnotationsTable = () => {
     null,
   );
 
-  const rows = useMemo<TableRow[]>(
-    () =>
-      session.instances
-        .filter(
-          (instance) =>
-            scope === "all" || instance.frames.includes(session.frame),
-        )
-        .map((instance) => ({
-          id: makeTrackKey(
-            instance.className,
-            canonicalizeTrackId(instance.trackId),
-          ),
-          instance,
-        })),
-    [session.instances, session.frame, scope],
-  );
+  const rows: TableRow[] = session.instances
+    .filter(
+      (instance) => scope === "all" || instance.frames.includes(session.frame),
+    )
+    .map((instance) => ({
+      id: makeTrackKey(
+        instance.className,
+        canonicalizeTrackId(instance.trackId),
+      ),
+      instance,
+    }));
 
   const { className, trackId } = session.selection;
   const selectedKeys =

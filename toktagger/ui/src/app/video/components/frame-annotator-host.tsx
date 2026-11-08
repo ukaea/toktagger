@@ -2,7 +2,7 @@
  * The canvas: shows the current frame in OpenSeadragon with the Annotorious layer on top.
  * It handles points and frame labels itself, since Annotorious has no tools for them.
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import OpenSeadragon from "openseadragon";
 import {
   OpenSeadragonAnnotator,
@@ -182,10 +182,7 @@ export function FrameAnnotatorHost({ imageBase64 }: { imageBase64: string }) {
     string | null
   >(null);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
-  const classItems = useMemo(
-    () => annotationLabels.map((label) => ({ name: label.name })),
-    [annotationLabels],
-  );
+  const classItems = annotationLabels.map((label) => ({ name: label.name }));
 
   useEffect(() => {
     if (!api?.on || !api?.off) return;
@@ -231,10 +228,7 @@ export function FrameAnnotatorHost({ imageBase64 }: { imageBase64: string }) {
     setImageNatural(null);
   }, [frame, setImageNatural]);
 
-  const dataUrl = useMemo(
-    () => `data:image/png;base64,${imageBase64}`,
-    [imageBase64],
-  );
+  const dataUrl = `data:image/png;base64,${imageBase64}`;
   const viewer = api?.viewer;
   const savedViewRef = useRef<{
     bounds: OpenSeadragon.Rect;
@@ -604,23 +598,20 @@ export function FrameAnnotatorHost({ imageBase64 }: { imageBase64: string }) {
     };
   }, [api, canDrawPoint, canTagFrame, drawIntent, editMode, hideAnnotations]);
 
-  const viewerOptions = useMemo<OpenSeadragon.Options>(
-    () => ({
-      tileSources: {
-        type: "image",
-        url: dataUrl,
-      },
-      minZoomImageRatio: 0.8,
-      maxZoomPixelRatio: 100,
-      visibilityRatio: 0.5,
-      constrainDuringPan: true,
-      animationTime: 0.3,
-      showNavigationControl: false,
-      mouseNavEnabled: false,
-      imageSmoothingEnabled: false,
-    }),
-    [dataUrl],
-  );
+  const viewerOptions: OpenSeadragon.Options = {
+    tileSources: {
+      type: "image",
+      url: dataUrl,
+    },
+    minZoomImageRatio: 0.8,
+    maxZoomPixelRatio: 100,
+    visibilityRatio: 0.5,
+    constrainDuringPan: true,
+    animationTime: 0.3,
+    showNavigationControl: false,
+    mouseNavEnabled: false,
+    imageSmoothingEnabled: false,
+  };
 
   const formatDetails = (annotation: ImageAnnotation) => {
     const point = isPointAnno(annotation)
