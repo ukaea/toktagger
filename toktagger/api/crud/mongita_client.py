@@ -10,7 +10,13 @@ from typing import Any
 
 from filelock import FileLock
 from mongita import MongitaClientDisk
-from mongita.collection import Collection
+from mongita.collection import (
+    Collection,
+    _doc_matches_slow_filters,
+    _get_item_from_doc,
+    _sort_docs,
+)
+from mongita.database import Database
 from mongita.errors import DuplicateKeyError
 from mongita.results import DeleteResult, UpdateResult
 
@@ -375,6 +381,137 @@ class AsyncCollection:
         return await self._run(
             lambda col: col.create_index(keys, *args, **kwargs), mutates=True
         )
+
+    async def aggregate(self, pipeline: list[dict[str, Any]]) -> "AsyncCursor":
+        """Run an aggregation pipeline, supporting only the stages in `_apply_stage`.
+
+        The whole pipeline runs under one lock, so `$lookup` sees the same snapshot
+        as the collection it starts from.
+        """
+        stages = list(pipeline)
+        leading_filter: dict[str, Any] = {}
+        if stages and _stage_name(stages[0]) == "$match":
+            leading_filter = stages.pop(0)["$match"]
+
+        def _aggregate(col: Collection) -> list[dict[str, Any]]:
+            docs = [dict(doc) for doc in col.find(leading_filter)]
+            return _apply_stages(col.database, docs, stages)
+
+        docs = await self._run(_aggregate)
+
+        async def _loaded() -> list[dict[str, Any]]:
+            return docs
+
+        return AsyncCursor(_loaded)
+
+
+def _stage_name(stage: dict[str, Any]) -> str:
+    if len(stage) != 1:
+        raise ValueError(f"An aggregation stage must have exactly one key: {stage}")
+    return next(iter(stage))
+
+
+def _field_path(expression: Any) -> str:
+    if not isinstance(expression, str) or not expression.startswith("$"):
+        raise NotImplementedError(f"Only '$field' paths are supported: {expression}")
+    return expression[1:]
+
+
+def _apply_stages(
+    database: Database, docs: list[dict[str, Any]], stages: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    for stage in stages:
+        name = _stage_name(stage)
+        docs = _apply_stage(database, docs, name, stage[name])
+    return docs
+
+
+def _apply_stage(
+    database: Database, docs: list[dict[str, Any]], name: str, spec: Any
+) -> list[dict[str, Any]]:
+    match name:
+        case "$match":
+            return [doc for doc in docs if _doc_matches_slow_filters(doc, spec)]
+        case "$lookup":
+            return _lookup(database, docs, spec)
+        case "$addFields":
+            return [_add_fields(doc, spec) for doc in docs]
+        case "$project":
+            return _project(docs, spec)
+        case "$sort":
+            sorted_docs = list(docs)
+            _sort_docs(sorted_docs, list(spec.items()))
+            return sorted_docs
+        case "$skip":
+            return docs[spec:]
+        case "$limit":
+            return docs[:spec]
+        case _:
+            raise NotImplementedError(f"Unsupported aggregation stage: {name}")
+
+
+def _lookup(
+    database: Database, docs: list[dict[str, Any]], spec: dict[str, Any]
+) -> list[dict[str, Any]]:
+    local_field, foreign_field = spec["localField"], spec["foreignField"]
+    local_values = list(
+        {
+            value
+            for doc in docs
+            if (value := _get_item_from_doc(doc, local_field)) is not None
+        }
+    )
+    foreign_docs = database[spec["from"]].find({foreign_field: {"$in": local_values}})
+    matches_by_value: dict[Any, list[dict[str, Any]]] = {}
+    for foreign_doc in foreign_docs:
+        foreign_value = _get_item_from_doc(foreign_doc, foreign_field)
+        matches_by_value.setdefault(foreign_value, []).append(dict(foreign_doc))
+    sub_pipeline = spec.get("pipeline", [])
+    return [
+        {
+            **doc,
+            spec["as"]: _apply_stages(
+                database,
+                matches_by_value.get(_get_item_from_doc(doc, local_field), []),
+                sub_pipeline,
+            ),
+        }
+        for doc in docs
+    ]
+
+
+def _add_fields(doc: dict[str, Any], spec: dict[str, Any]) -> dict[str, Any]:
+    added: dict[str, Any] = {}
+    for field, expression in spec.items():
+        if not (isinstance(expression, dict) and set(expression) == {"$size"}):
+            raise NotImplementedError(f"Only $size is supported in $addFields: {field}")
+        value = _get_item_from_doc(doc, _field_path(expression["$size"]))
+        if not isinstance(value, list):
+            raise TypeError(f"$size requires an array, got {type(value).__name__}")
+        added[field] = len(value)
+    return {**doc, **added}
+
+
+def _project(docs: list[dict[str, Any]], spec: dict[str, Any]) -> list[dict[str, Any]]:
+    keep_id = bool(spec.get("_id", True))
+    fields = {field: bool(flag) for field, flag in spec.items() if field != "_id"}
+    if len(set(fields.values())) > 1:
+        raise ValueError("Cannot mix inclusion and exclusion in $project")
+    # A lone {"_id": 1} is an inclusion projection, as in MongoDB.
+    including = (
+        next(iter(fields.values()))
+        if fields
+        else spec.get("_id") is not None and keep_id
+    )
+    if including:
+        wanted = set(fields) | ({"_id"} if keep_id else set())
+        return [
+            {key: value for key, value in doc.items() if key in wanted} for doc in docs
+        ]
+    dropped = set(fields) | (set() if keep_id else {"_id"})
+    return [
+        {key: value for key, value in doc.items() if key not in dropped} for doc in docs
+    ]
 
 
 def _modified(result: UpdateResult) -> bool:

@@ -140,6 +140,14 @@ class MongoDBClient:
         )
         return await documents.to_list()
 
+    async def aggregate(
+        self,
+        collection: CollectionName,
+        pipeline: list[dict[str, typing.Any]],
+    ) -> list[dict[str, typing.Any]]:
+        cursor = await self.db[collection].aggregate(pipeline)
+        return await cursor.to_list()
+
     async def delete_document_by_id(
         self,
         collection: CollectionName,

@@ -256,3 +256,132 @@ async def test_unused_cursor_does_not_warn(client):
         client["annotate_db"]["projects"].find({})
         gc.collect()
     assert not [warning for warning in caught if warning.category is RuntimeWarning]
+
+
+ANNOTATIONS_LOOKUP = {
+    "from": "annotations",
+    "localField": "_id",
+    "foreignField": "sample_id",
+    "as": "annotations",
+}
+
+
+@pytest_asyncio.fixture
+async def aggregate_db(client):
+    database = client["annotate_db"]
+    await database["samples"].insert_many(
+        [
+            {"_id": "s1", "shot_id": 10, "kind": "a"},
+            {"_id": "s2", "shot_id": 20, "kind": "b"},
+            {"_id": "s3", "shot_id": 30, "kind": "a"},
+        ]
+    )
+    await database["annotations"].insert_many(
+        [
+            {"_id": "a101", "sample_id": "s1", "label": "x"},
+            {"_id": "a102", "sample_id": "s1", "label": "y"},
+            {"_id": "a103", "sample_id": "s2", "label": "x"},
+        ]
+    )
+    return database
+
+
+async def _aggregate(database, pipeline):
+    cursor = await database["samples"].aggregate(pipeline)
+    return await cursor.to_list()
+
+
+@pytest.mark.asyncio
+async def test_aggregate_match_leading_and_later(aggregate_db):
+    leading = await _aggregate(aggregate_db, [{"$match": {"kind": "a"}}])
+    later = await _aggregate(
+        aggregate_db, [{"$sort": {"_id": 1}}, {"$match": {"shot_id": {"$gt": 15}}}]
+    )
+    assert sorted(doc["_id"] for doc in leading) == ["s1", "s3"]
+    assert [doc["_id"] for doc in later] == ["s2", "s3"]
+
+
+@pytest.mark.asyncio
+async def test_aggregate_lookup_with_and_without_pipeline(aggregate_db):
+    full = await _aggregate(
+        aggregate_db, [{"$lookup": ANNOTATIONS_LOOKUP}, {"$sort": {"_id": 1}}]
+    )
+    projected = await _aggregate(
+        aggregate_db,
+        [
+            {
+                "$lookup": {
+                    **ANNOTATIONS_LOOKUP,
+                    "pipeline": [{"$project": {"_id": 1}}],
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ],
+    )
+    assert [len(doc["annotations"]) for doc in full] == [2, 1, 0]
+    assert {annotation["label"] for annotation in full[0]["annotations"]} == {"x", "y"}
+    assert [doc["annotations"] for doc in projected] == [
+        [{"_id": "a101"}, {"_id": "a102"}],
+        [{"_id": "a103"}],
+        [],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_aggregate_add_fields_size_project_and_sort(aggregate_db):
+    docs = await _aggregate(
+        aggregate_db,
+        [
+            {"$lookup": ANNOTATIONS_LOOKUP},
+            {"$addFields": {"annotation_count": {"$size": "$annotations"}}},
+            {"$project": {"annotations": 0}},
+            {"$sort": {"annotation_count": 1, "_id": -1}},
+        ],
+    )
+    assert docs == [
+        {"_id": "s3", "shot_id": 30, "kind": "a", "annotation_count": 0},
+        {"_id": "s2", "shot_id": 20, "kind": "b", "annotation_count": 1},
+        {"_id": "s1", "shot_id": 10, "kind": "a", "annotation_count": 2},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_aggregate_project_inclusion(aggregate_db):
+    with_id = await _aggregate(
+        aggregate_db, [{"$project": {"shot_id": 1}}, {"$sort": {"_id": 1}}]
+    )
+    without_id = await _aggregate(
+        aggregate_db,
+        [{"$project": {"shot_id": 1, "_id": 0}}, {"$sort": {"shot_id": 1}}],
+    )
+    assert with_id[0] == {"_id": "s1", "shot_id": 10}
+    assert without_id[0] == {"shot_id": 10}
+    with pytest.raises(ValueError, match="mix"):
+        await _aggregate(aggregate_db, [{"$project": {"shot_id": 1, "kind": 0}}])
+
+
+@pytest.mark.asyncio
+async def test_aggregate_skip_and_limit(aggregate_db):
+    docs = await _aggregate(
+        aggregate_db, [{"$sort": {"_id": 1}}, {"$skip": 1}, {"$limit": 1}]
+    )
+    assert [doc["_id"] for doc in docs] == ["s2"]
+
+
+@pytest.mark.asyncio
+async def test_aggregate_does_not_modify_stored_documents(aggregate_db):
+    await _aggregate(
+        aggregate_db,
+        [
+            {"$lookup": ANNOTATIONS_LOOKUP},
+            {"$addFields": {"annotation_count": {"$size": "$annotations"}}},
+        ],
+    )
+    stored = await aggregate_db["samples"].find_one({"_id": "s1"})
+    assert stored == {"_id": "s1", "shot_id": 10, "kind": "a"}
+
+
+@pytest.mark.asyncio
+async def test_aggregate_unsupported_stage_raises(aggregate_db):
+    with pytest.raises(NotImplementedError, match=r"\$group"):
+        await _aggregate(aggregate_db, [{"$group": {"_id": "$kind"}}])
