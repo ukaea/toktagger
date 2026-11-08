@@ -110,6 +110,17 @@
 # huggingface_userspace = '<your value here>'
 
 
+[polling]
+# Whether to run the background task that adds new shots to projects with auto-add enabled.
+# enabled = true
+
+# Time (in seconds) between checks for projects which are due a check for new shots.
+# tick_seconds = 60
+
+# Maximum number of new shots to add to one project in one check.
+# max_shots_per_check = 100
+
+
 [sal]
 # URL for the SAL server to connect to for JET data loaders.
 # host = 'https://sal.jetdata.eu'
