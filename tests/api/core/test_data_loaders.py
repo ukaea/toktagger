@@ -1,12 +1,15 @@
 import base64
 import io
 import pathlib
+from collections.abc import Iterator
 
+import h5py
 import numpy
 import pytest
 import xarray
 from PIL import Image
 
+from tests.defuse_files import write_defuse_file
 from toktagger.api.core import data_loaders
 from toktagger.api.core.views import Profile2DView
 from toktagger.api.schemas.data import (
@@ -20,6 +23,8 @@ from toktagger.api.schemas.data import (
 )
 from toktagger.api.schemas.projects import Task
 from toktagger.api.schemas.samples import (
+    DataTypes,
+    DefuseFileData,
     ImageArrayFileData,
     ImageFileData,
     Sample,
@@ -733,6 +738,7 @@ async def test_custom_data_loader(api_client):
         ("uda", data_loaders.UDADataLoader, ShotData),
         ("sal", data_loaders.SALDataLoader, ShotData),
         ("fair_mast", data_loaders.FAIRMASTDataLoader, ShotData),
+        ("defuse", data_loaders.DefuseDataLoader, DefuseFileData),
     ],
 )
 def test_loader_registry(name, data_loader, sample_data_model):
@@ -830,3 +836,173 @@ def test_uda_loader_all_signals_missing_raises(monkeypatch):
 
     with pytest.raises(data_loaders.DataLoaderError):
         data_loaders.UDADataLoader().get_sample(sample, params=DataParams())
+
+
+@pytest.fixture
+def defuse_file(tmp_path: pathlib.Path) -> Iterator[pathlib.Path]:
+    data_loaders._get_defuse_signals.cache_clear()
+    yield write_defuse_file(tmp_path / "MASTUno12345.h5")
+    data_loaders._get_defuse_signals.cache_clear()
+
+
+def _defuse_sample(file_path: pathlib.Path, signal_names: list[str] | None) -> Sample:
+    return Sample(
+        shot_id=12345,
+        data=DefuseFileData(
+            file_name=str(file_path), type="h5", signal_names=signal_names
+        ),
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+
+
+def test_defuse_loader_resolves_signal_versions(defuse_file):
+    data = data_loaders.DefuseDataLoader().get_sample(
+        _defuse_sample(
+            defuse_file, ["IPLA", "ZMAG", "ZMAG_v1", "missing", "Termination_v1"]
+        ),
+        params=DataParams(name="identity"),
+    )
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    assert data.values["IPLA"].values[0] == pytest.approx(0.0)
+    assert data.values["ZMAG"].values[0] == pytest.approx(2.0)
+    assert data.values["ZMAG_v1"].values[0] == pytest.approx(1.0)
+    assert data.values["missing"] is None
+    assert data.values["Termination_v1"] is None
+
+
+def test_defuse_loader_loads_latest_of_all_signals(defuse_file):
+    data = data_loaders.DefuseDataLoader().get_sample(
+        _defuse_sample(defuse_file, None), params=DataParams(name="identity")
+    )
+    assert sorted(data.values) == ["IPLA", "ZMAG"]
+    assert data.values["ZMAG"].values[0] == pytest.approx(2.0)
+
+
+def test_defuse_loader_time_window_and_downsampling(defuse_file):
+    data = data_loaders.DefuseDataLoader().get_sample(
+        _defuse_sample(defuse_file, ["IPLA"]),
+        params=DataParams(name="identity"),
+        time_min=0.2,
+        time_max=0.8,
+        min_time_step=0.1,
+    )
+    signal = data.values["IPLA"]
+    assert signal.time[0] >= 0.2 - 1e-6
+    assert signal.time[-1] <= 0.8 + 1e-6
+    assert numpy.diff(signal.time) == pytest.approx(0.1)
+    assert signal.values == pytest.approx(signal.time, abs=1e-6)
+
+
+def test_defuse_loader_raises_when_no_signals_load(defuse_file):
+    with pytest.raises(data_loaders.DataLoaderError):
+        data_loaders.DefuseDataLoader().get_sample(
+            _defuse_sample(defuse_file, ["missing"]),
+            params=DataParams(name="identity"),
+        )
+
+
+def test_defuse_loader_missing_file(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        data_loaders.DefuseDataLoader().get_sample(
+            _defuse_sample(tmp_path / "MASTUno1.h5", ["IPLA"]),
+            params=DataParams(name="identity"),
+        )
+
+
+def test_defuse_loader_ignores_detection_results(defuse_file):
+    data = data_loaders.DefuseDataLoader().get_sample(
+        _defuse_sample(defuse_file, None), params=DataParams(name="identity")
+    )
+    assert "IPLA" in data.values
+    assert all(not name.startswith("objDIS") for name in data.values)
+
+
+def test_defuse_loader_drops_non_finite_samples(tmp_path):
+    data_loaders._get_defuse_signals.cache_clear()
+    file_path = tmp_path / "MASTUno1.h5"
+    with h5py.File(file_path, "w") as h5_file:
+        group = h5_file.create_group("SIG/IPLA_v1")
+        group["time"] = numpy.array([0.0, 1.0, 2.0, numpy.nan])
+        group["signal"] = numpy.array([1.0, numpy.inf, 3.0, 4.0])
+
+    data = data_loaders.DefuseDataLoader().get_sample(
+        _defuse_sample(file_path, ["IPLA"]), params=DataParams(name="identity")
+    )
+    assert data.values["IPLA"].time == [0.0, 2.0]
+    assert data.values["IPLA"].values == [1.0, 3.0]
+
+
+def test_defuse_loader_requires_sig_group(tmp_path):
+    data_loaders._get_defuse_signals.cache_clear()
+    file_path = tmp_path / "MASTUno1.h5"
+    with h5py.File(file_path, "w") as h5_file:
+        h5_file.create_group("objDIS")
+
+    with pytest.raises(data_loaders.DataLoaderError, match="SIG"):
+        data_loaders.DefuseDataLoader().get_sample(
+            _defuse_sample(file_path, ["IPLA"]), params=DataParams(name="identity")
+        )
+
+
+def test_defuse_loader_rejects_s3_files(defuse_file):
+    sample = _defuse_sample(defuse_file, ["IPLA"])
+    sample.data = DefuseFileData(
+        file_name=str(defuse_file), type="h5", protocol="s3", signal_names=["IPLA"]
+    )
+    with pytest.raises(data_loaders.DataLoaderError, match="local files"):
+        data_loaders.DefuseDataLoader().get_sample(
+            sample, params=DataParams(name="identity")
+        )
+
+
+def test_defuse_loader_rejects_image_params(defuse_file):
+    with pytest.raises(TypeError):
+        data_loaders.DefuseDataLoader().get_sample(
+            _defuse_sample(defuse_file, ["IPLA"]),
+            params=ImageParams(name="image", frame=0),
+        )
+
+
+def test_defuse_loader_rejects_other_sample_data(defuse_file):
+    sample = _defuse_sample(defuse_file, ["IPLA"])
+    sample.data = ShotData(protocol="uda", signal_names=["IPLA"])
+    with pytest.raises(TypeError):
+        data_loaders.DefuseDataLoader().get_sample(
+            sample, params=DataParams(name="identity")
+        )
+
+
+def test_defuse_loader_caches_per_signal_selection(defuse_file):
+    loader = data_loaders.DefuseDataLoader()
+    params = DataParams(name="identity")
+    loader.get_sample(_defuse_sample(defuse_file, ["IPLA"]), params=params)
+    data = loader.get_sample(_defuse_sample(defuse_file, ["ZMAG"]), params=params)
+    assert list(data.values) == ["ZMAG"]
+    assert data_loaders._get_defuse_signals.cache_info().currsize == 2
+
+
+@pytest.mark.parametrize(
+    "payload,expected_type",
+    [
+        (
+            {"file_name": "MASTUno1.h5", "type": "h5", "protocol": "file"},
+            DefuseFileData,
+        ),
+        (
+            {"file_name": "1.parquet", "type": "parquet", "protocol": "file"},
+            TimeSeriesFileData,
+        ),
+    ],
+)
+def test_sample_data_union_selects_defuse_by_type(payload, expected_type):
+    sample = Sample(
+        shot_id=1,
+        data=payload,
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+    assert type(sample.data) is expected_type
+    assert expected_type in DataTypes.__args__

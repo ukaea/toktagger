@@ -3,11 +3,13 @@ import inspect
 import io
 import os
 import pathlib
+import re
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from pathlib import Path
 from typing import ClassVar
 
+import h5py
 import numpy as np
 import pandas as pd
 import pydantic
@@ -28,6 +30,7 @@ from toktagger.api.schemas.data import (
 )
 from toktagger.api.schemas.samples import (
     DataTypes,
+    DefuseFileData,
     FileData,
     ImageArrayFileData,
     ImageFileData,
@@ -94,6 +97,7 @@ class LoaderRegistry:
                 ImageFileData,
                 ImageArrayFileData,
                 TimeSeriesFileData,
+                DefuseFileData,
             ):
                 raise ValueError(
                     f"Loader '{name}' must expect a supported data type as an input, but got '{sample_data_type}'."
@@ -741,4 +745,151 @@ def _get_fair_mast_signals(
         results,
         f"Could not load any signals from FAIR-MAST file at '{file_path}'. Check signal names and file accessibility.",
         f"Mixed data types found for file '{file_path}'. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles).",
+    )
+
+
+DEFUSE_SIGNAL_GROUP = re.compile(r"^(?P<name>.+)_v(?P<version>\d+)$")
+
+
+@LoaderRegistry.register("defuse")
+class DefuseDataLoader(DataLoader):
+    """DataLoader for retrieving time series signals from DEFUSE HDF5 output files"""
+
+    signal_name_help = (
+        "Use DEFUSE signal names from the SIG group, for example IPLA, ZMAG or "
+        "ZMAG_v2. A name without a version loads the latest version. Leave this "
+        "field empty to load all signals."
+    )
+
+    @classmethod
+    def sample_data_type(cls) -> type[DefuseFileData]:
+        return DefuseFileData
+
+    def get_sample(
+        self,
+        sample: Sample,
+        params: DataParams,
+        time_min: float | None = None,
+        time_max: float | None = None,
+        min_time_step: float | None = None,
+        **kwargs,
+    ) -> MultiVariateTimeSeriesData:
+        if not isinstance(sample.data, DefuseFileData):
+            raise TypeError(
+                f"Expected sample data of type 'DefuseFileData' but got '{type(sample.data)}'"
+            )
+        if not params.name == "identity":
+            raise TypeError(f"Expected blank parameters, but got '{params.name}'")
+
+        sample_data: DefuseFileData = sample.data
+        if sample_data.protocol != "file":
+            raise DataLoaderError(
+                f"DEFUSE data loader only supports local files, but got protocol '{sample_data.protocol}'"
+            )
+
+        file_path = pathlib.Path(sample_data.file_name).expanduser().resolve()
+        if not file_path.exists():
+            raise FileNotFoundError(f"Could not find file at '{file_path}'")
+
+        result = _get_defuse_signals(
+            file_path=str(file_path),
+            signal_names=(
+                tuple(sample_data.signal_names) if sample_data.signal_names else None
+            ),
+            time_min=time_min,
+            time_max=time_max,
+            min_time_step=min_time_step,
+        )
+        if not isinstance(result, MultiVariateTimeSeriesData):
+            raise DataLoaderError(
+                f"Expected time series data from DEFUSE file '{file_path}'"
+            )
+        return result
+
+
+def _latest_defuse_groups(signal_group: h5py.Group) -> dict[str, str]:
+    """Map each base signal name to the HDF5 group holding its highest version."""
+    latest: dict[str, tuple[int, str]] = {}
+    for group_name, group in signal_group.items():
+        if not (
+            isinstance(group, h5py.Group) and "signal" in group and "time" in group
+        ):
+            continue
+        match = DEFUSE_SIGNAL_GROUP.match(group_name)
+        name, version = (
+            (match["name"], int(match["version"])) if match else (group_name, 0)
+        )
+        if name not in latest or version > latest[name][0]:
+            latest[name] = (version, group_name)
+    return {name: group_name for name, (_, group_name) in latest.items()}
+
+
+def _read_defuse_signal(
+    group: h5py.Group,
+    time_min: float | None,
+    time_max: float | None,
+    min_time_step: float | None,
+) -> TimeSeriesData:
+    time = np.asarray(group["time"][()], dtype=np.float64).ravel()
+    values = np.asarray(group["signal"][()], dtype=np.float64).ravel()
+    if time.shape != values.shape:
+        raise DataLoaderError(
+            f"Signal '{group.name}' has {values.size} values but {time.size} time points"
+        )
+
+    keep = np.isfinite(time) & np.isfinite(values)
+    if time_min is not None:
+        keep &= time >= time_min
+    if time_max is not None:
+        keep &= time <= time_max
+    time = time[keep]
+    values = values[keep]
+
+    if (
+        min_time_step is not None
+        and len(time) > 1
+        and np.diff(time).mean() < min_time_step
+    ):
+        time_base = np.arange(time[0], time[-1], min_time_step)
+        values = np.interp(time_base, time, values)
+        time = time_base
+
+    return TimeSeriesData(time=time.tolist(), values=values.tolist())
+
+
+@lru_cache(maxsize=128)
+def _get_defuse_signals(
+    file_path: str,
+    signal_names: tuple[str, ...] | None,
+    time_min: float | None = None,
+    time_max: float | None = None,
+    min_time_step: float | None = None,
+) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+    results: dict[str, TimeSeriesData | Profile2DData | None] = {}
+    with h5py.File(file_path, "r") as h5_file:
+        signal_group = h5_file.get("SIG")
+        if not isinstance(signal_group, h5py.Group):
+            raise DataLoaderError(f"No 'SIG' group found in DEFUSE file '{file_path}'")
+
+        latest = _latest_defuse_groups(signal_group)
+        requested = sorted(latest) if signal_names is None else list(signal_names)
+
+        for name in requested:
+            group_name = latest.get(name)
+            if group_name is None and isinstance(signal_group.get(name), h5py.Group):
+                group_name = name
+            if group_name is None:
+                results[name] = None
+                continue
+            try:
+                results[name] = _read_defuse_signal(
+                    signal_group[group_name], time_min, time_max, min_time_step
+                )
+            except Exception:  # noqa: BLE001 -- one bad signal should not fail the whole multi-signal load
+                results[name] = None
+
+    return _combine_signals(
+        results,
+        f"Could not load any signals from DEFUSE file '{file_path}'. Check the signal names.",
+        f"Mixed data types found in DEFUSE file '{file_path}'.",
     )
