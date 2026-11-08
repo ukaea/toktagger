@@ -18,6 +18,7 @@ import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 
@@ -229,7 +230,8 @@ const PLOT_CONFIG: Partial<Plotly.Config> = {
 };
 
 export const Profile2dView = () => {
-  const { data, plotProps, viewParams } = useSample();
+  const { plotProps } = useSample();
+  const { data, viewParams } = usePanelData();
 
   const viewData = data as Profile2DData | null;
   const profileViewParams = viewParams as Profile2DViewParams | null;

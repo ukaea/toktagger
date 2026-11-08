@@ -206,6 +206,7 @@ export enum TaskType {
   Profile2D = "profile-2d",
   Video = "video",
   RadialProfile = "radial-profile",
+  MultiPanel = "multi-panel",
 }
 
 export const TaskSchema = z.enum([
@@ -213,7 +214,76 @@ export const TaskSchema = z.enum([
   TaskType.Profile2D,
   TaskType.Video,
   TaskType.RadialProfile,
+  TaskType.MultiPanel,
 ]);
+
+export const DEFAULT_SOURCE = "default";
+
+export const DataSourceSchema = z.object({
+  name: z.string().min(1),
+  data_loader: z.string(),
+});
+export type DataSource = z.infer<typeof DataSourceSchema>;
+
+export const GridPlacementSchema = z.object({
+  col: z.number().int().min(1).default(1),
+  row: z.number().int().min(1).default(1),
+  col_span: z.number().int().min(1).default(1),
+  row_span: z.number().int().min(1).default(1),
+});
+export type GridPlacement = z.infer<typeof GridPlacementSchema>;
+
+export const PanelBaseSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().nullable().optional(),
+  source: z.string().default(DEFAULT_SOURCE),
+  grid: GridPlacementSchema.default({
+    col: 1,
+    row: 1,
+    col_span: 1,
+    row_span: 1,
+  }),
+});
+
+export const TimeSeriesPanelSchema = PanelBaseSchema.extend({
+  kind: z.literal("time_series"),
+  signals: z.array(z.string()).min(1),
+});
+export type TimeSeriesPanel = z.infer<typeof TimeSeriesPanelSchema>;
+
+export const Profile2DPanelSchema = PanelBaseSchema.extend({
+  kind: z.literal("profile_2d"),
+  signal: z.string(),
+});
+export type Profile2DPanel = z.infer<typeof Profile2DPanelSchema>;
+
+export const RadialProfilePanelSchema = PanelBaseSchema.extend({
+  kind: z.literal("radial_profile"),
+  profile_signals: z.array(z.string()).min(1),
+  time_series_signals: z.array(z.string()).default([]),
+});
+export type RadialProfilePanel = z.infer<typeof RadialProfilePanelSchema>;
+
+export const VideoPanelSchema = PanelBaseSchema.extend({
+  kind: z.literal("video"),
+  signal: z.string().nullable().optional(),
+});
+export type VideoPanel = z.infer<typeof VideoPanelSchema>;
+
+export const PanelSchema = z.union([
+  TimeSeriesPanelSchema,
+  Profile2DPanelSchema,
+  RadialProfilePanelSchema,
+  VideoPanelSchema,
+]);
+export type Panel = z.infer<typeof PanelSchema>;
+export type PanelKind = Panel["kind"];
+
+export const LayoutSchema = z.object({
+  panels: z.array(PanelSchema).min(1),
+  link_time: z.boolean().default(true),
+});
+export type Layout = z.infer<typeof LayoutSchema>;
 
 export const ProjectSchema = z.object({
   _id: z.string().nullable(),
@@ -232,6 +302,8 @@ export const ProjectSchema = z.object({
   bounding_box_labels: z.array(z.string()).default([]),
   polygon_labels: z.array(z.string()).default([]),
   video_bounding_box_labels: z.array(z.string()).default([]),
+  sources: z.array(DataSourceSchema).default([]),
+  layout: LayoutSchema.nullable().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

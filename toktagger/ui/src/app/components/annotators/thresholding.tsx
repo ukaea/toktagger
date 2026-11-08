@@ -1,4 +1,5 @@
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { BACKEND_API_URL } from "@/app/core";
 import { Annotation, Profile2DDataSchema, Profile2DViewParams } from "@/types";
 import {
@@ -28,16 +29,9 @@ export default function Profile2DThresholdTool({
   project_id,
   sample_id,
 }: Profile2DThresholdToolInfo) {
-  const {
-    sample,
-    annotations,
-    setAnnotations,
-    dataParams,
-    data,
-    viewParams,
-    plotProps,
-    setPlotProps,
-  } = useSample();
+  const { sample, annotations, setAnnotations, plotProps, setPlotProps } =
+    useSample();
+  const { dataParams, data, viewParams } = usePanelData();
 
   const signalNames = getSignalNames(sample);
   const signalName =

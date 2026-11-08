@@ -1,12 +1,14 @@
 "use client";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { getSignalNames, shallowEqual } from "@/app/utils";
 import { Profile2DViewParams } from "@/types";
 import { ComboBox, Flex, Item, Switch } from "@adobe/react-spectrum";
 import { useEffect, useMemo, useState } from "react";
 
 export function Profile2DViewParamsWidget() {
-  const { sample, viewParams, setViewParams } = useSample();
+  const { sample } = useSample();
+  const { viewParams, setViewParams } = usePanelData();
   // Seed from any already-restored value in context instead of starting blank.
   const initialParams =
     viewParams.name === "profile_2d"

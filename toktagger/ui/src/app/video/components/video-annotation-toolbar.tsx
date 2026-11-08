@@ -25,7 +25,7 @@ import {
 } from "@annotorious/react";
 
 import { useVideoSession } from "./video-session";
-import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import type { DrawingTool } from "./types";
 
 export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
@@ -37,7 +37,7 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
     setEditMode,
     hideAnnotations,
   } = useVideoSession();
-  const { isLoading } = useSample();
+  const { isLoading } = usePanelData();
   const isFramePending = isLoading && props.desiredFrame !== frame;
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 

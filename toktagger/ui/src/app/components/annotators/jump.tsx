@@ -12,6 +12,7 @@ import { Annotation, MultiVariateTimeSeriesData } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 
 type JumpDetectionType = {
   project_id: string;
@@ -24,7 +25,8 @@ export function JumpDetectionTool({
   sample_id,
   data,
 }: JumpDetectionType) {
-  const { annotations, dataParams, setAnnotations } = useSample();
+  const { annotations, setAnnotations } = useSample();
+  const { dataParams } = usePanelData();
 
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(

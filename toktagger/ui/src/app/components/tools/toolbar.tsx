@@ -27,6 +27,7 @@ import { ExportTool } from "./export";
 import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import Profile2DThresholdTool from "../annotators/thresholding";
 import { Profile2DViewParamsWidget } from "@/app/profile2d/components/profile2dViewParamsWidget";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
@@ -90,12 +91,12 @@ export default function ToolBar() {
   const {
     project,
     sample,
-    data,
     setAnnotations,
     plotProps,
     setPlotProps,
     isValidated,
   } = useSample();
+  const { data } = usePanelData();
 
   const { modelsEnabled } = useServerHealth();
 

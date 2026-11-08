@@ -19,6 +19,7 @@ import {
 
 import type { Annotation, VideoFrameLabel } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { useVideoUiState } from "@/app/contexts/VideoContext";
 import {
   VideoBoundingBoxSchema,
@@ -438,13 +439,8 @@ export function VideoSessionProvider(props: {
   children: React.ReactNode;
 }) {
   const { projectId, sampleId, propagate, setPropagate, children } = props;
-  const {
-    data,
-    dataParams,
-    annotations,
-    isLoading,
-    setAnnotations: setSampleAnnotations,
-  } = useSample();
+  const { annotations, setAnnotations: setSampleAnnotations } = useSample();
+  const { data, dataParams, isLoading } = usePanelData();
   const {
     videoEditMode,
     setVideoEditMode,

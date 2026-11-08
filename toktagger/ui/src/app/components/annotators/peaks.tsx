@@ -18,6 +18,7 @@ import {
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 
 type PeakDetectionType = {
   project_id: string;
@@ -28,7 +29,8 @@ export function PeakDetectionTool({
   project_id,
   sample_id,
 }: PeakDetectionType) {
-  const { annotations, setAnnotations, dataParams, data } = useSample();
+  const { annotations, setAnnotations } = useSample();
+  const { dataParams, data } = usePanelData();
   const signals = useMemo(() => {
     const parsed = MultiVariateTimeSeriesDataSchema.safeParse(data);
     return parsed.success ? parsed.data.values : {};

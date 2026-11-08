@@ -12,6 +12,7 @@ import { Annotation, MultiVariateTimeSeriesDataSchema } from "@/types";
 import { AnnotatorTypes } from "./types";
 import { BACKEND_API_URL } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 
 type OutlierDetectionType = {
   project_id: string;
@@ -22,7 +23,8 @@ export function OutlierDetectionTool({
   project_id,
   sample_id,
 }: OutlierDetectionType) {
-  const { annotations, dataParams, data, setAnnotations } = useSample();
+  const { annotations, setAnnotations } = useSample();
+  const { dataParams, data } = usePanelData();
   const signals = useMemo(() => {
     const parsed = MultiVariateTimeSeriesDataSchema.safeParse(data);
     return parsed.success ? parsed.data.values : {};

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Provider,
   defaultTheme,
@@ -18,6 +18,13 @@ import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
+import {
+  LEGACY_PANEL_ID,
+  PanelDataProvider,
+  PanelScope,
+  panelsForProject,
+  usePanelData,
+} from "@/app/contexts/PanelDataContext";
 import { VideoProviders, VideoView } from "@/app/video/components/video-view";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
 
@@ -47,7 +54,8 @@ const SampleDataBreadCrumbs = ({
 };
 
 const SampleView = () => {
-  const { project, error, isLoading, data } = useSample();
+  const { project } = useSample();
+  const { error, isLoading, data } = usePanelData();
   if (!project) return null;
   if (error) return <ErrorView message={error} />;
 
@@ -74,6 +82,10 @@ function SampleTaskProviders({ children }: { children: React.ReactNode }) {
 
 function SamplePageContent(props: { sampleId: string }) {
   const { project, sample, isLoading, error } = useSample();
+  const panels = useMemo(
+    () => (project && sample ? panelsForProject(project, sample) : []),
+    [project, sample],
+  );
 
   // Early returns AFTER all hooks
   if (error) return <ErrorView message={error} />;
@@ -104,12 +116,21 @@ function SamplePageContent(props: { sampleId: string }) {
       <Provider theme={defaultTheme}>
         <ToastContainer placement="top" />
         <SampleDataBreadCrumbs project={project} sample={sample} />
-        <Flex>
-          <SampleTaskProviders>
-            <ToolBar />
-            <SampleView />
-          </SampleTaskProviders>
-        </Flex>
+        <PanelDataProvider
+          key={sample._id}
+          project={project}
+          sample={sample}
+          panels={panels}
+        >
+          <PanelScope panelId={LEGACY_PANEL_ID}>
+            <Flex>
+              <SampleTaskProviders>
+                <ToolBar />
+                <SampleView />
+              </SampleTaskProviders>
+            </Flex>
+          </PanelScope>
+        </PanelDataProvider>
       </Provider>
     </div>
   );

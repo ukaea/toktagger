@@ -19,7 +19,7 @@ import {
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 import { VideoAnnotationToolbar } from "@/app/video/components/video-annotation-toolbar";
 import { FrameJumpField } from "@/app/video/components/ui_elements";
-import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
 import {
   VideoUiStateProvider,
@@ -108,7 +108,7 @@ function VideoFrameAnnotator(props: {
   goToRelativeFrame: (delta: number, fallbackFrame: number) => number | null;
 }) {
   const session = useVideoSession();
-  const { videoFrameBounds, isLoading } = useSample();
+  const { videoFrameBounds, isLoading } = usePanelData();
   const isFramePending = isLoading && props.desiredFrame !== session.frame;
 
   const prevDisabled =
@@ -209,7 +209,7 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
 
 function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
-  const { data } = useSample();
+  const { data } = usePanelData();
   const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
@@ -236,7 +236,7 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
  * This component assumes it is already inside a VideoSessionProvider.
  */
 export function VideoView() {
-  const { data, dataParams, setDataParams } = useSample();
+  const { data, dataParams, setDataParams } = usePanelData();
   const desiredFrameRef = React.useRef<number | null>(null);
 
   useEffect(() => {

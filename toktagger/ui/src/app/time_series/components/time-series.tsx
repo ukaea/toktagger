@@ -14,13 +14,13 @@ import {
 } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
 import { TimePoint } from "@/app/components/tools/timePoint";
-import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { Flex, View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 export const TimeSeriesView = () => {
-  const { data } = useSample();
+  const { data } = usePanelData();
 
   const [plotData, setPlotData] = useState<Partial<Plotly.PlotData>[]>([]);
 

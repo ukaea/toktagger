@@ -16,6 +16,7 @@ import {
 import { useVideoSession } from "@/app/video/components/video-session";
 import { canonicalizeTrackId } from "@/app/video/components/video-utils";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { useVideoUiState } from "@/app/contexts/VideoContext";
 import {
   ClassPanel as VideoClassPanel,
@@ -35,7 +36,8 @@ function instanceKey(args: { class_name: string; track_id: string }) {
 
 export function VideoToolbox() {
   const session = useVideoSession();
-  const { annotationLabels, dataParams, setDataParams } = useSample();
+  const { annotationLabels } = useSample();
+  const { dataParams, setDataParams } = usePanelData();
   const { videoLastClassName, setVideoLastClassName } = useVideoUiState();
   const labels = annotationLabels;
 
