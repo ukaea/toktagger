@@ -8,6 +8,7 @@ import {
   relayout,
   PlotRelayoutEvent,
   PlotSelectionEvent,
+  purge,
 } from "plotly.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -108,6 +109,7 @@ export const BaseTimeSeriesPlot = ({
     [layout, panelHeight],
   );
   const allowRelayout = useRef(true);
+  const plotRef = useRef<HTMLDivElement>(null);
   const lastHoverTime = useRef(0);
   const lockedSubplotElementRef = useRef<HTMLElement | null>(null); // used to track which subplot an annotation was started on
 
@@ -609,6 +611,14 @@ export const BaseTimeSeriesPlot = ({
     toolingCallbacks,
   ]);
 
+  useEffect(() => {
+    const plot = plotRef.current;
+    // Plotly window listeners keep an unpurged graph alive; declared last to clean up after the other effects.
+    return () => {
+      if (plot) purge(plot);
+    };
+  }, []);
+
   return (
     <div
       className={
@@ -618,7 +628,7 @@ export const BaseTimeSeriesPlot = ({
       }
     >
       {/* Div where plot is inserted */}
-      <div id={plotId} className="" aria-label={ariaLabel}>
+      <div id={plotId} ref={plotRef} className="" aria-label={ariaLabel}>
         <>
           {React.Children.map(children, (child) => {
             return React.isValidElement(child)
