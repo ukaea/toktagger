@@ -9,63 +9,19 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
-  ComboBox,
-  Item,
-  Key,
   Heading,
   InlineAlert,
 } from "@adobe/react-spectrum";
-import { MultiVariateTimeSeriesDataSchema, PlotProps, TaskType } from "@/types";
 import { getAnnotationsForSample } from "@/app/core";
-import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
 import { ShotLabels } from "../annotators/labels";
-import { OutlierDetectionTool } from "../annotators/outliers";
-import { ChangePointDetectionTool } from "../annotators/changepoints";
-import { JumpDetectionTool } from "../annotators/jump";
 import { ExportTool } from "./export";
 import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
+import { ToolAccordion, ToolEntry } from "./toolAccordion";
 import { useSample } from "@/app/contexts/SampleContext";
-import { usePanelData } from "@/app/contexts/PanelDataContext";
-import Profile2DThresholdTool from "../annotators/thresholding";
-import { Profile2DViewParamsWidget } from "@/app/profile2d/components/profile2dViewParamsWidget";
-import { VideoToolbox } from "@/app/video/components/video-toolbox";
+import { useWorkspace } from "@/app/contexts/WorkspaceContext";
 import { useServerHealth } from "@/app/contexts/healthContext";
-
-type ColorMapPickerInfo = {
-  plotProps: PlotProps;
-  setPlotProps: (props: PlotProps) => void;
-};
-
-function ColorMapPicker({ plotProps, setPlotProps }: ColorMapPickerInfo) {
-  const options = [
-    { id: 1, name: "Viridis" },
-    { id: 2, name: "Plasma" },
-    { id: 3, name: "Inferno" },
-    { id: 4, name: "Magma" },
-    { id: 5, name: "Cividis" },
-  ];
-
-  const onColorMapChange = (key: Key | null) => {
-    if (key) {
-      const selectedColorMap = Number(key.toString());
-      const value = options.find((item) => item.id === selectedColorMap);
-      setPlotProps({ ...plotProps, colorMap: value?.name || "Cividis" });
-    }
-  };
-
-  return (
-    <ComboBox
-      label="Color Map"
-      defaultItems={options}
-      inputValue={plotProps.colorMap || "Cividis"}
-      onSelectionChange={onColorMapChange}
-    >
-      {(item) => <Item key={item.id}>{item.name}</Item>}
-    </ComboBox>
-  );
-}
 
 function AnnotationStatusAlert({ isValidated }: { isValidated: boolean }) {
   return (
@@ -88,16 +44,8 @@ function AnnotationStatusAlert({ isValidated }: { isValidated: boolean }) {
 }
 
 export default function ToolBar() {
-  const {
-    project,
-    sample,
-    setAnnotations,
-    plotProps,
-    setPlotProps,
-    isValidated,
-  } = useSample();
-  const { data } = usePanelData();
-
+  const { project, sample, setAnnotations, isValidated } = useSample();
+  const { setToolSlot } = useWorkspace();
   const { modelsEnabled } = useServerHealth();
 
   if (!project || !sample) {
@@ -113,134 +61,26 @@ export default function ToolBar() {
     return null;
   }
 
-  const tools: {
-    name: string;
-    component: React.ReactNode;
-    defaultExpanded?: boolean;
-  }[] = [];
-
-  if (data && project.task == TaskType.TimeSeries) {
-    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-
-    if (!result.success) {
-      console.warn("Time series data is not available");
-      return;
-    }
-
-    const tsData = result.data;
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
+  const sampleTools: ToolEntry[] = [
+    {
       name: "Shot Labels",
-      component: <ShotLabels labels={labels}></ShotLabels>,
-    });
-
-    tools.push({
-      name: "Peak Detection",
       component: (
-        <PeakDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></PeakDetectionTool>
+        <ShotLabels
+          labels={project.shot_labels || ["Valid Shot", "Invalid Shot"]}
+        />
       ),
-    });
-
-    tools.push({
-      name: "Outlier Detection",
-      component: (
-        <OutlierDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></OutlierDetectionTool>
-      ),
-    });
-
-    tools.push({
-      name: "Change Point Detection",
-      component: (
-        <ChangePointDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></ChangePointDetectionTool>
-      ),
-    });
-
-    tools.push({
-      name: "Jump Detection",
-      component: (
-        <JumpDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></JumpDetectionTool>
-      ),
-    });
-  } else if (project.task == TaskType.Profile2D) {
-    // Not gated on data so the signal picker below still lets the user recover.
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels}></ShotLabels>,
-    });
-
-    tools.push({
-      name: "View Parameters",
-      component: <Profile2DViewParamsWidget />,
-    });
-
-    tools.push({
-      name: "Color Map",
-      component: (
-        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
-      ),
-    });
-
-    tools.push({
-      name: "Threshold",
-      component: (
-        <Profile2DThresholdTool project_id={project_id} sample_id={sample_id} />
-      ),
-    });
-  } else if (project.task === TaskType.RadialProfile) {
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels}></ShotLabels>,
-    });
-
-    tools.push({
-      name: "Color Map",
-      component: (
-        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
-      ),
-    });
-  } else if (data && project.task === TaskType.Video) {
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels} />,
-    });
-
-    tools.push({
-      name: "Video Tools",
-      component: <VideoToolbox />,
-      defaultExpanded: true,
-    });
-  }
-  if (modelsEnabled) {
-    tools.push({
-      name: "Model Prediction",
-      component: (
-        <ModelPredictTool
-          project_id={project_id}
-          sample_id={sample_id}
-        ></ModelPredictTool>
-      ),
-    });
-  }
+    },
+  ];
+  const modelTools: ToolEntry[] = modelsEnabled
+    ? [
+        {
+          name: "Model Prediction",
+          component: (
+            <ModelPredictTool project_id={project_id} sample_id={sample_id} />
+          ),
+        },
+      ]
+    : [];
 
   const refreshAnnotations = async () => {
     const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
@@ -293,32 +133,19 @@ export default function ToolBar() {
               </Disclosure>
             </Accordion>
           </Flex>
-          {tools.length > 0 && (
-            <>
-              <Flex justifyContent="center" alignItems="center">
-                <Header height="size-300" marginBottom="size-100">
-                  <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
-                </Header>
-              </Flex>
-
-              <Accordion
-                allowsMultipleExpanded={true}
-                defaultExpandedKeys={tools
-                  .filter((item) => item.defaultExpanded)
-                  .map((item) => item.name)}
-                width="100%"
-              >
-                {tools.map((item) => (
-                  <Disclosure key={item.name} id={item.name}>
-                    <DisclosureTitle>
-                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                    </DisclosureTitle>
-                    <DisclosurePanel>{item.component}</DisclosurePanel>
-                  </Disclosure>
-                ))}
-              </Accordion>
-            </>
-          )}
+          <Flex justifyContent="center" alignItems="center">
+            <Header height="size-300" marginBottom="size-100">
+              <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+            </Header>
+          </Flex>
+          <ToolAccordion tools={sampleTools} />
+          {/* The active panel renders its own tools here, inside its own providers. */}
+          <div
+            ref={setToolSlot}
+            data-testid="panel-tools"
+            style={{ width: "100%" }}
+          />
+          <ToolAccordion tools={modelTools} />
         </Flex>
       </View>
     </Provider>

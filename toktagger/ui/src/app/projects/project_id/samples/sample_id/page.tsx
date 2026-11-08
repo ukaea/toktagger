@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import {
   Provider,
   defaultTheme,
@@ -10,22 +10,18 @@ import {
   Flex,
 } from "@adobe/react-spectrum";
 import { Project, Sample, TaskType } from "@/types";
-import { TimeSeriesView } from "@/app/time_series/components/time-series";
-import { Profile2dView } from "@/app/profile2d/components/profile2d";
-import { RadialProfileView } from "@/app/radial_profile/components/radial-profile";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useHref, useNavigate, useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
 import {
-  LEGACY_PANEL_ID,
   PanelDataProvider,
-  PanelScope,
   panelsForProject,
-  usePanelData,
 } from "@/app/contexts/PanelDataContext";
-import { VideoProviders, VideoView } from "@/app/video/components/video-view";
+import { WorkspaceProvider } from "@/app/contexts/WorkspaceContext";
+import { PanelFrame } from "@/app/panels/panel-frame";
+import { WorkspaceView } from "@/app/panels/workspace-view";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
 
 type SampleDataBreadCrumbsInfo = {
@@ -53,39 +49,13 @@ const SampleDataBreadCrumbs = ({
   );
 };
 
-const SampleView = () => {
-  const { project } = useSample();
-  const { error, isLoading, data } = usePanelData();
-  if (!project) return null;
-  if (error) return <ErrorView message={error} />;
-
-  if (project.task === TaskType.TimeSeries)
-    return isLoading ? <LoadingView /> : <TimeSeriesView />;
-  if (project.task === TaskType.Video)
-    return isLoading && !data ? <LoadingView /> : <VideoView />;
-  if (project.task === TaskType.Profile2D)
-    return isLoading ? <LoadingView /> : <Profile2dView />;
-  if (project.task === TaskType.RadialProfile)
-    return isLoading ? <LoadingView /> : <RadialProfileView />;
-  return null;
-};
-
-function SampleTaskProviders({ children }: { children: React.ReactNode }) {
-  const { project } = useSample();
-
-  if (project?.task === TaskType.Video) {
-    return <VideoProviders>{children}</VideoProviders>;
-  }
-
-  return <>{children}</>;
-}
-
 function SamplePageContent(props: { sampleId: string }) {
   const { project, sample, isLoading, error } = useSample();
   const panels = useMemo(
     () => (project && sample ? panelsForProject(project, sample) : []),
     [project, sample],
   );
+  const panelIds = useMemo(() => panels.map((panel) => panel.id), [panels]);
 
   // Early returns AFTER all hooks
   if (error) return <ErrorView message={error} />;
@@ -122,14 +92,21 @@ function SamplePageContent(props: { sampleId: string }) {
           sample={sample}
           panels={panels}
         >
-          <PanelScope panelId={LEGACY_PANEL_ID}>
+          <WorkspaceProvider
+            panelIds={panelIds}
+            linkTime={project.layout?.link_time ?? true}
+          >
             <Flex>
-              <SampleTaskProviders>
-                <ToolBar />
-                <SampleView />
-              </SampleTaskProviders>
+              <ToolBar />
+              {project.task === TaskType.MultiPanel ? (
+                <WorkspaceView panels={panels} />
+              ) : (
+                panels.map((panel) => (
+                  <PanelFrame key={panel.id} panel={panel} />
+                ))
+              )}
             </Flex>
-          </PanelScope>
+          </WorkspaceProvider>
         </PanelDataProvider>
       </Provider>
     </div>

@@ -18,7 +18,8 @@ import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
-import { usePanelData } from "@/app/contexts/PanelDataContext";
+import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
+import { useViewportHeight } from "@/app/contexts/PanelHeightContext";
 import { useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 
@@ -177,11 +178,12 @@ const buildPlotData = (
 const buildPlotLayout = (
   colorAxis: ColorAxis,
   isDarkMode: boolean,
+  height: number,
 ): Partial<Plotly.Layout> =>
   applyGlobalStyle(
     {
       autosize: true,
-      height: window.innerHeight * 0.9,
+      height: height * 0.9,
       xaxis: {
         title: { text: "" },
         domain: [0, 1],
@@ -259,14 +261,17 @@ export const Profile2dView = () => {
     return createPlotFunc(viewData, plotProps, interpFunc);
   }, [viewData, plotProps, logScale]);
 
+  const viewportHeight = useViewportHeight();
+  const plotId = usePlotId("Profile2DView");
   const plotData = useMemo<Partial<Plotly.PlotData>[]>(() => {
     if (!viewData || !plot) return [];
     return buildPlotData(viewData, plot.values, plotProps?.thresholdActive);
   }, [viewData, plot, plotProps?.thresholdActive]);
 
   const plotLayout = useMemo(
-    () => (plot ? buildPlotLayout(plot.colorAxis, isDarkMode) : {}),
-    [plot, isDarkMode],
+    () =>
+      plot ? buildPlotLayout(plot.colorAxis, isDarkMode, viewportHeight) : {},
+    [plot, isDarkMode, viewportHeight],
   );
 
   if (!viewData || !profileViewParams || !plot) {
@@ -280,7 +285,7 @@ export const Profile2dView = () => {
           <Flex direction="row" flex justifyContent="space-between">
             <Flex direction="column" flex gap="size-200">
               <BaseTimeSeriesPlot
-                plotId="Profile2DView"
+                plotId={plotId}
                 ariaLabel="profile-2d"
                 plotConfig={{
                   data: plotData,

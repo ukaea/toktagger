@@ -478,3 +478,10 @@ export function usePanelData(): PanelDataContextType {
   }
   return { ...state, panel, setDataParams, setViewParams };
 }
+
+/** A DOM id for a plot that is unique per panel; single-task pages keep the plain base id. */
+export function usePlotId(base: string): string {
+  const panelId = useContext(PanelIdContext);
+  if (!panelId || panelId === LEGACY_PANEL_ID) return base;
+  return `${base}-${panelId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}

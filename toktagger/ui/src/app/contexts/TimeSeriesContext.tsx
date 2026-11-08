@@ -14,6 +14,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -86,6 +87,11 @@ export const useTimeSeriesState = () => {
 
 export const TIME_SERIES_ANNOTATION_MENU = "time-series-annotation-menu";
 
+// Each provider owns its own menu, so panels with the same tools do not open each other's menu.
+const AnnotationMenuIdContext = createContext(TIME_SERIES_ANNOTATION_MENU);
+
+export const useAnnotationMenuId = () => useContext(AnnotationMenuIdContext);
+
 function isEditableEventTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
@@ -147,6 +153,7 @@ export const TimeSeriesProvider = ({
   const projectId = project?._id ?? "";
 
   const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
+  const annotationMenuId = `${TIME_SERIES_ANNOTATION_MENU}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
   const [toolingCallbacks, setToolingCallbacks] = useState<
     Map<TimeSeriesAnnotationType, ToolingCallbacks>
   >(new Map());
@@ -710,8 +717,10 @@ export const TimeSeriesProvider = ({
   return (
     <TimeSeriesActionsContext.Provider value={actionsValue}>
       <TimeSeriesStateContext value={stateValue}>
-        {children}
-        <Menu id={`${TIME_SERIES_ANNOTATION_MENU}`}>
+        <AnnotationMenuIdContext.Provider value={annotationMenuId}>
+          {children}
+        </AnnotationMenuIdContext.Provider>
+        <Menu id={annotationMenuId}>
           <Item
             id="delete"
             onClick={({ props }: ItemParams) => {

@@ -2,7 +2,8 @@
 
 import React from "react";
 import { useSample } from "@/app/contexts/SampleContext";
-import { NavAdapterProvider } from "@/app/contexts/NavAdapterContext";
+import { useRegisterNavAdapter } from "@/app/contexts/NavAdapterContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { type Annotation, type NavAdapter } from "@/types";
 import { useVideoSession } from "./video-session";
 
@@ -13,6 +14,7 @@ export function VideoNavAdapterBridge({
 }) {
   const session = useVideoSession();
   const { annotations } = useSample();
+  const { panel } = usePanelData();
 
   const adapter: NavAdapter = {
     getAnnotations: () => {
@@ -40,5 +42,7 @@ export function VideoNavAdapterBridge({
     },
   };
 
-  return <NavAdapterProvider value={adapter}>{children}</NavAdapterProvider>;
+  useRegisterNavAdapter(panel.id, adapter);
+
+  return <>{children}</>;
 }
