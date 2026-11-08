@@ -34,7 +34,14 @@ The annotations exist in three places:
 
 When the user draws or edits a shape, Annotorious fires an event, and `commitFromAnnotorious` writes the frame's annotations back into `byFrame` and `SampleContext`. When the frame changes, the session pushes that frame's list from `byFrame` into Annotorious. Frame labels have no shape, so they skip `byFrame` and Annotorious and live only in `SampleContext`.
 
-In the Annotorious format, the class label and track ID are stored as annotation bodies with the purposes `tagging` and `identifying`, and the frame is stored on `target.source`. `anno-utils.ts` converts between the two formats.
+In the Annotorious format, the frame is stored on `target.source`. Other data is stored as annotation bodies, each with a purpose:
+
+* `tagging`: the class label.
+* `identifying`: the track ID.
+* `creator`, `creator-name` and `creator-deleted`: the author of the annotation.
+* `db-id`: the backend `_id`. Annotorious makes its own IDs, so this body links a shape to its saved annotation. Without it, a save adds a colleague's annotation again as a new annotation, and does not update it.
+
+Annotorious does not keep `validated` or `uncertainty`. When the session writes a saved shape back to `SampleContext`, it copies these values from the previous copy of that annotation. `anno-utils.ts` converts between the two formats.
 
 !!! tip
     Change annotations through the functions on `useVideoSession()` rather than calling the Annotorious API directly. The session needs to see every change to keep `byFrame` and `SampleContext` in step.
@@ -53,6 +60,8 @@ Bounding boxes and polygons use Annotorious's own drawing tools. Points and fram
 * A frame label is added to, or removed from, `SampleContext` directly.
 
 As in the other views, drawing needs edit mode with **Ctrl** held. The session exposes this as `drawIntent`, which turns on Annotorious drawing and stops clicks selecting existing shapes.
+
+A project `viewer` cannot change annotations. The session's `canAnnotate` is false for a viewer, so `editMode` stays false. Drawing, points and frame labels all need `editMode`, so they are not available. The other session functions that change annotations, such as the clear and delete functions, check `canAnnotate` directly. Put this check in the session function, not only on the button, so that keyboard shortcuts also obey it.
 
 ### Saving
 `VideoNavAdapterBridge` provides the shared navigation controls with a `NavAdapter`. Save sends the annotations in `SampleContext`, and Clear removes the annotations on the current frame.

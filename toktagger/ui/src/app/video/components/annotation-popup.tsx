@@ -2,8 +2,6 @@
  * The card shown for a selected shape or frame label: its class, track ID, details and a Delete button.
  * Display only: the caller positions it and handles the buttons.
  */
-"use client";
-
 import React from "react";
 import { Button } from "@adobe/react-spectrum";
 

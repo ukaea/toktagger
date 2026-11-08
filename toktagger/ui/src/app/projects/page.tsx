@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { deleteProject, getProjects } from "@/app/core";
 import Delete from "@spectrum-icons/workflow/Delete";
 import { ProjectConfigEditor } from "./components/project_config";
@@ -159,7 +159,7 @@ export default function Projects() {
   });
   const [projects, setProjects] = useState<Project[]>([]);
 
-  const refreshProjects = useCallback(async () => {
+  const refreshProjects = async () => {
     try {
       setProjects(
         await getProjects(
@@ -175,7 +175,7 @@ export default function Projects() {
       console.warn("Failed to load projects", err);
       setProjects([]);
     }
-  }, [sortDescriptor, currentPage, projectsPerPage, projectName]);
+  };
 
   useEffect(() => {
     refreshProjects();
