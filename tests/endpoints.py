@@ -114,6 +114,31 @@ def create_local_samples(
     return response.json()
 
 
+def create_defuse_samples(
+    project_id: str,
+    shot_files: dict[int, pathlib.Path],
+    signal_names: list[str] | None = None,
+) -> list[str]:
+    samples = [
+        {
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "data": {
+                "file_name": str(file_path),
+                "type": "h5",
+                "protocol": "file",
+                "signal_names": signal_names,
+            },
+        }
+        for shot_id, file_path in shot_files.items()
+    ]
+    response = session.post(
+        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def create_image_samples(
     project_id: str,
     shot_id: int,

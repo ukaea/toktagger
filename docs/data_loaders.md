@@ -53,3 +53,12 @@ This data loader will load Numpy files (`.npy` / `.npz`) and display them as ima
 Values will be linearly scaled to be between 1-255 if required. If using a `.npz` file containing more than one named array, you should specify a `signal_name` which is the name of the array to use.
 
 **Signal names:** Use the name of one array in the `.npz` file, for example `frames`. If the file contains only one array, do not specify a signal name.
+
+## DEFUSE
+This data loader loads time series signals from DEFUSE HDF5 output files (`.h5`) on your local disk. It expects one file for each shot. The file name must end with the shot ID, for example `MASTUno48264.h5`.
+
+The data loader reads the signals in the `SIG` group of the file. Each signal is in a group named `<name>_v<version>`, which contains a `signal` dataset and a `time` dataset. The data loader ignores groups that do not contain these two datasets. It does not load the DEFUSE detection results in the `objDIS` group.
+
+**Signal names:** Use the DEFUSE signal names, for example `IPLA, ZMAG, SXR`. A name without a version loads the latest version of that signal. For example, if the file contains `ZMAG_v1` and `ZMAG_v2`, then `ZMAG` loads `ZMAG_v2`. To load a specific version, use the full name, for example `ZMAG_v1`. If you do not specify signal names, the data loader loads the latest version of all signals.
+
+Some DEFUSE signals contain millions of samples. Set **Min Time Step** in the project to make sure that these signals load quickly.
