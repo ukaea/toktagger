@@ -2,7 +2,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from bson import ObjectId
 from fastapi import HTTPException
@@ -27,7 +27,13 @@ from toktagger.api.schemas.projects import (
     ProjectMemberUpdate,
     ProjectUpdate,
 )
-from toktagger.api.schemas.samples import FileData, Sample, SampleSummary, SampleUpdate
+from toktagger.api.schemas.samples import (
+    FileData,
+    Sample,
+    SampleSummary,
+    SampleUpdate,
+    SampleWithAnnotationCount,
+)
 from toktagger.api.schemas.users import (
     UserBase,
     UserIn,
@@ -78,6 +84,28 @@ async def get_project(db_client: MongoDBClient, project_id: str) -> Project:
     return Project(**projects[0])
 
 
+async def _get_sample_filters(
+    db_client: MongoDBClient,
+    project_id: str,
+    validated: bool | None = None,
+    shot_id: int | None = None,
+) -> dict[str, Any]:
+    project_obj_id = convert_to_objectid(project_id, "projects")
+
+    if not await db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    filters: dict[str, Any] = {"project_id": project_obj_id}
+
+    if validated is not None:
+        filters["validated_annotations"] = validated
+
+    if shot_id:
+        filters["shot_id"] = shot_id
+
+    return filters
+
+
 async def get_samples(
     db_client: MongoDBClient,
     project_id: str,
@@ -89,18 +117,7 @@ async def get_samples(
     count: int | None = None,
 ) -> list[Sample]:
     # Return a list of all samples for this project and info about them
-    project_obj_id = convert_to_objectid(project_id, "projects")
-
-    if not await db_client.get_document_by_id("projects", project_obj_id):
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
-
-    filters = {"project_id": project_obj_id}
-
-    if validated is not None:
-        filters["validated_annotations"] = validated
-
-    if shot_id:
-        filters["shot_id"] = shot_id
+    filters = await _get_sample_filters(db_client, project_id, validated, shot_id)
 
     samples = await db_client.get_filtered_documents(
         collection="samples",
@@ -113,6 +130,45 @@ async def get_samples(
 
     samples = [TypeAdapter(Sample).validate_python(s) for s in samples]
     return samples
+
+
+async def get_samples_with_annotation_counts(
+    db_client: MongoDBClient,
+    project_id: str,
+    shot_id: int | None = None,
+    sort_by: str = "_id",
+    sort_direction: Literal["ascending", "descending"] = "descending",
+    start: int = 0,
+    count: int | None = None,
+) -> list[SampleWithAnnotationCount]:
+    """Get samples with their annotation counts, sortable by any field incl. the count."""
+    filters = await _get_sample_filters(db_client, project_id, shot_id=shot_id)
+    direction = 1 if sort_direction == "ascending" else -1
+    pipeline: list[dict[str, Any]] = [
+        {"$match": filters},
+        {
+            "$lookup": {
+                "from": "annotations",
+                "localField": "_id",
+                "foreignField": "sample_id",
+                # Only the IDs are joined, so large annotations never enter the sample.
+                "pipeline": [{"$project": {"_id": 1}}],
+                "as": "annotation_ids",
+            }
+        },
+        {"$addFields": {"annotation_count": {"$size": "$annotation_ids"}}},
+        {"$project": {"annotation_ids": 0}},
+        {"$sort": {sort_by: direction, "_id": direction}},
+        {"$skip": start},
+    ]
+    if count:
+        pipeline.append({"$limit": count})
+
+    samples = await db_client.aggregate("samples", pipeline)
+    return [
+        TypeAdapter(SampleWithAnnotationCount).validate_python(sample)
+        for sample in samples
+    ]
 
 
 async def update_sample(

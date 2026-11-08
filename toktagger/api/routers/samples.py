@@ -22,6 +22,7 @@ from toktagger.api.schemas.samples import (
     SampleIn,
     SampleSummary,
     SampleUpdateBatchItem,
+    SampleWithAnnotationCount,
 )
 from toktagger.api.schemas.users import UserOut
 
@@ -36,7 +37,7 @@ router = APIRouter(
 
 @router.get(
     "",
-    response_model=list[Sample],
+    response_model=list[SampleWithAnnotationCount],
     responses={
         200: {"description": "Samples have been retrieved successfully."},
         404: {"description": "Project not found with that ID."},
@@ -65,13 +66,13 @@ async def get_samples(
     shot_id: int | None = Query(
         None, description="The shot ID to search for, by default None"
     ),
-) -> list[Sample]:
+) -> list[SampleWithAnnotationCount]:
     """
     Get the full list of samples available for this project.
     --------------------------------------------------------
     """
     db_client: MongoDBClient = request.app.state.db_client
-    samples = await utils.get_samples(
+    return await utils.get_samples_with_annotation_counts(
         db_client=db_client,
         project_id=project_id,
         shot_id=shot_id,
@@ -80,7 +81,6 @@ async def get_samples(
         start=start,
         count=count,
     )
-    return samples
 
 
 @router.post(
@@ -272,7 +272,7 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client: MongoDBClient = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(
+    samples = await utils.get_samples_with_annotation_counts(
         db_client,
         project_id,
         sort_by=sort_by,

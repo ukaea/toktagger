@@ -44,7 +44,7 @@ import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ModelPredictModal } from "@/app/components/tools/modelPredict";
 import { ModelLoadModal } from "@/app/components/tools/modelLoad";
 import Delete from "@spectrum-icons/workflow/Delete";
-import type { Project, Sample } from "@/types";
+import type { Project, SampleWithAnnotationCount } from "@/types";
 import { useParams } from "react-router-dom";
 import { ImportButton } from "@/app/components/tools/import";
 import { ExportButton } from "@/app/components/tools/export";
@@ -55,7 +55,7 @@ import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
 
 type SamplesTableProps = {
   project_id: string;
-  samples: Sample[];
+  samples: SampleWithAnnotationCount[];
   sortDescriptor: SortDescriptor;
   onSortChange: (sort: SortDescriptor) => void;
   onModify?: () => void;
@@ -95,6 +95,9 @@ const SamplesTable = ({
           <Column key="validated_annotations" allowsSorting>
             Validated
           </Column>
+          <Column key="annotation_count" allowsSorting>
+            Annotations
+          </Column>
           <Column key="actions">Actions</Column>
         </TableHeader>
         <TableBody items={rows}>
@@ -111,6 +114,7 @@ const SamplesTable = ({
                   isReadOnly={true}
                 />
               </Cell>
+              <Cell>{item["annotation_count"]}</Cell>
               <Cell>
                 <Flex direction="row" gap="size-100">
                   <DialogTrigger>
@@ -175,7 +179,7 @@ export default function ProjectView() {
     column: "shot_id",
     direction: "ascending",
   });
-  const [samples, setSamples] = useState<Sample[]>([]);
+  const [samples, setSamples] = useState<SampleWithAnnotationCount[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [loadError, setLoadError] = useState<{
     forbidden: boolean;

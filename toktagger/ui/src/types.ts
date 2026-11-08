@@ -305,6 +305,13 @@ export const SampleSchema = z.object({
 });
 export type Sample = z.infer<typeof SampleSchema>;
 
+export const SampleWithAnnotationCountSchema = SampleSchema.extend({
+  annotation_count: z.int(),
+});
+export type SampleWithAnnotationCount = z.infer<
+  typeof SampleWithAnnotationCountSchema
+>;
+
 export const SampleUpdateSchema = z.object({
   validated_annotations: z.boolean(),
 });
