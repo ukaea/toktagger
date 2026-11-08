@@ -20,6 +20,7 @@ import type {
   VideoBoundingBoxInput,
   VideoPointInput,
   VideoPolygonInput,
+  VideoShapeInput,
 } from "@/types";
 import type { AnnotoriousDrawingTool, DrawingTool } from "./types";
 
@@ -456,7 +457,7 @@ export function annoToVideoPoint(
 export function annoToVideoAnnotation(
   a: ImageAnnotation,
   frame: number,
-): VideoBoundingBoxInput | VideoPolygonInput | VideoPointInput | null {
+): VideoShapeInput | null {
   if (isPointAnno(a)) return annoToVideoPoint(a, frame);
   if (isRectangleAnno(a)) return annoToVideoBBox(a, frame);
   if (isPolygonAnno(a)) return annoToVideoPolygon(a, frame);

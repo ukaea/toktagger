@@ -129,6 +129,8 @@ export const VideoShapeSchema = z.discriminatedUnion("type", [
   VideoPointSchema,
 ]);
 
+export type VideoShapeInput = z.input<typeof VideoShapeSchema>;
+
 export const AnnotationSchema = z.union([
   TimePointSchema,
   TimeRegionSchema,
