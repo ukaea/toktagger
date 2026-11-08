@@ -14,13 +14,14 @@ import {
 } from "@/app/utils";
 import { useEffect, useMemo, useState } from "react";
 import { TimePoint } from "@/app/components/tools/timePoint";
-import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
+import { useFigureHeight } from "@/app/contexts/PanelHeightContext";
 import { Flex, View } from "@adobe/react-spectrum";
-import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
-import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 
 export const TimeSeriesView = () => {
-  const { data } = useSample();
+  const { data } = usePanelData();
+  const figureHeight = useFigureHeight(0.9);
+  const plotId = usePlotId("TimesSeriesView");
 
   const [plotData, setPlotData] = useState<Partial<Plotly.PlotData>[]>([]);
 
@@ -79,7 +80,7 @@ export const TimeSeriesView = () => {
         //grid: { rows: 1, columns: 1, pattern: "independent" },
         dragmode: "pan",
         autosize: true,
-        height: window.innerHeight * 0.9,
+        height: figureHeight,
         xaxis: {
           minallowed: minTime,
           maxallowed: maxTime,
@@ -100,7 +101,7 @@ export const TimeSeriesView = () => {
       },
       isDarkMode,
     );
-  }, [plotData, isDarkMode]);
+  }, [plotData, isDarkMode, figureHeight]);
 
   if (!viewData) {
     return null;
@@ -110,18 +111,15 @@ export const TimeSeriesView = () => {
     <View width="100%">
       <Flex justifyContent="center" alignItems="center">
         <TimeSeriesProvider>
-          <Flex direction="row" flex justifyContent="space-between">
-            <Flex direction="column" flex gap="size-200">
-              <BaseTimeSeriesPlot
-                plotId="TimesSeriesView"
-                plotConfig={{ data: plotData, layout: plotLayout }}
-              >
-                <TimeRegion />
-                <TimePoint />
-              </BaseTimeSeriesPlot>
-              <AnnotationsTable />
-            </Flex>
-            <AnnotationToolbar />
+          <Flex direction="column" flex gap="size-200">
+            <BaseTimeSeriesPlot
+              plotId={plotId}
+              plotConfig={{ data: plotData, layout: plotLayout }}
+              linkTime
+            >
+              <TimeRegion />
+              <TimePoint />
+            </BaseTimeSeriesPlot>
           </Flex>
         </TimeSeriesProvider>
       </Flex>

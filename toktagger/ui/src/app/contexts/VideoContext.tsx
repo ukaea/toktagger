@@ -8,8 +8,6 @@ type VideoUiStateContextType = {
   setVideoPropagate: (value: boolean) => void;
   videoLastClassName: string | null;
   setVideoLastClassName: (value: string | null) => void;
-  videoEditMode: boolean;
-  setVideoEditMode: (value: boolean) => void;
   videoDrawingTool: ActiveDrawingTool;
   setVideoDrawingTool: (value: ActiveDrawingTool) => void;
 };
@@ -21,7 +19,6 @@ const VideoUiStateContext = createContext<VideoUiStateContextType | undefined>(
 const videoUiStateSnapshot = {
   videoPropagate: true,
   videoLastClassName: null as string | null,
-  videoEditMode: false,
   videoDrawingTool: null as ActiveDrawingTool,
 };
 
@@ -36,9 +33,6 @@ export function VideoUiStateProvider({
   const [videoLastClassName, setVideoLastClassNameState] = useState<
     string | null
   >(() => videoUiStateSnapshot.videoLastClassName);
-  const [videoEditMode, setVideoEditModeState] = useState(
-    () => videoUiStateSnapshot.videoEditMode,
-  );
   const [videoDrawingTool, setVideoDrawingToolState] =
     useState<ActiveDrawingTool>(() => videoUiStateSnapshot.videoDrawingTool);
 
@@ -50,11 +44,6 @@ export function VideoUiStateProvider({
   const setVideoLastClassName = useCallback((value: string | null) => {
     videoUiStateSnapshot.videoLastClassName = value;
     setVideoLastClassNameState(value);
-  }, []);
-
-  const setVideoEditMode = useCallback((value: boolean) => {
-    videoUiStateSnapshot.videoEditMode = value;
-    setVideoEditModeState(value);
   }, []);
 
   const setVideoDrawingTool = useCallback((value: ActiveDrawingTool) => {
@@ -69,8 +58,6 @@ export function VideoUiStateProvider({
         setVideoPropagate,
         videoLastClassName,
         setVideoLastClassName,
-        videoEditMode,
-        setVideoEditMode,
         videoDrawingTool,
         setVideoDrawingTool,
       }}

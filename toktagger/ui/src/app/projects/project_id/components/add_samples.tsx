@@ -16,54 +16,107 @@ import {
   ToastQueue,
   RadioGroup,
   Radio,
+  View,
 } from "@adobe/react-spectrum";
 import {
+  DataSource,
+  DEFAULT_SOURCE,
   Project,
   Sample,
-  ShotData,
-  FileData,
-  TimeSeriesFileData,
-  ImageArrayFileData,
+  SampleData,
+  TaskType,
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BACKEND_API_URL } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
 } from "@/app/components/ui/numerical_range";
 
-export const AddSamplesEditor = ({
-  project,
-  onModify,
-}: {
-  project: Project;
-  onModify?: () => void;
-}) => {
-  const dataLoader = project.data_loader;
+const FILE_SCHEMAS = [
+  "ImageFileData",
+  "ImageArrayFileData",
+  "TimeSeriesFileData",
+] as const;
+type FileSchemaTitle = (typeof FILE_SCHEMAS)[number];
 
-  // Data schema state
-  const [dataSchema, setDataSchema] = useState<Record<string, unknown> | null>(
-    null,
-  );
+const isFileSchema = (title: unknown): title is FileSchemaTitle =>
+  FILE_SCHEMAS.some((fileSchema) => fileSchema === title);
+
+// What the user entered for one data source.
+type SourceInput =
+  | { kind: "shot"; signalNames: string }
+  | {
+      kind: "file";
+      schemaTitle: FileSchemaTitle;
+      fileType: string;
+      dirPath: string;
+      columnNames: string;
+      shotIds: number[];
+    };
+
+const splitNames = (text: string) =>
+  text
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+
+/** Builds the sample data of one source for one shot. */
+function buildSourceData(input: SourceInput, shotId: number): SampleData {
+  if (input.kind === "shot") {
+    const signals = splitNames(input.signalNames);
+    if (signals.length === 0) {
+      throw new Error("At least one signal name is required for Shot Data");
+    }
+    return { protocol: "uda", signal_names: signals };
+  }
+
+  // For image directories, the "file name" is the directory of the shot.
+  const fileName =
+    input.schemaTitle === "ImageFileData"
+      ? `${input.dirPath}/${shotId}`
+      : `${input.dirPath}/${shotId}.${input.fileType}`;
+  const fileData = {
+    file_name: fileName,
+    type: input.fileType,
+    protocol: "file",
+  };
+  const columns = splitNames(input.columnNames);
+
+  if (input.schemaTitle === "TimeSeriesFileData" && columns.length > 0) {
+    return { ...fileData, signal_names: columns };
+  }
+  if (input.schemaTitle === "ImageArrayFileData" && columns.length > 1) {
+    throw new Error("Only one signal name allowed for image array data!");
+  }
+  if (input.schemaTitle === "ImageArrayFileData" && columns.length === 1) {
+    return { ...fileData, signal_name: columns[0] };
+  }
+  return fileData;
+}
+
+/** The fields for one data source; reports its input to the parent on each change. */
+function SourceInputGroup({
+  source,
+  showName,
+  onChange,
+}: {
+  source: DataSource;
+  showName: boolean;
+  onChange: (sourceName: string, input: SourceInput | null) => void;
+}) {
+  const dataLoader = source.data_loader;
+  const [schemaTitle, setSchemaTitle] = useState<string | null>(null);
   const [fileTypes, setFileTypes] = useState<{ key: string; value: string }[]>(
     [],
   );
-
-  // Form state
-  const [shotInputMethod, setShotInputMethod] = useState<string>("range"); // "range" or "file"
-  const [shotRange, setShotRange] = useState<NumericalRangeType>();
-  const [shotIds, setShotIds] = useState<number[]>([]);
-
-  // Shot Data fields
   const [signalNames, setSignalNames] = useState<string>("");
-
-  // File Data fields
   const [fileType, setFileType] = useState<string>("parquet");
   const [dirPath, setDirPath] = useState<string>("");
-  const [columnNames, setColumnNames] = useState<string>(""); // For time series files
+  const [columnNames, setColumnNames] = useState<string>("");
+  const [shotIds, setShotIds] = useState<number[]>([]);
 
-  // Determine if we should use directories (for image data)
-  const useDirectories = dataSchema?.title === "ImageFileData";
+  const useDirectories = schemaTitle === "ImageFileData";
 
   // Fetch the data schema type from the load registry
   useEffect(() => {
@@ -74,9 +127,7 @@ export const AddSamplesEditor = ({
         );
         if (response.ok) {
           const schema = await response.json();
-          // The schema has a "title" field that indicates the type
-          // e.g., "ShotData", "FileData", "TimeSeriesFileData"
-          setDataSchema(schema);
+          setSchemaTitle(schema.title);
 
           if (schema.title === "ShotData") {
             return;
@@ -106,13 +157,205 @@ export const AddSamplesEditor = ({
   }, [dataLoader]);
 
   useEffect(() => {
+    if (!isFileSchema(schemaTitle)) return;
+    async function fetchFileSamples() {
+      let apiUrl = `${BACKEND_API_URL}/paths/files?dir_path=${dirPath}&file_type=${fileType}`;
+      if (useDirectories) {
+        apiUrl = `${BACKEND_API_URL}/paths/directories?dir_path=${dirPath}&file_type=${fileType}`;
+      }
+      const response = await fetch(apiUrl);
+
+      if (response.ok) {
+        const fileNames: string[] = await response.json();
+
+        // Extract shot IDs from file names using regex (assuming shot ID is a number in the file name)
+        const extractedShotIds = fileNames
+          .map((fileName) => {
+            const regex = useDirectories
+              ? /^\d+$/
+              : new RegExp(`^\\d+\\.${fileType}$`);
+
+            const match = fileName.split("/").pop()?.match(regex);
+            return match ? parseInt(match[0], 10) : null;
+          })
+          .filter((id): id is number => id !== null);
+
+        setShotIds(extractedShotIds);
+      } else {
+        ToastQueue.negative(`Error fetching files for ${dirPath}.`, {
+          timeout: 3000,
+        });
+      }
+    }
+    fetchFileSamples();
+  }, [dirPath, fileType, useDirectories, schemaTitle]);
+
+  useEffect(() => {
+    if (schemaTitle === "ShotData") {
+      onChange(source.name, { kind: "shot", signalNames });
+    } else if (isFileSchema(schemaTitle)) {
+      onChange(source.name, {
+        kind: "file",
+        schemaTitle,
+        fileType,
+        dirPath,
+        columnNames,
+        shotIds,
+      });
+    } else {
+      onChange(source.name, null);
+    }
+  }, [
+    onChange,
+    source.name,
+    schemaTitle,
+    signalNames,
+    fileType,
+    dirPath,
+    columnNames,
+    shotIds,
+  ]);
+
+  return (
+    <View
+      borderWidth={showName ? "thin" : undefined}
+      borderColor="gray-300"
+      borderRadius="medium"
+      padding={showName ? "size-100" : undefined}
+      marginBottom="size-100"
+      aria-label={`Source ${source.name}`}
+    >
+      {schemaTitle && (
+        <Text>
+          {showName && (
+            <>
+              Source: <strong>{source.name}</strong>.{" "}
+            </>
+          )}
+          Data Type: <strong>{schemaTitle}</strong> (from {dataLoader} data
+          loader)
+        </Text>
+      )}
+
+      {schemaTitle === "ShotData" && (
+        <Form maxWidth="size-6000">
+          <TextField
+            label="Signal Names"
+            isRequired
+            value={signalNames}
+            onChange={setSignalNames}
+            description="Signal names to load as a comma-separated list, e.g., ip, dalpha, ANE_DENSITY"
+          />
+        </Form>
+      )}
+
+      {isFileSchema(schemaTitle) && (
+        <Form maxWidth="size-6000">
+          <ComboBox
+            label="File Type"
+            items={fileTypes}
+            isRequired
+            selectedKey={fileType}
+            onSelectionChange={(key) =>
+              setFileType(key ? String(key) : "parquet")
+            }
+            description="File extension to filter for. For directory paths, only files with this extension will be included."
+          >
+            {(item: Record<string, string>) => (
+              <Item key={item.key}>{item.value}</Item>
+            )}
+          </ComboBox>
+
+          <TextField
+            label={"Directory Path"}
+            isRequired
+            value={dirPath}
+            onChange={setDirPath}
+            description={"Path to directory containing data files"}
+          />
+
+          {schemaTitle !== "ImageFileData" ? (
+            <TextField
+              label={
+                schemaTitle === "TimeSeriesFileData"
+                  ? "Signal Names (comma-separated)"
+                  : "Signal Name"
+              }
+              value={columnNames}
+              onChange={setColumnNames}
+              description="Optional: Specify signal names to load data for."
+            />
+          ) : (
+            <></>
+          )}
+        </Form>
+      )}
+
+      {isFileSchema(schemaTitle) &&
+        (shotIds.length > 0 ? (
+          <Text>
+            Found <strong>{shotIds.length}</strong>{" "}
+            {useDirectories ? "directories" : "files"} with shot IDs:{" "}
+            {shotIds.slice(0, 5).join(", ")}
+            {shotIds.length > 5 && ` ... and ${shotIds.length - 5} more`}
+          </Text>
+        ) : (
+          <Text>No files found for the specified directory and file type.</Text>
+        ))}
+    </View>
+  );
+}
+
+export const AddSamplesEditor = ({
+  project,
+  onModify,
+}: {
+  project: Project;
+  onModify?: () => void;
+}) => {
+  const isMultiPanel = project.task === TaskType.MultiPanel;
+  const sources: DataSource[] =
+    project.sources.length > 0
+      ? project.sources
+      : [{ name: DEFAULT_SOURCE, data_loader: project.data_loader }];
+
+  const [inputs, setInputs] = useState<Record<string, SourceInput | null>>({});
+  const [shotInputMethod, setShotInputMethod] = useState<string>("range"); // "range" or "file"
+  const [shotRange, setShotRange] = useState<NumericalRangeType>();
+  const [manualShotIds, setManualShotIds] = useState<number[]>([]);
+
+  const setSourceInput = useCallback(
+    (sourceName: string, input: SourceInput | null) =>
+      setInputs((previous) => ({ ...previous, [sourceName]: input })),
+    [],
+  );
+
+  const sourceInputs = sources.map((source) => inputs[source.name] ?? null);
+  const fileInputs = sourceInputs.filter(
+    (input): input is Extract<SourceInput, { kind: "file" }> =>
+      input?.kind === "file",
+  );
+  // File sources decide the shots: a shot is added only when every file source has it.
+  const usesFiles = fileInputs.length > 0;
+  const shotIds = usesFiles
+    ? fileInputs
+        .slice(1)
+        .reduce(
+          (common, input) => common.filter((id) => input.shotIds.includes(id)),
+          fileInputs[0].shotIds,
+        )
+    : manualShotIds;
+
+  useEffect(() => {
     if (shotInputMethod === "range") {
-      setShotIds(
+      setManualShotIds(
         Array.from(
           { length: (shotRange?.max ?? 0) - (shotRange?.min ?? 0) + 1 },
           (_, i) => i + (shotRange?.min ?? 0),
         ),
       );
+    } else {
+      setManualShotIds([]);
     }
   }, [shotRange, shotInputMethod]);
 
@@ -147,7 +390,7 @@ export const AddSamplesEditor = ({
               timeout: 3000,
             });
           } else {
-            setShotIds(ids);
+            setManualShotIds(ids);
             ToastQueue.positive(`Loaded ${ids.length} shot IDs from CSV`, {
               timeout: 3000,
             });
@@ -165,128 +408,35 @@ export const AddSamplesEditor = ({
     }
   };
 
-  useEffect(() => {
-    async function fetchFileSamples() {
-      let apiUrl = `${BACKEND_API_URL}/paths/files?dir_path=${dirPath}&file_type=${fileType}`;
-      if (useDirectories) {
-        apiUrl = `${BACKEND_API_URL}/paths/directories?dir_path=${dirPath}&file_type=${fileType}`;
-      }
-      const response = await fetch(apiUrl);
-
-      if (response.ok) {
-        const result = await response.json();
-        const fileNames: string[] = result;
-
-        // Extract shot IDs from file names using regex (assuming shot ID is a number in the file name)
-        const extractedShotIds = fileNames
-          .map((fileName) => {
-            const regex = useDirectories
-              ? /^\d+$/
-              : new RegExp(`^\\d+\\.${fileType}$`);
-
-            const match = fileName.split("/").pop()?.match(regex);
-            return match ? parseInt(match[0], 10) : null;
-          })
-          .filter((id): id is number => id !== null);
-
-        setShotIds(extractedShotIds);
-      } else {
-        ToastQueue.negative(`Error fetching files for ${dirPath}.`, {
-          timeout: 3000,
-        });
-      }
-    }
-    fetchFileSamples();
-  }, [dirPath, fileType, useDirectories]);
-
   const onFormSubmit = async (close: () => void) => {
     try {
-      // Build samples array based on data schema type
+      const missing = sources.find((source) => !inputs[source.name]);
+      if (missing) {
+        throw new Error(`No data type is known for source '${missing.name}'`);
+      }
+
       const samples: Partial<Sample>[] = shotIds.map((shotId) => {
         const baseSample = {
           shot_id: shotId,
           timestamp: new Date().toISOString(),
         };
-
-        if (dataSchema?.title === "ShotData") {
-          // Shot Data
-          const signals = signalNames
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
-
-          if (signals.length === 0) {
-            throw new Error(
-              "At least one signal name is required for Shot Data",
-            );
-          }
-
-          return {
-            ...baseSample,
-            data: {
-              protocol: "uda",
-              signal_names: signals,
-            } as ShotData,
-          };
-        } else if (
-          dataSchema?.title === "ImageFileData" ||
-          dataSchema?.title === "ImageArrayFileData" ||
-          dataSchema?.title === "TimeSeriesFileData"
-        ) {
-          // File Data or Time Series File Data
-          let fileName: string =
-            dirPath + "/" + (shotId.toString() + "." + fileType); // Default file name format
-          if (useDirectories) {
-            fileName = dirPath + "/" + shotId.toString(); // For directories, the "file name" is just the directory path with shot ID
-          }
-
-          const fileData: Record<string, string | string[]> = {
-            file_name: fileName,
-            type: fileType,
-            protocol: "file",
-          };
-
-          // Add column_names for time series file data
-          if (columnNames.trim()) {
-            const columns = columnNames
-              .split(",")
-              .map((s) => s.trim())
-              .filter((s) => s.length > 0);
-
-            if (
-              dataSchema?.title === "TimeSeriesFileData" &&
-              columns.length > 0
-            ) {
-              fileData.signal_names = columns;
-              return {
-                ...baseSample,
-                data: fileData as TimeSeriesFileData,
-              };
-            } else if (
-              dataSchema?.title === "ImageArrayFileData" &&
-              columns.length > 1
-            ) {
-              throw new Error(
-                "Only one signal name allowed for image array data!",
-              );
-            } else if (
-              dataSchema?.title === "ImageArrayFileData" &&
-              columns.length == 1
-            ) {
-              fileData.signal_name = columns[0];
-              return {
-                ...baseSample,
-                data: fileData as ImageArrayFileData,
-              };
-            }
-          }
-          return {
-            ...baseSample,
-            data: fileData as FileData,
-          };
+        if (!isMultiPanel) {
+          const input = inputs[sources[0].name];
+          return input
+            ? { ...baseSample, data: buildSourceData(input, shotId) }
+            : baseSample;
         }
-
-        return baseSample;
+        return {
+          ...baseSample,
+          sources: Object.fromEntries(
+            sources.flatMap((source) => {
+              const input = inputs[source.name];
+              return input
+                ? [[source.name, buildSourceData(input, shotId)]]
+                : [];
+            }),
+          ),
+        };
       });
 
       // POST to API
@@ -322,9 +472,7 @@ export const AddSamplesEditor = ({
     }
   };
 
-  useEffect(() => {
-    setShotIds([]);
-  }, [dataSchema, shotInputMethod]);
+  const allSourcesKnown = sourceInputs.every((input) => input !== null);
 
   return (
     <DialogTrigger>
@@ -337,24 +485,17 @@ export const AddSamplesEditor = ({
           <Heading>Add Samples to Project</Heading>
           <Divider />
           <Content>
-            {/* Display data type info from schema */}
-            {dataSchema && (
-              <Text>
-                Data Type: <strong>{dataSchema.title}</strong> (from{" "}
-                {dataLoader} data loader)
-              </Text>
-            )}
+            {sources.map((source) => (
+              <SourceInputGroup
+                key={source.name}
+                source={source}
+                showName={sources.length > 1}
+                onChange={setSourceInput}
+              />
+            ))}
 
-            {/* Conditional fields based on data schema type */}
-            {dataSchema?.title === "ShotData" && (
+            {allSourcesKnown && !usesFiles && (
               <Form maxWidth="size-6000">
-                <TextField
-                  label="Signal Names"
-                  isRequired
-                  value={signalNames}
-                  onChange={setSignalNames}
-                  description="Signal names to load as a comma-separated list, e.g., ip, dalpha, ANE_DENSITY"
-                />
                 <RadioGroup
                   label="Shot ID Input Method"
                   value={shotInputMethod}
@@ -373,10 +514,6 @@ export const AddSamplesEditor = ({
                     rangeMin={0}
                   />
                 ) : (
-                  <></>
-                )}
-
-                {shotInputMethod === "file" ? (
                   <Flex direction="column" gap="size-100">
                     <input
                       type="file"
@@ -392,84 +529,24 @@ export const AddSamplesEditor = ({
                       Upload a CSV file with shot IDs in the first column
                       (header row will be skipped)
                     </Text>
-                    {shotIds.length > 0 && (
+                    {manualShotIds.length > 0 && (
                       <Text>
-                        Loaded <strong>{shotIds.length}</strong> shot IDs:{" "}
-                        {shotIds.slice(0, 5).join(", ")}
-                        {shotIds.length > 5 &&
-                          ` ... and ${shotIds.length - 5} more`}
+                        Loaded <strong>{manualShotIds.length}</strong> shot IDs:{" "}
+                        {manualShotIds.slice(0, 5).join(", ")}
+                        {manualShotIds.length > 5 &&
+                          ` ... and ${manualShotIds.length - 5} more`}
                       </Text>
                     )}
                   </Flex>
-                ) : (
-                  <></>
                 )}
               </Form>
             )}
 
-            {(dataSchema?.title === "ImageFileData" ||
-              dataSchema?.title === "ImageArrayFileData" ||
-              dataSchema?.title === "TimeSeriesFileData") && (
-              <Form maxWidth="size-6000">
-                <ComboBox
-                  label="File Type"
-                  items={fileTypes}
-                  isRequired
-                  selectedKey={fileType}
-                  onSelectionChange={(key) =>
-                    setFileType(key ? String(key) : "parquet")
-                  }
-                  description="File extension to filter for. For directory paths, only files with this extension will be included."
-                >
-                  {(item: Record<string, string>) => (
-                    <Item key={item.key}>{item.value}</Item>
-                  )}
-                </ComboBox>
-
-                <Flex direction="row" gap="size-200" alignItems="end">
-                  <TextField
-                    label={"Directory Path"}
-                    isRequired
-                    flex={1}
-                    value={dirPath}
-                    onChange={setDirPath}
-                    description={"Path to directory containing data files"}
-                  />
-                </Flex>
-              </Form>
-            )}
-
-            {/* Display found shot IDs */}
-            {(dataSchema?.title === "ImageFileData" ||
-              dataSchema?.title === "ImageArrayFileData" ||
-              dataSchema?.title === "TimeSeriesFileData") &&
-            shotIds.length > 0 ? (
+            {usesFiles && fileInputs.length > 1 && (
               <Text>
-                Found <strong>{shotIds.length}</strong>{" "}
-                {useDirectories ? "directories" : "files"} with shot IDs:{" "}
-                {shotIds.slice(0, 5).join(", ")}
-                {shotIds.length > 5 && ` ... and ${shotIds.length - 5} more`}
+                <strong>{shotIds.length}</strong> shot IDs are found in every
+                file source.
               </Text>
-            ) : (
-              <Text>
-                No files found for the specified directory and file type.
-              </Text>
-            )}
-
-            {(dataSchema?.title === "TimeSeriesFileData" ||
-              dataSchema?.title === "ImageArrayFileData") && (
-              <Form maxWidth="size-6000">
-                <TextField
-                  label={
-                    dataSchema?.title === "TimeSeriesFileData"
-                      ? "Signal Names (comma-separated)"
-                      : "Signal Name"
-                  }
-                  value={columnNames}
-                  onChange={setColumnNames}
-                  description="Optional: Specify signal names to load data for."
-                />
-              </Form>
             )}
           </Content>
           <ButtonGroup>

@@ -8,8 +8,9 @@ import {
   relayout,
   PlotRelayoutEvent,
   PlotSelectionEvent,
+  purge,
 } from "plotly.js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useTimeSeriesActions,
   useTimeSeriesState,
@@ -23,6 +24,11 @@ import {
 import React from "react";
 import { arrayMax, arrayMin } from "@/app/utils";
 import { ToastQueue } from "@adobe/react-spectrum";
+import { useLinkedTimeAxis, xRangeFromRelayout } from "./linked-time";
+import { usePanelHeight } from "@/app/contexts/PanelHeightContext";
+
+// Plotly's default margins leave little room for data in a small grid cell.
+const PANEL_MARGIN: Partial<Layout["margin"]> = { l: 60, r: 20, t: 30, b: 40 };
 
 const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
   modeBarButtons: [
@@ -60,6 +66,8 @@ type TimeSeriesPlotProps = {
   // "x" selects on time alone (y spans other units); "none" for plots whose x-axis is not time.
   selection?: "xy" | "x" | "none";
   onXRangeChange?: (range: [number, number] | null) => void;
+  // Follows and drives the shared workspace time window; only for plots whose x-axis is time.
+  linkTime?: boolean;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -74,6 +82,7 @@ export const BaseTimeSeriesPlot = ({
   tools,
   selection: selectionMode = "xy",
   onXRangeChange,
+  linkTime = false,
   children,
 }: TimeSeriesPlotProps) => {
   const [plotReady, setPlotReady] = useState(false);
@@ -94,18 +103,29 @@ export const BaseTimeSeriesPlot = ({
   } = useTimeSeriesState();
 
   const isDraggingRef = useRef(false);
+  const panelHeight = usePanelHeight();
+  const fittedLayout = useMemo(
+    () => (panelHeight === null ? layout : { ...layout, margin: PANEL_MARGIN }),
+    [layout, panelHeight],
+  );
   const allowRelayout = useRef(true);
+  const plotRef = useRef<HTMLDivElement>(null);
   const lastHoverTime = useRef(0);
   const lockedSubplotElementRef = useRef<HTMLElement | null>(null); // used to track which subplot an annotation was started on
 
   const plotId = externalId || "time-series";
   const drawingTool =
     activeAnnotationTool &&
+    toolingCallbacks.has(activeAnnotationTool.type) &&
     (!tools || tools.includes(activeAnnotationTool.type))
       ? activeAnnotationTool
       : null;
 
   if (!isDrawing) isDraggingRef.current = false;
+
+  const publishTimeWindow = useLinkedTimeAxis(plotId, plotReady, linkTime);
+  const publishTimeWindowRef = useRef(publishTimeWindow);
+  publishTimeWindowRef.current = publishTimeWindow;
 
   useEffect(() => {
     const plot = document.getElementById(plotId) as PlotlyHTMLElement;
@@ -227,20 +247,10 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-      if (onXRangeChange) {
-        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
-          onXRangeChange([
-            eventData["xaxis.range[0]"] as number,
-            eventData["xaxis.range[1]"] as number,
-          ]);
-        } else if (eventData["xaxis.range"]?.length === 2) {
-          onXRangeChange([
-            eventData["xaxis.range"][0] as number,
-            eventData["xaxis.range"][1] as number,
-          ]);
-        } else if (eventData["xaxis.autorange"]) {
-          onXRangeChange(null);
-        }
+      const xRange = xRangeFromRelayout(eventData);
+      if (xRange !== undefined) {
+        onXRangeChange?.(xRange);
+        publishTimeWindowRef.current(xRange);
       }
       if (rescaleOnZoom) {
         // This makes use of the first graph displayed but this should be fine
@@ -266,7 +276,7 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const initGraph = async () => {
-      react(plot, data, layout, config).then(generateOverplots);
+      react(plot, data, fittedLayout, config).then(generateOverplots);
 
       plot.removeAllListeners("plotly_relayout"); // remove any existing listeners
       plot.removeAllListeners("plotly_selected");
@@ -284,7 +294,7 @@ export const BaseTimeSeriesPlot = ({
   }, [
     config,
     data,
-    layout,
+    fittedLayout,
     plotId,
     rescaleOnZoom,
     onXRangeChange,
@@ -601,10 +611,24 @@ export const BaseTimeSeriesPlot = ({
     toolingCallbacks,
   ]);
 
+  useEffect(() => {
+    const plot = plotRef.current;
+    // Plotly window listeners keep an unpurged graph alive; declared last to clean up after the other effects.
+    return () => {
+      if (plot) purge(plot);
+    };
+  }, []);
+
   return (
-    <div className="w-full px-6 py-3 space-y-3 flex-col">
+    <div
+      className={
+        panelHeight === null
+          ? "w-full px-6 py-3 space-y-3 flex-col"
+          : "w-full px-1 flex-col"
+      }
+    >
       {/* Div where plot is inserted */}
-      <div id={plotId} className="" aria-label={ariaLabel}>
+      <div id={plotId} ref={plotRef} className="" aria-label={ariaLabel}>
         <>
           {React.Children.map(children, (child) => {
             return React.isValidElement(child)

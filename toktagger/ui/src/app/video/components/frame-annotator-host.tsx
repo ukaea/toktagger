@@ -23,6 +23,7 @@ import "@annotorious/plugin-tools/annotorious-plugin-tools.css";
 import { useVideoSession } from "@/app/video/components/video-session";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useVideoUiState } from "@/app/contexts/VideoContext";
+import { usePanelHeight } from "@/app/contexts/PanelHeightContext";
 import {
   getLabelTrack,
   isPointAnno,
@@ -37,6 +38,8 @@ import { AnnotationPopup } from "./annotation-popup";
 import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
 
 const VIDEO_CANVAS_MENU_ID = "video-canvas-menu";
+// Space in a grid cell for the frame controls above the viewer.
+const PANEL_CONTROLS_HEIGHT = 90;
 
 function setGestureNavigation(
   viewer: OpenSeadragon.Viewer,
@@ -153,6 +156,7 @@ export function FrameAnnotatorHost(props: { imageBase64: string }) {
  * to the session store directly.
  */
 function Inner({ imageBase64 }: { imageBase64: string }) {
+  const panelHeight = usePanelHeight();
   const { annotationLabels } = useSample();
   const { setVideoLastClassName } = useVideoUiState();
   const {
@@ -621,7 +625,18 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
 
   return (
     <div className="w-full flex justify-center">
-      <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
+      <div
+        className={
+          panelHeight === null
+            ? "relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]"
+            : "relative w-full"
+        }
+        style={
+          panelHeight === null
+            ? undefined
+            : { height: Math.max(panelHeight - PANEL_CONTROLS_HEIGHT, 120) }
+        }
+      >
         <OpenSeadragonAnnotator
           tool={annotoriousDrawingTool}
           drawingEnabled={annotoriousDrawingEnabled}

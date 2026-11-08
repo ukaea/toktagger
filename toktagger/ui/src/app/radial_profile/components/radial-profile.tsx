@@ -22,10 +22,10 @@ import {
 import { TimeRegion } from "@/app/components/tools/timeRegion";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { RadialRange } from "@/app/components/tools/radialRange";
-import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
-import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
+import { useViewportHeight } from "@/app/contexts/PanelHeightContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 
@@ -96,6 +96,9 @@ function useIsDarkMode() {
 }
 
 const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
+  const viewportHeight = useViewportHeight();
+  const radialPlotId = usePlotId("RadialProfileRadial");
+  const timePlotId = usePlotId("RadialProfileTime");
   const { visibleSlices, sliceColor, setTimeWindow } = useRadialProfile();
   const isDarkMode = useIsDarkMode();
 
@@ -155,7 +158,7 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
     return applyGlobalStyle(
       {
         autosize: true,
-        height: window.innerHeight * Math.max(0.5, 0.3 * profileNames.length),
+        height: viewportHeight * Math.max(0.5, 0.3 * profileNames.length),
         margin: { t: 30, b: 50 },
         showlegend: false,
         dragmode: "pan",
@@ -171,7 +174,7 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
       },
       isDarkMode,
     );
-  }, [profileNames, axisNumber, radialRanges, isDarkMode]);
+  }, [profileNames, axisNumber, radialRanges, isDarkMode, viewportHeight]);
 
   const timeData = useMemo<Partial<Plotly.PlotData>[]>(() => {
     const signals = Object.entries(data.time_series).map(
@@ -214,7 +217,7 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
     return applyGlobalStyle(
       {
         autosize: true,
-        height: window.innerHeight * 0.4,
+        height: viewportHeight * 0.4,
         margin: { t: 10 },
         showlegend: false,
         dragmode: "pan",
@@ -239,12 +242,12 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
       },
       isDarkMode,
     );
-  }, [data, isDarkMode]);
+  }, [data, isDarkMode, viewportHeight]);
 
   return (
     <>
       <BaseTimeSeriesPlot
-        plotId="RadialProfileRadial"
+        plotId={radialPlotId}
         ariaLabel="radial-profile"
         plotConfig={{
           data: radialData,
@@ -259,13 +262,14 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
         <RadialRange projection="radius" />
       </BaseTimeSeriesPlot>
       <BaseTimeSeriesPlot
-        plotId="RadialProfileTime"
+        plotId={timePlotId}
         ariaLabel="radial-profile-time"
         plotConfig={{ data: timeData, layout: timeLayout, config: PLOT_CONFIG }}
         rescaleOnZoom={false}
         tools={TIME_TOOLS}
         selection="x"
         onXRangeChange={setTimeWindow}
+        linkTime
       >
         <TimeRegion />
         <TimePoint />
@@ -276,7 +280,8 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
 };
 
 export const RadialProfileView = () => {
-  const { data, plotProps } = useSample();
+  const { plotProps } = useSample();
+  const { data } = usePanelData();
   // Memoised so an annotation drag doesn't rebuild both plots mid-draw.
   const parsed = useMemo(() => RadialProfileDataSchema.safeParse(data), [data]);
 
@@ -290,12 +295,8 @@ export const RadialProfileView = () => {
       <Flex justifyContent="center" alignItems="center">
         <RadialProfileProvider data={viewData} colorMap={plotProps.colorMap}>
           <TimeSeriesProvider>
-            <Flex direction="row" flex justifyContent="space-between">
-              <Flex direction="column" flex gap="size-100">
-                <RadialProfilePlots data={viewData} />
-                <AnnotationsTable />
-              </Flex>
-              <AnnotationToolbar />
+            <Flex direction="column" flex gap="size-100">
+              <RadialProfilePlots data={viewData} />
             </Flex>
           </TimeSeriesProvider>
         </RadialProfileProvider>

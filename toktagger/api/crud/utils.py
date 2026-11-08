@@ -10,8 +10,16 @@ from toktagger.api.schemas.annotations import (
     AnnotationOutTypeAdapter,
     AnnotationBatchTypes,
 )
-from toktagger.api.schemas.projects import Project
-from toktagger.api.schemas.samples import FileData, Sample, SampleUpdate, SampleSummary
+from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
+from toktagger.api.schemas.layouts import PanelBase
+from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.schemas.samples import (
+    FileData,
+    Sample,
+    SampleIn,
+    SampleUpdate,
+    SampleSummary,
+)
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 
 
@@ -517,3 +525,46 @@ async def import_annotations(
             await update_sample(
                 db_client, sample_id, SampleUpdate(validated_annotations=False)
             )
+
+
+def check_sample_sources(project: Project, sample: SampleIn) -> None:
+    """Raise an error if the sample has no data of the correct type for a project source."""
+    for source in project.sources:
+        source_data = sample.sources.get(source.name)
+        if source_data is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Sample for shot ID {sample.shot_id} has no data for source '{source.name}'.",
+            )
+        # Legacy single-task projects have never checked the data type, so keep that behaviour.
+        if project.task != Task.MULTI_PANEL:
+            continue
+        expected_type = LoaderRegistry.get(source.data_loader).sample_data_type()
+        if not isinstance(source_data, expected_type):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Sample for shot ID {sample.shot_id} must have data of type '{expected_type.__name__}' for source '{source.name}'.",
+            )
+
+
+def sample_for_panel(
+    project: Project, sample: Sample, panel: PanelBase
+) -> tuple[DataLoader, Sample]:
+    """Get the data loader and the sample data that load the signals of one panel."""
+    source = project.get_source(panel.source)
+    source_data = sample.sources.get(panel.source)
+    if source is None or source_data is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Data source '{panel.source}' not found for panel '{panel.id}'.",
+        )
+
+    signal_names = panel.signal_names()
+    data_fields = type(source_data).model_fields
+    if signal_names and "signal_names" in data_fields:
+        source_data = source_data.model_copy(update={"signal_names": signal_names})
+    elif len(signal_names) == 1 and "signal_name" in data_fields:
+        source_data = source_data.model_copy(update={"signal_name": signal_names[0]})
+
+    loader = LoaderRegistry.get(source.data_loader)()
+    return loader, sample.model_copy(update={"data": source_data})

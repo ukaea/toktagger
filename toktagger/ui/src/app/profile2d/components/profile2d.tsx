@@ -14,10 +14,10 @@ import { TimeRegion } from "@/app/components/tools/timeRegion";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { BoundingBox } from "@/app/components/tools/boundingBox";
 import { Polygon } from "@/app/components/tools/polygon";
-import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
-import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
+import { useFigureHeight } from "@/app/contexts/PanelHeightContext";
 import { useEffect, useMemo, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 
@@ -176,11 +176,12 @@ const buildPlotData = (
 const buildPlotLayout = (
   colorAxis: ColorAxis,
   isDarkMode: boolean,
+  height: number,
 ): Partial<Plotly.Layout> =>
   applyGlobalStyle(
     {
       autosize: true,
-      height: window.innerHeight * 0.9,
+      height,
       xaxis: {
         title: { text: "" },
         domain: [0, 1],
@@ -229,7 +230,8 @@ const PLOT_CONFIG: Partial<Plotly.Config> = {
 };
 
 export const Profile2dView = () => {
-  const { data, plotProps, viewParams } = useSample();
+  const { plotProps } = useSample();
+  const { data, viewParams } = usePanelData();
 
   const viewData = data as Profile2DData | null;
   const profileViewParams = viewParams as Profile2DViewParams | null;
@@ -257,14 +259,17 @@ export const Profile2dView = () => {
     return createPlotFunc(viewData, plotProps, interpFunc);
   }, [viewData, plotProps, logScale]);
 
+  const figureHeight = useFigureHeight(0.9);
+  const plotId = usePlotId("Profile2DView");
   const plotData = useMemo<Partial<Plotly.PlotData>[]>(() => {
     if (!viewData || !plot) return [];
     return buildPlotData(viewData, plot.values, plotProps?.thresholdActive);
   }, [viewData, plot, plotProps?.thresholdActive]);
 
   const plotLayout = useMemo(
-    () => (plot ? buildPlotLayout(plot.colorAxis, isDarkMode) : {}),
-    [plot, isDarkMode],
+    () =>
+      plot ? buildPlotLayout(plot.colorAxis, isDarkMode, figureHeight) : {},
+    [plot, isDarkMode, figureHeight],
   );
 
   if (!viewData || !profileViewParams || !plot) {
@@ -275,27 +280,24 @@ export const Profile2dView = () => {
     <View width="100%">
       <Flex justifyContent="center" alignItems="center">
         <TimeSeriesProvider signalName={profileViewParams.signal_name}>
-          <Flex direction="row" flex justifyContent="space-between">
-            <Flex direction="column" flex gap="size-200">
-              <BaseTimeSeriesPlot
-                plotId="Profile2DView"
-                ariaLabel="profile-2d"
-                plotConfig={{
-                  data: plotData,
-                  config: PLOT_CONFIG,
-                  layout: plotLayout,
-                }}
-                rescaleOnZoom={false}
-                muteHoverWhileDrawing
-              >
-                <TimeRegion />
-                <TimePoint />
-                <BoundingBox subplot={HEATMAP_SUBPLOT} />
-                <Polygon subplot={HEATMAP_SUBPLOT} />
-              </BaseTimeSeriesPlot>
-              <AnnotationsTable />
-            </Flex>
-            <AnnotationToolbar />
+          <Flex direction="column" flex gap="size-200">
+            <BaseTimeSeriesPlot
+              plotId={plotId}
+              ariaLabel="profile-2d"
+              linkTime
+              plotConfig={{
+                data: plotData,
+                config: PLOT_CONFIG,
+                layout: plotLayout,
+              }}
+              rescaleOnZoom={false}
+              muteHoverWhileDrawing
+            >
+              <TimeRegion />
+              <TimePoint />
+              <BoundingBox subplot={HEATMAP_SUBPLOT} />
+              <Polygon subplot={HEATMAP_SUBPLOT} />
+            </BaseTimeSeriesPlot>
           </Flex>
         </TimeSeriesProvider>
       </Flex>

@@ -15,10 +15,8 @@ import {
   TooltipTrigger,
   View,
 } from "@adobe/react-spectrum";
-import {
-  useTimeSeriesState,
-  useTimeSeriesActions,
-} from "@/app/contexts/TimeSeriesContext";
+import { useAnnotationTools } from "@/app/contexts/AnnotationToolContext";
+import { useWorkspace } from "@/app/contexts/WorkspaceContext";
 import { useEffect, useState } from "react";
 import { TimeSeriesAnnotationType } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
@@ -50,9 +48,15 @@ function readSavedAllocations(projectId: string): Record<string, string> {
 }
 
 export const AnnotationToolbar = () => {
-  const { editMode, toolingCallbacks, categories, activeAnnotationTool } =
-    useTimeSeriesState();
-  const { setEditMode, setAnnotationTool } = useTimeSeriesActions();
+  const {
+    editMode,
+    setEditMode,
+    activePanelTools,
+    categories,
+    activeAnnotationTool,
+    setAnnotationTool,
+  } = useAnnotationTools();
+  const { setVideoToolSlot } = useWorkspace();
   const { project } = useSample();
   const projectId = project?._id;
 
@@ -134,10 +138,14 @@ export const AnnotationToolbar = () => {
             (shortcut: e)
           </Tooltip>
         </TooltipTrigger>
-        <Divider size="S" marginX="size-200" />
-        <h1 className="text-xl font-bold">Tools</h1>
+        {activePanelTools.length > 0 && (
+          <>
+            <Divider size="S" marginX="size-200" />
+            <h1 className="text-xl font-bold">Tools</h1>
+          </>
+        )}
         <Flex direction="column" alignItems="center" gap="size-100">
-          {[...toolingCallbacks.keys()].map((info) => {
+          {activePanelTools.map((info) => {
             const toolActive = info === activeAnnotationTool?.type;
             return (
               <Flex
@@ -192,6 +200,7 @@ export const AnnotationToolbar = () => {
             );
           })}
         </Flex>
+        <div ref={setVideoToolSlot} />
       </Flex>
       <Flex direction="row" justifyContent="end" marginEnd="size-100">
         <ContextualHelp

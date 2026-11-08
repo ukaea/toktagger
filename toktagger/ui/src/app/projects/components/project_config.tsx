@@ -21,6 +21,7 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
+  View,
 } from "@adobe/react-spectrum";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
@@ -28,6 +29,12 @@ import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
 import { useAPISchema } from "@/app/contexts/apiSchema";
 import { SchemaParser } from "@/schemaParser";
+import { LayoutEditor } from "./layout_editor";
+import {
+  defaultLayoutYaml,
+  layoutToYaml,
+  parseLayoutYaml,
+} from "./layout_yaml";
 
 // Query strategies
 const QueryStrategies = [
@@ -133,31 +140,43 @@ export function ProjectConfigEditor({
     string[]
   >(_project?.video_bounding_box_labels || []);
 
+  const isMultiPanel = task === TaskType.MultiPanel;
+  // Null until the user edits it, so the starter text follows the default data loader.
+  const [editedLayoutYaml, setLayoutYaml] = useState<string | null>(() => {
+    if (_project?.layout_yaml) return _project.layout_yaml;
+    if (!_project?.layout) return null;
+    return layoutToYaml({ sources: _project.sources, layout: _project.layout });
+  });
+  const layoutYaml = editedLayoutYaml ?? defaultLayoutYaml(dataLoader ?? "");
+
   useEffect(() => {
     const parser = new SchemaParser(schema);
     const defaultShotLabels = parser.parseDefaultShotLabels();
-    if (shotLabels.length === 0) {
+    if (shotLabels.length === 0 && defaultShotLabels.length > 0) {
       setShotLabels(defaultShotLabels);
     }
     const defaultTimeRegionLabels = parser.parseDefaultTimeRegionLabels();
-    if (timeRegionLabels.length === 0) {
+    if (timeRegionLabels.length === 0 && defaultTimeRegionLabels.length > 0) {
       setTimeRegionLabels(defaultTimeRegionLabels);
     }
     const defaultTimePointLabels = parser.parseDefaultTimePointLabels();
-    if (timePointLabels.length === 0) {
+    if (timePointLabels.length === 0 && defaultTimePointLabels.length > 0) {
       setTimePointLabels(defaultTimePointLabels);
     }
     const defaultBoundingBoxLabels = parser.parseDefaultBoundingBoxLabels();
-    if (boundingBoxLabels.length === 0) {
+    if (boundingBoxLabels.length === 0 && defaultBoundingBoxLabels.length > 0) {
       setBoundingBoxLabels(defaultBoundingBoxLabels);
     }
     const defaultPolygonLabels = parser.parseDefaultPolygonLabels();
-    if (polygonLabels.length === 0) {
+    if (polygonLabels.length === 0 && defaultPolygonLabels.length > 0) {
       setPolygonLabels(defaultPolygonLabels);
     }
     const defaultVideoBoundingBoxLabels =
       parser.parseDefaultVideoBoundingBoxLabels();
-    if (videoBoundingBoxLabels.length === 0) {
+    if (
+      videoBoundingBoxLabels.length === 0 &&
+      defaultVideoBoundingBoxLabels.length > 0
+    ) {
       setVideoBoundingBoxLabels(defaultVideoBoundingBoxLabels);
     }
   }, [
@@ -211,13 +230,22 @@ export function ProjectConfigEditor({
         ToastQueue.negative("Data loader is required", { timeout: 3000 });
         return;
       }
+      const parsedLayout = parseLayoutYaml(layoutYaml);
+      if (isMultiPanel && parsedLayout.error !== null) {
+        ToastQueue.negative(parsedLayout.error, { timeout: 5000 });
+        return;
+      }
+      const layoutConfig = isMultiPanel ? parsedLayout.config : null;
 
       // Build project object
       const newProject: Partial<Project> = {
         name: projectName,
         task: task as TaskType,
         query_strategy: queryStrategy,
-        data_loader: dataLoader,
+        data_loader: layoutConfig?.sources[0].data_loader ?? dataLoader,
+        sources: layoutConfig?.sources ?? _project?.sources ?? [],
+        layout: layoutConfig?.layout ?? null,
+        layout_yaml: layoutConfig ? layoutYaml : null,
         timestamp: new Date().toISOString(),
         time_min: timeMin,
         time_max: timeMax,
@@ -279,11 +307,11 @@ export function ProjectConfigEditor({
         {!isEditing ? <Text>{buttonText}</Text> : <></>}
       </Button>
       {(close) => (
-        <Dialog>
+        <Dialog width={isMultiPanel ? "min(1280px, 92vw)" : undefined}>
           <Heading>{titleText}</Heading>
           <Divider />
           <Content>
-            <Form maxWidth="size-6000">
+            <Form>
               <TextField
                 label="Project Name"
                 isRequired
@@ -308,6 +336,7 @@ export function ProjectConfigEditor({
 
               <ComboBox
                 label="Data Loader"
+                isHidden={isMultiPanel}
                 items={dataLoaders}
                 isRequired
                 selectedKey={dataLoader}
@@ -403,14 +432,14 @@ export function ProjectConfigEditor({
                       />
                     </>
                   )}
-                  {task === TaskType.RadialProfile && (
+                  {(task === TaskType.RadialProfile || isMultiPanel) && (
                     <LabelsForm
                       label="Radial Range Labels"
                       defaultLabels={boundingBoxLabels}
                       setLabels={setBoundingBoxLabels}
                     />
                   )}
-                  {task === TaskType.Profile2D && (
+                  {(task === TaskType.Profile2D || isMultiPanel) && (
                     <>
                       <LabelsForm
                         label="Bounding Box Labels"
@@ -424,7 +453,7 @@ export function ProjectConfigEditor({
                       />
                     </>
                   )}
-                  {task === TaskType.Video && (
+                  {(task === TaskType.Video || isMultiPanel) && (
                     <LabelsForm
                       label="Video Bounding Box Labels"
                       defaultLabels={videoBoundingBoxLabels}
@@ -434,6 +463,15 @@ export function ProjectConfigEditor({
                 </DisclosurePanel>
               </Disclosure>
             </Form>
+            {isMultiPanel && (
+              <View marginTop="size-200">
+                <LayoutEditor
+                  yaml={layoutYaml}
+                  dataLoaders={dataLoaders.map((loader) => loader.key)}
+                  onChange={setLayoutYaml}
+                />
+              </View>
+            )}
           </Content>
           <ButtonGroup>
             <Button variant="secondary" onPress={close}>

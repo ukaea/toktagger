@@ -2,7 +2,6 @@
 
 import {
   ActionButton,
-  Button,
   Content,
   ContextualHelp,
   Divider,
@@ -25,19 +24,14 @@ import {
 } from "@annotorious/react";
 
 import { useVideoSession } from "./video-session";
-import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import type { DrawingTool } from "./types";
 
-export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
-  const {
-    frame,
-    drawingTool,
-    setDrawingTool,
-    editMode,
-    setEditMode,
-    hideAnnotations,
-  } = useVideoSession();
-  const { isLoading } = useSample();
+/** The video drawing tools; the global annotation toolbar shows them while the video panel is active. */
+export function VideoAnnotationTools(props: { desiredFrame: number }) {
+  const { frame, drawingTool, setDrawingTool, editMode, hideAnnotations } =
+    useVideoSession();
+  const { isLoading } = usePanelData();
   const isFramePending = isLoading && props.desiredFrame !== frame;
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -53,35 +47,12 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
   };
 
   const toolsDisabled = !editMode || hideAnnotations || isFramePending;
-  const modeVariant: "accent" | "primary" = editMode ? "accent" : "primary";
 
   return (
-    <View
-      width="size-3000"
-      flexShrink={0}
-      marginTop="size-200"
-      data-testid="annotation-toolbar"
-    >
+    <View data-testid="video-annotation-tools" width="100%">
       <Flex direction="column" alignItems="center" gap="size-150">
-        <h1 className="text-2xl font-bold">Annotation Toolbar</h1>
-        <TooltipTrigger placement="left">
-          <Button
-            width="size-1600"
-            variant={modeVariant}
-            isDisabled={hideAnnotations}
-            onPress={() => setEditMode(!editMode)}
-          >
-            {editMode ? "Edit Mode" : "View Mode"}
-          </Button>
-          <Tooltip>
-            {editMode
-              ? "Return to View Mode (shortcut: e)"
-              : "Enter Edit Mode (shortcut: e)"}
-          </Tooltip>
-        </TooltipTrigger>
-
         <Divider size="S" marginX="size-200" />
-        <h1 className="text-xl font-bold">Tools</h1>
+        <h1 className="text-xl font-bold">Video Tools</h1>
 
         <Flex direction="column" alignItems="center" gap="size-100">
           <TooltipTrigger placement="left">
@@ -168,13 +139,13 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
       </Flex>
 
       <Flex direction="row" justifyContent="end" marginEnd="size-100">
-        <ContextualHelp aria-label="annotation-context-help">
-          <Heading>Annotation Toolbar</Heading>
+        <ContextualHelp aria-label="video-annotation-context-help">
+          <Heading>Video Tools</Heading>
           <Content>
             <Text>
-              Use the top button or <b>e</b> to switch between view and edit
-              modes. Zoom, pan, and select annotations in either mode; shapes
-              can only be changed in edit mode.
+              Use the Edit Mode button or <b>e</b> to switch between view and
+              edit modes. Zoom, pan, and select annotations in either mode;
+              shapes can only be changed in edit mode.
               <br />
               <br />
               In edit mode, select a tool and hold <b>Ctrl</b> while dragging or
