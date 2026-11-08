@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   Cell,
   Column,
@@ -259,13 +259,16 @@ export default function ProjectView() {
 
   // The server adds new shots in the background, so poll to show them
   const autoAddEnabled = project?.auto_add_shots?.enabled ?? false;
+  const onAutoAddRefresh = useEffectEvent(() => {
+    refreshSamples();
+  });
   useEffect(() => {
     if (!autoAddEnabled) {
       return;
     }
-    const intervalId = setInterval(refreshSamples, AUTO_ADD_REFRESH_MS);
+    const intervalId = setInterval(onAutoAddRefresh, AUTO_ADD_REFRESH_MS);
     return () => clearInterval(intervalId);
-  }, [autoAddEnabled, refreshSamples]);
+  }, [autoAddEnabled]);
 
   if (loadError) {
     return loadError.forbidden ? (
