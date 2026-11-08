@@ -8,6 +8,7 @@ from toktagger.api.schemas.samples import (
     SampleUpdateBatchItem,
 )
 from toktagger.api.schemas.annotations import Annotation
+from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas import convert_to_objectid
 from typing import Literal
 import logging
@@ -91,10 +92,15 @@ async def add_samples(
     # Do we also want to allow a single value, or list of specific value?
     print(samples)
     project_obj_id = convert_to_objectid(project_id, "projects")
-    if not await request.app.state.db_client.get_document_by_id(
+    project_document = await request.app.state.db_client.get_document_by_id(
         "projects", project_obj_id
-    ):
+    )
+    if not project_document:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    project = Project.model_validate(project_document)
+    for sample in samples:
+        utils.check_sample_sources(project, sample)
 
     # Remove annotations (if they exist), these will be added later
     all_annotations = [sample.annotations for sample in samples]

@@ -1,10 +1,11 @@
-from pydantic import Field, field_validator, computed_field
+from pydantic import Field, field_validator, computed_field, model_validator
 from typing import Optional, List
 from enum import Enum
 
 
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas import ConfiguredModel
+from toktagger.api.schemas.layouts import DEFAULT_SOURCE, DataSource, Layout
 
 
 class Task(str, Enum):
@@ -14,6 +15,7 @@ class Task(str, Enum):
     PROFILE_2D = "profile-2d"
     VIDEO = "video"
     RADIAL_PROFILE = "radial-profile"
+    MULTI_PANEL = "multi-panel"
 
 
 class QueryStrategyType(str, Enum):
@@ -112,6 +114,16 @@ class ProjectIn(ConfiguredModel):
         description="The list of labels to use for video bounding box labelling (if applicable).",
     )
 
+    sources: list[DataSource] = Field(
+        default_factory=list,
+        description="The named data sources of this project. Leave empty to use one source with the project data loader.",
+    )
+
+    layout: Optional[Layout] = Field(
+        None,
+        description="The panels to show for each sample (required for multi-panel projects).",
+    )
+
     @computed_field
     @property
     def model_types(self) -> List[str]:
@@ -131,6 +143,38 @@ class ProjectIn(ConfiguredModel):
             )
 
         return value
+
+    @field_validator("sources")
+    def check_sources(cls, sources: list[DataSource]) -> list[DataSource]:
+        names = [source.name for source in sources]
+        if len(set(names)) != len(names):
+            raise ValueError(f"Data source names must be unique, but got '{names}'.")
+        for source in sources:
+            if source.data_loader not in (loaders := LoaderRegistry.names()):
+                raise ValueError(
+                    f"Invalid data loader '{source.data_loader}' for source '{source.name}' - valid options are '{loaders}'."
+                )
+        return sources
+
+    @model_validator(mode="after")
+    def check_layout(self):
+        if not self.sources:
+            self.sources = [
+                DataSource(name=DEFAULT_SOURCE, data_loader=self.data_loader)
+            ]
+        if self.task == Task.MULTI_PANEL and self.layout is None:
+            raise ValueError("A multi-panel project must have a layout.")
+        if self.layout is not None:
+            source_names = {source.name for source in self.sources}
+            for panel in self.layout.panels:
+                if panel.source not in source_names:
+                    raise ValueError(
+                        f"Panel '{panel.id}' uses unknown data source '{panel.source}' - valid options are '{sorted(source_names)}'."
+                    )
+        return self
+
+    def get_source(self, name: str) -> DataSource | None:
+        return next((source for source in self.sources if source.name == name), None)
 
 
 class Project(ProjectIn):
