@@ -1,6 +1,13 @@
 import YAML, { isMap, isScalar } from "yaml";
 import { z } from "zod/v4";
-import { DataSourceSchema, LayoutSchema } from "@/types";
+import { DataSourceSchema, LayoutSchema, PanelKind } from "@/types";
+
+export const PANEL_KINDS: { key: PanelKind; name: string }[] = [
+  { key: "time_series", name: "Time series" },
+  { key: "profile_2d", name: "Profile 2D / spectrogram" },
+  { key: "radial_profile", name: "Radial profile" },
+  { key: "video", name: "Video" },
+];
 
 export const LayoutConfigSchema = z.object({
   sources: z.array(DataSourceSchema).min(1),

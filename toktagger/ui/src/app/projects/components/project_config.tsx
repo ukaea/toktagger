@@ -307,11 +307,11 @@ export function ProjectConfigEditor({
         {!isEditing ? <Text>{buttonText}</Text> : <></>}
       </Button>
       {(close) => (
-        <Dialog>
+        <Dialog width={isMultiPanel ? "min(1280px, 92vw)" : undefined}>
           <Heading>{titleText}</Heading>
           <Divider />
           <Content>
-            <Form maxWidth="size-6000">
+            <Form>
               <TextField
                 label="Project Name"
                 isRequired

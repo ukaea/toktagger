@@ -27,14 +27,13 @@ import {
   Panel,
   PanelKind,
 } from "@/types";
-import { LayoutConfig, layoutToYaml, parseLayoutYaml } from "./layout_yaml";
-
-const PANEL_KINDS: { key: PanelKind; name: string }[] = [
-  { key: "time_series", name: "Time series" },
-  { key: "profile_2d", name: "Profile 2D / spectrogram" },
-  { key: "radial_profile", name: "Radial profile" },
-  { key: "video", name: "Video" },
-];
+import {
+  LayoutConfig,
+  PANEL_KINDS,
+  layoutToYaml,
+  parseLayoutYaml,
+} from "./layout_yaml";
+import { LayoutPreview } from "./layout_preview";
 
 const splitSignals = (text: string) =>
   text
@@ -510,43 +509,62 @@ export function LayoutEditor({
   const [selectedTab, setSelectedTab] = useState("yaml");
   // Taken when the Form tab opens, so an invalid value typed in the form does not unmount it.
   const [formSeed, setFormSeed] = useState<LayoutConfig | null>(null);
+  const [lastValid, setLastValid] = useState({ yaml, config: parsed.config });
+  if (parsed.config && lastValid.yaml !== yaml) {
+    setLastValid({ yaml, config: parsed.config });
+  }
 
   return (
-    <Tabs
-      aria-label="Layout editor"
-      selectedKey={selectedTab}
-      onSelectionChange={(key) => {
-        setSelectedTab(String(key));
-        if (key === "form") setFormSeed(parsed.config);
-      }}
-    >
-      <TabList>
-        <Item key="yaml">YAML</Item>
-        <Item key="form">Form</Item>
-      </TabList>
-      <TabPanels>
-        <Item key="yaml">
-          <View paddingTop="size-100">
-            <YamlEditor text={yaml} error={parsed.error} onChange={onChange} />
-          </View>
-        </Item>
-        <Item key="form">
-          <View paddingTop="size-100">
-            {formSeed ? (
-              <Flex direction="column" gap="size-100">
-                {parsed.error && <LayoutErrors error={parsed.error} />}
-                <LayoutForm
-                  initial={formSeed}
-                  dataLoaders={dataLoaders}
-                  onChange={(config) => onChange(layoutToYaml(config, yaml))}
+    <Flex gap="size-300" wrap>
+      <View flexGrow={1} flexBasis="size-4600" minWidth={0}>
+        <Tabs
+          aria-label="Layout editor"
+          selectedKey={selectedTab}
+          onSelectionChange={(key) => {
+            setSelectedTab(String(key));
+            if (key === "form") setFormSeed(parsed.config);
+          }}
+        >
+          <TabList>
+            <Item key="yaml">YAML</Item>
+            <Item key="form">Form</Item>
+          </TabList>
+          <TabPanels>
+            <Item key="yaml">
+              <View paddingTop="size-100">
+                <YamlEditor
+                  text={yaml}
+                  error={parsed.error}
+                  onChange={onChange}
                 />
-              </Flex>
-            ) : (
-              <Text>Correct the errors in the YAML tab to use the form.</Text>
-            )}
-          </View>
-        </Item>
-      </TabPanels>
-    </Tabs>
+              </View>
+            </Item>
+            <Item key="form">
+              <View paddingTop="size-100">
+                {formSeed ? (
+                  <Flex direction="column" gap="size-100">
+                    {parsed.error && <LayoutErrors error={parsed.error} />}
+                    <LayoutForm
+                      initial={formSeed}
+                      dataLoaders={dataLoaders}
+                      onChange={(config) =>
+                        onChange(layoutToYaml(config, yaml))
+                      }
+                    />
+                  </Flex>
+                ) : (
+                  <Text>
+                    Correct the errors in the YAML tab to use the form.
+                  </Text>
+                )}
+              </View>
+            </Item>
+          </TabPanels>
+        </Tabs>
+      </View>
+      <View flexShrink={0} width="size-6000" maxWidth="100%">
+        <LayoutPreview config={lastValid.config} />
+      </View>
+    </Flex>
   );
 }

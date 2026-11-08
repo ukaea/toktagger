@@ -226,13 +226,23 @@ def test_multi_panel_tabs_switch_panels(server_setup, page: Page):
     expect(tabs.get_by_role("tab")).to_have_text(["Profiles", "Signals"])
     expect(page.get_by_test_id("panel-radial")).to_be_visible()
     expect(page.get_by_test_id("panel-traces")).to_have_count(0)
+    radial_plot = page.get_by_test_id("panel-radial").get_by_label(
+        "radial-profile", exact=True
+    )
+    radial_plot.evaluate("plot => { plot.dataset.firstDraw = 'kept'; }")
 
     tabs.get_by_role("tab", name="Signals").click()
-    expect(page.get_by_test_id("panel-radial")).to_have_count(0)
+    expect(page.get_by_test_id("panel-radial")).to_be_hidden()
     expect(page.get_by_test_id("panel-traces")).to_have_attribute("data-active", "true")
     expect(
         page.get_by_test_id("panel-tools").get_by_text("Peak Detection")
     ).to_be_visible()
+
+    # An opened tab stays mounted, so switching back does not draw its plots again.
+    tabs.get_by_role("tab", name="Profiles").click()
+    expect(radial_plot).to_have_attribute("data-first-draw", "kept")
+    expect(page.get_by_test_id("panel-traces")).to_be_hidden()
+    tabs.get_by_role("tab", name="Signals").click()
 
     with page.expect_response(lambda r: "panels/traces/data" in r.url):
         page.reload()
@@ -250,7 +260,7 @@ def test_multi_panel_annotation_shows_on_other_tab(server_setup, page: Page):
         page.get_by_test_id("panel-traces").get_by_label("time-zone").first
     ).to_be_visible()
 
-    # Switching at once proves that an unsynced edit survives the unmount of its panel.
+    # Switching at once proves that the edit reaches a panel on another tab before its sync.
     page.get_by_role("tab", name="Profiles").click()
     expect(
         page.get_by_test_id("panel-spectrogram").get_by_label("time-zone").first
@@ -351,6 +361,17 @@ def test_create_multi_panel_project_from_yaml(server_setup, page: Page):
     editor = modal.get_by_role("textbox", name="Layout YAML")
     editor.fill(LAYOUT_YAML)
     expect(modal.get_by_role("alert", name="Layout errors")).to_have_count(0)
+    preview = modal.get_by_test_id("layout-preview")
+    expect(preview.get_by_role("tab")).to_have_text(["Profiles", "Signals"])
+    expect(preview.get_by_role("group", name="Preview spectrogram")).to_contain_text(
+        "Profile 2D / spectrogram"
+    )
+    expect(preview.get_by_role("group", name="Preview spectrogram")).to_contain_text(
+        "Data loader: synthetic_radial (source default)"
+    )
+    expect(preview.get_by_role("group", name="Preview traces")).to_have_count(0)
+    preview.get_by_role("tab", name="Signals").click()
+    expect(preview.get_by_role("group", name="Preview traces")).to_be_visible()
 
     with page.expect_response(
         lambda r: r.url.endswith("/projects") and r.request.method == "POST"
@@ -371,6 +392,11 @@ def test_create_multi_panel_project_from_yaml(server_setup, page: Page):
     modal.get_by_role("tab", name="Form").click()
     modal.get_by_role("button", name="Add tab").click()
     expect(modal.get_by_test_id("layout-tab")).to_have_count(3)
+    preview = modal.get_by_test_id("layout-preview")
+    expect(preview.get_by_role("tab")).to_have_text(["Profiles", "Signals"])
+    new_tab = modal.get_by_test_id("layout-tab").nth(2)
+    new_tab.get_by_role("textbox", name="Signals (comma separated)").fill("ip")
+    expect(preview.get_by_role("tab")).to_have_text(["Profiles", "Signals", "Tab 3"])
     modal.get_by_role("tab", name="YAML").click()
     text = modal.get_by_role("textbox", name="Layout YAML").input_value()
     assert text.startswith("# Two tabs for the review.")
@@ -388,3 +414,27 @@ def test_invalid_layout_yaml_blocks_create(server_setup, page: Page):
     modal.get_by_role("button", name="Create").click()
     expect(modal).to_be_visible()
     assert requests.get("http://localhost:8002/projects").json() == []
+
+
+def test_layout_preview_warns_about_overlapping_panels(server_setup, page: Page):
+    modal = open_multi_panel_dialog(page)
+    modal.get_by_role("textbox", name="Layout YAML").fill(
+        LAYOUT_YAML.replace(
+            "          signals: [ip]\n",
+            "          signals: [ip]\n"
+            "        - id: density\n"
+            "          kind: time_series\n"
+            "          signals: [ne]\n",
+        )
+    )
+    preview = modal.get_by_test_id("layout-preview")
+    expect(preview).to_contain_text("Panels traces, density overlap on tab Signals.")
+    preview.get_by_role("tab", name="Signals").click()
+    expect(preview.get_by_role("group", name="Preview density")).to_have_attribute(
+        "data-overlap", "true"
+    )
+
+    with page.expect_response(
+        lambda r: r.url.endswith("/projects") and r.request.method == "POST"
+    ):
+        modal.get_by_role("button", name="Create").click()

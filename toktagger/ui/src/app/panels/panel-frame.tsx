@@ -10,6 +10,7 @@ import { PanelHeightContext } from "@/app/contexts/PanelHeightContext";
 import { ToolAccordion } from "@/app/components/tools/toolAccordion";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
+import { gridArea } from "./grid";
 import { PANEL_REGISTRY } from "./registry";
 
 function Passthrough({ children }: { children: React.ReactNode }) {
@@ -88,8 +89,7 @@ export function PanelCell({ panel }: { panel: Panel }) {
       onFocusCapture={() => setActivePanelId(panel.id)}
       onPointerDownCapture={() => setActivePanelId(panel.id)}
       style={{
-        gridColumn: `${panel.grid.col} / span ${panel.grid.col_span}`,
-        gridRow: `${panel.grid.row} / span ${panel.grid.row_span}`,
+        ...gridArea(panel.grid),
         minWidth: 0,
         minHeight: 0,
       }}

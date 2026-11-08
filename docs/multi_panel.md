@@ -12,6 +12,7 @@ A project can have one or more tabs. Use tabs to put many panels on different pa
 - Each tab has its own grid. The **Column** and **Row** of a panel are the position in the grid of its tab.
 - Each panel id must be unique in all the tabs of the project.
 - If the project has only one tab, the page does not show the tab bar.
+- TokTagger draws the plots of a tab when you open the tab for the first time. When you go back to a tab, its plots show immediately and keep their zoom.
 - If the layout has `panels` and no `tabs`, TokTagger makes one tab with the title `Main`. Thus, a layout from an earlier version of TokTagger continues to work.
 
 ## Panel types
@@ -52,6 +53,15 @@ TokTagger checks the layout before it saves the project:
 - Each panel must use a data source that exists.
 
 If the layout has an error, the editor shows the error below the text and you cannot create the project.
+
+### Layout preview
+
+The **UI Preview** area is next to the layout editor. It shows a diagram of the sample page for the current layout.
+
+- The preview has a tab bar with the title of each tab, as on the sample page. Click a title to see the panels of that tab. When the layout has only one tab, the preview does not show the tab bar.
+- Each box is one panel, at its position on the grid. The box shows the panel title (or the panel id), the kind of panel, the data loader and the data source. The colour of the box shows the kind of panel.
+- The preview changes when you change the **YAML** tab or the **Form** tab. When the text has an error, the preview shows the last layout that had no error.
+- When two panels on one tab use the same grid cell, the two boxes have a red dashed border, and a warning shows below the preview. The warning names the tab, also when the preview shows a different tab. The warning does not stop you from saving the project, but the panels cover each other on the sample page.
 
 ### Edit the layout as YAML
 
