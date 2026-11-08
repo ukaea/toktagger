@@ -1,4 +1,4 @@
-import { DataSource, DEFAULT_SOURCE, Layout, Project, TaskType } from "@/types";
+import { Project, TaskType } from "@/types";
 import {
   Button,
   ButtonGroup,
@@ -29,7 +29,12 @@ import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
 import { useAPISchema } from "@/app/contexts/apiSchema";
 import { SchemaParser } from "@/schemaParser";
-import { LayoutEditor, validateLayoutConfig } from "./layout_editor";
+import { LayoutEditor } from "./layout_editor";
+import {
+  defaultLayoutYaml,
+  layoutToYaml,
+  parseLayoutYaml,
+} from "./layout_yaml";
 
 // Query strategies
 const QueryStrategies = [
@@ -136,27 +141,13 @@ export function ProjectConfigEditor({
   >(_project?.video_bounding_box_labels || []);
 
   const isMultiPanel = task === TaskType.MultiPanel;
-  const [sources, setSources] = useState<DataSource[]>(_project?.sources ?? []);
-  const [layout, setLayout] = useState<Layout>(
-    _project?.layout ?? {
-      panels: [
-        {
-          id: "panel_1",
-          title: null,
-          kind: "time_series",
-          source: DEFAULT_SOURCE,
-          signals: [],
-          grid: { col: 1, row: 1, col_span: 1, row_span: 1 },
-        },
-      ],
-      link_time: true,
-    },
-  );
-  // Before the user adds sources, the project data loader is the one default source.
-  const editedSources: DataSource[] =
-    sources.length > 0
-      ? sources
-      : [{ name: DEFAULT_SOURCE, data_loader: dataLoader ?? "" }];
+  // Null until the user edits it, so the starter text follows the default data loader.
+  const [editedLayoutYaml, setLayoutYaml] = useState<string | null>(() => {
+    if (_project?.layout_yaml) return _project.layout_yaml;
+    if (!_project?.layout) return null;
+    return layoutToYaml({ sources: _project.sources, layout: _project.layout });
+  });
+  const layoutYaml = editedLayoutYaml ?? defaultLayoutYaml(dataLoader ?? "");
 
   useEffect(() => {
     const parser = new SchemaParser(schema);
@@ -239,25 +230,22 @@ export function ProjectConfigEditor({
         ToastQueue.negative("Data loader is required", { timeout: 3000 });
         return;
       }
-      if (isMultiPanel) {
-        const problem = validateLayoutConfig({
-          sources: editedSources,
-          layout,
-        });
-        if (problem) {
-          ToastQueue.negative(problem, { timeout: 5000 });
-          return;
-        }
+      const parsedLayout = parseLayoutYaml(layoutYaml);
+      if (isMultiPanel && parsedLayout.error !== null) {
+        ToastQueue.negative(parsedLayout.error, { timeout: 5000 });
+        return;
       }
+      const layoutConfig = isMultiPanel ? parsedLayout.config : null;
 
       // Build project object
       const newProject: Partial<Project> = {
         name: projectName,
         task: task as TaskType,
         query_strategy: queryStrategy,
-        data_loader: isMultiPanel ? editedSources[0].data_loader : dataLoader,
-        sources: isMultiPanel ? editedSources : (_project?.sources ?? []),
-        layout: isMultiPanel ? layout : null,
+        data_loader: layoutConfig?.sources[0].data_loader ?? dataLoader,
+        sources: layoutConfig?.sources ?? _project?.sources ?? [],
+        layout: layoutConfig?.layout ?? null,
+        layout_yaml: layoutConfig ? layoutYaml : null,
         timestamp: new Date().toISOString(),
         time_min: timeMin,
         time_max: timeMax,
@@ -478,13 +466,9 @@ export function ProjectConfigEditor({
             {isMultiPanel && (
               <View marginTop="size-200">
                 <LayoutEditor
-                  sources={editedSources}
-                  layout={layout}
+                  yaml={layoutYaml}
                   dataLoaders={dataLoaders.map((loader) => loader.key)}
-                  onChange={(config) => {
-                    setSources(config.sources);
-                    setLayout(config.layout);
-                  }}
+                  onChange={setLayoutYaml}
                 />
               </View>
             )}

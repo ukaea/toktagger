@@ -1,6 +1,8 @@
 from pydantic import Field, field_validator, computed_field, model_validator
-from typing import Optional, List
+from typing import Any, Optional, List
 from enum import Enum
+
+import yaml
 
 
 from toktagger.api.core.data_loaders import LoaderRegistry
@@ -123,6 +125,28 @@ class ProjectIn(ConfiguredModel):
         None,
         description="The panels to show for each sample (required for multi-panel projects).",
     )
+
+    layout_yaml: Optional[str] = Field(
+        None,
+        description="The sources and layout as YAML text. When set, it replaces the sources and the layout.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_layout_yaml(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or not data.get("layout_yaml"):
+            return data
+        try:
+            config = yaml.safe_load(data["layout_yaml"])
+        except yaml.YAMLError as error:
+            raise ValueError(f"Invalid layout YAML: {error}") from error
+        if not isinstance(config, dict) or "layout" not in config:
+            raise ValueError("The layout YAML must have a 'layout' key.")
+        return {
+            **data,
+            "sources": config.get("sources", []),
+            "layout": config["layout"],
+        }
 
     @computed_field
     @property

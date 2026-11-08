@@ -9,7 +9,7 @@ import {
   PlotRelayoutEvent,
   PlotSelectionEvent,
 } from "plotly.js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useTimeSeriesActions,
   useTimeSeriesState,
@@ -24,6 +24,10 @@ import React from "react";
 import { arrayMax, arrayMin } from "@/app/utils";
 import { ToastQueue } from "@adobe/react-spectrum";
 import { useLinkedTimeAxis, xRangeFromRelayout } from "./linked-time";
+import { usePanelHeight } from "@/app/contexts/PanelHeightContext";
+
+// Plotly's default margins leave little room for data in a small grid cell.
+const PANEL_MARGIN: Partial<Layout["margin"]> = { l: 60, r: 20, t: 30, b: 40 };
 
 const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
   modeBarButtons: [
@@ -98,6 +102,11 @@ export const BaseTimeSeriesPlot = ({
   } = useTimeSeriesState();
 
   const isDraggingRef = useRef(false);
+  const panelHeight = usePanelHeight();
+  const fittedLayout = useMemo(
+    () => (panelHeight === null ? layout : { ...layout, margin: PANEL_MARGIN }),
+    [layout, panelHeight],
+  );
   const allowRelayout = useRef(true);
   const lastHoverTime = useRef(0);
   const lockedSubplotElementRef = useRef<HTMLElement | null>(null); // used to track which subplot an annotation was started on
@@ -105,6 +114,7 @@ export const BaseTimeSeriesPlot = ({
   const plotId = externalId || "time-series";
   const drawingTool =
     activeAnnotationTool &&
+    toolingCallbacks.has(activeAnnotationTool.type) &&
     (!tools || tools.includes(activeAnnotationTool.type))
       ? activeAnnotationTool
       : null;
@@ -264,7 +274,7 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const initGraph = async () => {
-      react(plot, data, layout, config).then(generateOverplots);
+      react(plot, data, fittedLayout, config).then(generateOverplots);
 
       plot.removeAllListeners("plotly_relayout"); // remove any existing listeners
       plot.removeAllListeners("plotly_selected");
@@ -282,7 +292,7 @@ export const BaseTimeSeriesPlot = ({
   }, [
     config,
     data,
-    layout,
+    fittedLayout,
     plotId,
     rescaleOnZoom,
     onXRangeChange,
@@ -600,7 +610,13 @@ export const BaseTimeSeriesPlot = ({
   ]);
 
   return (
-    <div className="w-full px-6 py-3 space-y-3 flex-col">
+    <div
+      className={
+        panelHeight === null
+          ? "w-full px-6 py-3 space-y-3 flex-col"
+          : "w-full px-1 flex-col"
+      }
+    >
       {/* Div where plot is inserted */}
       <div id={plotId} className="" aria-label={ariaLabel}>
         <>

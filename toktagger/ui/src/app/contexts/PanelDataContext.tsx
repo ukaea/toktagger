@@ -14,7 +14,9 @@ import {
   AnyViewParamsSchema,
   Data,
   DataParams,
+  DEFAULT_TAB_TITLE,
   ImageDataSchema,
+  LayoutTab,
   MultiVariateTimeSeriesDataSchema,
   Panel,
   PanelKind,
@@ -107,25 +109,40 @@ const TASK_PANEL_KINDS: Record<
 
 export const LEGACY_PANEL_ID = "default";
 
-/** The panels to show for a sample: the project layout, or one panel for a single-task project. */
-export function panelsForProject(project: Project, sample: Sample): Panel[] {
-  if (project.task === TaskType.MultiPanel) return project.layout?.panels ?? [];
+/** The tabs to show for a sample: the project layout, or one tab with one panel for a single-task project. */
+export function tabsForProject(project: Project, sample: Sample): LayoutTab[] {
+  if (project.task === TaskType.MultiPanel) return project.layout?.tabs ?? [];
+  return [
+    { title: DEFAULT_TAB_TITLE, panels: [legacyPanel(project.task, sample)] },
+  ];
+}
 
+/** All the panels of all the tabs, in order. */
+export function panelsOfTabs(tabs: LayoutTab[]): Panel[] {
+  return tabs.flatMap((tab) => tab.panels);
+}
+
+function legacyPanel(
+  task: Exclude<TaskType, TaskType.MultiPanel>,
+  sample: Sample,
+): Panel {
   const signals = getSignalNames(sample);
   const base = {
     id: LEGACY_PANEL_ID,
     source: "default",
     grid: { col: 1, row: 1, col_span: 1, row_span: 1 },
   };
-  const kind = TASK_PANEL_KINDS[project.task];
-  if (kind === "time_series") return [{ ...base, kind, signals }];
-  if (kind === "profile_2d")
-    return [{ ...base, kind, signal: signals[0] ?? "" }];
+  const kind = TASK_PANEL_KINDS[task];
+  if (kind === "time_series") return { ...base, kind, signals };
+  if (kind === "profile_2d") return { ...base, kind, signal: signals[0] ?? "" };
   if (kind === "radial_profile")
-    return [
-      { ...base, kind, profile_signals: signals, time_series_signals: [] },
-    ];
-  return [{ ...base, kind, signal: signals[0] ?? null }];
+    return {
+      ...base,
+      kind,
+      profile_signals: signals,
+      time_series_signals: [],
+    };
+  return { ...base, kind, signal: signals[0] ?? null };
 }
 
 function parsePanelData(data: unknown, kind: PanelKind): Data {
@@ -477,6 +494,11 @@ export function usePanelData(): PanelDataContextType {
     throw new Error(`Panel '${panelId}' is not in the layout`);
   }
   return { ...state, panel, setDataParams, setViewParams };
+}
+
+/** The id of the panel that encloses the caller, if any. */
+export function usePanelId(): string | undefined {
+  return useContext(PanelIdContext);
 }
 
 /** A DOM id for a plot that is unique per panel; single-task pages keep the plain base id. */

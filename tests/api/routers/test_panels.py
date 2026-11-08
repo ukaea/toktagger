@@ -158,3 +158,88 @@ async def test_get_unknown_panel_data(api_client, setup_db):
         f"/projects/{project_id}/samples/{sample_id}/panels/missing/data", json={}
     )
     assert response.status_code == 404
+
+
+LAYOUT_YAML = """
+# Two tabs of panels.
+sources:
+  - {name: shot, data_loader: synthetic_radial}
+layout:
+  tabs:
+    - title: Profiles
+      panels:
+        - {id: radial, kind: radial_profile, source: shot, profile_signals: [TE, NE]}
+    - title: Signals
+      panels:
+        - {id: traces, kind: time_series, source: shot, signals: [ip]}
+"""
+
+
+def test_layout_panels_become_one_tab():
+    layout = Layout.model_validate(LAYOUT)
+    assert [tab.title for tab in layout.tabs] == ["Main"]
+    assert [panel.id for panel in layout.panels] == [
+        panel["id"] for panel in LAYOUT["panels"]
+    ]
+
+
+def test_layout_rejects_duplicate_panel_ids_in_two_tabs():
+    panel = {"id": "same", "kind": "time_series", "signals": ["ip"]}
+    with pytest.raises(ValidationError, match="Panel IDs must be unique"):
+        Layout.model_validate(
+            {
+                "tabs": [
+                    {"title": "One", "panels": [panel]},
+                    {"title": "Two", "panels": [panel]},
+                ]
+            }
+        )
+
+
+def test_layout_rejects_duplicate_tab_titles():
+    tabs = [
+        {
+            "title": "Same",
+            "panels": [{"id": panel_id, "kind": "time_series", "signals": ["ip"]}],
+        }
+        for panel_id in ["first", "second"]
+    ]
+    with pytest.raises(ValidationError, match="Tab titles must be unique"):
+        Layout.model_validate({"tabs": tabs})
+
+
+def test_project_layout_from_yaml():
+    project = ProjectIn.model_validate(
+        _project(sources=[], layout=None, layout_yaml=LAYOUT_YAML)
+    )
+    assert project.layout is not None
+    assert [tab.title for tab in project.layout.tabs] == ["Profiles", "Signals"]
+    assert [source.name for source in project.sources] == ["shot"]
+    assert project.layout_yaml == LAYOUT_YAML
+
+
+def test_project_rejects_invalid_yaml():
+    with pytest.raises(ValidationError, match="line 3"):
+        ProjectIn.model_validate(_project(layout_yaml="layout:\n  tabs: [\n- broken"))
+
+
+@pytest.mark.asyncio
+async def test_get_panel_data_on_second_tab(api_client, setup_db):
+    response = await api_client.post(
+        "/projects", json=_project(layout=None, layout_yaml=LAYOUT_YAML)
+    )
+    assert response.status_code == 200, response.text
+    project_id = response.json()["_id"]
+    project = (await api_client.get(f"/projects/{project_id}")).json()
+    assert project["layout_yaml"] == LAYOUT_YAML
+    response = await api_client.post(
+        f"/projects/{project_id}/samples",
+        json=[{"shot_id": 1, "sources": {"shot": SAMPLE_SOURCES["shot"]}}],
+    )
+    assert response.status_code == 200, response.text
+    sample_id = response.json()[0]
+    response = await api_client.post(
+        f"/projects/{project_id}/samples/{sample_id}/panels/traces/data", json={}
+    )
+    assert response.status_code == 200, response.text
+    assert list(response.json()["values"]) == ["ip"]

@@ -22,8 +22,6 @@ import {
 import { TimeRegion } from "@/app/components/tools/timeRegion";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { RadialRange } from "@/app/components/tools/radialRange";
-import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
-import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
 import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
@@ -297,12 +295,8 @@ export const RadialProfileView = () => {
       <Flex justifyContent="center" alignItems="center">
         <RadialProfileProvider data={viewData} colorMap={plotProps.colorMap}>
           <TimeSeriesProvider>
-            <Flex direction="row" flex justifyContent="space-between">
-              <Flex direction="column" flex gap="size-100">
-                <RadialProfilePlots data={viewData} />
-                <AnnotationsTable />
-              </Flex>
-              <AnnotationToolbar />
+            <Flex direction="column" flex gap="size-100">
+              <RadialProfilePlots data={viewData} />
             </Flex>
           </TimeSeriesProvider>
         </RadialProfileProvider>

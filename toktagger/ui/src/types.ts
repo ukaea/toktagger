@@ -279,10 +279,34 @@ export const PanelSchema = z.union([
 export type Panel = z.infer<typeof PanelSchema>;
 export type PanelKind = Panel["kind"];
 
-export const LayoutSchema = z.object({
+export const DEFAULT_TAB_TITLE = "Main";
+
+export const LayoutTabSchema = z.object({
+  title: z.string().min(1),
   panels: z.array(PanelSchema).min(1),
-  link_time: z.boolean().default(true),
 });
+export type LayoutTab = z.infer<typeof LayoutTabSchema>;
+
+// Mirrors the backend: a layout with only `panels` is one tab.
+const panelsToTabs = (data: unknown): unknown => {
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    "tabs" in data ||
+    !("panels" in data)
+  )
+    return data;
+  const { panels, ...rest } = data;
+  return { ...rest, tabs: [{ title: DEFAULT_TAB_TITLE, panels }] };
+};
+
+export const LayoutSchema = z.preprocess(
+  panelsToTabs,
+  z.object({
+    tabs: z.array(LayoutTabSchema).min(1),
+    link_time: z.boolean().default(true),
+  }),
+);
 export type Layout = z.infer<typeof LayoutSchema>;
 
 export const ProjectSchema = z.object({
@@ -304,6 +328,7 @@ export const ProjectSchema = z.object({
   video_bounding_box_labels: z.array(z.string()).default([]),
   sources: z.array(DataSourceSchema).default([]),
   layout: LayoutSchema.nullable().optional(),
+  layout_yaml: z.string().nullable().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

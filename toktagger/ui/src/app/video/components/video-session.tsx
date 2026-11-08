@@ -21,6 +21,7 @@ import type { Annotation, VideoFrameLabel } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
 import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { useVideoUiState } from "@/app/contexts/VideoContext";
+import { useAnnotationTools } from "@/app/contexts/AnnotationToolContext";
 import {
   VideoBoundingBoxSchema,
   VideoFrameLabelSchema,
@@ -441,12 +442,9 @@ export function VideoSessionProvider(props: {
   const { projectId, sampleId, propagate, setPropagate, children } = props;
   const { annotations, setAnnotations: setSampleAnnotations } = useSample();
   const { data, dataParams, isLoading } = usePanelData();
-  const {
-    videoEditMode,
-    setVideoEditMode,
-    videoDrawingTool,
-    setVideoDrawingTool,
-  } = useVideoUiState();
+  const { videoDrawingTool, setVideoDrawingTool } = useVideoUiState();
+  const { editMode: sharedEditMode, setEditMode: setSharedEditMode } =
+    useAnnotationTools();
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -516,9 +514,9 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] =
     useState<ActiveDrawingTool>(videoDrawingTool);
-  const [editMode, setEditModeState] = useState(videoEditMode);
   const [ctrlHeld, setCtrlHeld] = useState(false);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
+  const editMode = sharedEditMode && !hideAnnotations;
   const hideAnnotationsRef = useRef(false);
 
   const isFramePending =
@@ -550,13 +548,11 @@ export function VideoSessionProvider(props: {
         api?.cancelDrawing?.();
         api?.setSelected?.();
         setCtrlHeld(false);
-        setEditModeState(false);
-        setVideoEditMode(false);
         setDrawingToolState(null);
         setVideoDrawingTool(null);
       }
     },
-    [api, setVideoDrawingTool, setVideoEditMode],
+    [api, setVideoDrawingTool],
   );
 
   const frameKey = useMemo(
@@ -789,15 +785,21 @@ export function VideoSessionProvider(props: {
   const setEditMode = useCallback(
     (v: boolean) => {
       if (hideAnnotationsRef.current) return;
-      api?.cancelDrawing?.();
-      api?.setSelected?.();
-      flushPendingOverlay();
-      setCtrlHeld(false);
-      setEditModeState(v);
-      setVideoEditMode(v);
+      setSharedEditMode(v);
     },
-    [api, flushPendingOverlay, setVideoEditMode],
+    [setSharedEditMode],
   );
+
+  // The shared mode also changes from the annotation toolbar and the e key, so the cleanup runs here.
+  const wasEditMode = useRef(editMode);
+  useEffect(() => {
+    if (wasEditMode.current === editMode) return;
+    wasEditMode.current = editMode;
+    api?.cancelDrawing?.();
+    api?.setSelected?.();
+    flushPendingOverlay();
+    setCtrlHeld(false);
+  }, [api, editMode, flushPendingOverlay]);
 
   useEffect(() => {
     const releaseCtrl = () => {
@@ -809,24 +811,10 @@ export function VideoSessionProvider(props: {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableEventTarget(event.target)) return;
 
-      if (event.key === "Control") {
-        if (event.repeat) return;
-        // Commit an in-progress edit first so the overlay sync doesn't revert it.
-        if (editMode) flushCurrentFrameOverlay();
-        setCtrlHeld(true);
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === "e" &&
-        !event.repeat &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.altKey &&
-        !hideAnnotationsRef.current
-      ) {
-        setEditMode(!editMode);
-      }
+      if (event.key !== "Control" || event.repeat) return;
+      // Commit an in-progress edit first so the overlay sync doesn't revert it.
+      if (editMode) flushCurrentFrameOverlay();
+      setCtrlHeld(true);
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -848,7 +836,7 @@ export function VideoSessionProvider(props: {
       window.removeEventListener("blur", releaseCtrl);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [api, editMode, flushCurrentFrameOverlay, setEditMode]);
+  }, [api, editMode, flushCurrentFrameOverlay]);
 
   const clearCurrentFrame = useCallback(() => {
     api?.setSelected?.();

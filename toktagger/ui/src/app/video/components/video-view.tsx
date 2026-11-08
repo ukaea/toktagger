@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Annotorious } from "@annotorious/react";
 import { ImageDataSchema } from "@/types";
 import {
@@ -17,9 +18,11 @@ import {
   useVideoSession,
 } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
-import { VideoAnnotationToolbar } from "@/app/video/components/video-annotation-toolbar";
+import { VideoAnnotationTools } from "@/app/video/components/video-annotation-toolbar";
 import { FrameJumpField } from "@/app/video/components/ui_elements";
-import { usePanelData } from "@/app/contexts/PanelDataContext";
+import { usePanelData, usePanelId } from "@/app/contexts/PanelDataContext";
+import { useWorkspace } from "@/app/contexts/WorkspaceContext";
+import { usePanelHeight } from "@/app/contexts/PanelHeightContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
 import {
   VideoUiStateProvider,
@@ -109,6 +112,7 @@ function VideoFrameAnnotator(props: {
 }) {
   const session = useVideoSession();
   const { videoFrameBounds, isLoading } = usePanelData();
+  const inGridCell = usePanelHeight() !== null;
   const isFramePending = isLoading && props.desiredFrame !== session.frame;
 
   const prevDisabled =
@@ -167,8 +171,10 @@ function VideoFrameAnnotator(props: {
       {/* Frame annotator canvas (image + Annotorious overlay). */}
       <Grid
         width="100%"
-        columns={["size-1600", "1fr", "size-1600"]}
-        areas={["labels viewer spacer"]}
+        columns={
+          inGridCell ? ["auto", "1fr"] : ["size-1600", "1fr", "size-1600"]
+        }
+        areas={inGridCell ? ["labels viewer"] : ["labels viewer spacer"]}
         columnGap="size-200"
         alignItems="start"
       >
@@ -196,6 +202,17 @@ function VideoFrameAnnotator(props: {
         </Flex>
       </Grid>
     </div>
+  );
+}
+
+/** Shows the video drawing tools in the global annotation toolbar while this panel is active. */
+function VideoToolsInToolbar(props: { desiredFrame: number }) {
+  const { videoToolSlot, activePanelId } = useWorkspace();
+  const panelId = usePanelId();
+  if (!videoToolSlot || activePanelId !== panelId) return null;
+  return createPortal(
+    <VideoAnnotationTools desiredFrame={props.desiredFrame} />,
+    videoToolSlot,
   );
 }
 
@@ -337,18 +354,14 @@ export function VideoView() {
   };
 
   return (
-    <div className="min-w-0 flex-1">
-      <div className="flex w-full justify-between">
-        <div className="min-w-0 flex-1 px-4 py-3">
-          <VideoFrameAnnotator
-            imageBase64={imageBase64}
-            desiredFrame={desiredFrame}
-            goToFrame={goToFrame}
-            goToRelativeFrame={goToRelativeFrame}
-          />
-        </div>
-        <VideoAnnotationToolbar desiredFrame={desiredFrame} />
-      </div>
+    <div className="min-w-0 flex-1 px-4 py-3">
+      <VideoFrameAnnotator
+        imageBase64={imageBase64}
+        desiredFrame={desiredFrame}
+        goToFrame={goToFrame}
+        goToRelativeFrame={goToRelativeFrame}
+      />
+      <VideoToolsInToolbar desiredFrame={desiredFrame} />
     </div>
   );
 }

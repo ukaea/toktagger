@@ -17,12 +17,16 @@ import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
 import {
   PanelDataProvider,
-  panelsForProject,
+  panelsOfTabs,
+  tabsForProject,
 } from "@/app/contexts/PanelDataContext";
 import { WorkspaceProvider } from "@/app/contexts/WorkspaceContext";
 import { PanelFrame } from "@/app/panels/panel-frame";
 import { WorkspaceView } from "@/app/panels/workspace-view";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
+import { AnnotationToolProvider } from "@/app/contexts/AnnotationToolContext";
+import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
+import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 
 type SampleDataBreadCrumbsInfo = {
   project: Project;
@@ -51,11 +55,11 @@ const SampleDataBreadCrumbs = ({
 
 function SamplePageContent(props: { sampleId: string }) {
   const { project, sample, isLoading, error } = useSample();
-  const panels = useMemo(
-    () => (project && sample ? panelsForProject(project, sample) : []),
+  const tabs = useMemo(
+    () => (project && sample ? tabsForProject(project, sample) : []),
     [project, sample],
   );
-  const panelIds = useMemo(() => panels.map((panel) => panel.id), [panels]);
+  const panels = useMemo(() => panelsOfTabs(tabs), [tabs]);
 
   // Early returns AFTER all hooks
   if (error) return <ErrorView message={error} />;
@@ -93,19 +97,26 @@ function SamplePageContent(props: { sampleId: string }) {
           panels={panels}
         >
           <WorkspaceProvider
-            panelIds={panelIds}
+            tabs={tabs}
+            projectId={project._id ?? ""}
             linkTime={project.layout?.link_time ?? true}
           >
-            <Flex>
-              <ToolBar />
-              {project.task === TaskType.MultiPanel ? (
-                <WorkspaceView panels={panels} />
-              ) : (
-                panels.map((panel) => (
-                  <PanelFrame key={panel.id} panel={panel} />
-                ))
-              )}
-            </Flex>
+            <AnnotationToolProvider>
+              <Flex>
+                <ToolBar />
+                <Flex direction="column" flex minWidth={0} gap="size-200">
+                  {project.task === TaskType.MultiPanel ? (
+                    <WorkspaceView tabs={tabs} />
+                  ) : (
+                    panels.map((panel) => (
+                      <PanelFrame key={panel.id} panel={panel} />
+                    ))
+                  )}
+                  <AnnotationsTable panels={panels} />
+                </Flex>
+                <AnnotationToolbar />
+              </Flex>
+            </AnnotationToolProvider>
           </WorkspaceProvider>
         </PanelDataProvider>
       </Provider>

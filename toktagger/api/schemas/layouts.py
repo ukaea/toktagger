@@ -1,6 +1,6 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 from toktagger.api.schemas.views import (
     Profile2DViewParams,
@@ -88,21 +88,46 @@ PanelTypes = Annotated[
 ]
 
 
-class Layout(BaseModel):
+DEFAULT_TAB_TITLE = "Main"
+
+
+def _duplicates(values: list[str]) -> list[str]:
+    return sorted({value for value in values if values.count(value) > 1})
+
+
+class LayoutTab(BaseModel):
+    """A named page of panels, shown on its own grid."""
+
+    title: str = Field(..., min_length=1, description="The title of this tab.")
     panels: list[PanelTypes] = Field(..., min_length=1)
+
+
+class Layout(BaseModel):
+    tabs: list[LayoutTab] = Field(..., min_length=1)
     link_time: bool = Field(
         True, description="Keep the time axis of all panels the same."
     )
 
-    @field_validator("panels")
+    @model_validator(mode="before")
     @classmethod
-    def check_unique_ids(cls, panels: list[PanelTypes]) -> list[PanelTypes]:
-        ids = [panel.id for panel in panels]
-        if duplicates := sorted(
-            {panel_id for panel_id in ids if ids.count(panel_id) > 1}
-        ):
+    def panels_to_tabs(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "tabs" not in data and "panels" in data:
+            panels = data["panels"]
+            data = {key: value for key, value in data.items() if key != "panels"}
+            data["tabs"] = [{"title": DEFAULT_TAB_TITLE, "panels": panels}]
+        return data
+
+    @model_validator(mode="after")
+    def check_unique_names(self) -> "Layout":
+        if duplicates := _duplicates([panel.id for panel in self.panels]):
             raise ValueError(f"Panel IDs must be unique, duplicates: {duplicates}")
-        return panels
+        if duplicates := _duplicates([tab.title for tab in self.tabs]):
+            raise ValueError(f"Tab titles must be unique, duplicates: {duplicates}")
+        return self
+
+    @property
+    def panels(self) -> list[PanelTypes]:
+        return [panel for tab in self.tabs for panel in tab.panels]
 
     def get_panel(self, panel_id: str) -> PanelTypes | None:
         return next((panel for panel in self.panels if panel.id == panel_id), None)

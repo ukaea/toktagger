@@ -1,15 +1,15 @@
 "use client";
 import {
   ActionButton,
-  Button,
   Checkbox,
-  Disclosure,
-  DisclosurePanel,
-  DisclosureTitle,
+  FileTrigger,
   Flex,
   Item,
   NumberField,
   Picker,
+  TabList,
+  TabPanels,
+  Tabs,
   Text,
   TextArea,
   TextField,
@@ -17,17 +17,17 @@ import {
 } from "@adobe/react-spectrum";
 import Add from "@spectrum-icons/workflow/Add";
 import Delete from "@spectrum-icons/workflow/Delete";
+import Download from "@spectrum-icons/workflow/Download";
+import FileAdd from "@spectrum-icons/workflow/FileAdd";
 import { useState } from "react";
-import { z } from "zod/v4";
 import {
   DataSource,
-  DataSourceSchema,
   GridPlacement,
-  Layout,
-  LayoutSchema,
+  LayoutTab,
   Panel,
   PanelKind,
 } from "@/types";
+import { LayoutConfig, layoutToYaml, parseLayoutYaml } from "./layout_yaml";
 
 const PANEL_KINDS: { key: PanelKind; name: string }[] = [
   { key: "time_series", name: "Time series" },
@@ -35,33 +35,6 @@ const PANEL_KINDS: { key: PanelKind; name: string }[] = [
   { key: "radial_profile", name: "Radial profile" },
   { key: "video", name: "Video" },
 ];
-
-const LayoutConfigSchema = z.object({
-  sources: z.array(DataSourceSchema).min(1),
-  layout: LayoutSchema,
-});
-export type LayoutConfig = z.infer<typeof LayoutConfigSchema>;
-
-/** Checks a layout configuration and returns an error message, or null when it is valid. */
-export function validateLayoutConfig(config: LayoutConfig): string | null {
-  const result = LayoutConfigSchema.safeParse(config);
-  if (!result.success) return z.prettifyError(result.error);
-  const sourceNames = config.sources.map((source) => source.name);
-  if (new Set(sourceNames).size !== sourceNames.length) {
-    return "Data source names must be unique";
-  }
-  const panelIds = config.layout.panels.map((panel) => panel.id);
-  if (new Set(panelIds).size !== panelIds.length) {
-    return "Panel ids must be unique";
-  }
-  const unknownSource = config.layout.panels.find(
-    (panel) => !sourceNames.includes(panel.source),
-  );
-  if (unknownSource) {
-    return `Panel '${unknownSource.id}' uses an unknown data source '${unknownSource.source}'`;
-  }
-  return null;
-}
 
 const splitSignals = (text: string) =>
   text
@@ -275,92 +248,129 @@ function PanelRow({
   );
 }
 
-function JsonImport({
-  config,
-  onImport,
-}: {
-  config: LayoutConfig;
-  onImport: (config: LayoutConfig) => void;
-}) {
-  const [text, setText] = useState(() => JSON.stringify(config, null, 2));
-  const [error, setError] = useState<string | null>(null);
+const replaceAt = <Item,>(items: Item[], index: number, item: Item): Item[] =>
+  items.map((existing, existingIndex) =>
+    existingIndex === index ? item : existing,
+  );
+const removeAt = <Item,>(items: Item[], index: number): Item[] =>
+  items.filter((_item, existingIndex) => existingIndex !== index);
 
-  const apply = () => {
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(text);
-    } catch (parseError) {
-      setError(`Invalid JSON: ${parseError}`);
-      return;
-    }
-    const result = LayoutConfigSchema.safeParse(parsedJson);
-    if (!result.success) {
-      setError(z.prettifyError(result.error));
-      return;
-    }
-    const problem = validateLayoutConfig(result.data);
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    onImport(result.data);
+function newPanel(panels: Panel[], allPanels: Panel[], source: string): Panel {
+  const ids = new Set(allPanels.map((panel) => panel.id));
+  let number = allPanels.length + 1;
+  while (ids.has(`panel_${number}`)) number += 1;
+  const nextRow = Math.max(0, ...panels.map((panel) => panel.grid.row)) + 1;
+  return {
+    id: `panel_${number}`,
+    kind: "time_series",
+    source,
+    signals: [],
+    grid: { col: 1, row: nextRow, col_span: 1, row_span: 1 },
   };
+}
 
+function TabGroup({
+  tab,
+  allPanels,
+  sourceNames,
+  onChange,
+  onRemove,
+}: {
+  tab: LayoutTab;
+  allPanels: Panel[];
+  sourceNames: string[];
+  onChange: (tab: LayoutTab) => void;
+  onRemove: () => void;
+}) {
+  const setPanels = (panels: Panel[]) => onChange({ ...tab, panels });
   return (
-    <Flex direction="column" gap="size-100">
-      <TextArea
-        label="Sources and layout (JSON)"
-        value={text}
-        onChange={setText}
-        width="100%"
-        height="size-3600"
-      />
-      {error && <Text UNSAFE_style={{ color: "red" }}>{error}</Text>}
-      <Button variant="secondary" onPress={apply} alignSelf="start">
-        Apply JSON
-      </Button>
-    </Flex>
+    <View
+      borderWidth="thin"
+      borderColor="gray-400"
+      borderRadius="medium"
+      padding="size-150"
+      data-testid="layout-tab"
+    >
+      <Flex direction="column" gap="size-100">
+        <Flex gap="size-100" alignItems="end">
+          <TextField
+            label="Tab title"
+            value={tab.title}
+            onChange={(title) => onChange({ ...tab, title })}
+          />
+          <ActionButton
+            aria-label={`Remove tab ${tab.title}`}
+            onPress={onRemove}
+          >
+            <Delete />
+          </ActionButton>
+        </Flex>
+        {tab.panels.map((panel, panelIndex) => (
+          <PanelRow
+            key={panelIndex}
+            panel={panel}
+            sourceNames={sourceNames}
+            onChange={(updated) =>
+              setPanels(replaceAt(tab.panels, panelIndex, updated))
+            }
+            onRemove={() => setPanels(removeAt(tab.panels, panelIndex))}
+          />
+        ))}
+        <ActionButton
+          alignSelf="start"
+          onPress={() =>
+            setPanels([
+              ...tab.panels,
+              newPanel(tab.panels, allPanels, sourceNames[0] ?? ""),
+            ])
+          }
+        >
+          <Add />
+          <Text>Add panel</Text>
+        </ActionButton>
+      </Flex>
+    </View>
   );
 }
 
-/** Edits the data sources and the panel layout of a multi-panel project. */
-export function LayoutEditor({
-  sources,
-  layout,
+function LayoutForm({
+  initial,
   dataLoaders,
   onChange,
 }: {
-  sources: DataSource[];
-  layout: Layout;
+  initial: LayoutConfig;
   dataLoaders: string[];
   onChange: (config: LayoutConfig) => void;
 }) {
-  // Remounts the rows after a JSON import so their uncontrolled text fields pick up the new values.
-  const [revision, setRevision] = useState(0);
+  // The form keeps its own copy, so a half-typed value does not reset it.
+  const [config, setConfig] = useState(initial);
+  const { sources, layout } = config;
   const sourceNames = sources.map((source) => source.name);
-  const setPanels = (panels: Panel[]) =>
-    onChange({ sources, layout: { ...layout, panels } });
+  const allPanels = layout.tabs.flatMap((tab) => tab.panels);
+  const update = (next: LayoutConfig) => {
+    setConfig(next);
+    onChange(next);
+  };
   const setSources = (nextSources: DataSource[]) =>
-    onChange({ sources: nextSources, layout });
+    update({ sources: nextSources, layout });
+  const setTabs = (tabs: LayoutTab[]) =>
+    update({ sources, layout: { ...layout, tabs } });
 
-  const addPanel = () => {
-    const nextRow =
-      Math.max(0, ...layout.panels.map((panel) => panel.grid.row)) + 1;
-    setPanels([
-      ...layout.panels,
+  const addTab = () => {
+    const titles = new Set(layout.tabs.map((tab) => tab.title));
+    let number = layout.tabs.length + 1;
+    while (titles.has(`Tab ${number}`)) number += 1;
+    setTabs([
+      ...layout.tabs,
       {
-        id: `panel_${layout.panels.length + 1}`,
-        title: null,
-        kind: "time_series",
-        source: sourceNames[0],
-        signals: [],
-        grid: { col: 1, row: nextRow, col_span: 1, row_span: 1 },
+        title: `Tab ${number}`,
+        panels: [newPanel([], allPanels, sourceNames[0] ?? "")],
       },
     ]);
   };
 
   return (
-    <Flex direction="column" gap="size-200" key={revision}>
+    <Flex direction="column" gap="size-200">
       <Text>Data sources</Text>
       {sources.map((source, sourceIndex) => (
         <SourceRow
@@ -368,19 +378,9 @@ export function LayoutEditor({
           source={source}
           dataLoaders={dataLoaders}
           onChange={(updated) =>
-            setSources(
-              sources.map((existing, existingIndex) =>
-                existingIndex === sourceIndex ? updated : existing,
-              ),
-            )
+            setSources(replaceAt(sources, sourceIndex, updated))
           }
-          onRemove={() =>
-            setSources(
-              sources.filter(
-                (_source, existingIndex) => existingIndex !== sourceIndex,
-              ),
-            )
-          }
+          onRemove={() => setSources(removeAt(sources, sourceIndex))}
         />
       ))}
       <ActionButton
@@ -399,56 +399,154 @@ export function LayoutEditor({
         <Text>Add source</Text>
       </ActionButton>
 
-      <Text>Panels</Text>
-      {layout.panels.map((panel, panelIndex) => (
-        <PanelRow
-          key={panelIndex}
-          panel={panel}
+      <Text>Tabs</Text>
+      {layout.tabs.map((tab, tabIndex) => (
+        <TabGroup
+          key={tabIndex}
+          tab={tab}
+          allPanels={allPanels}
           sourceNames={sourceNames}
           onChange={(updated) =>
-            setPanels(
-              layout.panels.map((existing, existingIndex) =>
-                existingIndex === panelIndex ? updated : existing,
-              ),
-            )
+            setTabs(replaceAt(layout.tabs, tabIndex, updated))
           }
-          onRemove={() =>
-            setPanels(
-              layout.panels.filter(
-                (_panel, existingIndex) => existingIndex !== panelIndex,
-              ),
-            )
-          }
+          onRemove={() => setTabs(removeAt(layout.tabs, tabIndex))}
         />
       ))}
-      <ActionButton alignSelf="start" onPress={addPanel}>
+      <ActionButton alignSelf="start" onPress={addTab}>
         <Add />
-        <Text>Add panel</Text>
+        <Text>Add tab</Text>
       </ActionButton>
       <Checkbox
         isSelected={layout.link_time}
         onChange={(link_time) =>
-          onChange({ sources, layout: { ...layout, link_time } })
+          update({ sources, layout: { ...layout, link_time } })
         }
       >
         Link the time axes of all panels
       </Checkbox>
-
-      <Disclosure>
-        <DisclosureTitle>
-          <span style={{ fontSize: "0.9rem" }}>Edit as JSON</span>
-        </DisclosureTitle>
-        <DisclosurePanel>
-          <JsonImport
-            key={JSON.stringify({ sources, layout })}
-            config={{ sources, layout }}
-            onImport={(config) => {
-              onChange(config);
-              setRevision((previous) => previous + 1);
-            }}
-          />
-        </DisclosurePanel>
-      </Disclosure>
     </Flex>
+  );
+}
+
+function LayoutErrors({ error }: { error: string }) {
+  return (
+    <pre
+      role="alert"
+      aria-label="Layout errors"
+      style={{
+        color: "var(--spectrum-semantic-negative-color-text-small)",
+        whiteSpace: "pre-wrap",
+        margin: 0,
+      }}
+    >
+      {error}
+    </pre>
+  );
+}
+
+function downloadYaml(text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/yaml" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "layout.yaml";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function YamlEditor({
+  text,
+  error,
+  onChange,
+}: {
+  text: string;
+  error: string | null;
+  onChange: (text: string) => void;
+}) {
+  return (
+    <Flex direction="column" gap="size-100">
+      <TextArea
+        label="Layout YAML"
+        value={text}
+        onChange={onChange}
+        width="100%"
+        height="size-6000"
+        validationState={error ? "invalid" : "valid"}
+        UNSAFE_className="[&_textarea]:font-mono"
+      />
+      {error && <LayoutErrors error={error} />}
+      <Flex gap="size-100">
+        <FileTrigger
+          acceptedFileTypes={[".yaml", ".yml", "application/yaml", "text/yaml"]}
+          onSelect={(files) => {
+            const file = files?.[0];
+            if (file) file.text().then(onChange);
+          }}
+        >
+          <ActionButton>
+            <FileAdd />
+            <Text>Load file</Text>
+          </ActionButton>
+        </FileTrigger>
+        <ActionButton onPress={() => downloadYaml(text)}>
+          <Download />
+          <Text>Download</Text>
+        </ActionButton>
+      </Flex>
+    </Flex>
+  );
+}
+
+/** Edits the data sources and the tabs of panels of a multi-panel project, as YAML or with a form. */
+export function LayoutEditor({
+  yaml,
+  dataLoaders,
+  onChange,
+}: {
+  yaml: string;
+  dataLoaders: string[];
+  onChange: (yaml: string) => void;
+}) {
+  const parsed = parseLayoutYaml(yaml);
+  const [selectedTab, setSelectedTab] = useState("yaml");
+  // Taken when the Form tab opens, so an invalid value typed in the form does not unmount it.
+  const [formSeed, setFormSeed] = useState<LayoutConfig | null>(null);
+
+  return (
+    <Tabs
+      aria-label="Layout editor"
+      selectedKey={selectedTab}
+      onSelectionChange={(key) => {
+        setSelectedTab(String(key));
+        if (key === "form") setFormSeed(parsed.config);
+      }}
+    >
+      <TabList>
+        <Item key="yaml">YAML</Item>
+        <Item key="form">Form</Item>
+      </TabList>
+      <TabPanels>
+        <Item key="yaml">
+          <View paddingTop="size-100">
+            <YamlEditor text={yaml} error={parsed.error} onChange={onChange} />
+          </View>
+        </Item>
+        <Item key="form">
+          <View paddingTop="size-100">
+            {formSeed ? (
+              <Flex direction="column" gap="size-100">
+                {parsed.error && <LayoutErrors error={parsed.error} />}
+                <LayoutForm
+                  initial={formSeed}
+                  dataLoaders={dataLoaders}
+                  onChange={(config) => onChange(layoutToYaml(config, yaml))}
+                />
+              </Flex>
+            ) : (
+              <Text>Correct the errors in the YAML tab to use the form.</Text>
+            )}
+          </View>
+        </Item>
+      </TabPanels>
+    </Tabs>
   );
 }

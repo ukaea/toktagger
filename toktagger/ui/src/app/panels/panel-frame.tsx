@@ -95,7 +95,8 @@ export function PanelCell({ panel }: { panel: Panel }) {
       }}
     >
       <View
-        borderWidth={isActive ? "thick" : "thin"}
+        // A fixed width keeps the cell size, so activating a panel mid-drag does not replot it.
+        borderWidth="thick"
         borderColor={isActive ? "blue-500" : "gray-300"}
         borderRadius="medium"
         height="100%"
