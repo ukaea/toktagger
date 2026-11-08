@@ -1,5 +1,7 @@
 # Data Loaders
 
+You set the signal names on the project, in the **Create Project** or **Edit Project** dialog. Each sample in the project uses the same signal names. The sections below show the signal names that each data loader accepts.
+
 ## Tabular
 
 This data loader will load local tabular data files (e.g., CSV, parquet, etc.) using [pandas](https://pandas.pydata.org/). The data files must be accessible at the path provided. The column names will be used as the names for the signal names.
@@ -18,10 +20,14 @@ export UDA_METANEW_PLUGINNAME="MAST_DB"
 
 **Signal names:** Use UDA signal names or aliases, for example `ip, ANE_DENSITY`. All signals in a sample must be the same type of data. Use only time series signals or only 2D profile signals. Do not mix them.
 
+**Auto-add new shots:** Supported. The data loader gets the latest MAST-U shot number from UDA.
+
 ## UDA Camera
 This data loader uses [UDA](https://ukaea.github.io/UDA/) to access camera data from MAST and MAST-U. In order for this data loader to work, you must be connected to a machine with access to one of the UDA servers as above.
 
-**Signal names:** Use exactly one camera signal name, for example `rba`.
+**Signal names:** Use exactly one camera signal name, for example `rba`. This field is required.
+
+**Auto-add new shots:** Supported, the same as the UDA data loader.
 
 ## SAL
 This data loader uses [SAL](https://data.jet.uk/guides/sal/python_client.html) to access data from the JET data centre. In order for this data loader to work, you must be connected to a machine with access to the JDC or connected to the JDC VPN. Furthermore, you must have configured a local authentication details file at `~/.sal/credentials`, with contents looking the the following:
@@ -33,6 +39,8 @@ password=<your-password>
 ```
 
 **Signal names:** Use the SAL path that follows `pulse/<shot_id>/`, for example `ppf/signal/jetppf/magn/ipla`. The data loader adds the `pulse/<shot_id>/` prefix.
+
+**Auto-add new shots:** Supported. The data loader lists the pulses under `/pulse` and uses the highest pulse number.
 
 ## FAIR MAST
 This data loader access data from the [FAIR MAST](https://mastapp.site) project.

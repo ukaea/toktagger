@@ -10,11 +10,12 @@ import os
 # can still opt back in explicitly.
 os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
 
+import asyncio
+import contextlib
 import pathlib
 import signal
 import sys
 import tempfile
-from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 import uvicorn
@@ -28,6 +29,8 @@ from toktagger.api import config
 from toktagger.api.auth import oidc
 from toktagger.api.auth.core import get_internal_token, get_signing_secret
 from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.core.shot_poller import run_shot_poller
+from toktagger.api.crud.utils import backfill_project_signal_names
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
 from toktagger.api.routers.annotations import router as annotations_router
@@ -60,7 +63,7 @@ async def lock_timeout_handler(request: Request, exc: Exception) -> JSONResponse
     )
 
 
-@asynccontextmanager
+@contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     db_name = "annotate_db"
 
@@ -82,7 +85,21 @@ async def lifespan(app: FastAPI):
     app.state.idp = oidc.IdentityProvider(config.settings.auth)
     await app.state.idp.connect()
 
+    async with app.state.db_client.lock("signal-names-backfill", ttl=300, timeout=60):
+        await backfill_project_signal_names(app.state.db_client)
+
+    shot_poller = (
+        asyncio.create_task(run_shot_poller(app.state.db_client))
+        if config.settings.polling.enabled
+        else None
+    )
+
     yield
+
+    if shot_poller:
+        shot_poller.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await shot_poller
 
     await app.state.db_client.client.close()
 

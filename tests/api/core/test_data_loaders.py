@@ -545,6 +545,46 @@ def test_uda_loader_data_doesnt_exist(uda_test):
         pass
 
 
+class _FakeUDAClient:
+    def latest_shot(self) -> int:
+        return 52345
+
+
+class _FakeBranchReport:
+    branches = ["99971", "99972", "latest", "1000"]
+
+
+class _FakeSALClient:
+    def __init__(self, host: str):
+        self.host = host
+
+    def list(self, path: str) -> _FakeBranchReport:
+        assert path == "/pulse"
+        return _FakeBranchReport()
+
+
+@pytest.mark.parametrize(
+    "loader", [data_loaders.UDADataLoader, data_loaders.UDACameraDataLoader]
+)
+def test_uda_latest_shot(monkeypatch, loader):
+    monkeypatch.setattr(data_loaders.pyuda, "Client", _FakeUDAClient)
+    assert loader.latest_shot() == 52345
+
+
+def test_sal_latest_shot(monkeypatch, tmp_path):
+    (tmp_path / ".sal").mkdir()
+    (tmp_path / ".sal" / "credentials").touch()
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(data_loaders, "SALClient", _FakeSALClient)
+    assert data_loaders.SALDataLoader.latest_shot() == 99972
+
+
+def test_sal_latest_shot_no_credentials(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with pytest.raises(data_loaders.DataLoaderError, match="credentials"):
+        data_loaders.SALDataLoader.latest_shot()
+
+
 def test_sal_loader():
     try:
         from sal.client import SALClient

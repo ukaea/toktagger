@@ -52,12 +52,14 @@ def create_project(
     time_min: float = -0.1,
     time_max: float = 0.8,
     min_time_step: float = 0.0001,
+    signal_names: list[str] | None = None,
 ) -> str:
     project = {
         "name": name,
         "task": task,
         "query_strategy": query_strategy,
         "data_loader": data_loader,
+        "signal_names": signal_names or [],
         "time_min": time_min,
         "time_max": time_max,
         "min_time_step": min_time_step,
@@ -78,7 +80,6 @@ def create_uda_samples(
     shot_ids: list[int],
     token: str,
     base_url: str = BASE_URL,
-    signals: list[str] | None = None,
 ):
     samples = []
     for shot_id in shot_ids:
@@ -86,7 +87,6 @@ def create_uda_samples(
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": signals,
                 "protocol": "uda",
             },
         }
@@ -109,7 +109,6 @@ def create_sal_samples(
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["ppf/signal/jetppf/magn/ipla"],
                 "protocol": "sal",
             },
         }
@@ -132,7 +131,6 @@ def create_fair_mast_samples(
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["magnetics/ip"],
                 "protocol": "fair_mast",
             },
         }
@@ -153,7 +151,6 @@ def create_local_samples(
     base_url: str = BASE_URL,
     base_path: str = ".",
     file_type: str = "parquet",
-    signals: list[str] | None = None,
     annotations: list[dict] | None = None,
 ):
     samples = []
@@ -167,7 +164,6 @@ def create_local_samples(
                 "file_name": file_name,
                 "type": file_type,
                 "protocol": "file",
-                "signal_names": signals,
             },
         }
         if annotations:
@@ -221,7 +217,6 @@ def create_uda_camera_samples(
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["rbb"],
                 "protocol": "uda_camera",
             },
         }
@@ -266,14 +261,9 @@ def main():
         "sequential",
         token=token,
         base_url=args.url,
+        signal_names=["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"],
     )
-    create_uda_samples(
-        project_id,
-        shot_ids,
-        token=token,
-        base_url=args.url,
-        signals=["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"],
-    )
+    create_uda_samples(project_id, shot_ids, token=token, base_url=args.url)
 
     project_id = create_project(
         "Local ELM Project",
@@ -303,6 +293,7 @@ def main():
         token=token,
         base_url=args.url,
         min_time_step=0.000001,
+        signal_names=["mirnov", "saddle_0"],
     )
     create_local_samples(
         project_id,
@@ -311,7 +302,6 @@ def main():
         base_url=args.url,
         base_path=base_path / "mhd",
         file_type="parquet",
-        signals=["mirnov", "saddle_0"],
     )
 
     project_id = create_project(
@@ -322,17 +312,16 @@ def main():
         token=token,
         base_url=args.url,
         min_time_step=1e-6,
+        signal_names=[
+            "/XMB/SANX13-01/CH13",
+            "/XMB/SANX13-01/CH14",
+            "/XMB/SANX13-01/CH15",
+        ],
     )
     shot_ids = [
         52583,
     ]
-    create_uda_samples(
-        project_id,
-        shot_ids,
-        token=token,
-        base_url=args.url,
-        signals=["/XMB/SANX13-01/CH13", "/XMB/SANX13-01/CH14", "/XMB/SANX13-01/CH15"],
-    )
+    create_uda_samples(project_id, shot_ids, token=token, base_url=args.url)
     # ---- Image / UFO demo project ----
     project_id = create_project(
         "Frame Project", "video", "image", "random", token=token, base_url=args.url
@@ -352,6 +341,7 @@ def main():
         time_min=38,
         time_max=None,
         min_time_step=0.0001,
+        signal_names=["ppf/signal/jetppf/magn/ipla"],
     )
     shot_ids = [87737]
     create_sal_samples(project_id, shot_ids, token=token, base_url=args.url)
@@ -364,6 +354,7 @@ def main():
         query_strategy="sequential",
         token=token,
         base_url=args.url,
+        signal_names=["magnetics/ip"],
     )
     shot_ids = [30421]
     create_fair_mast_samples(project_id, shot_ids, token=token, base_url=args.url)
@@ -376,6 +367,7 @@ def main():
         "random",
         token=token,
         base_url=args.url,
+        signal_names=["rbb"],
     )
     create_uda_camera_samples(project_id, shot_ids, token=token, base_url=args.url)
 

@@ -222,3 +222,61 @@ async def test_create_project_invalid(api_client, db_client):
     # Check it has not been added to database
     projects = await db_client.get_all_documents("projects")
     assert len(projects) == 0
+
+
+@pytest.mark.asyncio
+async def test_create_project_with_auto_add_shots(api_client, db_client):
+    auto_add = {"enabled": True, "interval_minutes": 5}
+    response = await api_client.post(
+        "/projects",
+        json={
+            "name": "auto_add_project",
+            "task": Task.TIME_SERIES,
+            "query_strategy": "random",
+            "data_loader": "uda",
+            "signal_names": ["ip"],
+            "auto_add_shots": auto_add,
+        },
+    )
+    assert response.status_code == 200
+
+    project = await api_client.get(f"/projects/{response.json()['_id']}")
+    assert project.json()["auto_add_shots"] == auto_add
+    assert project.json()["shots_last_checked"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_project_with_auto_add_shots_unsupported_loader(
+    api_client, db_client
+):
+    response = await api_client.post(
+        "/projects",
+        json={
+            "name": "auto_add_project",
+            "task": Task.TIME_SERIES,
+            "query_strategy": "random",
+            "data_loader": "tabular",
+            "auto_add_shots": {"enabled": True},
+        },
+    )
+    assert response.status_code == 422
+    assert await db_client.get_all_documents("projects") == []
+
+
+@pytest.mark.asyncio
+async def test_update_project_auto_add_shots(api_client, setup_db):
+    auto_add = {"enabled": True, "interval_minutes": 15}
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}", json={"auto_add_shots": auto_add}
+    )
+    assert response.status_code == 200
+
+    project = await api_client.get(f"/projects/{setup_db['project_id_1']}")
+    assert project.json()["auto_add_shots"] == auto_add
+
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_2']}", json={"auto_add_shots": auto_add}
+    )
+    assert response.status_code == 422
+    project = await api_client.get(f"/projects/{setup_db['project_id_2']}")
+    assert project.json()["auto_add_shots"] is None
