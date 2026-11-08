@@ -118,6 +118,7 @@ export const TimeSeriesView = () => {
               <BaseTimeSeriesPlot
                 plotId={plotId}
                 plotConfig={{ data: plotData, layout: plotLayout }}
+                linkTime
               >
                 <TimeRegion />
                 <TimePoint />

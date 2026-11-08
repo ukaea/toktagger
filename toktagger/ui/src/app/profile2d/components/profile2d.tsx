@@ -287,6 +287,7 @@ export const Profile2dView = () => {
               <BaseTimeSeriesPlot
                 plotId={plotId}
                 ariaLabel="profile-2d"
+                linkTime
                 plotConfig={{
                   data: plotData,
                   config: PLOT_CONFIG,

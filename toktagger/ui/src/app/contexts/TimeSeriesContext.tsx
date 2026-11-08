@@ -226,12 +226,24 @@ export const TimeSeriesProvider = ({
   // The sample's annotations are shared with other tools, so this view must replace
   // only its own and carry the rest through untouched. Without this, annotations it
   // cannot represent - shot labels, for example - are lost on every edit.
+  // Annotations bound to another signal belong to other panels, so they are kept but not shown here.
+  const isShownHere = useCallback(
+    (annotation: { signal_name?: string | null }) =>
+      signalName === null ||
+      !annotation.signal_name ||
+      annotation.signal_name === signalName,
+    [signalName],
+  );
+
   const mergeTimeSeriesAnnotations = useCallback(
     (previous: Annotation[], updated: TimeSeriesAnnotation[]): Annotation[] => [
-      ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
+      ...previous.filter(
+        (annotation) =>
+          !isTimeSeriesAnnotation(annotation) || !isShownHere(annotation),
+      ),
       ...parseTimeSeriesAnnotations(updated),
     ],
-    [parseTimeSeriesAnnotations],
+    [isShownHere, parseTimeSeriesAnnotations],
   );
 
   // Discards any in-progress annotation for the currently active tool and clears the
@@ -298,8 +310,8 @@ export const TimeSeriesProvider = ({
 
   useEffect(() => {
     cancelOngoingActionRef.current(); // If the annotations are changed, any ongoing annotations must be cancelled
-    setAnnotations(parseRawAnnotations(rawAnnotations));
-  }, [parseRawAnnotations, rawAnnotations]);
+    setAnnotations(parseRawAnnotations(rawAnnotations).filter(isShownHere));
+  }, [isShownHere, parseRawAnnotations, rawAnnotations]);
 
   const triggerSync = useCallback(() => {
     setSyncCounter((prev) => (prev + 1) % 100);

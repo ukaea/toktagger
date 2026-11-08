@@ -271,6 +271,7 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
         tools={TIME_TOOLS}
         selection="x"
         onXRangeChange={setTimeWindow}
+        linkTime
       >
         <TimeRegion />
         <TimePoint />

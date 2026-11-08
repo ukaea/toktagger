@@ -23,6 +23,7 @@ import {
 import React from "react";
 import { arrayMax, arrayMin } from "@/app/utils";
 import { ToastQueue } from "@adobe/react-spectrum";
+import { useLinkedTimeAxis, xRangeFromRelayout } from "./linked-time";
 
 const DEFAULT_PLOTLY_CONFIG: Partial<Config> = {
   modeBarButtons: [
@@ -60,6 +61,8 @@ type TimeSeriesPlotProps = {
   // "x" selects on time alone (y spans other units); "none" for plots whose x-axis is not time.
   selection?: "xy" | "x" | "none";
   onXRangeChange?: (range: [number, number] | null) => void;
+  // Follows and drives the shared workspace time window; only for plots whose x-axis is time.
+  linkTime?: boolean;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -74,6 +77,7 @@ export const BaseTimeSeriesPlot = ({
   tools,
   selection: selectionMode = "xy",
   onXRangeChange,
+  linkTime = false,
   children,
 }: TimeSeriesPlotProps) => {
   const [plotReady, setPlotReady] = useState(false);
@@ -106,6 +110,10 @@ export const BaseTimeSeriesPlot = ({
       : null;
 
   if (!isDrawing) isDraggingRef.current = false;
+
+  const publishTimeWindow = useLinkedTimeAxis(plotId, plotReady, linkTime);
+  const publishTimeWindowRef = useRef(publishTimeWindow);
+  publishTimeWindowRef.current = publishTimeWindow;
 
   useEffect(() => {
     const plot = document.getElementById(plotId) as PlotlyHTMLElement;
@@ -227,20 +235,10 @@ export const BaseTimeSeriesPlot = ({
     };
 
     const relayoutHandler = (eventData: PlotRelayoutEvent) => {
-      if (onXRangeChange) {
-        if ("xaxis.range[0]" in eventData && "xaxis.range[1]" in eventData) {
-          onXRangeChange([
-            eventData["xaxis.range[0]"] as number,
-            eventData["xaxis.range[1]"] as number,
-          ]);
-        } else if (eventData["xaxis.range"]?.length === 2) {
-          onXRangeChange([
-            eventData["xaxis.range"][0] as number,
-            eventData["xaxis.range"][1] as number,
-          ]);
-        } else if (eventData["xaxis.autorange"]) {
-          onXRangeChange(null);
-        }
+      const xRange = xRangeFromRelayout(eventData);
+      if (xRange !== undefined) {
+        onXRangeChange?.(xRange);
+        publishTimeWindowRef.current(xRange);
       }
       if (rescaleOnZoom) {
         // This makes use of the first graph displayed but this should be fine
