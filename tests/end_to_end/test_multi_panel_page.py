@@ -150,3 +150,54 @@ def test_multi_panel_time_region_shows_on_all_time_panels(server_setup, page: Pa
     expect(
         page.get_by_test_id("panel-spectrogram").get_by_label("time-zone").first
     ).to_be_attached()
+
+
+def test_create_and_edit_multi_panel_project(server_setup, page: Page):
+    page.goto("http://localhost:8002")
+    page.get_by_role("button", name="Create").click()
+    modal = page.get_by_role("dialog")
+
+    modal.get_by_role("textbox", name="Project Name").fill("UI Multi Panel")
+    modal.get_by_role("button", name="Task").click()
+    page.get_by_role("option", name="multi-panel").click()
+    expect(modal.get_by_role("combobox", name="Data Loader")).to_be_hidden()
+
+    modal.get_by_role("button", name="Data loader").click()
+    page.get_by_role("option", name="synthetic_radial", exact=True).click()
+    modal.get_by_role("textbox", name="Signals (comma separated)").fill("ip, TE")
+    modal.get_by_role("button", name="Add panel").click()
+    expect(modal.get_by_test_id("layout-panel")).to_have_count(2)
+    second_panel = modal.get_by_test_id("layout-panel").nth(1)
+    second_panel.get_by_role("button", name="Kind").click()
+    page.get_by_role("option", name="Profile 2D / spectrogram").click()
+    second_panel.get_by_role("textbox", name="Signal", exact=True).fill("TE")
+
+    with page.expect_response(
+        lambda r: r.url.endswith("/projects") and r.request.method == "POST"
+    ):
+        modal.get_by_role("button", name="Create").click()
+
+    project = requests.get("http://localhost:8002/projects").json()[0]
+    assert project["task"] == "multi-panel"
+    assert project["data_loader"] == "synthetic_radial"
+    assert project["sources"] == [
+        {"name": "default", "data_loader": "synthetic_radial"}
+    ]
+    panels = project["layout"]["panels"]
+    assert [panel["kind"] for panel in panels] == ["time_series", "profile_2d"]
+    assert panels[0]["signals"] == ["ip", "TE"]
+    assert panels[1]["signal"] == "TE"
+    assert panels[1]["grid"]["row"] == 2
+
+    page.get_by_role("row").nth(1).get_by_role("button", name="Edit").click()
+    modal = page.get_by_role("dialog")
+    modal.get_by_role("textbox", name="Project Name").fill("UI Multi Panel 2")
+    with page.expect_response(
+        lambda r: f"/projects/{project['_id']}" in r.url and r.request.method == "PUT"
+    ) as response_info:
+        modal.get_by_role("button", name="Save Changes").click()
+    assert response_info.value.ok
+
+    updated = requests.get(f"http://localhost:8002/projects/{project['_id']}").json()
+    assert updated["name"] == "UI Multi Panel 2"
+    assert updated["layout"]["panels"] == panels

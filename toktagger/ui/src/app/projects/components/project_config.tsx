@@ -1,4 +1,4 @@
-import { Project, TaskType } from "@/types";
+import { DataSource, DEFAULT_SOURCE, Layout, Project, TaskType } from "@/types";
 import {
   Button,
   ButtonGroup,
@@ -21,6 +21,7 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
+  View,
 } from "@adobe/react-spectrum";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
@@ -28,6 +29,7 @@ import { useState, useEffect } from "react";
 import { BACKEND_API_URL } from "@/app/core";
 import { useAPISchema } from "@/app/contexts/apiSchema";
 import { SchemaParser } from "@/schemaParser";
+import { LayoutEditor, validateLayoutConfig } from "./layout_editor";
 
 // Query strategies
 const QueryStrategies = [
@@ -133,31 +135,57 @@ export function ProjectConfigEditor({
     string[]
   >(_project?.video_bounding_box_labels || []);
 
+  const isMultiPanel = task === TaskType.MultiPanel;
+  const [sources, setSources] = useState<DataSource[]>(_project?.sources ?? []);
+  const [layout, setLayout] = useState<Layout>(
+    _project?.layout ?? {
+      panels: [
+        {
+          id: "panel_1",
+          title: null,
+          kind: "time_series",
+          source: DEFAULT_SOURCE,
+          signals: [],
+          grid: { col: 1, row: 1, col_span: 1, row_span: 1 },
+        },
+      ],
+      link_time: true,
+    },
+  );
+  // Before the user adds sources, the project data loader is the one default source.
+  const editedSources: DataSource[] =
+    sources.length > 0
+      ? sources
+      : [{ name: DEFAULT_SOURCE, data_loader: dataLoader ?? "" }];
+
   useEffect(() => {
     const parser = new SchemaParser(schema);
     const defaultShotLabels = parser.parseDefaultShotLabels();
-    if (shotLabels.length === 0) {
+    if (shotLabels.length === 0 && defaultShotLabels.length > 0) {
       setShotLabels(defaultShotLabels);
     }
     const defaultTimeRegionLabels = parser.parseDefaultTimeRegionLabels();
-    if (timeRegionLabels.length === 0) {
+    if (timeRegionLabels.length === 0 && defaultTimeRegionLabels.length > 0) {
       setTimeRegionLabels(defaultTimeRegionLabels);
     }
     const defaultTimePointLabels = parser.parseDefaultTimePointLabels();
-    if (timePointLabels.length === 0) {
+    if (timePointLabels.length === 0 && defaultTimePointLabels.length > 0) {
       setTimePointLabels(defaultTimePointLabels);
     }
     const defaultBoundingBoxLabels = parser.parseDefaultBoundingBoxLabels();
-    if (boundingBoxLabels.length === 0) {
+    if (boundingBoxLabels.length === 0 && defaultBoundingBoxLabels.length > 0) {
       setBoundingBoxLabels(defaultBoundingBoxLabels);
     }
     const defaultPolygonLabels = parser.parseDefaultPolygonLabels();
-    if (polygonLabels.length === 0) {
+    if (polygonLabels.length === 0 && defaultPolygonLabels.length > 0) {
       setPolygonLabels(defaultPolygonLabels);
     }
     const defaultVideoBoundingBoxLabels =
       parser.parseDefaultVideoBoundingBoxLabels();
-    if (videoBoundingBoxLabels.length === 0) {
+    if (
+      videoBoundingBoxLabels.length === 0 &&
+      defaultVideoBoundingBoxLabels.length > 0
+    ) {
       setVideoBoundingBoxLabels(defaultVideoBoundingBoxLabels);
     }
   }, [
@@ -211,13 +239,25 @@ export function ProjectConfigEditor({
         ToastQueue.negative("Data loader is required", { timeout: 3000 });
         return;
       }
+      if (isMultiPanel) {
+        const problem = validateLayoutConfig({
+          sources: editedSources,
+          layout,
+        });
+        if (problem) {
+          ToastQueue.negative(problem, { timeout: 5000 });
+          return;
+        }
+      }
 
       // Build project object
       const newProject: Partial<Project> = {
         name: projectName,
         task: task as TaskType,
         query_strategy: queryStrategy,
-        data_loader: dataLoader,
+        data_loader: isMultiPanel ? editedSources[0].data_loader : dataLoader,
+        sources: isMultiPanel ? editedSources : (_project?.sources ?? []),
+        layout: isMultiPanel ? layout : null,
         timestamp: new Date().toISOString(),
         time_min: timeMin,
         time_max: timeMax,
@@ -308,6 +348,7 @@ export function ProjectConfigEditor({
 
               <ComboBox
                 label="Data Loader"
+                isHidden={isMultiPanel}
                 items={dataLoaders}
                 isRequired
                 selectedKey={dataLoader}
@@ -403,14 +444,14 @@ export function ProjectConfigEditor({
                       />
                     </>
                   )}
-                  {task === TaskType.RadialProfile && (
+                  {(task === TaskType.RadialProfile || isMultiPanel) && (
                     <LabelsForm
                       label="Radial Range Labels"
                       defaultLabels={boundingBoxLabels}
                       setLabels={setBoundingBoxLabels}
                     />
                   )}
-                  {task === TaskType.Profile2D && (
+                  {(task === TaskType.Profile2D || isMultiPanel) && (
                     <>
                       <LabelsForm
                         label="Bounding Box Labels"
@@ -424,7 +465,7 @@ export function ProjectConfigEditor({
                       />
                     </>
                   )}
-                  {task === TaskType.Video && (
+                  {(task === TaskType.Video || isMultiPanel) && (
                     <LabelsForm
                       label="Video Bounding Box Labels"
                       defaultLabels={videoBoundingBoxLabels}
@@ -434,6 +475,19 @@ export function ProjectConfigEditor({
                 </DisclosurePanel>
               </Disclosure>
             </Form>
+            {isMultiPanel && (
+              <View marginTop="size-200">
+                <LayoutEditor
+                  sources={editedSources}
+                  layout={layout}
+                  dataLoaders={dataLoaders.map((loader) => loader.key)}
+                  onChange={(config) => {
+                    setSources(config.sources);
+                    setLayout(config.layout);
+                  }}
+                />
+              </View>
+            )}
           </Content>
           <ButtonGroup>
             <Button variant="secondary" onPress={close}>
