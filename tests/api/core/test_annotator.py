@@ -212,3 +212,24 @@ def test_profile_2d_threshold_missing_signal_raises():
 
     with pytest.raises(TypeError, match="does not exist"):
         annotator.predict(mv_data)
+
+
+def test_mask_to_polygons_returns_regions_in_data_coordinates():
+    mask = np.zeros((20, 30), dtype=bool)
+    mask[2:8, 3:10] = True
+    mask[12:18, 15:28] = True
+    mask[0, 0] = True
+    time = np.linspace(1.0, 2.0, 30)
+    dim_1 = np.linspace(0.0, 100.0, 20)
+
+    region_polygons = annotators.mask_to_polygons(
+        mask, time=time, dim_1=dim_1, min_size=4, max_polygon_points=10
+    )
+
+    assert len(region_polygons) == 2
+    for region_mask, polygon in region_polygons:
+        assert region_mask.shape == mask.shape
+        assert len(polygon.exterior.coords) <= 11
+        min_x, min_y, max_x, max_y = polygon.bounds
+        assert time[0] <= min_x < max_x <= time[-1]
+        assert dim_1[0] <= min_y < max_y <= dim_1[-1]

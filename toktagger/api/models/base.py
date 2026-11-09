@@ -335,6 +335,7 @@ class ModelRegistry:
     _tasks: typing.ClassVar[dict[str, list[Task]]] = {}
     _training_params: typing.ClassVar[dict[str, type[pydantic.BaseModel]]] = {}
     _prediction_params: typing.ClassVar[dict[str, type[pydantic.BaseModel]]] = {}
+    _pretrained: typing.ClassVar[set[str]] = set()
 
     @classmethod
     def register(
@@ -343,6 +344,7 @@ class ModelRegistry:
         tasks: list[Task | str],
         training_params: type[pydantic.BaseModel] | None = None,
         prediction_params: type[pydantic.BaseModel] | None = None,
+        pretrained: bool = False,
     ):
         def decorator(model_class: type[Model]):
             if not issubclass(model_class, Model):
@@ -364,6 +366,8 @@ class ModelRegistry:
             cls._tasks[name] = [Task(_task) for _task in tasks]
             cls._training_params[name] = training_params
             cls._prediction_params[name] = prediction_params
+            if pretrained:
+                cls._pretrained.add(name)
 
             return model_class
 
@@ -387,6 +391,11 @@ class ModelRegistry:
         if not task:
             return list(cls._registry.keys())
         return [name for name, tasks in cls._tasks.items() if task in tasks]
+
+    @classmethod
+    def is_pretrained(cls, name: str) -> bool:
+        """Return True when training the model needs no validated samples or annotations."""
+        return name in cls._pretrained
 
     @classmethod
     def tasks(cls, name: str) -> list[Task]:
