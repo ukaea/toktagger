@@ -83,7 +83,7 @@ def _require_active(user: UserOut) -> UserOut:
     return user
 
 
-async def _get_user_from_bearer_token(request: Request, token: str) -> UserOut:
+async def _get_user_from_api_token(request: Request, token: str) -> UserOut:
     db_client = request.app.state.db_client
     user_id = await bearer_tokens.authenticate_bearer_token(
         db_client, token, purpose="api"
@@ -112,7 +112,7 @@ async def _get_user_from_bearer(request: Request, token: str) -> UserOut:
             )
         return _INTERNAL_USER
     if bearer_tokens.is_bearer_token(token):
-        return await _get_user_from_bearer_token(request, token)
+        return await _get_user_from_api_token(request, token)
 
     idp: oidc.IdentityProvider | None = request.app.state.idp
     if idp is None:

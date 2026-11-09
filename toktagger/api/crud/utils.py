@@ -789,10 +789,7 @@ async def get_bearer_tokens(
         "bearer_tokens", {"expires_at": {"$lt": time.time()}}
     )
     filters: dict = {"user_id": convert_to_objectid(user_id, "users")}
-    if purpose == "api":
-        # Tokens created before purposes were introduced are API tokens.
-        filters["purpose"] = {"$in": ["api", None]}
-    elif purpose is not None:
+    if purpose is not None:
         filters["purpose"] = purpose
     docs = await db_client.get_filtered_documents(
         "bearer_tokens",

@@ -13,7 +13,7 @@ from toktagger.api.schemas.auth import (
     BearerTokenUpdate,
 )
 
-TOKEN_PREFIX = "tt_"
+TOKEN_PREFIX = "tt"
 HINT_LENGTH = 4
 LAST_USED_RESOLUTION_SECONDS = 60
 
@@ -35,7 +35,7 @@ async def create_bearer_token(
     purpose: Literal["api", "mcp"] = "api",
 ) -> BearerTokenCreated:
     """Store a new token for a user and return it. Only its hash is stored."""
-    prefix = f"{TOKEN_PREFIX}{purpose}_"
+    prefix = f"{TOKEN_PREFIX}_{purpose}_"
     token = prefix + secrets.token_urlsafe(32)
     now = time.time()
     bearer_token = BearerToken(
