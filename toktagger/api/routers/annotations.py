@@ -610,11 +610,33 @@ async def remove_annotation(
     annotation_id: str = Path(description="The ID of the annotation to delete."),
     current_user: UserOut = Depends(require_project_annotator),
 ):
-    """Delete a single annotation, whoever created it.
+    """
+    Delete a single annotation, whoever created it.
 
-    The batch save (PUT above) carries no "deleted ids" signal and its replace step is
-    scoped to the caller's own annotations, so removing someone else's annotation --
-    or a model's prediction -- has to be an explicit call.
+    The batch save (PUT above) carries no "deleted ids" signal and its replace
+    step is scoped to the caller's own annotations, so removing someone else's
+    annotation -- or a model's prediction -- has to be an explicit call.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete from.
+    sample_id : str
+        The ID of the sample to delete an annotation from.
+    annotation_id : str
+        The ID of the annotation to delete.
+    current_user : UserOut
+        The authenticated project annotator/admin, or a global admin. Resolved
+        by the server, not supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
     """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
