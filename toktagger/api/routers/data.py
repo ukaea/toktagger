@@ -21,7 +21,7 @@ router = APIRouter(
 )
 
 
-@router.post("", response_model=DataResponseType)
+@router.post("", response_model=DataResponseType, operation_id="get_sample_data")
 async def get_data(
     request: Request,
     project_id: str,
@@ -30,7 +30,36 @@ async def get_data(
     params: DataParamTypes | None = DataParams(),
     view: ViewParamTypes | None = ViewParams(),
 ) -> DataResponseType:
-    """Get data, e.g. time trace, about the given sample required for the given project"""
+    """
+    Get data, e.g. time trace, about the given sample required for the given
+    project.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get data for.
+    sample_id : str
+        The ID of the sample to get data for.
+    params : DataParamTypes | None
+        Parameters for loading the sample data.
+    view : ViewParamTypes | None
+        View transformation to apply to the loaded data.
+
+    current_user : UserOut
+        The authenticated project member (viewer, annotator, or admin), or a
+        global admin. Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    DataResponseType
+        The data for the sample, e.g. time trace, profile-2d, or image.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server, as it can add potentially
+    very large datasets directly into the agent's context window - use the Python client to retrieve raw data for analysis.
+    The get_samples_summary endpoint summarizes sample metadata, not signal values.
+    """
     db_client: MongoDBClient = request.app.state.db_client
 
     project = await utils.get_project(db_client, project_id)

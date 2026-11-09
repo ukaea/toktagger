@@ -31,7 +31,10 @@ router = APIRouter(
 
 
 @router.get(
-    "", responses={200: {"description": "Returns a list of available Projects."}}
+    "",
+    responses={200: {"description": "Returns a list of available Projects."}},
+    operation_id="get_projects",
+    tags=["MCP"],
 )
 async def get_projects(
     request: Request,
@@ -56,7 +59,51 @@ async def get_projects(
     ),
     current_user: UserOut = Depends(get_current_user),
 ) -> list[Project]:
-    """Get a list of projects visible to the current user."""
+    """
+    Get a list of projects visible to the authenticated user, with optional sorting, pagination,
+    and filtering by name.
+
+    Parameters
+    ----------
+    sort_by : str
+        Field to sort responses by, by default '_id' (equivalent to timestamp).
+    sort_direction : Literal["ascending", "descending"]
+        Direction to sort responses, by default 'descending'.
+    start : int
+        Index of the first project you want returned when sorted by the
+        above parameter.
+    count : int | None
+        Number of projects you want returned, leave blank to return all entries.
+    name : str | None
+        Name of a project to search for, by default None.
+
+    current_user : UserOut
+        The active authenticated user, resolved by the server from a browser
+        session or bearer token; do not send this as a request parameter.
+
+    Returns
+    -------
+    list[Project]
+        A list of Project objects, each containing: name, task,
+        query_strategy, data_loader, time_min, time_max, shot_labels,
+        time_region_labels, time_point_labels, bounding_box_labels,
+        polygon_labels, video_bounding_box_labels, model_types, _id, timestamp.
+
+    Notes
+    -----
+    Non-admin users see only projects they belong to; global admins see all projects.
+    Sorting, filtering, and pagination apply to the visible projects.
+
+    Use When:
+        - You need to discover what projects exist and their configurations
+        - You need a project _id to use with other endpoints
+        - You want to list projects for auditing or summary purposes
+    Do Not Use When:
+        - You need project samples - use get_samples instead
+    Example User Requests:
+        - "What projects are available?"
+        - "Show me all projects named Disruption"
+    """
     return await utils.get_user_projects(
         db_client=request.app.state.db_client,
         user_id=current_user.id,
@@ -69,13 +116,50 @@ async def get_projects(
     )
 
 
-@router.post("", responses={200: {"description": "Project created successfully."}})
+@router.post(
+    "",
+    responses={200: {"description": "Project created successfully."}},
+    operation_id="create_project",
+    tags=["MCP"],
+)
 async def create_project(
     request: Request,
     project: ProjectIn,
     current_user: UserOut = Depends(get_current_user),
 ):
-    """Create a new project and auto-add the creator as project admin."""
+    """
+    Create a new project with specified task, data loader, query strategy,
+    label sets, and optional model types.
+    The user should be prompted for the required parameters in the ProjectIn
+    schema.
+
+    Parameters
+    ----------
+    project : ProjectIn
+        The configuration for the new project to create.
+
+    current_user : UserOut
+        The active authenticated user, resolved by the server from a browser
+        session or bearer token; do not send this as a request parameter.
+
+    Returns
+    -------
+    dict
+        A dict with _id containing the new project's unique identifier.
+
+    Notes
+    -----
+    The creator is automatically added as a project admin.
+
+    Use When:
+        - You are setting up a new annotation workflow for a dataset
+        - You are preparing to add samples and annotations
+    Do Not Use When:
+        - The project already exists and you wish to update it - use update_project instead
+    Example User Requests:
+        - "Create a new time-series annotation project"
+        - "Set up a video project with UFO bounding box labels"
+    """
     if project.data_loader not in LoaderRegistry.names():
         raise HTTPException(422, detail="Invalid data loader specified.")
 
@@ -90,6 +174,7 @@ async def create_project(
 
 @router.get(
     "/{project_id}",
+    operation_id="get_project",
     responses={
         200: {"description": "Project retrieved successfully."},
         404: {"description": "Project not found with that ID."},
@@ -100,12 +185,35 @@ async def get_project(
     project_id: str = Path(description="The ID of the project to return"),
     current_user: UserOut = Depends(require_project_viewer),
 ) -> Project:
-    """Get a single project using its ID."""
+    """
+    Get a single project using its ID.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to return.
+
+    current_user : UserOut
+        The authenticated project member (viewer, annotator, or admin), or a
+        global admin. Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    Project
+        The project with the specified ID.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server - should use get_projects
+    instead.
+    """
     return await utils.get_project(request.app.state.db_client, project_id)
 
 
 @router.put(
     "/{project_id}",
+    operation_id="update_project",
+    tags=["MCP"],
     responses={
         200: {"description": "Project updated successfully."},
         404: {"description": "Project not found with that ID."},
@@ -117,12 +225,45 @@ async def update_project(
     project_id: str = Path(description="The ID of the project to update"),
     current_user: UserOut = Depends(require_project_admin_role),
 ):
-    """Update a project's information."""
+    """
+    Update a project's information, modifying an existing project's
+    configuration, including task, labels, time windows, model types, and
+    other settings.
+
+    Parameters
+    ----------
+    project : ProjectUpdate
+        The updated configuration for the project.
+    project_id : str
+        The ID of the project to update.
+
+    current_user : UserOut
+        The authenticated project admin, or a global admin.
+        Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    Use When:
+        - You need to change a project's annotation labels after creation
+        - You want to add or remove model types from a project
+        - You are updating project metadata (time windows, query strategy, etc.)
+    Do Not Use When:
+        - You are creating a new project - use create_project instead
+    Example User Requests:
+        - "Update the label set for this project"
+        - "Change the query strategy for this project to sequential"
+    """
     await utils.update_project(request.app.state.db_client, project_id, project)
 
 
 @router.delete(
     "/{project_id}",
+    operation_id="delete_project",
     responses={
         200: {"description": "Project deleted successfully."},
         404: {"description": "Project not found with that ID."},
@@ -133,13 +274,34 @@ async def delete_project(
     project_id: str = Path(description="The ID of the project to delete"),
     current_user: UserOut = Depends(require_project_admin_role),
 ):
-    """Permanently delete a project."""
+    """
+    Permanently delete a project.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete.
+
+    current_user : UserOut
+        The authenticated project admin, or a global admin.
+        Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
+    """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.delete_projects(db_client=db_client, project_id=project_id)
 
 
 @router.delete(
     "",
+    operation_id="delete_all_projects",
     responses={
         200: {"description": "Projects have been successfully deleted."},
     },
@@ -148,7 +310,22 @@ async def delete_all_projects(
     request: Request,
     _: UserOut = Depends(require_global_admin),
 ):
-    """Remove all projects."""
+    """
+    Remove all projects.
+
+    _ : UserOut
+        The authenticated global admin. Resolved by the server, not
+        supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
+    """
     await utils.delete_projects(db_client=request.app.state.db_client)
 
 
