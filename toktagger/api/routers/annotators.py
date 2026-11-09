@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from toktagger.api.auth.dependencies import (
     get_current_user,
     require_project_annotator,
-    require_project_viewer,
 )
 from toktagger.api.core.annotators import ANNOTATORS, ANNOTATORS_PER_TASK
 from toktagger.api.core.data_loaders import LoaderRegistry
@@ -25,16 +24,6 @@ router = APIRouter(
     tags=["Annotators"],
     dependencies=[Depends(get_current_user)],
 )
-
-
-@router.get("/annotator")
-async def get_annotators(
-    request: Request,
-    project_id: str,
-    current_user: UserOut = Depends(require_project_viewer),
-):
-    # Dunno if this is of any use
-    pass
 
 
 @router.post(

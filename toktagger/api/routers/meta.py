@@ -7,6 +7,8 @@ from toktagger.api.auth.dependencies import get_current_user
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.models import check_models_enabled, models_dependencies_installed
 from toktagger.api.schemas.models import LoadMethods
+from toktagger.api.schemas.annotators import ANNOTATOR_REGISTRY
+from toktagger.api.schemas.projects import Task
 
 if models_dependencies_installed():
     from toktagger.api.models.base import ModelRegistry
@@ -15,12 +17,12 @@ else:
 
 router = APIRouter(
     prefix="/meta",
-    tags=["Metadata"],
+    tags=["Metadata", "MCP"],
     dependencies=[Depends(get_current_user)],
 )
 
 
-@router.get("/dataloader", operation_id="get_dataloaders", tags=["MCP"])
+@router.get("/dataloader", operation_id="get_dataloaders")
 async def get_dataloaders(request: Request) -> list[str]:
     """
     Get a list of all registered data loader names
@@ -50,7 +52,7 @@ async def get_dataloaders(request: Request) -> list[str]:
     return LoaderRegistry.names()
 
 
-@router.get("/dataloader/{loader}", operation_id="get_data_schema", tags=["MCP"])
+@router.get("/dataloader/{loader}", operation_id="get_data_schema")
 async def get_data_schema(loader: str) -> dict[str, typing.Any]:
     """
     Get the data parameter schema required for getting data with this data
@@ -83,16 +85,44 @@ async def get_data_schema(loader: str) -> dict[str, typing.Any]:
     return LoaderRegistry.get_data_schema(loader)
 
 
-@router.get("/dataloader/{loader}/help")
+@router.get("/dataloader/{loader}/help", operation_id="get_signal_name_help")
 async def get_signal_name_help(loader: str) -> str | None:
-    """Get help text which describes the signal names this dataloader expects."""
+    """
+    Get help text describing the signal names a data loader expects, if the
+    loader defines any.
+
+    Parameters
+    ----------
+    loader : str
+        The name of the data loader to get signal name help for.
+
+    Returns
+    -------
+    str | None
+        Help text describing the expected signal names, or None if the loader
+        defines no help text.
+
+    Notes
+    -----
+    Requires an active authenticated user (browser session or bearer token).
+    Unknown loader names return an error.
+
+    Use When:
+        - You are adding samples with a data loader and need to know which signal names it expects
+        - You are unsure what values to use for a loader's signal parameters
+    Do Not Use When:
+        - You need the loader's full parameter schema - use get_data_schema instead
+        - You need the list of available loaders - use get_dataloaders instead
+    Example User Requests:
+        - "What signal names does the UDA loader expect?"
+        - "How do I pick signal names for this data loader?"
+    """
     return LoaderRegistry.get_signal_name_help(loader)
 
 
 @router.get(
     "/models",
     operation_id="get_model_types",
-    tags=["MCP"],
     dependencies=[Depends(check_models_enabled)],
 )
 async def get_model_types(task: str) -> list[str]:
@@ -132,7 +162,6 @@ async def get_model_types(task: str) -> list[str]:
 @router.get(
     "/models/load",
     operation_id="get_model_load_methods",
-    tags=["MCP"],
     dependencies=[Depends(check_models_enabled)],
 )
 async def get_model_load_methods() -> list[str]:
@@ -174,7 +203,6 @@ async def get_model_load_methods() -> list[str]:
 @router.get(
     "/models/load/{load_method}",
     operation_id="get_model_load_method_allowlist",
-    tags=["MCP"],
     dependencies=[Depends(check_models_enabled)],
 )
 async def get_model_load_method_allowlist(load_method: LoadMethods) -> str | None:
@@ -230,7 +258,6 @@ async def get_model_load_method_allowlist(load_method: LoadMethods) -> str | Non
 @router.get(
     "/models/{model}/train",
     operation_id="get_model_training_schema",
-    tags=["MCP"],
     dependencies=[Depends(check_models_enabled)],
 )
 async def get_model_training_schema(model: str) -> dict[str, typing.Any] | None:
@@ -269,7 +296,6 @@ async def get_model_training_schema(model: str) -> dict[str, typing.Any] | None:
 @router.get(
     "/models/{model}/predict",
     operation_id="get_model_prediction_schema",
-    tags=["MCP"],
     dependencies=[Depends(check_models_enabled)],
 )
 async def get_model_prediction_schema(model: str) -> dict[str, typing.Any] | None:
@@ -303,3 +329,38 @@ async def get_model_prediction_schema(model: str) -> dict[str, typing.Any] | Non
     return ModelRegistry.get_params_schema(
         model, schema_type="prediction", return_draft_07=True
     )
+
+
+@router.get(
+    "/annotators",
+    operation_id="get_annotator_types",
+)
+async def get_annotator_types(task: Task) -> list[str]:
+    """
+    Get a list of available automated annotators for a specified task
+    ("time-series", "video", "profile-2d").
+
+    Parameters
+    ----------
+    task : Task
+        The task type to get annotators for.
+
+    Returns
+    -------
+    list[str]
+        A list of annotator type strings (e.g. ["peak_detection"]).
+
+    Notes
+    -----
+    Requires an active authenticated user (browser session or bearer token).
+
+    Use When:
+        - You need to know which automated annotators can be used for a given task
+        - You need to check which annotators can label samples in a project - find the task associated with the project first via get_projects
+    Do Not Use When:
+        - The user has asked for available ML models - use get_model_types instead
+    Example User Requests:
+        - "Which annotators are available for time-series tasks?"
+        - "Can I use the peak-detection annotator for this project?"
+    """
+    return ANNOTATOR_REGISTRY.get(task, [])

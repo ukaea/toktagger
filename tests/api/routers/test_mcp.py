@@ -33,6 +33,7 @@ async def test_expected_tools(mcp_client):
         "get_sample_model_predictions",
         "get_samples",
         "get_samples_summary",
+        "get_signal_name_help",
         "get_trained_models",
         "get_user",
         "health_check",
