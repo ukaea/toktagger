@@ -38,6 +38,7 @@ async def test_expected_tools(mcp_client):
         "health_check",
         "import_annotations",
         "list_my_memberships",
+        "list_project_members",
         "list_users",
         "load_model_weights_gitlab",
         "load_model_weights_hugging_face",

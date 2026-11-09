@@ -332,12 +332,45 @@ async def delete_all_projects(
 @router.get(
     "/{project_id}/members",
     response_model=list[ProjectMemberOut],
+    operation_id="list_project_members",
+    tags=["MCP"],
 )
 async def list_project_members(
     request: Request,
-    project_id: str = Path(...),
+    project_id: str = Path(description="The ID of the project to get members from."),
     _: UserOut = Depends(require_project_viewer),
 ):
+    """
+    Get a list of all members of a project, with their roles and
+    annotation-visibility preferences.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get members from.
+    _ : UserOut
+        The authenticated project member (viewer, annotator, or admin), or a
+        global admin. Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    list[ProjectMemberOut]
+        One entry per member: user ID, username, role (admin, annotator, or
+        viewer), and show_others_annotations.
+
+    Notes
+    -----
+    Use When:
+        - You need to know who is a member of a project and in what role
+        - You need to check whether a member can see other users' annotations
+    Do Not Use When:
+        - You need the projects the current user belongs to - use list_my_memberships instead
+        - You need to know all projects which the current user belongs to - use list_my_memberships instead
+        - You need to add, remove, or update members - membership changes are not exposed via MCP
+    Example User Requests:
+        - "Who is in this project?"
+        - "What role does this user have in the project?"
+    """
     return await utils.get_project_members(request.app.state.db_client, project_id)
 
 
@@ -345,9 +378,32 @@ async def list_project_members(
 async def add_project_member(
     request: Request,
     body: ProjectMemberCreate,
-    project_id: str = Path(...),
+    project_id: str = Path(description="The ID of the project to add the member to."),
     current_user: UserOut = Depends(require_project_admin_role),
 ):
+    """
+    Add a user as a member of a project.
+
+    Parameters
+    ----------
+    body : ProjectMemberCreate
+        The username to add and their project role (admin, annotator, or
+        viewer; default annotator).
+    project_id : str
+        The ID of the project to add the member to.
+    current_user : UserOut
+        The authenticated project admin, or a global admin. Resolved by the
+        server, not supplied in the request.
+
+    Returns
+    -------
+    dict
+        The _id of the created membership.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
+    """
     db_client = request.app.state.db_client
     user = await utils.get_user_by_username(db_client, body.username)
     if not user:
@@ -362,11 +418,42 @@ async def add_project_member(
 async def update_project_member(
     request: Request,
     body: ProjectMemberUpdate,
-    project_id: str = Path(...),
-    user_id: str = Path(...),
+    project_id: str = Path(
+        description="The ID of the project the membership belongs to."
+    ),
+    user_id: str = Path(description="The ID of the member to update."),
     current_user: UserOut = Depends(get_current_user),
     membership: ProjectMember | None = Depends(get_project_membership),
 ):
+    """
+    Update a project member's role or annotation-visibility preference.
+
+    Parameters
+    ----------
+    body : ProjectMemberUpdate
+        The membership fields to update: role (admin, annotator, or viewer)
+        and/or show_others_annotations.
+    project_id : str
+        The ID of the project the membership belongs to.
+    user_id : str
+        The ID of the member to update.
+    current_user : UserOut
+        The authenticated user. Resolved by the server, not supplied in the
+        request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    Project admins may change any member; other members may update only their
+    own show_others_annotations preference - changing role always needs a
+    project admin or global admin.
+
+    This endpoint is not exposed to the MCP server.
+    """
     db_client = request.app.state.db_client
 
     # Project admins can change any member. A non-admin may edit only their own
@@ -392,10 +479,36 @@ async def update_project_member(
 @router.delete("/{project_id}/members/{user_id}")
 async def remove_project_member(
     request: Request,
-    project_id: str = Path(...),
-    user_id: str = Path(...),
+    project_id: str = Path(
+        description="The ID of the project to remove the member from."
+    ),
+    user_id: str = Path(description="The ID of the member to remove."),
     current_user: UserOut = Depends(require_project_admin_role),
 ):
+    """
+    Remove a user from a project.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to remove the member from.
+    user_id : str
+        The ID of the member to remove.
+    current_user : UserOut
+        The authenticated project admin, or a global admin. Resolved by the
+        server, not supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    A project admin cannot remove themselves from a project (422).
+
+    This endpoint is not exposed to the MCP server.
+    """
     if current_user.id == user_id:
         raise HTTPException(
             status_code=422, detail="You cannot remove yourself from a project"
