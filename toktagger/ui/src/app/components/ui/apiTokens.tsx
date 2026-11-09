@@ -27,7 +27,11 @@ import type { Key } from "@react-types/shared";
 import Delete from "@spectrum-icons/workflow/Delete";
 import { z } from "zod/v4";
 import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
-import { ApiTokenCreatedSchema, ApiTokenSchema, type ApiToken } from "@/types";
+import {
+  BearerTokenCreatedSchema,
+  BearerTokenSchema,
+  type BearerToken,
+} from "@/types";
 
 const TOKENS_URL = `${BACKEND_API_URL}/users/me/tokens`;
 const LIFETIME_OPTIONS = [
@@ -51,15 +55,15 @@ async function readError(res: Response, fallback: string): Promise<Error> {
 }
 
 export default function ApiTokens() {
-  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [tokens, setTokens] = useState<BearerToken[]>([]);
   const [name, setName] = useState("");
   const [lifetime, setLifetime] = useState<Key>("30");
   const [newToken, setNewToken] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const res = await apiFetch(TOKENS_URL);
+    const res = await apiFetch(`${TOKENS_URL}?purpose=api`);
     if (!res.ok) throw await readError(res, "Failed to load API tokens");
-    const parsed = z.array(ApiTokenSchema).safeParse(await res.json());
+    const parsed = z.array(BearerTokenSchema).safeParse(await res.json());
     if (!parsed.success) throw new Error("Unexpected API token list");
     setTokens(parsed.data);
   }, []);
@@ -74,11 +78,12 @@ export default function ApiTokens() {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
+          purpose: "api",
           expires_in_days: Number(lifetime),
         }),
       });
       if (!res.ok) throw await readError(res, "Failed to create API token");
-      const parsed = ApiTokenCreatedSchema.safeParse(await res.json());
+      const parsed = BearerTokenCreatedSchema.safeParse(await res.json());
       if (!parsed.success) throw new Error("Unexpected API token response");
       setNewToken(parsed.data.token);
       setName("");

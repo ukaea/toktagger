@@ -1,4 +1,4 @@
-"""Personal API tokens: management through a browser session, use as a Bearer token."""
+"""Personal tokens: management through a browser session, use as a Bearer token."""
 
 import hashlib
 import time
@@ -10,7 +10,8 @@ from pydantic import ValidationError
 from tests.db_definitions import USER_ADMIN_ID, USER_ALICE_ID, USER_BOB_ID
 from tests.identity import get_auth_token, session_headers
 from toktagger.api import config
-from toktagger.api.schemas.auth import ApiTokenCreate
+from toktagger.api.auth import bearer_tokens
+from toktagger.api.schemas.auth import BearerTokenCreate
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -35,6 +36,7 @@ async def test_created_token_authenticates_as_its_owner(
     created = await _create(client)
     assert created["token"].startswith("tt_")
     assert created["hint"] == created["token"][-4:]
+    assert created["purpose"] == "api"
 
     response = await client.get("/auth/me", headers=_bearer(created["token"]))
     assert response.status_code == 200
@@ -64,7 +66,7 @@ async def test_only_the_hash_is_stored(
     unauthenticated_api_client, setup_db_auth, db_client
 ):
     created = await _create(unauthenticated_api_client)
-    stored = await db_client.db["api_tokens"].find({}).to_list()
+    stored = await db_client.db["bearer_tokens"].find({}).to_list()
     assert len(stored) == 1
     assert created["token"] not in stored[0].values()
     assert (
@@ -112,13 +114,13 @@ async def test_expired_token_is_rejected(
 ):
     client = unauthenticated_api_client
     created = await _create(client)
-    await db_client.db["api_tokens"].update_many(
+    await db_client.db["bearer_tokens"].update_many(
         {}, {"$set": {"created_at": time.time() - 100, "expires_at": time.time() - 1}}
     )
 
     response = await client.get("/auth/me", headers=_bearer(created["token"]))
     assert response.status_code == 401
-    assert await db_client.db["api_tokens"].count_documents({}) == 0
+    assert await db_client.db["bearer_tokens"].count_documents({}) == 0
 
 
 @pytest.mark.asyncio
@@ -153,14 +155,14 @@ async def test_deleting_a_user_removes_their_tokens(
 ):
     client = unauthenticated_api_client
     await _create(client)
-    assert await db_client.db["api_tokens"].count_documents({}) == 1
+    assert await db_client.db["bearer_tokens"].count_documents({}) == 1
 
     response = await client.delete(
         f"/users/{setup_db_auth['alice_id']}",
         headers=session_headers(get_auth_token(USER_ADMIN_ID)),
     )
     assert response.status_code == 200
-    assert await db_client.db["api_tokens"].count_documents({}) == 0
+    assert await db_client.db["bearer_tokens"].count_documents({}) == 0
 
 
 @pytest.mark.asyncio
@@ -176,6 +178,113 @@ async def test_api_token_cannot_manage_tokens(
         "/users/me/tokens", json={"name": "more"}, headers=headers
     )
     assert response.status_code == 403
+    response = await client.delete(
+        f"/users/me/tokens/{created['_id']}", headers=headers
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("purpose", [None, "api", "mcp"])
+async def test_list_filters_by_purpose(
+    unauthenticated_api_client, setup_db_auth, purpose
+):
+    client = unauthenticated_api_client
+    created = [await _create(client, purpose=value) for value in ("api", "mcp")]
+    await _create(client, user_id=USER_BOB_ID, purpose="mcp")
+    response = await client.get(
+        "/users/me/tokens",
+        params={} if purpose is None else {"purpose": purpose},
+        headers=session_headers(get_auth_token(USER_ALICE_ID)),
+    )
+    assert response.status_code == 200
+    assert {token["_id"] for token in response.json()} == {
+        token["_id"]
+        for token in created
+        if purpose is None or token["purpose"] == purpose
+    }
+    assert all(
+        "token" not in token and "token_hash" not in token for token in response.json()
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["get", "post"])
+async def test_invalid_purpose_is_rejected(
+    unauthenticated_api_client, setup_db_auth, method
+):
+    client = unauthenticated_api_client
+    headers = session_headers(get_auth_token(USER_ALICE_ID))
+    if method == "get":
+        response = await client.get("/users/me/tokens?purpose=invalid", headers=headers)
+    else:
+        response = await client.post(
+            "/users/me/tokens",
+            json={"name": "invalid", "purpose": "invalid"},
+            headers=headers,
+        )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_legacy_token_defaults_to_api(
+    unauthenticated_api_client, setup_db_auth, db_client
+):
+    client = unauthenticated_api_client
+    created = await _create(client)
+    document = (await db_client.get_filtered_documents("bearer_tokens"))[0]
+    document.pop("purpose")
+    await db_client.delete_filtered_documents("bearer_tokens")
+    await db_client.db["bearer_tokens"].insert_one(document)
+    assert (
+        await bearer_tokens.authenticate_bearer_token(db_client, created["token"])
+        == USER_ALICE_ID
+    )
+    assert (
+        await bearer_tokens.authenticate_bearer_token(
+            db_client, created["token"], purpose="mcp"
+        )
+        is None
+    )
+    for purpose in ("api", "mcp"):
+        response = await client.get(
+            "/users/me/tokens",
+            params={"purpose": purpose},
+            headers=session_headers(get_auth_token(USER_ALICE_ID)),
+        )
+        assert response.status_code == 200
+        assert [token["purpose"] for token in response.json()] == (
+            ["api"] if purpose == "api" else []
+        )
+
+
+@pytest.mark.asyncio
+async def test_mcp_token_authentication_and_revocation(
+    unauthenticated_api_client, setup_db_auth, db_client
+):
+    client = unauthenticated_api_client
+    created = await _create(client, purpose="mcp")
+    assert created["purpose"] == "mcp"
+    assert created["token"].startswith("tt_mcp_")
+    assert (
+        await bearer_tokens.authenticate_bearer_token(
+            db_client, created["token"], purpose="mcp"
+        )
+        == USER_ALICE_ID
+    )
+    response = await client.get("/auth/me", headers=_bearer(created["token"]))
+    assert response.status_code == 401
+    response = await client.delete(
+        f"/users/me/tokens/{created['_id']}",
+        headers=session_headers(get_auth_token(USER_ALICE_ID)),
+    )
+    assert response.status_code == 204
+    assert (
+        await bearer_tokens.authenticate_bearer_token(
+            db_client, created["token"], purpose="mcp"
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -206,26 +315,26 @@ def test_default_max_lifetime_is_365_days(monkeypatch):
     default = type(config.settings.auth).model_fields["api_token_max_lifetime_days"]
     assert default.default == 365
     monkeypatch.setattr(config.settings.auth, "api_token_max_lifetime_days", 365)
-    assert ApiTokenCreate(name="laptop", expires_in_days=365).expires_in_days == 365
+    assert BearerTokenCreate(name="laptop", expires_in_days=365).expires_in_days == 365
     with pytest.raises(ValidationError, match="at most 365 days"):
-        ApiTokenCreate(name="laptop", expires_in_days=366)
+        BearerTokenCreate(name="laptop", expires_in_days=366)
 
 
 def test_create_schema_follows_configured_max_lifetime(monkeypatch):
     monkeypatch.setattr(config.settings.auth, "api_token_max_lifetime_days", 7)
-    assert ApiTokenCreate(name="laptop", expires_in_days=7).expires_in_days == 7
+    assert BearerTokenCreate(name="laptop", expires_in_days=7).expires_in_days == 7
     with pytest.raises(ValidationError, match="at most 7 days"):
-        ApiTokenCreate(name="laptop", expires_in_days=8)
+        BearerTokenCreate(name="laptop", expires_in_days=8)
 
 
 @pytest.mark.parametrize("expires_in_days", [0, -1])
 def test_create_schema_rejects_non_positive_lifetime(expires_in_days: int):
     with pytest.raises(ValidationError):
-        ApiTokenCreate(name="laptop", expires_in_days=expires_in_days)
+        BearerTokenCreate(name="laptop", expires_in_days=expires_in_days)
 
 
 @pytest.mark.asyncio
-async def test_api_token_follows_project_membership(
+async def test_bearer_token_follows_project_membership(
     unauthenticated_api_client, setup_db_auth
 ):
     created = await _create(unauthenticated_api_client)

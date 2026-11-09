@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -19,7 +19,8 @@ class LogoutResponse(BaseModel):
     logout_url: str | None = None
 
 
-class ApiTokenCreate(BaseModel):
+class BearerTokenCreate(BaseModel):
+    purpose: Literal["api", "mcp"] = "api"
     name: str = Field(..., min_length=1, max_length=100)
     expires_in_days: int = Field(30, gt=0)
 
@@ -28,7 +29,7 @@ class ApiTokenCreate(BaseModel):
     def check_max_lifetime(cls, value: int) -> int:
         max_days = config.settings.auth.api_token_max_lifetime_days
         if value > max_days:
-            raise ValueError(f"An API token can be valid for at most {max_days} days")
+            raise ValueError(f"A bearer token can be valid for at most {max_days} days")
         return value
 
 
@@ -47,14 +48,15 @@ class SessionUpdate(BaseModel):
     refreshed_at: float | None = None
 
 
-class ApiTokenBase(BaseModel):
+class BearerTokenBase(BaseModel):
+    purpose: Literal["api", "mcp"] = "api"
     name: str = Field(..., min_length=1, max_length=100)
     hint: str = Field(
         ..., min_length=1, max_length=8, description="Last characters of the token."
     )
 
 
-class ApiToken(ApiTokenBase):
+class BearerToken(BearerTokenBase):
     token_hash: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     created_at: float = Field(..., gt=0)
     expires_at: float = Field(..., gt=0)
@@ -67,11 +69,11 @@ class ApiToken(ApiTokenBase):
         return self
 
 
-class ApiTokenUpdate(BaseModel):
+class BearerTokenUpdate(BaseModel):
     last_used_at: float | None = Field(None, gt=0)
 
 
-class ApiTokenOut(ApiTokenBase):
+class BearerTokenOut(BearerTokenBase):
     model_config = ConfigDict(validate_by_name=True)
 
     id: str = Field(..., alias="_id")
@@ -80,5 +82,5 @@ class ApiTokenOut(ApiTokenBase):
     last_used_at: datetime | None = None
 
 
-class ApiTokenCreated(ApiTokenOut):
+class BearerTokenCreated(BearerTokenOut):
     token: str = Field(..., description="The token. The server shows it one time only.")

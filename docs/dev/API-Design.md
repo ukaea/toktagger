@@ -1,6 +1,14 @@
 # API Endpoints
 Below is a brief outline of the design of the backend API and what each endpoint does. For full documentation of these endpoints, launch the application and go to `http://localhost:8002/docs`.
 
+## `/users/me/tokens`
+- **GET**: List the current user's bearer tokens; optionally filter with `purpose=api` or `purpose=mcp`.
+- **POST**: Create a bearer token with `name`, `expires_in_days`, and `purpose` (`api` by default). The raw token is returned only once.
+- **DELETE `/users/me/tokens/{token_id}`**: Revoke a token owned by the current user.
+
+Token management requires a browser session. API tokens authenticate REST requests; MCP-purpose tokens can be managed but MCP authentication integration is not implemented yet.
+Bearer tokens are stored in the `bearer_tokens` collection; documents without a purpose are treated as `api` tokens.
+
 ## `/projects`
 - **GET**: Get a list of all available projects
 - **POST**: Create a new project

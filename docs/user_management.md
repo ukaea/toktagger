@@ -207,6 +207,22 @@ export TOKTAGGER_API_TOKEN=<API token>
 python scripts/setup.py
 ```
 
+### Personal MCP tokens
+
+Personal bearer tokens have a purpose: `api` for REST scripts or `mcp` for MCP clients.
+MCP-purpose tokens cannot authenticate direct REST requests. MCP authentication integration is not implemented yet.
+
+Using an authenticated browser session (including the CSRF header), create an MCP token with
+`POST /users/me/tokens` and a JSON body such as
+`{"name": "my MCP client", "purpose": "mcp", "expires_in_days": 30}`.
+The token is returned only once and uses the same lifetime limit as an API token.
+
+`GET /users/me/tokens` lists both purposes; add `?purpose=api` or `?purpose=mcp` to filter.
+Revoke either purpose with `DELETE /users/me/tokens/{token_id}`.
+All token management requires a browser session, not a bearer token.
+The Profile page manages API tokens only. Omitting `purpose` when creating a token defaults to `api`,
+and tokens created before purposes were introduced remain API tokens.
+
 ### Identity provider access tokens
 
 A script can also send an access token of the identity provider. TokTagger checks the signature, the issuer, the expiry and the audience of the token. The identity provider must let the script get an access token. The default TokTagger clients in Canaille and in the Keycloak development realm do not do this.

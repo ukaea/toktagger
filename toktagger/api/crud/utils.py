@@ -18,7 +18,7 @@ from toktagger.api.schemas.annotations import (
     AnnotationOutTypes,
 )
 from toktagger.api.schemas.annotators import AnnotatorTypes
-from toktagger.api.schemas.auth import ApiTokenOut
+from toktagger.api.schemas.auth import BearerTokenOut
 from toktagger.api.schemas.models import Model, ModelIn, ModelUpdate
 from toktagger.api.schemas.projects import (
     Project,
@@ -780,17 +780,27 @@ async def get_all_users(db_client: MongoDBClient) -> list[UserOut]:
     return [UserOut.model_validate(d) for d in docs]
 
 
-async def get_api_tokens(db_client: MongoDBClient, user_id: str) -> list[ApiTokenOut]:
+async def get_bearer_tokens(
+    db_client: MongoDBClient,
+    user_id: str,
+    purpose: Literal["api", "mcp"] | None = None,
+) -> list[BearerTokenOut]:
     await db_client.delete_filtered_documents(
-        "api_tokens", {"expires_at": {"$lt": time.time()}}
+        "bearer_tokens", {"expires_at": {"$lt": time.time()}}
     )
+    filters: dict = {"user_id": convert_to_objectid(user_id, "users")}
+    if purpose == "api":
+        # Tokens created before purposes were introduced are API tokens.
+        filters["purpose"] = {"$in": ["api", None]}
+    elif purpose is not None:
+        filters["purpose"] = purpose
     docs = await db_client.get_filtered_documents(
-        "api_tokens",
-        {"user_id": convert_to_objectid(user_id, "users")},
+        "bearer_tokens",
+        filters,
         sort_by="created_at",
         sort_direction="descending",
     )
-    return [ApiTokenOut.model_validate({**d, "_id": str(d["_id"])}) for d in docs]
+    return [BearerTokenOut.model_validate({**d, "_id": str(d["_id"])}) for d in docs]
 
 
 async def create_user(db_client: MongoDBClient, user: UserIn) -> str:

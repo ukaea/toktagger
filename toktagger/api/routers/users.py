@@ -1,6 +1,8 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 
-from toktagger.api.auth import api_tokens, sessions
+from toktagger.api.auth import bearer_tokens, sessions
 from toktagger.api.auth.dependencies import (
     get_current_user,
     require_global_admin,
@@ -9,7 +11,11 @@ from toktagger.api.auth.dependencies import (
 from toktagger.api.crud import utils
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas import convert_to_objectid
-from toktagger.api.schemas.auth import ApiTokenCreate, ApiTokenCreated, ApiTokenOut
+from toktagger.api.schemas.auth import (
+    BearerTokenCreate,
+    BearerTokenCreated,
+    BearerTokenOut,
+)
 from toktagger.api.schemas.users import UserOut, UserUpdate
 from toktagger.api.schemas.projects import ProjectMemberOut
 
@@ -101,87 +107,93 @@ async def list_my_memberships(
     )
 
 
-@router.get("/me/tokens", response_model=list[ApiTokenOut])
-async def list_my_api_tokens(
+@router.get("/me/tokens", response_model=list[BearerTokenOut])
+async def list_my_bearer_tokens(
     request: Request,
+    purpose: Literal["api", "mcp"] | None = None,
     current_user: UserOut = Depends(require_session_user),
-) -> list[ApiTokenOut]:
+) -> list[BearerTokenOut]:
     """
-    List the API tokens created by the currently authenticated user.
+    List the bearer tokens created by the currently authenticated user.
 
     Parameters
     ----------
+    purpose : Literal["api", "mcp"] | None
+        Filter by token purpose, or omit to list both purposes.
     current_user : UserOut
         The authenticated user with an active browser session. Resolved by the
         server, not supplied in the request.
 
     Returns
     -------
-    list[ApiTokenOut]
-        The caller's API tokens (name, created, expiry, last used); raw token
+    list[BearerTokenOut]
+        The caller's bearer tokens (name, created, expiry, last used); raw token
         values are never returned.
 
     Notes
     -----
-    Requires a browser session - API tokens cannot call this endpoint, so a
+    Requires a browser session - bearer tokens cannot call this endpoint, so a
     leaked token cannot be used to discover or mint further tokens.
 
     This endpoint is not exposed to the MCP server.
     """
-    return await utils.get_api_tokens(request.app.state.db_client, current_user.id)
+    return await utils.get_bearer_tokens(
+        request.app.state.db_client, current_user.id, purpose=purpose
+    )
 
 
-@router.post("/me/tokens", response_model=ApiTokenCreated, status_code=201)
-async def create_my_api_token(
+@router.post("/me/tokens", response_model=BearerTokenCreated, status_code=201)
+async def create_my_bearer_token(
     request: Request,
-    body: ApiTokenCreate,
+    body: BearerTokenCreate,
     current_user: UserOut = Depends(require_session_user),
-) -> ApiTokenCreated:
+) -> BearerTokenCreated:
     """
-    Create a new API token for the currently authenticated user.
+    Create a new bearer token for the currently authenticated user.
 
     Parameters
     ----------
-    body : ApiTokenCreate
-        The token's name and its lifetime in days (default 30, capped by the
-        server's api_token_max_lifetime_days setting).
+    body : BearerTokenCreate
+        The token's name, purpose (api by default), and lifetime in days
+        (default 30, capped by the server's api_token_max_lifetime_days setting).
     current_user : UserOut
         The authenticated user with an active browser session. Resolved by the
         server, not supplied in the request.
 
     Returns
     -------
-    ApiTokenCreated
+    BearerTokenCreated
         The created token, including its raw value, which is shown only once.
 
     Notes
     -----
-    Requires a browser session - API tokens cannot call this endpoint, so a
+    Requires a browser session - bearer tokens cannot call this endpoint, so a
     leaked token cannot be used to mint further tokens.
 
     This endpoint is not exposed to the MCP server.
     """
-    return await api_tokens.create_api_token(
+    return await bearer_tokens.create_bearer_token(
         request.app.state.db_client,
         current_user.id,
         body.name,
         body.expires_in_days * 24 * 60 * 60,
+        purpose=body.purpose,
     )
 
 
 @router.delete("/me/tokens/{token_id}", status_code=204)
-async def revoke_my_api_token(
+async def revoke_my_bearer_token(
     request: Request,
-    token_id: str = Path(description="The ID of the API token to revoke."),
+    token_id: str = Path(description="The ID of the bearer token to revoke."),
     current_user: UserOut = Depends(require_session_user),
 ) -> None:
     """
-    Revoke one of the currently authenticated user's API tokens.
+    Revoke one of the currently authenticated user's bearer tokens.
 
     Parameters
     ----------
     token_id : str
-        The ID of the API token to revoke.
+        The ID of the bearer token to revoke.
     current_user : UserOut
         The authenticated user with an active browser session. Resolved by the
         server, not supplied in the request.
@@ -193,16 +205,16 @@ async def revoke_my_api_token(
 
     Notes
     -----
-    Requires a browser session - API tokens cannot call this endpoint, so a
+    Requires a browser session - bearer tokens cannot call this endpoint, so a
     leaked token cannot be used to revoke other tokens.
 
     This endpoint is not exposed to the MCP server.
     """
-    revoked = await api_tokens.revoke_api_token(
+    revoked = await bearer_tokens.revoke_bearer_token(
         request.app.state.db_client, current_user.id, token_id
     )
     if not revoked:
-        raise HTTPException(status_code=404, detail="API token not found")
+        raise HTTPException(status_code=404, detail="bearer token not found")
 
 
 @router.get("/{user_id}", response_model=UserOut, operation_id="get_user", tags=["MCP"])
@@ -319,7 +331,7 @@ async def delete_user(
     _: UserOut = Depends(require_global_admin),
 ) -> None:
     """
-    Delete a user account, along with all of its API tokens and active sessions.
+    Delete a user account, along with all of its bearer tokens and active sessions.
 
     Parameters
     ----------
@@ -360,7 +372,7 @@ async def delete_user(
 
         await utils.delete_user(db_client, user_id)
         await db_client.delete_filtered_documents(
-            "api_tokens", {"user_id": convert_to_objectid(user_id, "users")}
+            "bearer_tokens", {"user_id": convert_to_objectid(user_id, "users")}
         )
     if target:
         await sessions.end_user_sessions(db_client, target.id)
