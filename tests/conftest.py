@@ -6,13 +6,13 @@ import pathlib
 import tempfile
 import time
 
-import httpx2
 import pytest
 import pytest_asyncio
 import requests
 from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
 from fastmcp import Client
+from fastmcp.utilities.asgi_transport import run_asgi_lifespan
 from fastmcp.client.transports import StreamableHttpTransport
 
 from tests import db_definitions, endpoints
@@ -184,11 +184,12 @@ async def api_client(unauthenticated_api_client, admin_user):
     yield unauthenticated_api_client
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture
 async def mcp_client(api_server, db_client, admin_user):
     api_server._api_app.state.db_client = db_client
     api_server._api_app.state.project = None
     api_server._api_app.state.idp = None
+
     token = await bearer_tokens.create_bearer_token(
         db_client,
         user_id=admin_user,
@@ -197,43 +198,28 @@ async def mcp_client(api_server, db_client, admin_user):
         purpose="mcp",
     )
 
-    # Stateless JSON responses let ASGI tests exercise HTTP without an idle SSE stream.
-    mcp_http_app = api_server._mcp_app.http_app(
-        "/", stateless_http=True, json_response=True
+    app = api_server._mcp_app.http_app(
+        "/",
+        stateless_http=True,
+        json_response=True,
     )
 
     def http_client_factory(**kwargs):
-        return httpx2.AsyncClient(
-            transport=httpx2.ASGITransport(app=mcp_http_app), **kwargs
+        return AsyncClient(
+            transport=ASGITransport(app=app),
+            **kwargs,
         )
 
     transport = StreamableHttpTransport(
         "http://test/",
-        headers={"Authorization": f"Bearer {token.token}"},
+        headers={
+            "Authorization": f"Bearer {token.token}",
+        },
         httpx_client_factory=http_client_factory,
     )
-    ready = asyncio.get_running_loop().create_future()
-    shutdown = asyncio.Event()
-
-    async def run_mcp_app():
-        try:
-            async with mcp_http_app.router.lifespan_context(mcp_http_app):
-                ready.set_result(None)
-                await shutdown.wait()
-        except BaseException as error:
-            if not ready.done():
-                ready.set_exception(error)
-            raise
-
-    # AnyIO lifespan scopes must enter and exit in the same task across fixture yield.
-    lifespan_task = asyncio.create_task(run_mcp_app())
-    try:
-        await ready
+    async with run_asgi_lifespan(app):
         async with Client(transport) as client:
             yield client
-    finally:
-        shutdown.set()
-        await lifespan_task
 
 
 @pytest_asyncio.fixture(scope="function")
