@@ -83,10 +83,13 @@ def _require_active(user: UserOut) -> UserOut:
     return user
 
 
-async def _get_user_from_api_token(request: Request, token: str) -> UserOut:
+async def _get_user_from_personal_token(request: Request, token: str) -> UserOut:
     db_client = request.app.state.db_client
+    route = request.scope.get("route")
+    # The same tag controls tool exposure and MCP-token access, including direct REST.
+    allows_mcp = isinstance(route, APIRoute) and "MCP" in route.tags
     user_id = await bearer_tokens.authenticate_bearer_token(
-        db_client, token, purpose="api"
+        db_client, token, purpose=None if allows_mcp else "api"
     )
     if user_id is None:
         raise HTTPException(status_code=401, detail="Invalid or expired bearer token")
@@ -97,7 +100,7 @@ async def _get_user_from_api_token(request: Request, token: str) -> UserOut:
 
 
 async def _get_user_from_bearer(request: Request, token: str) -> UserOut:
-    """Authenticate a bearer header: the internal token, an API token or an IdP token.
+    """Authenticate a bearer header: the internal token, a personal token or an IdP token.
 
     A bearer header cannot be attached by a cross-site caller, so it needs no CSRF
     cover, and the caller manages its own token, so the session does not slide.
@@ -112,7 +115,7 @@ async def _get_user_from_bearer(request: Request, token: str) -> UserOut:
             )
         return _INTERNAL_USER
     if bearer_tokens.is_bearer_token(token):
-        return await _get_user_from_api_token(request, token)
+        return await _get_user_from_personal_token(request, token)
 
     idp: oidc.IdentityProvider | None = request.app.state.idp
     if idp is None:

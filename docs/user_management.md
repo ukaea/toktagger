@@ -210,7 +210,10 @@ python scripts/setup.py
 ### Personal MCP tokens
 
 Personal bearer tokens have a purpose: `api` for REST scripts or `mcp` for MCP clients.
-MCP-purpose tokens cannot authenticate direct REST requests. MCP authentication integration is not implemented yet.
+MCP-purpose tokens can authenticate only operations exposed as MCP tools (routes tagged `MCP`),
+including direct REST calls to those operations. Other protected REST operations reject them
+with HTTP 401. Account status, project membership, and role checks still apply.
+MCP transport authentication integration is not implemented yet.
 
 Using an authenticated browser session (including the CSRF header), create an MCP token with
 `POST /users/me/tokens` and a JSON body such as

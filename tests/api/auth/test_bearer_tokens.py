@@ -75,10 +75,15 @@ async def test_only_the_hash_is_stored(
 
 
 @pytest.mark.asyncio
-async def test_revoked_token_is_rejected(unauthenticated_api_client, setup_db_auth):
+@pytest.mark.parametrize("purpose", ["api", "mcp"])
+async def test_revoked_token_is_rejected(
+    unauthenticated_api_client, setup_db_auth, purpose
+):
     client = unauthenticated_api_client
-    created = await _create(client)
-    response = await client.get("/auth/me", headers=_bearer(created["token"]))
+    created = await _create(client, purpose=purpose)
+    response = await client.get(
+        f"/users/{USER_ALICE_ID}", headers=_bearer(created["token"])
+    )
     assert response.status_code == 200
 
     response = await client.delete(
@@ -87,7 +92,9 @@ async def test_revoked_token_is_rejected(unauthenticated_api_client, setup_db_au
     )
     assert response.status_code == 204
 
-    response = await client.get("/auth/me", headers=_bearer(created["token"]))
+    response = await client.get(
+        f"/users/{USER_ALICE_ID}", headers=_bearer(created["token"])
+    )
     assert response.status_code == 401
 
 
@@ -109,16 +116,19 @@ async def test_cannot_revoke_another_users_token(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("purpose", ["api", "mcp"])
 async def test_expired_token_is_rejected(
-    unauthenticated_api_client, setup_db_auth, db_client
+    unauthenticated_api_client, setup_db_auth, db_client, purpose
 ):
     client = unauthenticated_api_client
-    created = await _create(client)
+    created = await _create(client, purpose=purpose)
     await db_client.db["bearer_tokens"].update_many(
         {}, {"$set": {"created_at": time.time() - 100, "expires_at": time.time() - 1}}
     )
 
-    response = await client.get("/auth/me", headers=_bearer(created["token"]))
+    response = await client.get(
+        f"/users/{USER_ALICE_ID}", headers=_bearer(created["token"])
+    )
     assert response.status_code == 401
     assert await db_client.db["bearer_tokens"].count_documents({}) == 0
 
@@ -132,11 +142,12 @@ async def test_unknown_token_is_rejected(unauthenticated_api_client, setup_db_au
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("purpose", ["api", "mcp"])
 async def test_token_of_deactivated_user_is_rejected(
-    unauthenticated_api_client, setup_db_auth
+    unauthenticated_api_client, setup_db_auth, purpose
 ):
     client = unauthenticated_api_client
-    created = await _create(client)
+    created = await _create(client, purpose=purpose)
 
     response = await client.put(
         f"/users/{setup_db_auth['alice_id']}",
@@ -145,7 +156,9 @@ async def test_token_of_deactivated_user_is_rejected(
     )
     assert response.status_code == 200
 
-    response = await client.get("/auth/me", headers=_bearer(created["token"]))
+    response = await client.get(
+        f"/users/{USER_ALICE_ID}", headers=_bearer(created["token"])
+    )
     assert response.status_code == 401
 
 
@@ -272,6 +285,11 @@ async def test_mcp_token_authentication_and_revocation(
         )
         == USER_ALICE_ID
     )
+    response = await client.get(
+        f"/users/{USER_ALICE_ID}", headers=_bearer(created["token"])
+    )
+    assert response.status_code == 200
+    assert response.json()["username"] == "alice"
     response = await client.get("/auth/me", headers=_bearer(created["token"]))
     assert response.status_code == 401
     response = await client.delete(
@@ -285,6 +303,55 @@ async def test_mcp_token_authentication_and_revocation(
         )
         is None
     )
+
+
+@pytest.mark.asyncio
+async def test_mcp_token_cannot_manage_tokens(
+    unauthenticated_api_client, setup_db_auth
+):
+    client = unauthenticated_api_client
+    created = await _create(client, purpose="mcp")
+    headers = _bearer(created["token"])
+
+    assert (await client.get("/users/me/tokens", headers=headers)).status_code == 401
+    response = await client.post(
+        "/users/me/tokens", json={"name": "more", "purpose": "mcp"}, headers=headers
+    )
+    assert response.status_code == 401
+    response = await client.delete(
+        f"/users/me/tokens/{created['_id']}", headers=headers
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_admin_mcp_token_cannot_access_untagged_operation(
+    unauthenticated_api_client, setup_db_auth
+):
+    client = unauthenticated_api_client
+    created = await _create(client, user_id=USER_ADMIN_ID, purpose="mcp")
+    headers = {**_bearer(created["token"]), "X-MCP": "true"}
+    response = await client.get(f"/users/{USER_ALICE_ID}", headers=headers)
+    assert response.status_code == 200
+
+    response = await client.put(
+        f"/users/{USER_ALICE_ID}", json={"is_active": False}, headers=headers
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_mcp_access_uses_stored_purpose_not_prefix(
+    unauthenticated_api_client, setup_db_auth, db_client
+):
+    client = unauthenticated_api_client
+    created = await _create(client, purpose="api")
+    await db_client.db["bearer_tokens"].update_many({}, {"$set": {"purpose": "mcp"}})
+    headers = _bearer(created["token"])
+    response = await client.get(f"/users/{USER_ALICE_ID}", headers=headers)
+    assert response.status_code == 200
+    response = await client.get("/auth/me", headers=headers)
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -334,10 +401,11 @@ def test_create_schema_rejects_non_positive_lifetime(expires_in_days: int):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("purpose", ["api", "mcp"])
 async def test_bearer_token_follows_project_membership(
-    unauthenticated_api_client, setup_db_auth
+    unauthenticated_api_client, setup_db_auth, purpose
 ):
-    created = await _create(unauthenticated_api_client)
+    created = await _create(unauthenticated_api_client, purpose=purpose)
     response = await unauthenticated_api_client.get(
         f"/projects/{setup_db_auth['project_id']}/samples",
         headers=_bearer(created["token"]),

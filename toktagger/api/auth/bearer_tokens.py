@@ -74,9 +74,9 @@ async def revoke_bearer_token(
 async def authenticate_bearer_token(
     db_client: MongoDBClient,
     token: str,
-    purpose: Literal["api", "mcp"] = "api",
+    purpose: Literal["api", "mcp"] | None = "api",
 ) -> str | None:
-    """Return the user ID for a valid token with the requested purpose."""
+    """Return the owner of a valid token; purpose=None accepts either purpose."""
     documents = await db_client.get_filtered_documents(
         "bearer_tokens", {"token_hash": _hash(token)}, limit=1
     )
@@ -85,7 +85,7 @@ async def authenticate_bearer_token(
         return None
     document = documents[0]
     bearer_token = BearerToken.model_validate(document)
-    if bearer_token.purpose != purpose:
+    if purpose is not None and bearer_token.purpose != purpose:
         return None
     if bearer_token.expires_at <= now:
         await db_client.delete_filtered_documents(
