@@ -34,7 +34,7 @@ from toktagger.api.auth.core import get_internal_token, get_signing_secret
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
-from toktagger.api.routers.mcp import INSTRUCTIONS
+from toktagger.api.routers.mcp import INSTRUCTIONS, forward_mcp_authorization
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.auth import router as auth_router
@@ -321,6 +321,9 @@ class Server:
                 self._api_app,
                 name="toktagger",
                 instructions=INSTRUCTIONS,
+                httpx_client_kwargs={
+                    "event_hooks": {"request": [forward_mcp_authorization]}
+                },
                 route_maps=[
                     # Tagged routers turned into tools
                     RouteMap(

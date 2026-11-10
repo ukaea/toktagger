@@ -1,3 +1,17 @@
+from fastmcp.server.dependencies import get_http_request
+from httpx2 import Request
+
+
+async def forward_mcp_authorization(request: Request) -> None:
+    try:
+        authorization = get_http_request().headers.get("authorization")
+    except RuntimeError:
+        return
+    if authorization:
+        # Only this request gets the caller credential; shared client headers stay untouched.
+        request.headers["Authorization"] = authorization
+
+
 INSTRUCTIONS = """
     TokTagger is a human-in-the-loop annotation platform for fusion tokamak data.
 

@@ -213,7 +213,9 @@ Personal bearer tokens have a purpose: `api` for REST scripts or `mcp` for MCP c
 MCP-purpose tokens can authenticate only operations exposed as MCP tools (routes tagged `MCP`),
 including direct REST calls to those operations. Other protected REST operations reject them
 with HTTP 401. Account status, project membership, and role checks still apply.
-MCP transport authentication integration is not implemented yet.
+Configure your MCP client to send `Authorization: Bearer <token>` on every request to `/mcp/`.
+TokTagger forwards that header to its internal API for tool authentication; browser cookies
+are not forwarded. MCP initialization and tool discovery do not currently require authentication.
 
 Using an authenticated browser session (including the CSRF header), create an MCP token with
 `POST /users/me/tokens` and a JSON body such as

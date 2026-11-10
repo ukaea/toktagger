@@ -6,17 +6,20 @@ import pathlib
 import tempfile
 import time
 
+import httpx2
 import pytest
 import pytest_asyncio
 import requests
 from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
 from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
 
 from tests import db_definitions, endpoints
 from tests.db_definitions import USER_ADMIN_ID
 from tests.identity import get_auth_token, session_cookies, session_headers
 from toktagger.api import config
+from toktagger.api.auth import bearer_tokens
 from toktagger.api.auth.canaille import ManagedCanaille, managed_idp
 from toktagger.api.auth.cookies import CSRF_COOKIE_NAME
 from toktagger.api.crud.db import MongoDBClient
@@ -165,13 +168,16 @@ async def unauthenticated_api_client(api_server, db_client):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def api_client(unauthenticated_api_client, db_client):
-    # Auth is always required now — seed the admin user and authenticate as them
-    await db_client.insert(
+async def admin_user(db_client):
+    return await db_client.insert(
         "users",
         db_definitions.USER_ADMIN,
         ids={"_id": ObjectId(db_definitions.USER_ADMIN_ID)},
     )
+
+
+@pytest_asyncio.fixture(scope="function")
+async def api_client(unauthenticated_api_client, admin_user):
     unauthenticated_api_client.headers.update(
         session_headers(get_auth_token(USER_ADMIN_ID))
     )
@@ -179,13 +185,55 @@ async def api_client(unauthenticated_api_client, db_client):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def mcp_client(api_server, db_client):
-    # Lifespan
+async def mcp_client(api_server, db_client, admin_user):
     api_server._api_app.state.db_client = db_client
     api_server._api_app.state.project = None
+    api_server._api_app.state.idp = None
+    token = await bearer_tokens.create_bearer_token(
+        db_client,
+        user_id=admin_user,
+        name="test MCP client",
+        lifetime_seconds=3600,
+        purpose="mcp",
+    )
 
-    async with Client(api_server._mcp_app) as client:
-        yield client
+    # Stateless JSON responses let ASGI tests exercise HTTP without an idle SSE stream.
+    mcp_http_app = api_server._mcp_app.http_app(
+        "/", stateless_http=True, json_response=True
+    )
+
+    def http_client_factory(**kwargs):
+        return httpx2.AsyncClient(
+            transport=httpx2.ASGITransport(app=mcp_http_app), **kwargs
+        )
+
+    transport = StreamableHttpTransport(
+        "http://test/",
+        headers={"Authorization": f"Bearer {token.token}"},
+        httpx_client_factory=http_client_factory,
+    )
+    ready = asyncio.get_running_loop().create_future()
+    shutdown = asyncio.Event()
+
+    async def run_mcp_app():
+        try:
+            async with mcp_http_app.router.lifespan_context(mcp_http_app):
+                ready.set_result(None)
+                await shutdown.wait()
+        except BaseException as error:
+            if not ready.done():
+                ready.set_exception(error)
+            raise
+
+    # AnyIO lifespan scopes must enter and exit in the same task across fixture yield.
+    lifespan_task = asyncio.create_task(run_mcp_app())
+    try:
+        await ready
+        async with Client(transport) as client:
+            yield client
+    finally:
+        shutdown.set()
+        await lifespan_task
 
 
 @pytest_asyncio.fixture(scope="function")

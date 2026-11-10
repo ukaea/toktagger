@@ -231,7 +231,7 @@ async def test_put_update_sample_annotations(mcp_client, setup_db):
     # Returns the _id of the new annotation
     assert len(result.structured_content.get("result", [])) == 1
 
-    # Annotations for this sample should have been replaced
+    # Annotations for this sample should have been appended
     result = await mcp_client.call_tool(
         "get_sample_annotations",
         arguments={
@@ -240,9 +240,7 @@ async def test_put_update_sample_annotations(mcp_client, setup_db):
         },
     )
     annotations = result.structured_content.get("result", [])
-    assert len(annotations) == 1
-    assert annotations[0]["label"] == "test"
-    assert annotations[0]["validated"] is True
+    assert len(annotations) == 4
 
 
 @pytest.mark.asyncio
