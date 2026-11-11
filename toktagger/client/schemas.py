@@ -9,7 +9,7 @@ from toktagger.api.schemas.data import (
     DataParams,
     DataResponseType,
 )
-from toktagger.api.schemas.projects import Project as ProjectSchema
+from toktagger.api.schemas.projects import Project as ProjectSchema, ProjectUpdate
 from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
@@ -51,6 +51,10 @@ class Project(ProjectSchema):
                 "to use its methods."
             )
         return self._client
+
+    def update(self, updates: ProjectUpdate) -> Project:
+        """Return an updated project without changing this local instance."""
+        return self._require_client().update_project(self.id, updates)
 
     def list_samples(
         self,

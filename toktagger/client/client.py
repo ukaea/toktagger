@@ -1,4 +1,4 @@
-"""Stateless Python client for creating projects and retrieving TokTagger data."""
+"""Stateless Python client for managing projects and retrieving TokTagger data."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from toktagger.api.schemas.data import (
     DataParams,
     DataResponseType,
 )
-from toktagger.api.schemas.projects import ProjectIn
+from toktagger.api.schemas.projects import ProjectIn, ProjectUpdate
 from toktagger.api.schemas.samples import SampleSummary
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
@@ -260,6 +260,12 @@ class TokTaggerClient:
         data = self._request("POST", "/projects", json=body).json()
         # Creation returns only an ID; fetch the server's stored configuration.
         return self.get_project(data["_id"])
+
+    def update_project(self, project_id: str, updates: ProjectUpdate) -> Project:
+        """Apply partial updates and return a freshly fetched, client-bound project."""
+        body = updates.model_dump(mode="json", exclude_unset=True)
+        self._request("PUT", f"/projects/{project_id}", json=body)
+        return self.get_project(project_id)
 
     def list_samples(
         self,

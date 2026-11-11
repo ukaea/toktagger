@@ -2,7 +2,7 @@
 
 TokTagger ships with a Python client (`toktagger.client`) for pulling labelled data from a running TokTagger server programmatically, without going through the UI. You can fetch projects, samples, sample data (time series, images, 2D profiles) and annotations, and convert them straight into pandas, xarray and numpy objects — handy for building ML pipelines or doing offline analysis on your labelled datasets.
 
-The client can create projects and fetch data. It cannot yet modify projects or create or modify samples or annotations.
+The client can create and update projects and fetch data. It cannot yet create or modify samples or annotations.
 
 ## Installation
 
@@ -81,6 +81,28 @@ Set `TOKTAGGER_API_TOKEN` or pass `api_token` when constructing the client. The 
 `ProjectIn` validates the configuration and supplies the same defaults as the API. Unlike the returned `Project`, it does not require an ID. Using a schema also keeps label and time settings in one place rather than duplicating them as method parameters; the trade-off is the extra import and schema construction.
 
 The method posts the configuration, then fetches the stored project using the returned ID. The result supports the same chained lookups as other client methods. API and connection errors use the normal client exceptions. If the follow-up fetch fails, the project may already have been created; check before retrying to avoid duplicates.
+
+## Updating Projects
+
+Use `ProjectUpdate` to change only the fields you specify:
+
+```python
+from toktagger.api.schemas.projects import ProjectUpdate, QueryStrategyType
+
+project = client.update_project(
+    project_id,
+    ProjectUpdate(name="New name", query_strategy=QueryStrategyType.SEQUENTIAL),
+)
+
+# The same operation using a client-bound project:
+project = project.update(ProjectUpdate(time_min=0.0, time_region_labels=[]))
+```
+
+Both methods return a freshly fetched, client-bound `Project`. `project.update()` does not change the original local object; assign its return value to keep your local reference current.
+
+Unspecified fields remain unchanged. The backend also ignores `None` values; they do not clear existing settings. An empty label list (`[]`) does clear that label list. Task and data loader cannot be changed through `ProjectUpdate`. Updating requires project-admin or global-admin permissions.
+
+As with creation, updating is followed by a GET request. If that fetch fails, the update may already have been saved.
 
 ## Fetching Projects and Samples
 

@@ -4,8 +4,10 @@ import pandas as pd
 import pytest
 from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
+from toktagger.api.schemas.projects import ProjectUpdate
 from toktagger.api.schemas.samples import SampleSummary
 from toktagger.client.client import (
+    Project,
     Sample,
 )
 from toktagger.client.exceptions import (
@@ -14,6 +16,26 @@ from toktagger.client.exceptions import (
 
 # Valid ObjectId format but absent from the server database
 MISSING_OBJECT_ID = "0" * 24
+
+
+def test_update_project(integration_toktagger_client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+    project = integration_toktagger_client.get_project(project_id)
+
+    updated_project = project.update(ProjectUpdate(name="updated_project"))
+
+    assert isinstance(updated_project, Project)
+    assert updated_project._client is integration_toktagger_client
+    assert updated_project.model_dump() == {
+        **project.model_dump(),
+        "name": "updated_project",
+    }
+    assert project.name == "seeded_project_with_samples"
+    stored_project = integration_toktagger_client.get_project(project_id)
+    assert stored_project.model_dump() == updated_project.model_dump()
+    assert sorted(sample.id for sample in updated_project.list_samples()) == sorted(
+        sample_ids
+    )
 
 
 def test_list_samples(integration_toktagger_client, seeded_project_with_samples):

@@ -1,6 +1,7 @@
 import httpx
 import pytest
 
+from toktagger.api.schemas.projects import ProjectUpdate
 from toktagger.client.client import Project, TokTaggerClient
 from toktagger.client.exceptions import (
     MultipleResultsFoundError,
@@ -72,6 +73,8 @@ def test_project_method_without_client_raises(toktagger_client, setup_db):
     ).json()
     project = Project.model_validate(raw)
     assert project._client is None
+    with pytest.raises(TokTaggerClientError, match="no client attached"):
+        project.update(ProjectUpdate(name="updated_project"))
     with pytest.raises(TokTaggerClientError, match="no client attached"):
         project.list_samples()
     with pytest.raises(TokTaggerClientError):

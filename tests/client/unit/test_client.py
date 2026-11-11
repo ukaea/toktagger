@@ -14,7 +14,11 @@ from toktagger.api.schemas.data import (
     ImageParams,
     MultiVariateTimeSeriesData,
 )
-from toktagger.api.schemas.projects import Project as ProjectSchema
+from toktagger.api.schemas.projects import (
+    Project as ProjectSchema,
+    ProjectUpdate,
+    QueryStrategyType,
+)
 from toktagger.api.schemas.samples import ImageFileData, SampleIn
 from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
 from toktagger.client import TokTaggerClient
@@ -170,6 +174,38 @@ def test_create_project_server_validation_error(toktagger_client):
     assert exc_info.value.status_code == 422
     assert "data_loader" in exc_info.value.detail
     assert toktagger_client.list_projects() == []
+
+
+def test_update_project(toktagger_client, setup_db):
+    project = toktagger_client.get_project(setup_db["project_id_1"])
+    updates = ProjectUpdate(
+        name="updated_project", query_strategy=QueryStrategyType.RANDOM
+    )
+    updated_project = toktagger_client.update_project(project.id, updates)
+
+    assert isinstance(updated_project, Project)
+    assert updated_project._client is toktagger_client
+    assert updated_project.query_strategy == "random"
+    assert updated_project.name == "updated_project"
+    assert updated_project.id == setup_db["project_id_1"]
+    assert len(updated_project.list_samples()) == 2
+
+
+def test_update_project_missing(toktagger_client):
+    with pytest.raises(NotFoundError) as exc_info:
+        toktagger_client.update_project("0" * 24, ProjectUpdate(name="updated"))
+    assert exc_info.value.status_code == 404
+
+
+def test_project_update_delegates(toktagger_client, setup_db):
+    project = toktagger_client.get_project(setup_db["project_id_1"])
+
+    updated_project = project.update(ProjectUpdate(name="updated_project"))
+
+    assert isinstance(updated_project, Project)
+    assert updated_project._client is toktagger_client
+    assert updated_project.name == "updated_project"
+    assert project.name == db_definitions.PROJECT_1.name
 
 
 def test_get_project_returns_bootstrapped(toktagger_client, setup_db):

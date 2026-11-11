@@ -8,6 +8,7 @@ import tests.db_definitions as db_definitions
 from tests import endpoints
 from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
+from toktagger.api.schemas.projects import ProjectUpdate, QueryStrategyType
 from toktagger.api.schemas.samples import SampleSummary
 from toktagger.client.client import (
     Project,
@@ -77,6 +78,49 @@ def test_create_project(integration_toktagger_client, project_definition):
     members = endpoints.get_project_members(project.id)
     assert len(members) == 1
     assert members[0]["role"] == "admin"
+
+
+@pytest.mark.parametrize(
+    "updates",
+    [
+        ProjectUpdate(
+            name="updated_project", query_strategy=QueryStrategyType.SEQUENTIAL
+        ),
+        ProjectUpdate(time_min=0.0, time_max=1.5, min_time_step=0.001),
+        ProjectUpdate(shot_labels=[], time_region_labels=["Flat Top"]),
+        ProjectUpdate(),
+        ProjectUpdate(name=None, time_min=None),
+    ],
+    ids=[
+        "name-and-strategy",
+        "time-window",
+        "labels",
+        "no-changes",
+        "ignored-null-values",
+    ],
+)
+def test_update_project(integration_toktagger_client, seeded_project, updates):
+    project = integration_toktagger_client.get_project(seeded_project[0])
+
+    updated_project = integration_toktagger_client.update_project(project.id, updates)
+
+    assert isinstance(updated_project, Project)
+    assert updated_project._client is integration_toktagger_client
+    assert updated_project.model_dump() == {
+        **project.model_dump(),
+        **updates.model_dump(mode="json", exclude_unset=True, exclude_none=True),
+    }
+    stored_project = integration_toktagger_client.get_project(project.id)
+    assert stored_project.model_dump() == updated_project.model_dump()
+    assert updated_project.list_samples() == []
+
+
+def test_update_project_missing(integration_toktagger_client):
+    with pytest.raises(NotFoundError) as exc_info:
+        integration_toktagger_client.update_project(
+            MISSING_OBJECT_ID, ProjectUpdate(name="updated_project")
+        )
+    assert exc_info.value.status_code == 404
 
 
 def test_get_project(integration_toktagger_client, seeded_project):
