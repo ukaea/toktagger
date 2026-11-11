@@ -14,6 +14,14 @@ class TokTaggerAPIError(TokTaggerClientError):
         super().__init__(f"TokTagger API error (status {status_code}): {detail}")
 
 
+class AuthenticationError(TokTaggerClientError):
+    """401 response, indicating failure to authenticate."""
+
+
+class PermissionError(TokTaggerAPIError):
+    """403 response, indicating permissions error."""
+
+
 class NotFoundError(TokTaggerAPIError):
     """404 response, or a by-name / by-shot-id lookup which matched nothing."""
 

@@ -168,6 +168,10 @@ class Server(pydantic.BaseModel):
         description="The directory to use for storing entries in the Mongita database, if used.",
         validate_default=True,
     )
+    mcp_enabled: bool = pydantic.Field(
+        True,
+        description="Whether to launch an MCP server for use with LLM agents.",
+    )
     forwarded_allow_ips: str = pydantic.Field(
         "127.0.0.1",
         description="Comma-separated addresses of reverse proxies whose X-Forwarded-* headers TokTagger trusts. Use `*` only when the proxy is the only host that can reach TokTagger.",

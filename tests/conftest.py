@@ -11,11 +11,15 @@ import pytest_asyncio
 import requests
 from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
+from fastmcp import Client
+from fastmcp.utilities.asgi_transport import run_asgi_lifespan
+from fastmcp.client.transports import StreamableHttpTransport
 
 from tests import db_definitions, endpoints
 from tests.db_definitions import USER_ADMIN_ID
 from tests.identity import get_auth_token, session_cookies, session_headers
 from toktagger.api import config
+from toktagger.api.auth import bearer_tokens
 from toktagger.api.auth.canaille import ManagedCanaille, managed_idp
 from toktagger.api.auth.cookies import CSRF_COOKIE_NAME
 from toktagger.api.crud.db import MongoDBClient
@@ -130,12 +134,12 @@ async def db_client(settings):
     await db_client.delete_filtered_documents("users")
     await db_client.delete_filtered_documents("project_members")
     await db_client.delete_filtered_documents("sessions")
-    await db_client.delete_filtered_documents("api_tokens")
+    await db_client.delete_filtered_documents("bearer_tokens")
     await db_client.client.close()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
+async def api_server(tmp_path, monkeypatch, db_client):
     monkeypatch.setattr(config.settings.server, "cache_dir", tmp_path)
     monkeypatch.setattr(auth_core, "_serializer", None)
     monkeypatch.setattr(auth_core, "_fernet", None)
@@ -144,7 +148,13 @@ async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
     server.testing_mode = True
     monkeypatch.setenv("API_URL", "http://test")
     server._setup_app()
-    app = server.app
+
+    yield server
+
+
+@pytest_asyncio.fixture(scope="function")
+async def unauthenticated_api_client(api_server, db_client):
+    app = api_server.app
     app.state.db_client = db_client
     app.state.project = None
     app.state.idp = None
@@ -158,17 +168,58 @@ async def unauthenticated_api_client(tmp_path, monkeypatch, db_client):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def api_client(unauthenticated_api_client, db_client):
-    # Auth is always required now — seed the admin user and authenticate as them
-    await db_client.insert(
+async def admin_user(db_client):
+    return await db_client.insert(
         "users",
         db_definitions.USER_ADMIN,
         ids={"_id": ObjectId(db_definitions.USER_ADMIN_ID)},
     )
+
+
+@pytest_asyncio.fixture(scope="function")
+async def api_client(unauthenticated_api_client, admin_user):
     unauthenticated_api_client.headers.update(
         session_headers(get_auth_token(USER_ADMIN_ID))
     )
     yield unauthenticated_api_client
+
+
+@pytest_asyncio.fixture
+async def mcp_client(api_server, db_client, admin_user):
+    api_server._api_app.state.db_client = db_client
+    api_server._api_app.state.project = None
+    api_server._api_app.state.idp = None
+
+    token = await bearer_tokens.create_bearer_token(
+        db_client,
+        user_id=admin_user,
+        name="test MCP client",
+        lifetime_seconds=3600,
+        purpose="mcp",
+    )
+
+    app = api_server._mcp_app.http_app(
+        "/",
+        stateless_http=True,
+        json_response=True,
+    )
+
+    def http_client_factory(**kwargs):
+        return AsyncClient(
+            transport=ASGITransport(app=app),
+            **kwargs,
+        )
+
+    transport = StreamableHttpTransport(
+        "http://test/",
+        headers={
+            "Authorization": f"Bearer {token.token}",
+        },
+        httpx_client_factory=http_client_factory,
+    )
+    async with run_asgi_lifespan(app):
+        async with Client(transport) as client:
+            yield client
 
 
 @pytest_asyncio.fixture(scope="function")

@@ -111,7 +111,7 @@ const eslintConfig = [
       "src/app/components/tools/polygon.tsx",
       "src/app/components/tools/timePoint.tsx",
       "src/app/components/tools/timeRegion.tsx",
-      "src/app/components/ui/apiTokens.tsx",
+      "src/app/components/ui/bearerTokens.tsx",
       "src/app/contexts/AuthContext.tsx",
       "src/app/contexts/SampleContext.tsx",
       "src/app/contexts/apiSchema.tsx",

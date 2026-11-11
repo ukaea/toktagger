@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import httpx
+import os
 from pydantic import TypeAdapter
 
 from toktagger.api.schemas.annotations import (
@@ -22,6 +23,8 @@ from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 from toktagger.client.exceptions import (
     MultipleResultsFoundError,
     NotFoundError,
+    AuthenticationError,
+    PermissionError,
     TokTaggerAPIError,
     TokTaggerClientError,
 )
@@ -65,8 +68,8 @@ class TokTaggerClient:
     def __init__(
         self,
         base_url: str = "http://localhost:8002",
+        api_token: str | None = os.environ.get("TOKTAGGER_API_TOKEN"),
         timeout: float = 30.0,
-        headers: dict[str, str] | None = None,
         transport: httpx.BaseTransport | None = None,
     ):
         """Create a client for the TokTagger API.
@@ -77,18 +80,25 @@ class TokTaggerClient:
             Base URL of the TokTagger server; a trailing slash is stripped, by default "http://localhost:8002"
         timeout : float
             Per-request HTTP timeout, in seconds, by default 30.0
-        headers : dict of str, optional
-            Extra HTTP headers to send with every request.
         transport : httpx.BaseTransport, optional
             A custom httpx transport. Intended as a test hook (e.g.
             `httpx.MockTransport`); leave unset for normal use.
         """
+        if not api_token:
+            raise TokTaggerClientError(
+                """No API token specified! 
+                Create one via the UI and specify it when initializing the Client,
+                or set it as the `TOKTAGGER_API_TOKEN` environment variable."""
+            )
+
         # transport is a test hook, eg httpx.MockTransport
         self._base_url = base_url.rstrip("/")
         self._http = httpx.Client(
             base_url=self._base_url,
             timeout=timeout,
-            headers=headers or {},
+            headers={
+                "Authorization": f"Bearer {api_token}",
+            },
             transport=transport,
         )
 
@@ -534,7 +544,14 @@ class TokTaggerClient:
 
         if response.status_code >= 400:
             detail = self._extract_detail(response)
-            if response.status_code == 404:
+            if response.status_code == 401:
+                raise AuthenticationError(
+                    response.status_code,
+                    "Client could not authenticate with the TokTagger server - have you set a valid API token?",
+                )
+            elif response.status_code == 403:
+                raise PermissionError(response.status_code, detail)
+            elif response.status_code == 404:
                 raise NotFoundError(response.status_code, detail)
             raise TokTaggerAPIError(response.status_code, detail)
         return response
