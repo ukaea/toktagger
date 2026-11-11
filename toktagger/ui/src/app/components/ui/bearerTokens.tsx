@@ -66,7 +66,7 @@ export default function BearerTokens({ purpose }: { purpose: "api" | "mcp" }) {
     const parsed = z.array(BearerTokenSchema).safeParse(await res.json());
     if (!parsed.success) throw new Error("Unexpected token list");
     setTokens(parsed.data);
-  }, []);
+  }, [purpose]);
 
   useEffect(() => {
     refresh().catch(showError);
