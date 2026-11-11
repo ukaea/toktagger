@@ -1,66 +1,63 @@
 import httpx
 import pytest
-from toktagger.client.client import Project
+
+from toktagger.client.client import Project, TokTaggerClient
 from toktagger.client.exceptions import (
     MultipleResultsFoundError,
     NotFoundError,
     TokTaggerAPIError,
     TokTaggerClientError,
 )
-from tests.client.conftest import (
-    make_client,
-)
 
 
-def test_404_raises_not_found_error():
-    client = make_client(
-        lambda request: httpx.Response(404, json={"detail": "Project not found."})
-    )
+def test_404_raises_not_found_error(toktagger_client, setup_db):
     with pytest.raises(NotFoundError) as exc_info:
-        client._request("GET", f"/projects/{'0' * 24}")
+        toktagger_client.get_project("0" * 24)
     assert exc_info.value.status_code == 404
-    assert exc_info.value.detail == "Project not found."
+    assert exc_info.value.detail == "Project not found with that ID."
 
 
-def test_non_404_error_raises_api_error():
-    client = make_client(lambda request: httpx.Response(500, json={"detail": "boom"}))
+def test_non_404_error_raises_api_error(toktagger_client, setup_db):
     with pytest.raises(TokTaggerAPIError) as exc_info:
-        client._request("GET", "/projects")
+        toktagger_client._request(
+            "GET", "/projects", params={"sort_direction": "invalid"}
+        )
     assert not isinstance(exc_info.value, NotFoundError)
-    assert exc_info.value.status_code == 500
-    assert exc_info.value.detail == "boom"
+    assert exc_info.value.status_code == 422
+    assert "Input should be 'ascending' or 'descending'" in exc_info.value.detail
 
 
 def test_non_json_error_body_uses_text():
-    client = make_client(lambda request: httpx.Response(400, text="Bad Request"))
+    # Plain-text errors are parsed independently of the API's JSON error handlers.
+    response = httpx.Response(400, text="Bad Request")
+    assert TokTaggerClient._extract_detail(response) == "Bad Request"
+
+
+def test_list_error_detail_is_stringified(toktagger_client, setup_db):
     with pytest.raises(TokTaggerAPIError) as exc_info:
-        client._request("GET", "/projects")
-    assert exc_info.value.detail == "Bad Request"
-
-
-def test_list_error_detail_is_stringified():
-    # FastAPI validation errors return detail as a list
-    client = make_client(
-        lambda request: httpx.Response(
-            422, json={"detail": [{"msg": "field required"}]}
+        toktagger_client._request(
+            "GET",
+            f"/projects/{setup_db['project_id_1']}/samples",
+            params={"shot_id": "invalid"},
         )
-    )
-    with pytest.raises(TokTaggerAPIError) as exc_info:
-        client._request("POST", "/projects")
-    assert "field required" in exc_info.value.detail
+    assert exc_info.value.status_code == 422
+    assert "Input should be a valid integer" in exc_info.value.detail
 
 
-def test_transport_error_wrapped():
-    def handler(request: httpx.Request) -> httpx.Response:
+def test_transport_error_wrapped(toktagger_client):
+    # Inject only the unreachable-server failure; normal requests use the test API.
+    def fail_request(request):
         raise httpx.ConnectError("connection refused", request=request)
 
-    client = make_client(handler)
-    with pytest.raises(TokTaggerClientError):
-        client.health()
+    toktagger_client._http.event_hooks["request"].append(fail_request)
+    with pytest.raises(
+        TokTaggerClientError, match="Failed to reach TokTagger server"
+    ) as exc_info:
+        toktagger_client.health()
+    assert isinstance(exc_info.value.__cause__, httpx.ConnectError)
 
 
 def test_error_hierarchy():
-    # Client-side lookup errors: no status code, not API errors
     multiple = MultipleResultsFoundError("2 projects matched name 'tokamak'")
     assert isinstance(multiple, TokTaggerClientError)
     assert not isinstance(multiple, TokTaggerAPIError)
@@ -69,13 +66,16 @@ def test_error_hierarchy():
     assert not_found.status_code is None
 
 
-def test_project_method_without_client_raises(project_1, sample_1):
-    project = Project.model_validate(project_1)
+def test_project_method_without_client_raises(toktagger_client, setup_db):
+    raw = toktagger_client._request(
+        "GET", f"/projects/{setup_db['project_id_1']}"
+    ).json()
+    project = Project.model_validate(raw)
     assert project._client is None
     with pytest.raises(TokTaggerClientError, match="no client attached"):
         project.list_samples()
     with pytest.raises(TokTaggerClientError):
-        project.get_sample(sample_1["_id"])
+        project.get_sample(setup_db["sample_id_1"])
     with pytest.raises(TokTaggerClientError):
         project.get_sample_by_shot_id(1)
     with pytest.raises(TokTaggerClientError):

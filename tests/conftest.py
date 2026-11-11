@@ -10,7 +10,7 @@ import pytest
 import pytest_asyncio
 import requests
 from bson.objectid import ObjectId
-from httpx import ASGITransport, AsyncClient
+from httpx import ASGITransport, AsyncClient, MockTransport, Response
 from fastmcp import Client
 from fastmcp.utilities.asgi_transport import run_asgi_lifespan
 from fastmcp.client.transports import StreamableHttpTransport
@@ -24,6 +24,7 @@ from toktagger.api.auth.canaille import ManagedCanaille, managed_idp
 from toktagger.api.auth.cookies import CSRF_COOKIE_NAME
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.main import Server
+from toktagger.client import TokTaggerClient
 import toktagger.api.auth.core as auth_core
 
 MODELS_ENABLED = importlib.util.find_spec("ray") is not None
@@ -220,6 +221,39 @@ async def mcp_client(api_server, db_client, admin_user):
     async with run_asgi_lifespan(app):
         async with Client(transport) as client:
             yield client
+
+
+@pytest_asyncio.fixture
+async def toktagger_client(unauthenticated_api_client, db_client, admin_user):
+    token = await bearer_tokens.create_bearer_token(
+        db_client,
+        user_id=admin_user,
+        name="test TokTagger client",
+        lifetime_seconds=3600,
+        purpose="api",
+    )
+
+    def forward_request(request):
+        response = asyncio.run(
+            unauthenticated_api_client.request(
+                method=request.method,
+                url=str(request.url),
+                headers=request.headers,
+                content=request.read(),
+            )
+        )
+        return Response(
+            status_code=response.status_code,
+            headers=response.headers,
+            content=response.content,
+        )
+
+    with TokTaggerClient(
+        base_url="http://test",
+        api_token=token.token,
+        transport=MockTransport(forward_request),
+    ) as client:
+        yield client
 
 
 @pytest_asyncio.fixture(scope="function")

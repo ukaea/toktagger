@@ -326,7 +326,6 @@ class Sample(SampleSchema):
     def list_annotations(
         self,
         validated: bool | None = None,
-        created_by: str | None = None,
         start: int = 0,
         count: int = 100,
         sort_by: str = "_id",
@@ -338,8 +337,6 @@ class Sample(SampleSchema):
         ----------
         validated : bool, optional
             If provided, only return annotations with this validation status.
-        created_by : str, optional
-            If provided, only return annotations created by this annotator
             (a model name or "manual").
         start : int
             Number of matching annotations to skip (pagination offset), by default 0
@@ -370,7 +367,6 @@ class Sample(SampleSchema):
             self.project_id,
             sample_id=self.id,
             validated=validated,
-            created_by=created_by,
             start=start,
             count=count,
             sort_by=sort_by,

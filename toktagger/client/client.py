@@ -86,9 +86,7 @@ class TokTaggerClient:
         """
         if not api_token:
             raise TokTaggerClientError(
-                """No API token specified! 
-                Create one via the UI and specify it when initializing the Client,
-                or set it as the `TOKTAGGER_API_TOKEN` environment variable."""
+                "No API token specified! Create one via the UI and specify it when initializing the Client, or set it as the `TOKTAGGER_API_TOKEN` environment variable."
             )
 
         # transport is a test hook, eg httpx.MockTransport
@@ -459,7 +457,6 @@ class TokTaggerClient:
         project_id: str,
         sample_id: str | None = None,
         validated: bool | None = None,
-        created_by: str | None = None,
         start: int = 0,
         count: int = 100,
         sort_by: str = "_id",
@@ -476,8 +473,6 @@ class TokTaggerClient:
             enables the ``created_by`` filter.
         validated : bool, optional
             If provided, only return annotations with this validation status.
-        created_by : str, optional
-            If provided, only return annotations created by this annotator
             (a model name or "manual"); requires ``sample_id``.
         start : int, default: 0
             Number of matching annotations to skip (pagination offset).
@@ -503,12 +498,6 @@ class TokTaggerClient:
             If the API returns a non-2xx response (e.g. 404 if the project or
             sample does not exist).
         """
-        if created_by is not None and sample_id is None:
-            raise TokTaggerClientError(
-                "The created_by filter is only supported at sample level; "
-                "pass sample_id to filter annotations by created_by."
-            )
-
         params = {
             "start": start,
             "count": count,
@@ -517,8 +506,6 @@ class TokTaggerClient:
         }
         if validated is not None:
             params["validated"] = validated
-        if created_by is not None:
-            params["created_by"] = created_by
 
         if sample_id is not None:
             path = f"/projects/{project_id}/samples/{sample_id}/annotations"

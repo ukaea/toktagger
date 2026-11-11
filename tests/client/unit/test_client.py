@@ -1,532 +1,344 @@
-import json
+from pathlib import Path
 
-import httpx
+import numpy as np
+import pandas as pd
 import pytest
+import pytest_asyncio
+from bson import ObjectId
+from PIL import Image
+
 import tests.db_definitions as db_definitions
-from toktagger.api.schemas.annotations import TimeRegion
+from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 from toktagger.api.schemas.data import (
     ImageData,
     ImageParams,
     MultiVariateTimeSeriesData,
 )
 from toktagger.api.schemas.projects import Project as ProjectSchema
+from toktagger.api.schemas.samples import ImageFileData, SampleIn
 from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
-from toktagger.client.client import (
-    Project,
-    Sample,
-    TokTaggerClient,
-)
+from toktagger.client import TokTaggerClient
+from toktagger.client.client import Project, Sample
 from toktagger.client.exceptions import (
     MultipleResultsFoundError,
     NotFoundError,
-    TokTaggerClientError,
-)
-from tests.client.conftest import (
-    make_client,
-    PROJECT_1_ID,
-    PROJECT_2_ID,
-    SAMPLE_1_ID,
-    SAMPLE_2_ID,
-    ANNOTATION_1_ID,
-    ANNOTATION_2_ID,
 )
 
 
-def test_health_parses_json():
-    client = make_client(
-        lambda request: httpx.Response(200, json={"name": "TokTagger"})
+@pytest_asyncio.fixture
+async def duplicate_project(db_client, setup_db):
+    return await db_client.insert("projects", db_definitions.PROJECT_1)
+
+
+@pytest_asyncio.fixture
+async def duplicate_sample(db_client, setup_db):
+    return await db_client.insert(
+        "samples",
+        db_definitions.SAMPLE_1,
+        ids={"project_id": ObjectId(setup_db["project_id_1"])},
     )
-    assert client.health() == {"name": "TokTagger"}
+
+
+@pytest_asyncio.fixture
+async def image_sample(db_client, setup_db):
+    return await db_client.insert(
+        "samples",
+        SampleIn(
+            shot_id=5,
+            data=ImageFileData(
+                file_name=str(Path(__file__).parents[2] / "mast_images"), type="png"
+            ),
+        ),
+        ids={"project_id": ObjectId(setup_db["project_id_3"])},
+    )
+
+
+def test_health_parses_json(toktagger_client):
+    health = toktagger_client.health()
+    assert health["name"] == "TokTagger"
+    assert health["db_connected"] is True
+    assert health["testing_mode"] is True
 
 
 def test_base_url_trailing_slash_removed():
-    client = make_client(
-        lambda request: httpx.Response(200, json={}), base_url="http://localhost:8002/"
+    with TokTaggerClient(
+        base_url="http://localhost:8002/", api_token="test-token"
+    ) as client:
+        assert client._base_url == "http://localhost:8002"
+
+
+def test_headers_are_passed(toktagger_client, setup_db):
+    # Project endpoints require the bearer token created by the shared fixture.
+    assert toktagger_client._http.headers["Authorization"].startswith("Bearer ")
+    assert (
+        toktagger_client.get_project(setup_db["project_id_1"]).id
+        == setup_db["project_id_1"]
     )
-    assert client._base_url == "http://localhost:8002"
 
 
-def test_headers_are_passed():
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"token": request.headers.get("x-token")})
-
-    client = make_client(handler, headers={"X-Token": "secret"})
-    assert client.health()["token"] == "secret"
-
-
-def test_context_manager_closes_client():
-    client = make_client(lambda request: httpx.Response(200, json={}))
-    with client:
-        assert not client._http.is_closed
-    assert client._http.is_closed
+def test_context_manager_closes_client(toktagger_client):
+    with toktagger_client:
+        assert not toktagger_client._http.is_closed
+        assert toktagger_client.health()["db_connected"] is True
+    assert toktagger_client._http.is_closed
 
 
-def test_bootstrap_project(project_1):
-    client = TokTaggerClient()
-    project = client._bootstrap_project(project_1)
-
+def test_bootstrap_project(toktagger_client, setup_db):
+    raw = toktagger_client._request(
+        "GET", f"/projects/{setup_db['project_id_1']}"
+    ).json()
+    project = toktagger_client._bootstrap_project(raw)
     assert isinstance(project, Project)
     assert isinstance(project, ProjectSchema)
-    assert project.id == PROJECT_1_ID
+    assert project.id == setup_db["project_id_1"]
     assert project.name == db_definitions.PROJECT_1.name
-    assert project._client is client
-    # Bootstrapping must not change serialization output
-    assert project.model_dump() == ProjectSchema.model_validate(project_1).model_dump()
+    assert project._client is toktagger_client
+    assert project.model_dump() == ProjectSchema.model_validate(raw).model_dump()
 
 
-def test_bootstrap_sample(sample_1):
-    client = TokTaggerClient()
-    sample = client._bootstrap_sample(sample_1)
-
+def test_bootstrap_sample(toktagger_client, setup_db):
+    raw = toktagger_client._request(
+        "GET", f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}"
+    ).json()
+    sample = toktagger_client._bootstrap_sample(raw)
     assert isinstance(sample, Sample)
     assert isinstance(sample, SampleSchema)
-    assert sample.id == SAMPLE_1_ID
-    assert sample.project_id == PROJECT_1_ID
-    assert sample._client is client
-    assert sample.model_dump() == SampleSchema.model_validate(sample_1).model_dump()
+    assert sample.id == setup_db["sample_id_1"]
+    assert sample.project_id == setup_db["project_id_1"]
+    assert sample._client is toktagger_client
+    assert sample.model_dump() == SampleSchema.model_validate(raw).model_dump()
 
 
-def test_list_projects_returns_bootstrapped(project_1, project_2):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(200, json=[project_1, project_2])
-
-    client = make_client(handler)
-    projects = client.list_projects()
-
-    assert [p.id for p in projects] == [PROJECT_1_ID, PROJECT_2_ID]
-    assert all(isinstance(p, Project) for p in projects)
-    assert all(p._client is client for p in projects)
-    assert requests_seen[0].url.path == "/projects"
-    # defaults are sent explicitly
-    params = requests_seen[0].url.params
-    assert params["sort_by"] == "_id"
-    assert params["sort_direction"] == "descending"
-    assert params["start"] == "0"
-    # the optional name filter is omitted when None
-    assert "name" not in params
+def test_list_projects_returns_bootstrapped(toktagger_client, setup_db):
+    projects = toktagger_client.list_projects()
+    assert [project.id for project in projects] == [
+        setup_db["project_id_3"],
+        setup_db["project_id_2"],
+        setup_db["project_id_1"],
+    ]
+    assert all(isinstance(project, Project) for project in projects)
+    assert all(project._client is toktagger_client for project in projects)
 
 
-def test_list_projects_forwards_filters(project_1, project_2):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(200, json=[project_1, project_2])
-
-    client = make_client(handler)
-    client.list_projects(
-        name="test", start=5, count=3, sort_by="name", sort_direction="ascending"
+def test_list_projects_forwards_filters(toktagger_client, setup_db):
+    projects = toktagger_client.list_projects(
+        name="test_project",
+        start=1,
+        count=1,
+        sort_by="name",
+        sort_direction="ascending",
     )
-
-    params = requests_seen[0].url.params
-    assert params["name"] == "test"
-    assert params["start"] == "5"
-    assert params["count"] == "3"
-    assert params["sort_by"] == "name"
-    assert params["sort_direction"] == "ascending"
+    assert [project.id for project in projects] == [setup_db["project_id_2"]]
 
 
-def test_get_project_returns_bootstrapped(project_1):
-    client = make_client(lambda request: httpx.Response(200, json=project_1))
-    project = client.get_project(PROJECT_1_ID)
+def test_get_project_returns_bootstrapped(toktagger_client, setup_db):
+    project = toktagger_client.get_project(setup_db["project_id_1"])
     assert isinstance(project, Project)
-    assert project.id == PROJECT_1_ID
-    assert project._client is client
+    assert project.id == setup_db["project_id_1"]
+    assert project._client is toktagger_client
 
 
-def test_get_project_by_name_single_match(project_1):
-    client = make_client(lambda request: httpx.Response(200, json=[project_1]))
-    project = client.get_project_by_name("test_project_0")
-    assert project.id == PROJECT_1_ID
-    assert project._client is client
+def test_get_project_by_name_single_match(toktagger_client, setup_db):
+    project = toktagger_client.get_project_by_name(db_definitions.PROJECT_1.name)
+    assert project.id == setup_db["project_id_1"]
+    assert project._client is toktagger_client
 
 
-def test_get_project_by_name_no_match():
-    client = make_client(lambda request: httpx.Response(200, json=[]))
+def test_get_project_by_name_no_match(toktagger_client, setup_db):
     with pytest.raises(NotFoundError) as exc_info:
-        client.get_project_by_name("does not exist")
-    # client-side lookup error: no HTTP status code
+        toktagger_client.get_project_by_name("does not exist")
     assert exc_info.value.status_code is None
 
 
-def test_get_project_by_name_multiple_match(project_1, project_2):
-    client = make_client(
-        lambda request: httpx.Response(200, json=[project_1, project_2])
+def test_get_project_by_name_multiple_match(toktagger_client, duplicate_project):
+    with pytest.raises(MultipleResultsFoundError, match="2 projects"):
+        toktagger_client.get_project_by_name(db_definitions.PROJECT_1.name)
+
+
+def test_list_samples_returns_bootstrapped(toktagger_client, setup_db):
+    samples = toktagger_client.list_samples(setup_db["project_id_1"])
+    assert [sample.id for sample in samples] == [
+        setup_db["sample_id_2"],
+        setup_db["sample_id_1"],
+    ]
+    assert all(isinstance(sample, Sample) for sample in samples)
+    assert all(sample._client is toktagger_client for sample in samples)
+
+
+def test_list_samples_forwards_shot_id_and_count(toktagger_client, setup_db):
+    samples = toktagger_client.list_samples(
+        setup_db["project_id_1"], shot_id=1, count=1
     )
-    with pytest.raises(MultipleResultsFoundError) as exc_info:
-        client.get_project_by_name("project")
-    assert "2 projects" in str(exc_info.value)
+    assert [sample.id for sample in samples] == [setup_db["sample_id_1"]]
+    limited_samples = toktagger_client.list_samples(setup_db["project_id_1"], count=1)
+    assert [sample.id for sample in limited_samples] == [setup_db["sample_id_2"]]
 
 
-# --- list_samples / get_sample / get_sample_by_shot_id / get_samples_summary ---
-
-
-def test_list_samples_returns_bootstrapped(sample_1, sample_2):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(200, json=[sample_1, sample_2])
-
-    client = make_client(handler)
-    samples = client.list_samples(PROJECT_1_ID)
-
-    assert [s.id for s in samples] == [SAMPLE_1_ID, SAMPLE_2_ID]
-    assert all(isinstance(s, Sample) for s in samples)
-    assert all(s._client is client for s in samples)
-    assert requests_seen[0].url.path == f"/projects/{PROJECT_1_ID}/samples"
-    # Default None not forwarded
-    assert "shot_id" not in requests_seen[0].url.params
-
-
-def test_list_samples_forwards_shot_id_and_count(sample_1, sample_2):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(200, json=[sample_1, sample_2])
-
-    client = make_client(handler)
-    client.list_samples(PROJECT_1_ID, shot_id=1, count=2)
-
-    params = requests_seen[0].url.params
-    assert params["shot_id"] == "1"
-    assert params["count"] == "2"
-
-
-def test_get_sample_returns_bootstrapped(sample_1):
-    client = make_client(lambda request: httpx.Response(200, json=sample_1))
-    sample = client.get_sample(PROJECT_1_ID, SAMPLE_1_ID)
+def test_get_sample_returns_bootstrapped(toktagger_client, setup_db):
+    sample = toktagger_client.get_sample(
+        setup_db["project_id_1"], setup_db["sample_id_1"]
+    )
     assert isinstance(sample, Sample)
-    assert sample.id == SAMPLE_1_ID
-    assert sample.project_id == PROJECT_1_ID
-    assert sample._client is client
+    assert sample.id == setup_db["sample_id_1"]
+    assert sample.project_id == setup_db["project_id_1"]
+    assert sample._client is toktagger_client
 
 
-def test_get_sample_by_shot_id_single_match(sample_1):
-    client = make_client(lambda request: httpx.Response(200, json=[sample_1]))
-    sample = client.get_sample_by_shot_id(PROJECT_1_ID, 1)
-    assert sample.id == SAMPLE_1_ID
-    assert sample._client is client
+def test_get_sample_by_shot_id_single_match(toktagger_client, setup_db):
+    sample = toktagger_client.get_sample_by_shot_id(setup_db["project_id_1"], 1)
+    assert sample.id == setup_db["sample_id_1"]
+    assert sample._client is toktagger_client
 
 
-def test_get_sample_by_shot_id_no_match():
-    client = make_client(lambda request: httpx.Response(200, json=[]))
+def test_get_sample_by_shot_id_no_match(toktagger_client, setup_db):
     with pytest.raises(NotFoundError) as exc_info:
-        client.get_sample_by_shot_id(PROJECT_1_ID, 999)
+        toktagger_client.get_sample_by_shot_id(setup_db["project_id_1"], 999)
     assert exc_info.value.status_code is None
 
 
-def test_get_sample_by_shot_id_multiple_match(sample_1, sample_2):
-    client = make_client(lambda request: httpx.Response(200, json=[sample_1, sample_2]))
-    with pytest.raises(MultipleResultsFoundError) as exc_info:
-        client.get_sample_by_shot_id(PROJECT_1_ID, 1)
-    assert "2 samples" in str(exc_info.value)
+def test_get_sample_by_shot_id_multiple_match(
+    toktagger_client, setup_db, duplicate_sample
+):
+    with pytest.raises(MultipleResultsFoundError, match="2 samples"):
+        toktagger_client.get_sample_by_shot_id(setup_db["project_id_1"], 1)
 
 
-# --- bootstrapped Project methods (delegation + chaining) ---
-
-
-def test_project_list_samples_delegates(project_1, sample_1, sample_2):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        if request.url.path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        return httpx.Response(200, json=[sample_1, sample_2])
-
-    client = make_client(handler)
-    project = client.get_project(PROJECT_1_ID)
+def test_project_list_samples_delegates(toktagger_client, setup_db):
+    project = toktagger_client.get_project(setup_db["project_id_1"])
     samples = project.list_samples(shot_id=1)
-
-    assert [s.id for s in samples] == [SAMPLE_1_ID, SAMPLE_2_ID]
-    assert all(isinstance(s, Sample) for s in samples)
-    assert all(s._client is client for s in samples)
-    # delegated to the samples endpoint with the project's own id
-    assert requests_seen[-1].url.path == f"/projects/{PROJECT_1_ID}/samples"
-    assert requests_seen[-1].url.params["shot_id"] == "1"
+    assert [sample.id for sample in samples] == [setup_db["sample_id_1"]]
+    assert all(isinstance(sample, Sample) for sample in samples)
+    assert all(sample._client is toktagger_client for sample in samples)
 
 
-def test_project_get_sample_delegates(project_1, sample_1):
-    def handler(request):
-        if request.url.path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        return httpx.Response(200, json=sample_1)
-
-    client = make_client(handler)
-    project = client.get_project(PROJECT_1_ID)
-    sample = project.get_sample(SAMPLE_1_ID)
-    assert sample.id == SAMPLE_1_ID
-    assert sample._client is client
-
-
-def test_project_get_sample_by_shot_id_delegates(project_1, sample_1):
-    def handler(request):
-        if request.url.path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        return httpx.Response(200, json=[sample_1])
-
-    client = make_client(handler)
-    project = client.get_project(PROJECT_1_ID)
-    sample = project.get_sample_by_shot_id(1)
-    assert sample.id == SAMPLE_1_ID
-
-
-def test_project_get_samples_summary_delegates(project_1):
-    def handler(request):
-        if request.url.path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        return httpx.Response(200, json={"total": 0})
-
-    client = make_client(handler)
-    project = client.get_project(PROJECT_1_ID)
-    summary = project.get_samples_summary()
-    assert isinstance(summary, SampleSummary)
-    assert summary.total == 0
-
-
-def test_chained_retrieval_style(project_1, sample_1):
-    def handler(request):
-        path = request.url.path
-        if path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        if path == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}":
-            return httpx.Response(200, json=sample_1)
-        return httpx.Response(404, json={"detail": f"unexpected {path}"})
-
-    client = make_client(handler)
-    sample = client.get_project(PROJECT_1_ID).get_sample(SAMPLE_1_ID)
-    assert isinstance(sample, Sample)
-    assert sample.id == SAMPLE_1_ID
-    assert sample.project_id == PROJECT_1_ID
-    assert sample._client is client
-
-
-# --- get_data ---
-
-
-def test_get_data_posts_params_and_parses_response():
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(
-            200,
-            json={"values": {"Ip": {"time": [0.0, 1.0], "values": [0.5, 0.6]}}},
-        )
-
-    client = make_client(handler)
-    data = client.get_data(PROJECT_1_ID, SAMPLE_1_ID)
-
-    # Parsed into the concrete data type, not a raw dict
-    assert isinstance(data, MultiVariateTimeSeriesData)
-    assert data.values["Ip"].time == [0.0, 1.0]
-    assert data.values["Ip"].values == [0.5, 0.6]
-
-    request = requests_seen[0]
-    assert request.method == "POST"
-    assert request.url.path == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/data"
-    # Default params and view are sent explicitly in the body
-    body = json.loads(request.content)
-    assert body["params"]["name"] == "identity"
-    assert body["view"]["name"] == "identity"
-
-
-def test_get_data_forwards_image_params():
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(200, json={"frame": 3, "values": "BASE64"})
-
-    client = make_client(handler)
-    data = client.get_data(PROJECT_1_ID, SAMPLE_1_ID, params=ImageParams(frame=3))
-
-    assert isinstance(data, ImageData)
-    assert data.frame == 3
-    body = json.loads(requests_seen[0].content)
-    assert body["params"]["name"] == "image"
-    assert body["params"]["frame"] == 3
-    assert body["params"]["return_raw"] is False
-
-
-def test_get_data_missing_sample_raises_not_found():
-    client = make_client(
-        lambda request: httpx.Response(
-            404, json={"detail": "Sample not found with that ID."}
-        )
+def test_project_get_sample_delegates(toktagger_client, setup_db):
+    sample = toktagger_client.get_project(setup_db["project_id_1"]).get_sample(
+        setup_db["sample_id_1"]
     )
+    assert sample.id == setup_db["sample_id_1"]
+    assert sample._client is toktagger_client
+
+
+def test_project_get_sample_by_shot_id_delegates(toktagger_client, setup_db):
+    sample = toktagger_client.get_project(
+        setup_db["project_id_1"]
+    ).get_sample_by_shot_id(1)
+    assert sample.id == setup_db["sample_id_1"]
+
+
+def test_project_get_samples_summary_delegates(toktagger_client, setup_db):
+    summary = toktagger_client.get_project(
+        setup_db["project_id_1"]
+    ).get_samples_summary()
+    assert isinstance(summary, SampleSummary)
+    assert summary.total == 2
+    assert summary.shot_min == 1
+    assert summary.shot_max == 2
+
+
+def test_chained_retrieval_style(toktagger_client, setup_db):
+    sample = toktagger_client.get_project(setup_db["project_id_1"]).get_sample(
+        setup_db["sample_id_1"]
+    )
+    assert isinstance(sample, Sample)
+    assert sample.id == setup_db["sample_id_1"]
+    assert sample.project_id == setup_db["project_id_1"]
+    assert sample._client is toktagger_client
+
+
+def test_get_data_parses_response(toktagger_client, setup_db):
+    data = toktagger_client.get_data(setup_db["project_id_2"], setup_db["sample_id_4"])
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    assert set(data.values) == {"Ip"}
+    assert data.values["Ip"].time == list(range(100))
+    expected = pd.read_parquet(db_definitions.SAMPLE_4.data.file_name)
+    assert data.values["Ip"].values == expected.Ip.tolist()
+
+
+def test_get_data_forwards_image_params(toktagger_client, setup_db, image_sample):
+    data = toktagger_client.get_data(
+        setup_db["project_id_3"],
+        image_sample,
+        params=ImageParams(frame=1, return_raw=True),
+    )
+    assert isinstance(data, ImageData)
+    assert data.frame == 1
+    assert isinstance(data.values, list)
+    with Image.open(Path(__file__).parents[2] / "mast_images" / "1.png") as image:
+        np.testing.assert_array_equal(data.to_processed(), np.asarray(image))
+
+
+def test_get_data_missing_sample_raises_not_found(toktagger_client, setup_db):
     with pytest.raises(NotFoundError) as exc_info:
-        client.get_data(PROJECT_1_ID, SAMPLE_1_ID)
+        toktagger_client.get_data(setup_db["project_id_2"], "0" * 24)
     assert exc_info.value.status_code == 404
 
 
-# --- list_annotations ---
+def test_list_annotations_project_level(toktagger_client, setup_db):
+    annotations = toktagger_client.list_annotations(setup_db["project_id_1"])
+    assert [annotation.id for annotation in annotations] == [
+        setup_db["annotation_id_4"],
+        setup_db["annotation_id_3"],
+        setup_db["annotation_id_2"],
+        setup_db["annotation_id_1"],
+    ]
+    assert isinstance(annotations[0], TimePoint)
+    assert isinstance(annotations[-1], TimeRegion)
+    assert annotations[-1].time_min == 0.2
+    assert annotations[-1].label == "annotation"
 
 
-def test_list_annotations_project_level(annotation_1, annotation_2):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(200, json=[annotation_1, annotation_2])
-
-    client = make_client(handler)
-    annotations = client.list_annotations(PROJECT_1_ID)
-
-    # Parsed into concrete annotation types, not raw dicts
-    assert all(isinstance(a, TimeRegion) for a in annotations)
-    assert [a.id for a in annotations] == [ANNOTATION_1_ID, ANNOTATION_2_ID]
-    assert annotations[0].time_min == 0.2
-    assert annotations[0].label == "annotation"
-
-    request = requests_seen[0]
-    assert request.url.path == f"/projects/{PROJECT_1_ID}/annotations"
-    params = request.url.params
-    # Defaults are sent explicitly; optional filters are omitted when None
-    assert params["start"] == "0"
-    assert params["count"] == "100"
-    assert params["sort_by"] == "_id"
-    assert params["sort_direction"] == "descending"
-    assert "validated" not in params
-    assert "created_by" not in params
-
-
-def test_list_annotations_sample_level(annotation_1):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        return httpx.Response(200, json=[annotation_1])
-
-    client = make_client(handler)
-    annotations = client.list_annotations(
-        PROJECT_1_ID,
-        sample_id=SAMPLE_1_ID,
+def test_list_annotations_sample_level(toktagger_client, setup_db):
+    annotations = toktagger_client.list_annotations(
+        setup_db["project_id_1"],
+        sample_id=setup_db["sample_id_1"],
         validated=True,
-        created_by="manual",
-        start=5,
-        count=3,
+        start=1,
+        count=1,
         sort_by="timestamp",
         sort_direction="ascending",
     )
+    assert [annotation.id for annotation in annotations] == [
+        setup_db["annotation_id_2"],
+    ]
+    assert isinstance(annotations[0], TimeRegion)
 
-    assert all(isinstance(a, TimeRegion) for a in annotations)
-    request = requests_seen[0]
-    # Routed to the sample-level endpoint with all filters forwarded
-    assert (
-        request.url.path
-        == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/annotations"
+
+def test_project_get_data_delegates(toktagger_client, setup_db):
+    data = toktagger_client.get_project(setup_db["project_id_2"]).get_data(
+        setup_db["sample_id_4"]
     )
-    params = request.url.params
-    assert params["validated"] == "true"
-    assert params["created_by"] == "manual"
-    assert params["start"] == "5"
-    assert params["count"] == "3"
-    assert params["sort_by"] == "timestamp"
-    assert params["sort_direction"] == "ascending"
-
-
-def test_list_annotations_created_by_requires_sample_id():
-    client = make_client(lambda request: httpx.Response(200, json=[]))
-    with pytest.raises(TokTaggerClientError):
-        client.list_annotations(PROJECT_1_ID, created_by="manual")
-
-
-# --- bootstrapped get_data / list_annotations (delegation + chaining) ---
-
-
-def test_project_get_data_delegates(project_1):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        if request.url.path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        return httpx.Response(
-            200,
-            json={"values": {"Ip": {"time": [0.0], "values": [0.5]}}},
-        )
-
-    client = make_client(handler)
-    project = client.get_project(PROJECT_1_ID)
-    data = project.get_data(SAMPLE_1_ID)
-
     assert isinstance(data, MultiVariateTimeSeriesData)
-    # Delegated to the data endpoint with the project's own id
-    assert requests_seen[-1].method == "POST"
-    assert requests_seen[-1].url.path == (
-        f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/data"
+    assert data.values["Ip"].time == list(range(100))
+
+
+def test_project_list_annotations_delegates(toktagger_client, setup_db):
+    annotations = toktagger_client.get_project(
+        setup_db["project_id_1"]
+    ).list_annotations(validated=True)
+    assert [annotation.id for annotation in annotations] == [
+        setup_db["annotation_id_2"],
+        setup_db["annotation_id_1"],
+    ]
+    assert all(isinstance(annotation, TimeRegion) for annotation in annotations)
+
+
+def test_sample_get_data_delegates(toktagger_client, setup_db):
+    sample = toktagger_client.get_project(setup_db["project_id_2"]).get_sample(
+        setup_db["sample_id_4"]
     )
-
-
-def test_project_list_annotations_delegates(project_1, annotation_1):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        if request.url.path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        return httpx.Response(200, json=[annotation_1])
-
-    client = make_client(handler)
-    project = client.get_project(PROJECT_1_ID)
-    annotations = project.list_annotations(validated=True)
-
-    assert all(isinstance(a, TimeRegion) for a in annotations)
-    assert requests_seen[-1].url.path == f"/projects/{PROJECT_1_ID}/annotations"
-    assert requests_seen[-1].url.params["validated"] == "true"
-
-
-def test_sample_get_data_delegates(project_1, sample_1):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        path = request.url.path
-        if path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        if path == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}":
-            return httpx.Response(200, json=sample_1)
-        return httpx.Response(
-            200,
-            json={"values": {"Ip": {"time": [0.0], "values": [0.5]}}},
-        )
-
-    client = make_client(handler)
-    sample = client.get_project(PROJECT_1_ID).get_sample(SAMPLE_1_ID)
     data = sample.get_data()
-
     assert isinstance(data, MultiVariateTimeSeriesData)
-    # Delegated using the sample's own project and ids
-    assert requests_seen[-1].url.path == (
-        f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/data"
+    assert data.values["Ip"].time == list(range(100))
+
+
+def test_sample_list_annotations_delegates(toktagger_client, setup_db):
+    sample = toktagger_client.get_project(setup_db["project_id_1"]).get_sample(
+        setup_db["sample_id_1"]
     )
-
-
-def test_sample_list_annotations_delegates(project_1, sample_1, annotation_1):
-    requests_seen = []
-
-    def handler(request):
-        requests_seen.append(request)
-        path = request.url.path
-        if path == f"/projects/{PROJECT_1_ID}":
-            return httpx.Response(200, json=project_1)
-        if path == f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}":
-            return httpx.Response(200, json=sample_1)
-        return httpx.Response(200, json=[annotation_1])
-
-    client = make_client(handler)
-    sample = client.get_project(PROJECT_1_ID).get_sample(SAMPLE_1_ID)
-    annotations = sample.list_annotations(created_by="manual")
-
-    assert all(isinstance(a, TimeRegion) for a in annotations)
-    # Routed to the sample-level endpoint, created_by filter forwarded
-    assert requests_seen[-1].url.path == (
-        f"/projects/{PROJECT_1_ID}/samples/{SAMPLE_1_ID}/annotations"
-    )
-    assert requests_seen[-1].url.params["created_by"] == "manual"
+    annotations = sample.list_annotations(validated=True)
+    assert [annotation.id for annotation in annotations] == [
+        setup_db["annotation_id_2"],
+        setup_db["annotation_id_1"],
+    ]
+    assert all(isinstance(annotation, TimeRegion) for annotation in annotations)
