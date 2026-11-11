@@ -176,6 +176,70 @@ def test_list_samples_shot_id_filter(
     assert samples[0].shot_id == 10000
 
 
+@pytest.mark.parametrize(
+    "sample_definition",
+    [
+        db_definitions.SAMPLE_1,
+        db_definitions.SAMPLE_2,
+        db_definitions.SAMPLE_3,
+        db_definitions.SAMPLE_4,
+    ],
+    ids=["uda", "sal", "s3-csv", "local-parquet"],
+)
+def test_create_sample(integration_toktagger_client, seeded_project, sample_definition):
+    project_id = seeded_project[0]
+
+    sample = integration_toktagger_client.create_sample(project_id, sample_definition)
+
+    assert isinstance(sample, Sample)
+    assert ObjectId.is_valid(sample.id)
+    assert sample._client is integration_toktagger_client
+    assert sample.project_id == project_id
+    assert sample.model_dump(exclude={"id", "project_id", "validated_annotations"}) == (
+        sample_definition.model_dump(exclude={"annotations", "validated_annotations"})
+    )
+    assert sample.validated_annotations is False
+    stored_sample = integration_toktagger_client.get_sample(project_id, sample.id)
+    assert stored_sample.model_dump() == sample.model_dump()
+    assert [
+        result.id for result in integration_toktagger_client.list_samples(project_id)
+    ] == [sample.id]
+    assert sample.list_annotations() == []
+
+
+def test_create_sample_with_annotations(integration_toktagger_client, seeded_project):
+    annotation = db_definitions.ANNOTATION_1.model_copy(
+        update={"shot_id": db_definitions.SAMPLE_4.shot_id}
+    )
+    sample_definition = db_definitions.SAMPLE_4.model_copy(
+        update={"annotations": [annotation]}
+    )
+
+    sample = integration_toktagger_client.create_sample(
+        seeded_project[0], sample_definition
+    )
+
+    assert sample.validated_annotations is True
+    annotations = sample.list_annotations()
+    assert len(annotations) == 1
+    assert isinstance(annotations[0], TimeRegion)
+    assert annotations[0].sample_id == sample.id
+    assert annotations[0].project_id == seeded_project[0]
+    assert annotations[0].shot_id == sample.shot_id
+    assert annotations[0].label == db_definitions.ANNOTATION_1.label
+    assert annotations[0].time_min == db_definitions.ANNOTATION_1.time_min
+    assert annotations[0].time_max == db_definitions.ANNOTATION_1.time_max
+    assert annotations[0].validated is True
+
+
+def test_create_sample_missing_project(integration_toktagger_client):
+    with pytest.raises(NotFoundError) as exc_info:
+        integration_toktagger_client.create_sample(
+            MISSING_OBJECT_ID, db_definitions.SAMPLE_4
+        )
+    assert exc_info.value.status_code == 404
+
+
 def test_get_sample(integration_toktagger_client, seeded_project_with_samples):
     project_id, sample_ids = seeded_project_with_samples
     sample = integration_toktagger_client.get_sample(project_id, sample_ids[0])

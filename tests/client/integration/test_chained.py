@@ -2,6 +2,8 @@ import pathlib
 
 import pandas as pd
 import pytest
+
+from tests import db_definitions
 from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.projects import ProjectUpdate
@@ -55,6 +57,26 @@ def test_list_samples_shot_id_filter(
     samples = project.list_samples(shot_id=10000)
     assert len(samples) == 1
     assert samples[0].shot_id == 10000
+
+
+def test_create_sample(integration_toktagger_client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+    project = integration_toktagger_client.get_project(project_id)
+
+    sample = project.create_sample(db_definitions.SAMPLE_4)
+
+    assert isinstance(sample, Sample)
+    assert sample._client is integration_toktagger_client
+    assert sample.project_id == project_id
+    assert sample.shot_id == db_definitions.SAMPLE_4.shot_id
+    assert sample.data == db_definitions.SAMPLE_4.data
+    assert sorted(result.id for result in project.list_samples()) == sorted(
+        [*sample_ids, sample.id]
+    )
+    data = sample.get_data()
+    assert isinstance(data, MultiVariateTimeSeriesData)
+    expected_data = pd.read_parquet(db_definitions.SAMPLE_4.data.file_name)
+    assert data.values["Ip"].values == expected_data.Ip.tolist()
 
 
 def test_get_sample(integration_toktagger_client, seeded_project_with_samples):

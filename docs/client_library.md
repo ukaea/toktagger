@@ -2,7 +2,7 @@
 
 TokTagger ships with a Python client (`toktagger.client`) for pulling labelled data from a running TokTagger server programmatically, without going through the UI. You can fetch projects, samples, sample data (time series, images, 2D profiles) and annotations, and convert them straight into pandas, xarray and numpy objects — handy for building ML pipelines or doing offline analysis on your labelled datasets.
 
-The client can create and update projects and fetch data. It cannot yet create or modify samples or annotations.
+The client can create and update projects, create samples with optional initial annotations, and fetch data. It cannot yet modify existing samples or annotations.
 
 ## Installation
 
@@ -103,6 +103,32 @@ Both methods return a freshly fetched, client-bound `Project`. `project.update()
 Unspecified fields remain unchanged. The backend also ignores `None` values; they do not clear existing settings. An empty label list (`[]`) does clear that label list. Task and data loader cannot be changed through `ProjectUpdate`. Updating requires project-admin or global-admin permissions.
 
 As with creation, updating is followed by a GET request. If that fetch fails, the update may already have been saved.
+
+## Creating Samples
+
+Pass a `SampleIn` to `client.create_sample(project_id, sample)` or `project.create_sample(sample)`:
+
+```python
+from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
+
+sample = project.create_sample(
+    SampleIn(
+        shot_id=10000,
+        data=TimeSeriesFileData(
+            file_name="/data/10000.parquet",
+            type="parquet",
+            signal_names=["Ip"],
+        ),
+    )
+)
+data = sample.get_data()
+```
+
+The data source must match the project's loader, and file paths refer to files accessible to the server, not the client machine. Remote sources use `ShotData`; image sources use `ImageFileData` or `ImageArrayFileData`.
+
+`SampleIn.annotations` optionally supplies initial batch annotations. The backend derives `validated_annotations` from them and attributes human annotations to the authenticated caller. Sample creation requires project-admin or global-admin permissions.
+
+Both methods return a freshly fetched, client-bound `Sample`, supporting chained data and annotation lookups. The client sends a one-item list to the API's bulk-create endpoint, then fetches the new sample by its returned ID. If that fetch fails, the sample may already exist; check before retrying to avoid duplicates.
 
 ## Fetching Projects and Samples
 

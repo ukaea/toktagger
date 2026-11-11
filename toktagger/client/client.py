@@ -18,7 +18,7 @@ from toktagger.api.schemas.data import (
     DataResponseType,
 )
 from toktagger.api.schemas.projects import ProjectIn, ProjectUpdate
-from toktagger.api.schemas.samples import SampleSummary
+from toktagger.api.schemas.samples import SampleIn, SampleSummary
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
 from toktagger.client.exceptions import (
@@ -318,6 +318,14 @@ class TokTaggerClient:
             "GET", f"/projects/{project_id}/samples", params=params
         ).json()
         return [self._bootstrap_sample(sample) for sample in data]
+
+    def create_sample(self, project_id: str, sample: SampleIn) -> Sample:
+        """Create a sample in a project and return it bound to this client."""
+        body = sample.model_dump(mode="json", include=set(SampleIn.model_fields))
+        sample_ids = self._request(
+            "POST", f"/projects/{project_id}/samples", json=[body]
+        ).json()
+        return self.get_sample(project_id, sample_ids[0])
 
     def get_sample(self, project_id: str, sample_id: str) -> Sample:
         """Get a single sample by project and sample ID.

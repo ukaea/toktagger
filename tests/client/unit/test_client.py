@@ -251,6 +251,38 @@ def test_list_samples_forwards_shot_id_and_count(toktagger_client, setup_db):
     assert [sample.id for sample in limited_samples] == [setup_db["sample_id_2"]]
 
 
+def test_create_sample(toktagger_client, setup_db):
+    project_id = setup_db["project_id_2"]
+
+    sample = toktagger_client.create_sample(project_id, db_definitions.SAMPLE_3)
+
+    assert isinstance(sample, Sample)
+    assert ObjectId.is_valid(sample.id)
+    assert sample._client is toktagger_client
+    assert sample.project_id == project_id
+    assert sample.shot_id == db_definitions.SAMPLE_3.shot_id
+    assert sample.data == db_definitions.SAMPLE_3.data
+    assert sample.validated_annotations is False
+    assert sample.list_annotations() == []
+
+
+def test_create_sample_missing_project(toktagger_client):
+    with pytest.raises(NotFoundError) as exc_info:
+        toktagger_client.create_sample("0" * 24, db_definitions.SAMPLE_3)
+    assert exc_info.value.status_code == 404
+
+
+def test_project_create_sample_delegates(toktagger_client, setup_db):
+    project = toktagger_client.get_project(setup_db["project_id_2"])
+
+    sample = project.create_sample(db_definitions.SAMPLE_3)
+
+    assert isinstance(sample, Sample)
+    assert sample._client is toktagger_client
+    assert sample.project_id == project.id
+    assert sample.shot_id == db_definitions.SAMPLE_3.shot_id
+
+
 def test_get_sample_returns_bootstrapped(toktagger_client, setup_db):
     sample = toktagger_client.get_sample(
         setup_db["project_id_1"], setup_db["sample_id_1"]

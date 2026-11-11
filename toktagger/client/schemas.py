@@ -10,7 +10,11 @@ from toktagger.api.schemas.data import (
     DataResponseType,
 )
 from toktagger.api.schemas.projects import Project as ProjectSchema, ProjectUpdate
-from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
+from toktagger.api.schemas.samples import (
+    Sample as SampleSchema,
+    SampleIn,
+    SampleSummary,
+)
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
 from toktagger.client.exceptions import TokTaggerClientError
@@ -100,6 +104,10 @@ class Project(ProjectSchema):
             sort_by=sort_by,
             sort_direction=sort_direction,
         )
+
+    def create_sample(self, sample: SampleIn) -> Sample:
+        """Create a sample in this project and return it bound to the client."""
+        return self._require_client().create_sample(self.id, sample)
 
     def get_sample(self, sample_id: str) -> Sample:
         """Get a single sample in this project by its ID.
