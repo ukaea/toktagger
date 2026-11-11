@@ -151,7 +151,11 @@ export default function BearerTokens({ purpose }: { purpose: "api" | "mcp" }) {
                 data-testid={`new-${purpose}-token`}
               />
               <Flex gap="size-100">
-                <Button variant="primary" onPress={() => copyToken(newToken)}>
+                <Button
+                  aria-label={`Copy ${purpose.toUpperCase()} Token`}
+                  variant="primary"
+                  onPress={() => copyToken(newToken)}
+                >
                   Copy
                 </Button>
                 <Button variant="secondary" onPress={() => setNewToken(null)}>
