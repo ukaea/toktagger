@@ -325,17 +325,22 @@ async def test_mcp_token_cannot_manage_tokens(
 
 
 @pytest.mark.asyncio
-async def test_admin_mcp_token_cannot_access_untagged_operation(
+async def test_mcp_token_cannot_access_untagged_operation(
     unauthenticated_api_client, setup_db_auth
 ):
     client = unauthenticated_api_client
     created = await _create(client, user_id=USER_ADMIN_ID, purpose="mcp")
-    headers = {**_bearer(created["token"]), "X-MCP": "true"}
+    headers = {**_bearer(created["token"])}
     response = await client.get(f"/users/{USER_ALICE_ID}", headers=headers)
     assert response.status_code == 200
 
     response = await client.put(
         f"/users/{USER_ALICE_ID}", json={"is_active": False}, headers=headers
+    )
+    assert response.status_code == 401
+
+    response = await client.delete(
+        f"/projects/{setup_db_auth['project_id']}", headers=headers
     )
     assert response.status_code == 401
 

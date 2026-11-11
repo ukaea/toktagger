@@ -322,3 +322,24 @@ async def test_error_for_unsupported_tool(mcp_client, setup_db):
                 "sample_id": setup_db["sample_id_1"],
             },
         )
+
+
+@pytest.mark.asyncio
+async def test_error_for_unauthenticated(mcp_client, api_client, setup_db):
+    """Cannot use MCP tool without valid token"""
+
+    # Revoke MCP token
+    response = await api_client.get(
+        "/users/me/tokens",
+    )
+    assert response.status_code == 200
+    token_id = response.json()[0]["_id"]
+    response = await api_client.delete(
+        f"/users/me/tokens/{token_id}",
+    )
+    assert response.status_code == 204
+
+    with pytest.raises(ToolError, match="Invalid or expired bearer token"):
+        await mcp_client.call_tool(
+            "get_projects",
+        )
