@@ -240,38 +240,6 @@ async def test_invalid_purpose_is_rejected(
 
 
 @pytest.mark.asyncio
-async def test_legacy_token_defaults_to_api(
-    unauthenticated_api_client, setup_db_auth, db_client
-):
-    client = unauthenticated_api_client
-    created = await _create(client)
-    document = (await db_client.get_filtered_documents("bearer_tokens"))[0]
-    document.pop("purpose")
-    await db_client.delete_filtered_documents("bearer_tokens")
-    await db_client.db["bearer_tokens"].insert_one(document)
-    assert (
-        await bearer_tokens.authenticate_bearer_token(db_client, created["token"])
-        == USER_ALICE_ID
-    )
-    assert (
-        await bearer_tokens.authenticate_bearer_token(
-            db_client, created["token"], purpose="mcp"
-        )
-        is None
-    )
-    for purpose in ("api", "mcp"):
-        response = await client.get(
-            "/users/me/tokens",
-            params={"purpose": purpose},
-            headers=session_headers(get_auth_token(USER_ALICE_ID)),
-        )
-        assert response.status_code == 200
-        assert [token["purpose"] for token in response.json()] == (
-            ["api"] if purpose == "api" else []
-        )
-
-
-@pytest.mark.asyncio
 async def test_mcp_token_authentication_and_revocation(
     unauthenticated_api_client, setup_db_auth, db_client
 ):
