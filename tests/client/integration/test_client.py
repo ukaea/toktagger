@@ -2,6 +2,10 @@ import pathlib
 
 import pandas as pd
 import pytest
+from bson import ObjectId
+
+import tests.db_definitions as db_definitions
+from tests import endpoints
 from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.samples import SampleSummary
@@ -45,6 +49,34 @@ def test_list_projects_name_filter(
     ids = [p.id for p in projects]
     assert seeded_project_with_samples[0] in ids
     assert seeded_project[0] not in ids
+
+
+@pytest.mark.parametrize(
+    "project_definition",
+    [
+        db_definitions.PROJECT_1,
+        db_definitions.PROJECT_2,
+        db_definitions.PROJECT_3,
+    ],
+    ids=["profile-2d", "time-series", "video"],
+)
+def test_create_project(integration_toktagger_client, project_definition):
+    project = integration_toktagger_client.create_project(project_definition)
+
+    assert isinstance(project, Project)
+    assert ObjectId.is_valid(project.id)
+    assert project._client is integration_toktagger_client
+    assert project.model_dump(exclude={"id"}) == project_definition.model_dump()
+
+    stored_project = integration_toktagger_client.get_project(project.id)
+    assert stored_project.model_dump() == project.model_dump()
+    assert project.id in [
+        result.id for result in integration_toktagger_client.list_projects()
+    ]
+    assert project.list_samples() == []
+    members = endpoints.get_project_members(project.id)
+    assert len(members) == 1
+    assert members[0]["role"] == "admin"
 
 
 def test_get_project(integration_toktagger_client, seeded_project):

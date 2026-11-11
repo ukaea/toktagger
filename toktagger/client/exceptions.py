@@ -14,7 +14,7 @@ class TokTaggerAPIError(TokTaggerClientError):
         super().__init__(f"TokTagger API error (status {status_code}): {detail}")
 
 
-class AuthenticationError(TokTaggerClientError):
+class AuthenticationError(TokTaggerAPIError):
     """401 response, indicating failure to authenticate."""
 
 

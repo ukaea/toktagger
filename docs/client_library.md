@@ -2,7 +2,7 @@
 
 TokTagger ships with a Python client (`toktagger.client`) for pulling labelled data from a running TokTagger server programmatically, without going through the UI. You can fetch projects, samples, sample data (time series, images, 2D profiles) and annotations, and convert them straight into pandas, xarray and numpy objects — handy for building ML pipelines or doing offline analysis on your labelled datasets.
 
-The client is **read-only**: it fetches data but cannot create or modify projects, samples or annotations.
+The client can create projects and fetch data. It cannot yet modify projects or create or modify samples or annotations.
 
 ## Installation
 
@@ -51,6 +51,36 @@ sample = client.get_sample(project.id, sample.id)
 data = client.get_data(project.id, sample.id)
 annotations = client.list_annotations(project.id, sample_id=sample.id)
 ```
+
+## Creating Projects
+
+Pass the existing `ProjectIn` schema to `create_project()`:
+
+```python
+from toktagger.api.schemas.projects import ProjectIn, QueryStrategyType, Task
+from toktagger.client import TokTaggerClient
+
+with TokTaggerClient() as client:
+    project = client.create_project(
+        ProjectIn(
+            name="Disruption Detection",
+            task=Task.TIME_SERIES,
+            data_loader="tabular",
+            query_strategy=QueryStrategyType.SEQUENTIAL,
+            time_min=0.0,
+            time_max=1.0,
+            time_region_labels=["Flat Top", "Ramp Up"],
+        )
+    )
+    print(project.id)
+    samples = project.list_samples()  # Initially empty
+```
+
+Set `TOKTAGGER_API_TOKEN` or pass `api_token` when constructing the client. The creator becomes a project admin.
+
+`ProjectIn` validates the configuration and supplies the same defaults as the API. Unlike the returned `Project`, it does not require an ID. Using a schema also keeps label and time settings in one place rather than duplicating them as method parameters; the trade-off is the extra import and schema construction.
+
+The method posts the configuration, then fetches the stored project using the returned ID. The result supports the same chained lookups as other client methods. API and connection errors use the normal client exceptions. If the follow-up fetch fails, the project may already have been created; check before retrying to avoid duplicates.
 
 ## Fetching Projects and Samples
 

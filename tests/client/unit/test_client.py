@@ -20,8 +20,10 @@ from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
 from toktagger.client import TokTaggerClient
 from toktagger.client.client import Project, Sample
 from toktagger.client.exceptions import (
+    AuthenticationError,
     MultipleResultsFoundError,
     NotFoundError,
+    TokTaggerAPIError,
 )
 
 
@@ -129,6 +131,45 @@ def test_list_projects_forwards_filters(toktagger_client, setup_db):
         sort_direction="ascending",
     )
     assert [project.id for project in projects] == [setup_db["project_id_2"]]
+
+
+@pytest.mark.parametrize(
+    "project_definition",
+    [
+        db_definitions.PROJECT_1,
+        db_definitions.PROJECT_2,
+        db_definitions.PROJECT_3,
+    ],
+    ids=["profile-2d", "time-series", "video"],
+)
+def test_create_project(toktagger_client, project_definition):
+    original_config = project_definition.model_dump()
+
+    project = toktagger_client.create_project(project_definition)
+
+    assert isinstance(project, Project)
+    assert ObjectId.is_valid(project.id)
+    assert project._client is toktagger_client
+    assert project.model_dump(exclude={"id"}) == original_config
+    assert project.list_samples() == []
+
+
+def test_create_project_invalid_token(toktagger_client):
+    toktagger_client._http.headers["Authorization"] = "Bearer invalid-token"
+    with pytest.raises(AuthenticationError, match="could not authenticate") as exc_info:
+        toktagger_client.create_project(db_definitions.PROJECT_2)
+    assert exc_info.value.status_code == 401
+
+
+def test_create_project_server_validation_error(toktagger_client):
+    project_config = db_definitions.PROJECT_2.model_copy(
+        update={"data_loader": "invalid-loader"}
+    )
+    with pytest.raises(TokTaggerAPIError) as exc_info:
+        toktagger_client.create_project(project_config)
+    assert exc_info.value.status_code == 422
+    assert "data_loader" in exc_info.value.detail
+    assert toktagger_client.list_projects() == []
 
 
 def test_get_project_returns_bootstrapped(toktagger_client, setup_db):
