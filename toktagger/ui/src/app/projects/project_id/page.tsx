@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   Cell,
   Column,
@@ -209,7 +209,7 @@ export default function ProjectView() {
           [{ key: "projects", label: "Projects" }],
   );
 
-  const refreshSamples = useCallback(async () => {
+  const refreshSamples = async () => {
     if (!hasId) {
       return;
     }
@@ -241,7 +241,7 @@ export default function ProjectView() {
         });
       }
     }
-  }, [project_id, shotId, currentPage, samplesPerPage, sortDescriptor, hasId]);
+  };
 
   useEffect(() => {
     refreshSamples();

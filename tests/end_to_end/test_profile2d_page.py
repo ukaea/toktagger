@@ -283,16 +283,10 @@ def test_profile2d_annotations_locked_in_view_mode(server_setup, page: Page):
     before = annotations[0]
 
     # Annotations have pointer events disabled in View Mode, so dragging one does not move it...
-    zone = page.get_by_label("time-zone").first
-    expect(zone).to_be_visible()
-    zone_box = zone.bounding_box()
-    assert zone_box is not None
-    center_x = zone_box["x"] + zone_box["width"] / 2
-    center_y = zone_box["y"] + zone_box["height"] / 2
-    page.mouse.move(center_x, center_y)
-    page.mouse.down()
-    page.mouse.move(center_x + 100, center_y, steps=10)
-    page.mouse.up()
+    # drag_to re-resolves the zone, which the post-save redraw replaces; force skips the pointer-events hit check.
+    page.get_by_label("time-zone").first.drag_to(
+        page.locator(".nsewdrag").first, force=True
+    )
 
     annotations = save_annotations(page, project_id, sample_id)
     assert len(annotations) == 1
