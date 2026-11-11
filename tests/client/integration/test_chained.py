@@ -7,7 +7,7 @@ from tests import db_definitions
 from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.projects import ProjectUpdate
-from toktagger.api.schemas.samples import SampleSummary
+from toktagger.api.schemas.samples import SampleSummary, SampleUpdate
 from toktagger.client.client import (
     Project,
     Sample,
@@ -77,6 +77,26 @@ def test_create_sample(integration_toktagger_client, seeded_project_with_samples
     assert isinstance(data, MultiVariateTimeSeriesData)
     expected_data = pd.read_parquet(db_definitions.SAMPLE_4.data.file_name)
     assert data.values["Ip"].values == expected_data.Ip.tolist()
+
+
+def test_update_sample(integration_toktagger_client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+    sample = integration_toktagger_client.get_sample(project_id, sample_ids[0])
+
+    updated_sample = sample.update(
+        SampleUpdate(validated_annotations=not sample.validated_annotations)
+    )
+
+    assert isinstance(updated_sample, Sample)
+    assert updated_sample._client is integration_toktagger_client
+    assert updated_sample.model_dump() == {
+        **sample.model_dump(),
+        "validated_annotations": not sample.validated_annotations,
+    }
+    assert updated_sample is not sample
+    stored_sample = integration_toktagger_client.get_sample(project_id, sample.id)
+    assert stored_sample.model_dump() == updated_sample.model_dump()
+    assert isinstance(updated_sample.get_data(), MultiVariateTimeSeriesData)
 
 
 def test_get_sample(integration_toktagger_client, seeded_project_with_samples):

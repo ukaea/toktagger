@@ -19,7 +19,7 @@ from toktagger.api.schemas.projects import (
     ProjectUpdate,
     QueryStrategyType,
 )
-from toktagger.api.schemas.samples import ImageFileData, SampleIn
+from toktagger.api.schemas.samples import ImageFileData, SampleIn, SampleUpdate
 from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
 from toktagger.client import TokTaggerClient
 from toktagger.client.client import Project, Sample
@@ -281,6 +281,45 @@ def test_project_create_sample_delegates(toktagger_client, setup_db):
     assert sample._client is toktagger_client
     assert sample.project_id == project.id
     assert sample.shot_id == db_definitions.SAMPLE_3.shot_id
+
+
+def test_update_sample(toktagger_client, setup_db):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+
+    sample = toktagger_client.update_sample(
+        project_id, sample_id, SampleUpdate(validated_annotations=True)
+    )
+
+    assert isinstance(sample, Sample)
+    assert sample._client is toktagger_client
+    assert sample.id == sample_id
+    assert sample.project_id == project_id
+    assert sample.shot_id == db_definitions.SAMPLE_1.shot_id
+    assert sample.validated_annotations is True
+    assert len(sample.list_annotations()) == 3
+
+
+def test_update_sample_missing(toktagger_client, setup_db):
+    with pytest.raises(NotFoundError) as exc_info:
+        toktagger_client.update_sample(
+            setup_db["project_id_1"], "0" * 24, SampleUpdate(validated_annotations=True)
+        )
+    assert exc_info.value.status_code == 404
+
+
+def test_sample_update_delegates(toktagger_client, setup_db):
+    sample = toktagger_client.get_sample(
+        setup_db["project_id_1"], setup_db["sample_id_1"]
+    )
+
+    updated_sample = sample.update(SampleUpdate(validated_annotations=True))
+
+    assert isinstance(updated_sample, Sample)
+    assert updated_sample._client is toktagger_client
+    assert updated_sample.id == sample.id
+    assert updated_sample.validated_annotations is True
+    assert sample.validated_annotations is False
 
 
 def test_get_sample_returns_bootstrapped(toktagger_client, setup_db):

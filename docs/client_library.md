@@ -2,7 +2,7 @@
 
 TokTagger ships with a Python client (`toktagger.client`) for pulling labelled data from a running TokTagger server programmatically, without going through the UI. You can fetch projects, samples, sample data (time series, images, 2D profiles) and annotations, and convert them straight into pandas, xarray and numpy objects — handy for building ML pipelines or doing offline analysis on your labelled datasets.
 
-The client can create and update projects, create samples with optional initial annotations, and fetch data. It cannot yet modify existing samples or annotations.
+The client can create and update projects and samples, include initial annotations when creating samples, and fetch data. It cannot yet modify existing annotations.
 
 ## Installation
 
@@ -129,6 +129,25 @@ The data source must match the project's loader, and file paths refer to files a
 `SampleIn.annotations` optionally supplies initial batch annotations. The backend derives `validated_annotations` from them and attributes human annotations to the authenticated caller. Sample creation requires project-admin or global-admin permissions.
 
 Both methods return a freshly fetched, client-bound `Sample`, supporting chained data and annotation lookups. The client sends a one-item list to the API's bulk-create endpoint, then fetches the new sample by its returned ID. If that fetch fails, the sample may already exist; check before retrying to avoid duplicates.
+
+## Updating Samples
+
+Use `SampleUpdate` to change a sample's validation status:
+
+```python
+from toktagger.api.schemas.samples import SampleUpdate
+
+sample = client.update_sample(
+    project_id, sample_id, SampleUpdate(validated_annotations=True)
+)
+
+# The same operation using a client-bound sample:
+sample = sample.update(SampleUpdate(validated_annotations=False))
+```
+
+Both methods return a freshly fetched, client-bound `Sample`; `sample.update()` does not mutate the original local instance. Unspecified fields and `None` values are left unchanged. `False` explicitly clears the sample's validation flag. This does not change individual annotations or their validation status. Shot ID and data source are not editable through `SampleUpdate`.
+
+Updating requires annotator or admin access to the project, or global-admin permissions. The client checks that the sample belongs to the project before sending a one-item batch update, then fetches the saved sample. If the final fetch fails, the update may already have been saved.
 
 ## Fetching Projects and Samples
 

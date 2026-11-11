@@ -18,7 +18,12 @@ from toktagger.api.schemas.data import (
     DataResponseType,
 )
 from toktagger.api.schemas.projects import ProjectIn, ProjectUpdate
-from toktagger.api.schemas.samples import SampleIn, SampleSummary
+from toktagger.api.schemas.samples import (
+    SampleIn,
+    SampleSummary,
+    SampleUpdate,
+    SampleUpdateBatchItem,
+)
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
 from toktagger.client.exceptions import (
@@ -326,6 +331,18 @@ class TokTaggerClient:
             "POST", f"/projects/{project_id}/samples", json=[body]
         ).json()
         return self.get_sample(project_id, sample_ids[0])
+
+    def update_sample(
+        self, project_id: str, sample_id: str, updates: SampleUpdate
+    ) -> Sample:
+        """Apply partial updates and return a freshly fetched, client-bound sample."""
+        # The bulk endpoint does not check that the sample belongs to this project.
+        self.get_sample(project_id, sample_id)
+        body = SampleUpdateBatchItem(id=sample_id, updates=updates).model_dump(
+            mode="json", by_alias=True, exclude_unset=True
+        )
+        self._request("PUT", f"/projects/{project_id}/samples", json=[body])
+        return self.get_sample(project_id, sample_id)
 
     def get_sample(self, project_id: str, sample_id: str) -> Sample:
         """Get a single sample by project and sample ID.

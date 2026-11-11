@@ -9,7 +9,7 @@ from tests import endpoints
 from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.projects import ProjectUpdate, QueryStrategyType
-from toktagger.api.schemas.samples import SampleSummary
+from toktagger.api.schemas.samples import SampleSummary, SampleUpdate
 from toktagger.client.client import (
     Project,
     Sample,
@@ -238,6 +238,69 @@ def test_create_sample_missing_project(integration_toktagger_client):
             MISSING_OBJECT_ID, db_definitions.SAMPLE_4
         )
     assert exc_info.value.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "updates, expected_validated",
+    [
+        (SampleUpdate(validated_annotations=True), True),
+        (SampleUpdate(validated_annotations=False), False),
+        (SampleUpdate(validated_annotations=None), True),
+        (SampleUpdate(), True),
+    ],
+    ids=["validated", "unvalidated", "ignored-null", "no-changes"],
+)
+def test_update_sample(
+    integration_toktagger_client,
+    seeded_project_with_samples,
+    updates,
+    expected_validated,
+):
+    project_id, sample_ids = seeded_project_with_samples
+    original = integration_toktagger_client.update_sample(
+        project_id, sample_ids[0], SampleUpdate(validated_annotations=True)
+    )
+    original_annotations = original.list_annotations()
+
+    sample = integration_toktagger_client.update_sample(
+        project_id, original.id, updates
+    )
+
+    assert isinstance(sample, Sample)
+    assert sample._client is integration_toktagger_client
+    assert sample.model_dump() == {
+        **original.model_dump(),
+        "validated_annotations": expected_validated,
+    }
+    stored_sample = integration_toktagger_client.get_sample(project_id, sample.id)
+    assert stored_sample.model_dump() == sample.model_dump()
+    assert sample.list_annotations() == original_annotations
+
+
+def test_update_sample_missing(integration_toktagger_client, seeded_project):
+    with pytest.raises(NotFoundError) as exc_info:
+        integration_toktagger_client.update_sample(
+            seeded_project[0],
+            MISSING_OBJECT_ID,
+            SampleUpdate(validated_annotations=True),
+        )
+    assert exc_info.value.status_code == 404
+
+
+def test_update_sample_wrong_project(
+    integration_toktagger_client, seeded_project, seeded_project_with_samples
+):
+    project_id, sample_ids = seeded_project_with_samples
+    original = integration_toktagger_client.get_sample(project_id, sample_ids[0])
+
+    with pytest.raises(NotFoundError) as exc_info:
+        integration_toktagger_client.update_sample(
+            seeded_project[0],
+            original.id,
+            SampleUpdate(validated_annotations=not original.validated_annotations),
+        )
+    assert exc_info.value.status_code == 404
+    assert integration_toktagger_client.get_sample(project_id, original.id) == original
 
 
 def test_get_sample(integration_toktagger_client, seeded_project_with_samples):

@@ -14,6 +14,7 @@ from toktagger.api.schemas.samples import (
     Sample as SampleSchema,
     SampleIn,
     SampleSummary,
+    SampleUpdate,
 )
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
@@ -294,6 +295,10 @@ class Sample(SampleSchema):
                 "to use its methods."
             )
         return self._client
+
+    def update(self, updates: SampleUpdate) -> Sample:
+        """Return an updated sample without changing this local instance."""
+        return self._require_client().update_sample(self.project_id, self.id, updates)
 
     def get_data(
         self,
