@@ -1,11 +1,12 @@
 import base64
 import io
-from typing import Literal, NoReturn, Union
+from typing import Literal, NoReturn
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 from PIL import Image
+
 from pydantic import BaseModel
 
 from toktagger.api.schemas import ConfiguredModel
@@ -128,12 +129,8 @@ class ImageParams(DataParams):
     return_raw: bool = False
 
 
-DataResponseType = Union[
-    Data,
-    ImageData,
-    MultiVariateTimeSeriesData,
-    Profile2DData,
-    MultiProfile2DData,
-]
+DataResponseType = (
+    Data | ImageData | MultiVariateTimeSeriesData | Profile2DData | MultiProfile2DData
+)
 
-DataParamTypes = Union[DataParams, ImageParams]
+DataParamTypes = DataParams | ImageParams

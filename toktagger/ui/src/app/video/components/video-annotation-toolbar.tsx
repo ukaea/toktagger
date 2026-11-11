@@ -1,5 +1,6 @@
-"use client";
-
+/**
+ * The right-hand annotation toolbar: the Edit/View Mode button, the four tool buttons and Reset View.
+ */
 import {
   ActionButton,
   Button,
@@ -31,10 +32,13 @@ import type { DrawingTool } from "./types";
 export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
   const {
     frame,
+    selection,
+    setSelection,
     drawingTool,
     setDrawingTool,
     editMode,
     setEditMode,
+    canAnnotate,
     hideAnnotations,
   } = useVideoSession();
   const { isLoading } = useSample();
@@ -42,7 +46,12 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
   const toggleTool = (tool: DrawingTool) => {
-    setDrawingTool(drawingTool === tool ? null : tool);
+    const next = drawingTool === tool ? null : tool;
+    // A track keeps its annotation type, so picking a tool here starts a new track
+    if (next && selection.trackId) {
+      setSelection({ ...selection, trackId: null });
+    }
+    setDrawingTool(next);
   };
 
   const resetView = () => {
@@ -52,7 +61,8 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
     viewport.applyConstraints();
   };
 
-  const toolsDisabled = !editMode || hideAnnotations || isFramePending;
+  const toolsDisabled =
+    !canAnnotate || !editMode || hideAnnotations || isFramePending;
   const modeVariant: "accent" | "primary" = editMode ? "accent" : "primary";
 
   return (
@@ -68,15 +78,17 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
           <Button
             width="size-1600"
             variant={modeVariant}
-            isDisabled={hideAnnotations}
+            isDisabled={hideAnnotations || !canAnnotate}
             onPress={() => setEditMode(!editMode)}
           >
             {editMode ? "Edit Mode" : "View Mode"}
           </Button>
           <Tooltip>
-            {editMode
-              ? "Return to View Mode (shortcut: e)"
-              : "Enter Edit Mode (shortcut: e)"}
+            {!canAnnotate
+              ? "You have view-only access to this project - annotations cannot be edited"
+              : editMode
+                ? "Return to View Mode (shortcut: e)"
+                : "Enter Edit Mode (shortcut: e)"}
           </Tooltip>
         </TooltipTrigger>
 

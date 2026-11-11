@@ -9,8 +9,8 @@ import {
   Switch,
 } from "@adobe/react-spectrum";
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
-import { AnnotatorTypes } from "./types";
-import { BACKEND_API_URL } from "@/app/core";
+import { AnnotatorTypes, annotatorCreatedBy } from "@/types";
+import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
 
 enum ChangePointMethod {
@@ -42,7 +42,9 @@ export function ChangePointDetectionTool({
 
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
-      (ann) => ann.created_by === AnnotatorTypes.CHANGE_POINT_DETECTION,
+      (ann) =>
+        ann.created_by ===
+        annotatorCreatedBy(AnnotatorTypes.CHANGE_POINT_DETECTION),
     );
   });
 
@@ -54,13 +56,16 @@ export function ChangePointDetectionTool({
   const validSignalName = signalName && signalName in data.values;
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchData = async () => {
       if (!isEnabled) {
         // Remove previous annotations from this annotator
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION ||
+              annotation.created_by !==
+                annotatorCreatedBy(AnnotatorTypes.CHANGE_POINT_DETECTION) ||
               annotation.validated,
           );
           return otherAnnotations;
@@ -70,7 +75,7 @@ export function ChangePointDetectionTool({
         return;
       }
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/change_point_detection`,
         {
           method: "POST",
@@ -91,16 +96,21 @@ export function ChangePointDetectionTool({
       );
 
       const payload: Annotation[] = await response.json();
+      if (cancelled) return;
       setAnnotations((previousAnnotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.CHANGE_POINT_DETECTION ||
+            annotation.created_by !==
+              annotatorCreatedBy(AnnotatorTypes.CHANGE_POINT_DETECTION) ||
             annotation.validated,
         );
         return otherAnnotations.concat(payload);
       });
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [
     project_id,
     sample_id,

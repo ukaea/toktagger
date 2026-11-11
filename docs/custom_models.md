@@ -148,6 +148,8 @@ server = Server()
 server.run()
 ```
 
+To run your model in the Docker Compose stack, read [Add custom data loaders and models](deployment.md#add-custom-data-loaders-and-models).
+
 ## Data Handling
 
 ### Train/Validation/Test Split
@@ -461,33 +463,6 @@ Then run:
 ```sh
 python run_server.py
 ```
-
-## Using Docker
-
-If you are using the docker compose option to run the server, you can provide a custom script to add your own models. Create a file that imports your models and runs the server:
-
-```python
-# custom_toktagger.py
-from toktagger.api.main import Server
-from my_models import MyCustomModel  # Import to register
-
-server = Server()
-server.run(
-    host="0.0.0.0",
-    port=8002
-)
-```
-
-Then provide the path to your script when running docker compose:
-
-```sh
-CUSTOM_SCRIPT=./custom_toktagger.py docker compose --env-file .env.dev -f docker-compose.dev.yml up --build
-```
-
-!!! tip
-    Make sure you provide the **path** to your script, not just the filename.
-    
-    e.g., provide `CUSTOM_SCRIPT=./custom_toktagger.py`, not `CUSTOM_SCRIPT=custom_toktagger.py`.
 
 ## Annotation Types
 
