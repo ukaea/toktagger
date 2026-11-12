@@ -1,4 +1,5 @@
 from typing import Optional
+import asyncio
 from toktagger.api.auth.dependencies import (
     get_current_user,
     require_project_viewer,
@@ -38,12 +39,14 @@ async def _get_data(
 
     data_loader = LoaderRegistry.get(project.data_loader)()
     try:
-        data = data_loader.get_sample(
-            sample,
-            params=params,
-            time_min=project.time_min,
-            time_max=project.time_max,
-            min_time_step=project.min_time_step,
+        data = await asyncio.to_thread(
+            data_loader.get_sample(
+                sample,
+                params=params,
+                time_min=project.time_min,
+                time_max=project.time_max,
+                min_time_step=project.min_time_step,
+            )
         )
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
@@ -59,7 +62,7 @@ async def _get_data(
     return data
 
 
-@router.post("", operation_id="get_sample_data", response_model=DataResponseType)
+@router.post("", response_model=DataResponseType)
 async def get_data(
     request: Request,
     project_id: str,
