@@ -85,14 +85,14 @@ class TimeSeriesData(Data):
             signal=SignalSummary(
                 time=SummaryAxes(
                     count=len(self.time),
-                    max=numpy.max(self.time),
-                    min=numpy.min(self.time),
+                    max=numpy.nanmax(self.time),
+                    min=numpy.nanmin(self.time),
                 ),
                 values=SummaryValues(
                     count=len(self.values),
-                    max=numpy.max(self.values),
-                    min=numpy.min(self.values),
-                    mean=numpy.mean(self.values),
+                    max=numpy.nanmax(self.values),
+                    min=numpy.nanmin(self.values),
+                    mean=numpy.nanmean(self.values),
                 ),
             ),
         )
@@ -128,13 +128,13 @@ class Profile2DData(Data):
             signal=Signal2DSummary(
                 time=SummaryAxes(
                     count=len(self.time),
-                    max=numpy.max(self.time),
-                    min=numpy.min(self.time),
+                    max=numpy.nanmax(self.time),
+                    min=numpy.nanmin(self.time),
                 ),
                 dim_1=SummaryAxes(
                     count=len(self.dim_1),
-                    max=numpy.max(self.dim_1),
-                    min=numpy.min(self.dim_1),
+                    max=numpy.nanmax(self.dim_1),
+                    min=numpy.nanmin(self.dim_1),
                 ),
                 values=Summary2DValues(
                     shape=values.shape,

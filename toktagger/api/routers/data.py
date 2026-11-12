@@ -11,7 +11,7 @@ from toktagger.api.schemas.data import (
     DataResponseType,
     DataParams,
     DataParamTypes,
-    SampleSummaryTypes,
+    DataSummaryTypes,
 )
 from toktagger.api.schemas.users import UserOut
 from toktagger.api.schemas.views import ViewParams, ViewParamTypes
@@ -106,7 +106,7 @@ async def get_data(
     "/summary",
     operation_id="get_sample_data_summary",
     tags=["MCP"],
-    response_model=SampleSummaryTypes,
+    response_model=DataSummaryTypes,
 )
 async def get_sample_data_summary(
     request: Request,
@@ -115,7 +115,7 @@ async def get_sample_data_summary(
     current_user: UserOut = Depends(require_project_viewer),
     params: Optional[DataParamTypes] = DataParams(),
     view: Optional[ViewParamTypes] = ViewParams(),
-) -> SampleSummaryTypes:
+) -> DataSummaryTypes:
     """
     Get a summary of the diagnostic data for a specific sample, with optional
     view transformation (e.g. profile-2d heatmaps).
@@ -137,7 +137,7 @@ async def get_sample_data_summary(
 
     Returns
     -------
-    SampleSummaryTypes
+    DataSummaryTypes
         Summaries of sample data, containing information such as signal names,
         max/min/mean values, point counts, etc.
 

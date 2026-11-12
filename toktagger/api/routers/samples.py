@@ -449,8 +449,7 @@ async def get_sample_summary(
     Returns
     -------
     SampleSummary
-        A SampleSummary object with total_samples, min_shot_id, max_shot_id,
-        data_type.
+        A SampleSummary object with total, shot_min, shot_max, data.
 
     Notes
     -----
