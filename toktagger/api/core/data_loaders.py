@@ -726,8 +726,10 @@ def _get_fair_mast_signals(
             item = TimeSeriesData(time=time, values=data)
             results[name] = item
         elif len(ds.data.shape) == 2:
+            dim_1_name = next(dim for dim in ds.dims if dim != "time")
+            ds = ds.transpose("time", dim_1_name)
             time = ds["time"].values
-            dim_1 = ds[ds.data.dims[1]].values
+            dim_1 = ds[dim_1_name].values
             values = ds.values
 
             item = Profile2DData(time=time, dim_1=dim_1, values=values)
