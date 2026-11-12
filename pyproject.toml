@@ -56,6 +56,9 @@ models = [
   "safetensors>=0.7.0",
   "huggingface-hub>=1.22.0",
 ]
+mcp = [
+  "fastmcp>=4.1.6",
+]
 
 [build-system]
 requires = ["setuptools>=61"]
