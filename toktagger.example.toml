@@ -131,8 +131,8 @@
 # The directory to use for storing entries in the Mongita database, if used.
 # cache_dir = '/home/runner/.cache/toktagger'
 
-# Whether to launch an MCP server for use with LLM agents.
-# mcp_enabled = true
+# Whether to launch an MCP server for use with LLM agents. Requires `mcp` optional extra.
+# mcp_enabled = false
 
 # Comma-separated addresses of reverse proxies whose X-Forwarded-* headers TokTagger trusts. Use `*` only when the proxy is the only host that can reach TokTagger.
 # forwarded_allow_ips = '127.0.0.1'
