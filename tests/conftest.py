@@ -11,9 +11,6 @@ import pytest_asyncio
 import requests
 from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
-from fastmcp import Client
-from fastmcp.utilities.asgi_transport import run_asgi_lifespan
-from fastmcp.client.transports import StreamableHttpTransport
 
 from tests import db_definitions, endpoints
 from tests.db_definitions import USER_ADMIN_ID
@@ -27,6 +24,7 @@ from toktagger.api.main import Server
 import toktagger.api.auth.core as auth_core
 
 MODELS_ENABLED = importlib.util.find_spec("ray") is not None
+MCP_ENABLED = importlib.util.find_spec("fastmcp") is not None
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +33,10 @@ def check_models_status(request):
         pytest.skip("This test requires models dependencies to not be installed!")
     elif not MODELS_ENABLED and request.node.get_closest_marker("models_enabled"):
         pytest.skip("This test requires models dependencies to be installed!")
+    if MCP_ENABLED and request.node.get_closest_marker("mcp_disabled"):
+        pytest.skip("This test requires MCP dependencies to not be installed!")
+    elif not MCP_ENABLED and request.node.get_closest_marker("mcp_enabled"):
+        pytest.skip("This test requires MCP dependencies to be installed!")
 
 
 if MODELS_ENABLED:
@@ -108,7 +110,7 @@ def settings():
         models_dir = pathlib.Path(tempd) / "models"
         models_dir.mkdir(exist_ok=True)
         s = config.Settings(
-            server=config.Server(cache_dir=tempd),
+            server=config.Server(cache_dir=tempd, mcp_enabled=MCP_ENABLED),
             models=config.Models(cache_dir=models_dir, max_actors=1),
             database=config.Database(mongo_url="./toktagger_test_db"),
             auth=config.Auth(canaille_bootstrap_password=E2E_ADMIN_PASSWORD),
@@ -184,42 +186,59 @@ async def api_client(unauthenticated_api_client, admin_user):
     yield unauthenticated_api_client
 
 
-@pytest_asyncio.fixture
-async def mcp_client(api_server, db_client, admin_user):
-    api_server.app.state.db_client = db_client
-    api_server.app.state.project = None
-    api_server.app.state.idp = None
+if MCP_ENABLED:
+    from fastmcp import Client
+    from fastmcp.utilities.asgi_transport import run_asgi_lifespan
+    from fastmcp.client.transports import StreamableHttpTransport
 
-    token = await bearer_tokens.create_bearer_token(
-        db_client,
-        user_id=admin_user,
-        name="test MCP client",
-        lifetime_seconds=3600,
-        purpose="mcp",
-    )
+    @pytest_asyncio.fixture
+    async def mcp_client(api_server, db_client, admin_user):
+        api_server.app.state.db_client = db_client
+        api_server.app.state.project = None
+        api_server.app.state.idp = None
 
-    app = api_server._mcp_app.http_app(
-        "/",
-        stateless_http=True,
-        json_response=True,
-    )
-
-    def http_client_factory(**kwargs):
-        return AsyncClient(
-            transport=ASGITransport(app=app),
-            **kwargs,
+        token = await bearer_tokens.create_bearer_token(
+            db_client,
+            user_id=admin_user,
+            name="test MCP client",
+            lifetime_seconds=3600,
+            purpose="mcp",
         )
 
-    transport = StreamableHttpTransport(
-        "http://test/",
-        headers={
-            "Authorization": f"Bearer {token.token}",
-        },
-        httpx_client_factory=http_client_factory,
+        app = api_server._mcp_app.http_app(
+            "/",
+            stateless_http=True,
+            json_response=True,
+        )
+
+        def http_client_factory(**kwargs):
+            return AsyncClient(
+                transport=ASGITransport(app=app),
+                **kwargs,
+            )
+
+        transport = StreamableHttpTransport(
+            "http://test/",
+            headers={
+                "Authorization": f"Bearer {token.token}",
+            },
+            httpx_client_factory=http_client_factory,
+        )
+        async with run_asgi_lifespan(app):
+            async with Client(transport) as client:
+                yield client
+
+else:
+    _error_msg = (
+        "You have attempted to run a test which uses a fixture that requires MCP, "
+        "but the mcp optional dependencies (fastmcp) are not installed, "
+        "and this test was not marked as a 'mcp_enabled' test. "
+        "Please review the fixture usage of this test, or mark it accurately."
     )
-    async with run_asgi_lifespan(app):
-        async with Client(transport) as client:
-            yield client
+
+    @pytest.fixture()
+    def mcp_client():
+        raise pytest.UsageError(_error_msg)
 
 
 @pytest_asyncio.fixture(scope="function")

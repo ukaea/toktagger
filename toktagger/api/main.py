@@ -24,17 +24,13 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from fastmcp import FastMCP
-from fastmcp.server.providers.openapi import RouteMap, MCPType
-from fastmcp.utilities.lifespan import combine_lifespans
-
 from toktagger.api import config
 from toktagger.api.auth import oidc
 from toktagger.api.auth.core import get_internal_token, get_signing_secret
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
-from toktagger.api.routers.mcp import INSTRUCTIONS, forward_mcp_authorization
+from toktagger.api.routers.mcp import mcp_dependencies_installed
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.auth import router as auth_router
@@ -50,6 +46,13 @@ from toktagger.api.routers.users import router as users_router
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
     import ray
+
+if mcp_dependencies_installed():
+    from fastmcp import FastMCP
+    from fastmcp.server.providers.openapi import RouteMap, MCPType
+    from fastmcp.utilities.lifespan import combine_lifespans
+
+    from toktagger.api.routers.mcp import INSTRUCTIONS, forward_mcp_authorization
 
     from toktagger.api.models.base import (
         ActorRegistry,
@@ -317,6 +320,10 @@ class Server:
         self.app.include_router(base_router)
 
         if config.settings.server.mcp_enabled:
+            if not mcp_dependencies_installed():
+                raise RuntimeError(
+                    "MCP server enabled in config, but optional dependencies not installed! Install toktagger[mcp]"
+                )
             self._mcp_app = FastMCP.from_fastapi(
                 self.app,
                 name="toktagger",

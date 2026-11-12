@@ -139,9 +139,9 @@ class Profile2DData(Data):
                 values=Summary2DValues(
                     shape=values.shape,
                     count=values.size,
-                    max=values.max(),
-                    min=values.min(),
-                    mean=values.mean(),
+                    max=numpy.nanmax(values),
+                    min=numpy.nanmin(values),
+                    mean=numpy.nanmean(values),
                 ),
             ),
         )

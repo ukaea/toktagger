@@ -1,11 +1,15 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from fastmcp.exceptions import ToolError
 
 from toktagger.api.crud import utils
 from toktagger.api.crud.db import LockTimeoutError
-from toktagger.api.routers.mcp import INSTRUCTIONS
+from toktagger.api.routers.mcp import INSTRUCTIONS, mcp_dependencies_installed
+
+if mcp_dependencies_installed():
+    from fastmcp.exceptions import ToolError
+
+pytestmark = pytest.mark.mcp_enabled
 
 
 @pytest.mark.asyncio
