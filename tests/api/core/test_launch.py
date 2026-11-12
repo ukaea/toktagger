@@ -5,6 +5,11 @@ import pytest
 
 from toktagger.api import config, main
 
+from toktagger.api.routers.mcp import mcp_dependencies_installed
+
+if mcp_dependencies_installed():
+    pass
+
 
 @pytest.mark.parametrize(
     ("public_url", "warns"),
@@ -49,3 +54,25 @@ def test_run_server_ignores_reload_with_several_workers(monkeypatch):
     main.run_server("localhost", 8002, 2, reload=True)
 
     assert uvicorn_run.call_args.kwargs["reload"] is False
+
+
+@pytest.mark.mcp_disabled
+def test_mcp_enabled_without_dependencies(settings, monkeypatch):
+    monkeypatch.setattr(settings.server, "mcp_enabled", True)
+    server = main.Server()
+
+    with pytest.raises(RuntimeError) as error:
+        server._setup_app()
+
+    assert str(error.value) == (
+        "MCP server enabled in config, but optional dependencies not installed! "
+        "Install toktagger[mcp]"
+    )
+
+
+@pytest.mark.mcp_enabled
+def test_mcp_disabled_with_dependencies_registers_no_tools(settings, monkeypatch):
+    monkeypatch.setattr(settings.server, "mcp_enabled", False)
+    server = main.Server()
+    server._setup_app()
+    assert server._mcp_app is None

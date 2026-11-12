@@ -46,6 +46,11 @@ from toktagger.api.routers.users import router as users_router
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
     import ray
+    from toktagger.api.models.base import (
+        ActorRegistry,
+        ModelRegistry,
+        WorkerRegistry,
+    )
 
 if mcp_dependencies_installed():
     from fastmcp import FastMCP
@@ -53,12 +58,6 @@ if mcp_dependencies_installed():
     from fastmcp.utilities.lifespan import combine_lifespans
 
     from toktagger.api.routers.mcp import INSTRUCTIONS, forward_mcp_authorization
-
-    from toktagger.api.models.base import (
-        ActorRegistry,
-        ModelRegistry,
-        WorkerRegistry,
-    )
 
 
 async def lock_timeout_handler(request: Request, exc: Exception) -> JSONResponse:
