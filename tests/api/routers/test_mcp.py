@@ -1,6 +1,15 @@
+from unittest.mock import AsyncMock
+
 import pytest
-from fastmcp.exceptions import ToolError
-from toktagger.api.routers.mcp import INSTRUCTIONS
+
+from toktagger.api.crud import utils
+from toktagger.api.crud.db import LockTimeoutError
+from toktagger.api.routers.mcp import INSTRUCTIONS, mcp_dependencies_installed
+
+if mcp_dependencies_installed():
+    from fastmcp.exceptions import ToolError
+
+pytestmark = pytest.mark.mcp_enabled
 
 
 @pytest.mark.asyncio
@@ -309,6 +318,47 @@ async def test_error_for_unknown_project(mcp_client, setup_db):
             "get_samples",
             arguments={"project_id": "123456789012345678901234"},
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transport", ["rest", "mcp"])
+async def test_annotation_lock_timeout(
+    transport, api_client, mcp_client, setup_db, monkeypatch
+):
+    update_annotations = AsyncMock(side_effect=LockTimeoutError("test lock"))
+    monkeypatch.setattr(utils, "update_annotations", update_annotations)
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    annotations = [
+        {
+            "shot_id": 1,
+            "time_min": 0.5,
+            "time_max": 0.9,
+            "label": "test",
+            "created_by": "manual_annotation",
+        }
+    ]
+    detail = "Another request is changing this resource. Try again."
+
+    if transport == "rest":
+        response = await api_client.put(
+            f"/projects/{project_id}/samples/{sample_id}/annotations",
+            json=annotations,
+        )
+        assert response.status_code == 409
+        assert response.json() == {"detail": detail}
+    else:
+        with pytest.raises(ToolError, match=f"HTTP error 409.*{detail}"):
+            await mcp_client.call_tool(
+                "update_sample_annotations",
+                arguments={
+                    "project_id": project_id,
+                    "sample_id": sample_id,
+                    "annotations": annotations,
+                },
+            )
+
+    update_annotations.assert_awaited_once()
 
 
 @pytest.mark.asyncio

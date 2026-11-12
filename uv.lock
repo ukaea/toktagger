@@ -4419,7 +4419,6 @@ dependencies = [
     { name = "canaille", extra = ["front", "oidc", "server", "sqlite"] },
     { name = "cryptography" },
     { name = "fastapi" },
-    { name = "fastmcp" },
     { name = "filelock" },
     { name = "fsspec" },
     { name = "hmmlearn" },
@@ -4453,6 +4452,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+mcp = [
+    { name = "fastmcp" },
+]
 models = [
     { name = "huggingface-hub" },
     { name = "mlflow" },
@@ -4481,7 +4483,7 @@ requires-dist = [
     { name = "canaille", extras = ["front", "oidc", "server", "sqlite"], specifier = ">=0.2.7" },
     { name = "cryptography", specifier = ">=48.0.1" },
     { name = "fastapi" },
-    { name = "fastmcp", specifier = ">=4.1.6" },
+    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=4.1.6" },
     { name = "filelock", specifier = ">=3.19.1" },
     { name = "fsspec" },
     { name = "hmmlearn", specifier = ">=0.3.3" },
@@ -4517,7 +4519,7 @@ requires-dist = [
     { name = "xarray" },
     { name = "zarr", specifier = ">=3" },
 ]
-provides-extras = ["models"]
+provides-extras = ["models", "mcp"]
 
 [package.metadata.requires-dev]
 dev = [

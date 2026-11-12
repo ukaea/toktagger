@@ -14,7 +14,7 @@ import numpy
 from toktagger.api.schemas import ConfiguredModel
 
 
-class SampleSummary(BaseModel):
+class DataSummary(BaseModel):
     type: str
     description: str
     num_signals: int
@@ -45,7 +45,7 @@ class Signal2DSummary(BaseModel):
     values: Summary2DValues
 
 
-class ImageSampleSummary(SampleSummary, SummaryValues):
+class ImageDataSummary(DataSummary, SummaryValues):
     type: Literal["video"]
     frame_number: int
     shape: tuple[int, ...]
@@ -54,22 +54,22 @@ class ImageSampleSummary(SampleSummary, SummaryValues):
     colour_mode: str
 
 
-class TimeSeriesSampleSummary(SampleSummary):
+class TimeSeriesDataSummary(DataSummary):
     type: Literal["time-series"]
     signal: SignalSummary
 
 
-class MultiVariateTimeSeriesSampleSummary(SampleSummary):
+class MultiVariateTimeSeriesDataSummary(DataSummary):
     type: Literal["time-series"]
     signals: dict[str, SignalSummary]
 
 
-class Profile2DSampleSummary(SampleSummary):
+class Profile2DDataSummary(DataSummary):
     type: Literal["profile-2d"]
     signal: Signal2DSummary
 
 
-class MultiVariateProfile2DSampleSummary(SampleSummary):
+class MultiVariateProfile2DDataSummary(DataSummary):
     type: Literal["profile-2d"]
     signals: dict[str, Signal2DSummary]
 
@@ -90,22 +90,22 @@ class TimeSeriesData(Data):
         frame.index.name = "time"
         return frame
 
-    def summary(self) -> TimeSeriesSampleSummary:
-        return TimeSeriesSampleSummary(
+    def summary(self) -> TimeSeriesDataSummary:
+        return TimeSeriesDataSummary(
             type="time-series",
             description="Time series signal from one diagnostic inside a Tokamak.",
             num_signals=1,
             signal=SignalSummary(
                 time=SummaryAxes(
                     count=len(self.time),
-                    max=numpy.max(self.time),
-                    min=numpy.min(self.time),
+                    max=numpy.nanmax(self.time),
+                    min=numpy.nanmin(self.time),
                 ),
                 values=SummaryValues(
                     count=len(self.values),
-                    max=numpy.max(self.values),
-                    min=numpy.min(self.values),
-                    mean=numpy.mean(self.values),
+                    max=numpy.nanmax(self.values),
+                    min=numpy.nanmin(self.values),
+                    mean=numpy.nanmean(self.values),
                 ),
             ),
         )
@@ -126,14 +126,15 @@ class MultiVariateTimeSeriesData(Data):
         frame.index.name = "time"
         return frame
 
-    def summary(self) -> MultiVariateTimeSeriesSampleSummary:
-        return MultiVariateTimeSeriesSampleSummary(
+    def summary(self) -> MultiVariateTimeSeriesDataSummary:
+        return MultiVariateTimeSeriesDataSummary(
             type="time-series",
             description="Time series signals from one or more diagnostics inside a Tokamak.",
             num_signals=len(self.values),
             signals={
                 signal: time_series.summary().signal
                 for signal, time_series in self.values.items()
+                if time_series
             },
         )
 
@@ -170,29 +171,29 @@ class Profile2DData(Data):
         """Dataset with one variable named `values`, dims (time, dim_1)."""
         return xr.Dataset({"values": self._to_dataarray()})
 
-    def summary(self) -> Profile2DSampleSummary:
+    def summary(self) -> Profile2DDataSummary:
         values = numpy.array(self.values)
-        return Profile2DSampleSummary(
+        return Profile2DDataSummary(
             type="profile-2d",
             description="2D profile signal from one diagnostic inside a Tokamak (eg, spectrometer). Contains measurements of points along an axis (dim_1) at each time point.",
             num_signals=1,
             signal=Signal2DSummary(
                 time=SummaryAxes(
                     count=len(self.time),
-                    max=numpy.max(self.time),
-                    min=numpy.min(self.time),
+                    max=numpy.nanmax(self.time),
+                    min=numpy.nanmin(self.time),
                 ),
                 dim_1=SummaryAxes(
                     count=len(self.dim_1),
-                    max=numpy.max(self.dim_1),
-                    min=numpy.min(self.dim_1),
+                    max=numpy.nanmax(self.dim_1),
+                    min=numpy.nanmin(self.dim_1),
                 ),
                 values=Summary2DValues(
                     shape=values.shape,
                     count=values.size,
-                    max=values.max(),
-                    min=values.min(),
-                    mean=values.mean(),
+                    max=numpy.nanmax(values),
+                    min=numpy.nanmin(values),
+                    mean=numpy.nanmean(values),
                 ),
             ),
         )
@@ -216,13 +217,13 @@ class MultiProfile2DData(Data):
                 "convert them individually with to_processed()."
             ) from e
 
-    def summary(self) -> MultiVariateProfile2DSampleSummary:
-        return MultiVariateProfile2DSampleSummary(
+    def summary(self) -> MultiVariateProfile2DDataSummary:
+        return MultiVariateProfile2DDataSummary(
             type="profile-2d",
             description="2D profile signals from one or more diagnostics inside a Tokamak (eg, spectrometers). Contains measurements of points along an axis (dim_1) at each time point.",
             num_signals=len(self.values),
             signals={
-                signal: profile.signal_summary().signal
+                signal: profile.summary().signal
                 for signal, profile in self.values.items()
                 if profile
             },
@@ -249,7 +250,7 @@ class ImageData(Data):
             image = image.convert("RGBA")
         return np.asarray(image)
 
-    def summary(self) -> ImageSampleSummary:
+    def summary(self) -> ImageDataSummary:
         # values may be base64-encoded, or raw encoded file bytes when return_raw is set
         encoded = (
             base64.b64decode(self.values)
@@ -258,7 +259,7 @@ class ImageData(Data):
         )
         im = Image.open(io.BytesIO(encoded))
         arr = numpy.array(im)
-        return ImageSampleSummary(
+        return ImageDataSummary(
             type="video",
             description="One frame from a camera diagnostic video inside a Tokamak",
             num_signals=1,
@@ -291,10 +292,10 @@ DataResponseType = (
 
 DataParamTypes = DataParams | ImageParams
 
-SampleSummaryTypes = Union[
-    ImageSampleSummary,
-    TimeSeriesSampleSummary,
-    MultiVariateTimeSeriesSampleSummary,
-    Profile2DSampleSummary,
-    MultiVariateProfile2DSampleSummary,
+DataSummaryTypes = Union[
+    ImageDataSummary,
+    TimeSeriesDataSummary,
+    MultiVariateTimeSeriesDataSummary,
+    Profile2DDataSummary,
+    MultiVariateProfile2DDataSummary,
 ]

@@ -56,6 +56,9 @@ Annotators = "annotators.md"
 "Python Client" = "client_library.md"
 
 [[project.nav]]
+"AI Agents" = "ai_agents.md"
+
+[[project.nav]]
 "Data Loaders" = "data_loaders.md"
 
 [[project.nav]]

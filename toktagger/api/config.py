@@ -169,8 +169,8 @@ class Server(pydantic.BaseModel):
         validate_default=True,
     )
     mcp_enabled: bool = pydantic.Field(
-        True,
-        description="Whether to launch an MCP server for use with LLM agents.",
+        False,
+        description="Whether to launch an MCP server for use with LLM agents. Requires `mcp` optional extra.",
     )
     forwarded_allow_ips: str = pydantic.Field(
         "127.0.0.1",

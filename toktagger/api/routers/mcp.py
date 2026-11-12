@@ -1,5 +1,17 @@
-from fastmcp.server.dependencies import get_http_request
-from httpx2 import Request
+import importlib
+
+try:
+    from httpx2 import Request
+except ImportError:
+    from httpx import Request
+
+
+def mcp_dependencies_installed() -> bool:
+    return importlib.util.find_spec("fastmcp") is not None
+
+
+if mcp_dependencies_installed():
+    from fastmcp.server.dependencies import get_http_request
 
 
 async def forward_mcp_authorization(request: Request) -> None:
