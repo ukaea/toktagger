@@ -40,13 +40,12 @@ async def _get_data(
     data_loader = LoaderRegistry.get(project.data_loader)()
     try:
         data = await asyncio.to_thread(
-            data_loader.get_sample(
-                sample,
-                params=params,
-                time_min=project.time_min,
-                time_max=project.time_max,
-                min_time_step=project.min_time_step,
-            )
+            data_loader.get_sample,
+            sample,
+            params=params,
+            time_min=project.time_min,
+            time_max=project.time_max,
+            min_time_step=project.min_time_step,
         )
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
