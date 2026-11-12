@@ -165,6 +165,33 @@ def test_get_data_missing_sample_raises_not_found(
     assert exc_info.value.status_code == 404
 
 
+def test_create_annotations(integration_toktagger_client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+    sample = integration_toktagger_client.get_sample(project_id, sample_ids[0])
+
+    annotations = sample.list_annotations()
+    assert len(annotations) == 2
+
+    annotation = TimeRegion(
+        label=db_definitions.ANNOTATION_1.label,
+        time_min=db_definitions.ANNOTATION_1.time_min,
+        time_max=db_definitions.ANNOTATION_1.time_max,
+    )
+
+    annotation_ids = sample.create_annotations([annotation])
+
+    assert len(annotation_ids) == 1
+    annotations = sample.list_annotations()
+    assert len(annotations) == 3
+    created = next(
+        annotation for annotation in annotations if annotation.id == annotation_ids[0]
+    )
+    assert created.sample_id == sample.id
+    assert created.label == db_definitions.ANNOTATION_1.label
+    assert created.time_min == db_definitions.ANNOTATION_1.time_min
+    assert created.time_max == db_definitions.ANNOTATION_1.time_max
+
+
 def test_list_annotations_project_level(
     integration_toktagger_client, seeded_project_with_samples
 ):

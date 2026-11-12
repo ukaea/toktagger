@@ -12,8 +12,10 @@ from toktagger.api.crud import utils
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.schemas.annotations import (
     RESERVED_CREATED_BY_PREFIXES,
+    AnnotationBatchTypeAdapter,
     AnnotationBatchTypes,
     AnnotationOutTypes,
+    AnnotationTypes,
 )
 from toktagger.api.schemas.samples import SampleUpdate
 from toktagger.api.schemas.users import UserOut
@@ -116,7 +118,7 @@ async def get_all_annotations(
         - You need to sort annotations by any of their attributes, eg by uncertainty, or timestamp
     Do Not Use When:
         - You need annotations for a specific sample — use get_sample_annotations instead
-        - You want to create or update annotations — use import_annotations or update_sample_annotations instead
+        - You want to create or update annotations — use create_sample_annotations or update_sample_annotations instead
     Example User Requests:
         - "Show me all annotations for this project"
         - "Show me validated annotations for this project"
@@ -341,7 +343,7 @@ async def get_annotations(
         - You are building a sample-level annotation review UI
     Do Not Use When:
         - You need all annotations for a project — use get_project_annotations instead
-        - You are creating/updating annotations — use update_sample_annotations instead
+        - You are creating/updating annotations — use create_sample_annotations or update_sample_annotations instead
     Example User Requests:
         - "What annotations exist for this sample?"
         - "Show me the model predictions for this sample"
@@ -376,6 +378,97 @@ async def get_annotations(
         count=count,
     )
     return await utils.add_author_names(db_client, annotations)
+
+
+@router.post(
+    "/samples/{sample_id}/annotations",
+    operation_id="create_sample_annotations",
+    tags=["MCP"],
+    response_model=list[str],
+    responses={
+        200: {"description": "New annotation IDs returned in input order."},
+        404: {"description": "Project or Sample not found with that ID."},
+    },
+)
+async def create_annotations(
+    request: Request,
+    annotations: list[AnnotationTypes],
+    project_id: str,
+    sample_id: str,
+    current_user: UserOut = Depends(require_project_annotator),
+) -> list[str]:
+    """
+    Append new annotations to a single sample without replacing existing records.
+
+    Parameters
+    ----------
+    annotations : list[AnnotationTypes]
+        The annotations to create, without IDs. Project, sample and shot
+        identity are derived from the target sample.
+    project_id : str
+        The ID of the project containing the sample.
+    sample_id : str
+        The ID of the sample to add annotations to.
+    current_user : UserOut
+        The authenticated project annotator/admin, or a global admin.
+        Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    list[str]
+        The new annotation IDs in input order. An empty input returns an empty
+        list without changing annotations or sample validation.
+
+    Notes
+    -----
+    Human authorship is assigned to the authenticated caller; registered machine
+    authors are preserved. Any validated addition marks the sample validated;
+    unvalidated additions do not clear its existing validation flag.
+
+    Use When:
+        - You want to add new annotations to one existing sample
+        - You must preserve all existing annotations, including your own
+    Do Not Use When:
+        - You want to edit or replace annotations — use update_sample_annotations instead
+        - You want to import annotations by shot ID across samples — use import_annotations instead
+        - You only want to read annotations — use get_sample_annotations instead
+    Example User Requests:
+        - "Add a Flat Top region from 0.2 to 0.4 seconds to this sample"
+        - "Add these labels without removing the sample's existing annotations"
+    """
+    db_client: MongoDBClient = request.app.state.db_client
+    await utils.get_project(db_client=db_client, project_id=project_id)
+    sample = await utils.get_sample(
+        db_client=db_client, project_id=project_id, sample_id=sample_id
+    )
+    if not annotations:
+        return []
+
+    stored_annotations = [
+        AnnotationBatchTypeAdapter.validate_python(
+            {
+                **annotation.model_dump(mode="python"),
+                "id": None,
+                "project_id": project_id,
+                "sample_id": sample_id,
+                "shot_id": sample.shot_id,
+                "created_by": annotation.created_by
+                if utils.is_machine_author(annotation.created_by)
+                else current_user.id,
+            }
+        )
+        for annotation in annotations
+    ]
+
+    async with db_client.lock(f"annotations:{project_id}:{sample_id}"):
+        annotation_ids = await utils.add_annotations(
+            db_client, project_id, sample_id, stored_annotations
+        )
+        if any(annotation.validated for annotation in annotations):
+            await utils.update_sample(
+                db_client, sample_id, SampleUpdate(validated_annotations=True)
+            )
+    return annotation_ids
 
 
 @router.put(
@@ -446,6 +539,7 @@ async def update_annotations(
         - You are correcting or refining annotations for a single sample
     Do Not Use When:
         - You do not have permission to overwrite existing annotations - check with the user first
+        - You only want to append annotations - use create_sample_annotations instead
         - You are only querying annotations for a sample - use get_sample_annotations instead
     Example User Requests:
         - "Save my annotations for this sample"

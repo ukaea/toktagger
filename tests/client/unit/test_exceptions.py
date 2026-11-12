@@ -79,6 +79,16 @@ def test_sample_update_without_client_raises(toktagger_client, setup_db):
         sample.update(SampleUpdate(validated_annotations=True))
 
 
+def test_sample_create_annotations_without_client(toktagger_client, setup_db):
+    bound_sample = toktagger_client.get_sample(
+        setup_db["project_id_1"], setup_db["sample_id_1"]
+    )
+    sample = Sample.model_validate(bound_sample.model_dump())
+
+    with pytest.raises(TokTaggerClientError, match="no client attached"):
+        sample.create_annotations([db_definitions.ANNOTATION_1])
+
+
 def test_project_method_without_client_raises(toktagger_client, setup_db):
     raw = toktagger_client._request(
         "GET", f"/projects/{setup_db['project_id_1']}"

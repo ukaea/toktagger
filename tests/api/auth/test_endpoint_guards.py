@@ -190,6 +190,26 @@ ACTIONS: dict[str, Action] = {
             "global_admin": _status(200),
         },
     ),
+    "create_sample_annotations": Action(
+        method="POST",
+        path="/projects/{project_id}/samples/{sample_id}/annotations",
+        body=lambda *_: [
+            {
+                "label": "lbl",
+                "time_min": 0.0,
+                "time_max": 1.0,
+                "type": "time_region",
+            }
+        ],
+        expected={
+            "unauthenticated": _status(401),
+            "non_member": _status(403),
+            "viewer": _status(403),
+            "annotator": _status(200),
+            "project_admin": _status(200),
+            "global_admin": _status(200),
+        },
+    ),
     "delete_project_annotations": Action(
         method="DELETE",
         path="/projects/{project_id}/annotations",

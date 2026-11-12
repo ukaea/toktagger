@@ -9,6 +9,7 @@ import os
 from pydantic import TypeAdapter
 
 from toktagger.api.schemas.annotations import (
+    AnnotationTypes,
     AnnotationOutTypeAdapter,
     AnnotationOutTypes,
 )
@@ -490,6 +491,56 @@ class TokTaggerClient:
             "POST", f"/projects/{project_id}/samples/{sample_id}/data", json=body
         ).json()
         return DataResponseTypeAdapter.validate_python(data)
+
+    def create_annotations(
+        self, project_id: str, sample_id: str, annotations: list[AnnotationTypes]
+    ) -> list[str]:
+        """Append new annotations to a single sample without replacing existing ones.
+
+        Parameters
+        ----------
+        project_id : str
+            The ID of the project containing the sample.
+        sample_id : str
+            The ID of the sample to add annotations to.
+        annotations : list[AnnotationTypes]
+            New annotations, such as TimeRegion or VideoBoundingBox.
+            Shot, project and sample IDs are derived from the target sample;
+            supplied annotation IDs are ignored.
+
+        Returns
+        -------
+        list[str]
+            The new annotation IDs in input order, or an empty list if no
+            annotations were supplied.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If the server cannot be reached.
+        TokTaggerAPIError
+            If the API returns a non-2xx response (e.g. 404 if the project or
+            sample does not exist, or 403 if the caller cannot annotate it).
+
+        Notes
+        -----
+        Requires project annotator/admin or global-admin access. Human
+        annotations are attributed to the authenticated caller; registered
+        machine authors are preserved. Any validated addition marks the sample
+        validated; unvalidated additions do not clear its validation flag.
+        Other samples are untouched, including those sharing the same shot ID.
+
+        Use list_annotations() to retrieve the saved records. Creation is not
+        transactional; check for saved annotations before retrying a failed
+        request to avoid duplicates.
+        """
+        body = [
+            annotation.model_dump(mode="json", by_alias=True, exclude={"id"})
+            for annotation in annotations
+        ]
+        return self._request(
+            "POST", f"/projects/{project_id}/samples/{sample_id}/annotations", json=body
+        ).json()
 
     def list_annotations(
         self,

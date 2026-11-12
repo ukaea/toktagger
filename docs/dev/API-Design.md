@@ -39,7 +39,8 @@ Bearer tokens are stored in the `bearer_tokens` collection; documents without a 
 
 ## `/projects/{project_id}/samples/{sample_id}/annotations`
 - **GET**: Tell me the annotations already stored for this sample
-- **PUT**: Add human annotations for this sample
+- **POST**: Append new annotations to this sample without replacing existing records; returns new IDs in input order. Exposed to MCP as `create_sample_annotations`. Accepts a list of `AnnotationTypes` (without IDs); `created_by` is optional on inputs and required on stored annotation outputs. Requires annotator/admin access. Supplied IDs are ignored, and project/sample/shot identity comes from the URL's sample. Human authorship is assigned to the caller; registered machine authors are preserved. Any validated addition marks the sample validated without clearing an existing validation flag. An empty list changes nothing. Other samples sharing the shot ID are untouched.
+- **PUT**: Replace the caller's annotations and edit other authors' annotations by ID
 - **DELETE**: Delete the annotations whose IDs are in the request body (a JSON list). If there is no body, delete ALL annotations for this sample
 
 ## `/projects/{project_id}/annotator/`

@@ -1,5 +1,18 @@
+from typing import get_args
+
 import pytest
 from bson.objectid import ObjectId
+
+from toktagger.api.schemas.annotations import AnnotationOutTypes, TimeRegion
+
+from tests import db_definitions
+
+
+@pytest.mark.parametrize("annotation_schema", get_args(AnnotationOutTypes))
+def test_annotation_output_requires_author(annotation_schema):
+    author_field = annotation_schema.model_fields["created_by"]
+    assert author_field.is_required()
+    assert author_field.annotation is str
 
 
 @pytest.mark.asyncio
@@ -276,7 +289,35 @@ async def test_delete_annotations_bulk_scoped_to_sample(
 
 
 @pytest.mark.asyncio
-async def test_create_annotations(api_client, setup_db, db_client):
+@pytest.mark.parametrize("validated", [True, False])
+async def test_create_annotations(api_client, setup_db, db_client, validated):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    path = f"/projects/{project_id}/samples/{sample_id}"
+    db_annotations = await db_client.get_filtered_documents(
+        "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_1"])}
+    )
+    payload = TimeRegion(
+        label=db_definitions.ANNOTATION_1.label,
+        time_min=db_definitions.ANNOTATION_1.time_min,
+        time_max=db_definitions.ANNOTATION_1.time_max,
+        validated=validated,
+    ).model_dump(mode="json")
+
+    response = await api_client.post(f"{path}/annotations", json=[payload])
+    assert response.status_code == 200
+
+    db_annotations_new = await db_client.get_filtered_documents(
+        "annotations", filters={"sample_id": ObjectId(setup_db["sample_id_1"])}
+    )
+    assert len(db_annotations_new) == len(db_annotations) + 1
+
+    assert response.status_code == 200
+    assert (await api_client.get(path)).json()["validated_annotations"] is validated
+
+
+@pytest.mark.asyncio
+async def test_update_annotations(api_client, setup_db, db_client):
     in_annotations = [
         {
             "label": "ramp_up",
@@ -336,7 +377,7 @@ async def test_create_annotations(api_client, setup_db, db_client):
 
 
 @pytest.mark.asyncio
-async def test_create_annotation_invalid(api_client, setup_db, db_client):
+async def test_update_annotation_invalid(api_client, setup_db, db_client):
     in_annotations = [
         {"time": 5.2, "validated": "validated"},
     ]

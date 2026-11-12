@@ -2,7 +2,7 @@
 
 TokTagger ships with a Python client (`toktagger.client`) for pulling labelled data from a running TokTagger server programmatically, without going through the UI. You can fetch projects, samples, sample data (time series, images, 2D profiles) and annotations, and convert them straight into pandas, xarray and numpy objects — handy for building ML pipelines or doing offline analysis on your labelled datasets.
 
-The client can create and update projects and samples, include initial annotations when creating samples, and fetch data. It cannot yet modify existing annotations.
+The client can create and update projects and samples, create new annotations, include initial annotations when creating samples, and fetch data. It cannot yet modify existing annotations.
 
 ## Installation
 
@@ -186,6 +186,34 @@ with TokTaggerClient() as client:
 ```
 
 The response is parsed into its concrete type, e.g. `TimeSeriesData`, `MultiVariateTimeSeriesData`, `Profile2DData`, `MultiProfile2DData` or `ImageData`. Which parameters are valid depends on the project's [data loader](./data_loaders.md) and labelling view, e.g. `ImageParams(frame=...)` for [video](./video.md)/image projects and `Profile2DViewParams(signal_name=...)` for [2D profile](./profile_2d.md) projects.
+
+## Creating Annotations
+
+Use `sample.create_annotations(annotations)` or `client.create_annotations(project_id, sample_id, annotations)` to append new annotations to one sample without replacing existing ones:
+
+```python
+from toktagger.api.schemas.annotations import TimeRegion
+
+annotation_ids = sample.create_annotations([
+    TimeRegion(
+        label="Flat Top",
+        time_min=0.2,
+        time_max=0.4,
+        validated=True,
+    )
+])
+
+# Equivalent flat call:
+annotation_ids = client.create_annotations(project_id, sample_id, [
+    TimeRegion(label="Ramp Up", time_min=0.1, time_max=0.2)
+])
+```
+
+Pass plain annotation schemas such as `TimeRegion`, `TimePoint`, or `VideoBoundingBox` (the `AnnotationTypes` union). `created_by` is optional; the server assigns human authorship. There is no need to supply shot, sample, or project IDs in the annotations: the server derives them from the target sample. Supplied annotation IDs are ignored; this always creates new records, never edits existing ones. Other samples are untouched, even if they share the same shot ID.
+
+Both methods return the new annotation IDs in input order; use `sample.list_annotations()` to retrieve saved records. Human authorship is assigned to the authenticated caller, while registered machine authors are preserved. Creating requires project annotator/admin or global-admin access. Any validated annotation marks the sample validated; unvalidated additions do not clear its existing validation flag. An empty list returns `[]` and changes nothing.
+
+The bound `Sample` is not refreshed or mutated by creation. Fetch it again to see its current validation flag. The operation is not transactional: if a request fails after writing begins, some annotations may already exist; check before retrying to avoid duplicates.
 
 ## Fetching Annotations
 

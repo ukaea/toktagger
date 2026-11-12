@@ -12,8 +12,8 @@ class AnnotationBase(ConfiguredModel):
     """Base class for annotation inputs, without IDs."""
 
     label: str
-    created_by: str
     validated: bool = False
+    created_by: str | None = None
     signal_name: str | None = None
     uncertainty: float | None = 1
 
@@ -128,10 +128,6 @@ class AnnotationBatch(AnnotationBase):
     project_id: str | None = None
     sample_id: str | None = None
     shot_id: int | None = None
-    # Optional here (unlike AnnotationBase) so imported/saved annotations don't need to
-    # supply it — every route that accepts a batch stamps the caller's own identity over
-    # whatever's provided anyway.
-    created_by: str | None = None
 
 
 class AnnotationOut(AnnotationBatch):
@@ -141,6 +137,7 @@ class AnnotationOut(AnnotationBatch):
     project_id: str
     sample_id: str
     shot_id: int
+    created_by: str
     # Resolved from created_by when read; None for a deleted user or a legacy placeholder.
     created_by_name: str | None = None
     created_by_deleted: bool = False
@@ -151,7 +148,7 @@ def create_out_model(base_class, name_suffix="Out"):
     class_name = f"{base_class.__name__}{name_suffix}"
     return create_model(
         class_name,
-        __base__=(base_class, AnnotationOut),
+        __base__=(AnnotationOut, base_class),
     )
 
 

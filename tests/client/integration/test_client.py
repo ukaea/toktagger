@@ -6,7 +6,7 @@ from bson import ObjectId
 
 import tests.db_definitions as db_definitions
 from tests import endpoints
-from toktagger.api.schemas.annotations import TimeRegion
+from toktagger.api.schemas.annotations import TimePoint, TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.projects import ProjectUpdate, QueryStrategyType
 from toktagger.api.schemas.samples import SampleSummary, SampleUpdate
@@ -360,6 +360,47 @@ def test_get_data_missing_sample_raises_not_found(
     with pytest.raises(NotFoundError) as exc_info:
         integration_toktagger_client.get_data(project_id, MISSING_OBJECT_ID)
     assert exc_info.value.status_code == 404
+
+
+def test_create_annotations(integration_toktagger_client, seeded_project_with_samples):
+    project_id, sample_ids = seeded_project_with_samples
+    project = integration_toktagger_client.get_project(project_id)
+    sample = project.get_sample(sample_ids[0])
+    existing = project.list_annotations()
+    other_annotations = project.get_sample(sample_ids[1]).list_annotations()
+    annotations = [
+        TimeRegion(label="new region", time_min=0.1, time_max=0.2, validated=True),
+        TimePoint(label="new point", time=0.3),
+    ]
+
+    annotation_ids = integration_toktagger_client.create_annotations(
+        project_id, sample.id, annotations
+    )
+
+    assert len(annotation_ids) == 2
+    assert all(ObjectId.is_valid(annotation_id) for annotation_id in annotation_ids)
+    stored = project.list_annotations()
+    assert len(stored) == len(existing) + 2
+    assert {item.id for item in existing} <= {item.id for item in stored}
+    for annotation_id, annotation in zip(annotation_ids, annotations):
+        saved = next(item for item in stored if item.id == annotation_id)
+        assert saved.project_id == project_id
+        assert saved.sample_id == sample.id
+        assert saved.shot_id == sample.shot_id
+        assert saved.created_by is not None
+        assert not saved.created_by.startswith(("model::", "annotators::"))
+        input_fields = set(type(annotation).model_fields) - {
+            "id",
+            "project_id",
+            "sample_id",
+            "shot_id",
+            "created_by",
+        }
+        assert saved.model_dump(include=input_fields) == annotation.model_dump(
+            include=input_fields
+        )
+    assert project.get_sample(sample.id).validated_annotations is True
+    assert project.get_sample(sample_ids[1]).list_annotations() == other_annotations
 
 
 def test_list_annotations_project_level(

@@ -22,6 +22,7 @@ async def test_expected_tools(mcp_client):
         "create_automated_sample_annotations",
         "create_model_predictions",
         "create_project",
+        "create_sample_annotations",
         "create_sample_model_predictions",
         "get_annotator_types",
         "get_data_schema",
