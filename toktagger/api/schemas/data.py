@@ -109,6 +109,7 @@ class MultiVariateTimeSeriesData(Data):
             signals={
                 signal: time_series.summary().signal
                 for signal, time_series in self.values.items()
+                if time_series
             },
         )
 
@@ -155,7 +156,7 @@ class MultiProfile2DData(Data):
             description="2D profile signals from one or more diagnostics inside a Tokamak (eg, spectrometers). Contains measurements of points along an axis (dim_1) at each time point.",
             num_signals=len(self.values),
             signals={
-                signal: profile.signal_summary().signal
+                signal: profile.summary().signal
                 for signal, profile in self.values.items()
                 if profile
             },

@@ -225,8 +225,7 @@ The token is returned only once and uses the same lifetime limit as an API token
 `GET /users/me/tokens` lists both purposes; add `?purpose=api` or `?purpose=mcp` to filter.
 Revoke either purpose with `DELETE /users/me/tokens/{token_id}`.
 All token management requires a browser session, not a bearer token.
-The Profile page manages API tokens only. Omitting `purpose` when creating a token defaults to `api`,
-and tokens created before purposes were introduced remain API tokens.
+The Profile page manages API tokens only. Omitting `purpose` when creating a token defaults to `api`.
 
 ### Identity provider access tokens
 

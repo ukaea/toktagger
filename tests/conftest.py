@@ -186,9 +186,9 @@ async def api_client(unauthenticated_api_client, admin_user):
 
 @pytest_asyncio.fixture
 async def mcp_client(api_server, db_client, admin_user):
-    api_server._api_app.state.db_client = db_client
-    api_server._api_app.state.project = None
-    api_server._api_app.state.idp = None
+    api_server.app.state.db_client = db_client
+    api_server.app.state.project = None
+    api_server.app.state.idp = None
 
     token = await bearer_tokens.create_bearer_token(
         db_client,
