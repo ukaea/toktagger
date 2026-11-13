@@ -230,6 +230,20 @@ async def test_show_others_annotations_filter(
     assert "alice_ann" in labels
     assert ("bob_ann" in labels) == expect_bobs_label
 
+    for path in (
+        f"/projects/{project_id}/annotations",
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+    ):
+        response = await client.get(
+            path,
+            params={"ids": [alice_saved.json()[0], bob_saved.json()[0]]},
+            headers=session_headers(alice_token),
+        )
+        assert response.status_code == 200
+        filtered_labels = {annotation["label"] for annotation in response.json()}
+        assert "alice_ann" in filtered_labels
+        assert ("bob_ann" in filtered_labels) == expect_bobs_label
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("show_others", [False, True])

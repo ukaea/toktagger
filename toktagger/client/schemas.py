@@ -5,6 +5,7 @@ from pydantic import PrivateAttr, TypeAdapter
 
 from toktagger.api.schemas.annotations import (
     AnnotationOut as AnnotationOutSchema,
+    AnnotationTypes,
     TimePointOut as TimePointOutSchema,
     TimeRegionOut as TimeRegionOutSchema,
     BoundingBoxOut as BoundingBoxOutSchema,
@@ -21,10 +22,12 @@ from toktagger.api.schemas.data import (
     DataParams,
     DataResponseType,
 )
-from toktagger.api.schemas.projects import Project as ProjectSchema
+from toktagger.api.schemas.projects import Project as ProjectSchema, ProjectUpdate
 from toktagger.api.schemas.samples import (
     Sample as SampleSchema,
+    SampleIn,
     SampleSummary,
+    SampleUpdate,
 )
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
@@ -36,7 +39,7 @@ if TYPE_CHECKING:
 
 
 class Annotation(AnnotationOutSchema):
-    """Annotation schema with a bound client reference."""
+    """Annotation schema with a bound client for single-record updates."""
 
     _client: TokTaggerClient | None = PrivateAttr(default=None)
 
@@ -47,6 +50,42 @@ class Annotation(AnnotationOutSchema):
                 "TokTaggerClient.list_annotations() to use its methods."
             )
         return self._client
+
+    def update(self, annotation: AnnotationTypes) -> AnnotationOutTypes:
+        """Update this annotation without changing this local instance.
+
+        Parameters
+        ----------
+        annotation : AnnotationTypes
+            The label and geometry, plus optional fields to update. The type
+            must match this annotation. Omitted optional fields and None
+            values are left unchanged.
+
+        Returns
+        -------
+        AnnotationOutTypes
+            The updated concrete annotation, bound to the same client.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If this Annotation has no client attached, or the server cannot
+            be reached.
+        TokTaggerAPIError
+            If the API rejects the update, including missing annotations,
+            insufficient permissions, or attempts to change annotation type.
+
+        Notes
+        -----
+        IDs, authorship, shot ID and creation timestamp are preserved.
+        Other annotations are untouched. Setting validated=True marks the
+        sample validated; other updates leave its validation flag unchanged.
+        A follow-up fetch returns the stored annotation. If that fetch fails,
+        the update may already have been saved.
+        """
+        return self._require_client().update_annotation(
+            self.project_id, self.sample_id, self.id, annotation
+        )
 
 
 # Generate Out classes using factory function
@@ -106,6 +145,10 @@ class Project(ProjectSchema):
             )
         return self._client
 
+    def update(self, updates: ProjectUpdate) -> Project:
+        """Return an updated project without changing this local instance."""
+        return self._require_client().update_project(self.id, updates)
+
     def list_samples(
         self,
         shot_id: int | None = None,
@@ -150,6 +193,10 @@ class Project(ProjectSchema):
             sort_by=sort_by,
             sort_direction=sort_direction,
         )
+
+    def create_samples(self, samples: list[SampleIn]) -> list[Sample]:
+        """Create samples in this project and return them bound to the client."""
+        return self._require_client().create_samples(self.id, samples)
 
     def get_sample(self, sample_id: str) -> Sample:
         """Get a single sample in this project by its ID.
@@ -294,6 +341,53 @@ class Sample(SampleSchema):
             )
         return self._client
 
+    def update(self, updates: SampleUpdate) -> Sample:
+        """Return an updated sample without changing this local instance."""
+        return self._require_client().update_sample(self.project_id, self.id, updates)
+
+    def create_annotations(
+        self, annotations: list[AnnotationTypes]
+    ) -> list[AnnotationOutTypes]:
+        """Append new annotations to this sample without replacing existing ones.
+
+        Parameters
+        ----------
+        annotations : list[AnnotationTypes]
+            New annotations, such as TimeRegion or VideoBoundingBox.
+            Shot, project and sample IDs are derived from this sample;
+            supplied annotation IDs are ignored.
+
+        Returns
+        -------
+        list[AnnotationOutTypes]
+            Freshly fetched, client-bound annotations in input order, or an
+            empty list if no annotations were supplied.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If this Sample has no client attached, or the server cannot be
+            reached.
+        TokTaggerAPIError
+            If the API returns a non-2xx response (e.g. 404 if the project or
+            sample does not exist, or 403 if the caller cannot annotate it).
+
+        Notes
+        -----
+        Requires project annotator/admin or global-admin access. Human
+        annotations are attributed to the authenticated caller; registered
+        machine authors are preserved. Any validated addition marks the sample
+        validated; unvalidated additions do not clear its validation flag.
+        Other samples are untouched, including those sharing the same shot ID.
+
+        This local Sample is not refreshed or mutated; fetch it again for its
+        current validation flag. Creation and the follow-up bulk fetch are not
+        transactional; check for saved annotations before retrying to avoid duplicates.
+        """
+        return self._require_client().create_annotations(
+            self.project_id, self.id, annotations
+        )
+
     def get_annotation(self, annotation_id: str) -> AnnotationOutTypes:
         """Get a single annotation belonging to this sample.
 
@@ -306,7 +400,7 @@ class Sample(SampleSchema):
         -------
         AnnotationOutTypes
             The concrete annotation, with resolved author information and
-            this sample's client attached.
+            this sample's client attached for chained updates.
 
         Raises
         ------
