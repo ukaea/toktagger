@@ -645,14 +645,6 @@ def test_list_annotations_sample_level(toktagger_client, setup_db):
     assert isinstance(annotations[0], TimeRegion)
 
 
-def test_project_get_data_delegates(toktagger_client, setup_db):
-    data = toktagger_client.get_project(setup_db["project_id_2"]).get_data(
-        setup_db["sample_id_4"]
-    )
-    assert isinstance(data, MultiVariateTimeSeriesData)
-    assert data.values["Ip"].time == list(range(100))
-
-
 def test_project_list_annotations_delegates(toktagger_client, setup_db):
     annotations = toktagger_client.get_project(
         setup_db["project_id_1"]

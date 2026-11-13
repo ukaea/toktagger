@@ -16,6 +16,8 @@ You need a TokTagger server to connect to, running by default at `http://localho
 
 ## Getting Started
 
+Create an API token in the UI, then set `TOKTAGGER_API_TOKEN` before importing the client, or pass `api_token="your-token"` to `TokTaggerClient(...)`. A missing token raises `TokTaggerClientError` during construction.
+
 ```python
 from toktagger.client import TokTaggerClient
 
@@ -165,6 +167,8 @@ The list methods support pagination with `start` (results to skip) and `count` (
 
 ## Fetching Sample Data
 
+Fetch data with `project.get_sample(sample_id).get_data()` or directly with `client.get_data(project_id, sample_id)`. `Project` does not expose `get_data()`.
+
 `get_data()` returns a sample's data the same way the UI requests it, and accepts the same data loader and view parameters:
 
 ```python
@@ -209,7 +213,7 @@ annotation_ids = client.create_annotations(project_id, sample_id, [
 ])
 ```
 
-Pass plain annotation schemas such as `TimeRegion`, `TimePoint`, or `VideoBoundingBox` (the `AnnotationTypes` union). `created_by` is optional; the server assigns human authorship. There is no need to supply shot, sample, or project IDs in the annotations: the server derives them from the target sample. Supplied annotation IDs are ignored; this always creates new records, never edits existing ones. Other samples are untouched, even if they share the same shot ID.
+Pass plain annotation schemas such as `TimeRegion`, `TimePoint`, or `VideoBoundingBox` (the `AnnotationTypes` union). The server assigns human authorship. There is no need to supply shot, sample, or project IDs in the annotations: the server derives them from the target sample. Supplied annotation IDs are ignored; this always creates new records, never edits existing ones. Other samples are untouched, even if they share the same shot ID.
 
 Both methods return the new annotation IDs in input order; use `sample.list_annotations()` to retrieve saved records. Human authorship is assigned to the authenticated caller, while registered machine authors are preserved. Creating requires project annotator/admin or global-admin access. Any validated annotation marks the sample validated; unvalidated additions do not clear its existing validation flag. An empty list returns `[]` and changes nothing.
 
@@ -258,12 +262,11 @@ with TokTaggerClient() as client:
     # Only validated annotations, most recent first
     annotations = client.list_annotations(project_id, validated=True, count=1000)
 
-    # One sample's annotations, restricted to a specific annotator
-    # (a model name, or "manual")
-    annotations = sample.list_annotations(created_by="manual")
+    # One sample's annotations
+    annotations = sample.list_annotations()
 ```
 
-Filters: `validated` (validation status) and `created_by` (annotator; sample level only), plus the usual `start` / `count` / `sort_by` / `sort_direction` pagination arguments.
+Filter by `validated` (validation status), with the usual `start` / `count` / `sort_by` / `sort_direction` pagination arguments.
 
 ## Converting to pandas, xarray and numpy
 
@@ -281,10 +284,8 @@ Every data model returned by `get_data()` has a `to_processed()` method that con
 
 `to_processed()` raises `ValueError` for a bare `Data` instance (no payload), an `ImageData` whose encoded bytes cannot be decoded, or a profile whose values are inconsistent with its coordinate lengths.
 
-Annotations are not data models, so they have a dedicated helper: `annotations_to_dataframe(annotations)` returns a `DataFrame` with one row per annotation; a column is created for every field present on any annotation, with NaN where a row lacks it, so mixed annotation types aggregate into one frame.
-
 ```python
-from toktagger.client import TokTaggerClient, annotations_to_dataframe
+from toktagger.client import TokTaggerClient
 from toktagger.api.schemas.data import ImageParams
 
 with TokTaggerClient() as client:
@@ -296,11 +297,29 @@ with TokTaggerClient() as client:
         project_id, sample_id, params=ImageParams(frame=0)
     ).to_processed()  # ndarray
 
-    # One DataFrame across all of a project's annotations
-    df = annotations_to_dataframe(client.list_annotations(project_id, count=1000))
 ```
 
 The conversions are pure — they make no network calls. Fetch with the client first, then convert.
+
+## Summarising Sample Data
+
+Call `data.summary()` on any concrete time-series, profile or image data object returned by `get_data()`. It returns a typed Pydantic summary model, computed locally without another server request:
+
+```python
+data = sample.get_data()
+summary = data.summary()
+print(summary.type, summary.num_signals)
+```
+
+| Data type | Summary model | Contents |
+|---|---|---|
+| `TimeSeriesData` | `TimeSeriesDataSummary` | Time-axis count/range and value count/min/max/mean in `signal` |
+| `MultiVariateTimeSeriesData` | `MultiVariateTimeSeriesDataSummary` | Per-signal time-series statistics in `signals` |
+| `Profile2DData` | `Profile2DDataSummary` | Time and spatial-axis count/range, value shape/count/min/max/mean in `signal` |
+| `MultiProfile2DData` | `MultiVariateProfile2DDataSummary` | Per-profile statistics in `signals` |
+| `ImageData` | `ImageDataSummary` | Frame number, shape, height, width, colour mode and pixel count/min/max/mean |
+
+All summaries include `type`, `description` and `num_signals`. A bare `Data` object has no `summary()` method.
 
 ## Error Handling
 
@@ -308,10 +327,14 @@ All client errors derive from `TokTaggerClientError`, so you can catch them all 
 
 | Exception | Raised when |
 |---|---|
-| `TokTaggerClientError` | the server cannot be reached, or another client-side error |
+| `TokTaggerClientError` | no API token is supplied, the server cannot be reached, or another client-side error |
 | `TokTaggerAPIError` | the API returns a non-2xx response; has `status_code` and `detail` attributes |
+| `AuthenticationError` | a 401 response: the server rejected authentication |
+| `PermissionError` | a 403 response: the caller lacks permission |
 | `NotFoundError` | a 404 response, or a by-name / by-shot-ID lookup that matched nothing |
 | `MultipleResultsFoundError` | a by-name / by-shot-ID lookup matched more than one record |
+
+`AuthenticationError`, `PermissionError` and `NotFoundError` inherit from `TokTaggerAPIError` and expose `status_code` and `detail`. Import them from `toktagger.client.exceptions`; its `PermissionError` is distinct from Python's built-in exception.
 
 ```python
 from toktagger.client import TokTaggerClient

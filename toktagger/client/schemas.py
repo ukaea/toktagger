@@ -268,49 +268,6 @@ class Project(ProjectSchema):
         """
         return self._require_client().get_samples_summary(self.id)
 
-    def get_data(
-        self,
-        sample_id: str,
-        params: DataParamTypes = DataParams(),
-        view: ViewParamTypes = ViewParams(),
-    ) -> DataResponseType:
-        """Get data (e.g. a time trace) about one of this project's samples.
-
-        Parameters
-        ----------
-        sample_id : str
-            The ID of the sample to fetch data for.
-        params : DataParams or ImageParams, default: DataParams()
-            Data loader parameters (e.g. ``ImageParams(frame=...)`` for video
-            data).
-        view : ViewParams or Profile2DViewParams, default: ViewParams()
-            View parameters controlling how the raw data is processed.
-
-        Returns
-        -------
-        DataResponseType
-            The sample data, parsed into its concrete type (e.g.
-            ``TimeSeriesData``, ``ImageData``).
-
-        Raises
-        ------
-        TokTaggerClientError
-            If this Project has no client attached, or the server cannot be
-            reached.
-        TokTaggerAPIError
-            If the API returns a non-2xx response (e.g. 404 if the sample or
-            its data does not exist).
-
-        Notes
-        -----
-        Use `to_processed()` on the `Data` object returned by this method to
-        get the data into a format ready for analysis, eg a pandas Dataframe
-        for time-series, an xarray Dataset for profile-2d, or a numpy Array for images.
-        """
-        return self._require_client().get_data(
-            self.id, sample_id, params=params, view=view
-        )
-
     def list_annotations(
         self,
         validated: bool | None = None,
@@ -516,7 +473,6 @@ class Sample(SampleSchema):
         ----------
         validated : bool, optional
             If provided, only return annotations with this validation status.
-            (a model name or "manual").
         start : int
             Number of matching annotations to skip (pagination offset), by default 0
         count : int, default: 100

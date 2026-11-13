@@ -88,6 +88,9 @@ class TokTaggerClient:
         ----------
         base_url : str
             Base URL of the TokTagger server; a trailing slash is stripped, by default "http://localhost:8002"
+        api_token : str, optional
+            API bearer token, defaulting to TOKTAGGER_API_TOKEN read when this
+            module is imported. A missing or empty token raises TokTaggerClientError.
         timeout : float
             Per-request HTTP timeout, in seconds, by default 30.0
         transport : httpx.BaseTransport, optional
@@ -655,11 +658,9 @@ class TokTaggerClient:
         project_id : str
             The ID of the project to list annotations for.
         sample_id : str, optional
-            If provided, only return annotations for this sample, which also
-            enables the ``created_by`` filter.
+            If provided, only return annotations for this sample.
         validated : bool, optional
             If provided, only return annotations with this validation status.
-            (a model name or "manual"); requires ``sample_id``.
         start : int, default: 0
             Number of matching annotations to skip (pagination offset).
         count : int, default: 100
@@ -678,8 +679,7 @@ class TokTaggerClient:
         Raises
         ------
         TokTaggerClientError
-            If the server cannot be reached, or if ``created_by`` is given
-            without a ``sample_id``.
+            If the server cannot be reached.
         TokTaggerAPIError
             If the API returns a non-2xx response (e.g. 404 if the project or
             sample does not exist).

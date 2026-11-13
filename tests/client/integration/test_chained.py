@@ -152,13 +152,13 @@ def test_get_data(integration_toktagger_client, seeded_project_with_samples):
     assert data.values["Ip"].values == df.Ip.tolist()
 
 
-def test_get_data_missing_sample_raises_not_found(
+def test_get_sample_missing_sample_raises_not_found(
     integration_toktagger_client, seeded_project_with_samples
 ):
     project_id, _, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     with pytest.raises(NotFoundError) as exc_info:
-        project.get_data(MISSING_OBJECT_ID)
+        project.get_sample(MISSING_OBJECT_ID)
     assert exc_info.value.status_code == 404
 
 
