@@ -22,7 +22,7 @@ class AnnotationBase(ConfiguredModel):
         if isinstance(values, dict):
             if values.get("validated"):
                 values["uncertainty"] = 0
-            elif values.get("uncertainty") is None:
+            elif "uncertainty" in values and values["uncertainty"] is None:
                 values["uncertainty"] = 1
         return values
 
