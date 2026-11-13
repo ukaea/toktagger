@@ -132,6 +132,7 @@ def create_annotations(
         json=annotations,
     )
     assert response.status_code == 200
+    return response.json()
 
 
 def create_image_samples(

@@ -38,6 +38,7 @@ async def test_expected_tools(mcp_client):
         "get_next_sample",
         "get_project_annotations",
         "get_projects",
+        "get_annotation",
         "get_sample_annotations",
         "get_sample_data_summary",
         "get_sample_model_predictions",
@@ -57,6 +58,7 @@ async def test_expected_tools(mcp_client):
         "start_model_training",
         "stop_model_training",
         "update_project",
+        "update_annotation",
         "update_sample_annotations",
         "update_samples",
     ]
@@ -251,6 +253,55 @@ async def test_put_update_sample_annotations(mcp_client, setup_db):
     )
     annotations = result.structured_content.get("result", [])
     assert len(annotations) == 4
+
+
+@pytest.mark.asyncio
+async def test_get_single_annotation(mcp_client, setup_db):
+    result = await mcp_client.call_tool(
+        "get_annotation",
+        arguments={
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_1"],
+            "annotation_id": setup_db["annotation_id_1"],
+        },
+    )
+
+    assert result.is_error is False
+    annotation = result.structured_content["result"]
+    assert annotation["_id"] == setup_db["annotation_id_1"]
+    assert annotation["created_by_name"] == "manual"
+
+
+@pytest.mark.asyncio
+async def test_put_update_single_annotation(mcp_client, setup_db):
+    result = await mcp_client.call_tool(
+        "update_annotation",
+        arguments={
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_1"],
+            "annotation_id": setup_db["annotation_id_1"],
+            "annotation": {
+                "type": "time_region",
+                "label": "corrected",
+                "time_min": 0.5,
+                "time_max": 0.6,
+            },
+        },
+    )
+
+    assert result.is_error is False
+    fetched = await mcp_client.call_tool(
+        "get_annotation",
+        arguments={
+            "project_id": setup_db["project_id_1"],
+            "sample_id": setup_db["sample_id_1"],
+            "annotation_id": setup_db["annotation_id_1"],
+        },
+    )
+    assert fetched.is_error is False
+    updated = fetched.structured_content["result"]
+    assert updated["_id"] == setup_db["annotation_id_1"]
+    assert updated["label"] == "corrected"
 
 
 @pytest.mark.asyncio

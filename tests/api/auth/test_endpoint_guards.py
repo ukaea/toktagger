@@ -290,6 +290,36 @@ ACTIONS: dict[str, Action] = {
     ),
     # A well-formed but absent annotation ID: an authorised caller gets past the guard
     # and finds nothing (404), so a 403 here can only come from the permission check.
+    "get_single_annotation": Action(
+        method="GET",
+        path="/projects/{project_id}/samples/{sample_id}/annotations/{missing_id}",
+        expected={
+            "unauthenticated": _status(401),
+            "non_member": _status(403),
+            "viewer": _status(404),
+            "annotator": _status(404),
+            "project_admin": _status(404),
+            "global_admin": _status(404),
+        },
+    ),
+    "update_single_annotation": Action(
+        method="PUT",
+        path="/projects/{project_id}/samples/{sample_id}/annotations/{missing_id}",
+        body=lambda *_: {
+            "type": "time_region",
+            "label": "corrected",
+            "time_min": 0.5,
+            "time_max": 0.6,
+        },
+        expected={
+            "unauthenticated": _status(401),
+            "non_member": _status(403),
+            "viewer": _status(403),
+            "annotator": _status(404),
+            "project_admin": _status(404),
+            "global_admin": _status(404),
+        },
+    ),
     "delete_single_annotation": Action(
         method="DELETE",
         path="/projects/{project_id}/samples/{sample_id}/annotations/{missing_id}",

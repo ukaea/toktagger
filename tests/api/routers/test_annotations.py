@@ -317,6 +317,177 @@ async def test_create_annotations(api_client, setup_db, db_client, validated):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "annotation_key, definition",
+    [
+        ("annotation_id_1", db_definitions.ANNOTATION_1),
+        ("annotation_id_3", db_definitions.ANNOTATION_3),
+    ],
+)
+async def test_get_single_annotation(api_client, setup_db, annotation_key, definition):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+
+    response = await api_client.get(
+        f"/projects/{project_id}/samples/{sample_id}/annotations/{setup_db[annotation_key]}"
+    )
+
+    assert response.status_code == 200
+    annotation = response.json()
+    assert annotation["_id"] == setup_db[annotation_key]
+    assert annotation["project_id"] == project_id
+    assert annotation["sample_id"] == sample_id
+    assert annotation["type"] == definition.type
+    assert annotation["label"] == definition.label
+    assert annotation["created_by"] == definition.created_by
+    assert annotation["created_by_name"] == definition.created_by
+    assert annotation["shot_id"] == definition.shot_id
+
+
+@pytest.mark.asyncio
+async def test_get_single_annotation_invalid_id(api_client, setup_db):
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/invalid"
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_single_annotation(api_client, setup_db):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    annotation_id = setup_db["annotation_id_1"]
+    path = f"/projects/{project_id}/samples/{sample_id}/annotations"
+    existing = (await api_client.get(path)).json()
+    original = next(
+        annotation for annotation in existing if annotation["_id"] == annotation_id
+    )
+
+    response = await api_client.put(
+        f"{path}/{annotation_id}",
+        json={
+            "type": "time_region",
+            "label": "corrected",
+            "time_min": 0.5,
+            "time_max": 0.6,
+            "validated": True,
+            "created_by": "spoofed",
+            "_id": setup_db["annotation_id_2"],
+            "shot_id": 999,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() is None
+    fetched = await api_client.get(f"{path}/{annotation_id}")
+    assert fetched.status_code == 200
+    updated = fetched.json()
+    assert updated["_id"] == annotation_id
+    assert updated["created_by"] == original["created_by"]
+    assert updated["timestamp"] == original["timestamp"]
+    assert updated["shot_id"] == original["shot_id"]
+    assert updated["project_id"] == project_id
+    assert updated["sample_id"] == sample_id
+    assert updated["label"] == "corrected"
+    assert updated["time_min"] == 0.5
+    assert updated["uncertainty"] == 0
+    stored = (await api_client.get(path)).json()
+    assert len(stored) == len(existing)
+    assert all(
+        annotation in stored
+        for annotation in existing
+        if annotation["_id"] != annotation_id
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+@pytest.mark.parametrize(
+    "target",
+    ["missing", "wrong_sample", "wrong_project", "missing_sample", "missing_project"],
+)
+async def test_single_annotation_scope(api_client, setup_db, target, method):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    annotation_id = setup_db["annotation_id_1"]
+    if target == "missing":
+        annotation_id = "0" * 24
+    elif target == "wrong_sample":
+        sample_id = setup_db["sample_id_2"]
+    elif target == "missing_sample":
+        sample_id = "0" * 24
+    elif target == "missing_project":
+        project_id = "0" * 24
+    else:
+        project_id = setup_db["project_id_2"]
+        sample_id = setup_db["sample_id_3"]
+
+    response = await api_client.request(
+        method,
+        f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
+        json={
+            "type": "time_region",
+            "label": "corrected",
+            "time_min": 0.5,
+            "time_max": 0.6,
+        },
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "annotation_key, payload",
+    [
+        (
+            "annotation_id_1",
+            {
+                "type": "time_region",
+                "label": "corrected",
+                "time_min": 0.5,
+                "time_max": 0.6,
+            },
+        ),
+        ("annotation_id_3", {"type": "time_point", "label": "corrected", "time": 0.7}),
+    ],
+)
+async def test_update_single_annotation_preserves_optional_fields(
+    api_client, setup_db, db_client, annotation_key, payload
+):
+    path = f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations"
+    annotation_id = setup_db[annotation_key]
+    existing = (await api_client.get(path)).json()
+    original = next(
+        annotation for annotation in existing if annotation["_id"] == annotation_id
+    )
+
+    response = await api_client.put(f"{path}/{annotation_id}", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() is None
+    fetched = await api_client.get(f"{path}/{annotation_id}")
+    assert fetched.status_code == 200
+    updated = fetched.json()
+    assert updated["validated"] == original["validated"]
+    assert updated["uncertainty"] == original["uncertainty"]
+    assert updated["signal_name"] == original["signal_name"]
+    stored = await db_client.get_document_by_id("annotations", ObjectId(annotation_id))
+    assert stored["uncertainty"] == original["uncertainty"]
+
+
+@pytest.mark.asyncio
+async def test_update_single_annotation_wrong_type(api_client, setup_db):
+    response = await api_client.put(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations/{setup_db['annotation_id_1']}",
+        json={"type": "time_point", "label": "wrong type", "time": 0.5},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_update_annotations(api_client, setup_db, db_client):
     in_annotations = [
         {

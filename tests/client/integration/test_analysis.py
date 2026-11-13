@@ -17,7 +17,7 @@ from toktagger.api.schemas.views import Profile2DViewParams
 def test_timeseries_to_processed_multi(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     sample = integration_toktagger_client.get_project(project_id).get_sample(
         sample_ids[0]
     )
@@ -36,7 +36,7 @@ def test_timeseries_to_processed_multi(
 def test_timeseries_to_processed_single(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     data = integration_toktagger_client.get_data(project_id, sample_ids[0])
     assert isinstance(data, MultiVariateTimeSeriesData)
 

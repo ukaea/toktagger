@@ -52,7 +52,7 @@ def seeded_project_with_samples(integration_toktagger_client):
         validated=False,
         uncertainty=0.5,
     )
-    endpoints.create_annotations(
+    annotation_ids = endpoints.create_annotations(
         project_id,
         sample_ids[0],
         [flat_top.model_dump(mode="json"), ramp_up.model_dump(mode="json")],
@@ -62,7 +62,7 @@ def seeded_project_with_samples(integration_toktagger_client):
         sample_ids[1],
         [flat_top.model_dump(mode="json")],
     )
-    yield project_id, sample_ids
+    yield project_id, sample_ids, annotation_ids
     requests.delete(f"{BASE_URL}/projects/{project_id}")
 
 

@@ -8,10 +8,7 @@ from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.data import MultiVariateTimeSeriesData
 from toktagger.api.schemas.projects import ProjectUpdate
 from toktagger.api.schemas.samples import SampleSummary, SampleUpdate
-from toktagger.client.client import (
-    Project,
-    Sample,
-)
+from toktagger.client.schemas import Project, Sample, TimeRegionOut
 from toktagger.client.exceptions import (
     NotFoundError,
 )
@@ -21,7 +18,7 @@ MISSING_OBJECT_ID = "0" * 24
 
 
 def test_update_project(integration_toktagger_client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
 
     updated_project = project.update(ProjectUpdate(name="updated_project"))
@@ -41,7 +38,7 @@ def test_update_project(integration_toktagger_client, seeded_project_with_sample
 
 
 def test_list_samples(integration_toktagger_client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     samples = project.list_samples()
     assert sorted(s.id for s in samples) == sorted(sample_ids)
@@ -52,7 +49,7 @@ def test_list_samples(integration_toktagger_client, seeded_project_with_samples)
 def test_list_samples_shot_id_filter(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, _ = seeded_project_with_samples
+    project_id, _, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     samples = project.list_samples(shot_id=10000)
     assert len(samples) == 1
@@ -60,7 +57,7 @@ def test_list_samples_shot_id_filter(
 
 
 def test_create_sample(integration_toktagger_client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
 
     sample = project.create_sample(db_definitions.SAMPLE_4)
@@ -80,7 +77,7 @@ def test_create_sample(integration_toktagger_client, seeded_project_with_samples
 
 
 def test_update_sample(integration_toktagger_client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     sample = integration_toktagger_client.get_sample(project_id, sample_ids[0])
 
     updated_sample = sample.update(
@@ -100,7 +97,7 @@ def test_update_sample(integration_toktagger_client, seeded_project_with_samples
 
 
 def test_get_sample(integration_toktagger_client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     sample = project.get_sample(sample_ids[0])
     assert isinstance(sample, Sample)
@@ -112,7 +109,7 @@ def test_get_sample(integration_toktagger_client, seeded_project_with_samples):
 def test_get_sample_by_shot_id(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, _ = seeded_project_with_samples
+    project_id, _, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     sample = project.get_sample_by_shot_id(10001)
     assert sample.shot_id == 10001
@@ -123,7 +120,7 @@ def test_get_sample_by_shot_id(
 def test_get_sample_by_shot_id_missing(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, _ = seeded_project_with_samples
+    project_id, _, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     with pytest.raises(NotFoundError) as exc_info:
         project.get_sample_by_shot_id(99999)
@@ -131,7 +128,7 @@ def test_get_sample_by_shot_id_missing(
 
 
 def test_get_samples_summary(integration_toktagger_client, seeded_project_with_samples):
-    project_id, _ = seeded_project_with_samples
+    project_id, _, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     summary = project.get_samples_summary()
     assert isinstance(summary, SampleSummary)
@@ -141,7 +138,7 @@ def test_get_samples_summary(integration_toktagger_client, seeded_project_with_s
 
 
 def test_get_data(integration_toktagger_client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     sample = project.get_sample(sample_ids[0])
     data = sample.get_data()
@@ -158,7 +155,7 @@ def test_get_data(integration_toktagger_client, seeded_project_with_samples):
 def test_get_data_missing_sample_raises_not_found(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, _ = seeded_project_with_samples
+    project_id, _, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     with pytest.raises(NotFoundError) as exc_info:
         project.get_data(MISSING_OBJECT_ID)
@@ -166,7 +163,7 @@ def test_get_data_missing_sample_raises_not_found(
 
 
 def test_create_annotations(integration_toktagger_client, seeded_project_with_samples):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     sample = integration_toktagger_client.get_sample(project_id, sample_ids[0])
 
     annotations = sample.list_annotations()
@@ -192,10 +189,46 @@ def test_create_annotations(integration_toktagger_client, seeded_project_with_sa
     assert created.time_max == db_definitions.ANNOTATION_1.time_max
 
 
+def test_get_annotation(integration_toktagger_client, seeded_project_with_samples):
+    project_id, sample_ids, annotation_ids = seeded_project_with_samples
+    project = integration_toktagger_client.get_project(project_id)
+    sample = project.get_sample(sample_ids[0])
+
+    assert len(annotation_ids) == 2
+    for annotation_id in annotation_ids:
+        annotation = sample.get_annotation(annotation_id)
+
+        assert isinstance(annotation, TimeRegionOut)
+        assert annotation.id == annotation_id
+        assert annotation.project_id == project_id
+        assert annotation.sample_id == sample.id
+        assert annotation._client is integration_toktagger_client
+
+
+def test_update_annotation(integration_toktagger_client, seeded_project_with_samples):
+    project_id, sample_ids, _ = seeded_project_with_samples
+    sample = integration_toktagger_client.get_sample(project_id, sample_ids[0])
+    original = sample.list_annotations()[0]
+
+    updated = original.update(TimeRegion(label="corrected", time_min=0.5, time_max=0.6))
+
+    assert updated.id == original.id
+    assert updated._client is integration_toktagger_client
+    assert updated.created_by == original.created_by
+    assert updated.label == "corrected"
+    assert original.label == "Ramp Up"
+    assert len(sample.list_annotations()) == 2
+    saved_again = updated.update(
+        TimeRegion(label="reviewed", time_min=0.5, time_max=0.7)
+    )
+    assert saved_again.id == original.id
+    assert saved_again.label == "reviewed"
+
+
 def test_list_annotations_project_level(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     annotations = project.list_annotations()
 
@@ -211,7 +244,7 @@ def test_list_annotations_project_level(
 def test_list_annotations_sample_level(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     sample = project.get_sample(sample_ids[0])
 
@@ -224,7 +257,7 @@ def test_list_annotations_sample_level(
 def test_list_annotations_sample_level_filters(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     sample = project.get_sample(sample_ids[0])
 
@@ -243,7 +276,7 @@ def test_list_annotations_sample_level_filters(
 def test_list_annotations_missing_sample_raises_not_found(
     integration_toktagger_client, seeded_project_with_samples
 ):
-    project_id, sample_ids = seeded_project_with_samples
+    project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
     sample = project.get_sample(sample_ids[0])
     # Point the sample at an ID the server does not know

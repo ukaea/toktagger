@@ -10,8 +10,6 @@ from pydantic import TypeAdapter
 
 from toktagger.api.schemas.annotations import (
     AnnotationTypes,
-    AnnotationOutTypeAdapter,
-    AnnotationOutTypes,
 )
 from toktagger.api.schemas.data import (
     DataParamTypes,
@@ -35,7 +33,12 @@ from toktagger.client.exceptions import (
     TokTaggerAPIError,
     TokTaggerClientError,
 )
-from toktagger.client.schemas import Project, Sample
+from toktagger.client.schemas import (
+    AnnotationOutTypeAdapter,
+    AnnotationOutTypes,
+    Project,
+    Sample,
+)
 
 # Parse the heterogeneous data responses into their concrete types
 DataResponseTypeAdapter = TypeAdapter(DataResponseType)
@@ -542,6 +545,99 @@ class TokTaggerClient:
             "POST", f"/projects/{project_id}/samples/{sample_id}/annotations", json=body
         ).json()
 
+    def get_annotation(
+        self, project_id: str, sample_id: str, annotation_id: str
+    ) -> AnnotationOutTypes:
+        """Get one annotation by its project, sample and annotation IDs.
+
+        Parameters
+        ----------
+        project_id : str
+            The ID of the project containing the annotation.
+        sample_id : str
+            The ID of the sample containing the annotation.
+        annotation_id : str
+            The ID of the annotation to retrieve.
+
+        Returns
+        -------
+        AnnotationOutTypes
+            The concrete annotation, with resolved author information and
+            this client attached for chained updates.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If the server cannot be reached.
+        TokTaggerAPIError
+            If the API rejects the request, including 404 for missing,
+            or out-of-scope annotations, or 403 for insufficient access.
+
+        Notes
+        -----
+        Direct ID lookups ignore the annotation list preference.
+        Project access is still required.
+        """
+        data = self._request(
+            "GET",
+            f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
+        ).json()
+        return self._bootstrap_annotation(data)
+
+    def update_annotation(
+        self,
+        project_id: str,
+        sample_id: str,
+        annotation_id: str,
+        annotation: AnnotationTypes,
+    ) -> AnnotationOutTypes:
+        """Update one annotation by ID and return it bound to this client.
+
+        Parameters
+        ----------
+        project_id : str
+            The ID of the project containing the annotation.
+        sample_id : str
+            The ID of the sample containing the annotation.
+        annotation_id : str
+            The ID of the annotation to update.
+        annotation : AnnotationTypes
+            The label and geometry, plus optional fields to update. The type
+            must match the stored annotation. Omitted optional fields and
+            None values are left unchanged.
+
+        Returns
+        -------
+        AnnotationOutTypes
+            The updated annotation, parsed into its concrete type and bound
+            to this client.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If the server cannot be reached.
+        TokTaggerAPIError
+            If the API returns a non-2xx response (e.g. 404 for an annotation
+            outside this project/sample, 403 for insufficient permissions, or
+            422 for an annotation type change).
+
+        Notes
+        -----
+        IDs, authorship, shot ID and creation timestamp are preserved.
+        Other annotations are untouched. Setting validated=True marks the
+        sample validated; other updates leave its validation flag unchanged.
+
+        The update is followed by get_annotation(). If that fetch fails,
+        the update may already have been saved.
+        """
+        body = annotation.model_dump(mode="json", exclude_unset=True)
+        self._request(
+            "PUT",
+            f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
+            json=body,
+        )
+        return self.get_annotation(project_id, sample_id, annotation_id)
+
     def list_annotations(
         self,
         project_id: str,
@@ -603,7 +699,7 @@ class TokTaggerClient:
             path = f"/projects/{project_id}/annotations"
         data = self._request("GET", path, params=params).json()
         # Parse each annotation once so callers get concrete typed objects
-        return [AnnotationOutTypeAdapter.validate_python(a) for a in data]
+        return [self._bootstrap_annotation(annotation) for annotation in data]
 
     def _request(
         self,
@@ -641,6 +737,11 @@ class TokTaggerClient:
             return response.text
         detail = body.get("detail") if isinstance(body, dict) else body
         return detail if isinstance(detail, str) else str(detail)
+
+    def _bootstrap_annotation(self, data: dict[str, Any]) -> AnnotationOutTypes:
+        annotation = AnnotationOutTypeAdapter.validate_python(data)
+        annotation._client = self
+        return annotation
 
     def _bootstrap_project(self, data: dict[str, Any]) -> Project:
         # Attach this client so the returned model can be used for chained calls

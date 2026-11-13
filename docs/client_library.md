@@ -2,7 +2,7 @@
 
 TokTagger ships with a Python client (`toktagger.client`) for pulling labelled data from a running TokTagger server programmatically, without going through the UI. You can fetch projects, samples, sample data (time series, images, 2D profiles) and annotations, and convert them straight into pandas, xarray and numpy objects — handy for building ML pipelines or doing offline analysis on your labelled datasets.
 
-The client can create and update projects and samples, create new annotations, include initial annotations when creating samples, and fetch data. It cannot yet modify existing annotations.
+The client can create and update projects, samples and annotations, include initial annotations when creating samples, and fetch data.
 
 ## Installation
 
@@ -34,7 +34,7 @@ with TokTaggerClient("http://localhost:8002") as client:
 
 Use the client as a context manager so the underlying HTTP connection is closed when the `with` block exits. If your server runs elsewhere, pass the address as `base_url` (a per-request `timeout` in seconds can also be set).
 
-Every project and sample returned by the client has the client bound to it, so you can chain lookups without passing IDs around:
+Every project, sample and annotation returned by the client has the client bound to it, so you can chain operations without passing IDs around:
 
 ```python
 with TokTaggerClient() as client:
@@ -215,7 +215,38 @@ Both methods return the new annotation IDs in input order; use `sample.list_anno
 
 The bound `Sample` is not refreshed or mutated by creation. Fetch it again to see its current validation flag. The operation is not transactional: if a request fails after writing begins, some annotations may already exist; check before retrying to avoid duplicates.
 
+## Updating Annotations
+
+Use `client.update_annotation(project_id, sample_id, annotation_id, annotation)` to update one annotation, or call `update()` on an annotation returned by `list_annotations()`:
+
+```python
+from toktagger.api.schemas.annotations import TimeRegion
+
+annotation = sample.list_annotations()[0]  # A time region in this example
+updated = annotation.update(
+    TimeRegion(label="Flat Top", time_min=0.2, time_max=0.4, validated=True)
+)
+
+# Equivalent flat call:
+updated = client.update_annotation(
+    project_id,
+    sample_id,
+    annotation.id,
+    TimeRegion(label="Flat Top", time_min=0.2, time_max=0.4, validated=True),
+)
+```
+
+Supply the same annotation type, including its required label and geometry. Optional fields you omit, and explicit `None` values, remain unchanged. An annotation cannot change type. IDs, author, shot ID and creation timestamp are preserved, and other annotations on the sample are untouched. Updating requires project annotator/admin or global-admin access; annotators may correct another author's annotation without taking ownership.
+
+Both forms return a freshly fetched concrete annotation with a bound client, so `updated.update(...)` also works. Returned annotations retain their concrete server schema type and also inherit the client `Annotation` base (`from toktagger.client.schemas import Annotation`). The original local instance is not mutated. A validated annotation has zero uncertainty. Only an update explicitly setting `validated=True` marks the sample validated; other updates leave the sample's existing validation flag unchanged.
+
+The API update returns no updated schema. The client follows it with `get_annotation()` to retrieve the saved record, matching project and sample updates. If that fetch fails, the update may already have been saved; check before retrying.
+
+The server returns 404 if the annotation does not belong to the specified project and sample.
+
 ## Fetching Annotations
+
+Use `client.get_annotation(project_id, sample_id, annotation_id)` or `sample.get_annotation(annotation_id)` to retrieve a single annotation by ID. The result includes resolved author names and a bound client for `annotation.update(...)`. Missing or out-of-scope annotations raise `NotFoundError`. Direct-ID lookups ignore the annotation list preference; project access is still required.
 
 `list_annotations()` returns a project's annotations (or one sample's), parsed into their concrete types — e.g. `TimeRegion`, `TimePoint`, `VideoBoundingBox` — rather than raw dictionaries:
 

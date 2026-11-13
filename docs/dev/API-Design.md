@@ -43,6 +43,11 @@ Bearer tokens are stored in the `bearer_tokens` collection; documents without a 
 - **PUT**: Replace the caller's annotations and edit other authors' annotations by ID
 - **DELETE**: Delete the annotations whose IDs are in the request body (a JSON list). If there is no body, delete ALL annotations for this sample
 
+## `/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}`
+- **GET**: Fetch one annotation by ID with resolved author information. Exposed to MCP as `get_annotation`. Requires viewer, annotator or admin access. Direct-ID lookups ignore `show_others_annotations`, which only filters lists. Missing or out-of-scope annotations return 404.
+- **PUT**: Update one annotation by ID without returning an updated schema (success returns JSON `null`). Fetch the saved annotation with GET. Exposed to MCP as `update_annotation`. Accepts an `AnnotationTypes` payload with the same type as the stored annotation; label and geometry are required, while omitted optional fields and `None` values are left unchanged. Requires annotator/admin access, including for edits to another author's annotation. Preserves ID, project/sample/shot identity, author and creation timestamp. Other annotations are untouched. A validated annotation has zero uncertainty. Only an update explicitly setting `validated=True` marks its sample validated; other updates leave the sample validation flag unchanged. Returns 404 for an annotation outside the requested project/sample and 422 for a type change.
+- **DELETE**: Delete the specified annotation, regardless of authorship; requires annotator/admin access.
+
 ## `/projects/{project_id}/annotator/`
 - **GET**: Get a list of all annotators available for this task (not implemented)
 

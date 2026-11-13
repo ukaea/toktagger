@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import get_args
 
 import numpy as np
 import pandas as pd
@@ -8,7 +9,11 @@ from bson import ObjectId
 from PIL import Image
 
 import tests.db_definitions as db_definitions
-from toktagger.api.schemas.annotations import TimePoint, TimeRegion
+from toktagger.api.schemas.annotations import (
+    AnnotationOutTypes as AnnotationOutSchemaTypes,
+    TimePoint,
+    TimeRegion,
+)
 from toktagger.api.schemas.data import (
     ImageData,
     ImageParams,
@@ -23,6 +28,7 @@ from toktagger.api.schemas.samples import ImageFileData, SampleIn, SampleUpdate
 from toktagger.api.schemas.samples import Sample as SampleSchema, SampleSummary
 from toktagger.client import TokTaggerClient
 from toktagger.client.client import Project, Sample
+from toktagger.client.schemas import Annotation, AnnotationOutTypes
 from toktagger.client.exceptions import (
     AuthenticationError,
     MultipleResultsFoundError,
@@ -487,6 +493,126 @@ def test_create_annotations_empty(toktagger_client, setup_db):
     )
 
     assert toktagger_client.list_annotations(project_id) == existing
+
+
+@pytest.mark.parametrize("server_schema", get_args(AnnotationOutSchemaTypes))
+def test_client_annotation_schemas_match_server(server_schema):
+    client_schemas = get_args(AnnotationOutTypes)
+    assert len(client_schemas) == len(get_args(AnnotationOutSchemaTypes))
+    matching_schemas = [
+        client_schema
+        for client_schema in client_schemas
+        if issubclass(client_schema, server_schema)
+    ]
+    assert len(matching_schemas) == 1
+    client_schema = matching_schemas[0]
+    assert issubclass(client_schema, Annotation)
+    assert client_schema.model_json_schema() == server_schema.model_json_schema()
+
+
+@pytest.mark.parametrize(
+    "annotation_key, annotation_type",
+    [("annotation_id_1", TimeRegion), ("annotation_id_3", TimePoint)],
+)
+def test_get_annotation(toktagger_client, setup_db, annotation_key, annotation_type):
+    annotation = toktagger_client.get_annotation(
+        setup_db["project_id_1"], setup_db["sample_id_1"], setup_db[annotation_key]
+    )
+
+    assert isinstance(annotation, annotation_type)
+    assert isinstance(annotation, Annotation)
+    assert annotation.id == setup_db[annotation_key]
+    assert annotation._client is toktagger_client
+    assert annotation.created_by_name is not None
+
+
+@pytest.mark.parametrize(
+    "annotation_key, annotation_type",
+    [("annotation_id_1", TimeRegion), ("annotation_id_3", TimePoint)],
+)
+def test_sample_get_annotation(
+    toktagger_client, setup_db, annotation_key, annotation_type
+):
+    sample = toktagger_client.get_sample(
+        setup_db["project_id_1"], setup_db["sample_id_1"]
+    )
+
+    annotation = sample.get_annotation(setup_db[annotation_key])
+
+    assert isinstance(annotation, annotation_type)
+    assert isinstance(annotation, Annotation)
+    assert annotation.id == setup_db[annotation_key]
+    assert annotation.project_id == sample.project_id
+    assert annotation.sample_id == sample.id
+    assert annotation._client is toktagger_client
+    assert annotation.created_by_name is not None
+
+
+@pytest.mark.parametrize(
+    "annotation_key", ["annotation_id_4", None], ids=["other-sample", "missing"]
+)
+def test_sample_get_annotation_missing(toktagger_client, setup_db, annotation_key):
+    sample = toktagger_client.get_sample(
+        setup_db["project_id_1"], setup_db["sample_id_1"]
+    )
+    annotation_id = setup_db[annotation_key] if annotation_key else "0" * 24
+
+    with pytest.raises(NotFoundError) as exc_info:
+        sample.get_annotation(annotation_id)
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.parametrize("target", ["missing", "wrong_sample", "wrong_project"])
+def test_get_annotation_missing(toktagger_client, setup_db, target):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    annotation_id = setup_db["annotation_id_1"]
+    if target == "missing":
+        annotation_id = "0" * 24
+    elif target == "wrong_sample":
+        sample_id = setup_db["sample_id_2"]
+    else:
+        project_id = setup_db["project_id_2"]
+        sample_id = setup_db["sample_id_3"]
+
+    with pytest.raises(NotFoundError) as exc_info:
+        toktagger_client.get_annotation(project_id, sample_id, annotation_id)
+
+    assert exc_info.value.status_code == 404
+
+
+def test_update_annotation(toktagger_client, setup_db):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    original = toktagger_client.list_annotations(project_id, sample_id)[0]
+    updates = TimePoint(label="corrected", time=0.7, validated=True)
+
+    updated = toktagger_client.update_annotation(
+        project_id, sample_id, original.id, updates
+    )
+
+    assert isinstance(updated, TimePoint)
+    assert isinstance(updated, Annotation)
+    assert updated.id == original.id
+    assert updated.created_by == original.created_by
+    assert updated.label == "corrected"
+    assert updated.time == 0.7
+    assert updated.validated is True
+    assert updated.uncertainty == 0
+    assert updated._client is toktagger_client
+    assert original.label != updated.label
+
+
+def test_update_annotation_missing(toktagger_client, setup_db):
+    with pytest.raises(NotFoundError) as exc_info:
+        toktagger_client.update_annotation(
+            setup_db["project_id_1"],
+            setup_db["sample_id_1"],
+            "0" * 24,
+            TimeRegion(label="missing", time_min=0.5, time_max=0.6),
+        )
+    assert exc_info.value.status_code == 404
 
 
 def test_list_annotations_project_level(toktagger_client, setup_db):

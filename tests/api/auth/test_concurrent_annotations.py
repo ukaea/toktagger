@@ -4,7 +4,7 @@ Integration tests for concurrent annotation safety and per-user visibility.
 Key invariants under test:
   1. User A saving annotations does NOT delete User B's annotations.
   2. The server overwrites `created_by` from the JWT — clients cannot spoof identity.
-  3. When show_others_annotations=False, a user only sees their own annotations.
+  3. show_others_annotations=False filters lists, but not direct annotation-ID reads.
   4. Viewer-role users cannot PUT annotations (403).
   5. A project non-member cannot access annotations (403).
 """
@@ -48,6 +48,53 @@ async def get_annotations(client, project_id, sample_id, token):
     )
     assert resp.status_code == 200, resp.text
     return resp.json()
+
+
+@pytest.mark.asyncio
+async def test_single_annotation_update_preserves_other_author(
+    setup_db_auth, unauthenticated_api_client
+):
+    client = unauthenticated_api_client
+    admin_token = get_auth_token(USER_ADMIN_ID)
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+    for username in ("alice", "bob"):
+        await add_member(client, admin_token, project_id, username, "annotator")
+    alice_token = get_auth_token(USER_ALICE_ID)
+    bob_token = get_auth_token(USER_BOB_ID)
+    saved = await put_annotations(
+        client, project_id, sample_id, alice_token, "alice_label"
+    )
+    assert saved.status_code == 200
+    annotation_id = saved.json()[0]
+
+    response = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
+        json={
+            "type": "time_region",
+            "label": "bob_correction",
+            "time_min": 0.2,
+            "time_max": 0.4,
+            "created_by": USER_BOB_ID,
+        },
+        headers=session_headers(bob_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json() is None
+    fetched = await client.get(
+        f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
+        headers=session_headers(bob_token),
+    )
+    assert fetched.status_code == 200
+    assert fetched.json()["_id"] == annotation_id
+    assert fetched.json()["created_by"] == USER_ALICE_ID
+    assert fetched.json()["created_by_name"] == "alice"
+    assert fetched.json()["label"] == "bob_correction"
+    stored = await get_annotations(client, project_id, sample_id, alice_token)
+    assert len(stored) == 1
+    assert stored[0]["created_by"] == USER_ALICE_ID
+    assert stored[0]["label"] == "bob_correction"
 
 
 @pytest.mark.asyncio
@@ -163,8 +210,14 @@ async def test_show_others_annotations_filter(
     alice_token = get_auth_token(USER_ALICE_ID)
     bob_token = get_auth_token(USER_BOB_ID)
 
-    await put_annotations(client, project_id, sample_id, alice_token, "alice_ann")
-    await put_annotations(client, project_id, sample_id, bob_token, "bob_ann")
+    alice_saved = await put_annotations(
+        client, project_id, sample_id, alice_token, "alice_ann"
+    )
+    bob_saved = await put_annotations(
+        client, project_id, sample_id, bob_token, "bob_ann"
+    )
+    assert alice_saved.status_code == 200
+    assert bob_saved.status_code == 200
 
     await client.put(
         f"/projects/{project_id}/members/{setup_db_auth['alice_id']}",
@@ -176,6 +229,43 @@ async def test_show_others_annotations_filter(
     labels = {a["label"] for a in alice_view}
     assert "alice_ann" in labels
     assert ("bob_ann" in labels) == expect_bobs_label
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("show_others", [False, True])
+async def test_get_annotation_by_id_ignores_list_preference(
+    setup_db_auth, unauthenticated_api_client, show_others
+):
+    client = unauthenticated_api_client
+    project_id = setup_db_auth["project_id"]
+    sample_id = setup_db_auth["sample_id"]
+    admin_token = get_auth_token(USER_ADMIN_ID)
+    await add_member(client, admin_token, project_id, "alice", "viewer")
+    await add_member(client, admin_token, project_id, "bob", "annotator")
+    alice_token = get_auth_token(USER_ALICE_ID)
+    bob_saved = await put_annotations(
+        client, project_id, sample_id, get_auth_token(USER_BOB_ID), "bob_ann"
+    )
+    assert bob_saved.status_code == 200
+    preference = await client.put(
+        f"/projects/{project_id}/members/{setup_db_auth['alice_id']}",
+        json={"show_others_annotations": show_others},
+        headers=session_headers(alice_token),
+    )
+    assert preference.status_code == 200
+    annotation_id = bob_saved.json()[0]
+
+    response = await client.get(
+        f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
+        headers=session_headers(alice_token),
+    )
+
+    assert response.status_code == 200
+    annotation = response.json()
+    assert annotation["_id"] == annotation_id
+    assert annotation["created_by"] == USER_BOB_ID
+    assert annotation["created_by_name"] == "bob"
+    assert annotation["label"] == "bob_ann"
 
 
 @pytest.mark.asyncio

@@ -1,9 +1,22 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, TypeAdapter
 
-from toktagger.api.schemas.annotations import AnnotationOutTypes, AnnotationTypes
+from toktagger.api.schemas.annotations import (
+    AnnotationOut as AnnotationOutSchema,
+    AnnotationTypes,
+    TimePointOut as TimePointOutSchema,
+    TimeRegionOut as TimeRegionOutSchema,
+    BoundingBoxOut as BoundingBoxOutSchema,
+    PolygonOut as PolygonOutSchema,
+    VideoBoundingBoxOut as VideoBoundingBoxOutSchema,
+    VideoPolygonOut as VideoPolygonOutSchema,
+    VideoPointOut as VideoPointOutSchema,
+    VideoFrameLabelOut as VideoFrameLabelOutSchema,
+    ClassLabelOut as ClassLabelOutSchema,
+    create_combined_model,
+)
 from toktagger.api.schemas.data import (
     DataParamTypes,
     DataParams,
@@ -23,6 +36,81 @@ from toktagger.client.exceptions import TokTaggerClientError
 # Parse the heterogeneous data responses into their concrete types
 if TYPE_CHECKING:
     from toktagger.client.client import TokTaggerClient
+
+
+class Annotation(AnnotationOutSchema):
+    """Annotation schema with a bound client for single-record updates."""
+
+    _client: TokTaggerClient | None = PrivateAttr(default=None)
+
+    def _require_client(self) -> TokTaggerClient:
+        if self._client is None:
+            raise TokTaggerClientError(
+                "This Annotation has no client attached; retrieve it via "
+                "TokTaggerClient.list_annotations() to use its methods."
+            )
+        return self._client
+
+    def update(self, annotation: AnnotationTypes) -> AnnotationOutTypes:
+        """Update this annotation without changing this local instance.
+
+        Parameters
+        ----------
+        annotation : AnnotationTypes
+            The label and geometry, plus optional fields to update. The type
+            must match this annotation. Omitted optional fields and None
+            values are left unchanged.
+
+        Returns
+        -------
+        AnnotationOutTypes
+            The updated concrete annotation, bound to the same client.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If this Annotation has no client attached, or the server cannot
+            be reached.
+        TokTaggerAPIError
+            If the API rejects the update, including missing annotations,
+            insufficient permissions, or attempts to change annotation type.
+
+        Notes
+        -----
+        IDs, authorship, shot ID and creation timestamp are preserved.
+        Other annotations are untouched. Setting validated=True marks the
+        sample validated; other updates leave its validation flag unchanged.
+        A follow-up fetch returns the stored annotation. If that fetch fails,
+        the update may already have been saved.
+        """
+        return self._require_client().update_annotation(
+            self.project_id, self.sample_id, self.id, annotation
+        )
+
+
+# Generate Out classes using factory function
+TimePointOut = create_combined_model(Annotation, TimePointOutSchema, "")
+TimeRegionOut = create_combined_model(Annotation, TimeRegionOutSchema, "")
+BoundingBoxOut = create_combined_model(Annotation, BoundingBoxOutSchema, "")
+PolygonOut = create_combined_model(Annotation, PolygonOutSchema, "")
+VideoBoundingBoxOut = create_combined_model(Annotation, VideoBoundingBoxOutSchema, "")
+VideoPolygonOut = create_combined_model(Annotation, VideoPolygonOutSchema, "")
+VideoPointOut = create_combined_model(Annotation, VideoPointOutSchema, "")
+VideoFrameLabelOut = create_combined_model(Annotation, VideoFrameLabelOutSchema, "")
+ClassLabelOut = create_combined_model(Annotation, ClassLabelOutSchema, "")
+
+AnnotationOutTypes = (
+    TimePointOut
+    | TimeRegionOut
+    | BoundingBoxOut
+    | PolygonOut
+    | VideoBoundingBoxOut
+    | VideoPolygonOut
+    | VideoPointOut
+    | VideoFrameLabelOut
+    | ClassLabelOut
+)
+AnnotationOutTypeAdapter = TypeAdapter(AnnotationOutTypes)
 
 
 class Project(ProjectSchema):
@@ -340,6 +428,38 @@ class Sample(SampleSchema):
         """
         return self._require_client().create_annotations(
             self.project_id, self.id, annotations
+        )
+
+    def get_annotation(self, annotation_id: str) -> AnnotationOutTypes:
+        """Get a single annotation belonging to this sample.
+
+        Parameters
+        ----------
+        annotation_id : str
+            The ID of the annotation to retrieve.
+
+        Returns
+        -------
+        AnnotationOutTypes
+            The concrete annotation, with resolved author information and
+            this sample's client attached for chained updates.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If this Sample has no client attached, or the server cannot
+            be reached.
+        TokTaggerAPIError
+            If the API rejects the request, including 404 for an annotation
+            not belonging to this sample or 403 for insufficient access.
+
+        Notes
+        -----
+        Direct ID lookups ignore the annotation list preference.
+        Project access is still required.
+        """
+        return self._require_client().get_annotation(
+            self.project_id, self.id, annotation_id
         )
 
     def get_data(
