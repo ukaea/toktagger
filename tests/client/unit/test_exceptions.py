@@ -117,7 +117,7 @@ def test_project_method_without_client_raises(toktagger_client, setup_db):
     project = Project.model_validate(raw)
     assert project._client is None
     with pytest.raises(TokTaggerClientError, match="no client attached"):
-        project.create_sample(db_definitions.SAMPLE_3)
+        project.create_samples([db_definitions.SAMPLE_3])
     with pytest.raises(TokTaggerClientError, match="no client attached"):
         project.update(ProjectUpdate(name="updated_project"))
     with pytest.raises(TokTaggerClientError, match="no client attached"):

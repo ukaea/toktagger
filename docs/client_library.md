@@ -108,12 +108,12 @@ As with creation, updating is followed by a GET request. If that fetch fails, th
 
 ## Creating Samples
 
-Pass a `SampleIn` to `client.create_sample(project_id, sample)` or `project.create_sample(sample)`:
+Pass a list of `SampleIn` to `client.create_samples(project_id, samples)` or `project.create_samples(samples)`:
 
 ```python
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
 
-sample = project.create_sample(
+samples = project.create_samples([
     SampleIn(
         shot_id=10000,
         data=TimeSeriesFileData(
@@ -122,15 +122,15 @@ sample = project.create_sample(
             signal_names=["Ip"],
         ),
     )
-)
-data = sample.get_data()
+])
+data = samples[0].get_data()
 ```
 
 The data source must match the project's loader, and file paths refer to files accessible to the server, not the client machine. Remote sources use `ShotData`; image sources use `ImageFileData` or `ImageArrayFileData`.
 
 `SampleIn.annotations` optionally supplies initial batch annotations. The backend derives `validated_annotations` from them and attributes human annotations to the authenticated caller. Sample creation requires project-admin or global-admin permissions.
 
-Both methods return a freshly fetched, client-bound `Sample`, supporting chained data and annotation lookups. The client sends a one-item list to the API's bulk-create endpoint, then fetches the new sample by its returned ID. If that fetch fails, the sample may already exist; check before retrying to avoid duplicates.
+Both methods return a list of freshly fetched, client-bound `Sample` outputs in input order, supporting chained data and annotation lookups. An empty input list returns `[]`. The client sends the list to the API's bulk-create endpoint, then retrieves the created samples with one ID-filtered GET request. If creation or a fetch fails, some samples may already exist; check before retrying to avoid duplicates.
 
 ## Updating Samples
 
@@ -198,7 +198,7 @@ Use `sample.create_annotations(annotations)` or `client.create_annotations(proje
 ```python
 from toktagger.api.schemas.annotations import TimeRegion
 
-annotation_ids = sample.create_annotations([
+annotations = sample.create_annotations([
     TimeRegion(
         label="Flat Top",
         time_min=0.2,
@@ -208,14 +208,14 @@ annotation_ids = sample.create_annotations([
 ])
 
 # Equivalent flat call:
-annotation_ids = client.create_annotations(project_id, sample_id, [
+annotations = client.create_annotations(project_id, sample_id, [
     TimeRegion(label="Ramp Up", time_min=0.1, time_max=0.2)
 ])
 ```
 
 Pass plain annotation schemas such as `TimeRegion`, `TimePoint`, or `VideoBoundingBox` (the `AnnotationTypes` union). The server assigns human authorship. There is no need to supply shot, sample, or project IDs in the annotations: the server derives them from the target sample. Supplied annotation IDs are ignored; this always creates new records, never edits existing ones. Other samples are untouched, even if they share the same shot ID.
 
-Both methods return the new annotation IDs in input order; use `sample.list_annotations()` to retrieve saved records. Human authorship is assigned to the authenticated caller, while registered machine authors are preserved. Creating requires project annotator/admin or global-admin access. Any validated annotation marks the sample validated; unvalidated additions do not clear its existing validation flag. An empty list returns `[]` and changes nothing.
+Both methods return freshly fetched, client-bound annotations in input order, using one ID-filtered GET request after creation. The fetch respects annotation visibility preferences; if any created record cannot be retrieved, `NotFoundError` is raised. The public `list_samples()` and `list_annotations()` methods do not expose ID filters. Human authorship is assigned to the authenticated caller, while registered machine authors are preserved. Creating requires project annotator/admin or global-admin access. Any validated annotation marks the sample validated; unvalidated additions do not clear its existing validation flag. An empty list returns `[]` and changes nothing.
 
 The bound `Sample` is not refreshed or mutated by creation. Fetch it again to see its current validation flag. The operation is not transactional: if a request fails after writing begins, some annotations may already exist; check before retrying to avoid duplicates.
 

@@ -67,10 +67,13 @@ async def get_samples(
     shot_id: int | None = Query(
         None, description="The shot ID to search for, by default None"
     ),
+    ids: list[str] | None = Query(
+        None, description="Only return these sample IDs, before sorting and pagination."
+    ),
 ) -> list[Sample]:
     """
     Get the full list of samples available for this project, with optional
-    pagination, sorting, and shot ID filtering.
+    pagination, sorting, and shot ID or sample ID filtering.
 
     Parameters
     ----------
@@ -87,6 +90,9 @@ async def get_samples(
         The number of samples to return, leave blank to return all entries.
     shot_id : int | None
         The shot ID to search for, by default None.
+    ids : list[str] | None
+        Restrict to these sample IDs before sorting and pagination.
+        Unknown IDs and IDs outside the project are omitted.
 
     current_user : UserOut
         The authenticated project member (viewer, annotator, or admin), or a
@@ -117,6 +123,7 @@ async def get_samples(
         db_client=db_client,
         project_id=project_id,
         shot_id=shot_id,
+        ids=ids,
         sort_by=sort_by,
         sort_direction=sort_direction,
         start=start,

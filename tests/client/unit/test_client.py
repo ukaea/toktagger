@@ -257,36 +257,48 @@ def test_list_samples_forwards_shot_id_and_count(toktagger_client, setup_db):
     assert [sample.id for sample in limited_samples] == [setup_db["sample_id_2"]]
 
 
-def test_create_sample(toktagger_client, setup_db):
+@pytest.mark.parametrize(
+    "sample_definitions",
+    [[], [db_definitions.SAMPLE_3], [db_definitions.SAMPLE_3, db_definitions.SAMPLE_4]],
+    ids=["empty", "single", "multiple"],
+)
+def test_create_samples(toktagger_client, setup_db, sample_definitions):
     project_id = setup_db["project_id_2"]
 
-    sample = toktagger_client.create_sample(project_id, db_definitions.SAMPLE_3)
+    samples = toktagger_client.create_samples(project_id, sample_definitions)
 
-    assert isinstance(sample, Sample)
-    assert ObjectId.is_valid(sample.id)
-    assert sample._client is toktagger_client
-    assert sample.project_id == project_id
-    assert sample.shot_id == db_definitions.SAMPLE_3.shot_id
-    assert sample.data == db_definitions.SAMPLE_3.data
-    assert sample.validated_annotations is False
-    assert sample.list_annotations() == []
+    assert len(samples) == len(sample_definitions)
+    assert len({sample.id for sample in samples}) == len(samples)
+    for sample, definition in zip(samples, sample_definitions, strict=True):
+        assert isinstance(sample, Sample)
+        assert ObjectId.is_valid(sample.id)
+        assert sample._client is toktagger_client
+        assert sample.project_id == project_id
+        assert sample.shot_id == definition.shot_id
+        assert sample.data == definition.data
+        assert sample.validated_annotations is False
+        assert sample.list_annotations() == []
 
 
-def test_create_sample_missing_project(toktagger_client):
+def test_create_samples_missing_project(toktagger_client):
     with pytest.raises(NotFoundError) as exc_info:
-        toktagger_client.create_sample("0" * 24, db_definitions.SAMPLE_3)
+        toktagger_client.create_samples("0" * 24, [db_definitions.SAMPLE_3])
     assert exc_info.value.status_code == 404
 
 
-def test_project_create_sample_delegates(toktagger_client, setup_db):
+def test_project_create_samples_delegates(toktagger_client, setup_db):
     project = toktagger_client.get_project(setup_db["project_id_2"])
 
-    sample = project.create_sample(db_definitions.SAMPLE_3)
+    samples = project.create_samples([db_definitions.SAMPLE_3, db_definitions.SAMPLE_4])
 
-    assert isinstance(sample, Sample)
-    assert sample._client is toktagger_client
-    assert sample.project_id == project.id
-    assert sample.shot_id == db_definitions.SAMPLE_3.shot_id
+    assert len(samples) == 2
+    assert all(isinstance(sample, Sample) for sample in samples)
+    assert all(sample._client is toktagger_client for sample in samples)
+    assert all(sample.project_id == project.id for sample in samples)
+    assert [sample.shot_id for sample in samples] == [
+        db_definitions.SAMPLE_3.shot_id,
+        db_definitions.SAMPLE_4.shot_id,
+    ]
 
 
 def test_update_sample(toktagger_client, setup_db):
@@ -428,22 +440,63 @@ def test_get_data_missing_sample_raises_not_found(toktagger_client, setup_db):
     assert exc_info.value.status_code == 404
 
 
+@pytest.mark.parametrize("resource", ["samples", "annotations"])
+def test_creation_uses_one_bulk_fetch(
+    toktagger_client, setup_db, monkeypatch, resource
+):
+    requests = []
+    original_request = toktagger_client._request
+
+    def record_request(method, path, **kwargs):
+        requests.append((method, path, kwargs))
+        return original_request(method, path, **kwargs)
+
+    monkeypatch.setattr(toktagger_client, "_request", record_request)
+    project_id = setup_db["project_id_1"]
+
+    if resource == "samples":
+        path = f"/projects/{project_id}/samples"
+        created = toktagger_client.create_samples(
+            project_id, [db_definitions.SAMPLE_1, db_definitions.SAMPLE_2]
+        )
+    else:
+        sample_id = setup_db["sample_id_1"]
+        path = f"/projects/{project_id}/samples/{sample_id}/annotations"
+        created = toktagger_client.create_annotations(
+            project_id,
+            sample_id,
+            [
+                TimeRegion(label="first", time_min=0, time_max=1),
+                TimePoint(label="second", time=2),
+            ],
+        )
+
+    assert len(created) == 2
+    assert [(method, url) for method, url, _ in requests] == [
+        ("POST", path),
+        ("GET", path),
+    ]
+    assert requests[1][2]["params"] == {"ids": [item.id for item in created]}
+
+
 def test_create_annotations(toktagger_client, setup_db):
     project_id = setup_db["project_id_1"]
     sample_id = setup_db["sample_id_1"]
     existing = toktagger_client.list_annotations(project_id)
     annotation = TimeRegion(label="new region", time_min=0.5, time_max=0.6)
 
-    annotation_ids = toktagger_client.create_annotations(
+    created_annotations = toktagger_client.create_annotations(
         project_id, sample_id, [annotation]
     )
 
-    assert len(annotation_ids) == 1
-    assert ObjectId.is_valid(annotation_ids[0])
+    assert len(created_annotations) == 1
+    created = created_annotations[0]
+    assert ObjectId.is_valid(created.id)
+    assert created._client is toktagger_client
     stored = toktagger_client.list_annotations(project_id)
     assert len(stored) == len(existing) + 1
     assert {item.id for item in existing} <= {item.id for item in stored}
-    created = next(item for item in stored if item.id == annotation_ids[0])
+    assert next(item for item in stored if item.id == created.id) == created
     assert isinstance(created, TimeRegion)
     assert created.project_id == project_id
     assert created.sample_id == sample_id
@@ -458,11 +511,12 @@ def test_sample_create_annotations(toktagger_client, setup_db):
         setup_db["project_id_1"], setup_db["sample_id_1"]
     )
 
-    annotation_ids = sample.create_annotations([db_definitions.ANNOTATION_1])
+    created_annotations = sample.create_annotations([db_definitions.ANNOTATION_1])
 
-    assert len(annotation_ids) == 1
+    assert len(created_annotations) == 1
+    assert created_annotations[0]._client is toktagger_client
     assert len(sample.list_annotations()) == 4
-    assert annotation_ids[0] != setup_db["annotation_id_1"]
+    assert created_annotations[0].id != setup_db["annotation_id_1"]
 
 
 @pytest.mark.parametrize("target", ["project", "sample", "wrong_project"])

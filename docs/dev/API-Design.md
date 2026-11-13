@@ -21,7 +21,7 @@ Bearer tokens are stored in the `bearer_tokens` collection; documents without a 
 - **DELETE**: Delete a project using its ID
 
 ## `/projects/{project_id}/samples`
-- **GET**: Get info about which samples are being investigated in this project (which pulses etc)
+- **GET**: Get info about which samples are being investigated in this project (which pulses etc). Optional repeated `ids` query parameters (`?ids=ID1&ids=ID2`) restrict samples by ID in the database before sorting and `start`/`count` pagination, combined with the shot-ID filter. Unknown or out-of-project IDs are omitted; malformed IDs return 400.
 - **PUT**: Add extra samples to this project
 - **DELETE**: Remove samples from this project
 
@@ -34,11 +34,11 @@ Bearer tokens are stored in the `bearer_tokens` collection; documents without a 
 **DELETE**: Delete data for this sample (not implemented)
 
 ## `/projects/{project_id}/annotations?{filters}`
-- **GET**: Tell me information about annotations available for this project
+- **GET**: Tell me information about annotations available for this project. Optional repeated `ids` query parameters restrict annotation IDs in the database before sorting and `start`/`count` pagination. Existing validation and author visibility filters still apply. Unknown, out-of-project, or hidden annotations are omitted; malformed IDs return 400.
 - **DELETE**: Delete ALL annotations for ALL samples for this project
 
 ## `/projects/{project_id}/samples/{sample_id}/annotations`
-- **GET**: Tell me the annotations already stored for this sample
+- **GET**: Tell me the annotations already stored for this sample. Supports the same optional repeated `ids` query filter as the project annotation list, additionally scoped to this sample; existing validation, creator, and visibility filters still apply.
 - **POST**: Append new annotations to this sample without replacing existing records; returns new IDs in input order. Exposed to MCP as `create_sample_annotations`. Accepts a list of `AnnotationTypes` (without IDs); `created_by` is optional on inputs and required on stored annotation outputs. Requires annotator/admin access. Supplied IDs are ignored, and project/sample/shot identity comes from the URL's sample. Human authorship is assigned to the caller; registered machine authors are preserved. Any validated addition marks the sample validated without clearing an existing validation flag. An empty list changes nothing. Other samples sharing the shot ID are untouched.
 - **PUT**: Replace the caller's annotations and edit other authors' annotations by ID
 - **DELETE**: Delete the annotations whose IDs are in the request body (a JSON list). If there is no body, delete ALL annotations for this sample

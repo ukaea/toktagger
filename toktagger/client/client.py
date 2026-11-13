@@ -331,13 +331,26 @@ class TokTaggerClient:
         ).json()
         return [self._bootstrap_sample(sample) for sample in data]
 
-    def create_sample(self, project_id: str, sample: SampleIn) -> Sample:
-        """Create a sample in a project and return it bound to this client."""
-        body = sample.model_dump(mode="json", include=set(SampleIn.model_fields))
+    def create_samples(self, project_id: str, samples: list[SampleIn]) -> list[Sample]:
+        """Create samples and return them bound to this client in input order."""
+        body = [
+            sample.model_dump(mode="json", include=set(SampleIn.model_fields))
+            for sample in samples
+        ]
         sample_ids = self._request(
-            "POST", f"/projects/{project_id}/samples", json=[body]
+            "POST", f"/projects/{project_id}/samples", json=body
         ).json()
-        return self.get_sample(project_id, sample_ids[0])
+        if not sample_ids:
+            return []
+        data = self._request(
+            "GET",
+            f"/projects/{project_id}/samples",
+            params={"ids": sample_ids, "count": len(sample_ids)},
+        ).json()
+        samples = [self._bootstrap_sample(sample) for sample in data]
+        if len(samples) != len(sample_ids):
+            return NotFoundError("Some samples were not created correctly!")
+        return samples
 
     def update_sample(
         self, project_id: str, sample_id: str, updates: SampleUpdate
@@ -500,7 +513,7 @@ class TokTaggerClient:
 
     def create_annotations(
         self, project_id: str, sample_id: str, annotations: list[AnnotationTypes]
-    ) -> list[str]:
+    ) -> list[AnnotationOutTypes]:
         """Append new annotations to a single sample without replacing existing ones.
 
         Parameters
@@ -516,9 +529,9 @@ class TokTaggerClient:
 
         Returns
         -------
-        list[str]
-            The new annotation IDs in input order, or an empty list if no
-            annotations were supplied.
+        list[AnnotationOutTypes]
+            Freshly fetched, client-bound annotations in input order, or an
+            empty list if no annotations were supplied.
 
         Raises
         ------
@@ -536,17 +549,24 @@ class TokTaggerClient:
         validated; unvalidated additions do not clear its validation flag.
         Other samples are untouched, including those sharing the same shot ID.
 
-        Use list_annotations() to retrieve the saved records. Creation is not
-        transactional; check for saved annotations before retrying a failed
-        request to avoid duplicates.
+        Creation and the follow-up bulk fetch are not transactional; check for
+        saved annotations before retrying a failed request to avoid duplicates.
         """
         body = [
             annotation.model_dump(mode="json", by_alias=True, exclude={"id"})
             for annotation in annotations
         ]
-        return self._request(
-            "POST", f"/projects/{project_id}/samples/{sample_id}/annotations", json=body
+        path = f"/projects/{project_id}/samples/{sample_id}/annotations"
+        annotation_ids = self._request("POST", path, json=body).json()
+        if not annotation_ids:
+            return []
+        data = self._request(
+            "GET", path, params={"ids": annotation_ids, "count": len(annotation_ids)}
         ).json()
+        annotations = [self._bootstrap_annotation(annotation) for annotation in data]
+        if len(annotations) != len(annotation_ids):
+            return NotFoundError("Some annotations were not created correctly!")
+        return annotations
 
     def get_annotation(
         self, project_id: str, sample_id: str, annotation_id: str

@@ -194,9 +194,9 @@ class Project(ProjectSchema):
             sort_direction=sort_direction,
         )
 
-    def create_sample(self, sample: SampleIn) -> Sample:
-        """Create a sample in this project and return it bound to the client."""
-        return self._require_client().create_sample(self.id, sample)
+    def create_samples(self, samples: list[SampleIn]) -> list[Sample]:
+        """Create samples in this project and return them bound to the client."""
+        return self._require_client().create_samples(self.id, samples)
 
     def get_sample(self, sample_id: str) -> Sample:
         """Get a single sample in this project by its ID.
@@ -345,7 +345,9 @@ class Sample(SampleSchema):
         """Return an updated sample without changing this local instance."""
         return self._require_client().update_sample(self.project_id, self.id, updates)
 
-    def create_annotations(self, annotations: list[AnnotationTypes]) -> list[str]:
+    def create_annotations(
+        self, annotations: list[AnnotationTypes]
+    ) -> list[AnnotationOutTypes]:
         """Append new annotations to this sample without replacing existing ones.
 
         Parameters
@@ -357,9 +359,9 @@ class Sample(SampleSchema):
 
         Returns
         -------
-        list[str]
-            The new annotation IDs in input order, or an empty list if no
-            annotations were supplied.
+        list[AnnotationOutTypes]
+            Freshly fetched, client-bound annotations in input order, or an
+            empty list if no annotations were supplied.
 
         Raises
         ------
@@ -378,10 +380,9 @@ class Sample(SampleSchema):
         validated; unvalidated additions do not clear its validation flag.
         Other samples are untouched, including those sharing the same shot ID.
 
-        This local Sample is not refreshed or mutated. Use list_annotations()
-        to retrieve saved records and fetch the sample again for its current
-        validation flag. Creation is not transactional; check for saved
-        annotations before retrying a failed request to avoid duplicates.
+        This local Sample is not refreshed or mutated; fetch it again for its
+        current validation flag. Creation and the follow-up bulk fetch are not
+        transactional; check for saved annotations before retrying to avoid duplicates.
         """
         return self._require_client().create_annotations(
             self.project_id, self.id, annotations

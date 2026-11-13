@@ -56,11 +56,11 @@ def test_list_samples_shot_id_filter(
     assert samples[0].shot_id == 10000
 
 
-def test_create_sample(integration_toktagger_client, seeded_project_with_samples):
+def test_create_samples(integration_toktagger_client, seeded_project_with_samples):
     project_id, sample_ids, _ = seeded_project_with_samples
     project = integration_toktagger_client.get_project(project_id)
 
-    sample = project.create_sample(db_definitions.SAMPLE_4)
+    [sample] = project.create_samples([db_definitions.SAMPLE_4])
 
     assert isinstance(sample, Sample)
     assert sample._client is integration_toktagger_client
@@ -175,13 +175,14 @@ def test_create_annotations(integration_toktagger_client, seeded_project_with_sa
         time_max=db_definitions.ANNOTATION_1.time_max,
     )
 
-    annotation_ids = sample.create_annotations([annotation])
+    [created] = sample.create_annotations([annotation])
 
-    assert len(annotation_ids) == 1
+    assert created._client is integration_toktagger_client
     annotations = sample.list_annotations()
     assert len(annotations) == 3
-    created = next(
-        annotation for annotation in annotations if annotation.id == annotation_ids[0]
+    assert (
+        next(annotation for annotation in annotations if annotation.id == created.id)
+        == created
     )
     assert created.sample_id == sample.id
     assert created.label == db_definitions.ANNOTATION_1.label

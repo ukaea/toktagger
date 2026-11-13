@@ -74,6 +74,10 @@ async def get_all_annotations(
         None,
         description="Whether to return only validated or unvalidated annotations, leave blank for all annotations",
     ),
+    ids: list[str] | None = Query(
+        None,
+        description="Only return these annotation IDs, before sorting and pagination.",
+    ),
     current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
     """
@@ -84,6 +88,8 @@ async def get_all_annotations(
     ----------
     project_id : str
         The ID of the project to retrieve annotations for.
+    ids : list[str] | None
+        Restrict to these IDs before sorting and pagination; other filters still apply.
     sort_by : str
         Field to sort responses by, by default '_id' (equivalent to timestamp).
     sort_direction : Literal["ascending", "descending"]
@@ -142,6 +148,7 @@ async def get_all_annotations(
         db_client=db_client,
         project_id=project_id,
         validated=validated,
+        ids=ids,
         created_by=created_by,
         sort_by=sort_by,
         sort_direction=sort_direction,
@@ -294,6 +301,10 @@ async def get_annotations(
         None,
         description="Only return annotations by this author: a user ID, or a model:: or annotators:: value.",
     ),
+    ids: list[str] | None = Query(
+        None,
+        description="Only return these annotation IDs, before sorting and pagination.",
+    ),
     current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
     """
@@ -306,6 +317,8 @@ async def get_annotations(
         The ID of the project to get samples from.
     sample_id : str
         The ID of the sample to get annotations from.
+    ids : list[str] | None
+        Restrict to these IDs before sorting and pagination; other filters still apply.
     sort_by : str
         Field to sort responses by, by default '_id' (equivalent to timestamp).
     sort_direction : Literal["ascending", "descending"]
@@ -372,6 +385,7 @@ async def get_annotations(
         project_id=project_id,
         sample_id=sample_id,
         validated=validated,
+        ids=ids,
         created_by=effective_created_by,
         sort_by=sort_by,
         sort_direction=sort_direction,

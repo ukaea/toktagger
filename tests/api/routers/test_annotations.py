@@ -30,6 +30,56 @@ async def test_get_all_annotations(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("sample_scoped", [False, True], ids=["project", "sample"])
+@pytest.mark.parametrize(
+    "query, expected_keys",
+    [
+        ({}, ["annotation_id_1", "annotation_id_3"]),
+        ({"start": 1, "count": 1}, ["annotation_id_3"]),
+        ({"count": 1, "sort_direction": "descending"}, ["annotation_id_3"]),
+        ({"validated": "true"}, ["annotation_id_1"]),
+    ],
+)
+async def test_get_annotations_ids(
+    api_client, setup_db, sample_scoped, query, expected_keys
+):
+    path = f"/projects/{setup_db['project_id_1']}"
+    if sample_scoped:
+        path += f"/samples/{setup_db['sample_id_1']}"
+    response = await api_client.get(
+        f"{path}/annotations",
+        params={
+            "ids": [
+                setup_db["annotation_id_3"],
+                setup_db["annotation_id_1"],
+                setup_db["annotation_id_1"],
+                setup_db["annotation_id_5"],
+                "0" * 24,
+            ],
+            "sort_direction": "ascending",
+            **query,
+        },
+    )
+
+    assert response.status_code == 200
+    assert [annotation["_id"] for annotation in response.json()] == [
+        setup_db[key] for key in expected_keys
+    ]
+    assert all("created_by_name" in annotation for annotation in response.json())
+
+
+@pytest.mark.asyncio
+async def test_get_annotations_ids_created_by(api_client, setup_db):
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations",
+        params={"ids": [setup_db["annotation_id_1"]], "created_by": "absent"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
 async def test_get_all_annotations_sortby(api_client, setup_db):
     response = await api_client.get(
         f"/projects/{setup_db['project_id_1']}/samples/{setup_db['sample_id_1']}/annotations?sort_by=label"
