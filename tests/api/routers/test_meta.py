@@ -22,6 +22,23 @@ async def test_get_data_schema(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("loader", "supported"),
+    [
+        ("uda", True),
+        ("uda_camera", True),
+        ("sal", True),
+        ("fair_mast", False),
+        ("tabular", False),
+    ],
+)
+async def test_get_latest_shot_support(api_client, setup_db, loader, supported):
+    response = await api_client.get(f"/meta/dataloader/{loader}/latest-shot-support")
+    assert response.status_code == 200
+    assert response.json() is supported
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("loader", ["uda", "sal", "fair_mast", "tabular"])
 async def test_get_signal_name_help(api_client, setup_db, loader):
     response = await api_client.get(f"/meta/dataloader/{loader}/help")

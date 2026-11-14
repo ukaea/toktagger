@@ -27,6 +27,7 @@ A project defines the annotation task, data source, and labeling configuration f
         - `tabular` - Load CSV/TSV/Parquet files from local disk
         - `image` - Load images from local PNG / JPEG files
         - `image-array` - Load Numpy arrays as images from local `.npy` or `.npz` files
+    - **Signal Names**: The signals to load for each sample in the project, in a comma-separated format. For examples for each data loader, refer to [Data Loaders](data_loaders.md). This field is required for `uda`, `uda_camera`, `sal` and `fair_mast`. It is optional for `tabular` and `image-array`, and does not show for `image`. You can change the signal names later in **Edit Project**. A change updates all samples in the project.
     - **Query Strategy**: Navigation strategy to select the next sample to annotate:
         - `sequential` - In order sequentially by shot ID
         - `random` - Random selection
@@ -45,7 +46,15 @@ A project defines the annotation task, data source, and labeling configuration f
     - **Polygon labels** - labels for polygons in images
     - **Video bounding box labels** - labels for bounding boxes in video frames
 
-6. Click **Create** to finalize the project - you should see a new entry appear in your Projects table.
+6. (Optional) Configure **Auto-add New Shots**. This section shows only for data loaders that can find the latest shot (`uda`, `uda_camera` and `sal`):
+    - Set the switch to on to let the server add new shots to the project.
+    - **Check Interval (minutes)**: The time between two checks. The default is 10 minutes.
+
+    New samples use the signal names of the project.
+
+    At each check, the server gets the latest shot number from the data source. Then it adds a sample for each shot that is higher than the highest shot in the project. The server does not add lower shots. If the project has no samples, the server adds only the latest shot. The Samples page shows the time of the last check and loads new samples automatically. Auto-add is off by default.
+
+7. Click **Create** to finalize the project - you should see a new entry appear in your Projects table.
 
 ---
 
@@ -62,9 +71,10 @@ A sample represents a single unit of data to be labeled—typically a tokamak sh
 2. Click **Add Samples**
 3. Choose your **Data Input Method**:
 
+All samples use the signal names of the project. The dialog shows these signal names. To change them, use **Edit Project**.
+
 **For Signal Data (UDA, SAL, etc.)**
 
-- **Signal Names**: Comma-separated list of signal names to load for annotation. For examples for each data loader, refer to [Data Loaders](data_loaders.md).
 - **Shot ID Input**:
     - **Numerical Range**: Specify a start and end shot ID
     - **Text File**: Upload a `.txt` or `.csv` file with one shot ID per line as the first column (additional columns are ignored)
@@ -74,7 +84,6 @@ A sample represents a single unit of data to be labeled—typically a tokamak sh
 - **File Type**: Select the file format (`csv`, `parquet`, `json`, etc.)
 - **Directory Path**: Path to the directory containing files 
     - Files should be named `{shot_id}.{extension}` (e.g., `100.parquet`)
-- **Signal Name(s)**: Comma-separated column names to load. If not specified, loads all columns present in the file. For image arrays loaded from `.npz` files, only one signal name is accepted.
 
 **For Image Data (PNG, JPEG)**
 

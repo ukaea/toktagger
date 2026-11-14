@@ -9,7 +9,13 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.end_to_end.conftest import login_as
-from tests.endpoints import add_project_member, create_project, create_user, session
+from tests.endpoints import (
+    DEFAULT_SIGNAL_NAMES,
+    add_project_member,
+    create_project,
+    create_user,
+    session,
+)
 
 
 def check_base_page(page):
@@ -531,6 +537,13 @@ def test_create_project(
 
     modal.get_by_role("button", name="Data Loader").click()
     page.get_by_role("option", name=data_loader, exact=True).click()
+
+    if data_loader in DEFAULT_SIGNAL_NAMES:
+        modal.get_by_role("textbox", name="Signal Names").fill(
+            ", ".join(DEFAULT_SIGNAL_NAMES[data_loader])
+        )
+    elif data_loader == "image":
+        expect(modal.get_by_role("textbox", name="Signal Names")).to_have_count(0)
 
     modal.get_by_role("radio", name="Random").click()
     modal.get_by_role("textbox", name="Project Name").fill("Test Project")

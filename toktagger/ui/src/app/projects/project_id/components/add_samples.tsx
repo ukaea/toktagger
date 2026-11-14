@@ -17,39 +17,27 @@ import {
   ToastQueue,
   RadioGroup,
   Radio,
-  ContextualHelp,
 } from "@adobe/react-spectrum";
 import {
   Project,
-  Sample,
-  ShotData,
+  ShotDataIn,
   FileData,
-  TimeSeriesFileData,
-  ImageArrayFileData,
+  SignalNameRules,
+  SignalNameRulesSchema,
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import { useState, useEffect } from "react";
-import { z } from "zod/v4";
 import * as d3 from "d3";
 import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
 } from "@/app/components/ui/numerical_range";
 
-const DEFAULT_SIGNAL_NAME_HELP =
-  "Use the signal names that the data loader expects.";
-
-const SignalNameHelp = ({ helpText }: { helpText: string | null }) => (
-  <ContextualHelp>
-    <Heading>Signal names</Heading>
-    <Content>
-      <Text>
-        {helpText ?? DEFAULT_SIGNAL_NAME_HELP} Refer to the Data Loaders
-        documentation for examples.
-      </Text>
-    </Content>
-  </ContextualHelp>
-);
+type SampleIn = {
+  shot_id: number;
+  timestamp: string;
+  data?: ShotDataIn | FileData;
+};
 
 export const AddSamplesEditor = ({
   project,
@@ -71,20 +59,22 @@ export const AddSamplesEditor = ({
   const [fileTypes, setFileTypes] = useState<{ key: string; value: string }[]>(
     [],
   );
-  const [signalNameHelp, setSignalNameHelp] = useState<string | null>(null);
+  const [signalNameRules, setSignalNameRules] =
+    useState<SignalNameRules | null>(null);
 
   // Form state
   const [shotInputMethod, setShotInputMethod] = useState<string>("range"); // "range" or "file"
   const [shotRange, setShotRange] = useState<NumericalRangeType>();
   const [shotIds, setShotIds] = useState<number[]>([]);
 
-  // Shot Data fields
-  const [signalNames, setSignalNames] = useState<string>("");
-
   // File Data fields
   const [fileType, setFileType] = useState<string>("parquet");
   const [dirPath, setDirPath] = useState<string>("");
-  const [columnNames, setColumnNames] = useState<string>(""); // For time series files
+
+  const usesSignalNames = signalNameRules !== null && signalNameRules.max !== 0;
+  const missingSignalNames =
+    signalNameRules !== null &&
+    project.signal_names.length < signalNameRules.min;
 
   // Determine if we should use directories (for image data)
   const useDirectories = dataSchema?.title === "ImageFileData";
@@ -102,14 +92,13 @@ export const AddSamplesEditor = ({
           // e.g., "ShotData", "FileData", "TimeSeriesFileData"
           setDataSchema(schema);
 
-          const helpResponse = await apiFetch(
-            `${BACKEND_API_URL}/meta/dataloader/${dataLoader}/help`,
+          const rulesResponse = await apiFetch(
+            `${BACKEND_API_URL}/meta/dataloader/${dataLoader}/signal-names`,
           );
-          const helpText = z
-            .string()
-            .nullable()
-            .safeParse(helpResponse.ok ? await helpResponse.json() : null);
-          setSignalNameHelp(helpText.success ? helpText.data : null);
+          const rules = SignalNameRulesSchema.safeParse(
+            rulesResponse.ok ? await rulesResponse.json() : null,
+          );
+          setSignalNameRules(rules.success ? rules.data : null);
 
           if (schema.title === "ShotData") {
             return;
@@ -234,88 +223,29 @@ export const AddSamplesEditor = ({
   const onFormSubmit = async (close: () => void) => {
     try {
       // Build samples array based on data schema type
-      const samples: Partial<Sample>[] = shotIds.map((shotId) => {
+      const samples: SampleIn[] = shotIds.map((shotId) => {
         const baseSample = {
           shot_id: shotId,
           timestamp: new Date().toISOString(),
         };
 
         if (dataSchema?.title === "ShotData") {
-          // Shot Data
-          const signals = signalNames
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
-
-          if (signals.length === 0) {
-            throw new Error(
-              "At least one signal name is required for Shot Data",
-            );
-          }
-
-          return {
-            ...baseSample,
-            data: {
-              protocol: "uda",
-              signal_names: signals,
-            } as ShotData,
-          };
+          const shotData: ShotDataIn = { protocol: dataLoader };
+          return { ...baseSample, data: shotData };
         } else if (
           dataSchema?.title === "ImageFileData" ||
           dataSchema?.title === "ImageArrayFileData" ||
           dataSchema?.title === "TimeSeriesFileData"
         ) {
-          // File Data or Time Series File Data
-          let fileName: string =
-            dirPath + "/" + (shotId.toString() + "." + fileType); // Default file name format
-          if (useDirectories) {
-            fileName = dirPath + "/" + shotId.toString(); // For directories, the "file name" is just the directory path with shot ID
-          }
-
-          const fileData: Record<string, string | string[]> = {
-            file_name: fileName,
+          // For directories, the "file name" is the directory path with the shot ID
+          const fileData: FileData = {
+            file_name: useDirectories
+              ? `${dirPath}/${shotId}`
+              : `${dirPath}/${shotId}.${fileType}`,
             type: fileType,
             protocol: "file",
           };
-
-          // Add column_names for time series file data
-          if (columnNames.trim()) {
-            const columns = columnNames
-              .split(",")
-              .map((s) => s.trim())
-              .filter((s) => s.length > 0);
-
-            if (
-              dataSchema?.title === "TimeSeriesFileData" &&
-              columns.length > 0
-            ) {
-              fileData.signal_names = columns;
-              return {
-                ...baseSample,
-                data: fileData as TimeSeriesFileData,
-              };
-            } else if (
-              dataSchema?.title === "ImageArrayFileData" &&
-              columns.length > 1
-            ) {
-              throw new Error(
-                "Only one signal name allowed for image array data!",
-              );
-            } else if (
-              dataSchema?.title === "ImageArrayFileData" &&
-              columns.length == 1
-            ) {
-              fileData.signal_name = columns[0];
-              return {
-                ...baseSample,
-                data: fileData as ImageArrayFileData,
-              };
-            }
-          }
-          return {
-            ...baseSample,
-            data: fileData as FileData,
-          };
+          return { ...baseSample, data: fileData };
         }
 
         return baseSample;
@@ -376,18 +306,33 @@ export const AddSamplesEditor = ({
                 {dataLoader} data loader)
               </Text>
             )}
+            {usesSignalNames && (
+              <Text
+                data-testid="add-samples-signal-names"
+                marginStart="size-100"
+              >
+                {missingSignalNames ? (
+                  <>
+                    This project has no signal names. Set them in the project
+                    settings before you add samples.
+                  </>
+                ) : (
+                  <>
+                    Signal names:{" "}
+                    <strong>
+                      {project.signal_names.length > 0
+                        ? project.signal_names.join(", ")
+                        : "all"}
+                    </strong>{" "}
+                    (set in the project settings)
+                  </>
+                )}
+              </Text>
+            )}
 
             {/* Conditional fields based on data schema type */}
             {dataSchema?.title === "ShotData" && (
               <Form maxWidth="size-6000">
-                <TextField
-                  label="Signal Names"
-                  isRequired
-                  value={signalNames}
-                  onChange={setSignalNames}
-                  description="Comma-separated list of signals to load."
-                  contextualHelp={<SignalNameHelp helpText={signalNameHelp} />}
-                />
                 <RadioGroup
                   label="Shot ID Input Method"
                   value={shotInputMethod}
@@ -488,29 +433,16 @@ export const AddSamplesEditor = ({
                 No files found for the specified directory and file type.
               </Text>
             )}
-
-            {(dataSchema?.title === "TimeSeriesFileData" ||
-              dataSchema?.title === "ImageArrayFileData") && (
-              <Form maxWidth="size-6000">
-                <TextField
-                  label={
-                    dataSchema?.title === "TimeSeriesFileData"
-                      ? "Signal Names (comma-separated)"
-                      : "Signal Name"
-                  }
-                  value={columnNames}
-                  onChange={setColumnNames}
-                  description="Optional: Specify signal names to load data for."
-                  contextualHelp={<SignalNameHelp helpText={signalNameHelp} />}
-                />
-              </Form>
-            )}
           </Content>
           <ButtonGroup>
             <Button variant="secondary" onPress={close}>
               Cancel
             </Button>
-            <Button variant="primary" onPress={async () => onFormSubmit(close)}>
+            <Button
+              variant="primary"
+              isDisabled={missingSignalNames}
+              onPress={async () => onFormSubmit(close)}
+            >
               Add Samples
             </Button>
           </ButtonGroup>

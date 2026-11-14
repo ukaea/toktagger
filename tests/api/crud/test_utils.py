@@ -83,7 +83,9 @@ async def test_delete_project_wrong_id(db_client, setup_db):
 async def test_update_project(db_client, setup_db):
     project = await utils.get_project(db_client, setup_db["project_id_1"])
     project.name = "Updated Project Name"
-    await utils.update_project(db_client, setup_db["project_id_1"], project=project)
+    await utils.update_project(
+        db_client, setup_db["project_id_1"], project=project, data_loader="uda"
+    )
     # Check project has been updated
     await db_client.db["projects"].find_one({"_id": ObjectId(setup_db["project_id_1"])})
 

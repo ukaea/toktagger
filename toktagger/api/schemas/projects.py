@@ -1,7 +1,8 @@
+from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas import ConfiguredModel
@@ -23,6 +24,15 @@ class QueryStrategyType(str, Enum):
     UNCERTAINTY = "uncertainty"
 
 
+class AutoAddShots(BaseModel):
+    """Settings to add new shots from the data source at a set interval."""
+
+    enabled: bool = Field(False, description="Whether to check for new shots.")
+    interval_minutes: int = Field(
+        10, ge=1, description="The time (in minutes) between checks for new shots."
+    )
+
+
 class ProjectIn(ConfiguredModel):
     name: str = Field(..., description="The name of the project.")
     task: Task = Field(..., description="The type of labelling task.")
@@ -34,6 +44,11 @@ class ProjectIn(ConfiguredModel):
     data_loader: str = Field(
         ...,
         description="The type of data which will need to be loaded for this project.",
+    )
+
+    signal_names: list[str] = Field(
+        default_factory=list,
+        description="The signal names to load for every sample in this project.",
     )
 
     time_min: float | None = Field(
@@ -111,6 +126,11 @@ class ProjectIn(ConfiguredModel):
         description="The list of labels to use for video bounding box labelling (if applicable).",
     )
 
+    auto_add_shots: AutoAddShots | None = Field(
+        None,
+        description="Settings to add new shots from the data source at a set interval (if applicable).",
+    )
+
     @computed_field
     @property
     def model_types(self) -> list[str]:
@@ -131,9 +151,26 @@ class ProjectIn(ConfiguredModel):
 
         return value
 
+    @model_validator(mode="after")
+    def check_auto_add_shots(self):
+        if self.auto_add_shots and not LoaderRegistry.supports_latest_shot(
+            self.data_loader
+        ):
+            raise ValueError(
+                f"Data loader '{self.data_loader}' does not support adding new shots automatically."
+            )
+        return self
+
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
+    shots_last_checked: datetime | None = Field(
+        None, description="The time of the last check for new shots."
+    )
+
+
+class ProjectShotsChecked(BaseModel):
+    shots_last_checked: datetime
 
 
 class ProjectUpdate(BaseModel):
@@ -141,6 +178,7 @@ class ProjectUpdate(BaseModel):
 
     name: str | None = None
     query_strategy: QueryStrategyType | None = None
+    signal_names: list[str] | None = None
     time_min: float | None = None
     time_max: float | None = None
     min_time_step: float | None = None
@@ -150,6 +188,7 @@ class ProjectUpdate(BaseModel):
     bounding_box_labels: list[str] | None = None
     polygon_labels: list[str] | None = None
     video_bounding_box_labels: list[str] | None = None
+    auto_add_shots: AutoAddShots | None = None
 
 
 class ProjectMember(ConfiguredModel):

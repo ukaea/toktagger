@@ -62,14 +62,29 @@ def get_project_members(project_id: str) -> list[dict]:
     return response.json()
 
 
+DEFAULT_SIGNAL_NAMES = {
+    "uda": ["ip", "ANE_DENSITY"],
+    "sal": ["ppf/signal/jetppf/magn/ipla"],
+    "fair_mast": ["magnetics/ip"],
+    "uda_camera": ["rba"],
+}
+
+
 def create_project(
-    name: str, task: str, data_loader: str, query_strategy: str = "random"
+    name: str,
+    task: str,
+    data_loader: str,
+    query_strategy: str = "random",
+    signal_names: list[str] | None = None,
 ) -> str:
     project = {
         "name": name,
         "task": task,
         "query_strategy": query_strategy,
         "data_loader": data_loader,
+        "signal_names": signal_names
+        if signal_names is not None
+        else DEFAULT_SIGNAL_NAMES.get(data_loader, []),
     }
 
     response = session.post(
@@ -82,6 +97,14 @@ def create_project(
     return project_id
 
 
+def set_project_signal_names(project_id: str, signal_names: list[str]) -> None:
+    response = session.put(
+        f"http://localhost:8002/projects/{project_id}",
+        json={"signal_names": signal_names},
+    )
+    assert response.status_code == 200, response.text
+
+
 def create_local_samples(
     project_id: str,
     shot_ids: list[int],
@@ -89,6 +112,7 @@ def create_local_samples(
     columns: list[str] | None = None,
     file_names: list[str] | None = None,
 ):
+    set_project_signal_names(project_id, columns or [])
     samples = []
     if not file_names:
         file_names = [f"{shot_id}.parquet" for shot_id in shot_ids]
@@ -147,6 +171,7 @@ def create_uda_samples(
 ):
     if signal_names is None:
         signal_names = ["ip", "ANE_DENSITY"]
+    set_project_signal_names(project_id, signal_names)
     samples = []
     for shot_id in shot_ids:
         sample = {
