@@ -105,3 +105,39 @@ You can also make predictions on specific samples from within the sample view pa
 <figure markdown="span">
    ![The ML model prediction tool with the sample view, allowing users to make predictions on specific samples.](assets/model_predict_sample.png){ width="800" }
 </figure>
+
+## Built-in Models
+
+### TokEye
+[TokEye](https://github.com/PlasmaControl/tokeye) is a pretrained U-Net. It finds fluctuating activity in spectrograms. Use it in projects with the `profile-2d` task. The model type is `tokeye`.
+
+TokEye gives two scores for each pixel:
+
+- `coherent`: coherent activity, for example modes.
+- `transient`: transient activity, for example bursts.
+
+TokEye does not train on your annotations. Use one of these procedures to get the pretrained weights:
+
+- **Train**: select `tokeye` in the Train window. TokTagger downloads the weights from Hugging Face. It does not change the weights. The router accepts a train job only when the project has a minimum of one validated sample and one validated annotation.
+- **Load from Hugging Face**: set the user space to `nc1`, the model name to `big_tf_unet` and the file name to `big_tf_unet_251210.pt`. This procedure does not need validated samples. If `load_safetensors_only` is `true`, TokTagger does not load this file, because it is a `.pt` file.
+
+!!! tip
+    If the server cannot connect to the internet, download the weights before you start the server:
+    ```
+    tokeye download big_tf_unet
+    ```
+
+The prediction parameters are:
+
+| Parameter | Description |
+| --- | --- |
+| `signal_name` | The time-series or 2D profile signal to segment. |
+| `channels` | The TokEye channels to convert into polygons (`coherent`, `transient`). |
+| `threshold` | A pixel is part of a region when its score is more than this value. |
+| `min_size` | TokTagger removes regions that have fewer pixels than this value. |
+| `max_polygon_points` | The maximum number of points in each polygon. |
+| `n_fft`, `hop` | The STFT window length and hop length for time-series signals. |
+| `log_scale` | Apply `log1p` to 2D profile values. TokEye expects log-scaled spectrograms. |
+| `device` | The device for inference (`cpu`, `cuda` or `mps`). |
+
+For a time-series signal, TokEye calculates its own STFT. The polygons use time (s) and frequency (kHz) coordinates, so they show correctly on the spectrogram view. Each polygon has the label `coherent` or `transient`. Its uncertainty is 1 minus the mean score in the region.

@@ -24,3 +24,6 @@ if models_dependencies_installed():
         YoloVideoDetectionModel as YoloVideoDetectionModel,
         YoloVideoDetectionP2Model as YoloVideoDetectionP2Model,
     )
+    from toktagger.api.models.tokeye_segmentation import (
+        TokEyeSegmentation as TokEyeSegmentation,
+    )

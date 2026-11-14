@@ -330,15 +330,17 @@ async def start_model_training(
     logger.info(f"Collected {len(annotations)} annotations.")
     logger.info(f"Collected {len(samples)} samples.")
 
-    if len(samples) == 0:
-        raise HTTPException(
-            status_code=404, detail="No validated samples found to train a model on!"
-        )
-    if len(annotations) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="No validated annotations found to train a model on!",
-        )
+    if not ModelRegistry.is_pretrained(model_type):
+        if len(samples) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="No validated samples found to train a model on!",
+            )
+        if len(annotations) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="No validated annotations found to train a model on!",
+            )
 
     # Held until the queued model is inserted, so a second start sees it and backs off.
     async with db_client.lock(f"models:{project.id}:{model_type}"):
