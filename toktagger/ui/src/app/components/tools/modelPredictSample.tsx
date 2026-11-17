@@ -21,6 +21,7 @@ import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
 import { modelCreatedBy } from "@/types";
+import { getSignalNames } from "@/app/utils";
 
 type ModelPredictInfo = {
   project_id: string;
@@ -28,7 +29,17 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { annotations, project, dataParams, setAnnotations } = useSample();
+  const {
+    annotations,
+    project,
+    sample,
+    dataParams,
+    viewParams,
+    setAnnotations,
+  } = useSample();
+  const signalNames = getSignalNames(sample);
+  const viewSignalName =
+    "signal_name" in viewParams ? viewParams.signal_name : null;
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) =>
@@ -243,6 +254,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
             setFormData={setUnvalidatedFormData}
             useGPU={useGPU}
             setUseGPU={setUseGPU}
+            signalNames={signalNames}
+            defaultSignalName={viewSignalName}
           />
           <Flex marginTop="size-200" marginBottom="size-200">
             <Button

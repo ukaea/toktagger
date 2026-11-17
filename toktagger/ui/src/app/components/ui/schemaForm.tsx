@@ -494,15 +494,57 @@ const SchemaForm = forwardRef<Form, SchemaFormProps>(
   },
 );
 
+/** Turn a string `signal_name` field into a choice of the sample's signals. */
+function withSignalOptions(
+  schema: RJSFSchema,
+  signalNames: string[],
+  defaultSignalName: string | null,
+): RJSFSchema {
+  const signalProperty = schema.properties?.signal_name;
+  if (
+    signalNames.length === 0 ||
+    typeof signalProperty !== "object" ||
+    signalProperty.type !== "string"
+  ) {
+    return schema;
+  }
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      signal_name: {
+        ...signalProperty,
+        enum: signalNames,
+        default:
+          defaultSignalName && signalNames.includes(defaultSignalName)
+            ? defaultSignalName
+            : signalNames[0],
+      },
+    },
+  };
+}
+
 type ModelFormProps = Omit<SchemaFormProps, "schema"> & {
   schema: RJSFSchema | null;
   useGPU: boolean;
   setUseGPU: (useGPU: boolean) => void;
+  signalNames?: string[];
+  defaultSignalName?: string | null;
 };
 
 const ModelForm = forwardRef<Form, ModelFormProps>(
   (
-    { schema, disabled, onSubmit, formData, setFormData, useGPU, setUseGPU },
+    {
+      schema,
+      disabled,
+      onSubmit,
+      formData,
+      setFormData,
+      useGPU,
+      setUseGPU,
+      signalNames = [],
+      defaultSignalName = null,
+    },
     ref,
   ) => {
     const { gpuAvailable } = useServerHealth();
@@ -549,7 +591,11 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
             {schema && (
               <SchemaForm
                 ref={ref}
-                schema={schema}
+                schema={withSignalOptions(
+                  schema,
+                  signalNames,
+                  defaultSignalName,
+                )}
                 onSubmit={onSubmit}
                 disabled={disabled}
                 formData={formData}

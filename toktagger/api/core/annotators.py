@@ -150,7 +150,46 @@ def downsample_time_series(
     return time_coarse, signal
 
 
-def _coords_to_flat_list(coords: Iterable[tuple[float, float]]) -> list[float]:
+def mask_to_polygons(
+    mask: np.ndarray,
+    time: np.ndarray,
+    dim_1: np.ndarray,
+    min_size: int = 0,
+    max_polygon_points: int | None = None,
+) -> list[tuple[np.ndarray, Polygon]]:
+    """Convert a (dim_1, time) binary mask into polygons in data coordinates.
+
+    Returns one (region_mask, polygon) pair for each valid contour of each connected region.
+    """
+    labeled_regions = measure.label(mask, connectivity=2)
+
+    if min_size > 0:
+        labeled_regions = morphology.remove_small_objects(
+            labeled_regions, min_size=min_size
+        )
+
+    region_polygons: list[tuple[np.ndarray, Polygon]] = []
+    for region_label in range(1, labeled_regions.max() + 1):
+        region_mask = labeled_regions == region_label
+
+        for contour in measure.find_contours(region_mask, 0.5):
+            if max_polygon_points and len(contour) > max_polygon_points:
+                indices = np.round(
+                    np.linspace(0, len(contour) - 1, max_polygon_points)
+                ).astype(int)
+                contour = contour[indices]
+            # Contour coordinates are (row, col), convert to (x, y)
+            pixel_coords = [
+                (int(np.round(point[1])), int(np.round(point[0]))) for point in contour
+            ]
+            poly = Polygon([(time[x], dim_1[y]) for x, y in pixel_coords])
+            if poly.is_valid and poly.area > 0:
+                region_polygons.append((region_mask, poly))
+
+    return region_polygons
+
+
+def coords_to_flat_list(coords: Iterable[tuple[float, float]]) -> list[float]:
     """
     Convert an iterable of (x,y) coordinates to COCO flattened list [x1,y1,x2,y2,...].
     Drops the closing coordinate if it's equal to the first (Shapely exterior rings often close).
@@ -651,48 +690,22 @@ class Profile2DThresholdAnnotator:
         if self.params.dim_1_max is not None:
             mask[dim_1 > self.params.dim_1_max] = 0
 
-        labeled_regions = measure.label(mask, connectivity=2)
-
-        if self.params.min_size > 0:
-            labeled_regions = morphology.remove_small_objects(
-                labeled_regions, min_size=self.params.min_size
-            )
-
-        # Convert each labeled region to polygons
-        polygons: list[Polygon] = []
-        for region_label in range(1, labeled_regions.max() + 1):
-            # Create a binary mask for the current label
-            region_mask = labeled_regions == region_label
-
-            # Find contours at the 0.5 level
-            contours = measure.find_contours(region_mask, 0.5)
-
-            for contour in contours:
-                if (
-                    self.params.max_polygon_points
-                    and len(contour) > self.params.max_polygon_points
-                ):
-                    indices = np.round(
-                        np.linspace(0, len(contour) - 1, self.params.max_polygon_points)
-                    ).astype(int)
-                    contour = contour[indices]
-                # Contour coordinates are (row, col), convert to (x, y)
-                contour_coords = [
-                    (int(np.round(c[1])), int(np.round(c[0]))) for c in contour
-                ]
-                contour_coords = [(time[x], dim_1[y]) for x, y in contour_coords]
-                poly = Polygon(contour_coords)
-                if poly.is_valid and poly.area > 0:
-                    polygons.append(poly)
+        region_polygons = mask_to_polygons(
+            mask,
+            time=time,
+            dim_1=dim_1,
+            min_size=self.params.min_size,
+            max_polygon_points=self.params.max_polygon_points,
+        )
 
         annotations = [
             PolygonAnnotation(
-                segmentation=[_coords_to_flat_list(polygon.exterior.coords)],
+                segmentation=[coords_to_flat_list(polygon.exterior.coords)],
                 label="Unknown",
                 created_by=f"annotators::{AnnotatorTypes.PROFILE_2D_THRESHOLD.value}",
                 signal_name=self.params.signal_name,
             )
-            for polygon in polygons
+            for _, polygon in region_polygons
         ]
         return annotations
 
