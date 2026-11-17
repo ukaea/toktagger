@@ -42,6 +42,7 @@ def check_base_page(page):
     # Expect all table headings visible
     expect(page.get_by_role("columnheader", name="Shot ID")).to_be_visible()
     expect(page.get_by_role("columnheader", name="Date Created")).to_be_visible()
+    expect(page.get_by_role("columnheader", name="Annotations")).to_be_visible()
 
     # Expect Add and Clear Samples button visible
     expect(page.get_by_role("button", name="Add Samples", exact=True)).to_be_visible()
@@ -276,7 +277,7 @@ def test_samples_sorting(server_setup, page: Page):
     # Create a project
     project_id = create_project("Test Project", "time-series", "uda")
     # And 2 samples
-    create_uda_samples(project_id, shot_ids=[20000])
+    unvalidated_sample_ids = create_uda_samples(project_id, shot_ids=[20000])
     time.sleep(0.1)
 
     sample_ids = create_uda_samples(project_id, shot_ids=[10000])
@@ -286,6 +287,18 @@ def test_samples_sorting(server_setup, page: Page):
         f"http://localhost:8002/projects/{project_id}/samples",
         json=[{"id": sample_ids[0], "updates": {"validated_annotations": True}}],
     )
+    # Give the 20000 sample one annotation, 10000 has none
+    disruption = TimePoint(
+        label="Disruption",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time=71,
+    )
+    response = session.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{unvalidated_sample_ids[0]}/annotations",
+        json=[disruption.model_dump(mode="json")],
+    )
+    assert response.status_code == 200
+
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
 
@@ -300,6 +313,9 @@ def test_samples_sorting(server_setup, page: Page):
 
     # Sort by validated annotations - ascending, so should be non validated first
     sort(page, "Validated", "20000", "10000")
+
+    # Sort by annotation count - ascending, so 10000 (no annotations) first
+    sort(page, "Annotations", "10000", "20000")
 
 
 def test_samples_search(server_setup, page: Page):

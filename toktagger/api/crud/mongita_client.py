@@ -15,6 +15,7 @@ from mongita.collection import (
     _doc_matches_slow_filters,
     _get_item_from_doc,
     _sort_docs,
+    _validate_sort,
 )
 from mongita.database import Database
 from mongita.errors import DuplicateKeyError
@@ -388,10 +389,10 @@ class AsyncCollection:
         The whole pipeline runs under one lock, so `$lookup` sees the same snapshot
         as the collection it starts from.
         """
-        stages = list(pipeline)
         leading_filter: dict[str, Any] = {}
-        if stages and _stage_name(stages[0]) == "$match":
-            leading_filter = stages.pop(0)["$match"]
+        stages = pipeline
+        if pipeline and _stage_name(pipeline[0]) == "$match":
+            leading_filter, stages = pipeline[0]["$match"], pipeline[1:]
 
         def _aggregate(col: Collection) -> list[dict[str, Any]]:
             docs = [dict(doc) for doc in col.find(leading_filter)]
@@ -440,7 +441,7 @@ def _apply_stage(
             return _project(docs, spec)
         case "$sort":
             sorted_docs = list(docs)
-            _sort_docs(sorted_docs, list(spec.items()))
+            _sort_docs(sorted_docs, _validate_sort(list(spec.items())))
             return sorted_docs
         case "$skip":
             return docs[spec:]
@@ -453,6 +454,9 @@ def _apply_stage(
 def _lookup(
     database: Database, docs: list[dict[str, Any]], spec: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    missing = {"from", "localField", "foreignField", "as"} - set(spec)
+    if missing:
+        raise ValueError(f"$lookup is missing required fields: {sorted(missing)}")
     local_field, foreign_field = spec["localField"], spec["foreignField"]
     local_values = list(
         {

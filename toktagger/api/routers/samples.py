@@ -272,12 +272,18 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client: MongoDBClient = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples_with_annotation_counts(
+    samples_with_counts = await utils.get_samples_with_annotation_counts(
         db_client,
         project_id,
         sort_by=sort_by,
         sort_direction=sort_direction,
     )
+    samples = [
+        Sample.model_validate(
+            sample.model_dump(by_alias=True, exclude={"annotation_count"})
+        )
+        for sample in samples_with_counts
+    ]
     annotations = await utils.get_annotations(db_client, project_id)
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
 

@@ -12,7 +12,7 @@ import pytest
 import pytest_asyncio
 from filelock import FileLock
 from mongita import MongitaClientDisk
-from mongita.errors import DuplicateKeyError
+from mongita.errors import DuplicateKeyError, MongitaError
 
 from toktagger.api.crud.mongita_client import AsyncMongitaClient
 
@@ -385,3 +385,38 @@ async def test_aggregate_does_not_modify_stored_documents(aggregate_db):
 async def test_aggregate_unsupported_stage_raises(aggregate_db):
     with pytest.raises(NotImplementedError, match=r"\$group"):
         await _aggregate(aggregate_db, [{"$group": {"_id": "$kind"}}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "id_direction, expected_order",
+    [(-1, ["s4", "s3", "s2", "s1"]), (1, ["s3", "s4", "s2", "s1"])],
+)
+async def test_aggregate_sort_tie_break_on_id(
+    aggregate_db, id_direction, expected_order
+):
+    await aggregate_db["samples"].insert_one({"_id": "s4", "shot_id": 40, "kind": "b"})
+    docs = await _aggregate(
+        aggregate_db,
+        [
+            {"$lookup": ANNOTATIONS_LOOKUP},
+            {"$addFields": {"annotation_count": {"$size": "$annotations"}}},
+            {"$sort": {"annotation_count": 1, "_id": id_direction}},
+        ],
+    )
+    assert [doc["_id"] for doc in docs] == expected_order
+
+
+@pytest.mark.asyncio
+async def test_aggregate_invalid_sort_direction_raises(aggregate_db):
+    with pytest.raises(MongitaError, match="Sort direction"):
+        await _aggregate(aggregate_db, [{"$sort": {"_id": 2}}])
+
+
+@pytest.mark.asyncio
+async def test_aggregate_lookup_missing_fields_raises(aggregate_db):
+    lookup = {
+        key: value for key, value in ANNOTATIONS_LOOKUP.items() if key != "foreignField"
+    }
+    with pytest.raises(ValueError, match="foreignField"):
+        await _aggregate(aggregate_db, [{"$lookup": lookup}])
