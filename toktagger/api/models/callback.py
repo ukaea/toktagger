@@ -1,6 +1,6 @@
 from tensorflow.keras.callbacks import Callback
 
-from toktagger.api.core.sender import send_model_updates
+from toktagger.api.core.model_runtime import send_model_updates
 from toktagger.api.schemas.models import ModelUpdate
 
 

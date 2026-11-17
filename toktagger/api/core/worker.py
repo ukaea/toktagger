@@ -8,7 +8,7 @@ import ray
 from pydantic import ValidationError
 from ray.exceptions import ActorDiedError
 
-from toktagger.api.core.sender import send_model_updates
+from toktagger.api.core.model_runtime import ServerModelProgress, send_model_updates
 from toktagger.api.models.loaders import (
     GitlabLoader,
     HuggingfaceLoader,
@@ -66,6 +66,7 @@ def get_actor(project: Project, model: Model, use_gpu: bool):
             .remote(
                 model_id=str(model.id),
                 project=project,
+                progress_callback=ServerModelProgress(project.id, str(model.id)),
             )
         )
 

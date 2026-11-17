@@ -3,12 +3,12 @@ import math
 import pathlib
 import typing
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 import pydantic
 from sklearn.model_selection import train_test_split
 
 from toktagger.api.core.data_loaders import DataLoader
-from toktagger.api.core.sender import send_model_updates
 from toktagger.api.models import models_dependencies_installed
 from toktagger.api.schemas.annotations import Annotation, AnnotationBase
 from toktagger.api.schemas.data import DataParamTypes
@@ -17,6 +17,8 @@ from toktagger.api.schemas.projects import Project, Task
 from toktagger.api.schemas.samples import Sample
 
 logger = logging.getLogger("ray")
+
+ModelProgressCallback = Callable[[ModelUpdate], None]
 
 if models_dependencies_installed():
     import ray
@@ -90,9 +92,12 @@ class Model(ABC):
         self,
         model_id: str,
         project: Project,
+        *,
+        progress_callback: ModelProgressCallback | None = None,
     ) -> None:
         self.id = model_id
         self.project = project
+        self._progress_callback = progress_callback
         self.model = self.define_model()
         loader_registry = ray.get_actor("WorkerLoaderRegistry")
         data_loader: type[DataLoader] = ray.get(
@@ -153,7 +158,7 @@ class Model(ABC):
         progress: float | None = None,
         score: float | None = None,
     ) -> None:
-        """Send progress updates during model training to the TokTagger server.
+        """Report progress through the optional execution-environment callback.
 
         Parameters
         ----------
@@ -165,7 +170,8 @@ class Model(ABC):
             A metric of how well the model is performing (such as accuracy or loss), by default None
         """
         model_update = ModelUpdate(status=status, progress=progress, score=score)
-        send_model_updates(self.project.id, self.id, model_update)
+        if self._progress_callback is not None:
+            self._progress_callback(model_update)
 
     def split_data(
         self,

@@ -14,7 +14,7 @@ from bson import ObjectId
 from tests.identity import get_auth_token, session_headers
 from tests.db_definitions import TEST_ISSUER, USER_ADMIN_ID
 from toktagger.api import config
-from toktagger.api.core.sender import send_model_updates
+from toktagger.api.core.model_runtime import send_model_updates
 from toktagger.api.routers import models as models_router
 from toktagger.api.schemas.users import UserIn
 from toktagger.api.schemas.models import (

@@ -210,7 +210,11 @@ data = data_loader.get_sample(sample, DataParams())
 
 ## Progress Tracking
 
-Use the `log_progress()` method to send training updates to the UI:
+Use the `log_progress()` method to report training updates. The base constructor accepts an optional keyword-only `progress_callback: Callable[[ModelUpdate], None]`. It receives each validated update synchronously; without a callback, reporting is a no-op. Callback exceptions propagate to the caller. Server workers inject a callback that sends updates to the existing UI/API workflow, so models do not need to import the server sender. Custom constructors must accept and forward `progress_callback` to `super().__init__()`.
+
+Data loading and GPU discovery still depend on server services while the remaining portable contract is being extracted.
+
+For example, inside your model:
 
 ```python
 # At the start of training

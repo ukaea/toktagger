@@ -11,9 +11,7 @@ from toktagger.api.schemas.models import (
     GitlabLoadParams,
     HuggingfaceLoadParams,
 )
-from toktagger.api.core.sender import (
-    send_model_updates,
-)
+from toktagger.api.core.model_runtime import send_model_updates
 import logging
 import shutil
 from mlflow import MlflowClient, MlflowException
