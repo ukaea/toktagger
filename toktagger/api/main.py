@@ -46,11 +46,8 @@ from toktagger.api.routers.users import router as users_router
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
     import ray
-    from toktagger.api.models.base import (
-        ActorRegistry,
-        ModelRegistry,
-        WorkerRegistry,
-    )
+    from toktagger.api.core.model_runtime import ActorRegistry, WorkerRegistry
+    from toktagger.api.models.base import ModelRegistry
 
 if mcp_dependencies_installed():
     from fastmcp import FastMCP

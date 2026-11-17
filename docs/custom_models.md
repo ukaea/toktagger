@@ -125,6 +125,8 @@ The `@ModelRegistry.register()` decorator automatically registers your model wit
 * training_params: A Pydantic `BaseModel` containing required training parameters, optional
 * prediction_params: A Pydantic `BaseModel` containing required prediction parameters, optional
 
+`ModelRegistry.get(name)` returns the registered Python model class, not a Ray actor class. Server workers wrap model classes with `ray.remote` when constructing actors. The server-only `WorkerRegistry` and `ActorRegistry` live in `toktagger.api.core.model_runtime`; update custom imports from `toktagger.api.models.base` accordingly. Model construction still uses server services while the portable execution contract is being extracted.
+
 #### Supported Tasks
 
 Models can be registered for one or more of the following tasks:

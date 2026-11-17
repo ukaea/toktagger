@@ -11,7 +11,9 @@ import pytest
 
 pytest.importorskip("ray")
 
-from toktagger.api.models.base import ActorRegistry
+from tests.models_definitions import MockDisruptionCNN
+from toktagger.api.core.model_runtime import ActorRegistry
+from toktagger.api.models.base import ModelRegistry
 
 # @ray.remote replaces the class with an ActorClass handle; this is the original.
 Registry = ActorRegistry.__ray_metadata__.modified_class
@@ -30,9 +32,18 @@ def _no_ray_cluster():
     gone" case update_actors handles, so eviction still completes.
     """
     with patch(
-        "toktagger.api.models.base.ray.get_actor", side_effect=ValueError
+        "toktagger.api.core.model_runtime.ray.get_actor", side_effect=ValueError
     ) as get_actor:
         yield get_actor
+
+
+def test_model_registry_lookup_returns_plain_model_class():
+    assert ModelRegistry.get("mock_disruption_cnn") is MockDisruptionCNN
+
+
+def test_unknown_model_registry_lookup_fails():
+    with pytest.raises(ValueError, match="No Model class called 'unknown_model'"):
+        ModelRegistry.get("unknown_model")
 
 
 def test_gpu_request_is_rejected_when_gpu_support_is_off():
