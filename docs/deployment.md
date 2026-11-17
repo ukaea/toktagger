@@ -24,17 +24,23 @@ You need:
 
 ## Install
 
-1. Copy the example settings:
+1. Copy the example for your authentication option to `.env`:
 
     ```sh
+    # Existing OpenID Connect provider
     cp .env.example .env
+
+    # OR bundled Keycloak and Postgres
+    cp .env.keycloak.example .env
     ```
 
-2. Edit `.env`. Set `TOKTAGGER_HOST`, `AUTH_SECRET_KEY` and `MONGO_PASSWORD`. Choose one of these authentication options:
+    Each example selects the required Compose files through `COMPOSE_FILE`. The Keycloak example chains the core file and the Keycloak overlay; the overlay is not a standalone stack.
 
-    **Bundled Keycloak:** Keep `COMPOSE_FILE=docker-compose.yml:docker-compose.keycloak.yml`. Set `KEYCLOAK_HOST`, `KEYCLOAK_CLIENT_SECRET`, `KEYCLOAK_ADMIN_PASSWORD` and `POSTGRES_PASSWORD`.
+2. Edit `.env`. Set `TOKTAGGER_HOST`, `AUTH_SECRET_KEY` and `MONGO_PASSWORD`, then complete the settings for your chosen option:
 
-    **Existing IdP:** Set `COMPOSE_FILE=docker-compose.yml`. Uncomment and set `AUTH_ISSUER_URL`, `AUTH_CLIENT_ID` and `AUTH_CLIENT_SECRET`. Keycloak and Postgres settings are not needed. Configure a confidential OIDC client using the [identity provider checklist](user_management.md#use-keycloak-or-another-identity-provider), with these URLs:
+    **Bundled Keycloak (`.env.keycloak.example`):** Set `KEYCLOAK_HOST`, `KEYCLOAK_CLIENT_SECRET`, `KEYCLOAK_ADMIN_PASSWORD` and `POSTGRES_PASSWORD`.
+
+    **Existing IdP (`.env.example`):** Set `AUTH_ISSUER_URL`, `AUTH_CLIENT_ID` and `AUTH_CLIENT_SECRET`. Configure a confidential OIDC client using the [identity provider checklist](user_management.md#use-keycloak-or-another-identity-provider), with these URLs:
 
     - Sign-in callback: `https://<TOKTAGGER_HOST>/auth/callback`
     - Sign-out redirect: `https://<TOKTAGGER_HOST>/ui/login`
