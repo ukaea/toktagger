@@ -103,6 +103,6 @@ Or directly via uvicorn (use `python -m uvicorn` to make sure that the correct v
 python -m uvicorn toktagger.api.asgi:app --workers 4 --host 0.0.0.0 --port 8002
 ```
 
-`docker-compose.yml` is the production stack. It runs TokTagger with Keycloak, MongoDB and a Caddy proxy that handles TLS. See the [Deployment](docs/deployment.md) guide.
+`docker-compose.yml` runs TokTagger with MongoDB and a Caddy proxy that handles TLS. Use your existing OpenID Connect provider, or add `docker-compose.keycloak.yml` to run bundled Keycloak and Postgres. See the [Deployment](docs/deployment.md) guide.
 
 See the [User Management](docs/user_management.md) guide for creating accounts, assigning roles, and managing project membership.
