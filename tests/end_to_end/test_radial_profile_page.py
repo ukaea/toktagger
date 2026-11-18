@@ -1,9 +1,8 @@
 from typing import Tuple
 
-import requests
 from playwright.sync_api import FloatRect, Page, expect
 
-from tests.endpoints import create_project, create_uda_samples
+from tests.endpoints import create_project, create_uda_samples, session
 from tests.radial_definitions import RADIAL_TIME
 
 RADIAL_PLOT_ID = "RadialProfileRadial"
@@ -134,7 +133,7 @@ def test_radial_profile_range_uses_zoomed_time_window(server_setup, page: Page):
     expect(page.get_by_role("button", name="View Mode")).to_be_enabled()
     save(page, sample_id)
 
-    box = requests.get(
+    box = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     ).json()[0]
     # The time span is the zoomed window, not the whole shot.
@@ -170,7 +169,7 @@ def test_radial_profile_draw_and_edit_radial_range(server_setup, page: Page):
     expect(page.get_by_role("button", name="View Mode")).to_be_enabled()
     save(page, sample_id)
 
-    annotations = requests.get(
+    annotations = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     ).json()
     assert len(annotations) == 1

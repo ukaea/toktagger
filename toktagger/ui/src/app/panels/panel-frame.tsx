@@ -8,6 +8,8 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { useWorkspace } from "@/app/contexts/WorkspaceContext";
 import { PanelHeightContext } from "@/app/contexts/PanelHeightContext";
 import { ToolAccordion } from "@/app/components/tools/toolAccordion";
+import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
+import { useServerHealth } from "@/app/contexts/healthContext";
 import ErrorView from "@/app/views/error";
 import LoadingView from "@/app/views/loading";
 import { gridArea } from "./grid";
@@ -27,9 +29,10 @@ function PanelContent({ panel }: { panel: Panel }) {
 }
 
 function PanelTools({ panel }: { panel: Panel }) {
-  const { project, sample, plotProps, setPlotProps } = useSample();
+  const { project, sample, plotProps, setPlotProps, canAnnotate } = useSample();
   const { data } = usePanelData();
   const { activePanelId, toolSlot } = useWorkspace();
+  const { modelsEnabled } = useServerHealth();
 
   if (
     activePanelId !== panel.id ||
@@ -46,7 +49,17 @@ function PanelTools({ panel }: { panel: Panel }) {
     data,
     plotProps,
     setPlotProps,
+    canAnnotate,
   });
+  // Predicting writes annotations, so it needs the annotator role; it predicts on this panel's data.
+  if (modelsEnabled && canAnnotate) {
+    tools.push({
+      name: "Model Prediction",
+      component: (
+        <ModelPredictTool project_id={project._id} sample_id={sample._id} />
+      ),
+    });
+  }
   return createPortal(<ToolAccordion tools={tools} />, toolSlot);
 }
 

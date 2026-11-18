@@ -26,6 +26,8 @@ export type PanelToolContext = {
   data: Data | null;
   plotProps: PlotProps;
   setPlotProps: (props: PlotProps) => void;
+  // Tools that write annotations need the annotator role.
+  canAnnotate: boolean;
 };
 
 type PanelDefinition = {
@@ -40,9 +42,10 @@ function timeSeriesTools({
   projectId,
   sampleId,
   data,
+  canAnnotate,
 }: PanelToolContext): ToolEntry[] {
   const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
-  if (!result.success) return [];
+  if (!result.success || !canAnnotate) return [];
   const ids = { project_id: projectId, sample_id: sampleId };
   return [
     {
@@ -79,15 +82,19 @@ export const PANEL_REGISTRY: Record<PanelKind, PanelDefinition> = {
     tools: (context) => [
       { name: "View Parameters", component: <Profile2DViewParamsWidget /> },
       colorMapTool(context),
-      {
-        name: "Threshold",
-        component: (
-          <Profile2DThresholdTool
-            project_id={context.projectId}
-            sample_id={context.sampleId}
-          />
-        ),
-      },
+      ...(context.canAnnotate
+        ? [
+            {
+              name: "Threshold",
+              component: (
+                <Profile2DThresholdTool
+                  project_id={context.projectId}
+                  sample_id={context.sampleId}
+                />
+              ),
+            },
+          ]
+        : []),
     ],
   },
   radial_profile: {

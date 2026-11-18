@@ -1,5 +1,7 @@
-from typing import Annotated, Any, List, Optional, Union, Literal
-from pydantic import Field, BaseModel, computed_field, model_validator
+from typing import Annotated, Any, Literal
+
+from pydantic import BaseModel, Field, computed_field, model_validator
+
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
 from toktagger.api.schemas.layouts import DEFAULT_SOURCE
@@ -16,12 +18,12 @@ class ImageFileData(FileData):
 
 class ImageArrayFileData(FileData):
     type: Literal["npy", "npz"]
-    signal_name: Optional[str] = None
+    signal_name: str | None = None
 
 
 class TimeSeriesFileData(FileData):
     type: Literal["csv", "tsv", "parquet", "feather", "json", "xlsx"]
-    signal_names: Optional[list[str]] = None
+    signal_names: list[str] | None = None
 
 
 class ShotData(BaseModel):
@@ -29,7 +31,7 @@ class ShotData(BaseModel):
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 
-DataTypes = Union[TimeSeriesFileData, ImageFileData, ImageArrayFileData, ShotData]
+DataTypes = TimeSeriesFileData | ImageFileData | ImageArrayFileData | ShotData
 
 
 class SampleBase(ConfiguredModel):
@@ -54,7 +56,7 @@ class SampleBase(ConfiguredModel):
 
 
 class SampleIn(SampleBase):
-    annotations: Optional[List[AnnotationBatchTypes]] = None
+    annotations: list[AnnotationBatchTypes] | None = None
 
     @computed_field
     @property
@@ -63,7 +65,7 @@ class SampleIn(SampleBase):
             return False
 
         return any(
-            [annotation.validated for annotation in self.annotations]
+            annotation.validated for annotation in self.annotations
         )  # TODO any or all?
 
 
@@ -74,7 +76,7 @@ class Sample(SampleBase):
 
 
 class SampleUpdate(ConfiguredModel):
-    validated_annotations: Optional[bool] = None
+    validated_annotations: bool | None = None
 
 
 class SampleUpdateBatchItem(ConfiguredModel):
@@ -84,6 +86,6 @@ class SampleUpdateBatchItem(ConfiguredModel):
 
 class SampleSummary(BaseModel):
     total: int
-    shot_min: Optional[int] = None
-    shot_max: Optional[int] = None
-    data: Optional[DataTypes] = None
+    shot_min: int | None = None
+    shot_max: int | None = None
+    data: DataTypes | None = None

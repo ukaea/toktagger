@@ -1,5 +1,8 @@
-"use client";
-
+/**
+ * Converts annotations between the backend format and the Annotorious format. In Annotorious the class
+ * label, track ID, creator and backend _id are bodies (tagging, identifying, creator, creator-name,
+ * creator-deleted, db-id), and the frame is on target.source.
+ */
 import {
   ShapeType,
   type AnnotationBody,
@@ -13,34 +16,27 @@ import {
 } from "@annotorious/react";
 import type { Ellipse, EllipseGeometry } from "@annotorious/annotorious";
 import type {
-  AnnotoriousDrawingTool,
-  DrawingTool,
-  VideoAnnotationShape,
-  VideoBoundingBox,
-  VideoPoint,
-  VideoPolygon,
-} from "./types";
-import { classIdForName } from "./types";
-
-/**
- * Annotorious annotation helpers.
- *
- * We store two string bodies on each annotation:
- * - purpose="tagging"     -> class label
- * - purpose="identifying" -> track id
- * - purpose="creator"     -> backend created_by value
- *
- * These helpers keep the shape consistent and make conversion to/from backend boxes trivial.
- */
+  CreatedByFields,
+  VideoBoundingBoxInput,
+  VideoPointInput,
+  VideoPolygonInput,
+  VideoShapeInput,
+} from "@/types";
+import type { AnnotoriousDrawingTool, DrawingTool } from "./types";
 
 type UnknownRecord = Record<string, unknown>;
+// A point is an ellipse marked with a shape: point body, since Annotorious has no point shape
 const POINT_BODY_PURPOSE = "shape";
 const POINT_BODY_VALUE = "point";
 export const POINT_MARKER_SIZE = 4;
 const CREATOR_PURPOSE = "creator";
+const CREATOR_NAME_PURPOSE = "creator-name";
+const CREATOR_DELETED_PURPOSE = "creator-deleted";
+const DB_ID_PURPOSE = "db-id";
 
 export type PointGeometry = { x: number; y: number };
 
+// Points and frame labels have no Annotorious tool, so Annotorious gets rectangle with drawing turned off
 export function toAnnotoriousDrawingTool(
   tool: DrawingTool,
 ): AnnotoriousDrawingTool {
@@ -104,12 +100,7 @@ export function getBodyValue(
   return typeof v === "string" ? v : null;
 }
 
-/** Insert or replace a body by purpose (returns a new array).
- *
- * Annotorious bodies should have a unique `id`. Annotorious may auto-generate
- * missing IDs on load, but we ensure IDs here so our normalized/session state
- * is explicit and stable.
- */
+/** Inserts or replaces the body with this purpose, returning a new array. New bodies get an explicit id. */
 export function upsertBody(
   bodies: AnnotationBody[] | undefined,
   purpose: string,
@@ -121,7 +112,6 @@ export function upsertBody(
   if (idx >= 0) {
     const prev = list[idx] as AnnotationBody;
 
-    // Preserve existing body id if present; otherwise assign one once.
     const existingId = prev.id?.trim() ? prev.id : null;
 
     list[idx] = {
@@ -134,7 +124,6 @@ export function upsertBody(
     return list;
   }
 
-  // New body: assign an id explicitly.
   list.push({ id: newBodyId(), purpose, value } as AnnotationBody);
   return list;
 }
@@ -162,13 +151,32 @@ export function stampLabelAndTrack(
 /** Preserve backend creator metadata while annotations pass through Annotorious. */
 export function stampCreator(
   a: ImageAnnotation,
-  createdBy: string | null | undefined,
+  { created_by, created_by_name, created_by_deleted }: Partial<CreatedByFields>,
 ): ImageAnnotation {
-  const creator = createdBy?.trim();
+  const creator = created_by?.trim();
   if (!creator) return a;
 
-  const bodies = upsertBody(a.bodies, CREATOR_PURPOSE, creator);
+  let bodies = upsertBody(a.bodies, CREATOR_PURPOSE, creator);
+  if (created_by_name) {
+    bodies = upsertBody(bodies, CREATOR_NAME_PURPOSE, created_by_name);
+  }
+  if (created_by_deleted) {
+    bodies = upsertBody(bodies, CREATOR_DELETED_PURPOSE, "true");
+  }
   return { ...a, bodies };
+}
+
+/** Carry the backend _id through Annotorious, which mints its own ids.
+
+ * Without it a colleague's annotation comes back looking brand new on save, so it
+ * is inserted again under whoever saved rather than edited in place.
+ */
+export function stampDbId(
+  a: ImageAnnotation,
+  dbId: string | null | undefined,
+): ImageAnnotation {
+  if (!dbId) return a;
+  return { ...a, bodies: upsertBody(a.bodies, DB_ID_PURPOSE, dbId) };
 }
 
 /** Mark a selector as the UI representation of a point. */
@@ -193,6 +201,20 @@ export function getAnnotationCreator(a: ImageAnnotation): string {
   return getBodyValue(a, CREATOR_PURPOSE) ?? "manual";
 }
 
+/** Read the creator metadata stamped by stampCreator, for display with displayCreatedBy. */
+export function getAnnotationAuthor(a: ImageAnnotation): CreatedByFields {
+  return {
+    created_by: getAnnotationCreator(a),
+    created_by_name: getBodyValue(a, CREATOR_NAME_PURPOSE),
+    created_by_deleted: getBodyValue(a, CREATOR_DELETED_PURPOSE) === "true",
+  };
+}
+
+/** Read the backend _id, or null for a shape drawn here and not yet saved. */
+export function getAnnotationDbId(a: ImageAnnotation): string | null {
+  return getBodyValue(a, DB_ID_PURPOSE);
+}
+
 function newBodyId(): string {
   return (
     globalThis.crypto?.randomUUID?.() ??
@@ -202,8 +224,6 @@ function newBodyId(): string {
 
 /** True if the annotation target is a rectangle selector. */
 export function isRectangleAnno(a: ImageAnnotation): a is RectangleAnnotation {
-  // ShapeType.RECTANGLE is already the string literal "RECTANGLE",
-  // so we don't need a separate check for the string form.
   return a.target.selector.type === ShapeType.RECTANGLE;
 }
 
@@ -235,7 +255,6 @@ export function readRectGeometry(
   const g = a.target.selector.geometry;
   const { x, y, w, h } = g;
 
-  // TS now narrows x/y/w/h to number after these checks.
   if (
     !isFiniteNumber(x) ||
     !isFiniteNumber(y) ||
@@ -300,13 +319,7 @@ export function readPointGeometry(a: ImageAnnotation): PointGeometry | null {
   };
 }
 
-/**
- * Normalize an overlay list into a backend-safe shape:
- * - keep supported video shapes only
- * - stamp target.source with frameKey
- * - ensure class label exists (uses fallback if missing)
- * - ensure track id exists (uses fallback or allocator)
- */
+/** Cleans a frame's shapes: drops unsupported ones, stamps the frame, fills in class labels and track IDs. */
 export function normalizeOverlay(
   list: ImageAnnotation[],
   frameKey: string,
@@ -367,7 +380,7 @@ export function normalizeOverlay(
 export function annoToVideoBBox(
   a: RectangleAnnotation,
   frame: number,
-): VideoBoundingBox | null {
+): VideoBoundingBoxInput | null {
   const g = readRectGeometry(a);
   if (!g) return null;
 
@@ -376,10 +389,10 @@ export function annoToVideoBBox(
 
   return {
     type: "video_bounding_box",
+    _id: getAnnotationDbId(a),
     frame,
     track_id: String(trackId),
     label: String(className),
-    class_id: classIdForName(className),
     x_min: Math.round(g.x),
     y_min: Math.round(g.y),
     width: Math.round(g.w),
@@ -392,7 +405,7 @@ export function annoToVideoBBox(
 export function annoToVideoPolygon(
   a: PolygonAnnotation,
   frame: number,
-): VideoPolygon | null {
+): VideoPolygonInput | null {
   const g = readPolygonGeometry(a);
   if (!g) return null;
 
@@ -408,10 +421,10 @@ export function annoToVideoPolygon(
 
   return {
     type: "video_polygon",
+    _id: getAnnotationDbId(a),
     frame,
     track_id: String(trackId),
     label: String(className),
-    class_id: classIdForName(className),
     segmentation: [coordinates],
     created_by: getAnnotationCreator(a),
   };
@@ -421,7 +434,7 @@ export function annoToVideoPolygon(
 export function annoToVideoPoint(
   a: ImageAnnotation,
   frame: number,
-): VideoPoint | null {
+): VideoPointInput | null {
   const g = readPointGeometry(a);
   if (!g) return null;
 
@@ -430,12 +443,12 @@ export function annoToVideoPoint(
 
   return {
     type: "video_point",
+    _id: getAnnotationDbId(a),
     frame,
     track_id: String(trackId),
     label: String(className),
-    class_id: classIdForName(className),
-    x: Math.round(g.x),
-    y: Math.round(g.y),
+    x: Math.floor(g.x),
+    y: Math.floor(g.y),
     created_by: getAnnotationCreator(a),
   };
 }
@@ -444,7 +457,7 @@ export function annoToVideoPoint(
 export function annoToVideoAnnotation(
   a: ImageAnnotation,
   frame: number,
-): VideoAnnotationShape | null {
+): VideoShapeInput | null {
   if (isPointAnno(a)) return annoToVideoPoint(a, frame);
   if (isRectangleAnno(a)) return annoToVideoBBox(a, frame);
   if (isPolygonAnno(a)) return annoToVideoPolygon(a, frame);
@@ -453,7 +466,7 @@ export function annoToVideoAnnotation(
 
 /** Convert backend VideoBoundingBox -> Annotorious rectangle annotation. */
 export function videoBBoxToAnno(
-  b: VideoBoundingBox,
+  b: VideoBoundingBoxInput,
   frameKey: string,
 ): ImageAnnotation {
   const x = Number(b.x_min);
@@ -465,8 +478,7 @@ export function videoBBoxToAnno(
     globalThis.crypto?.randomUUID?.() ??
     `anno-${Math.random().toString(36).slice(2)}`;
 
-  // Annotorious Geometry type only guarantees `bounds`, but rectangle geometry
-  // includes x/y/w/h at runtime. Use the concrete RectangleGeometry type.
+  // Annotorious's general Geometry type only promises `bounds`, so use the concrete rectangle type
   const geometry: RectangleGeometry = {
     x,
     y,
@@ -492,12 +504,12 @@ export function videoBBoxToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, b.label, String(b.track_id));
-  return stampCreator(labelled, b.created_by);
+  return stampDbId(stampCreator(labelled, b), b._id);
 }
 
 /** Convert backend VideoPolygon -> Annotorious polygon annotation. */
 export function videoPolygonToAnno(
-  p: VideoPolygon,
+  p: VideoPolygonInput,
   frameKey: string,
 ): ImageAnnotation {
   const points: [number, number][] = [];
@@ -547,16 +559,17 @@ export function videoPolygonToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
-  return stampCreator(labelled, p.created_by);
+  return stampDbId(stampCreator(labelled, p), p._id);
 }
 
 /** Convert backend VideoPoint -> tagged Annotorious circle marker. */
 export function videoPointToAnno(
-  p: VideoPoint,
+  p: VideoPointInput,
   frameKey: string,
 ): ImageAnnotation {
-  const x = Number(p.x);
-  const y = Number(p.y);
+  // Points are pixel indices; draw at the pixel centre.
+  const cx = Number(p.x) + 0.5;
+  const cy = Number(p.y) + 0.5;
   const half = POINT_MARKER_SIZE / 2;
 
   const id =
@@ -564,15 +577,15 @@ export function videoPointToAnno(
     `anno-${Math.random().toString(36).slice(2)}`;
 
   const geometry: EllipseGeometry = {
-    cx: x,
-    cy: y,
+    cx,
+    cy,
     rx: half,
     ry: half,
     bounds: {
-      minX: x - half,
-      minY: y - half,
-      maxX: x + half,
-      maxY: y + half,
+      minX: cx - half,
+      minY: cy - half,
+      maxX: cx + half,
+      maxY: cy + half,
     },
   };
 
@@ -592,34 +605,5 @@ export function videoPointToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
-  return stampPoint(stampCreator(labelled, p.created_by));
-}
-
-/**
- * Normalizes a raw overlay list into our session invariants:
- * - supported video shapes only
- * - stamps the frame source key
- * - ensures class/track bodies exist (allocating track ids when needed)
- * - optional per-instance de-duplication within the frame
- *
- * The caller is responsible for writing the returned list into session state.
- */
-export function normalizeOverlayForSession(args: {
-  raw: ImageAnnotation[];
-  frameKey: string;
-  fallback: { className: string | null; trackId: string | null };
-  allocTrackId?: (className: string) => string;
-  enforceBothBodies?: boolean;
-  dedupeByInstance?: boolean;
-}): ImageAnnotation[] {
-  return normalizeOverlay(
-    args.raw,
-    args.frameKey,
-    args.fallback,
-    args.allocTrackId,
-    {
-      enforceBothBodies: args.enforceBothBodies ?? true,
-      dedupeByInstance: args.dedupeByInstance ?? true,
-    },
-  );
+  return stampPoint(stampDbId(stampCreator(labelled, p), p._id));
 }

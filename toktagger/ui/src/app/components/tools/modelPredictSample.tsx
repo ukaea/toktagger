@@ -21,6 +21,7 @@ import { usePanelData } from "@/app/contexts/PanelDataContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
+import { modelCreatedBy } from "@/types";
 
 type ModelPredictInfo = {
   project_id: string;
@@ -32,7 +33,10 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const { dataParams } = usePanelData();
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
-      (ann) => project?.model_types.includes(ann.created_by) || false,
+      (ann) =>
+        project?.model_types.some(
+          (t) => ann.created_by === modelCreatedBy(t),
+        ) || false,
     );
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -87,7 +91,8 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       setAnnotations((previousAnnotations: Annotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== selectedModelName || annotation.validated,
+            annotation.created_by !== modelCreatedBy(selectedModelName!) ||
+            annotation.validated,
         );
         return otherAnnotations;
       });
@@ -156,7 +161,34 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         }
       } else if (response.ok) {
         setAnnotations((previousAnnotations: Annotations) => {
-          return previousAnnotations.concat(payload);
+          const predictedFrames = new Set(
+            (payload as Annotation[]).flatMap((predictedAnnotation) =>
+              "frame" in predictedAnnotation &&
+              typeof predictedAnnotation.frame === "number"
+                ? [predictedAnnotation.frame]
+                : [],
+            ),
+          );
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) => {
+              if (
+                annotation.created_by !== modelCreatedBy(selectedModelName!)
+              ) {
+                return true;
+              }
+              // Video annotations are frame-scoped: only replace this
+              // model's prediction for the frame(s) we just predicted, so
+              // predictions for other frames of the same sample survive.
+              if (
+                "frame" in annotation &&
+                typeof annotation.frame === "number"
+              ) {
+                return !predictedFrames.has(annotation.frame);
+              }
+              return false;
+            },
+          );
+          return otherAnnotations.concat(payload);
         });
         clearInterval(interval);
         setIsLoading(false);

@@ -28,7 +28,7 @@ import {
   TaskType,
   ViewParams,
 } from "@/types";
-import { BACKEND_API_URL } from "@/app/core";
+import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { getSignalNames } from "@/app/utils";
 
 type FrameBounds = { min: number | null; max: number | null };
@@ -145,9 +145,21 @@ function legacyPanel(
   return { ...base, kind, signal: signals[0] ?? null };
 }
 
+const NO_SIGNALS_MESSAGE =
+  "No signals could be loaded for this sample. Check that the signal names are correct and that the data source is available.";
+
 function parsePanelData(data: unknown, kind: PanelKind): Data {
+  if (kind === "time_series") {
+    const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
+    if (!result.success) throw new Error(`Invalid data for ${kind} view`);
+    if (
+      Object.values(result.data.values).every((signal) => !signal?.time.length)
+    ) {
+      throw new Error(NO_SIGNALS_MESSAGE);
+    }
+    return result.data;
+  }
   const schema = {
-    time_series: MultiVariateTimeSeriesDataSchema,
     profile_2d: Profile2DDataSchema,
     radial_profile: RadialProfileDataSchema,
     video: ImageDataSchema,
@@ -265,7 +277,7 @@ function PanelDataLoader({
         const url = isMultiPanel
           ? `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/panels/${panel.id}/data`
           : `${BACKEND_API_URL}/projects/${projectId}/samples/${sampleId}/data`;
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ params: effectiveDataParams, view }),
@@ -319,7 +331,10 @@ function PanelDataLoader({
             return;
           }
 
-          update({ error: detail, data: null });
+          update({
+            error: `Could not load the data for this sample. ${detail}`,
+            data: null,
+          });
           return;
         }
 
@@ -371,6 +386,7 @@ function PanelDataLoader({
         }
         update({
           error: err instanceof Error ? err.message : "An error occurred",
+          data: null,
         });
       } finally {
         if (isCurrentRequest()) update({ isLoading: false });

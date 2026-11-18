@@ -1,5 +1,7 @@
-"use client";
-
+/**
+ * Entry point for the video view: the providers it needs and the page layout.
+ * Also owns frame navigation, which works by asking SampleContext for a new frame.
+ */
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Annotorious } from "@annotorious/react";
@@ -20,6 +22,7 @@ import {
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
 import { VideoAnnotationTools } from "@/app/video/components/video-annotation-toolbar";
 import { FrameJumpField } from "@/app/video/components/ui_elements";
+import { VideoAnnotationsTable } from "@/app/video/components/video-annotations-table";
 import { usePanelData, usePanelId } from "@/app/contexts/PanelDataContext";
 import { useWorkspace } from "@/app/contexts/WorkspaceContext";
 import { usePanelHeight } from "@/app/contexts/PanelHeightContext";
@@ -30,8 +33,10 @@ import {
 } from "@/app/contexts/VideoContext";
 import { useParams } from "react-router-dom";
 
+import { displayCreatedBy } from "@/types";
 import { AnnotationPopup } from "@/app/video/components/annotation-popup";
 
+/** Badges for the current frame's frame labels. Clicking one opens its popup. */
 function FrameLabelBadges() {
   const { frame, frameLabels, hideAnnotations, editMode, removeFrameLabel } =
     useVideoSession();
@@ -78,7 +83,7 @@ function FrameLabelBadges() {
                   className={frameLabel.label}
                   trackId={frameLabel.track_id}
                   heading="Frame label"
-                  details={`Frame ${frame} · ${frameLabel.created_by}`}
+                  details={`Frame ${frame} · ${displayCreatedBy(frameLabel)}`}
                   deleteDisabled={!editMode}
                   onDeleteBox={() => {
                     setSelectedBadgeKey(null);
@@ -95,15 +100,7 @@ function FrameLabelBadges() {
   );
 }
 
-/**
- * Frame annotator UI wrapper:
- * - Renders the frame navigation (prev/next + jump)
- * - Shows the latest requested frame index
- * - Flushes the current frame overlay before frame changes
- *
- * Note: this component does not fetch frames. The parent drives frame changes by
- * updating dataParams and passing the new image when the backend responds.
- */
+/** The Prev / Frame / Next controls and the image. Saves the frame's edits before leaving it. */
 function VideoFrameAnnotator(props: {
   imageBase64: string;
   desiredFrame: number;
@@ -136,7 +133,7 @@ function VideoFrameAnnotator(props: {
 
     session.flushCurrentFrameOverlay();
 
-    // Append missing manual instances only in Edit mode.
+    // Propagation: copy manual instances that are missing from the next frame onto it
     if (session.editMode && session.propagate) {
       session.forwardPropMissingManualToNext(next);
     }
@@ -168,7 +165,7 @@ function VideoFrameAnnotator(props: {
         </Button>
       </Flex>
 
-      {/* Frame annotator canvas (image + Annotorious overlay). */}
+      {/* Frame label badges, then the image. The empty spacer column keeps the image centred. */}
       <Grid
         width="100%"
         columns={
@@ -216,6 +213,7 @@ function VideoToolsInToolbar(props: { desiredFrame: number }) {
   );
 }
 
+/** Providers for the video view. They also wrap the left toolbox, so it can use the session. */
 export function VideoProviders({ children }: { children: React.ReactNode }) {
   return (
     <VideoUiStateProvider>
@@ -235,6 +233,7 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
 
   return (
     <Annotorious>
+      {/* Keyed by sample so the session starts fresh for each sample. */}
       <VideoSessionProvider
         key={`${project_id}:${sample_id}`}
         projectId={project_id}
@@ -248,12 +247,10 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * Render the image view and wire "go to frame" through SampleContext.
- * This component assumes it is already inside a VideoSessionProvider.
- */
+/** The video view's layout. Must be rendered inside VideoProviders. */
 export function VideoView() {
   const { data, dataParams, setDataParams } = usePanelData();
+  // The requested frame, updated straight away so quick repeated clicks step on from it
   const desiredFrameRef = React.useRef<number | null>(null);
 
   useEffect(() => {
@@ -276,7 +273,7 @@ export function VideoView() {
 
   const parsed = ImageDataSchema.safeParse(data);
   if (!parsed.success) {
-    throw new Error("Invalid data for UFO view (expected ImageData)");
+    throw new Error("Invalid data for video view (expected ImageData)");
   }
 
   const imageBase64 = parsed.data.values;
@@ -287,11 +284,7 @@ export function VideoView() {
       ? dataParams.frame
       : parsed.data.frame;
 
-  /**
-   * Request a specific frame from the backend by updating dataParams.
-   * The host page owns the fetch and is responsible for updating the session frame
-   * once the backend response arrives.
-   */
+  // SampleContext fetches the frame when dataParams changes, so this only sets the request
   const goToFrame = (n: number): boolean => {
     if (!Number.isFinite(n)) return false;
     const target = Math.max(0, Math.trunc(n));
@@ -355,12 +348,15 @@ export function VideoView() {
 
   return (
     <div className="min-w-0 flex-1 px-4 py-3">
-      <VideoFrameAnnotator
-        imageBase64={imageBase64}
-        desiredFrame={desiredFrame}
-        goToFrame={goToFrame}
-        goToRelativeFrame={goToRelativeFrame}
-      />
+      <Flex direction="column" gap="size-200">
+        <VideoFrameAnnotator
+          imageBase64={imageBase64}
+          desiredFrame={desiredFrame}
+          goToFrame={goToFrame}
+          goToRelativeFrame={goToRelativeFrame}
+        />
+        <VideoAnnotationsTable />
+      </Flex>
       <VideoToolsInToolbar desiredFrame={desiredFrame} />
     </div>
   );

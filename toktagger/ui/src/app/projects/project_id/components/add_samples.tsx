@@ -2,6 +2,7 @@
 import {
   Form,
   Button,
+  ActionButton,
   DialogTrigger,
   Dialog,
   Divider,
@@ -17,6 +18,7 @@ import {
   RadioGroup,
   Radio,
   View,
+  ContextualHelp,
 } from "@adobe/react-spectrum";
 import {
   DataSource,
@@ -28,10 +30,27 @@ import {
 } from "@/types";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import { useState, useEffect, useCallback } from "react";
-import { BACKEND_API_URL } from "@/app/core";
+import { z } from "zod/v4";
+import * as d3 from "d3";
+import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import NumericalRange, {
   NumericalRangeType,
 } from "@/app/components/ui/numerical_range";
+
+const DEFAULT_SIGNAL_NAME_HELP =
+  "Use the signal names that the data loader expects.";
+
+const SignalNameHelp = ({ helpText }: { helpText: string | null }) => (
+  <ContextualHelp>
+    <Heading>Signal names</Heading>
+    <Content>
+      <Text>
+        {helpText ?? DEFAULT_SIGNAL_NAME_HELP} Refer to the Data Loaders
+        documentation for examples.
+      </Text>
+    </Content>
+  </ContextualHelp>
+);
 
 const FILE_SCHEMAS = [
   "ImageFileData",
@@ -110,6 +129,7 @@ function SourceInputGroup({
   const [fileTypes, setFileTypes] = useState<{ key: string; value: string }[]>(
     [],
   );
+  const [signalNameHelp, setSignalNameHelp] = useState<string | null>(null);
   const [signalNames, setSignalNames] = useState<string>("");
   const [fileType, setFileType] = useState<string>("parquet");
   const [dirPath, setDirPath] = useState<string>("");
@@ -122,12 +142,21 @@ function SourceInputGroup({
   useEffect(() => {
     async function fetchDataSchema() {
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `${BACKEND_API_URL}/meta/dataloader/${dataLoader}`,
         );
         if (response.ok) {
           const schema = await response.json();
           setSchemaTitle(schema.title);
+
+          const helpResponse = await apiFetch(
+            `${BACKEND_API_URL}/meta/dataloader/${dataLoader}/help`,
+          );
+          const helpText = z
+            .string()
+            .nullable()
+            .safeParse(helpResponse.ok ? await helpResponse.json() : null);
+          setSignalNameHelp(helpText.success ? helpText.data : null);
 
           if (schema.title === "ShotData") {
             return;
@@ -163,7 +192,7 @@ function SourceInputGroup({
       if (useDirectories) {
         apiUrl = `${BACKEND_API_URL}/paths/directories?dir_path=${dirPath}&file_type=${fileType}`;
       }
-      const response = await fetch(apiUrl);
+      const response = await apiFetch(apiUrl);
 
       if (response.ok) {
         const fileNames: string[] = await response.json();
@@ -244,7 +273,8 @@ function SourceInputGroup({
             isRequired
             value={signalNames}
             onChange={setSignalNames}
-            description="Signal names to load as a comma-separated list, e.g., ip, dalpha, ANE_DENSITY"
+            description="Comma-separated list of signals to load."
+            contextualHelp={<SignalNameHelp helpText={signalNameHelp} />}
           />
         </Form>
       )}
@@ -284,6 +314,7 @@ function SourceInputGroup({
               value={columnNames}
               onChange={setColumnNames}
               description="Optional: Specify signal names to load data for."
+              contextualHelp={<SignalNameHelp helpText={signalNameHelp} />}
             />
           ) : (
             <></>
@@ -309,9 +340,13 @@ function SourceInputGroup({
 export const AddSamplesEditor = ({
   project,
   onModify,
+  // Which samples a project holds is project configuration, so only a project
+  // admin may add them - mirrors require_project_admin_role on POST /samples.
+  canManageSamples = true,
 }: {
   project: Project;
   onModify?: () => void;
+  canManageSamples?: boolean;
 }) => {
   const isMultiPanel = project.task === TaskType.MultiPanel;
   const sources: DataSource[] =
@@ -367,23 +402,22 @@ export const AddSamplesEditor = ({
       reader.onload = (e) => {
         try {
           const content = e.target?.result as string;
-          // Parse CSV: split by lines, skip header (first line), get first column
-          const lines = content.split(/\r?\n/).filter((line) => line.trim());
-          if (lines.length <= 1) {
+          // Parse CSV properly so quoted fields containing newlines stay in one row
+          const rows = d3
+            .csvParseRows(content)
+            .filter((row) => row.some((cell) => cell.trim()));
+          if (rows.length <= 1) {
             ToastQueue.negative("CSV file is empty or has no data rows", {
               timeout: 3000,
             });
             return;
           }
-          // Skip header (index 0), parse remaining lines
-          const ids = lines
+          // Skip header (index 0), take the first column of remaining rows
+          const ids = rows
             .slice(1)
-            .map((line) => {
-              // Get first column (split by comma, take first element)
-              const firstColumn = line.split(",")[0].trim();
-              return parseInt(firstColumn, 10);
-            })
-            .filter((id) => !isNaN(id));
+            .map((row) => row[0].trim())
+            .filter((firstColumn) => /^\d+$/.test(firstColumn))
+            .map((firstColumn) => parseInt(firstColumn, 10));
 
           if (ids.length === 0) {
             ToastQueue.negative("No valid shot IDs found in first column", {
@@ -440,7 +474,7 @@ export const AddSamplesEditor = ({
       });
 
       // POST to API
-      const response = await fetch(
+      const response = await apiFetch(
         `${BACKEND_API_URL}/projects/${project._id}/samples`,
         {
           method: "POST",
@@ -476,10 +510,10 @@ export const AddSamplesEditor = ({
 
   return (
     <DialogTrigger>
-      <Button variant="primary">
+      <ActionButton isQuiet isDisabled={!canManageSamples}>
         <AddCircle />
         <Text>Add Samples</Text>
-      </Button>
+      </ActionButton>
       {(close) => (
         <Dialog>
           <Heading>Add Samples to Project</Heading>

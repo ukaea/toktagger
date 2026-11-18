@@ -9,8 +9,8 @@ import {
   Switch,
 } from "@adobe/react-spectrum";
 import { Annotation, MultiVariateTimeSeriesData } from "@/types";
-import { AnnotatorTypes } from "./types";
-import { BACKEND_API_URL } from "@/app/core";
+import { AnnotatorTypes, annotatorCreatedBy } from "@/types";
+import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
 import { usePanelData } from "@/app/contexts/PanelDataContext";
 
@@ -30,7 +30,8 @@ export function JumpDetectionTool({
 
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
-      (ann) => ann.created_by === AnnotatorTypes.JUMP_DETECTION,
+      (ann) =>
+        ann.created_by === annotatorCreatedBy(AnnotatorTypes.JUMP_DETECTION),
     );
   });
 
@@ -54,7 +55,8 @@ export function JumpDetectionTool({
         setAnnotations((previousAnnotations: Annotation[]) => {
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) =>
-              annotation.created_by !== AnnotatorTypes.JUMP_DETECTION ||
+              annotation.created_by !==
+                annotatorCreatedBy(AnnotatorTypes.JUMP_DETECTION) ||
               annotation.validated,
           );
           return otherAnnotations;
@@ -64,7 +66,7 @@ export function JumpDetectionTool({
         return;
       }
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/annotator/jump_detection`,
         {
           method: "POST",
@@ -89,7 +91,8 @@ export function JumpDetectionTool({
       setAnnotations((previousAnnotations: Annotation[]) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== AnnotatorTypes.JUMP_DETECTION ||
+            annotation.created_by !==
+              annotatorCreatedBy(AnnotatorTypes.JUMP_DETECTION) ||
             annotation.validated,
         );
         return otherAnnotations.concat(payload);

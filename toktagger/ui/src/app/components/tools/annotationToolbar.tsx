@@ -57,7 +57,7 @@ export const AnnotationToolbar = () => {
     setAnnotationTool,
   } = useAnnotationTools();
   const { setVideoToolSlot } = useWorkspace();
-  const { project } = useSample();
+  const { project, canAnnotate } = useSample();
   const projectId = project?._id;
 
   const [categoryAllocations, setCategoryAllocations] = useState<
@@ -113,6 +113,7 @@ export const AnnotationToolbar = () => {
       width="size-3000"
       flexShrink={0}
       marginTop="size-200"
+      overflow="auto"
       data-testid="annotation-toolbar"
     >
       <Flex direction="column" alignItems="center" gap="size-150">
@@ -121,6 +122,7 @@ export const AnnotationToolbar = () => {
           <Button
             width="size-1600"
             variant={modeVariant}
+            isDisabled={!canAnnotate}
             onPress={() => {
               setEditMode(!editMode);
               if (firstTimeEdit) {
@@ -131,11 +133,13 @@ export const AnnotationToolbar = () => {
             {modeText}
           </Button>
           <Tooltip>
-            Click to enter{" "}
-            {editMode
-              ? "view mode - annotations disabled"
-              : "edit mode - annotations enabled"}{" "}
-            (shortcut: e)
+            {canAnnotate
+              ? `Click to enter ${
+                  editMode
+                    ? "view mode - annotations disabled"
+                    : "edit mode - annotations enabled"
+                } (shortcut: e)`
+              : "You have view-only access to this project — annotations cannot be edited."}
           </Tooltip>
         </TooltipTrigger>
         {activePanelTools.length > 0 && (

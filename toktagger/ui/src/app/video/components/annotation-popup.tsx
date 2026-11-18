@@ -1,14 +1,10 @@
-"use client";
-
+/**
+ * The card shown for a selected shape or frame label: its class, track ID, details and a Delete button.
+ * Display only: the caller positions it and handles the buttons.
+ */
 import React from "react";
 import { Button } from "@adobe/react-spectrum";
 
-/**
- * Lightweight floating UI for the currently selected annotation.
- *
- * Positioning is handled by Annotorious' ImageAnnotationPopup wrapper.
- * This component stays purely presentational.
- */
 export function AnnotationPopup(props: {
   className: string | null;
   trackId: string | null;

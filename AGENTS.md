@@ -16,7 +16,6 @@ toktagger --reload --no-browser
 npm --prefix toktagger/ui ci
 npm --prefix toktagger/ui run dev   # :5173 — expects the backend already running on :8002
 ```
-Or `docker compose -f docker-compose.dev.yml up` for the full stack (API + UI + Mongo + Mongo Express).
 
 ## Build, lint, test
 
@@ -40,6 +39,9 @@ Prefer running a single test (`pytest path/to/test_file.py -k test_name`) over a
 - New config values extend `Settings` in `toktagger/api/config.py` as a nested `pydantic.BaseModel`, not ad hoc `os.environ` reads.
 - Data loaders / models / query strategies register via their `@Registry.register(...)` decorator (`core/data_loaders.py`, `models/base.py`) rather than special-casing a router.
 - A new annotation/schema shape should reuse an existing base+subclass pattern (e.g. how `BoundingBox`/`VideoBoundingBox` relate) rather than being bespoke — look for the analogous type before adding a new one.
+- All documents are Pydantic `BaseModel`s defined in `/schemas`.
+- All DB reads/writes go through `MongoDBClient` helper methods (`db_client`).
+- General helper functions belong in `utils.py`.
 
 **Frontend**
 - React Spectrum components/style props over Tailwind or custom CSS; `UNSAFE_style` only once Spectrum props genuinely can't do it.

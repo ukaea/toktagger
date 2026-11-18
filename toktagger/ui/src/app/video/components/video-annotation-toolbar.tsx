@@ -1,5 +1,6 @@
-"use client";
-
+/**
+ * The right-hand annotation toolbar: the Edit/View Mode button, the four tool buttons and Reset View.
+ */
 import {
   ActionButton,
   Content,
@@ -29,14 +30,27 @@ import type { DrawingTool } from "./types";
 
 /** The video drawing tools; the global annotation toolbar shows them while the video panel is active. */
 export function VideoAnnotationTools(props: { desiredFrame: number }) {
-  const { frame, drawingTool, setDrawingTool, editMode, hideAnnotations } =
-    useVideoSession();
+  const {
+    frame,
+    selection,
+    setSelection,
+    drawingTool,
+    setDrawingTool,
+    editMode,
+    canAnnotate,
+    hideAnnotations,
+  } = useVideoSession();
   const { isLoading } = usePanelData();
   const isFramePending = isLoading && props.desiredFrame !== frame;
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
   const toggleTool = (tool: DrawingTool) => {
-    setDrawingTool(drawingTool === tool ? null : tool);
+    const next = drawingTool === tool ? null : tool;
+    // A track keeps its annotation type, so picking a tool here starts a new track
+    if (next && selection.trackId) {
+      setSelection({ ...selection, trackId: null });
+    }
+    setDrawingTool(next);
   };
 
   const resetView = () => {
@@ -46,7 +60,8 @@ export function VideoAnnotationTools(props: { desiredFrame: number }) {
     viewport.applyConstraints();
   };
 
-  const toolsDisabled = !editMode || hideAnnotations || isFramePending;
+  const toolsDisabled =
+    !canAnnotate || !editMode || hideAnnotations || isFramePending;
 
   return (
     <View data-testid="video-annotation-tools" width="100%">

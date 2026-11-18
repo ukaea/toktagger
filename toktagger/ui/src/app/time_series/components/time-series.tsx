@@ -12,7 +12,7 @@ import {
   assignStackedYAxes,
   buildStackedYAxesLayout,
 } from "@/app/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
 import { useFigureHeight } from "@/app/contexts/PanelHeightContext";
@@ -44,11 +44,11 @@ export const TimeSeriesView = () => {
 
     const plotData: Partial<Plotly.PlotData>[] = Object.entries(
       viewData.values,
-    ).map(([key, value]: [string, TimeSeriesData]) => {
+    ).map(([key, value]: [string, TimeSeriesData | null]) => {
       return {
         name: key,
-        x: value.time,
-        y: value.values,
+        x: value?.time ?? [],
+        y: value?.values ?? [],
         mode: "lines",
       };
     });
@@ -56,52 +56,50 @@ export const TimeSeriesView = () => {
     setPlotData(assignStackedYAxes(plotData));
   }, [data, viewData]);
 
-  const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
-    let maxTime = -Infinity;
-    let minTime = Infinity;
+  let maxTime = -Infinity;
+  let minTime = Infinity;
 
-    for (const trace of plotData) {
-      const xData = trace.x as number[];
-      if (xData && xData.length > 0) {
-        const traceMax = arrayMax(xData);
-        const traceMin = arrayMin(xData);
-        if (traceMax > maxTime) maxTime = traceMax;
-        if (traceMin < minTime) minTime = traceMin;
-      }
+  for (const trace of plotData) {
+    const xData = trace.x as number[];
+    if (xData && xData.length > 0) {
+      const traceMax = arrayMax(xData);
+      const traceMin = arrayMin(xData);
+      if (traceMax > maxTime) maxTime = traceMax;
+      if (traceMin < minTime) minTime = traceMin;
     }
+  }
 
-    const yAxesLayout = buildStackedYAxesLayout(
-      plotData.map((trace) => trace.name ?? ""),
-    );
+  const yAxesLayout = buildStackedYAxesLayout(
+    plotData.map((trace) => trace.name ?? ""),
+  );
 
-    return applyGlobalStyle(
-      {
-        uirevision: "true",
-        //grid: { rows: 1, columns: 1, pattern: "independent" },
-        dragmode: "pan",
-        autosize: true,
-        height: figureHeight,
-        xaxis: {
-          minallowed: minTime,
-          maxallowed: maxTime,
-          range: [minTime, maxTime],
-          fixedrange: false,
-          autorange: false,
-          rangeslider: { visible: true, thickness: 0.1 },
-          title: {
-            text: "Time [s]",
-            font: {
-              family: "Courier New, monospace",
-              size: 12,
-              color: "#7f7f7f",
-            },
+  const plotLayout: Partial<Plotly.Layout> = applyGlobalStyle(
+    {
+      uirevision: "true",
+      //grid: { rows: 1, columns: 1, pattern: "independent" },
+      dragmode: "pan",
+      autosize: true,
+      height: figureHeight,
+      xaxis: {
+        minallowed: minTime,
+        maxallowed: maxTime,
+        range: [minTime, maxTime],
+        fixedrange: false,
+        autorange: false,
+        rangeslider: { visible: true, thickness: 0.1 },
+        title: {
+          text: "Time [s]",
+          font: {
+            family: "Courier New, monospace",
+            size: 12,
+            color: "#7f7f7f",
           },
         },
-        ...yAxesLayout,
       },
-      isDarkMode,
-    );
-  }, [plotData, isDarkMode, figureHeight]);
+      ...yAxesLayout,
+    },
+    isDarkMode,
+  );
 
   if (!viewData) {
     return null;

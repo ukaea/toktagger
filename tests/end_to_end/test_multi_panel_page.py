@@ -1,4 +1,4 @@
-import requests
+from tests.endpoints import session
 from playwright.sync_api import Page, expect
 
 LAYOUT = {
@@ -46,7 +46,7 @@ PLOT_IDS = {
 
 
 def setup_project(page: Page, layout: dict = LAYOUT) -> tuple[str, str]:
-    response = requests.post(
+    response = session.post(
         "http://localhost:8002/projects",
         json={
             "name": "Test Multi Panel Project",
@@ -59,7 +59,7 @@ def setup_project(page: Page, layout: dict = LAYOUT) -> tuple[str, str]:
     assert response.status_code == 200, response.text
     project_id = response.json()["_id"]
 
-    response = requests.post(
+    response = session.post(
         f"http://localhost:8002/projects/{project_id}/samples",
         json=[{"shot_id": 1, "data": {"protocol": "uda", "signal_names": ["TE"]}}],
     )
@@ -299,7 +299,7 @@ def test_create_and_edit_multi_panel_project(server_setup, page: Page):
     ):
         modal.get_by_role("button", name="Create").click()
 
-    project = requests.get("http://localhost:8002/projects").json()[0]
+    project = session.get("http://localhost:8002/projects").json()[0]
     assert project["task"] == "multi-panel"
     assert project["data_loader"] == "synthetic_radial"
     assert project["sources"] == [
@@ -322,7 +322,7 @@ def test_create_and_edit_multi_panel_project(server_setup, page: Page):
         modal.get_by_role("button", name="Save Changes").click()
     assert response_info.value.ok
 
-    updated = requests.get(f"http://localhost:8002/projects/{project['_id']}").json()
+    updated = session.get(f"http://localhost:8002/projects/{project['_id']}").json()
     assert updated["name"] == "UI Multi Panel 2"
     assert updated["layout"]["tabs"][0]["panels"] == panels
 
@@ -378,7 +378,7 @@ def test_create_multi_panel_project_from_yaml(server_setup, page: Page):
     ):
         modal.get_by_role("button", name="Create").click()
 
-    project = requests.get("http://localhost:8002/projects").json()[0]
+    project = session.get("http://localhost:8002/projects").json()[0]
     assert project["layout_yaml"] == LAYOUT_YAML
     assert [tab["title"] for tab in project["layout"]["tabs"]] == [
         "Profiles",
@@ -413,7 +413,7 @@ def test_invalid_layout_yaml_blocks_create(server_setup, page: Page):
     )
     modal.get_by_role("button", name="Create").click()
     expect(modal).to_be_visible()
-    assert requests.get("http://localhost:8002/projects").json() == []
+    assert session.get("http://localhost:8002/projects").json() == []
 
 
 def test_layout_preview_warns_about_overlapping_panels(server_setup, page: Page):

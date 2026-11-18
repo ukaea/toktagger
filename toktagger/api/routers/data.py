@@ -1,24 +1,33 @@
-from typing import Optional
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from toktagger.api.auth.dependencies import (
+    get_current_user,
+    require_project_viewer,
+)
+from toktagger.api.core.data_loaders import DataLoader, DataLoaderError, LoaderRegistry
 from toktagger.api.core.views import DATA_VIEWS
-from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
 from toktagger.api.crud import utils
-from toktagger.api.schemas.data import DataResponseType, DataParams, DataParamTypes
+from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.schemas.data import DataParams, DataParamTypes, DataResponseType
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.users import UserOut
 from toktagger.api.schemas.views import (
     Profile2DViewParams,
     ViewParams,
     ViewParamTypes,
 )
 
-from fastapi import APIRouter, HTTPException, Request
+router = APIRouter(
+    prefix="/projects/{project_id}/samples/{sample_id}",
+    tags=["Data"],
+    dependencies=[Depends(get_current_user)],
+)
 
-from toktagger.api.core.data_loaders import DataLoaderError
 
-router = APIRouter(prefix="/projects/{project_id}/samples/{sample_id}", tags=["Data"])
-
-
-def load_view_data(
+async def load_view_data(
     project: Project,
     sample: Sample,
     data_loader: DataLoader,
@@ -27,7 +36,8 @@ def load_view_data(
 ) -> DataResponseType:
     """Load the sample data with the data loader, then convert it with the view."""
     try:
-        data = data_loader.get_sample(
+        data = await asyncio.to_thread(
+            data_loader.get_sample,
             sample,
             params=params,
             time_min=project.time_min,
@@ -50,17 +60,18 @@ async def get_data(
     request: Request,
     project_id: str,
     sample_id: str,
-    params: Optional[DataParamTypes] = DataParams(),
-    view: Optional[ViewParamTypes] = ViewParams(),
+    current_user: UserOut = Depends(require_project_viewer),
+    params: DataParamTypes | None = DataParams(),
+    view: ViewParamTypes | None = ViewParams(),
 ) -> DataResponseType:
     """Get data, e.g. time trace, about the given sample required for the given project"""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
 
     project = await utils.get_project(db_client, project_id)
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
     data_loader = LoaderRegistry.get(project.data_loader)()
-    return load_view_data(
+    return await load_view_data(
         project, sample, data_loader, params or DataParams(), view or ViewParams()
     )
 
@@ -71,11 +82,12 @@ async def get_panel_data(
     project_id: str,
     sample_id: str,
     panel_id: str,
-    params: Optional[DataParamTypes] = DataParams(),
-    view: Optional[ViewParamTypes] = None,
+    current_user: UserOut = Depends(require_project_viewer),
+    params: DataParamTypes | None = DataParams(),
+    view: ViewParamTypes | None = None,
 ) -> DataResponseType:
     """Get the data of one panel in the layout of a multi-panel project"""
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
 
     project = await utils.get_project(db_client, project_id)
     panel = project.layout.get_panel(panel_id) if project.layout else None
@@ -94,6 +106,6 @@ async def get_panel_data(
             update={"signal_name": panel.signal_names()[0]}
         )
 
-    return load_view_data(
+    return await load_view_data(
         project, panel_sample, data_loader, params or DataParams(), panel_view
     )

@@ -14,6 +14,7 @@ It currently supports the following features:
 - **Annotation Tools**: Apply consistent labels to signals and images using a customizable tagging system.
 - **ML Models**: Train and infer from ML models within the UI.
 - **Dataset Management**: Organize and manage annotations in a central repository.
+- **Multi-User Support**: Role-based access control with per-project membership, suitable for team annotation workflows.
 - **Extensible API**: A Python API for integrating with existing workflows and tools.
 
 
@@ -49,13 +50,36 @@ uv tool install --python 3.12.6 toktagger[models]
 ```
 
 ## Quick Start
-To get started, run:
+
+To start a local single-user instance:
 
 ```sh
 toktagger
 ```
 
-This will start a local instance of the application running at `http://localhost:8002`.
+This starts the application at `http://localhost:8002`. On the first start, TokTagger creates a local identity provider and prints the user name and the password of the first administrator to the terminal, which will only be shown once. Open the application and click **Sign in**.
+
+!!! warning
+    **This is an insecure default password.** Change it immediately after first login from within Canaille at `http://localhost:8003/profile/admin/auth/password`.
+
+### Multi-User / Team Deployment
+
+For concurrent multi-user access, run with multiple workers. Multiple workers operate on Linux, macOS and Windows:
+
+```sh
+toktagger --workers 4 --no-browser
+```
+
+The default host is `localhost`. Only the local machine can connect to it. To let other users on the network connect, add `--host 0.0.0.0`.
+
+!!! warning
+    `--host 0.0.0.0` makes TokTagger available to all devices that can reach the machine on port 8002. The traffic is not encrypted. Use it only on a trusted network. For other deployments, use the `docker-compose.yml` stack, which puts TokTagger behind a TLS proxy.
+
+See [User Management](user_management.md) for creating accounts, assigning roles, and managing project membership.
+
+### Deploy with Docker
+
+To run TokTagger on a shared server, use the Docker Compose stack. The stack adds TLS, Keycloak and MongoDB. Read the [Deployment](deployment.md) guide.
 
 ## Configuration
 There are a series of additional options which you can configure to customise the functionality of TokTagger - [find details about these here.](./configuration.md)

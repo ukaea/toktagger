@@ -36,7 +36,7 @@ Note that since some weights files are saved using `pickle`, they may contain ma
 For loading from a local file on your machine, simply specify the path to the existing file on your computer. Note that this will only work if the worker nodes are also running on your local system (which they are by default). 
 
 !!! warning
-    This option will not work if hosting a production TokTagger server, since users uploading files from their computers directly to the server is not supported for security reasons. You can disable this loading method by specifying `local_load_enabled = true` in the `models` section of your `toktagger.toml` file, or by setting `MODELS_LOCAL_LOAD_ENABLED=false`.
+    This option will not work if hosting a production TokTagger server, since users uploading files from their computers directly to the server is not supported for security reasons. You can disable this loading method by specifying `local_load_enabled = false` in the `models` section of your `toktagger.toml` file, or by setting `MODELS_LOCAL_LOAD_ENABLED=false`.
 
 <figure markdown="span">
    ![The ML model loading window, showing parameters for loading from a local file.](assets/model_load_local.png){ width="500" }

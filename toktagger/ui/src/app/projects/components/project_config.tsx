@@ -1,6 +1,7 @@
-import { Project, TaskType } from "@/types";
+import { Project, ProjectUpdate, TaskType } from "@/types";
 import {
   Button,
+  ActionButton,
   ButtonGroup,
   Content,
   Dialog,
@@ -26,7 +27,7 @@ import {
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { useState, useEffect } from "react";
-import { BACKEND_API_URL } from "@/app/core";
+import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useAPISchema } from "@/app/contexts/apiSchema";
 import { SchemaParser } from "@/schemaParser";
 import { LayoutEditor } from "./layout_editor";
@@ -84,9 +85,11 @@ const LabelsForm = ({
 export function ProjectConfigEditor({
   project: _project,
   onModify,
+  isDisabled,
 }: {
   project?: Project;
   onModify?: () => void;
+  isDisabled?: boolean;
 }) {
   const isEditing = !!_project;
   const titleText = isEditing ? "Edit Project" : "Create Project";
@@ -193,7 +196,7 @@ export function ProjectConfigEditor({
   useEffect(() => {
     async function fetchDataLoaders() {
       try {
-        const response = await fetch(`${BACKEND_API_URL}/meta/dataloader`);
+        const response = await apiFetch(`${BACKEND_API_URL}/meta/dataloader`);
         if (response.ok) {
           const dataLoadersList = await response.json();
           const loaders = dataLoadersList.map((item: string) => ({
@@ -237,16 +240,12 @@ export function ProjectConfigEditor({
       }
       const layoutConfig = isMultiPanel ? parsedLayout.config : null;
 
-      // Build project object
-      const newProject: Partial<Project> = {
+      const projectUpdate: ProjectUpdate = {
         name: projectName,
-        task: task as TaskType,
         query_strategy: queryStrategy,
-        data_loader: layoutConfig?.sources[0].data_loader ?? dataLoader,
         sources: layoutConfig?.sources ?? _project?.sources ?? [],
         layout: layoutConfig?.layout ?? null,
         layout_yaml: layoutConfig ? layoutYaml : null,
-        timestamp: new Date().toISOString(),
         time_min: timeMin,
         time_max: timeMax,
         min_time_step: minTimeStep,
@@ -257,10 +256,12 @@ export function ProjectConfigEditor({
         polygon_labels: polygonLabels,
         video_bounding_box_labels: videoBoundingBoxLabels,
       };
-
-      if (isEditing && _project?._id) {
-        newProject._id = _project._id;
-      }
+      const newProject: Partial<Project> = {
+        ...projectUpdate,
+        task: task as TaskType,
+        data_loader: layoutConfig?.sources[0].data_loader ?? dataLoader,
+        timestamp: new Date().toISOString(),
+      };
 
       let url = `${BACKEND_API_URL}/projects`;
       let method: "POST" | "PUT" = "POST";
@@ -270,12 +271,12 @@ export function ProjectConfigEditor({
       }
 
       // Create project via API
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(newProject),
+        body: JSON.stringify(method === "PUT" ? projectUpdate : newProject),
       });
 
       if (!response.ok) {
@@ -283,9 +284,12 @@ export function ProjectConfigEditor({
         throw new Error(error.detail || "Error creating project");
       }
 
-      ToastQueue.positive("Project created successfully!", {
-        timeout: 3000,
-      });
+      ToastQueue.positive(
+        `Project ${isEditing ? "updated" : "created"} successfully!`,
+        {
+          timeout: 3000,
+        },
+      );
 
       if (onModify) {
         onModify();
@@ -299,13 +303,16 @@ export function ProjectConfigEditor({
 
   return (
     <DialogTrigger>
-      <Button
-        aria-label={isEditing ? "Edit" : buttonText}
-        variant={isEditing ? "accent" : "primary"}
-      >
-        {icon}
-        {!isEditing ? <Text>{buttonText}</Text> : <></>}
-      </Button>
+      {isEditing ? (
+        <Button aria-label="Edit" variant="accent" isDisabled={isDisabled}>
+          {icon}
+        </Button>
+      ) : (
+        <ActionButton isQuiet aria-label={buttonText}>
+          {icon}
+          <Text>{buttonText}</Text>
+        </ActionButton>
+      )}
       {(close) => (
         <Dialog width={isMultiPanel ? "min(1280px, 92vw)" : undefined}>
           <Heading>{titleText}</Heading>

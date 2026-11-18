@@ -18,7 +18,7 @@ import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
 import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
 import { useFigureHeight } from "@/app/contexts/PanelHeightContext";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Flex, View } from "@adobe/react-spectrum";
 
 // The subplot annotations with real y values should be restricted to.
@@ -33,6 +33,10 @@ type ColorAxis = {
 };
 
 type ProfileValues = (number | null)[][];
+
+// An empty profile (signal not loaded) has no min/max, so fall back to a default.
+const finiteOr = (value: number, fallback: number) =>
+  Number.isFinite(value) ? value : fallback;
 
 // Leaves the lowest values fully transparent so the background shows through.
 const buildColorScale = (
@@ -59,8 +63,14 @@ const createLinearScalePlot = (
   return {
     values,
     colorAxis: {
-      cmin: Math.max(smallPrecisionFactor, arrayMin(values.flat())),
-      cmax: Math.max(smallPrecisionFactor, arrayMax(values.flat())),
+      cmin: Math.max(
+        smallPrecisionFactor,
+        finiteOr(arrayMin(values.flat()), 0),
+      ),
+      cmax: Math.max(
+        smallPrecisionFactor,
+        finiteOr(arrayMax(values.flat()), 1),
+      ),
       colorscale: buildColorScale(interpFunc, smallPrecisionFactor),
       colorbar: { ticks: "outside", tickfont: { size: 10 } },
     },
@@ -115,8 +125,14 @@ const createLogScalePlot = (
   const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
   const rawValues = data.values as ProfileValues;
 
-  const cmin = Math.max(smallPrecisionFactor, arrayMin(rawValues.flat()));
-  const cmax = Math.max(smallPrecisionFactor, arrayMax(rawValues.flat()));
+  const cmin = Math.max(
+    smallPrecisionFactor,
+    finiteOr(arrayMin(rawValues.flat()), 0),
+  );
+  const cmax = Math.max(
+    smallPrecisionFactor,
+    finiteOr(arrayMax(rawValues.flat()), 1),
+  );
 
   const values: ProfileValues = rawValues.map((row) =>
     row.map((x) =>
@@ -129,8 +145,8 @@ const createLogScalePlot = (
   return {
     values,
     colorAxis: {
-      cmin: arrayMin(values.flat()),
-      cmax: arrayMax(values.flat()),
+      cmin: finiteOr(arrayMin(values.flat()), 0),
+      cmax: finiteOr(arrayMax(values.flat()), 1),
       colorscale: buildColorScale(interpFunc, smallPrecisionFactor),
       colorbar: {
         ticks: "outside",
@@ -249,28 +265,27 @@ export const Profile2dView = () => {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
-  // Memoised so an annotation drag doesn't tear down and rebuild the plot mid-draw.
-  const plot = useMemo(() => {
-    if (!viewData || !plotProps) return null;
-    const interpFunc = getColorMapInterpolator(plotProps.colorMap);
-    const createPlotFunc = logScale
-      ? createLogScalePlot
-      : createLinearScalePlot;
-    return createPlotFunc(viewData, plotProps, interpFunc);
-  }, [viewData, plotProps, logScale]);
-
+  // Before the plot is built: the compiler won't memoise across a hook, and a rebuilt plot drops mid-draw shapes.
   const figureHeight = useFigureHeight(0.9);
   const plotId = usePlotId("Profile2DView");
-  const plotData = useMemo<Partial<Plotly.PlotData>[]>(() => {
-    if (!viewData || !plot) return [];
-    return buildPlotData(viewData, plot.values, plotProps?.thresholdActive);
-  }, [viewData, plot, plotProps?.thresholdActive]);
 
-  const plotLayout = useMemo(
-    () =>
-      plot ? buildPlotLayout(plot.colorAxis, isDarkMode, figureHeight) : {},
-    [plot, isDarkMode, figureHeight],
-  );
+  const plot =
+    viewData && plotProps
+      ? (logScale ? createLogScalePlot : createLinearScalePlot)(
+          viewData,
+          plotProps,
+          getColorMapInterpolator(plotProps.colorMap),
+        )
+      : null;
+
+  const plotData: Partial<Plotly.PlotData>[] =
+    viewData && plot
+      ? buildPlotData(viewData, plot.values, plotProps?.thresholdActive)
+      : [];
+
+  const plotLayout = plot
+    ? buildPlotLayout(plot.colorAxis, isDarkMode, figureHeight)
+    : {};
 
   if (!viewData || !profileViewParams || !plot) {
     return null;

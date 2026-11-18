@@ -33,6 +33,11 @@ type AnnotationToolContextType = {
     types: TimeSeriesAnnotationType[],
   ) => () => void;
   registerCancel: (ownerId: string, cancel: () => void) => () => void;
+  // Runs when edit mode turns on or off, from the toolbar button or the e key.
+  registerEditModeChange: (
+    ownerId: string,
+    onChange: (editMode: boolean) => void,
+  ) => () => void;
 };
 
 const AnnotationToolContext = createContext<
@@ -90,12 +95,55 @@ export function AnnotationToolProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { project } = useSample();
+  const { project, canAnnotate } = useSample();
   const projectId = project?._id ?? "";
 
-  const [editMode, setEditMode] = useState<boolean>(
+  const [editMode, setEditModeRaw] = useState<boolean>(
     () => sessionStorage.getItem(editModeKey(projectId)) === "true",
   );
+
+  // Viewers can't enter edit mode - gated here (rather than only disabling the
+  // toolbar button) so the "e" keyboard shortcut is blocked too.
+  const editModeHandlersRef = useRef(
+    new Map<string, (editMode: boolean) => void>(),
+  );
+  const setEditMode = useCallback(
+    (update: boolean | ((prev: boolean) => boolean)) => {
+      const next =
+        canAnnotate &&
+        (typeof update === "function" ? update(editMode) : update);
+      if (next !== editMode) {
+        editModeHandlersRef.current.forEach((onChange) => onChange(next));
+      }
+      setEditModeRaw(next);
+    },
+    [canAnnotate, editMode],
+  );
+
+  const registerEditModeChange = useCallback(
+    (ownerId: string, onChange: (editMode: boolean) => void) => {
+      editModeHandlersRef.current.set(ownerId, onChange);
+      return () => {
+        if (editModeHandlersRef.current.get(ownerId) === onChange) {
+          editModeHandlersRef.current.delete(ownerId);
+        }
+      };
+    },
+    [],
+  );
+
+  // If the role check resolves to "can't annotate" after edit mode was already on
+  // (e.g. restored from a previous session, or a mid-session role change), drop back
+  // to view mode.
+  useEffect(() => {
+    if (!canAnnotate) setEditModeRaw(false);
+  }, [canAnnotate]);
+
+  // Read through a ref so a canAnnotate change does not re-register the key listeners mid ctrl-drag.
+  const setEditModeRef = useRef(setEditMode);
+  useEffect(() => {
+    setEditModeRef.current = setEditMode;
+  }, [setEditMode]);
   const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>(
     null,
   );
@@ -238,7 +286,7 @@ export function AnnotationToolProvider({
         !event.metaKey &&
         !event.altKey
       ) {
-        setEditMode((prev) => !prev);
+        setEditModeRef.current((prev) => !prev);
       }
     };
     const keyUpHandler = (event: KeyboardEvent) => {
@@ -264,9 +312,11 @@ export function AnnotationToolProvider({
       activePanelTools,
       registerToolTypes,
       registerCancel,
+      registerEditModeChange,
     }),
     [
       editMode,
+      setEditMode,
       activeTool,
       setAnnotationTool,
       categories,
@@ -274,6 +324,7 @@ export function AnnotationToolProvider({
       activePanelTools,
       registerToolTypes,
       registerCancel,
+      registerEditModeChange,
     ],
   );
 

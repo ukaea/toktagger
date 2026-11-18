@@ -93,6 +93,7 @@ export const BaseTimeSeriesPlot = ({
     triggerUpdate,
     findSelectedAnnotations,
     setOngoingAction,
+    setFocusXRange,
   } = useTimeSeriesActions();
   const {
     activeAnnotationTool,
@@ -100,6 +101,7 @@ export const BaseTimeSeriesPlot = ({
     isDrawing,
     ongoingAction,
     editMode,
+    focusXRange,
   } = useTimeSeriesState();
 
   const isDraggingRef = useRef(false);
@@ -125,7 +127,9 @@ export const BaseTimeSeriesPlot = ({
 
   const publishTimeWindow = useLinkedTimeAxis(plotId, plotReady, linkTime);
   const publishTimeWindowRef = useRef(publishTimeWindow);
-  publishTimeWindowRef.current = publishTimeWindow;
+  useEffect(() => {
+    publishTimeWindowRef.current = publishTimeWindow;
+  });
 
   useEffect(() => {
     const plot = document.getElementById(plotId) as PlotlyHTMLElement;
@@ -395,6 +399,25 @@ export const BaseTimeSeriesPlot = ({
         : { dragmode: "pan" },
     );
   }, [isDrawing, muteHoverWhileDrawing, plotId, plotReady]);
+
+  useEffect(() => {
+    if (!plotReady || !focusXRange) return;
+
+    const plot = document.getElementById(plotId) as ExtendedPlotlyHTMLElement;
+    if (!plot) {
+      console.error("Could not locate plot to focus x range");
+      return;
+    }
+
+    const [x0, x1] = focusXRange;
+    const [viewStart, viewEnd] = plot._fullLayout.xaxis.range;
+    // Keep the current zoom unless the annotation doesn't fit, then pad it to ~80% of the view
+    const span = Math.max(viewEnd - viewStart, (x1 - x0) * 1.25);
+    const centre = (x0 + x1) / 2;
+    relayout(plot, { "xaxis.range": [centre - span / 2, centre + span / 2] });
+
+    setFocusXRange(null);
+  }, [focusXRange, plotId, plotReady, setFocusXRange]);
 
   useEffect(() => {
     if (!plotReady) {

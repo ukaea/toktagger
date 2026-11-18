@@ -1,13 +1,29 @@
-from pydantic import Field, field_validator, computed_field, model_validator
-from typing import Any, Optional, List
 from enum import Enum
+from typing import Any, Literal
 
 import yaml
-
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.layouts import DEFAULT_SOURCE, DataSource, Layout
+
+
+def parse_layout_yaml(data: Any) -> Any:
+    """Replace the sources and the layout with those in the `layout_yaml` text, if it is set."""
+    if not isinstance(data, dict) or not data.get("layout_yaml"):
+        return data
+    try:
+        config = yaml.safe_load(data["layout_yaml"])
+    except yaml.YAMLError as error:
+        raise ValueError(f"Invalid layout YAML: {error}") from error
+    if not isinstance(config, dict) or "layout" not in config:
+        raise ValueError("The layout YAML must have a 'layout' key.")
+    return {
+        **data,
+        "sources": config.get("sources", []),
+        "layout": config["layout"],
+    }
 
 
 class Task(str, Enum):
@@ -41,27 +57,27 @@ class ProjectIn(ConfiguredModel):
         description="The type of data which will need to be loaded for this project.",
     )
 
-    time_min: Optional[float] = Field(
+    time_min: float | None = Field(
         None,
         description="The minimum time (in seconds) for samples in this project.",
     )
 
-    time_max: Optional[float] = Field(
+    time_max: float | None = Field(
         None,
         description="The maximum time (in seconds) for samples in this project.",
     )
 
-    min_time_step: Optional[float] = Field(
+    min_time_step: float | None = Field(
         None,
         description="The minimum time step (in seconds) between samples in this project.",
     )
 
-    shot_labels: Optional[List[str]] = Field(
+    shot_labels: list[str] | None = Field(
         default=["Valid", "Invalid"],
         description="The list of labels to use for shot labelling (if applicable).",
     )
 
-    time_region_labels: Optional[List[str]] = Field(
+    time_region_labels: list[str] | None = Field(
         default=[
             "ELM",
             "L-mode",
@@ -83,7 +99,7 @@ class ProjectIn(ConfiguredModel):
         description="The list of labels to use for time region labelling (if applicable).",
     )
 
-    time_point_labels: Optional[List[str]] = Field(
+    time_point_labels: list[str] | None = Field(
         default=[
             "Disruption",
             "Thermal Quench",
@@ -95,17 +111,17 @@ class ProjectIn(ConfiguredModel):
         description="The list of labels to use for time point labelling (if applicable).",
     )
 
-    bounding_box_labels: Optional[List[str]] = Field(
+    bounding_box_labels: list[str] | None = Field(
         default=["NTM", "LLM", "Sawteeth", "Locked Mode"],
         description="The list of labels to use for bounding box labelling (if applicable).",
     )
 
-    polygon_labels: Optional[List[str]] = Field(
+    polygon_labels: list[str] | None = Field(
         default=["NTM", "LLM", "Sawteeth", "Locked Mode"],
         description="The list of labels to use for polygon labelling (if applicable).",
     )
 
-    video_bounding_box_labels: Optional[List[str]] = Field(
+    video_bounding_box_labels: list[str] | None = Field(
         default=[
             "UFO",
             "Minor UFO",
@@ -121,12 +137,12 @@ class ProjectIn(ConfiguredModel):
         description="The named data sources of this project. Leave empty to use one source with the project data loader.",
     )
 
-    layout: Optional[Layout] = Field(
+    layout: Layout | None = Field(
         None,
         description="The panels to show for each sample (required for multi-panel projects).",
     )
 
-    layout_yaml: Optional[str] = Field(
+    layout_yaml: str | None = Field(
         None,
         description="The sources and layout as YAML text. When set, it replaces the sources and the layout.",
     )
@@ -134,23 +150,11 @@ class ProjectIn(ConfiguredModel):
     @model_validator(mode="before")
     @classmethod
     def parse_layout_yaml(cls, data: Any) -> Any:
-        if not isinstance(data, dict) or not data.get("layout_yaml"):
-            return data
-        try:
-            config = yaml.safe_load(data["layout_yaml"])
-        except yaml.YAMLError as error:
-            raise ValueError(f"Invalid layout YAML: {error}") from error
-        if not isinstance(config, dict) or "layout" not in config:
-            raise ValueError("The layout YAML must have a 'layout' key.")
-        return {
-            **data,
-            "sources": config.get("sources", []),
-            "layout": config["layout"],
-        }
+        return parse_layout_yaml(data)
 
     @computed_field
     @property
-    def model_types(self) -> List[str]:
+    def model_types(self) -> list[str]:
         from toktagger.api.models import models_dependencies_installed
 
         if not models_dependencies_installed():
@@ -203,3 +207,51 @@ class ProjectIn(ConfiguredModel):
 
 class Project(ProjectIn):
     id: str = Field(..., alias="_id", description="The ID of this project.")
+
+
+class ProjectUpdate(BaseModel):
+    """The project fields which can change after creation."""
+
+    name: str | None = None
+    query_strategy: QueryStrategyType | None = None
+    time_min: float | None = None
+    time_max: float | None = None
+    min_time_step: float | None = None
+    shot_labels: list[str] | None = None
+    time_region_labels: list[str] | None = None
+    time_point_labels: list[str] | None = None
+    bounding_box_labels: list[str] | None = None
+    polygon_labels: list[str] | None = None
+    video_bounding_box_labels: list[str] | None = None
+    sources: list[DataSource] | None = None
+    layout: Layout | None = None
+    layout_yaml: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_layout_yaml(cls, data: Any) -> Any:
+        return parse_layout_yaml(data)
+
+
+class ProjectMember(ConfiguredModel):
+    role: Literal["admin", "annotator", "viewer"] = "annotator"
+    show_others_annotations: bool = True
+
+
+class ProjectMemberOut(ConfiguredModel):
+    id: str = Field(..., alias="_id")
+    project_id: str
+    user_id: str
+    username: str
+    role: Literal["admin", "annotator", "viewer"]
+    show_others_annotations: bool
+
+
+class ProjectMemberCreate(BaseModel):
+    username: str
+    role: Literal["admin", "annotator", "viewer"] = "annotator"
+
+
+class ProjectMemberUpdate(BaseModel):
+    role: Literal["admin", "annotator", "viewer"] | None = None
+    show_others_annotations: bool | None = None
