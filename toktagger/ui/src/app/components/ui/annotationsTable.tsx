@@ -1,7 +1,12 @@
 "use client";
 
-import { TimeSeriesAnnotationType, TimeSeriesCategory } from "@/types";
-import { ComponentType, ReactNode, useMemo, useState } from "react";
+import {
+  displayCreatedBy,
+  TimeSeriesAnnotation,
+  TimeSeriesAnnotationType,
+  TimeSeriesCategory,
+} from "@/types";
+import { ComponentType, ReactNode, useState } from "react";
 import {
   ActionButton,
   AlertDialog,
@@ -18,10 +23,13 @@ import {
   Cell,
   Section,
   Flex,
+  Selection,
   Text,
+  Tooltip,
+  TooltipTrigger,
   View,
 } from "@adobe/react-spectrum";
-import type { Selection, SortDescriptor } from "@react-types/shared";
+import type { SortDescriptor } from "@react-types/shared";
 import Delete from "@spectrum-icons/workflow/Delete";
 import Visibility from "@spectrum-icons/workflow/Visibility";
 import VisibilityOff from "@spectrum-icons/workflow/VisibilityOff";
@@ -29,53 +37,13 @@ import {
   useTimeSeriesActions,
   useTimeSeriesState,
 } from "@/app/contexts/TimeSeriesContext";
-
-interface MarkerProps {
-  color: string;
-}
-
-const MARKER_VIEWBOX = "0 0 24 24";
-
-// Shape mirrors how each annotation type actually renders on the plot, so the
-// marker doubles as a legend for the tool - stroked/filled with the category color
-const TimePointMarker = ({ color }: MarkerProps) => (
-  <svg width="10" height="20" viewBox={MARKER_VIEWBOX}>
-    <line x1="12" y1="1" x2="12" y2="40" stroke={color} strokeWidth="4" />
-  </svg>
-);
-
-const TimeRegionMarker = ({ color }: MarkerProps) => (
-  <svg width="20" height="20" viewBox={MARKER_VIEWBOX}>
-    <rect x="6" y="6" width="12" height="20" rx="2" fill={color} />
-  </svg>
-);
-
-const BoundingBoxMarker = ({ color }: MarkerProps) => (
-  <svg width="20" height="20" viewBox={MARKER_VIEWBOX}>
-    <rect
-      x="3"
-      y="5"
-      width="18"
-      height="14"
-      rx="1"
-      fill="none"
-      stroke={color}
-      strokeWidth="2.5"
-    />
-  </svg>
-);
-
-const PolygonMarker = ({ color }: MarkerProps) => (
-  <svg width="20" height="20" viewBox={MARKER_VIEWBOX}>
-    <polygon
-      points="12,2 22,9.5 18,21 6,21 2,9.5"
-      fill="none"
-      stroke={color}
-      strokeWidth="2.5"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+import {
+  BoundingBoxMarker,
+  MarkerProps,
+  PolygonMarker,
+  TimePointMarker,
+  TimeRegionMarker,
+} from "@/app/components/ui/annotationMarkers";
 
 // One marker per annotation type - set when the annotation's category/type is resolved below
 const MARKER_ICONS: Record<
@@ -90,11 +58,9 @@ const MARKER_ICONS: Record<
 
 interface TableEntry {
   id: string;
+  annotation: TimeSeriesAnnotation;
   category: TimeSeriesCategory;
   createdBy: string;
-  data: string;
-  // Numeric key for the Data column, so that it does not sort as a string
-  sortValue: number;
   marker: ComponentType<MarkerProps>;
   hidden: boolean;
 }
@@ -111,127 +77,114 @@ const Dimmed = ({ dim, children }: { dim: boolean; children: ReactNode }) => (
 const toCategoryId = (type: TimeSeriesAnnotationType, label: string) =>
   `${type}_${label}`;
 
+// Separate component because Spectrum caches rows by item, so editMode must be read here to stay fresh
+const AnnotationRowActions = ({
+  annotation,
+}: {
+  annotation: TimeSeriesAnnotation;
+}) => {
+  const { editMode, hiddenIds } = useTimeSeriesState();
+  const { removeAnnotation, setAnnotationsHidden } = useTimeSeriesActions();
+  const hidden = hiddenIds.has(annotation.id);
+  const visibilityLabel = hidden ? "Show annotation" : "Hide annotation";
+
+  return (
+    <Flex>
+      <TooltipTrigger delay={350}>
+        <ActionButton
+          isQuiet
+          aria-label={visibilityLabel}
+          onPress={() => setAnnotationsHidden([annotation.id], !hidden)}
+        >
+          {hidden ? <VisibilityOff /> : <Visibility />}
+        </ActionButton>
+        <Tooltip>{visibilityLabel}</Tooltip>
+      </TooltipTrigger>
+      <TooltipTrigger delay={350}>
+        <ActionButton
+          isQuiet
+          isDisabled={!editMode}
+          aria-label="Delete annotation"
+          onPress={() => removeAnnotation(annotation.id)}
+        >
+          <Delete />
+        </ActionButton>
+        <Tooltip>Delete annotation</Tooltip>
+      </TooltipTrigger>
+    </Flex>
+  );
+};
+
 export const AnnotationsTable = () => {
-  const { annotations, categories, hiddenIds, visibleAnnotations } =
+  const { annotations, categories, editMode, hiddenIds, visibleAnnotations } =
     useTimeSeriesState();
-  const {
-    setAnnotationsHidden,
-    showAllAnnotations,
-    removeAnnotation,
-    removeAnnotations,
-  } = useTimeSeriesActions();
+  const { setAnnotationsHidden, showAllAnnotations, removeAnnotations } =
+    useTimeSeriesActions();
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>();
   const [selection, setSelection] = useState<Selection>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const entries = useMemo<TableEntry[]>(() => {
-    const entriesBuffer: TableEntry[] = [];
-    annotations.forEach((annotation) => {
-      const categoryId = toCategoryId(annotation.type, annotation.label);
-      // Fall back to a category built from the annotation itself if none is configured.
-      const category = categories.get(categoryId) ?? {
-        label: annotation.label,
-        color: "black",
-        type: annotation.type,
-      };
+  const entries: TableEntry[] = annotations.map((annotation) => ({
+    id: annotation.id,
+    annotation,
+    // Fall back to a category built from the annotation itself if none is configured.
+    category: categories.get(
+      toCategoryId(annotation.type, annotation.label),
+    ) ?? {
+      label: annotation.label,
+      color: "black",
+      type: annotation.type,
+    },
+    createdBy: displayCreatedBy(annotation),
+    marker: MARKER_ICONS[annotation.type],
+    hidden: hiddenIds.has(annotation.id),
+  }));
 
-      let data: string;
-      switch (annotation.type) {
-        case TimeSeriesAnnotationType.TIME_POINT:
-          data = `${annotation.points[0].x.toFixed(4)}`;
-          break;
-        case TimeSeriesAnnotationType.TIME_REGION: {
-          const timeRegionPoints: string[] = [];
-          annotation.points.forEach((point) => {
-            timeRegionPoints.push(`${point.x.toFixed(4)}`);
-          });
-          data = `${timeRegionPoints[0]} - ${timeRegionPoints[1]}`;
-          break;
-        }
-        case TimeSeriesAnnotationType.BOUNDING_BOX: {
-          const boundingBoxPoints: string[] = [];
-          annotation.points.forEach((point) => {
-            boundingBoxPoints.push(
-              `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`,
-            );
-          });
-          data = `${boundingBoxPoints[0]} ${boundingBoxPoints[1]}`;
-          break;
-        }
-        case TimeSeriesAnnotationType.POLYGON:
-          data = `(${annotation.points[0].x.toFixed(2)}, ${annotation.points[0].y.toFixed(2)}) [${annotation.points.length}]`;
-          break;
-        default:
-          console.warn(
-            `Could not parse data for ${annotation.type} when adding to table`,
-          );
-          data = "";
-      }
-
-      entriesBuffer.push({
-        id: annotation.id,
-        category,
-        createdBy: annotation.created_by,
-        data,
-        sortValue: annotation.points[0]?.x ?? 0,
-        marker: MARKER_ICONS[annotation.type],
-        hidden: hiddenIds.has(annotation.id),
-      });
-    });
-
-    return entriesBuffer;
-  }, [annotations, categories, hiddenIds]);
-
-  const sortedEntries = useMemo(() => {
-    if (!sortDescriptor?.column) return entries;
-    const sorted = [...entries].sort((a, b) => {
-      switch (sortDescriptor.column) {
-        case "category":
-          return a.category.label.localeCompare(b.category.label);
-        case "type":
-          return a.category.type.localeCompare(b.category.type);
-        case "createdBy":
-          return a.createdBy.localeCompare(b.createdBy);
-        case "data":
-          return a.sortValue - b.sortValue;
-        default:
-          return 0;
-      }
-    });
-    return sortDescriptor.direction === "descending"
-      ? sorted.reverse()
-      : sorted;
-  }, [entries, sortDescriptor]);
+  const compareEntries = (a: TableEntry, b: TableEntry) => {
+    switch (sortDescriptor?.column) {
+      case "label":
+        return a.category.label.localeCompare(b.category.label);
+      case "type":
+        return a.annotation.type.localeCompare(b.annotation.type);
+      case "created_by":
+        return a.createdBy.localeCompare(b.createdBy);
+      default:
+        return 0;
+    }
+  };
+  const ascendingEntries = sortDescriptor?.column
+    ? [...entries].sort(compareEntries)
+    : entries;
+  const sortedEntries =
+    sortDescriptor?.direction === "descending"
+      ? [...ascendingEntries].reverse()
+      : ascendingEntries;
 
   // Only values that some annotation in this sample has
-  const selectOptions = useMemo(() => {
-    const types = new Map<string, SelectOption>();
-    const categoryOptions = new Map<string, SelectOption>();
-    const creators = new Map<string, SelectOption>();
-    entries.forEach(({ category, createdBy }) => {
-      types.set(category.type, { key: category.type, label: category.type });
-      const id = toCategoryId(category.type, category.label);
-      categoryOptions.set(id, {
-        key: id,
-        label: `${category.label} (${category.type})`,
-      });
-      creators.set(createdBy, { key: createdBy, label: createdBy });
+  const typeOptions = new Map<string, SelectOption>();
+  const categoryOptions = new Map<string, SelectOption>();
+  const creatorOptions = new Map<string, SelectOption>();
+  entries.forEach(({ annotation, category, createdBy }) => {
+    typeOptions.set(annotation.type, {
+      key: annotation.type,
+      label: annotation.type,
     });
-    return {
-      types: [...types.values()],
-      categories: [...categoryOptions.values()],
-      creators: [...creators.values()],
-    };
-  }, [entries]);
+    const categoryId = toCategoryId(annotation.type, category.label);
+    categoryOptions.set(categoryId, {
+      key: categoryId,
+      label: `${category.label} (${annotation.type})`,
+    });
+    creatorOptions.set(annotation.created_by, {
+      key: annotation.created_by,
+      label: createdBy,
+    });
+  });
 
   // Ids of deleted annotations, or from another sample, are dropped from the selection
-  const selectedEntries = useMemo(
-    () =>
-      selection === "all"
-        ? entries
-        : entries.filter((entry) => selection.has(entry.id)),
-    [entries, selection],
-  );
+  const selectedEntries =
+    selection === "all"
+      ? entries
+      : entries.filter((entry) => selection.has(entry.id));
   const selectedIds = selectedEntries.map((entry) => entry.id);
   const selectedHiddenCount = selectedEntries.filter(
     (entry) => entry.hidden,
@@ -239,20 +192,17 @@ export const AnnotationsTable = () => {
   const selectedVisibleCount = selectedEntries.length - selectedHiddenCount;
 
   const selectMatching = (key: string) => {
-    const [field, value] = [
-      key.slice(0, key.indexOf(":")),
-      key.slice(key.indexOf(":") + 1),
-    ];
-    const matches = entries.filter((entry) => {
+    const separator = key.indexOf(":");
+    const field = key.slice(0, separator);
+    const value = key.slice(separator + 1);
+    const matches = entries.filter(({ annotation, category }) => {
       switch (field) {
         case "type":
-          return entry.category.type === value;
+          return annotation.type === value;
         case "category":
-          return (
-            toCategoryId(entry.category.type, entry.category.label) === value
-          );
-        case "createdBy":
-          return entry.createdBy === value;
+          return toCategoryId(annotation.type, category.label) === value;
+        case "created_by":
+          return annotation.created_by === value;
         default:
           return false;
       }
@@ -263,7 +213,7 @@ export const AnnotationsTable = () => {
   };
 
   return (
-    <div className="relative w-[70%] overflow-x-auto shadow-md sm:rounded-lg ml-auto mr-auto p-4">
+    <div className="relative ml-auto mr-auto w-[70%] shrink-0 overflow-x-auto px-4 pb-4 shadow-md sm:rounded-lg">
       {/* <ToolingControls /> */}
       <Flex justifyContent="center" marginBottom="size-200">
         <h1 className="text-xl font-bold">Annotations</h1>
@@ -273,18 +223,18 @@ export const AnnotationsTable = () => {
           <ActionButton isDisabled={entries.length === 0}>Select</ActionButton>
           <Menu onAction={(key) => selectMatching(String(key))}>
             <Section title="Type">
-              {selectOptions.types.map((option) => (
+              {[...typeOptions.values()].map((option) => (
                 <Item key={`type:${option.key}`}>{option.label}</Item>
               ))}
             </Section>
-            <Section title="Category">
-              {selectOptions.categories.map((option) => (
+            <Section title="Class Label">
+              {[...categoryOptions.values()].map((option) => (
                 <Item key={`category:${option.key}`}>{option.label}</Item>
               ))}
             </Section>
-            <Section title="Created by">
-              {selectOptions.creators.map((option) => (
-                <Item key={`createdBy:${option.key}`}>{option.label}</Item>
+            <Section title="Created By">
+              {[...creatorOptions.values()].map((option) => (
+                <Item key={`created_by:${option.key}`}>{option.label}</Item>
               ))}
             </Section>
           </Menu>
@@ -311,7 +261,7 @@ export const AnnotationsTable = () => {
           <Text>Show selected</Text>
         </ActionButton>
         <ActionButton
-          isDisabled={selectedEntries.length === 0}
+          isDisabled={!editMode || selectedEntries.length === 0}
           onPress={() => setConfirmDelete(true)}
         >
           <Delete />
@@ -338,72 +288,48 @@ export const AnnotationsTable = () => {
         onSelectionChange={setSelection}
       >
         <TableHeader>
-          <Column key="actions" width="10%" hideHeader>
-            Actions
+          <Column key="marker" width={56} hideHeader>
+            Marker
           </Column>
-          <Column key="marker" width="4%">
-            <></>
+          <Column key="label" allowsSorting>
+            Class Label
           </Column>
-          <Column key="category" width="20%" allowsSorting>
-            Category
-          </Column>
-          <Column key="type" width="18%" allowsSorting>
+          <Column key="type" allowsSorting>
             Type
           </Column>
-          <Column key="createdBy" width="18%" allowsSorting>
-            Created by
+          <Column key="created_by" allowsSorting>
+            Created By
           </Column>
-          <Column key="data" width="24%" allowsSorting>
-            Data
+          <Column key="actions" width={96} hideHeader align="end">
+            Actions
           </Column>
         </TableHeader>
         <TableBody items={sortedEntries}>
-          {(item: TableEntry) => {
-            const { hidden } = item;
-            return (
-              <Row key={item.id}>
-                <Cell>
-                  <Flex>
-                    <ActionButton
-                      isQuiet
-                      aria-label={
-                        hidden ? "Show annotation" : "Hide annotation"
-                      }
-                      onPress={() => setAnnotationsHidden([item.id], !hidden)}
-                    >
-                      {hidden ? <VisibilityOff /> : <Visibility />}
-                    </ActionButton>
-                    <ActionButton
-                      isQuiet
-                      aria-label="Delete annotation"
-                      onPress={() => removeAnnotation(item.id)}
-                    >
-                      <Delete />
-                    </ActionButton>
-                  </Flex>
-                </Cell>
-                <Cell>
-                  <Dimmed dim={hidden}>
-                    <Flex justifyContent="center">
+          {(item: TableEntry) => (
+            <Row key={item.id}>
+              <Cell>
+                <Dimmed dim={item.hidden}>
+                  <Flex justifyContent="center">
+                    <span role="img" aria-label={item.annotation.type}>
                       <item.marker color={item.category.color} />
-                    </Flex>
-                  </Dimmed>
-                </Cell>
-                <Cell>
-                  <Dimmed dim={hidden}>{item.category.label}</Dimmed>
-                </Cell>
-                <Cell>
-                  <Dimmed dim={hidden}>{item.category.type}</Dimmed>
-                </Cell>
-                <Cell>
-                  <Dimmed dim={hidden}>{item.createdBy}</Dimmed>
-                </Cell>
-                <Cell>
-                  <Dimmed dim={hidden}>{item.data}</Dimmed>
-                </Cell>
-              </Row>
-            );
-          }}
+                    </span>
+                  </Flex>
+                </Dimmed>
+              </Cell>
+              <Cell>
+                <Dimmed dim={item.hidden}>{item.category.label}</Dimmed>
+              </Cell>
+              <Cell>
+                <Dimmed dim={item.hidden}>{item.annotation.type}</Dimmed>
+              </Cell>
+              <Cell>
+                <Dimmed dim={item.hidden}>{item.createdBy}</Dimmed>
+              </Cell>
+              <Cell>
+                <AnnotationRowActions annotation={item.annotation} />
+              </Cell>
+            </Row>
+          )}
         </TableBody>
       </TableView>
       <DialogContainer onDismiss={() => setConfirmDelete(false)}>

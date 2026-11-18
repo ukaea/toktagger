@@ -13,7 +13,12 @@ These settings should be defined under the `[server]` heading in the TOML file:
 | host            | SERVER_HOST             | str          | localhost                               | Address of the host to launch TokTagger on.                              |
 | port            | SERVER_PORT             | int          | 8002                                    | The port to use for the TokTagger Rest API.                              |
 | reload          | SERVER_RELOAD           | bool         | False                                   | Whether to hot reload the TokTagger server on changes to files.          |
+| workers         | SERVER_WORKERS          | int          | 1                                       | The number of uvicorn worker processes to use. Linux, macOS and Windows support more than one worker. When workers is more than 1, TokTagger ignores reload. |
 | cache_dir       | SERVER_CACHE_DIR        | pathlib.Path | ~/.cache/toktagger                      | The directory to use for storing entries in the Mongita database.        |
+| forwarded_allow_ips | SERVER_FORWARDED_ALLOW_IPS | str   | 127.0.0.1                               | Comma-separated addresses of reverse proxies whose X-Forwarded-* headers TokTagger trusts. Use `*` only when the proxy is the only host that can reach TokTagger. |
+| shutdown_timeout | SERVER_SHUTDOWN_TIMEOUT | int         | 120                                     | Seconds to wait for open requests to complete when the server stops.    |
+| healthcheck_timeout | SERVER_HEALTHCHECK_TIMEOUT | int  | 60                                      | Seconds a worker can be unresponsive before uvicorn restarts it. Slow data loaders (e.g. UDA) can block a worker for longer than the uvicorn default of 5 seconds. Applies only when workers is more than 1. |
+| cors_origins    | SERVER_CORS_ORIGINS     | list[str]    | ["http://localhost:5173"]               | Browser origins that can call the API from another site. Use a JSON list in the environment variable. |
 
 ## Database Settings
 These settings should be defined under the `[database]` heading in the TOML file:
@@ -21,6 +26,35 @@ These settings should be defined under the `[database]` heading in the TOML file
 | Setting         | Environment Variable    | Type         | Default                                 | Description                                                                                 |
 |-----------------|-------------------------|--------------|-----------------------------------------|---------------------------------------------------------------------------------------------|
 | mongo_url       | DATABASE_MONGO_URL      | str          | ./toktagger_db                          | URL of the MongoDB server to connect to as a backend, by default uses local Mongita client. |
+
+## Auth Settings
+These settings should be defined under the `[auth]` heading in the TOML file:
+
+| Setting         | Environment Variable    | Type         | Default                                 | Description                                                              |
+|-----------------|-------------------------|--------------|-----------------------------------------|--------------------------------------------------------------------------|
+| provider        | AUTH_PROVIDER           | str          | canaille                                | Identity provider mode: `canaille` (TokTagger runs a local Canaille server) or `oidc` (an external provider, for example Keycloak). |
+| issuer_url      | AUTH_ISSUER_URL         | str          | None                                    | Issuer URL of the external provider. Required when `provider` is `oidc`. In `canaille` mode, TokTagger sets it. |
+| client_id       | AUTH_CLIENT_ID          | str          | toktagger                               | OpenID Connect client ID of TokTagger. |
+| client_secret   | AUTH_CLIENT_SECRET      | str          | None                                    | Client secret of TokTagger. Required when `provider` is `oidc`. |
+| scopes          | AUTH_SCOPES             | str          | openid profile email                    | Scopes that TokTagger requests at sign-in. |
+| roles_claim     | AUTH_ROLES_CLAIM        | str          | groups                                  | Claim that holds the groups of the user. Use a dotted path for a nested claim. |
+| admin_group     | AUTH_ADMIN_GROUP        | str          | toktagger-admins                        | Members of this group get the global role `admin`. |
+| public_url      | AUTH_PUBLIC_URL         | str          | None                                    | Address that browsers use to reach TokTagger. If unset, it is built from `server.host` and `server.port`. |
+| session_idle_timeout_seconds | AUTH_SESSION_IDLE_TIMEOUT_SECONDS | int | 86400                      | Time in seconds after which a browser session with no requests ends. The provider can end the session earlier. |
+| session_refresh_seconds | AUTH_SESSION_REFRESH_SECONDS | int    | 300                                     | Time in seconds after which a browser session reads the account from the provider again. A change to the groups, or a disabled account, takes effect within this time. |
+| verify_bearer_audience | AUTH_VERIFY_BEARER_AUDIENCE | bool | True                                  | Check the audience of identity provider access tokens that scripts send as Bearer tokens. |
+| canaille_port   | AUTH_CANAILLE_PORT      | int          | 8003                                    | Port of the local Canaille server. |
+| canaille_public_url | AUTH_CANAILLE_PUBLIC_URL | str      | None                                    | Address that browsers use to reach Canaille. If unset, it is built from `server.host` and `canaille_port`. |
+| canaille_ready_timeout | AUTH_CANAILLE_READY_TIMEOUT | int | 60                                   | Time in seconds to wait for the local Canaille server to start. Increase this value on slow computers. |
+| canaille_bootstrap_password | AUTH_CANAILLE_BOOTSTRAP_PASSWORD | str | None                          | Password of the first Canaille administrator. If unset, TokTagger makes a random password and prints it. |
+| secret_key      | AUTH_SECRET_KEY         | str          | None                                    | Secret key used to sign session tokens. If unset, a key is generated and persisted to `secret.key` under the server `cache_dir` on first run. Set this explicitly for multi-worker/multi-process deployments so all processes share the same signing key. |
+| cookie_name     | AUTH_COOKIE_NAME        | str          | tt_access_token                         | Name of the httpOnly cookie that holds the session token. Set to `__Host-tt_access_token` on an HTTPS-only deployment for extra hardening. |
+| cookie_secure   | AUTH_COOKIE_SECURE      | bool         | None                                    | Whether to mark the auth cookie `Secure` (HTTPS only). If unset, it is derived from the scheme of the login request, so local HTTP development works and an HTTPS deployment is hardened automatically. |
+| cookie_samesite | AUTH_COOKIE_SAMESITE    | str          | lax                                     | `SameSite` policy for the auth cookie: `lax`, `strict` or `none`. Only use `none` if the frontend is served from a different site to the API; this also forces the cookie to be `Secure`. |
+
+The server reads the request scheme to decide whether the auth cookie is `Secure`.
+If TLS is terminated by a proxy on a different host, the server sees plain HTTP and
+the cookie is sent without `Secure`. Set `AUTH_COOKIE_SECURE=true` for that topology.
 
 ## Models Settings
 

@@ -17,12 +17,19 @@ import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useEffect, useMemo, useState } from "react";
-import { Flex, View } from "@adobe/react-spectrum";
+import { useElementHeight } from "@/app/hooks/useElementHeight";
+import { useEffect, useState } from "react";
+import { View } from "@adobe/react-spectrum";
 import * as d3 from "d3";
 
 // The subplot annotations with real y values should be restricted to.
 const HEATMAP_SUBPLOT = "xy2";
+
+// Floor for the plot, also used before the container has been measured. The
+// heatmap takes the upper 80% and the integrated trace the lower 20%, so this
+// leaves them ~380px and ~95px. The plot never renders smaller than this - the
+// column scrolls instead.
+const MIN_PLOT_HEIGHT = 480;
 
 // Plotly supports a shared color axis but @types/plotly.js does not declare it.
 type ColorAxis = {
@@ -33,6 +40,10 @@ type ColorAxis = {
 };
 
 type ProfileValues = (number | null)[][];
+
+// An empty profile (signal not loaded) has no min/max, so fall back to a default.
+const finiteOr = (value: number, fallback: number) =>
+  Number.isFinite(value) ? value : fallback;
 
 const colorMapInterpolators: Record<string, (value: number) => string> = {
   Viridis: d3.interpolateViridis,
@@ -67,8 +78,14 @@ const createLinearScalePlot = (
   return {
     values,
     colorAxis: {
-      cmin: Math.max(smallPrecisionFactor, arrayMin(values.flat())),
-      cmax: Math.max(smallPrecisionFactor, arrayMax(values.flat())),
+      cmin: Math.max(
+        smallPrecisionFactor,
+        finiteOr(arrayMin(values.flat()), 0),
+      ),
+      cmax: Math.max(
+        smallPrecisionFactor,
+        finiteOr(arrayMax(values.flat()), 1),
+      ),
       colorscale: buildColorScale(interpFunc, smallPrecisionFactor),
       colorbar: { ticks: "outside", tickfont: { size: 10 } },
     },
@@ -123,8 +140,14 @@ const createLogScalePlot = (
   const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
   const rawValues = data.values as ProfileValues;
 
-  const cmin = Math.max(smallPrecisionFactor, arrayMin(rawValues.flat()));
-  const cmax = Math.max(smallPrecisionFactor, arrayMax(rawValues.flat()));
+  const cmin = Math.max(
+    smallPrecisionFactor,
+    finiteOr(arrayMin(rawValues.flat()), 0),
+  );
+  const cmax = Math.max(
+    smallPrecisionFactor,
+    finiteOr(arrayMax(rawValues.flat()), 1),
+  );
 
   const values: ProfileValues = rawValues.map((row) =>
     row.map((x) =>
@@ -137,8 +160,8 @@ const createLogScalePlot = (
   return {
     values,
     colorAxis: {
-      cmin: arrayMin(values.flat()),
-      cmax: arrayMax(values.flat()),
+      cmin: finiteOr(arrayMin(values.flat()), 0),
+      cmax: finiteOr(arrayMax(values.flat()), 1),
       colorscale: buildColorScale(interpFunc, smallPrecisionFactor),
       colorbar: {
         ticks: "outside",
@@ -184,11 +207,12 @@ const buildPlotData = (
 const buildPlotLayout = (
   colorAxis: ColorAxis,
   isDarkMode: boolean,
+  height: number,
 ): Partial<Plotly.Layout> =>
   applyGlobalStyle(
     {
       autosize: true,
-      height: window.innerHeight * 0.9,
+      height,
       xaxis: {
         title: { text: "" },
         domain: [0, 1],
@@ -255,37 +279,47 @@ export const Profile2dView = () => {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
-  // Memoised so an annotation drag doesn't tear down and rebuild the plot mid-draw.
-  const plot = useMemo(() => {
-    if (!viewData || !plotProps) return null;
-    const interpFunc =
-      colorMapInterpolators[plotProps.colorMap ?? ""] ?? d3.interpolateCividis;
-    const createPlotFunc = logScale
-      ? createLogScalePlot
-      : createLinearScalePlot;
-    return createPlotFunc(viewData, plotProps, interpFunc);
-  }, [viewData, plotProps, logScale]);
+  // Before the plot is built: the compiler won't memoise across a hook, and a rebuilt plot drops mid-draw shapes.
+  const { ref: plotAreaRef, height: plotAreaHeight } =
+    useElementHeight<HTMLDivElement>();
 
-  const plotData = useMemo<Partial<Plotly.PlotData>[]>(() => {
-    if (!viewData || !plot) return [];
-    return buildPlotData(viewData, plot.values, plotProps?.thresholdActive);
-  }, [viewData, plot, plotProps?.thresholdActive]);
+  const plot =
+    viewData && plotProps
+      ? (logScale ? createLogScalePlot : createLinearScalePlot)(
+          viewData,
+          plotProps,
+          colorMapInterpolators[plotProps.colorMap ?? ""] ??
+            d3.interpolateCividis,
+        )
+      : null;
 
-  const plotLayout = useMemo(
-    () => (plot ? buildPlotLayout(plot.colorAxis, isDarkMode) : {}),
-    [plot, isDarkMode],
-  );
+  const plotData: Partial<Plotly.PlotData>[] =
+    viewData && plot
+      ? buildPlotData(viewData, plot.values, plotProps?.thresholdActive)
+      : [];
+
+  const plotHeight = Math.max(plotAreaHeight, MIN_PLOT_HEIGHT);
+
+  const plotLayout = plot
+    ? buildPlotLayout(plot.colorAxis, isDarkMode, plotHeight)
+    : {};
 
   if (!viewData || !profileViewParams || !plot) {
     return null;
   }
 
   return (
-    <View width="100%">
-      <Flex justifyContent="center" alignItems="center">
-        <TimeSeriesProvider signalName={profileViewParams.signal_name}>
-          <Flex direction="row" flex justifyContent="space-between">
-            <Flex direction="column" flex gap="size-200">
+    <View width="100%" height="100%" minHeight={0}>
+      <TimeSeriesProvider signalName={profileViewParams.signal_name}>
+        <div className="flex h-full min-h-0 flex-row justify-between">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <div
+              ref={plotAreaRef}
+              style={{
+                flex: `1 0 ${MIN_PLOT_HEIGHT}px`,
+                minHeight: MIN_PLOT_HEIGHT,
+              }}
+            >
               <BaseTimeSeriesPlot
                 plotId="Profile2DView"
                 ariaLabel="profile-2d"
@@ -302,12 +336,12 @@ export const Profile2dView = () => {
                 <BoundingBox subplot={HEATMAP_SUBPLOT} />
                 <Polygon subplot={HEATMAP_SUBPLOT} />
               </BaseTimeSeriesPlot>
-              <AnnotationsTable />
-            </Flex>
-            <AnnotationToolbar />
-          </Flex>
-        </TimeSeriesProvider>
-      </Flex>
+            </div>
+            <AnnotationsTable />
+          </div>
+          <AnnotationToolbar />
+        </div>
+      </TimeSeriesProvider>
     </View>
   );
 };

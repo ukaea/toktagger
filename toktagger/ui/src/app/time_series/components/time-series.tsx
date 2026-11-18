@@ -6,12 +6,22 @@ import { TimeRegion } from "@/app/components/tools/timeRegion";
 import "react-contexify/ReactContexify.css";
 
 import { applyGlobalStyle, arrayMax, arrayMin } from "@/app/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { useSample } from "@/app/contexts/SampleContext";
-import { Flex, View } from "@adobe/react-spectrum";
+import { View } from "@adobe/react-spectrum";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
+import { useElementHeight } from "@/app/hooks/useElementHeight";
+
+// The traces are stacked, so each one needs its own share of the height. The
+// plot never renders smaller than this - the column scrolls instead. The
+// rangeslider takes 10% of the plot, hence the extra.
+const MIN_TRACE_HEIGHT = 105;
+const RANGESLIDER_FRACTION = 0.1;
+
+// Floor for a single trace, also used before the container has been measured.
+const MIN_PLOT_HEIGHT = 320;
 
 export const TimeSeriesView = () => {
   const { data } = useSample();
@@ -39,11 +49,11 @@ export const TimeSeriesView = () => {
 
     let plotData: Partial<Plotly.PlotData>[] = Object.entries(
       viewData.values,
-    ).map(([key, value]: [string, TimeSeriesData]) => {
+    ).map(([key, value]: [string, TimeSeriesData | null]) => {
       return {
         name: key,
-        x: value.time,
-        y: value.values,
+        x: value?.time ?? [],
+        y: value?.values ?? [],
         mode: "lines",
       };
     });
@@ -61,90 +71,106 @@ export const TimeSeriesView = () => {
     setPlotData(plotData);
   }, [data, viewData]);
 
-  const plotLayout: Partial<Plotly.Layout> = useMemo(() => {
-    let maxTime = -Infinity;
-    let minTime = Infinity;
+  // The plot grows into spare height, but never shrinks below what the stacked
+  // traces need to stay legible - the column scrolls instead.
+  const { ref: plotAreaRef, height: plotAreaHeight } =
+    useElementHeight<HTMLDivElement>();
+  const minPlotHeight = Math.max(
+    MIN_PLOT_HEIGHT,
+    Math.round(
+      (plotData.length * MIN_TRACE_HEIGHT) / (1 - RANGESLIDER_FRACTION),
+    ),
+  );
+  const plotHeight = Math.max(plotAreaHeight, minPlotHeight);
 
-    for (const trace of plotData) {
-      const xData = trace.x as number[];
-      if (xData && xData.length > 0) {
-        const traceMax = arrayMax(xData);
-        const traceMin = arrayMin(xData);
-        if (traceMax > maxTime) maxTime = traceMax;
-        if (traceMin < minTime) minTime = traceMin;
-      }
+  let maxTime = -Infinity;
+  let minTime = Infinity;
+
+  for (const trace of plotData) {
+    const xData = trace.x as number[];
+    if (xData && xData.length > 0) {
+      const traceMax = arrayMax(xData);
+      const traceMin = arrayMin(xData);
+      if (traceMax > maxTime) maxTime = traceMax;
+      if (traceMin < minTime) minTime = traceMin;
     }
+  }
 
-    const numRows = plotData.length;
-    const domainHeight = 1 / numRows;
-    // Dynamically generate y-axis domains based on numRows
-    const yAxisDomains = Array.from({ length: numRows }, (_, i) => {
-      const start = i * domainHeight;
-      const end = (i + 1) * domainHeight;
-      return [start, end];
-    });
+  const numRows = plotData.length;
+  const domainHeight = 1 / numRows;
+  // Dynamically generate y-axis domains based on numRows
+  const yAxisDomains = Array.from({ length: numRows }, (_, i) => {
+    const start = i * domainHeight;
+    const end = (i + 1) * domainHeight;
+    return [start, end];
+  });
 
-    // Build yaxis layout object dynamically
-    const yAxesLayout = yAxisDomains.reduce(
-      (acc, domain, idx) => {
-        const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
-        acc[`yaxis${axisNum}`] = {
-          domain,
-          autorange: true,
-          fixedrange: true,
-          title: {
-            text: plotData[numRows - idx - 1].name || "",
-            font: {
-              family: "Courier New, monospace",
-              size: 12,
-              color: "#7f7f7f",
-            },
-          },
-        };
-        return acc;
-      },
-      {} as Record<string, unknown>,
-    );
-
-    return applyGlobalStyle(
-      {
-        uirevision: "true",
-        //grid: { rows: 1, columns: 1, pattern: "independent" },
-        dragmode: "pan",
-        autosize: true,
-        height: window.innerHeight * 0.9,
-        xaxis: {
-          minallowed: minTime,
-          maxallowed: maxTime,
-          range: [minTime, maxTime],
-          fixedrange: false,
-          autorange: false,
-          rangeslider: { visible: true, thickness: 0.1 },
-          title: {
-            text: "Time [s]",
-            font: {
-              family: "Courier New, monospace",
-              size: 12,
-              color: "#7f7f7f",
-            },
+  // Build yaxis layout object dynamically
+  const yAxesLayout = yAxisDomains.reduce(
+    (acc, domain, idx) => {
+      const axisNum = idx === 0 ? "" : idx + 1; // yaxis, yaxis2, yaxis3, ...
+      acc[`yaxis${axisNum}`] = {
+        domain,
+        autorange: true,
+        fixedrange: true,
+        title: {
+          text: plotData[numRows - idx - 1].name || "",
+          font: {
+            family: "Courier New, monospace",
+            size: 12,
+            color: "#7f7f7f",
           },
         },
-        ...yAxesLayout,
+      };
+      return acc;
+    },
+    {} as Record<string, unknown>,
+  );
+
+  const plotLayout: Partial<Plotly.Layout> = applyGlobalStyle(
+    {
+      uirevision: "true",
+      //grid: { rows: 1, columns: 1, pattern: "independent" },
+      dragmode: "pan",
+      autosize: true,
+      height: plotHeight,
+      xaxis: {
+        minallowed: minTime,
+        maxallowed: maxTime,
+        range: [minTime, maxTime],
+        fixedrange: false,
+        autorange: false,
+        rangeslider: { visible: true, thickness: 0.1 },
+        title: {
+          text: "Time [s]",
+          font: {
+            family: "Courier New, monospace",
+            size: 12,
+            color: "#7f7f7f",
+          },
+        },
       },
-      isDarkMode,
-    );
-  }, [plotData, isDarkMode]);
+      ...yAxesLayout,
+    },
+    isDarkMode,
+  );
 
   if (!viewData) {
     return null;
   }
 
   return (
-    <View width="100%">
-      <Flex justifyContent="center" alignItems="center">
-        <TimeSeriesProvider>
-          <Flex direction="row" flex justifyContent="space-between">
-            <Flex direction="column" flex gap="size-200">
+    <View width="100%" height="100%" minHeight={0}>
+      <TimeSeriesProvider>
+        <div className="flex h-full min-h-0 flex-row justify-between">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <div
+              ref={plotAreaRef}
+              style={{
+                flex: `1 0 ${minPlotHeight}px`,
+                minHeight: minPlotHeight,
+              }}
+            >
               <BaseTimeSeriesPlot
                 plotId="TimesSeriesView"
                 plotConfig={{ data: plotData, layout: plotLayout }}
@@ -152,12 +178,12 @@ export const TimeSeriesView = () => {
                 <TimeRegion />
                 <TimePoint />
               </BaseTimeSeriesPlot>
-              <AnnotationsTable />
-            </Flex>
-            <AnnotationToolbar />
-          </Flex>
-        </TimeSeriesProvider>
-      </Flex>
+            </div>
+            <AnnotationsTable />
+          </div>
+          <AnnotationToolbar />
+        </div>
+      </TimeSeriesProvider>
     </View>
   );
 };
