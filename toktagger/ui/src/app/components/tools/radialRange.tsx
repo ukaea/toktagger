@@ -73,7 +73,9 @@ export const RadialRange = ({
   const { effectiveTimeWindow } = useRadialProfile();
   // Tooling registers once, so the draw callbacks read the latest window through a ref.
   const timeWindowRef = useRef(effectiveTimeWindow);
-  timeWindowRef.current = effectiveTimeWindow;
+  useEffect(() => {
+    timeWindowRef.current = effectiveTimeWindow;
+  }, [effectiveTimeWindow]);
 
   const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
   const dragOffset = useRef(0);

@@ -26,8 +26,9 @@ import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
 import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
+import { useElementHeight } from "@/app/hooks/useElementHeight";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Flex, View } from "@adobe/react-spectrum";
+import { View } from "@adobe/react-spectrum";
 
 const RADIAL_TOOLS = [TimeSeriesAnnotationType.BOUNDING_BOX];
 const TIME_TOOLS = [
@@ -37,6 +38,10 @@ const TIME_TOOLS = [
 // The bottom of the time plot holds a strip marking each profile time slice.
 const SLICE_STRIP_DOMAIN: [number, number] = [0, 0.08];
 const SIGNALS_DOMAIN: [number, number] = [0.12, 1];
+// The plots grow into spare height but never shrink below these - the column scrolls instead.
+const MIN_PROFILE_HEIGHT = 160;
+const MIN_RADIAL_PLOT_HEIGHT = 320;
+const MIN_TIME_PLOT_HEIGHT = 280;
 
 const AXIS_TITLE_FONT = {
   family: "Courier New, monospace",
@@ -98,8 +103,18 @@ function useIsDarkMode() {
 const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
   const { visibleSlices, sliceColor, setTimeWindow } = useRadialProfile();
   const isDarkMode = useIsDarkMode();
+  const { ref: radialAreaRef, height: radialAreaHeight } =
+    useElementHeight<HTMLDivElement>();
+  const { ref: timeAreaRef, height: timeAreaHeight } =
+    useElementHeight<HTMLDivElement>();
 
   const profileNames = useMemo(() => Object.keys(data.profiles), [data]);
+  const minRadialHeight = Math.max(
+    MIN_RADIAL_PLOT_HEIGHT,
+    profileNames.length * MIN_PROFILE_HEIGHT,
+  );
+  const radialHeight = Math.max(radialAreaHeight, minRadialHeight);
+  const timeHeight = Math.max(timeAreaHeight, MIN_TIME_PLOT_HEIGHT);
   // The first profile is on the top row, as in assignStackedYAxes.
   const axisNumber = useCallback(
     (profileIndex: number) =>
@@ -155,7 +170,7 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
     return applyGlobalStyle(
       {
         autosize: true,
-        height: window.innerHeight * Math.max(0.5, 0.3 * profileNames.length),
+        height: radialHeight,
         margin: { t: 30, b: 50 },
         showlegend: false,
         dragmode: "pan",
@@ -171,7 +186,7 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
       },
       isDarkMode,
     );
-  }, [profileNames, axisNumber, radialRanges, isDarkMode]);
+  }, [profileNames, axisNumber, radialRanges, isDarkMode, radialHeight]);
 
   const timeData = useMemo<Partial<Plotly.PlotData>[]>(() => {
     const signals = Object.entries(data.time_series).map(
@@ -214,7 +229,7 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
     return applyGlobalStyle(
       {
         autosize: true,
-        height: window.innerHeight * 0.4,
+        height: timeHeight,
         margin: { t: 10 },
         showlegend: false,
         dragmode: "pan",
@@ -239,38 +254,55 @@ const RadialProfilePlots = ({ data }: { data: RadialProfileData }) => {
       },
       isDarkMode,
     );
-  }, [data, isDarkMode]);
+  }, [data, isDarkMode, timeHeight]);
 
   return (
     <>
-      <BaseTimeSeriesPlot
-        plotId="RadialProfileRadial"
-        ariaLabel="radial-profile"
-        plotConfig={{
-          data: radialData,
-          layout: radialLayout,
-          config: RADIAL_PLOT_CONFIG,
+      <div
+        ref={radialAreaRef}
+        style={{ flex: `3 0 ${minRadialHeight}px`, minHeight: minRadialHeight }}
+      >
+        <BaseTimeSeriesPlot
+          plotId="RadialProfileRadial"
+          ariaLabel="radial-profile"
+          plotConfig={{
+            data: radialData,
+            layout: radialLayout,
+            config: RADIAL_PLOT_CONFIG,
+          }}
+          rescaleOnZoom={false}
+          tools={RADIAL_TOOLS}
+          selection="none"
+          muteHoverWhileDrawing
+        >
+          <RadialRange projection="radius" />
+        </BaseTimeSeriesPlot>
+      </div>
+      <div
+        ref={timeAreaRef}
+        style={{
+          flex: `2 0 ${MIN_TIME_PLOT_HEIGHT}px`,
+          minHeight: MIN_TIME_PLOT_HEIGHT,
         }}
-        rescaleOnZoom={false}
-        tools={RADIAL_TOOLS}
-        selection="none"
-        muteHoverWhileDrawing
       >
-        <RadialRange projection="radius" />
-      </BaseTimeSeriesPlot>
-      <BaseTimeSeriesPlot
-        plotId="RadialProfileTime"
-        ariaLabel="radial-profile-time"
-        plotConfig={{ data: timeData, layout: timeLayout, config: PLOT_CONFIG }}
-        rescaleOnZoom={false}
-        tools={TIME_TOOLS}
-        selection="x"
-        onXRangeChange={setTimeWindow}
-      >
-        <TimeRegion />
-        <TimePoint />
-        <RadialRange projection="time" />
-      </BaseTimeSeriesPlot>
+        <BaseTimeSeriesPlot
+          plotId="RadialProfileTime"
+          ariaLabel="radial-profile-time"
+          plotConfig={{
+            data: timeData,
+            layout: timeLayout,
+            config: PLOT_CONFIG,
+          }}
+          rescaleOnZoom={false}
+          tools={TIME_TOOLS}
+          selection="x"
+          onXRangeChange={setTimeWindow}
+        >
+          <TimeRegion />
+          <TimePoint />
+          <RadialRange projection="time" />
+        </BaseTimeSeriesPlot>
+      </div>
     </>
   );
 };
@@ -286,20 +318,18 @@ export const RadialProfileView = () => {
   const viewData = parsed.data;
 
   return (
-    <View width="100%">
-      <Flex justifyContent="center" alignItems="center">
-        <RadialProfileProvider data={viewData} colorMap={plotProps.colorMap}>
-          <TimeSeriesProvider>
-            <Flex direction="row" flex justifyContent="space-between">
-              <Flex direction="column" flex gap="size-100">
-                <RadialProfilePlots data={viewData} />
-                <AnnotationsTable />
-              </Flex>
-              <AnnotationToolbar />
-            </Flex>
-          </TimeSeriesProvider>
-        </RadialProfileProvider>
-      </Flex>
+    <View width="100%" height="100%" minHeight={0}>
+      <RadialProfileProvider data={viewData} colorMap={plotProps.colorMap}>
+        <TimeSeriesProvider>
+          <div className="flex h-full min-h-0 flex-row justify-between">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+              <RadialProfilePlots data={viewData} />
+              <AnnotationsTable />
+            </div>
+            <AnnotationToolbar />
+          </div>
+        </TimeSeriesProvider>
+      </RadialProfileProvider>
     </View>
   );
 };

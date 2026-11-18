@@ -1,12 +1,13 @@
 import numpy as np
 import xarray as xr
+
 from toktagger.api.core.annotators import compute_stft
 from toktagger.api.schemas.data import (
-    Profile2DData,
-    MultiVariateTimeSeriesData,
+    Data,
     MultiProfile2DData,
     MultiSignalData,
-    Data,
+    MultiVariateTimeSeriesData,
+    Profile2DData,
     RadialProfileData,
     TimeSeriesData,
 )
@@ -40,7 +41,7 @@ class Profile2DView:
             dim_1 = np.array(data.dim_1)
             values = np.array(data.values).T  # (time, dim_1) -> (dim_1, time)
         else:
-            raise RuntimeError(f"Unsupported data type for Profile2DView: {type(data)}")
+            raise TypeError(f"Unsupported data type for Profile2DView: {type(data)}")
 
         # Clip to time/frequency range
         time_min = (
@@ -76,7 +77,7 @@ class Profile2DView:
         )
 
         ds = xr.DataArray(
-            values, coords=dict(dim_1=dim_1, time=time), dims=["dim_1", "time"]
+            values, coords={"dim_1": dim_1, "time": time}, dims=["dim_1", "time"]
         )
         ds = ds.sel(time=slice(time_min, time_max))
         ds = ds.sel(dim_1=slice(dim_1_min, dim_1_max))
@@ -97,9 +98,7 @@ class Profile2DView:
         profile_data = data.values.get(self.params.signal_name, None)
 
         if profile_data is None:
-            raise RuntimeError(
-                f"Profile data for {self.params.signal_name} does not exist."
-            )
+            return Profile2DData(time=[], dim_1=[], values=[])
 
         return self.convert_profile_to_view(profile_data)
 

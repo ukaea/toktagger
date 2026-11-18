@@ -72,5 +72,6 @@ class SyntheticRadialLoader(DataLoader):
         assert isinstance(sample.data, ShotData)
         signals = synthetic_signals()
         return _combine_signals(
-            {name: signals.get(name) for name in sample.data.signal_names}
+            {name: signals.get(name) for name in sample.data.signal_names},
+            "Could not load any synthetic radial signals.",
         )
