@@ -58,6 +58,10 @@ class Sample(SampleBase):
     project_id: str
 
 
+class SampleWithAnnotationCount(Sample):
+    annotation_count: int
+
+
 class SampleUpdate(ConfiguredModel):
     validated_annotations: bool | None = None
 
