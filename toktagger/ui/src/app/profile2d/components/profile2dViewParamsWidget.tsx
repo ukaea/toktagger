@@ -15,7 +15,7 @@ import {
   Picker,
   Switch,
 } from "@adobe/react-spectrum";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 // Matches the backend STFTParams defaults.
 const DEFAULT_STFT_PARAMS: STFTParams = {
@@ -53,17 +53,15 @@ export function Profile2DViewParamsWidget() {
     initialParams?.dim_1_max,
   );
 
-  const signalNames = useMemo(() => getSignalNames(sample), [sample]);
-  const isSpectrogram = useMemo(
-    () => SpectrogramDataSchema.safeParse(data).success,
-    [data],
-  );
+  const signalNames = getSignalNames(sample);
+  const firstSignal = signalNames[0];
+  const isSpectrogram = SpectrogramDataSchema.safeParse(data).success;
 
   useEffect(() => {
-    if (signalNames.length > 0 && !selectedSignal) {
-      setSelectedSignal(signalNames[0]);
+    if (firstSignal && !selectedSignal) {
+      setSelectedSignal(firstSignal);
     }
-  }, [signalNames, selectedSignal]);
+  }, [firstSignal, selectedSignal]);
 
   useEffect(() => {
     if (!selectedSignal) return;
