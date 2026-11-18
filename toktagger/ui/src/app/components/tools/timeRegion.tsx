@@ -26,7 +26,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
     setOngoingAction,
     selectAnnotations,
   } = useTimeSeriesActions();
-  const { annotations, forceUpdate, isDrawing, categories, editMode } =
+  const { visibleAnnotations, forceUpdate, isDrawing, categories, editMode } =
     useTimeSeriesState();
 
   const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -242,7 +242,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
       }
 
       // Create a line and a transparent drag handle for each VSpan
-      for (const zone of annotations) {
+      for (const zone of visibleAnnotations) {
         if (zone.type !== TimeSeriesAnnotationType.TIME_REGION) continue;
         const opacity = zone.selected ? 0.8 : 0.5;
 
@@ -336,7 +336,7 @@ export const TimeRegion = ({ plotId, plotReady }: ToolingProps) => {
       }
     });
   }, [
-    annotations,
+    visibleAnnotations,
     isDrawing,
     plotId,
     plotReady,

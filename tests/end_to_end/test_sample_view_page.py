@@ -926,6 +926,81 @@ def test_show_others_preference_survives_reload(server_setup, admin_token, brows
     user_page.context.close()
 
 
+def test_annotations_table_sort_and_hide(server_setup, page: Page):
+    # One "Flat Top" TIME REGION from peak_detection, one "Disruption" TIME POINT drawn manually
+    page, _, _ = setup_annotations(page, 2)
+    table = page.get_by_role("grid", name="Annotations table")
+    # Row 0 is the header row
+    first_row = table.get_by_role("row").nth(1)
+
+    table.get_by_role("columnheader", name="Class Label").click()
+    expect(first_row).to_contain_text("Disruption")
+    table.get_by_role("columnheader", name="Class Label").click()
+    expect(first_row).to_contain_text("Flat Top")
+
+    table.get_by_role("columnheader", name="Created By").click()
+    expect(first_row).to_contain_text("admin")
+
+    # The Select menu lists only the values that the annotations have
+    page.get_by_role("button", name="Select", exact=True).click()
+    menu = page.get_by_role("menu")
+    expect(menu.get_by_role("menuitem")).to_have_count(6)
+    expect(menu.get_by_role("menuitem", name="Disruption (TIME POINT)")).to_be_visible()
+    expect(menu.get_by_role("menuitem", name="Flat Top (TIME REGION)")).to_be_visible()
+
+    # Hide all time points through the selection
+    menu.get_by_role("menuitem", name="TIME POINT", exact=True).click()
+    page.get_by_role("button", name="Hide selected").click()
+    expect(page.get_by_label("time-point", exact=True)).to_have_count(0)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
+    expect(page.get_by_text("Showing 1 of 2")).to_be_visible()
+    expect(page.get_by_role("button", name="Hide selected")).to_be_disabled()
+
+    # Hide the remaining annotation from its own row
+    page.get_by_role("button", name="Hide annotation").click()
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(0)
+    expect(page.get_by_text("Showing 0 of 2")).to_be_visible()
+
+    page.get_by_role("button", name="Show selected").click()
+    expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
+    expect(page.get_by_text("Showing 1 of 2")).to_be_visible()
+
+    page.get_by_role("button", name="Show all").click()
+    expect(page.get_by_text("Showing 2 of 2")).to_be_visible()
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
+
+
+def test_annotations_table_delete(server_setup, page: Page):
+    # One "Flat Top" TIME REGION, one "Disruption" TIME POINT, plus a second TIME POINT
+    page, _, _ = setup_annotations(page, 2)
+    page.get_by_label("time-series").click(button="left", modifiers=["Control"])
+    table = page.get_by_role("grid", name="Annotations table")
+    expect(page.get_by_text("Showing 3 of 3")).to_be_visible()
+
+    # Select by type also picks hidden rows
+    point_rows = table.get_by_role("row").filter(has_text="TIME POINT")
+    point_rows.first.get_by_role("button", name="Hide annotation").click()
+    page.get_by_role("button", name="Select", exact=True).click()
+    page.get_by_role("menuitem", name="TIME POINT", exact=True).click()
+    expect(page.get_by_role("button", name="Delete selected (2)")).to_be_visible()
+
+    # Rows can also be selected and cleared one by one
+    point_rows.last.get_by_role("checkbox").uncheck()
+    table.get_by_role("row").filter(has_text="Flat Top").get_by_role("checkbox").check()
+    page.get_by_role("button", name="Delete selected (2)").click()
+    dialog = page.get_by_role("alertdialog")
+    expect(dialog).to_contain_text("Delete 2 annotations?")
+    expect(dialog).to_contain_text("1 of them are hidden")
+    dialog.get_by_role("button", name="Delete").click()
+    expect(page.get_by_text("Showing 1 of 1")).to_be_visible()
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(0)
+    expect(page.get_by_role("button", name="Delete selected (0)")).to_be_disabled()
+
+    # The row button deletes one annotation
+    table.get_by_role("button", name="Delete annotation").click()
+    expect(page.get_by_text("Showing 0 of 0")).to_be_visible()
+
+
 @pytest.mark.parametrize(
     ("query_strategy", "expected_order", "sort_by", "sort_direction"),
     [

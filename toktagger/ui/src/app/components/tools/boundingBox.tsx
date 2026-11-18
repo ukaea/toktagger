@@ -34,7 +34,7 @@ export const BoundingBox = ({ plotId, plotReady, subplot }: ToolingProps) => {
     setOngoingAction,
     selectAnnotations,
   } = useTimeSeriesActions();
-  const { annotations, forceUpdate, isDrawing, categories, editMode } =
+  const { visibleAnnotations, forceUpdate, isDrawing, categories, editMode } =
     useTimeSeriesState();
 
   const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -315,7 +315,7 @@ export const BoundingBox = ({ plotId, plotReady, subplot }: ToolingProps) => {
       };
 
       // Create a line and a transparent drag handle for each VSpan
-      for (const boundingBox of annotations) {
+      for (const boundingBox of visibleAnnotations) {
         if (boundingBox.type !== TimeSeriesAnnotationType.BOUNDING_BOX)
           continue;
         const opacity = boundingBox.selected ? 0.8 : 0.5;
@@ -458,7 +458,7 @@ export const BoundingBox = ({ plotId, plotReady, subplot }: ToolingProps) => {
       }
     });
   }, [
-    annotations,
+    visibleAnnotations,
     isDrawing,
     plotId,
     plotReady,

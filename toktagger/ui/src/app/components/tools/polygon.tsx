@@ -33,7 +33,7 @@ export const Polygon = ({ plotId, plotReady, subplot }: ToolingProps) => {
     setOngoingAction,
     selectAnnotations,
   } = useTimeSeriesActions();
-  const { annotations, forceUpdate, isDrawing, categories, editMode } =
+  const { visibleAnnotations, forceUpdate, isDrawing, categories, editMode } =
     useTimeSeriesState();
 
   const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
@@ -344,7 +344,7 @@ export const Polygon = ({ plotId, plotReady, subplot }: ToolingProps) => {
             }
           });
 
-      for (const polygon of annotations) {
+      for (const polygon of visibleAnnotations) {
         if (polygon.type !== TimeSeriesAnnotationType.POLYGON) continue;
         const opacity = polygon.selected ? 0.8 : 0.5;
         const pointerEvent = isDrawing || !editMode ? "none" : "all";
@@ -461,7 +461,7 @@ export const Polygon = ({ plotId, plotReady, subplot }: ToolingProps) => {
       }
     });
   }, [
-    annotations,
+    visibleAnnotations,
     isDrawing,
     plotId,
     plotReady,
