@@ -2,9 +2,7 @@
  * The annotations table below the frame, with one row per instance (class label + track ID).
  * It only talks to the session, never to Annotorious directly.
  */
-"use client";
-
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActionButton,
   ActionGroup,
@@ -110,7 +108,6 @@ function useSelectInstance() {
     setSelection({
       className: instance.className,
       trackId: canonicalizeTrackId(instance.trackId),
-      source: "explicit",
     });
     setVideoLastClassName(instance.className);
     requestFocusInstance(instance.className, instance.trackId, focus);
@@ -177,22 +174,17 @@ export const VideoAnnotationsTable = () => {
     null,
   );
 
-  const rows = useMemo<TableRow[]>(
-    () =>
-      session.instances
-        .filter(
-          (instance) =>
-            scope === "all" || instance.frames.includes(session.frame),
-        )
-        .map((instance) => ({
-          id: makeTrackKey(
-            instance.className,
-            canonicalizeTrackId(instance.trackId),
-          ),
-          instance,
-        })),
-    [session.instances, session.frame, scope],
-  );
+  const rows: TableRow[] = session.instances
+    .filter(
+      (instance) => scope === "all" || instance.frames.includes(session.frame),
+    )
+    .map((instance) => ({
+      id: makeTrackKey(
+        instance.className,
+        canonicalizeTrackId(instance.trackId),
+      ),
+      instance,
+    }));
 
   const { className, trackId } = session.selection;
   const selectedKeys =
@@ -204,7 +196,7 @@ export const VideoAnnotationsTable = () => {
     const row = rows.find((candidate) => keys.has(candidate.id));
     // Deselecting a row keeps the class but stops continuing its track
     if (!row) {
-      session.setSelection({ className, trackId: null, source: "explicit" });
+      session.setSelection({ className, trackId: null });
       session.closePopup();
       return;
     }

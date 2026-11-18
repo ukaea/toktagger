@@ -83,6 +83,7 @@ export const VideoBoundingBoxSchema = VideoAnnotationBaseSchema.extend({
 });
 
 export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;
+export type VideoBoundingBoxInput = z.input<typeof VideoBoundingBoxSchema>;
 
 const PolygonCoordinatesSchema = z
   .array(z.number())
@@ -111,6 +112,7 @@ export const VideoPolygonSchema = VideoAnnotationBaseSchema.extend({
 });
 
 export type VideoPolygon = z.infer<typeof VideoPolygonSchema>;
+export type VideoPolygonInput = z.input<typeof VideoPolygonSchema>;
 
 export const VideoPointSchema = VideoAnnotationBaseSchema.extend({
   type: z.literal("video_point"),
@@ -119,6 +121,15 @@ export const VideoPointSchema = VideoAnnotationBaseSchema.extend({
 });
 
 export type VideoPoint = z.infer<typeof VideoPointSchema>;
+export type VideoPointInput = z.input<typeof VideoPointSchema>;
+
+export const VideoShapeSchema = z.discriminatedUnion("type", [
+  VideoBoundingBoxSchema,
+  VideoPolygonSchema,
+  VideoPointSchema,
+]);
+
+export type VideoShapeInput = z.input<typeof VideoShapeSchema>;
 
 export const AnnotationSchema = z.union([
   TimePointSchema,

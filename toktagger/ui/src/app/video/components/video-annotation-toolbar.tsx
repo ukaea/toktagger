@@ -1,8 +1,6 @@
 /**
  * The right-hand annotation toolbar: the Edit/View Mode button, the four tool buttons and Reset View.
  */
-"use client";
-
 import {
   ActionButton,
   Button,
@@ -51,7 +49,7 @@ export function VideoAnnotationToolbar(props: { desiredFrame: number }) {
     const next = drawingTool === tool ? null : tool;
     // A track keeps its annotation type, so picking a tool here starts a new track
     if (next && selection.trackId) {
-      setSelection({ ...selection, trackId: null, source: "explicit" });
+      setSelection({ ...selection, trackId: null });
     }
     setDrawingTool(next);
   };
