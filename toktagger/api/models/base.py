@@ -1,27 +1,49 @@
-from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas.annotations import Annotation, AnnotationBase
-from toktagger.api.schemas.projects import Project, Task
-from toktagger.api.schemas.data import DataParamTypes
-from toktagger.api.core.data_loaders import DataLoader
-from sklearn.model_selection import train_test_split
-from abc import ABC, abstractmethod
 import inspect
-import typing
-import math
-from toktagger.api.core.sender import send_model_updates
-from toktagger.api.schemas.models import ModelUpdate
-import pydantic
-import uuid
-from collections import OrderedDict
 import logging
+import math
 import pathlib
+import typing
+import uuid
+from abc import ABC, abstractmethod
+from collections import OrderedDict
 
+import pydantic
+from sklearn.model_selection import train_test_split
+
+from toktagger.api.core.data_loaders import DataLoader
+from toktagger.api.core.sender import send_model_updates
 from toktagger.api.models import models_dependencies_installed
+from toktagger.api.schemas.annotations import Annotation, AnnotationBase
+from toktagger.api.schemas.data import DataParamTypes
+from toktagger.api.schemas.models import ModelUpdate
+from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.schemas.samples import Sample
 
 logger = logging.getLogger("ray")
 
 if models_dependencies_installed():
     import ray
+else:
+
+    class _RayStub:
+        @staticmethod
+        def remote(*args, **kwargs):
+            if len(args) == 1 and not kwargs and callable(args[0]):
+                return args[0]
+
+            def decorator(target):
+                return target
+
+            return decorator
+
+        class ObjectRef:
+            pass
+
+        @staticmethod
+        def get_actor(name):
+            raise RuntimeError("Ray not installed")
+
+    ray = _RayStub()  # type: ignore[assignment]
 
 
 # Recursively walk through schema, finding things which need to be changed
@@ -88,7 +110,7 @@ class Model(ABC):
         self.project = project
         self.model = self.define_model()
         loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
-        data_loader: typing.Type[DataLoader] = ray.get(
+        data_loader: type[DataLoader] = ray.get(
             loader_registry.get.remote(project.data_loader)
         )
         self.data_loader: DataLoader = data_loader()
@@ -164,7 +186,7 @@ class Model(ABC):
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
+        train_val_test_split: tuple[float, float, float],
     ) -> None:
         """Split annotations into training, validation and testing sets.
 
@@ -246,7 +268,6 @@ class Model(ABC):
     @abstractmethod
     def define_model(self) -> typing.Any:
         """Define and return your model architecture here."""
-        pass
 
     @abstractmethod
     def train(
@@ -271,7 +292,6 @@ class Model(ABC):
         float
             The score of the trained model, such as accuracy or loss.
         """
-        pass
 
     @abstractmethod
     def predict(
@@ -296,7 +316,6 @@ class Model(ABC):
         list[list[AnnotationBase]]
             A list of predicted annotations for each sample
         """
-        pass
 
     @abstractmethod
     def save(self, results_dir: pathlib.Path) -> None:
@@ -307,7 +326,6 @@ class Model(ABC):
         results_dir : pathlib.Path
             The path to a directory in the model cache where your model weights and accompanying information should be saved.
         """
-        pass
 
     @abstractmethod
     def load(
@@ -323,7 +341,6 @@ class Model(ABC):
             The name of the weights file within the above directory to load, by default None
             Note that this is optional, but should take precedence if provided.
         """
-        pass
 
     @abstractmethod
     def weights_exist(self, results_dir: pathlib.Path) -> bool:
@@ -343,22 +360,22 @@ class Model(ABC):
 
 
 class ModelRegistry:
-    _registry: dict[str, typing.Type[Model]] = {}
-    _tasks: dict[str, list[Task]] = {}
-    _training_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
-    _prediction_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
+    _registry: typing.ClassVar[dict[str, type[Model]]] = {}
+    _tasks: typing.ClassVar[dict[str, list[Task]]] = {}
+    _training_params: typing.ClassVar[dict[str, type[pydantic.BaseModel]]] = {}
+    _prediction_params: typing.ClassVar[dict[str, type[pydantic.BaseModel]]] = {}
 
     @classmethod
     def register(
         cls,
         name: str,
         tasks: list[Task | str],
-        training_params: typing.Type[pydantic.BaseModel] | None = None,
-        prediction_params: typing.Type[pydantic.BaseModel] | None = None,
+        training_params: type[pydantic.BaseModel] | None = None,
+        prediction_params: type[pydantic.BaseModel] | None = None,
     ):
-        def decorator(model_class: typing.Type[Model]):
+        def decorator(model_class: type[Model]):
             if not issubclass(model_class, Model):
-                raise ValueError(
+                raise TypeError(
                     f"Loader '{name}' does not inherit from Model base class."
                 )
             if training_params and not issubclass(training_params, pydantic.BaseModel):
@@ -383,13 +400,13 @@ class ModelRegistry:
 
     @classmethod
     def get(cls, name: str):
-        model_class: typing.Type[Model] | None = cls._registry.get(name)
+        model_class: type[Model] | None = cls._registry.get(name)
         if not model_class:
             raise ValueError(f"No Model class called '{name}' found in registry!")
         return ray.remote(model_class)
 
     @classmethod
-    def get_name(cls, model_class: typing.Type[Model]) -> str:
+    def get_name(cls, model_class: type[Model]) -> str:
         return next(
             name for name, model in cls._registry.items() if model_class == model
         )
@@ -410,9 +427,9 @@ class ModelRegistry:
     @classmethod
     def get_params(
         cls, name: str, schema_type: typing.Literal["training", "prediction"]
-    ) -> typing.Type[pydantic.BaseModel] | None:
+    ) -> type[pydantic.BaseModel] | None:
         if schema_type == "training":
-            params: typing.Type[pydantic.BaseModel] | None = cls._training_params.get(
+            params: type[pydantic.BaseModel] | None = cls._training_params.get(
                 name, False
             )
         elif schema_type == "prediction":
@@ -456,9 +473,7 @@ class ModelRegistry:
             The JSONSchema of the params model, if required.
         """
 
-        params: typing.Type[pydantic.BaseModel] | None = cls.get_params(
-            name, schema_type
-        )
+        params: type[pydantic.BaseModel] | None = cls.get_params(name, schema_type)
         if not params:
             return None
 
@@ -470,116 +485,152 @@ class ModelRegistry:
         return walk_schema(schema)
 
 
-if models_dependencies_installed():
+@ray.remote(num_cpus=0.1)
+class WorkerRegistry:
+    def __init__(self, registry):
+        self._registry: dict[str, Model | DataLoader] = registry
 
-    @ray.remote(num_cpus=0.1)
-    class WorkerRegistry:
-        def __init__(self, registry):
-            self._registry = registry
+    def get(self, name):
+        registered: Model | DataLoader | None = self._registry.get(name)
+        if not registered:
+            raise ValueError(f"No class called '{name}' found in registry!")
+        return registered
 
-        def get(self, name):
-            registered = self._registry.get(name)
-            if not registered:
-                raise ValueError(f"No class called '{name}' found in registry!")
-            return registered
 
-    class ActorRegistry:
-        """Registry to keep track of Ray actors, and the task they are associated with."""
+@ray.remote(num_cpus=0.1)
+class ActorRegistry:
+    """Registry to keep track of Ray actors, and the task they are associated with.
 
-        def __init__(self, max_actors: int, max_gpu_actors: int):
-            """Create task registry
+    Runs as a single named, detached Ray actor shared by all uvicorn workers,
+    so actor limits and task IDs are tracked cluster-wide rather than
+    independently per worker process.
+    """
 
-            Parameters
-            ----------
-            max_actors : int
-                Maximum number of actors to keep alive simultaneously
-            max_gpu_actors : int
-                Maximum number of GPU actors to keep alive simultaneously
-            """
+    def __init__(self, max_actors: int, max_gpu_actors: int):
+        """Create task registry
 
-            if max_actors < 1:
-                raise ValueError(
-                    "Insufficient CPU cores available for ML model functionality"
-                )
+        Parameters
+        ----------
+        max_actors : int
+            Maximum number of actors to keep alive simultaneously
+        max_gpu_actors : int
+            Maximum number of GPU actors to keep alive simultaneously
+        """
 
-            self.gpu_enabled = True if max_gpu_actors > 0 else False
-            self.max_actors = max_actors
-            self.max_gpu_actors = max_gpu_actors
-            self.tasks = {}
-            self.actors = OrderedDict()
+        if max_actors < 1:
+            raise ValueError(
+                "Insufficient CPU cores available for ML model functionality"
+            )
 
-        def register(self, task_ref: ray.ObjectRef) -> str:
-            """Store a Ray task reference in the registry and associate with a UUID.
+        self._gpu_enabled = max_gpu_actors > 0
+        self.max_actors = max_actors
+        self.max_gpu_actors = max_gpu_actors
+        self.tasks = {}
+        self.actors = OrderedDict()
 
-            Parameters
-            ----------
-            task_ref : ray.ObjectRef
-                The reference to the Ray task
+    def gpu_enabled(self) -> bool:
+        return self._gpu_enabled
 
-            Returns
-            -------
-            str
-                A unique identifier for this task
-            """
-            task_id = str(uuid.uuid4())
-            self.tasks[task_id] = task_ref
-            return task_id
+    def list_actors(self) -> list[str]:
+        return list(self.actors.keys())
 
-        def get(self, task_id: str) -> ray.ObjectRef | None:
-            """Convert a task ID back into the Ray task reference
+    def register(
+        self, task_ref: list[ray.ObjectRef], task_id: str | None = None
+    ) -> str:
+        """Store a Ray task reference in the registry and associate with an ID.
 
-            Parameters
-            ----------
-            task_id : str
-                The unique identifier for this task
+        Parameters
+        ----------
+        task_ref : list[ray.ObjectRef]
+            The task reference, wrapped in a list. Ray resolves a bare ObjectRef
+            passed to a remote call as a dependency and blocks until it finishes,
+            which would defeat polling it later via is_ready/get_result; a list
+            keeps it opaque to that.
+        task_id : str | None
+            The ID to store the task under, generated automatically if not given
 
-            Returns
-            -------
-            ray.ObjectRef | None
-                The Ray task reference, if it exists in the Registry
-            """
-            return self.tasks.get(task_id)
+        Returns
+        -------
+        str
+            The identifier for this task
+        """
+        task_id = task_id or str(uuid.uuid4())
+        self.tasks[task_id] = task_ref[0]
+        return task_id
 
-        def update_actors(self, actor_name: str, use_gpu: bool) -> None:
-            """Record that a Ray Actor has been accessed, and kill any stale Actors.
+    def is_ready(self, task_id: str) -> bool | None:
+        """Non-blocking check of whether a task has finished.
 
-            Parameters
-            ----------
-            actor_name : str
-                The name of the Ray Actor
-            """
-            # Set this actor to be the most recently used
-            if actor_name in self.actors:
-                self.actors.move_to_end(actor_name)
-            else:
-                self.actors[actor_name] = use_gpu
+        Runs inside the actor because Ray auto-dereferences any ObjectRef this
+        method would otherwise hand back across the actor boundary.
 
-            if not self.actors[actor_name] and use_gpu:
-                # CPU actor may be upgraded to GPU (but not other way round)
-                self.actors[actor_name] = use_gpu
+        Returns
+        -------
+        bool | None
+            True/False if the task is known, None if task_id isn't registered
+        """
+        task_ref = self.tasks.get(task_id)
+        if task_ref is None:
+            return None
+        ready, _ = ray.wait([task_ref], timeout=0)
+        return bool(ready)
 
-            stale_actor = None
-            # Check GPU limit first
-            gpu_count = sum(1 for gpu in self.actors.values() if gpu)
-            if self.gpu_enabled and gpu_count > self.max_gpu_actors:
-                # Find first actor which requires GPU
-                stale_actor = next(
-                    (actor for actor, gpu in self.actors.items() if gpu), None
-                )
-                if not stale_actor:
-                    raise ValueError(
-                        "GPU count exceeds maximum, but no GPU actor found!"
-                    )
-                self.actors.pop(stale_actor)
+    def get_result(self, task_id: str):
+        """Blocking fetch of a finished task's result (raises if the task raised)."""
+        return ray.get(self.tasks[task_id])
 
-            # Then check overall tasks limit
-            elif len(self.actors) > self.max_actors:
-                stale_actor, _ = self.actors.popitem(last=False)
+    def cancel(self, task_id: str) -> None:
+        """Cancel a registered task, if it exists.
 
-            if stale_actor:
-                try:
-                    actor = ray.get_actor(stale_actor)
-                    # Queue a kill job, letting any other in progress tasks finish first
-                    actor.__ray_terminate__.remote()
-                except ValueError:
-                    return
+        Forces the cancel: a cooperative one only raises at the task's next
+        bytecode instruction, which never arrives for a task blocked in a
+        C-level call (e.g. time.sleep), leaving its worker slot stuck.
+        """
+        task_ref = self.tasks.get(task_id)
+        if task_ref is not None:
+            ray.cancel(task_ref, force=True)
+
+    def update_actors(self, actor_name: str, use_gpu: bool) -> None:
+        """Record that a Ray Actor has been accessed, and kill any stale Actors.
+
+        Parameters
+        ----------
+        actor_name : str
+            The name of the Ray Actor
+        """
+        if use_gpu and not self._gpu_enabled:
+            raise ValueError("GPU requested but GPU support is not enabled on server")
+
+        # Set this actor to be the most recently used
+        if actor_name in self.actors:
+            self.actors.move_to_end(actor_name)
+        else:
+            self.actors[actor_name] = use_gpu
+
+        if not self.actors[actor_name] and use_gpu:
+            # CPU actor may be upgraded to GPU (but not other way round)
+            self.actors[actor_name] = use_gpu
+
+        stale_actor = None
+        # Check GPU limit first
+        gpu_count = sum(1 for gpu in self.actors.values() if gpu)
+        if self._gpu_enabled and gpu_count > self.max_gpu_actors:
+            # Find first actor which requires GPU
+            stale_actor = next(
+                (actor for actor, gpu in self.actors.items() if gpu), None
+            )
+            if not stale_actor:
+                raise ValueError("GPU count exceeds maximum, but no GPU actor found!")
+            self.actors.pop(stale_actor)
+
+        # Then check overall tasks limit
+        elif len(self.actors) > self.max_actors:
+            stale_actor, _ = self.actors.popitem(last=False)
+
+        if stale_actor:
+            try:
+                actor = ray.get_actor(stale_actor)
+                # Queue a kill job, letting any other in progress tasks finish first
+                actor.__ray_terminate__.remote()
+            except ValueError:
+                return

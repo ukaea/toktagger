@@ -2,47 +2,46 @@ import pytest
 
 pytest.importorskip("ray")
 
-import pathlib
-from toktagger.api.schemas.annotations import TimePointBatch
-from toktagger.api.schemas.models import (
-    ModelIn,
-    ModelUpdate,
-    GitlabLoadParams,
-    HuggingfaceLoadParams,
-)
-from toktagger.api.models.base import ActorRegistry
-from toktagger.api.core.sender import (
-    send_batch_samples,
-    send_batch_predictions,
-    send_model_updates,
-)
-import ray
-from unittest.mock import patch
-from bson import ObjectId
-import tempfile
 import asyncio
-import toktagger.api.config as config
+import pathlib
+import tempfile
+import time
+from unittest.mock import patch
+
+import ray
+from bson import ObjectId
+
 import tests.db_definitions as db_definitions
 import tests.models_definitions as models_definitions
+from tests.db_definitions import TEST_ISSUER, USER_ADMIN_ID
+from tests.identity import get_auth_token, session_headers
+from toktagger.api import config
+from toktagger.api.core.sender import send_model_updates
+from toktagger.api.routers import models as models_router
+from toktagger.api.schemas.annotations import TimePointBatch
+from toktagger.api.schemas.users import UserIn
+from toktagger.api.schemas.models import (
+    ModelIn,
+    GitlabLoadParams,
+    HuggingfaceLoadParams,
+    ModelUpdate,
+)
 
 
-def wait_for_results(task_registry: ActorRegistry, task_id: str):
-    task = task_registry.get(task_id)
-    results = ray.get(task, timeout=120)
-    return results
+def wait_for_results(
+    task_registry: ray.actor.ActorHandle, task_id: str, timeout: float = 30
+):
+    deadline = time.monotonic() + timeout
+    while not ray.get(task_registry.is_ready.remote(task_id)):
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"Task {task_id} did not complete within {timeout}s")
+        time.sleep(0.1)
+    return ray.get(task_registry.get_result.remote(task_id))
 
 
 async def collect_predict_results(models_api_client, task_id):
-    results = wait_for_results(models_api_client.app.state.task_registry, task_id)
-    with patch("requests.put", models_api_client.put):
-        response = await send_batch_samples(
-            results["project_id"], results["samples_batch"]
-        )
-        assert response.status_code == 200
-        response = await send_batch_predictions(
-            results["project_id"], results["model_id"], results["predictions_batch"]
-        )
-        assert response.status_code == 200
+    wait_for_results(models_api_client.app.state.task_registry, task_id)
+    await asyncio.gather(*models_router._prediction_writes)
 
 
 async def collect_train_results(models_api_client, task_id):
@@ -82,6 +81,9 @@ async def test_model_batch_predict_num_predictions(
 
     # Check latest version of model has been used by default (annotation label set to model ID in Mock)
     assert all(ann["label"] == setup_model_db["model_id_2"] for ann in annotations)
+
+    # Worker predictions must be stamped "model::<type>", not the raw type (see test_model_auth.py).
+    assert all(ann["created_by"] == "model::mock_disruption_cnn" for ann in annotations)
 
 
 @pytest.mark.asyncio
@@ -237,10 +239,9 @@ async def test_model_sample_predict(models_api_client, db_client, setup_model_db
     # Check it corresponds to sample ID we asked for predictions on
     assert str(annotations[0]["sample_id"]) == setup_model_db["sample_ids"][-1]
 
-    # Predictions are attributed to the model name, not its type
-    assert annotations[0]["created_by"] == models_definitions.MODEL_2.name
+    assert annotations[0]["created_by"] == "model::mock_disruption_cnn"
 
-    # And identified by that model's unique ID
+    # Predictions are identified by the producing model's unique ID
     assert annotations[0]["model_id"] == setup_model_db["model_id_2"]
 
 
@@ -263,8 +264,7 @@ async def test_model_sample_predict_version(
     # Check version 1 of model has been used (annotation label set to model ID in Mock)
     assert annotations[0]["label"] == setup_model_db["model_id_1"]
 
-    # This version has no name of its own, so it falls back to the model type
-    assert annotations[0]["created_by"] == models_definitions.MODEL_1.type
+    assert annotations[0]["created_by"] == "model::mock_disruption_cnn"
 
     assert annotations[0]["model_id"] == setup_model_db["model_id_1"]
 
@@ -319,6 +319,89 @@ async def test_model_sample_predict_replaces_previous_run(
     # Repeated runs replace rather than stack up
     assert len(annotations) == 1
     assert annotations[0]["_id"] != first_run[0]["_id"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_predict_endpoint_survives_same_named_human_save(
+    models_api_client, db_client, setup_model_db
+):
+    """A real prediction from the /predict endpoint (created_by="model::mock_disruption_cnn")
+    must survive a human user named "mock_disruption_cnn" saving their own
+    annotation for the same sample — the "model::" prefix is the namespace
+    separator that prevents the collision from corrupting either author's data.
+
+    Unlike test_user_save_does_not_corrupt_prefixed_predictions in
+    test_model_auth.py (which hand-crafts the "model::" annotation via a direct
+    import), this exercises the actual /predict endpoint and
+    Ray worker pipeline end to end, with real per-user JWT auth.
+    """
+    client = models_api_client
+    project_id = setup_model_db["project_id"]
+    sample_id = setup_model_db["sample_ids"][-1]
+
+    admin_token = get_auth_token(USER_ADMIN_ID)
+
+    # A human user whose name matches the model type (the collision scenario).
+    human_id = await db_client.insert(
+        "users",
+        UserIn(
+            username="mock_disruption_cnn",
+            oidc_issuer=TEST_ISSUER,
+            oidc_sub="mock_disruption_cnn-sub",
+        ),
+    )
+
+    await client.post(
+        f"/projects/{project_id}/members",
+        json={"username": "mock_disruption_cnn", "role": "annotator"},
+        headers=session_headers(admin_token),
+    )
+
+    # Run a REAL prediction through the actual /predict endpoint.
+    predict_resp = await client.post(
+        f"/projects/{project_id}/samples/{sample_id}/models/mock_disruption_cnn/predict",
+        headers=session_headers(admin_token),
+    )
+    assert predict_resp.status_code == 200, predict_resp.text
+    await collect_predict_results(client, predict_resp.json()["task_id"])
+
+    model_annotations = await db_client.get_filtered_documents(
+        collection="annotations",
+        filters={
+            "created_by": "model::mock_disruption_cnn",
+            "sample_id": ObjectId(sample_id),
+        },
+    )
+    assert len(model_annotations) == 1
+
+    # The human user (same name as the model) saves their own annotation for the
+    # same sample. update_annotations only replaces the CALLER's own annotations.
+    human_token = get_auth_token(human_id)
+    save_resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=[
+            {
+                "label": "human_ann",
+                "time_min": 0.0,
+                "time_max": 1.0,
+                "type": "time_region",
+                "validated": True,
+                "created_by": "placeholder",  # server overwrites from JWT
+            }
+        ],
+        headers=session_headers(human_token),
+    )
+    assert save_resp.status_code == 200, save_resp.text
+
+    # Both the real model prediction and the human's own annotation must survive.
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"sample_id": ObjectId(sample_id)}
+    )
+    labels_by_author = {a["created_by"]: a["label"] for a in annotations}
+    assert labels_by_author.get("model::mock_disruption_cnn") is not None
+    assert labels_by_author.get("model::mock_disruption_cnn") != "human_ann"
+    assert labels_by_author.get(human_id) == "human_ann"
 
 
 @pytest.mark.asyncio
@@ -662,7 +745,7 @@ async def test_model_delete_type(models_api_client, db_client, setup_model_db):
     assert not config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_2']}"
     ).exists()
-    # And for model 3 it does still exist
+    # And for model 3 and 4 it does still exist
     assert config.settings.models.cache_dir.joinpath(
         f"{setup_model_db['model_id_3']}"
     ).exists()
@@ -707,10 +790,7 @@ async def test_model_delete_type_version(models_api_client, db_client, setup_mod
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-@patch("ray.cancel")
-async def test_model_stop_training(
-    mock_func, models_api_client, db_client, setup_model_db
-):
+async def test_model_stop_training(models_api_client, db_client, setup_model_db):
     response = await models_api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/train"
     )
@@ -725,8 +805,6 @@ async def test_model_stop_training(
     )
     model = models[0]
     assert model["status"] == "aborted"
-
-    assert mock_func.call_count > 0
 
 
 @pytest.mark.asyncio
@@ -805,7 +883,7 @@ async def test_model_delete_predictions_keeps_other_model_with_same_name(
                 validated=False,
                 label="Disruption",
                 time=50,
-                created_by=shared_name,
+                created_by="model::disruption_cnn",
                 model_id=model_id,
             ),
             ids={
@@ -854,14 +932,14 @@ async def test_model_delete_no_predictions(
     models_api_client, db_client, setup_model_db
 ):
     response = await models_api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
+        f"/projects/{setup_model_db['project_id']}/models/mock_timeseries_cnn/predict"
     )
 
     # Nothing created by this model, so should return 404 and not delete anything
     assert response.status_code == 404
     assert (
         response.json()["detail"]
-        == "No annotations produced by mock_disruption_cnn could be found for this Project."
+        == "No annotations produced by mock_timeseries_cnn could be found for this Project."
     )
     annotations = await db_client.get_all_documents(collection="annotations")
     assert len(annotations) == 10

@@ -3,9 +3,10 @@ import pathlib
 import pytest
 from bson import ObjectId
 
-from toktagger.api.schemas.samples import ShotData, SampleIn, TimeSeriesFileData
 import tests.db_definitions as db_definitions
-import toktagger.api.config as config
+from toktagger.api import config
+from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
+from toktagger.api.schemas.samples import SampleIn, ShotData, TimeSeriesFileData
 
 
 @pytest.mark.asyncio
@@ -23,6 +24,44 @@ async def test_get_data_schema(api_client, setup_db):
     data = response.json()
     assert data["title"] == "ShotData"
     assert data == ShotData.model_json_schema()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("loader", ["uda", "sal", "fair_mast", "tabular"])
+async def test_get_signal_name_help(api_client, setup_db, loader):
+    response = await api_client.get(f"/meta/dataloader/{loader}/help")
+    assert response.status_code == 200
+    assert response.json() == LoaderRegistry.get(loader).signal_name_help
+
+
+@pytest.mark.asyncio
+async def test_get_signal_name_help_custom_loader(api_client, setup_db):
+    @LoaderRegistry.register("custom_help_test")
+    class CustomHelpLoader(DataLoader):
+        signal_name_help = "Custom help text."
+
+        @classmethod
+        def sample_data_type(cls) -> type[ShotData]:
+            return ShotData
+
+        def get_sample(self, sample, params=None, **kwargs):
+            raise NotImplementedError
+
+    @LoaderRegistry.register("custom_no_help_test")
+    class CustomNoHelpLoader(CustomHelpLoader):
+        signal_name_help = None
+
+    try:
+        response = await api_client.get("/meta/dataloader/custom_help_test/help")
+        assert response.status_code == 200
+        assert response.json() == "Custom help text."
+
+        response = await api_client.get("/meta/dataloader/custom_no_help_test/help")
+        assert response.status_code == 200
+        assert response.json() is None
+    finally:
+        LoaderRegistry._registry.pop("custom_help_test")
+        LoaderRegistry._registry.pop("custom_no_help_test")
 
 
 @pytest.mark.asyncio

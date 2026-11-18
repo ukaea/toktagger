@@ -1,42 +1,91 @@
-from fastapi import APIRouter, Request, Depends, Path, Query, Body, HTTPException
-from fastapi.responses import JSONResponse
+import asyncio
+import pathlib
 import random
+import shutil
+from collections import defaultdict
+
 from bson.objectid import ObjectId
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
+
+from toktagger.api import config
+from toktagger.api.auth.dependencies import (
+    get_current_user,
+    require_project_admin_role,
+    require_project_annotator,
+    require_project_annotator_or_internal,
+    require_project_viewer,
+)
 from toktagger.api.crud import utils
+from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.models import check_models_enabled, models_dependencies_installed
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
-from toktagger.api.schemas.data import DataParamTypes, DataParams
+from toktagger.api.schemas.data import DataParams, DataParamTypes
 from toktagger.api.schemas.models import (
+    GitlabLoadParams,
+    HuggingfaceLoadParams,
+    LocalLoadParams,
     Model,
     ModelIn,
     ModelUpdate,
-    PredictionBatch,
-    LocalLoadParams,
-    GitlabLoadParams,
-    HuggingfaceLoadParams,
 )
 from toktagger.api.schemas.projects import Project
-from toktagger.api.models import models_dependencies_installed, check_models_enabled
-from pydantic import ValidationError
-from collections import defaultdict
-import toktagger.api.config as config
-import pathlib
-import shutil
+from toktagger.api.schemas.samples import Sample
+from toktagger.api.schemas.users import UserOut
 
 # Only import large packages if models dependencies installed
 if models_dependencies_installed():
+    import ray
+
     from toktagger.api.core.worker import (
-        load_model_local,
+        get_predictions,
         load_model_gitlab,
         load_model_huggingface,
+        load_model_local,
         train_model,
-        get_predictions,
     )
     from toktagger.api.models.base import ModelRegistry
-    import ray
+else:
+    ModelRegistry = None
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Strong references, so a pending write is not garbage-collected before it runs.
+_prediction_writes: set[asyncio.Task] = set()
+
+
+async def _write_predictions(
+    db_client: MongoDBClient,
+    project_id: str,
+    model: Model,
+    samples: list[Sample],
+    predict_task: "ray.ObjectRef",
+) -> None:
+    try:
+        result = await predict_task
+        await utils.store_predictions(
+            db_client, project_id, model, samples, result["annotations_batch"]
+        )
+    except Exception:
+        logger.exception(f"Failed to store predictions for project {project_id}")
+
+
+def store_predictions_when_done(
+    db_client: MongoDBClient,
+    project_id: str,
+    model: Model,
+    samples: list[Sample],
+    predict_task: "ray.ObjectRef",
+) -> None:
+    """Write a prediction task's results to the database when it finishes, without blocking."""
+    write = asyncio.create_task(
+        _write_predictions(db_client, project_id, model, samples, predict_task)
+    )
+    _prediction_writes.add(write)
+    write.add_done_callback(_prediction_writes.discard)
 
 
 def validate_model_params(model_type: str, schema_type: str, params: dict):
@@ -117,8 +166,12 @@ async def create_model(db_client, project: Project, model_type: str) -> Model:
 router = APIRouter(
     prefix="/projects/{project_id}",
     tags=["Models"],
-    # Check models are enabled whenever an endpoint is called
-    dependencies=[Depends(check_models_enabled)],
+    # Authenticate every endpoint. The models-enabled gate is deliberately NOT here:
+    # router-level dependencies are solved before any endpoint-parameter dependency,
+    # so it would return 503 to a non-member before their role was ever checked.
+    # Each endpoint declares it after its role dependency instead, so permission
+    # errors take precedence over "ML extras not installed".
+    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -126,6 +179,8 @@ router = APIRouter(
 async def get_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_viewer),
+    _models_enabled: None = Depends(check_models_enabled),
     start: int = Query(
         0,
         description="Index of the first model you want returned when sorted by version",
@@ -137,7 +192,7 @@ async def get_models(
 ) -> list[Model]:
     # Return details about models being used by this project
     # Could be eg the ID, type of model, the accuracy, the version. link to mlflow / simvue instance, etc...
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     models = await utils.get_models(
         db_client=db_client,
         project_id=project_id,
@@ -152,6 +207,8 @@ async def get_models(
 async def get_model(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_viewer),
+    _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(
         description="The type of model to return information about."
     ),
@@ -160,7 +217,7 @@ async def get_model(
         description="The version of the model to return, leave blank to return the latest model.",
     ),
 ) -> Model:
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     model = await utils.get_model(
         db_client, project_id=project_id, model_type=model_type, version=version
     )
@@ -171,13 +228,15 @@ async def get_model(
 async def delete_models(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_admin_role),
+    _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to delete."),
     version: int = Query(
         None,
         description="The version of the model to delete, leave blank to delete all models",
     ),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
 
     await utils.get_project(db_client, project_id)
 
@@ -220,9 +279,13 @@ async def delete_models(
 
 @router.get("/models/{model_type}/train")
 async def get_training_info(
-    request: Request, project_id: str, model_type: str
+    request: Request,
+    project_id: str,
+    model_type: str,
+    current_user: UserOut = Depends(require_project_viewer),
+    _models_enabled: None = Depends(check_models_enabled),
 ) -> Model:
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client, project_id)
     latest_model = await utils.get_model(
         db_client, project_id=project_id, model_type=model_type
@@ -239,6 +302,8 @@ async def start_model_training(
     request: Request,
     project_id: str,
     model_type: str,
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
     use_gpu: bool = Query(False, description="Whether to use GPU to train the model"),
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
@@ -249,11 +314,11 @@ async def start_model_training(
         embed=True,
     ),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     # If GPU requested but not available, return error
-    if use_gpu and not task_registry.gpu_enabled:
+    if use_gpu and not await task_registry.gpu_enabled.remote():
         raise HTTPException(
             status_code=409,
             detail="GPU was requested but GPU support not enabled on server!",
@@ -288,45 +353,46 @@ async def start_model_training(
             detail="No validated annotations found to train a model on!",
         )
 
-    # Create model
-    # Try to get model for this project from database if it exists
-    db_models = await utils.get_models(db_client, project_id, model_type)
+    # Held until the queued model is inserted, so a second start sees it and backs off.
+    async with db_client.lock(f"models:{project.id}:{model_type}"):
+        # Try to get model for this project from database if it exists
+        db_models = await utils.get_models(db_client, project_id, model_type)
 
-    if (
-        len(
-            [
-                db_model
-                for db_model in db_models
-                if db_model.status in ["queued", "training", "loading"]
-            ]
+        if (
+            len(
+                [
+                    db_model
+                    for db_model in db_models
+                    if db_model.status in ["queued", "training", "loading"]
+                ]
+            )
+            > 0
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Training of {model_type} model already in progress!",
+            )
+
+        # Versioning is scoped to this name, so differently-named models of the same
+        # type each start again at v1 instead of sharing one counter.
+        same_name_models = [db_model for db_model in db_models if db_model.name == name]
+        if len(same_name_models) == 0:
+            version = 1
+        else:
+            version = same_name_models[0].version + 1
+
+        model_in = ModelIn(
+            type=model_type,
+            name=name,
+            version=version,
+            status="queued",
+            progress=0,
+            score=0,
         )
-        > 0
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Training of {model_type} model already in progress!",
+
+        model_id = await utils.add_model(
+            db_client=db_client, project_id=project.id, model=model_in
         )
-
-    # Versioning is scoped to this name, so differently-named models of the same
-    # type each start again at v1 instead of sharing one counter.
-    same_name_models = [db_model for db_model in db_models if db_model.name == name]
-    if len(same_name_models) == 0:
-        version = 1
-    else:
-        version = same_name_models[0].version + 1
-
-    model_in = ModelIn(
-        type=model_type,
-        name=name,
-        version=version,
-        status="queued",
-        progress=0,
-        score=0,
-    )
-
-    model_id = await utils.add_model(
-        db_client=db_client, project_id=project.id, model=model_in
-    )
 
     # Split annotations into 2D list, so annotations[idx] is a list of annotations for samples[idx]
     sample_annotations_mapping = defaultdict(list)
@@ -336,9 +402,11 @@ async def start_model_training(
 
     model = Model(**model_in.model_dump(), id=model_id, project_id=project.id)
 
-    task_registry.update_actors(model.id, use_gpu)
+    await task_registry.update_actors.remote(model.id, use_gpu)
 
-    train_task = train_model.remote(
+    # Pickling every sample and annotation is slow enough to stall the event loop
+    train_task = await asyncio.to_thread(
+        train_model.remote,
         model=model,
         project=project,
         samples=samples,
@@ -347,11 +415,14 @@ async def start_model_training(
         use_gpu=use_gpu,
     )
 
-    task_id = task_registry.register(train_task)
+    task_id = await task_registry.register.remote([train_task])
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model_id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model_id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model_id}
@@ -362,11 +433,13 @@ async def stop_model_training(
     request: Request,
     project_id: str,
     model_type: str,
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
     version: int | None = Query(
         None, description="Version of model to use, leave blank for latest version"
     ),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     # If version provided, get only that model
@@ -398,9 +471,7 @@ async def stop_model_training(
     # Get the task IDs and stop them
     for model in models:
         if model.task_id:
-            task = task_registry.get(model.task_id)
-            if task is not None:
-                ray.cancel(task)
+            await task_registry.cancel.remote(model.task_id)
             try:
                 actor = ray.get_actor(model.id)
                 ray.kill(actor)
@@ -408,6 +479,7 @@ async def stop_model_training(
                 pass
         await utils.update_model(
             db_client=db_client,
+            project_id=project_id,
             model_id=model.id,
             updates=ModelUpdate(status="aborted"),
         )
@@ -418,9 +490,14 @@ async def stop_model_training(
 
 @router.post("/models/{model_type}/load/local")
 async def load_model_weights_local(
-    request: Request, project_id: str, model_type: str, params: LocalLoadParams
+    request: Request,
+    project_id: str,
+    model_type: str,
+    params: LocalLoadParams,
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     # Check file available at weights path
@@ -440,12 +517,15 @@ async def load_model_weights_local(
     model = await create_model(db_client, project, model_type)
 
     task = load_model_local.remote(project=project, model=model, params=params)
-    task_id = task_registry.register(task)
-    task_registry.update_actors(model.id, use_gpu=False)
+    await task_registry.update_actors.remote(model.id, False)
+    task_id = await task_registry.register.remote([task])
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model.id}
@@ -453,9 +533,14 @@ async def load_model_weights_local(
 
 @router.post("/models/{model_type}/load/gitlab")
 async def load_model_weights_gitlab(
-    request: Request, project_id: str, model_type: str, params: GitlabLoadParams
+    request: Request,
+    project_id: str,
+    model_type: str,
+    params: GitlabLoadParams,
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     # Check if Gitlab load method is enabled
@@ -488,12 +573,15 @@ async def load_model_weights_gitlab(
 
     task = load_model_gitlab.remote(project=project, model=model, params=params)
 
-    task_id = task_registry.register(task)
-    task_registry.update_actors(model.id, use_gpu=False)
+    await task_registry.update_actors.remote(model.id, False)
+    task_id = await task_registry.register.remote([task])
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model.id}
@@ -501,9 +589,14 @@ async def load_model_weights_gitlab(
 
 @router.post("/models/{model_type}/load/hugging_face")
 async def load_model_weights_hugging_face(
-    request: Request, project_id: str, model_type: str, params: HuggingfaceLoadParams
+    request: Request,
+    project_id: str,
+    model_type: str,
+    params: HuggingfaceLoadParams,
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     # Check if HF load method is enabled
@@ -529,12 +622,15 @@ async def load_model_weights_hugging_face(
 
     task = load_model_huggingface.remote(project=project, model=model, params=params)
 
-    task_id = task_registry.register(task)
-    task_registry.update_actors(model.id, use_gpu=False)
+    await task_registry.update_actors.remote(model.id, False)
+    task_id = await task_registry.register.remote([task])
 
     # Associate the task ID with the model in the database
     await utils.update_model(
-        db_client=db_client, model_id=model.id, updates=ModelUpdate(task_id=task_id)
+        db_client=db_client,
+        project_id=project.id,
+        model_id=model.id,
+        updates=ModelUpdate(task_id=task_id),
     )
 
     return {"task_id": task_id, "model_id": model.id}
@@ -546,8 +642,10 @@ async def get_load_model_status(
     project_id: str = Path(description="The ID of the project to load a model for."),
     model_type: str = Path(description="The type of model to load."),
     task_id: str = Path(description="The load task to get results from."),
+    current_user: UserOut = Depends(require_project_viewer),
+    _models_enabled: None = Depends(check_models_enabled),
 ) -> bool | str:
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     project = await utils.get_project(db_client, project_id)
@@ -559,61 +657,60 @@ async def get_load_model_status(
         )
 
     # Check whether predictions are complete
-    task = task_registry.get(task_id)
-    if task is None:
+    is_ready = await task_registry.is_ready.remote(task_id)
+    if is_ready is None:
         raise HTTPException(detail="Load task not found with that ID!", status_code=404)
 
-    ready, waiting = ray.wait([task], timeout=0)
-
-    if waiting:
+    if not is_ready:
         return JSONResponse(
             content={"message": "Load task in the queue!"}, status_code=202
         )
-    elif ready:
-        # Get model which has this task ID associated
-        model = await utils.get_model(
-            db_client,
-            project_id,
-            model_type=model_type,
-            task_id=task_id,
+
+    # Get model which has this task ID associated
+    model = await utils.get_model(
+        db_client,
+        project_id,
+        model_type=model_type,
+        task_id=task_id,
+    )
+    try:
+        result: dict[str, str | None] = await task_registry.get_result.remote(task_id)
+
+    except Exception as e:
+        err_lines = str(e).strip().splitlines()
+        err_msg = err_lines[-1] if err_lines else repr(e)
+        await utils.update_model(
+            db_client=db_client,
+            project_id=project_id,
+            model_id=model.id,
+            updates=ModelUpdate(status="failed", progress=0),
         )
-        try:
-            result: dict[str, str | None] = ray.get(task)
+        raise HTTPException(
+            detail=f"Load task failed unexpectedly - {err_msg}",
+            status_code=500,
+        ) from e
 
-        except Exception as e:
-            err_lines = str(e).strip().splitlines()
-            err_msg = err_lines[-1] if err_lines else repr(e)
-            await utils.update_model(
-                db_client=db_client,
-                model_id=model.id,
-                updates=ModelUpdate(status="failed", progress=0),
-            )
-            raise HTTPException(
-                detail=f"Load task failed unexpectedly - {err_msg}",
-                status_code=500,
-            )
+    if result.get("message"):
+        await utils.update_model(
+            db_client=db_client,
+            project_id=project_id,
+            model_id=result["model_id"],
+            updates=ModelUpdate(status="failed", progress=0),
+        )
+        raise HTTPException(
+            detail=f"Failed to load weights - {result['message']}",
+            status_code=500,
+        )
 
-        if result.get("message"):
-            await utils.update_model(
-                db_client=db_client,
-                model_id=result["model_id"],
-                updates=ModelUpdate(status="failed", progress=0),
-            )
-            raise HTTPException(
-                detail=f"Failed to load weights - {result['message']}",
-                status_code=500,
-            )
-
-        return True
-
-    else:
-        raise HTTPException(status_code=404, detail="Load task not found with that ID!")
+    return True
 
 
 @router.post("/models/{model_type}/predict")
 async def predict(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to use for predictions."),
     version: int = Query(
         None, description="Version of model to use, leave blank for latest version"
@@ -633,11 +730,11 @@ async def predict(
         {}, description="Optional parameters for training the model", embed=True
     ),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     # If GPU requested but not available, return error
-    if use_gpu and not task_registry.gpu_enabled:
+    if use_gpu and not await task_registry.gpu_enabled.remote():
         raise HTTPException(
             status_code=409,
             detail="GPU was requested but GPU support not enabled on server!",
@@ -694,16 +791,18 @@ async def predict(
     else:
         samples = random.sample(selected_samples, num_predictions)
 
-    task_registry.update_actors(model.id, use_gpu)
+    await task_registry.update_actors.remote(model.id, use_gpu)
 
-    predict_task = get_predictions.remote(
+    predict_task = await asyncio.to_thread(
+        get_predictions.remote,
         project=project,
         model=model,
         samples=samples,
         params=params_validated,
         use_gpu=use_gpu,
     )
-    task_id = task_registry.register(predict_task)
+    task_id = await task_registry.register.remote([predict_task])
+    store_predictions_when_done(db_client, project.id, model, samples, predict_task)
 
     return {"task_id": task_id}
 
@@ -712,9 +811,11 @@ async def predict(
 async def delete_predictions(
     request: Request,
     project_id: str = Path(description="The ID of the project to get models for."),
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to delete predictions from."),
 ):
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     # Delete predictions using the given model for this project
     # Predict on samples as specified by filters
     project = await utils.get_project(db_client, project_id)
@@ -744,35 +845,6 @@ async def delete_predictions(
         )
 
 
-@router.put("/models/{model_id}/predictions")
-async def replace_model_predictions(
-    request: Request,
-    predictions: PredictionBatch,
-    project_id: str = Path(
-        description="The ID of the project these predictions belong to."
-    ),
-    model_id: str = Path(
-        description="The ID of the model which produced these predictions."
-    ),
-) -> None:
-    """
-    Store a completed prediction run, replacing this model's previous predictions.
-    ------------------------------------------------------------------------------
-    Predictions a human has already validated are kept, and the samples which were
-    predicted on only lose their old predictions as the new ones are written.
-    """
-    db_client = request.app.state.db_client
-    await utils.get_project(db_client, project_id)
-
-    await utils.replace_predictions(
-        db_client,
-        project_id=project_id,
-        model_id=model_id,
-        sample_ids=predictions.sample_ids,
-        annotations=predictions.annotations,
-    )
-
-
 @router.post("/samples/{sample_id}/models/{model_type}/predict")
 async def create_sample_predictions(
     request: Request,
@@ -782,6 +854,8 @@ async def create_sample_predictions(
     sample_id: str = Path(
         description="The ID of the sample to make model predictions for."
     ),
+    current_user: UserOut = Depends(require_project_annotator),
+    _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to make predictions from."),
     version: int = Query(
         None, description="Version of model to use, leave blank for latest version"
@@ -796,11 +870,11 @@ async def create_sample_predictions(
         DataParams(), description="Data parameters fort this sample", embed=True
     ),
 ) -> dict[str, str]:
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     # If GPU requested but not available, return error
-    if use_gpu and not task_registry.gpu_enabled:
+    if use_gpu and not await task_registry.gpu_enabled.remote():
         raise HTTPException(
             status_code=409,
             detail="GPU was requested but GPU support not enabled on server!",
@@ -828,7 +902,7 @@ async def create_sample_predictions(
 
     sample = await utils.get_sample(db_client, project_id, sample_id)
 
-    task_registry.update_actors(model.id, use_gpu)
+    await task_registry.update_actors.remote(model.id, use_gpu)
 
     task = get_predictions.remote(
         project=project,
@@ -838,7 +912,8 @@ async def create_sample_predictions(
         data_params=data_params,
         use_gpu=use_gpu,
     )
-    task_id = task_registry.register(task)
+    task_id = await task_registry.register.remote([task])
+    store_predictions_when_done(db_client, project.id, model, [sample], task)
 
     return {"task_id": task_id}
 
@@ -852,10 +927,12 @@ async def get_sample_predictions(
     sample_id: str = Path(
         description="The ID of the sample to get model predictions for."
     ),
+    current_user: UserOut = Depends(require_project_viewer),
+    _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to get predictions from."),
     task_id: str = Path(description="The prediction task to get results from."),
 ) -> list[AnnotationBatchTypes]:
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
     project = await utils.get_project(db_client, project_id)
@@ -869,56 +946,50 @@ async def get_sample_predictions(
     await utils.get_sample(db_client, project_id, sample_id)
 
     # Check whether predictions are complete
-    task = task_registry.get(task_id)
-    if task is None:
+    is_ready = await task_registry.is_ready.remote(task_id)
+    if is_ready is None:
         raise HTTPException(
             detail="Predict task not found with that ID!", status_code=404
         )
 
-    ready, waiting = ray.wait([task], timeout=0)
-
-    if waiting:
+    if not is_ready:
         return JSONResponse(
             content={"message": "Predict task in the queue!"}, status_code=202
         )
-    elif ready:
-        try:
-            result = ray.get(task)
-        except Exception as e:
-            logger.error(f"Prediction task failed: {e}")
-            raise HTTPException(
-                detail="Predict task failed - no predictions available",
-                status_code=500,
-            ) from e
 
-        # Check project ID and model type match those expected by user
-        if result["project_id"] != project_id:
-            raise HTTPException(
-                detail="Project ID for this task does not match!", status_code=422
-            )
-
-        # Check model type matches
-        if result["model_type"] != model_type:
-            raise HTTPException(
-                detail="Model used for this task does not match!", status_code=422
-            )
-
-        prediction_annotations = result["predictions_batch"].annotations
-
-        # Check that annotations contain results for this sample ID
-        if prediction_annotations and not all(
-            ann.sample_id == sample_id for ann in prediction_annotations
-        ):
-            raise HTTPException(
-                status_code=404,
-                detail="This task does not have results for the specified sample!",
-            )
-
-        return prediction_annotations
-    else:
+    try:
+        result = await task_registry.get_result.remote(task_id)
+    except Exception as e:
+        logger.error(f"Prediction task failed: {e}")
         raise HTTPException(
-            status_code=404, detail="Predict task not found with that ID!"
+            detail="Predict task failed - no predictions available",
+            status_code=500,
+        ) from e
+
+    # Check project ID and model type match those expected by user
+    if result["project_id"] != project_id:
+        raise HTTPException(
+            detail="Project ID for this task does not match!", status_code=422
         )
+
+    # Check model type matches
+    if result["model_type"] != model_type:
+        raise HTTPException(
+            detail="Model used for this task does not match!", status_code=422
+        )
+
+    prediction_annotations = result.get("annotations_batch")
+
+    # Check that annotations contain results for this sample ID
+    if prediction_annotations and not all(
+        ann.sample_id == sample_id for ann in prediction_annotations
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="This task does not have results for the specified sample!",
+        )
+
+    return prediction_annotations
 
 
 @router.put("/models/{model_id}")
@@ -928,20 +999,30 @@ async def update_model(
     project_id: str = Path(
         description="The ID of the project to make model predictions for."
     ),
+    current_user: UserOut = Depends(require_project_annotator_or_internal),
+    _models_enabled: None = Depends(check_models_enabled),
     model_id: str = Path(
         description="The ID of the model to update information about."
     ),
 ) -> None:
     # Update model status
-    db_client = request.app.state.db_client
+    db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client, project_id)
     await utils.update_model(
-        db_client=db_client, model_id=model_id, updates=model_updates
+        db_client=db_client,
+        project_id=project_id,
+        model_id=model_id,
+        updates=model_updates,
     )
 
 
 @router.get("/models/{model_id}/evaluate")
-async def evaluate(project_id: str, model_id: str):
+async def evaluate(
+    project_id: str,
+    model_id: str,
+    current_user: UserOut = Depends(require_project_viewer),
+    _models_enabled: None = Depends(check_models_enabled),
+):
     # Get evaluation of model by comparing model predictions to human evaluations
     # Specify samples to use via filters
     # Return overall statistics, as well as correct/incorrect for each sample ID

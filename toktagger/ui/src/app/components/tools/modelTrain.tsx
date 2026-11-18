@@ -124,7 +124,6 @@ export function ModelTrainModal({
 
   // Fetch train schema when model selection changes
   useEffect(() => {
-    setSchema(null);
     if (!selectedModelName) return;
     (async () => {
       const newSchema: RJSFSchema | null = await getModelTrainSchema(
@@ -137,7 +136,6 @@ export function ModelTrainModal({
 
   // Fetch model description when model selection changes
   useEffect(() => {
-    setModelDescription(null);
     if (!selectedModelName) return;
     (async () => {
       try {
@@ -203,6 +201,8 @@ export function ModelTrainModal({
 
   const handleModelSelection = (key: React.Key | null) => {
     setSelectedModelName(key !== null ? String(key) : null);
+    setSchema(null);
+    setModelDescription(null);
     setModelName("");
     setTrainingModelId(null);
     setTrainingStatus(null);

@@ -30,7 +30,7 @@ Below is a brief outline of the design of the backend API and what each endpoint
 ## `/projects/{project_id}/samples/{sample_id}/annotations`
 - **GET**: Tell me the annotations already stored for this sample
 - **PUT**: Add human annotations for this sample
-- **DELETE**: Delete annotations for this sample
+- **DELETE**: Delete the annotations whose IDs are in the request body (a JSON list). If there is no body, delete ALL annotations for this sample
 
 ## `/projects/{project_id}/annotator/`
 - **GET**: Get a list of all annotators available for this task (not implemented)
@@ -59,11 +59,10 @@ Below is a brief outline of the design of the backend API and what each endpoint
 ## `/projects/{project_id}/sampels/{sample_id}/models/{model_type}/predict?{filters}`
 - **POST**: Get modle predictions for this sample - blocking endpoint
 
-## `/projects/{project_id}/models/{model_id}/predictions`
-- **PUT**: Store a completed prediction run. The worker node calls this when inference
-  finishes. For each sample in the run, this model's unvalidated predictions are deleted
-  and the new ones are written in the same bulk operation. Thus, if a run fails, the user
-  keeps the predictions from the last successful run.
+When a prediction run finishes, the server stores the results. For each sample in the run,
+the server deletes the unvalidated predictions of this model and writes the new ones in the
+same bulk operation. Thus, if a run fails, the user keeps the predictions from the last
+successful run.
 
 ## `/projects/{project_id}/models/{model_type}/evaluate?{filters}`
 - **GET**: Returns statistics about how the predictions from the model compare to the human annotations for the shot(s) specified by filters (not implemented)

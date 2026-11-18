@@ -14,6 +14,7 @@ import {
   Sample,
   TimeSeriesFileDataSchema,
   ShotDataSchema,
+  pickCreatedBy,
 } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { Icon } from "@adobe/react-spectrum";
@@ -104,7 +105,8 @@ export function convertRawAnnotationsToTimeSeries(
     const timeRegion = TimeRegionSchema.parse(annotation);
     return {
       id: uuidv4(),
-      created_by: timeRegion.created_by,
+      db_id: timeRegion._id,
+      ...pickCreatedBy(timeRegion),
       model_id: timeRegion.model_id,
       label: timeRegion.label,
       signal_name: timeRegion.signal_name,
@@ -121,7 +123,8 @@ export function convertRawAnnotationsToTimeSeries(
     const timePoint = TimePointSchema.parse(annotation);
     return {
       id: uuidv4(),
-      created_by: timePoint.created_by,
+      db_id: timePoint._id,
+      ...pickCreatedBy(timePoint),
       model_id: timePoint.model_id,
       label: timePoint.label,
       signal_name: timePoint.signal_name,
@@ -135,7 +138,8 @@ export function convertRawAnnotationsToTimeSeries(
     const boundingBox = BoundingBoxSchema.parse(annotation);
     return {
       id: uuidv4(),
-      created_by: boundingBox.created_by,
+      db_id: boundingBox._id,
+      ...pickCreatedBy(boundingBox),
       model_id: boundingBox.model_id,
       label: boundingBox.label,
       signal_name: boundingBox.signal_name,
@@ -155,7 +159,8 @@ export function convertRawAnnotationsToTimeSeries(
     const polygon = PolygonSchema.parse(annotation);
     return {
       id: uuidv4(),
-      created_by: polygon.created_by,
+      db_id: polygon._id,
+      ...pickCreatedBy(polygon),
       model_id: polygon.model_id,
       label: polygon.label,
       signal_name: polygon.signal_name,
@@ -187,11 +192,12 @@ export function convertTimeSeriesToRawAnnotations(
 ): Annotation | null {
   if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
     const timePoint: TimePoint = {
+      _id: annotation.db_id,
       project_id: null,
       sample_id: null,
       validated: false,
       uncertainty: 1,
-      created_by: annotation.created_by,
+      ...pickCreatedBy(annotation),
       model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "time_point",
@@ -203,11 +209,12 @@ export function convertTimeSeriesToRawAnnotations(
 
   if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
     const timePoint: TimeRegion = {
+      _id: annotation.db_id,
       project_id: null,
       sample_id: null,
       validated: false,
       uncertainty: 1,
-      created_by: annotation.created_by,
+      ...pickCreatedBy(annotation),
       model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "time_region",
@@ -220,11 +227,12 @@ export function convertTimeSeriesToRawAnnotations(
 
   if (annotation.type === TimeSeriesAnnotationType.BOUNDING_BOX) {
     const boundingBox: BoundingBox = {
+      _id: annotation.db_id,
       project_id: null,
       sample_id: null,
       validated: false,
       uncertainty: 1,
-      created_by: annotation.created_by,
+      ...pickCreatedBy(annotation),
       model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "bounding_box",
@@ -239,11 +247,12 @@ export function convertTimeSeriesToRawAnnotations(
 
   if (annotation.type === TimeSeriesAnnotationType.POLYGON) {
     const polygon: Polygon = {
+      _id: annotation.db_id,
       project_id: null,
       sample_id: null,
       validated: false,
       uncertainty: 1,
-      created_by: annotation.created_by,
+      ...pickCreatedBy(annotation),
       model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "polygon",

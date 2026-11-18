@@ -1,32 +1,33 @@
+import logging
 import os
-import ray
-from ray.exceptions import ActorDiedError
 import pathlib
-from toktagger.api.schemas.projects import Project
-from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
-from toktagger.api.schemas.data import DataParamTypes
+import shutil
+
+import pydantic
+import ray
+from pydantic import ValidationError
+from ray.exceptions import ActorDiedError
+
+from toktagger.api.core.sender import send_model_updates
+from toktagger.api.models.loaders import (
+    GitlabLoader,
+    HuggingfaceLoader,
+    LocalLoader,
+)
 from toktagger.api.schemas.annotations import (
     AnnotationBatchTypeAdapter,
     AnnotationOutTypes,
 )
-from pydantic import ValidationError
+from toktagger.api.schemas.data import DataParamTypes
 from toktagger.api.schemas.models import (
-    Model,
-    ModelUpdate,
-    PredictionBatch,
-    LocalLoadParams,
     GitlabLoadParams,
     HuggingfaceLoadParams,
+    LocalLoadParams,
+    Model,
+    ModelUpdate,
 )
-from toktagger.api.core.sender import (
-    send_batch_samples,
-    send_batch_predictions,
-    send_model_updates,
-)
-import logging
-import shutil
-import pydantic
-from toktagger.api.models.loaders import LocalLoader, GitlabLoader, HuggingfaceLoader
+from toktagger.api.schemas.projects import Project
+from toktagger.api.schemas.samples import Sample, SampleUpdate, SampleUpdateBatchItem
 
 logger = logging.getLogger("ray")
 logger.setLevel("DEBUG")
@@ -162,7 +163,7 @@ def train_model(
         if results_dir.exists():
             shutil.rmtree(results_dir)
 
-        raise e
+        raise
 
 
 @ray.remote(num_cpus=0.1)
@@ -201,23 +202,14 @@ def get_predictions(
             annotation["sample_id"] = sample.id
             annotation["project_id"] = project.id
             annotation["shot_id"] = sample.shot_id
-            annotation["created_by"] = model.display_name
+            annotation["created_by"] = f"model::{model.type}"
             annotation["model_id"] = model.id
             try:
                 annotation = AnnotationBatchTypeAdapter.validate_python(annotation)
             except ValidationError as e:
                 logger.error(f"Failed to validate annotation: {e}")
+                continue
             annotations_batch.append(annotation)
-
-    predictions_batch = PredictionBatch(
-        sample_ids=[sample.id for sample in samples], annotations=annotations_batch
-    )
-
-    # Return predictions over rest API to server
-    send_batch_samples(project.id, samples_batch)
-    send_batch_predictions(
-        project_id=project.id, model_id=model.id, predictions=predictions_batch
-    )
 
     logger.info(f"Predictions for project {project.id} complete!")
 
@@ -226,5 +218,5 @@ def get_predictions(
         "model_id": model.id,
         "model_type": model.type,
         "samples_batch": samples_batch,
-        "predictions_batch": predictions_batch,
+        "annotations_batch": annotations_batch,
     }

@@ -29,7 +29,7 @@ type ModelPredictInfo = {
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const { annotations, project, dataParams, setAnnotations } = useSample();
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const [userEnabled, setUserEnabled] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -41,11 +41,17 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
     Record<string, unknown>
   >({});
   const formRef = useRef<Form>(null);
-  const didAutoEnable = useRef<boolean>(false);
 
   const selectedModel =
     models.find((model) => model._id === selectedModelId) ?? null;
   const selectedModelType = selectedModel?.type ?? null;
+  const modelIds = new Set(models.map((model) => model._id));
+  const hasModelPredictions = annotations.some(
+    (annotation) =>
+      annotation.model_id !== null && modelIds.has(annotation.model_id),
+  );
+  // Start out enabled if this sample already has predictions from one of the project's models, until the user touches the switch.
+  const isEnabled = userEnabled ?? hasModelPredictions;
 
   // Poll every 5s, so a model trained elsewhere (e.g. the Train Model dialog) shows up here without a page reload.
   useEffect(() => {
@@ -73,23 +79,6 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
     return () => clearInterval(interval);
   }, [project_id]);
 
-  // Start out enabled if this sample already has predictions from one of the project's models, but only before the user touches the switch.
-  useEffect(() => {
-    if (didAutoEnable.current || models.length === 0) {
-      return;
-    }
-    const modelIds = new Set(models.map((model) => model._id));
-    if (
-      annotations.some(
-        (annotation) =>
-          annotation.model_id !== null && modelIds.has(annotation.model_id),
-      )
-    ) {
-      didAutoEnable.current = true;
-      setIsEnabled(true);
-    }
-  }, [models, annotations]);
-
   useEffect(() => {
     const updateSchema = async () => {
       if (!selectedModelType) {
@@ -104,8 +93,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   }, [selectedModelType]);
 
   const onEnable = (newIsEnabled: boolean) => {
-    didAutoEnable.current = true;
-    setIsEnabled(newIsEnabled);
+    setUserEnabled(newIsEnabled);
     if (!newIsEnabled && selectedModelId) {
       // Remove previous annotations from this model
       setAnnotations((previousAnnotations: Annotations) => {
@@ -176,12 +164,34 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         }
       } else if (response.ok) {
         setAnnotations((previousAnnotations: Annotations) => {
-          // Replace any unvalidated predictions from this model with the new results rather than appending, so repeated runs don't stack up.
-          const withoutStale = previousAnnotations.filter(
-            (ann: Annotation) =>
-              ann.model_id !== selectedModelId || ann.validated,
+          const predictedFrames = new Set(
+            (payload as Annotation[]).flatMap((predictedAnnotation) =>
+              "frame" in predictedAnnotation &&
+              typeof predictedAnnotation.frame === "number"
+                ? [predictedAnnotation.frame]
+                : [],
+            ),
           );
-          return [...withoutStale, ...payload];
+          // Replace this model's unvalidated predictions rather than appending, so repeated runs don't stack up.
+          const otherAnnotations = previousAnnotations.filter(
+            (annotation: Annotation) => {
+              if (
+                annotation.model_id !== selectedModelId ||
+                annotation.validated
+              ) {
+                return true;
+              }
+              // Video predictions are frame-scoped, so other frames' predictions survive.
+              if (
+                "frame" in annotation &&
+                typeof annotation.frame === "number"
+              ) {
+                return !predictedFrames.has(annotation.frame);
+              }
+              return false;
+            },
+          );
+          return otherAnnotations.concat(payload);
         });
         clearInterval(interval);
         setIsLoading(false);

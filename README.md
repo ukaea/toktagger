@@ -21,6 +21,7 @@ It currently supports the following features:
 - **Annotation Tools**: Apply consistent labels to signals and images using a customizable tagging system.
 - **ML Models**: Train and infer from ML models within the UI.
 - **Dataset Management**: Organize and manage annotations in a central repository.
+- **Multi-User Support**: Role-based access control with per-project membership, suitable for team annotation workflows.
 - **Extensible API**: A Python API for integrating with existing workflows and tools.
 
 
@@ -56,10 +57,52 @@ uv tool install --python 3.12.6 toktagger[models]
 ```
 
 ## Quick Start
-To get started, run:
+
+To start a local single-user instance:
 
 ```sh
 toktagger
 ```
 
-This will start a local instance of the application running at `http://localhost:8002`.
+This starts a single-process instance at `http://localhost:8002`. On the first start, TokTagger creates a local identity provider and prints the user name and the password of the first administrator to the terminal. See [User Management](docs/user_management.md).
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--workers N` | `1` | Number of uvicorn worker processes |
+| `--host HOST` | `localhost` | Host to bind to |
+| `--port PORT` | `8002` | Port to listen on |
+| `--no-browser` | off | Suppress automatic browser launch |
+| `--reload` | off | Auto-reload on code changes (single-worker dev mode only) |
+
+### Development Mode
+
+For local development with automatic reload on code changes, use a single worker:
+
+```sh
+toktagger --workers 1 --reload
+```
+
+### Multi-User / Team Deployment
+
+For server deployments, run with multiple workers and disable the automatic browser launch. Multiple workers operate on Linux, macOS and Windows:
+
+```sh
+toktagger --workers 4 --no-browser
+```
+
+The default host is `localhost`. Only the local machine can connect to it. To let other users on the network connect, add `--host 0.0.0.0`.
+
+> [!WARNING]
+> `--host 0.0.0.0` makes TokTagger available to all devices that can reach the machine on port 8002. The traffic is not encrypted. Use it only on a trusted network. For other deployments, use the `docker-compose.yml` stack, which puts TokTagger behind a TLS proxy.
+
+Or directly via uvicorn (use `python -m uvicorn` to make sure that the correct virtual environment is used):
+
+```sh
+python -m uvicorn toktagger.api.asgi:app --workers 4 --host 0.0.0.0 --port 8002
+```
+
+`docker-compose.yml` is the production stack. It runs TokTagger with Keycloak, MongoDB and a Caddy proxy that handles TLS. See the [Deployment](docs/deployment.md) guide.
+
+See the [User Management](docs/user_management.md) guide for creating accounts, assigning roles, and managing project membership.

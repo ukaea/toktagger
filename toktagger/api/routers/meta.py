@@ -1,22 +1,32 @@
-from fastapi import APIRouter, Request, Depends, Query
-from toktagger.api.core.data_loaders import LoaderRegistry, DataLoaderError
+import logging
+import typing
+
+from fastapi import APIRouter, Depends, Query, Request
+
+from toktagger.api import config
+from toktagger.api.auth.dependencies import get_current_user, get_project_membership
+from toktagger.api.core.data_loaders import DataLoaderError, LoaderRegistry
 from toktagger.api.crud import utils
 from toktagger.api.crud.db import MongoDBClient
+from toktagger.api.models import check_models_enabled, models_dependencies_installed
 from toktagger.api.schemas.data import DataParams
 from toktagger.api.schemas.models import LoadMethods
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import ShotData, TimeSeriesFileData
-from toktagger.api.models import models_dependencies_installed, check_models_enabled
-import logging
-import typing
-import toktagger.api.config as config
+from toktagger.api.schemas.users import UserOut
 
 logger = logging.getLogger(__name__)
 
 if models_dependencies_installed():
     from toktagger.api.models.base import ModelRegistry
+else:
+    ModelRegistry = None
 
-router = APIRouter(prefix="/meta", tags=["Metadata"])
+router = APIRouter(
+    prefix="/meta",
+    tags=["Metadata"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 async def get_project_signals(db_client: MongoDBClient, project: Project) -> list[str]:
@@ -60,6 +70,12 @@ async def get_dataloaders(request: Request) -> list[str]:
 async def get_data_schema(loader: str) -> dict[str, typing.Any]:
     """Get schema which is required for getting data with this dataloader"""
     return LoaderRegistry.get_data_schema(loader)
+
+
+@router.get("/dataloader/{loader}/help")
+async def get_signal_name_help(loader: str) -> str | None:
+    """Get help text which describes the signal names this dataloader expects."""
+    return LoaderRegistry.get_signal_name_help(loader)
 
 
 @router.get(
@@ -133,6 +149,7 @@ async def get_model_training_schema(
             "any signal_names field's options from this project's sample signals."
         ),
     ),
+    current_user: UserOut = Depends(get_current_user),
 ) -> dict[str, typing.Any] | None:
     """Get params required for training this model."""
     schema = ModelRegistry.get_params_schema(
@@ -141,6 +158,7 @@ async def get_model_training_schema(
     if not schema or not project_id:
         return schema
 
+    await get_project_membership(project_id, request, current_user)
     db_client = request.app.state.db_client
     properties = schema.get("properties", {})
     project = await utils.get_project(db_client, project_id)

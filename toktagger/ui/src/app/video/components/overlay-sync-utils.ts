@@ -1,4 +1,12 @@
-import { boundsFromPoints, type ImageAnnotation } from "@annotorious/react";
+/**
+ * Helpers for working with Annotorious: compare overlays by content, replace an overlay,
+ * keep shapes inside the image and find the shape under the pointer.
+ */
+import {
+  boundsFromPoints,
+  type AnnotoriousOpenSeadragonAnnotator,
+  type ImageAnnotation,
+} from "@annotorious/react";
 import {
   getLabelTrack,
   isEllipseAnno,
@@ -108,10 +116,7 @@ export function setViewerCursor(viewerElement: HTMLElement, cursor: string) {
   });
 }
 
-/**
- * Stable signature for comparing overlays by content (not by reference).
- * Used to avoid feedback loops when we programmatically call `setAnnotations`.
- */
+/** A content fingerprint of one shape. Overlays are compared this way because IDs change on every conversion. */
 function annoSig(a: ImageAnnotation): string {
   const sel = a.target.selector;
   const source = getTargetSource(a);
@@ -157,6 +162,15 @@ export function sameOverlay(
   const bs = b.map(annoSig).sort();
   for (let i = 0; i < as.length; i++) if (as[i] !== bs[i]) return false;
   return true;
+}
+
+/** Replaces the Annotorious overlay via an empty set first, since a same-id replace leaves stale hit regions. */
+export function replaceAnnotoriousOverlay(
+  api: AnnotoriousOpenSeadragonAnnotator,
+  annotations: ImageAnnotation[],
+) {
+  api.setAnnotations([], true);
+  api.setAnnotations(annotations, true);
 }
 
 export function clampRectToImage(
@@ -317,6 +331,7 @@ function withPolygonGeometry(
   };
 }
 
+/** Clamps every shape to the image. Shapes with no area left inside it are dropped. */
 export function clampOverlayToNaturalImage(
   list: ImageAnnotation[],
   natural: { w: number; h: number } | null,
@@ -334,8 +349,8 @@ export function clampOverlayToNaturalImage(
         continue;
       }
 
-      const x = Math.max(0, Math.min(natural.w, point.x));
-      const y = Math.max(0, Math.min(natural.h, point.y));
+      const x = Math.max(0.5, Math.min(natural.w - 0.5, point.x));
+      const y = Math.max(0.5, Math.min(natural.h - 0.5, point.y));
 
       if (x === point.x && y === point.y) out.push(a);
       else {
