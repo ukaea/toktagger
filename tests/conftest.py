@@ -44,6 +44,9 @@ if MODELS_ENABLED:
         setup_model_db as setup_model_db,
     )
     from tests.models_fixtures import (
+        setup_model_predictions as setup_model_predictions,
+    )
+    from tests.models_fixtures import (
         setup_model_samples as setup_model_samples,
     )
 
@@ -65,6 +68,10 @@ else:
 
     @pytest.fixture()
     def setup_model_db():
+        raise pytest.UsageError(_error_msg)
+
+    @pytest.fixture()
+    def setup_model_predictions():
         raise pytest.UsageError(_error_msg)
 
     @pytest.fixture()

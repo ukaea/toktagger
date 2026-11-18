@@ -107,6 +107,7 @@ export function convertRawAnnotationsToTimeSeries(
       id: uuidv4(),
       db_id: timeRegion._id,
       ...pickCreatedBy(timeRegion),
+      model_id: timeRegion.model_id,
       label: timeRegion.label,
       signal_name: timeRegion.signal_name,
       type: TimeSeriesAnnotationType.TIME_REGION,
@@ -124,6 +125,7 @@ export function convertRawAnnotationsToTimeSeries(
       id: uuidv4(),
       db_id: timePoint._id,
       ...pickCreatedBy(timePoint),
+      model_id: timePoint.model_id,
       label: timePoint.label,
       signal_name: timePoint.signal_name,
       type: TimeSeriesAnnotationType.TIME_POINT,
@@ -138,6 +140,7 @@ export function convertRawAnnotationsToTimeSeries(
       id: uuidv4(),
       db_id: boundingBox._id,
       ...pickCreatedBy(boundingBox),
+      model_id: boundingBox.model_id,
       label: boundingBox.label,
       signal_name: boundingBox.signal_name,
       type: TimeSeriesAnnotationType.BOUNDING_BOX,
@@ -158,6 +161,7 @@ export function convertRawAnnotationsToTimeSeries(
       id: uuidv4(),
       db_id: polygon._id,
       ...pickCreatedBy(polygon),
+      model_id: polygon.model_id,
       label: polygon.label,
       signal_name: polygon.signal_name,
       type: TimeSeriesAnnotationType.POLYGON,
@@ -194,6 +198,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       ...pickCreatedBy(annotation),
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "time_point",
       time: annotation.points[0].x,
@@ -210,6 +215,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       ...pickCreatedBy(annotation),
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "time_region",
       time_min: annotation.points[0].x,
@@ -227,6 +233,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       ...pickCreatedBy(annotation),
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "bounding_box",
       x_min: Math.min(annotation.points[0].x, annotation.points[1].x),
@@ -246,6 +253,7 @@ export function convertTimeSeriesToRawAnnotations(
       validated: false,
       uncertainty: 1,
       ...pickCreatedBy(annotation),
+      model_id: annotation.model_id,
       signal_name: annotation.signal_name ?? null,
       type: "polygon",
       segmentation: [
@@ -398,6 +406,17 @@ export function getSignalNames(sample: Sample | null): string[] {
   }
 
   return sampleDataType.parse(sample.data).signal_names;
+}
+
+export function formatTimestamp(ts: string): string {
+  try {
+    return new Date(ts).toLocaleString(undefined, {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return ts;
+  }
 }
 
 export function shallowEqual(

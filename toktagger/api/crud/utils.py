@@ -161,8 +161,8 @@ async def get_models(
     models = await db_client.get_filtered_documents(
         collection="models",
         filters=filters,
-        sort_by="version",
-        sort_direction=-1,
+        sort_by="_id",
+        sort_direction="descending",
         start=start,
         limit=end - start + 1 if end is not None else 0,
     )
@@ -355,6 +355,7 @@ async def get_annotations(
     sample_id: str | None = None,
     validated: bool | None = None,
     created_by: str | None = None,
+    model_id: str | None = None,
     sort_by: str = "_id",
     sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
@@ -369,6 +370,8 @@ async def get_annotations(
         db_filters["validated"] = validated
     if created_by is not None:
         db_filters["created_by"] = created_by
+    if model_id is not None:
+        db_filters["model_id"] = model_id
 
     annotations = await db_client.get_filtered_documents(
         collection="annotations",
@@ -467,6 +470,8 @@ async def delete_annotations(
     annotation_id: str | None = None,
     annotation_ids: list[str] | None = None,
     created_by: str | None = None,
+    model_id: str | None = None,
+    validated: bool | None = None,
 ) -> int:
     """Delete annotations matching the given filters, returning how many were removed."""
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -489,11 +494,66 @@ async def delete_annotations(
         # Scope the delete to only this user's annotations (concurrent-safe)
         filters["created_by"] = created_by
 
+    if model_id is not None:
+        filters["model_id"] = model_id
+
+    if validated is not None:
+        filters["validated"] = validated
+
     result = await db_client.delete_filtered_documents(
         collection="annotations", filters=filters
     )
 
     return result.deleted_count
+
+
+async def replace_predictions(
+    db_client: MongoDBClient,
+    project_id: str,
+    model_id: str,
+    sample_ids: list[str],
+    annotations: list[AnnotationBatchTypes],
+) -> None:
+    """Swap a model's unvalidated predictions for the given samples with new ones.
+
+    Each sample is replaced in a single write, so its earlier predictions survive
+    until there is a complete set of new ones to put in their place.
+    """
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    model_obj_id = convert_to_objectid(model_id, "models")
+
+    if not await db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    if not await db_client.get_document_by_id(
+        collection="models", object_id=model_obj_id
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="Tried to store predictions for a model which does not exist!",
+        )
+
+    sample_groups = defaultdict(list)
+    for annotation in annotations:
+        if annotation.sample_id not in sample_ids:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Prediction for sample {annotation.sample_id} is not one of the samples being replaced.",
+            )
+        sample_groups[annotation.sample_id].append(annotation)
+
+    for sample_id in sample_ids:
+        ids = {
+            "project_id": project_obj_id,
+            "sample_id": convert_to_objectid(sample_id, "samples"),
+        }
+        await db_client.replace_filtered_documents(
+            collection="annotations",
+            filters={**ids, "model_id": model_id, "validated": False},
+            models=sample_groups[sample_id],
+            ids=ids,
+            exclude={"id"},
+        )
 
 
 async def update_annotations(
@@ -583,7 +643,7 @@ async def update_annotation_by_id(
 
 
 async def get_files(dir_path: str, file_type: str) -> list[str]:
-    file_names = Path(dir_path).glob(f"*.{file_type}")
+    file_names = Path(dir_path).glob(f"**/*.{file_type}")
     file_names = map(str, file_names)
     file_names = sorted(file_names)
     return file_names
@@ -695,7 +755,7 @@ async def import_annotations(
 async def store_predictions(
     db_client: MongoDBClient,
     project_id: str,
-    model_type: str,
+    model: Model,
     samples: list[Sample],
     annotations: list[AnnotationBatchTypes],
 ) -> None:
@@ -703,20 +763,31 @@ async def store_predictions(
 
     Authorship, validation and the target samples come from the server, so a
     compromised worker cannot pass predictions off as a user's validated work or
-    write outside the predicted samples.
+    write outside the predicted samples. The model's earlier unvalidated
+    predictions for these samples are replaced.
     """
-    shot_ids = {sample.shot_id for sample in samples}
+    samples_by_shot = {sample.shot_id: sample for sample in samples}
     predictions = [
-        annotation for annotation in annotations if annotation.shot_id in shot_ids
+        annotation
+        for annotation in annotations
+        if annotation.shot_id in samples_by_shot
     ]
     for annotation in predictions:
-        annotation.created_by = f"model::{model_type}"
+        annotation.sample_id = samples_by_shot[annotation.shot_id].id
+        annotation.created_by = f"model::{model.type}"
+        annotation.model_id = model.id
         annotation.validated = False
     for sample in samples:
         await update_sample(
             db_client, sample.id, SampleUpdate(validated_annotations=False)
         )
-    await import_annotations(db_client, project_id, predictions)
+    await replace_predictions(
+        db_client,
+        project_id=project_id,
+        model_id=model.id,
+        sample_ids=[sample.id for sample in samples],
+        annotations=predictions,
+    )
 
 
 async def get_user_by_username(

@@ -28,6 +28,7 @@ export const BaseAnnotationSchema = CreatedBySchema.extend({
   timestamp: z.string().optional(),
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
+  model_id: z.string().nullable().default(null),
   signal_name: z.string().nullable().default(null),
   label: z.string(),
   type: z.string(),
@@ -326,6 +327,7 @@ export const ModelSchema = z.object({
   timestamp: z.string(),
   project_id: z.string(),
   type: z.string(),
+  name: z.string().nullable().optional(),
   version: z.int(),
   status: z.string(),
   progress: z.number(),
@@ -441,6 +443,7 @@ export type TimeSeriesAnnotationPoint = {
 
 export type TimeSeriesAnnotation = CreatedByFields & {
   id: string;
+  model_id: string | null;
   // The backend's own _id, when this annotation already exists in the DB (e.g. loaded
   // via GET, possibly another user's). null for annotations drawn locally and not yet
   // saved. Must round-trip back out on save so the server can tell "existing" from
@@ -553,8 +556,6 @@ export enum AnnotatorTypes {
 
 export const annotatorCreatedBy = (type: AnnotatorTypes) =>
   `annotators::${type}`;
-
-export const modelCreatedBy = (modelType: string) => `model::${modelType}`;
 
 const NON_HUMAN_AUTHOR_KINDS: Record<string, string> = {
   model: "model",

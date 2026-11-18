@@ -3,7 +3,7 @@ import logging
 import os
 import re
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -13,6 +13,7 @@ from mongita import MongitaClientDisk
 from mongita.collection import Collection
 from mongita.errors import DuplicateKeyError
 from mongita.results import DeleteResult, UpdateResult
+from pymongo import DeleteMany, DeleteOne, InsertOne
 
 logger = logging.getLogger(__name__)
 
@@ -364,6 +365,26 @@ class AsyncCollection:
             mutates=True,
             wrote=_deleted,
         )
+
+    async def bulk_write(
+        self, requests: Sequence[Any], ordered: bool = True, *args, **kwargs
+    ) -> Any:
+        """Apply insert and delete operations in order, holding the lock throughout."""
+
+        def _apply(col: Collection) -> None:
+            for request in requests:
+                if isinstance(request, InsertOne):
+                    col.insert_one(request._doc)
+                elif isinstance(request, DeleteMany):
+                    col.delete_many(request._filter)
+                elif isinstance(request, DeleteOne):
+                    col.delete_one(request._filter)
+                else:
+                    raise NotImplementedError(
+                        f"Bulk operation {type(request).__name__} is not supported."
+                    )
+
+        return await self._run(_apply, mutates=True)
 
     async def count_documents(
         self, filter: dict[str, Any] | None = None, *args, **kwargs

@@ -1,3 +1,4 @@
+import inspect
 import logging
 import math
 import pathlib
@@ -66,6 +67,18 @@ def _update_schema(schema: dict) -> dict:
     # Remove unevaluatedProperties or unevaluatedItems
     schema.pop("unevaluatedProperties", None)
     schema.pop("unevaluatedItems", None)
+
+    # Collapse Pydantic's `T | None` encoding (anyOf: [<T schema>, {"type": "null"}])
+    # into a single nullable schema. Left as-is, RJSF treats this as a generic
+    # union and renders a "pick an alternative" selector instead of a widget for T.
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list) and len(any_of) == 2:
+        null_schemas = [s for s in any_of if s.get("type") == "null"]
+        other_schemas = [s for s in any_of if s.get("type") != "null"]
+        if len(null_schemas) == 1 and len(other_schemas) == 1:
+            schema.pop("anyOf")
+            for key, value in other_schemas[0].items():
+                schema.setdefault(key, value)
 
     return schema
 
@@ -329,6 +342,22 @@ class Model(ABC):
             Note that this is optional, but should take precedence if provided.
         """
 
+    @abstractmethod
+    def weights_exist(self, results_dir: pathlib.Path) -> bool:
+        """Check whether saved model state exists which load() can restore.
+
+        Parameters
+        ----------
+        results_dir : pathlib.Path
+            The path to a directory in the model cache where your model weights are saved.
+
+        Returns
+        -------
+        bool
+            True if load() can restore the model from results_dir.
+        """
+        pass
+
 
 class ModelRegistry:
     _registry: typing.ClassVar[dict[str, type[Model]]] = {}
@@ -413,6 +442,11 @@ class ModelRegistry:
         if params is False:
             raise ValueError(f"No Model class called '{name}' found in registry!")
         return params
+
+    @classmethod
+    def get_description(cls, name: str) -> str | None:
+        model_class = cls._registry.get(name)
+        return inspect.getdoc(model_class) if model_class else None
 
     @classmethod
     def get_params_schema(

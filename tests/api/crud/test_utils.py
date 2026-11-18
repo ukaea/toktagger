@@ -14,6 +14,7 @@ from tests.db_definitions import (
     USER_ADMIN,
 )
 from toktagger.api.crud import utils
+from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.models import ModelIn, ModelUpdate
 from toktagger.api.schemas.projects import ProjectMemberUpdate
 from toktagger.api.schemas.samples import SampleUpdate
@@ -238,6 +239,215 @@ async def test_get_annotations_validated(db_client, setup_db):
 
 
 @pytest.mark.asyncio
+async def test_get_annotations_by_model_id(db_client, setup_db):
+    model_id = str(ObjectId())
+    annotation_id = await db_client.insert(
+        "annotations",
+        ANNOTATION_1.model_copy(update={"model_id": model_id}),
+        ids={
+            "project_id": ObjectId(setup_db["project_id_1"]),
+            "sample_id": ObjectId(setup_db["sample_id_1"]),
+        },
+    )
+
+    annotations = await utils.get_annotations(
+        db_client, project_id=setup_db["project_id_1"], model_id=model_id
+    )
+
+    assert [str(annotation.id) for annotation in annotations] == [annotation_id]
+
+
+@pytest.mark.asyncio
+async def test_delete_annotations_by_model_id(db_client, setup_db):
+    model_id = str(ObjectId())
+    await db_client.insert(
+        "annotations",
+        ANNOTATION_1.model_copy(update={"model_id": model_id}),
+        ids={
+            "project_id": ObjectId(setup_db["project_id_1"]),
+            "sample_id": ObjectId(setup_db["sample_id_1"]),
+        },
+    )
+
+    deleted = await utils.delete_annotations(
+        db_client, project_id=setup_db["project_id_1"], model_id=model_id
+    )
+
+    assert deleted == 1
+
+    # Annotations from other sources are left alone
+    annotations = await db_client.get_filtered_documents("annotations")
+    assert len(annotations) == 5
+    assert all(annotation.get("model_id") is None for annotation in annotations)
+
+
+async def _add_prediction_model(db_client, project_id) -> str:
+    return await db_client.insert(
+        "models",
+        ModelIn(
+            type="disruption_cnn",
+            version=1,
+            status="completed",
+            progress=100,
+            score=1,
+        ),
+        ids={"project_id": ObjectId(project_id)},
+    )
+
+
+def _prediction(model_id: str, label: str, validated: bool = False) -> TimePointBatch:
+    return TimePointBatch(
+        shot_id=1,
+        time=0.5,
+        label=label,
+        validated=validated,
+        created_by="model::disruption_cnn",
+        model_id=model_id,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_replace_predictions(db_client, setup_db):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    model_id = await _add_prediction_model(db_client, project_id)
+
+    await db_client.insert(
+        "annotations",
+        _prediction(model_id, "stale"),
+        ids={
+            "project_id": ObjectId(project_id),
+            "sample_id": ObjectId(sample_id),
+        },
+    )
+
+    fresh = _prediction(model_id, "fresh")
+    fresh.sample_id = sample_id
+
+    await utils.replace_predictions(
+        db_client,
+        project_id=project_id,
+        model_id=model_id,
+        sample_ids=[sample_id],
+        annotations=[fresh],
+    )
+
+    predictions = await utils.get_annotations(
+        db_client, project_id=project_id, model_id=model_id
+    )
+    assert [prediction.label for prediction in predictions] == ["fresh"]
+
+    # The five seeded annotations came from elsewhere and are left alone
+    annotations = await db_client.get_filtered_documents("annotations")
+    assert len([a for a in annotations if a.get("model_id") is None]) == 5
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_replace_predictions_keeps_validated(db_client, setup_db):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    model_id = await _add_prediction_model(db_client, project_id)
+
+    await db_client.insert(
+        "annotations",
+        _prediction(model_id, "approved", validated=True),
+        ids={
+            "project_id": ObjectId(project_id),
+            "sample_id": ObjectId(sample_id),
+        },
+    )
+
+    fresh = _prediction(model_id, "fresh")
+    fresh.sample_id = sample_id
+
+    await utils.replace_predictions(
+        db_client,
+        project_id=project_id,
+        model_id=model_id,
+        sample_ids=[sample_id],
+        annotations=[fresh],
+    )
+
+    predictions = await utils.get_annotations(
+        db_client, project_id=project_id, model_id=model_id
+    )
+    assert sorted(prediction.label for prediction in predictions) == [
+        "approved",
+        "fresh",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_replace_predictions_with_no_results_clears_sample(db_client, setup_db):
+    project_id = setup_db["project_id_1"]
+    sample_id = setup_db["sample_id_1"]
+    other_sample_id = setup_db["sample_id_2"]
+    model_id = await _add_prediction_model(db_client, project_id)
+
+    for target_sample_id in (sample_id, other_sample_id):
+        await db_client.insert(
+            "annotations",
+            _prediction(model_id, "stale"),
+            ids={
+                "project_id": ObjectId(project_id),
+                "sample_id": ObjectId(target_sample_id),
+            },
+        )
+
+    # A run which found nothing for this sample still clears what it found before
+    await utils.replace_predictions(
+        db_client,
+        project_id=project_id,
+        model_id=model_id,
+        sample_ids=[sample_id],
+        annotations=[],
+    )
+
+    predictions = await utils.get_annotations(
+        db_client, project_id=project_id, model_id=model_id
+    )
+    assert [prediction.sample_id for prediction in predictions] == [other_sample_id]
+
+
+@pytest.mark.asyncio
+async def test_replace_predictions_model_not_found(db_client, setup_db):
+    with pytest.raises(HTTPException) as error:
+        await utils.replace_predictions(
+            db_client,
+            project_id=setup_db["project_id_1"],
+            model_id=str(ObjectId()),
+            sample_ids=[setup_db["sample_id_1"]],
+            annotations=[],
+        )
+
+    assert error.value.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_replace_predictions_unexpected_sample(db_client, setup_db):
+    project_id = setup_db["project_id_1"]
+    model_id = await _add_prediction_model(db_client, project_id)
+
+    stray = _prediction(model_id, "fresh")
+    stray.sample_id = setup_db["sample_id_2"]
+
+    with pytest.raises(HTTPException) as error:
+        await utils.replace_predictions(
+            db_client,
+            project_id=project_id,
+            model_id=model_id,
+            sample_ids=[setup_db["sample_id_1"]],
+            annotations=[stray],
+        )
+
+    assert error.value.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_add_annotations(db_client):
     project_id = await db_client.insert(collection="projects", model=PROJECT_1)
     sample_id = await db_client.insert(collection="samples", model=SAMPLE_1)
@@ -438,8 +648,8 @@ async def test_get_models(db_client, setup_model_db):
     models = await utils.get_models(db_client, project_id=setup_model_db["project_id"])
     # Check three models returned
     assert len(models) == 4
-    # Check returned in correct order - reverse order of version
-    assert [model.version for model in models] == [3, 2, 1, 1]
+    # Check returned in creation order, newest first (sorted by _id descending)
+    assert [model.version for model in models] == [1, 3, 2, 1]
 
 
 @pytest.mark.asyncio
@@ -866,23 +1076,35 @@ async def test_get_user_projects_as_admin(db_client, setup_db_auth, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.models_enabled
 async def test_store_predictions_trusts_only_server_values(db_client, setup_db):
     """A worker cannot choose the author, or write outside the samples it was sent."""
     project_id = setup_db["project_id_1"]
     sample = await utils.get_sample(db_client, project_id, setup_db["sample_id_1"])
+    model_id = await _add_prediction_model(db_client, project_id)
+    model = await utils.get_model(
+        db_client, project_id, model_type="disruption_cnn", model_id=model_id
+    )
     predictions = [
-        ANNOTATION_1.model_copy(update={"shot_id": 1, "created_by": "someone-else"}),
+        ANNOTATION_1.model_copy(
+            update={
+                "shot_id": 1,
+                "created_by": "someone-else",
+                "model_id": "spoofed",
+                "validated": True,
+            }
+        ),
         ANNOTATION_2.model_copy(update={"shot_id": 2}),
     ]
 
-    await utils.store_predictions(
-        db_client, project_id, "disruption_cnn", [sample], predictions
-    )
+    await utils.store_predictions(db_client, project_id, model, [sample], predictions)
 
     stored = await db_client.get_filtered_documents(
         "annotations", filters={"created_by": "model::disruption_cnn"}
     )
     assert [annotation["shot_id"] for annotation in stored] == [1]
+    assert stored[0]["model_id"] == model_id
+    assert stored[0]["validated"] is False
     assert all(
         annotation["created_by"] != "someone-else"
         for annotation in await db_client.get_filtered_documents("annotations")

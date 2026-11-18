@@ -1,3 +1,4 @@
+import asyncio
 import random
 import time
 
@@ -13,6 +14,7 @@ from tests.db_definitions import USER_ADMIN_ID
 from tests.identity import get_auth_token, session_headers
 from toktagger.api.auth.core import get_internal_token
 from toktagger.api.main import RAY_NAMESPACE, Server
+from toktagger.api.routers import models as models_router
 from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
 
@@ -86,6 +88,12 @@ async def models_api_client(monkeypatch, settings, db_client, ray_session):
     ) as client:
         client.app = app
         yield client
+
+    # A prediction write still pending here would land in the next test's database.
+    pending_writes = list(models_router._prediction_writes)
+    for write in pending_writes:
+        write.cancel()
+    await asyncio.gather(*pending_writes, return_exceptions=True)
 
     # Cancel the "abc123" pending task, in case this test didn't (e.g. it wasn't
     # the cancel-training test), so it doesn't linger for the rest of the module.
@@ -188,3 +196,37 @@ async def setup_model_db(setup_model_samples, db_client):
         "model_id_3": model_id_3,
         "model_id_4": model_id_4,
     }
+
+
+@pytest_asyncio.fixture(scope="function")
+async def setup_model_predictions(setup_model_db, db_client):
+    """Predictions stamped with the ID of the model which produced them.
+
+    Three are unvalidated and one is validated, so tests can tell apart deletion of
+    stale predictions from deletion of work a human has approved.
+    """
+    project_obj_id = ObjectId(setup_model_db["project_id"])
+    model_id = setup_model_db["model_id_3"]
+    annotation_ids = []
+
+    for index, sample_id in enumerate(setup_model_db["sample_ids"][:4]):
+        annotation = TimePointBatch(
+            shot_id=9980 + index,
+            validated=index == 3,
+            label="Disruption",
+            time=50 + index,
+            created_by=f"model::{db_definitions.MODEL_3.type}",
+            model_id=model_id,
+        )
+        annotation_ids.append(
+            await db_client.insert(
+                "annotations",
+                annotation,
+                ids={
+                    "project_id": project_obj_id,
+                    "sample_id": ObjectId(sample_id),
+                },
+            )
+        )
+
+    yield {"model_id": model_id, "annotation_ids": annotation_ids}

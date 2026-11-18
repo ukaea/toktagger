@@ -17,6 +17,7 @@ import { MultiVariateTimeSeriesDataSchema, PlotProps, TaskType } from "@/types";
 import { getAnnotationsForSample } from "@/app/core";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
 import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
+import { ModelTrainModal } from "@/app/components/tools/modelTrain";
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
 import { ChangePointDetectionTool } from "../annotators/changepoints";
@@ -212,6 +213,10 @@ export default function ToolBar() {
   }
   // Predicting writes annotations, so it needs the annotator role.
   if (modelsEnabled && canAnnotate) {
+    tools.push({
+      name: "Model Training",
+      component: <ModelTrainModal project={project} isEnabled />,
+    });
     tools.push({
       name: "Model Prediction",
       component: (
