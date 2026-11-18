@@ -11,10 +11,8 @@ import {
 } from "@/types";
 import React, {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -166,6 +164,7 @@ export const TimeSeriesProvider = ({
     useState<TimeSeriesToolDefinition | null>(() => readSavedTool(projectId));
   const [updateCounter, setUpdateCounter] = useState(0);
   const [syncCounter, setSyncCounter] = useState(0);
+  const [syncRequest, setSyncRequest] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(
     new Map(),
@@ -178,15 +177,12 @@ export const TimeSeriesProvider = ({
 
   // Viewers can't enter edit mode - gated here (rather than only disabling the
   // toolbar button) so the "e" keyboard shortcut is blocked too.
-  const setEditMode = useCallback(
-    (update: boolean | ((prev: boolean) => boolean)) => {
-      setEditModeRaw((prev) => {
-        const next = typeof update === "function" ? update(prev) : update;
-        return canAnnotate ? next : false;
-      });
-    },
-    [canAnnotate],
-  );
+  const setEditMode = (update: boolean | ((prev: boolean) => boolean)) => {
+    setEditModeRaw((prev) => {
+      const next = typeof update === "function" ? update(prev) : update;
+      return canAnnotate ? next : false;
+    });
+  };
 
   // If the role check resolves to "can't annotate" after edit mode was already on
   // (e.g. restored from a previous session, or a mid-session role change), drop back
@@ -225,80 +221,77 @@ export const TimeSeriesProvider = ({
     }
   }, [activeTool, projectId, pendingTool]);
 
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncCount = useRef<number>(0);
 
-  const parseRawAnnotations = useCallback(
-    (annotations: Annotation[]): TimeSeriesAnnotation[] => {
-      const parsedAnnotations: TimeSeriesAnnotation[] = [];
-      annotations.forEach((annotation) => {
-        const parsedAnnotation = convertRawAnnotationsToTimeSeries(annotation);
-        if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
-      });
-      return parsedAnnotations;
-    },
-    [],
-  );
+  const parseRawAnnotations = (
+    annotations: Annotation[],
+  ): TimeSeriesAnnotation[] => {
+    const parsedAnnotations: TimeSeriesAnnotation[] = [];
+    annotations.forEach((annotation) => {
+      const parsedAnnotation = convertRawAnnotationsToTimeSeries(annotation);
+      if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
+    });
+    return parsedAnnotations;
+  };
 
-  const parseTimeSeriesAnnotations = useCallback(
-    (annotations: TimeSeriesAnnotation[]): Annotation[] => {
-      const parsedAnnotations: Annotation[] = [];
-      annotations.forEach((annotation) => {
-        const parsedAnnotation = convertTimeSeriesToRawAnnotations(annotation);
-        if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
-      });
-      return parsedAnnotations;
-    },
-    [],
-  );
+  const parseTimeSeriesAnnotations = (
+    annotations: TimeSeriesAnnotation[],
+  ): Annotation[] => {
+    const parsedAnnotations: Annotation[] = [];
+    annotations.forEach((annotation) => {
+      const parsedAnnotation = convertTimeSeriesToRawAnnotations(annotation);
+      if (parsedAnnotation) parsedAnnotations.push(parsedAnnotation);
+    });
+    return parsedAnnotations;
+  };
 
   // The sample's annotations are shared with other tools, so this view must replace
   // only its own and carry the rest through untouched. Without this, annotations it
   // cannot represent - shot labels, for example - are lost on every edit.
-  const mergeTimeSeriesAnnotations = useCallback(
-    (previous: Annotation[], updated: TimeSeriesAnnotation[]): Annotation[] => {
-      // TimeSeriesAnnotation carries none of project_id, sample_id, shot_id, timestamp,
-      // validated or uncertainty, so the conversion back has to invent them. Right for a
-      // shape drawn here, but for an annotation that already exists those invented values
-      // would be written over the stored ones - downgrading somebody else's validated
-      // work on any edit before a save, and making every untouched annotation look edited
-      // to othersHaveUnsavedEdits (see core.tsx), which diffs on the full object.
-      const stored = new Map(
-        previous
-          .filter((annotation) => annotation._id)
-          .map((annotation) => [annotation._id, annotation]),
-      );
-      return [
-        ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
-        ...parseTimeSeriesAnnotations(updated).map((annotation) => {
-          const existing = annotation._id
-            ? stored.get(annotation._id)
-            : undefined;
-          if (!existing) return annotation;
-          return {
-            ...annotation,
-            project_id: existing.project_id,
-            sample_id: existing.sample_id,
-            shot_id: existing.shot_id,
-            timestamp: existing.timestamp,
-            validated: existing.validated,
-            uncertainty: existing.uncertainty,
-          };
-        }),
-      ];
-    },
-    [parseTimeSeriesAnnotations],
-  );
+  const mergeTimeSeriesAnnotations = (
+    previous: Annotation[],
+    updated: TimeSeriesAnnotation[],
+  ): Annotation[] => {
+    // TimeSeriesAnnotation carries none of project_id, sample_id, shot_id, timestamp,
+    // validated or uncertainty, so the conversion back has to invent them. Right for a
+    // shape drawn here, but for an annotation that already exists those invented values
+    // would be written over the stored ones - downgrading somebody else's validated
+    // work on any edit before a save, and making every untouched annotation look edited
+    // to othersHaveUnsavedEdits (see core.tsx), which diffs on the full object.
+    const stored = new Map(
+      previous
+        .filter((annotation) => annotation._id)
+        .map((annotation) => [annotation._id, annotation]),
+    );
+    return [
+      ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
+      ...parseTimeSeriesAnnotations(updated).map((annotation) => {
+        const existing = annotation._id
+          ? stored.get(annotation._id)
+          : undefined;
+        if (!existing) return annotation;
+        return {
+          ...annotation,
+          project_id: existing.project_id,
+          sample_id: existing.sample_id,
+          shot_id: existing.shot_id,
+          timestamp: existing.timestamp,
+          validated: existing.validated,
+          uncertainty: existing.uncertainty,
+        };
+      }),
+    ];
+  };
 
   // Discards any in-progress annotation for the currently active tool and clears the
   // ongoing-action flag - used whenever a draw is abandoned rather than completed normally
-  const cancelOngoingAction = useCallback(() => {
+  const cancelOngoingAction = () => {
     if (!ongoingAction) return;
     if (activeTool) {
       toolingCallbacks.get(activeTool.type)?.cancel?.();
     }
     setOngoingAction(false);
-  }, [activeTool, ongoingAction, toolingCallbacks]);
+  };
 
   useEffect(() => {
     if (!project) return;
@@ -357,27 +350,26 @@ export const TimeSeriesProvider = ({
     setAnnotations(parseRawAnnotations(rawAnnotations));
   }, [parseRawAnnotations, rawAnnotations]);
 
-  const triggerSync = useCallback(() => {
-    setSyncCounter((prev) => (prev + 1) % 100);
-  }, []);
+  // Each request restarts the timer; a ref-held timeout would stop the compiler memoising the callers.
+  const requestSync = () => {
+    setSyncRequest((prev) => prev + 1);
+  };
 
-  const syncAnnotations = useCallback(() => {
+  useEffect(() => {
+    if (syncRequest === 0) return;
+    const timeout = setTimeout(() => {
+      setSyncCounter((prev) => (prev + 1) % 100);
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [syncRequest]);
+
+  const syncAnnotations = () => {
     if (ongoingAction) {
-      if (syncTimeoutRef.current !== null) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-      syncTimeoutRef.current = setTimeout(triggerSync, 100);
+      requestSync();
       return;
     }
-    syncTimeoutRef.current = null;
     setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, annotations));
-  }, [
-    annotations,
-    ongoingAction,
-    mergeTimeSeriesAnnotations,
-    setRawAnnotations,
-    triggerSync,
-  ]);
+  };
 
   useEffect(() => {
     if (lastSyncCount.current === syncCounter) return;
@@ -385,87 +377,64 @@ export const TimeSeriesProvider = ({
     syncAnnotations();
   }, [syncAnnotations, syncCounter]);
 
-  const createAnnotation = useCallback(
-    (type: TimeSeriesAnnotationType, label: string): TimeSeriesAnnotation => {
-      const id = uuidv4();
-      return {
-        id,
-        db_id: null,
-        created_by: user?._id ?? "manual",
-        created_by_name: user?.username,
-        label,
-        signal_name: signalName,
-        type,
-        points: [],
-        selected: false,
-      };
-    },
-    [signalName, user],
-  );
+  const createAnnotation = (
+    type: TimeSeriesAnnotationType,
+    label: string,
+  ): TimeSeriesAnnotation => {
+    const id = uuidv4();
+    return {
+      id,
+      db_id: null,
+      created_by: user?._id ?? "manual",
+      created_by_name: user?.username,
+      label,
+      signal_name: signalName,
+      type,
+      points: [],
+      selected: false,
+    };
+  };
 
-  const addAnnotation = useCallback(
-    (annotation: TimeSeriesAnnotation) => {
-      if (syncTimeoutRef.current !== null) {
-        clearTimeout(syncTimeoutRef.current);
-        syncTimeoutRef.current = null;
-      }
-      syncTimeoutRef.current = setTimeout(triggerSync, 100);
+  const addAnnotation = (annotation: TimeSeriesAnnotation) => {
+    requestSync();
+    setAnnotations((prev) => [...prev, annotation]);
+  };
 
-      setAnnotations((prev) => [...prev, annotation]);
-    },
-    [triggerSync],
-  );
+  const removeAnnotation = (id: string) => {
+    requestSync();
+    setAnnotations((prev) => prev.filter((annotation) => annotation.id !== id));
+  };
 
-  const removeAnnotation = useCallback(
-    (id: string) => {
-      if (syncTimeoutRef.current !== null) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-      syncTimeoutRef.current = setTimeout(triggerSync, 100);
+  const getAnnotation = (id: string) => {
+    annotations.forEach((annotation) => {
+      if (annotation.id === id) return annotation;
+    });
+    console.warn(`Annotation with id: ${id} could not be found`);
+    return null;
+  };
 
-      setAnnotations((prev) =>
-        prev.filter((annotation) => annotation.id !== id),
-      );
-    },
-    [triggerSync],
-  );
+  const registerTooling = (
+    type: TimeSeriesAnnotationType,
+    callbacks: ToolingCallbacks,
+  ) => {
+    setToolingCallbacks((prev) => {
+      if (prev.has(type)) return prev;
+      const newMap = new Map(prev);
+      newMap.set(type, callbacks);
+      return newMap;
+    });
+  };
 
-  const getAnnotation = useCallback(
-    (id: string) => {
-      annotations.forEach((annotation) => {
-        if (annotation.id === id) return annotation;
-      });
-      console.warn(`Annotation with id: ${id} could not be found`);
-      return null;
-    },
-    [annotations],
-  );
-
-  const registerTooling = useCallback(
-    (type: TimeSeriesAnnotationType, callbacks: ToolingCallbacks) => {
-      setToolingCallbacks((prev) => {
-        if (prev.has(type)) return prev;
-        const newMap = new Map(prev);
-        newMap.set(type, callbacks);
-        return newMap;
-      });
-    },
-    [],
-  );
-
-  const setAnnotationTool = useCallback(
-    (tool: TimeSeriesToolDefinition | null) => {
-      if (!tool || toolingCallbacks.has(tool.type)) {
-        cancelOngoingAction(); // Switching tools mid-draw abandons whatever was in progress
-        setActiveTool(tool);
-        return;
-      }
-      console.warn(
-        `Could not set ${tool.type} as active tool since no callback has been registered`,
-      );
-    },
-    [cancelOngoingAction, toolingCallbacks],
-  );
+  const setAnnotationTool = (tool: TimeSeriesToolDefinition | null) => {
+    if (!tool || toolingCallbacks.has(tool.type)) {
+      cancelOngoingAction(); // Switching tools mid-draw abandons whatever was in progress
+      setActiveTool(tool);
+      return;
+    }
+    console.warn(
+      `Could not set ${tool.type} as active tool since no callback has been registered`,
+    );
+  };
 
   // Lets a mid-draw annotation be abandoned via Escape, in addition to switching tools
   useEffect(() => {
@@ -499,210 +468,160 @@ export const TimeSeriesProvider = ({
     setPendingTool(null);
   }, [pendingTool, toolingCallbacks, categories, projectId, setAnnotationTool]);
 
-  const updateAnnotation = useCallback(
-    (annotation: TimeSeriesAnnotation) => {
-      if (syncTimeoutRef.current !== null) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-      syncTimeoutRef.current = setTimeout(triggerSync, 100);
+  const updateAnnotation = (annotation: TimeSeriesAnnotation) => {
+    requestSync();
+    setAnnotations((prev) =>
+      prev.map((item) =>
+        item.id === annotation.id
+          ? { ...annotation, selected: item.selected }
+          : item,
+      ),
+    );
+  };
 
-      setAnnotations((prev) =>
-        prev.map((item) =>
-          item.id === annotation.id
-            ? { ...annotation, selected: item.selected }
-            : item,
-        ),
-      );
-    },
-    [triggerSync],
-  );
-
-  const triggerUpdate = useCallback(() => {
+  const triggerUpdate = () => {
     setUpdateCounter((prev) => (prev + 1) % 100);
-  }, []);
+  };
 
-  const selectAnnotations = useCallback(
-    (ids: string[]) => {
-      if (!editMode) return;
+  const selectAnnotations = (ids: string[]) => {
+    if (!editMode) return;
 
+    const updated_state: TimeSeriesAnnotation[] = annotations.map(
+      (annotation) => {
+        if (ids.includes(annotation.id)) {
+          return { ...annotation, selected: true };
+        }
+        return { ...annotation, selected: false };
+      },
+    );
+
+    setAnnotations(updated_state);
+  };
+
+  const findSelectedAnnotations = (range: SelectionRange | null) => {
+    if (!editMode) return;
+
+    if (!range) {
       const updated_state: TimeSeriesAnnotation[] = annotations.map(
-        (annotation) => {
-          if (ids.includes(annotation.id)) {
+        (annotation) => ({ ...annotation, selected: false }),
+      );
+      setAnnotations(updated_state);
+      return;
+    }
+
+    const updated_state: TimeSeriesAnnotation[] = annotations.map(
+      (annotation) => {
+        if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
+          if (
+            annotation.points[0].x > range.x.low &&
+            annotation.points[1].x < range.x.high
+          ) {
             return { ...annotation, selected: true };
           }
           return { ...annotation, selected: false };
-        },
-      );
-
-      setAnnotations(updated_state);
-    },
-    [annotations, editMode],
-  );
-
-  const findSelectedAnnotations = useCallback(
-    (range: SelectionRange | null) => {
-      if (!editMode) return;
-
-      if (!range) {
-        const updated_state: TimeSeriesAnnotation[] = annotations.map(
-          (annotation) => ({ ...annotation, selected: false }),
-        );
-        setAnnotations(updated_state);
-        return;
-      }
-
-      const updated_state: TimeSeriesAnnotation[] = annotations.map(
-        (annotation) => {
-          if (annotation.type === TimeSeriesAnnotationType.TIME_REGION) {
-            if (
-              annotation.points[0].x > range.x.low &&
-              annotation.points[1].x < range.x.high
-            ) {
-              return { ...annotation, selected: true };
-            }
-            return { ...annotation, selected: false };
-          }
-          if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
-            if (
-              annotation.points[0].x > range.x.low &&
-              annotation.points[0].x < range.x.high
-            ) {
-              return { ...annotation, selected: true };
-            }
-            return { ...annotation, selected: false };
-          }
-          if (annotation.type === TimeSeriesAnnotationType.BOUNDING_BOX) {
-            if (
-              annotation.points[0].x > range.x.low &&
-              annotation.points[1].x < range.x.high &&
-              annotation.points[1].y > range.y.low &&
-              annotation.points[0].y < range.y.high
-            ) {
-              return { ...annotation, selected: true };
-            }
-            return { ...annotation, selected: false };
-          }
-          if (annotation.type === TimeSeriesAnnotationType.POLYGON) {
-            const selected =
-              annotation.points.length > 0 &&
-              annotation.points.every(
-                (point) =>
-                  point.x >= range.x.low &&
-                  point.x <= range.x.high &&
-                  point.y >= range.y.low &&
-                  point.y <= range.y.high,
-              );
-
-            return {
-              ...annotation,
-              selected,
-            };
+        }
+        if (annotation.type === TimeSeriesAnnotationType.TIME_POINT) {
+          if (
+            annotation.points[0].x > range.x.low &&
+            annotation.points[0].x < range.x.high
+          ) {
+            return { ...annotation, selected: true };
           }
           return { ...annotation, selected: false };
-        },
-      );
-
-      setAnnotations(updated_state);
-    },
-    [annotations, editMode],
-  );
-
-  const batchUpdateLabels = useCallback(
-    (category: TimeSeriesCategory) => {
-      const updatedState: TimeSeriesAnnotation[] = annotations.map(
-        (annotation) => {
-          // Label should only be changed if it is the annotation is the correct type and selected
-          if (annotation.type === category.type && annotation.selected) {
-            return { ...annotation, label: category.label };
+        }
+        if (annotation.type === TimeSeriesAnnotationType.BOUNDING_BOX) {
+          if (
+            annotation.points[0].x > range.x.low &&
+            annotation.points[1].x < range.x.high &&
+            annotation.points[1].y > range.y.low &&
+            annotation.points[0].y < range.y.high
+          ) {
+            return { ...annotation, selected: true };
           }
-          return annotation;
-        },
-      );
+          return { ...annotation, selected: false };
+        }
+        if (annotation.type === TimeSeriesAnnotationType.POLYGON) {
+          const selected =
+            annotation.points.length > 0 &&
+            annotation.points.every(
+              (point) =>
+                point.x >= range.x.low &&
+                point.x <= range.x.high &&
+                point.y >= range.y.low &&
+                point.y <= range.y.high,
+            );
 
-      setRawAnnotations((prev) =>
-        mergeTimeSeriesAnnotations(prev, updatedState),
-      );
-    },
-    [annotations, mergeTimeSeriesAnnotations, setRawAnnotations],
-  );
+          return {
+            ...annotation,
+            selected,
+          };
+        }
+        return { ...annotation, selected: false };
+      },
+    );
+
+    setAnnotations(updated_state);
+  };
+
+  const batchUpdateLabels = (category: TimeSeriesCategory) => {
+    const updatedState: TimeSeriesAnnotation[] = annotations.map(
+      (annotation) => {
+        // Label should only be changed if it is the annotation is the correct type and selected
+        if (annotation.type === category.type && annotation.selected) {
+          return { ...annotation, label: category.label };
+        }
+        return annotation;
+      },
+    );
+
+    setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, updatedState));
+  };
 
   // Writes straight through to the sample's annotations, unlike removeAnnotation,
   // which only drops a half-drawn shape from this view's own working copy.
-  const deleteAnnotations = useCallback(
-    (shouldDelete: (annotation: TimeSeriesAnnotation) => boolean) => {
-      setRawAnnotations((prev) =>
-        mergeTimeSeriesAnnotations(
-          prev,
-          annotations.filter((annotation) => !shouldDelete(annotation)),
-        ),
-      );
-    },
-    [annotations, mergeTimeSeriesAnnotations, setRawAnnotations],
-  );
+  const deleteAnnotations = (
+    shouldDelete: (annotation: TimeSeriesAnnotation) => boolean,
+  ) => {
+    setRawAnnotations((prev) =>
+      mergeTimeSeriesAnnotations(
+        prev,
+        annotations.filter((annotation) => !shouldDelete(annotation)),
+      ),
+    );
+  };
 
-  const batchDeleteAnnotations = useCallback(
-    () => deleteAnnotations((annotation) => annotation.selected ?? false),
-    [deleteAnnotations],
-  );
+  const batchDeleteAnnotations = () =>
+    deleteAnnotations((annotation) => annotation.selected ?? false);
 
-  const actionsValue: TimeSeriesActions = useMemo(
-    () => ({
-      setAnnotations,
-      createAnnotation,
-      addAnnotation,
-      removeAnnotation,
-      setAnnotationTool,
-      registerTooling,
-      updateAnnotation,
-      getAnnotation,
-      triggerUpdate,
-      selectAnnotations,
-      findSelectedAnnotations,
-      setEditMode,
-      setOngoingAction,
-      setFocusXRange,
-    }),
-    [
-      createAnnotation,
-      addAnnotation,
-      removeAnnotation,
-      setAnnotationTool,
-      registerTooling,
-      updateAnnotation,
-      getAnnotation,
-      triggerUpdate,
-      selectAnnotations,
-      findSelectedAnnotations,
-      setEditMode,
-    ],
-  );
+  const actionsValue: TimeSeriesActions = {
+    setAnnotations,
+    createAnnotation,
+    addAnnotation,
+    removeAnnotation,
+    setAnnotationTool,
+    registerTooling,
+    updateAnnotation,
+    getAnnotation,
+    triggerUpdate,
+    selectAnnotations,
+    findSelectedAnnotations,
+    setEditMode,
+    setOngoingAction,
+    setFocusXRange,
+  };
 
-  const stateValue: TimeSeriesState = useMemo(
-    () => ({
-      annotations,
-      activeAnnotationTool: activeTool,
-      toolingCallbacks,
-      forceUpdate: updateCounter,
-      isDrawing,
-      ongoingAction,
-      categories,
-      editMode,
-      canAnnotate,
-      focusXRange,
-    }),
-    [
-      annotations,
-      activeTool,
-      toolingCallbacks,
-      updateCounter,
-      isDrawing,
-      ongoingAction,
-      categories,
-      editMode,
-      canAnnotate,
-      focusXRange,
-    ],
-  );
+  const stateValue: TimeSeriesState = {
+    annotations,
+    activeAnnotationTool: activeTool,
+    toolingCallbacks,
+    forceUpdate: updateCounter,
+    isDrawing,
+    ongoingAction,
+    categories,
+    editMode,
+    canAnnotate,
+    focusXRange,
+  };
 
   useEffect(() => {
     if (!editMode) return;
@@ -726,10 +645,10 @@ export const TimeSeriesProvider = ({
     setRawAnnotations,
   ]);
 
-  // setEditMode's identity changes whenever canAnnotate resolves (see above), so it's
-  // read through a ref rather than a dependency here - re-registering these listeners
-  // on that change would tear down the "Control" keydown/keyup pair mid-drag and break
-  // the ctrl-drag gesture tools rely on to draw. The ref always has the latest guard.
+  // setEditMode is re-created whenever canAnnotate changes, so it's read through a ref
+  // rather than a dependency here - re-registering these listeners on that change would
+  // tear down the "Control" keydown/keyup pair mid-drag and break the ctrl-drag gesture
+  // tools rely on to draw. The ref always has the latest guard.
   const setEditModeRef = useRef(setEditMode);
   useEffect(() => {
     setEditModeRef.current = setEditMode;

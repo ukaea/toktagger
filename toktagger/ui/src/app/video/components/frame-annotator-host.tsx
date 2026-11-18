@@ -2,9 +2,7 @@
  * The canvas: shows the current frame in OpenSeadragon with the Annotorious layer on top.
  * It handles points and frame labels itself, since Annotorious has no tools for them.
  */
-"use client";
-
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import OpenSeadragon from "openseadragon";
 import {
   OpenSeadragonAnnotator,
@@ -90,6 +88,24 @@ function findAnnotationOverlay(viewerElement: HTMLElement | null) {
   return null;
 }
 
+// The viewer and the drawing layer on top of it, which both need to catch clicks
+function getClickTargets(viewer: OpenSeadragon.Viewer): HTMLElement[] {
+  const viewerElement = viewer.element as HTMLElement;
+  return [viewerElement, findAnnotationOverlay(viewerElement)].filter(
+    (target, index, list): target is HTMLElement =>
+      !!target && list.indexOf(target) === index,
+  );
+}
+
+function toImagePoint(viewer: OpenSeadragon.Viewer, event: MouseEvent) {
+  const viewerBounds = (viewer.element as HTMLElement).getBoundingClientRect();
+  const viewerPoint = new OpenSeadragon.Point(
+    event.clientX - viewerBounds.left,
+    event.clientY - viewerBounds.top,
+  );
+  return viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+}
+
 function stopEvent(event: Event) {
   event.preventDefault();
   event.stopPropagation();
@@ -126,14 +142,7 @@ function findAnnotationAtPointer(
   const viewer = api.viewer;
   if (!viewer) return null;
 
-  const viewerElement = viewer.element as HTMLElement;
-  const viewerBounds = viewerElement.getBoundingClientRect();
-  const viewerPoint = new OpenSeadragon.Point(
-    event.clientX - viewerBounds.left,
-    event.clientY - viewerBounds.top,
-  );
-  const imagePoint =
-    viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+  const imagePoint = toImagePoint(viewer, event);
 
   return (
     [...api.getAnnotations()]
@@ -144,12 +153,7 @@ function findAnnotationAtPointer(
 }
 
 /** Renders the canvas for one frame's base64 image. */
-export function FrameAnnotatorHost(props: { imageBase64: string }) {
-  return <Inner imageBase64={props.imageBase64} />;
-}
-
-/** Syncing with Annotorious lives in the session, so this only renders and passes clicks to the session. */
-function Inner({ imageBase64 }: { imageBase64: string }) {
+export function FrameAnnotatorHost({ imageBase64 }: { imageBase64: string }) {
   const { annotationLabels } = useSample();
   const { setVideoLastClassName } = useVideoUiState();
   const {
@@ -178,10 +182,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     string | null
   >(null);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
-  const classItems = useMemo(
-    () => annotationLabels.map((label) => ({ name: label.name })),
-    [annotationLabels],
-  );
+  const classItems = annotationLabels.map((label) => ({ name: label.name }));
 
   useEffect(() => {
     if (!api?.on || !api?.off) return;
@@ -227,10 +228,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     setImageNatural(null);
   }, [frame, setImageNatural]);
 
-  const dataUrl = useMemo(
-    () => `data:image/png;base64,${imageBase64}`,
-    [imageBase64],
-  );
+  const dataUrl = `data:image/png;base64,${imageBase64}`;
   const viewer = api?.viewer;
   const savedViewRef = useRef<{
     bounds: OpenSeadragon.Rect;
@@ -396,12 +394,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   useEffect(() => {
     if (!api?.viewer) return;
 
-    const viewerElement = api.viewer.element as HTMLElement;
-    const overlay = findAnnotationOverlay(viewerElement);
-    const targets = [viewerElement, overlay].filter(
-      (target, index, list): target is HTMLElement =>
-        !!target && list.indexOf(target) === index,
-    );
+    const targets = getClickTargets(api.viewer);
 
     const blockContextMenu = (event: MouseEvent) => {
       // macOS fires contextmenu on Ctrl+primary click, which is the draw gesture here.
@@ -496,7 +489,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     if (!cls) return;
 
     setVideoLastClassName(cls);
-    setSelection({ className: cls, trackId: null, source: "explicit" });
+    setSelection({ className: cls, trackId: null });
   };
 
   // Point tool: Ctrl + click places a point. Listening in the capture phase gets the click before Annotorious.
@@ -504,24 +497,13 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     if (!api?.viewer || !canDrawPoint) return;
 
     const viewer = api.viewer;
-    const viewerElement = viewer.element as HTMLElement;
-    const overlay = findAnnotationOverlay(viewerElement);
-    const targets = [viewerElement, overlay].filter(
-      (target, index, list): target is HTMLElement =>
-        !!target && list.indexOf(target) === index,
-    );
+    const targets = getClickTargets(viewer);
 
     const handlePointClick = (event: MouseEvent) => {
       if (isSecondaryMouseEvent(event)) return;
       if (isAnnotationPopupEventTarget(event.target)) return;
 
-      const viewerBounds = viewerElement.getBoundingClientRect();
-      const viewerPoint = new OpenSeadragon.Point(
-        event.clientX - viewerBounds.left,
-        event.clientY - viewerBounds.top,
-      );
-      const imagePoint =
-        viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+      const imagePoint = toImagePoint(viewer, event);
 
       stopEvent(event);
       api.cancelDrawing?.();
@@ -543,12 +525,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   useEffect(() => {
     if (!api?.viewer || !canTagFrame) return;
 
-    const viewerElement = api.viewer.element as HTMLElement;
-    const overlay = findAnnotationOverlay(viewerElement);
-    const targets = [viewerElement, overlay].filter(
-      (target, index, list): target is HTMLElement =>
-        !!target && list.indexOf(target) === index,
-    );
+    const targets = getClickTargets(api.viewer);
 
     const handleFrameTagClick = (event: MouseEvent) => {
       if (isSecondaryMouseEvent(event)) return;
@@ -587,13 +564,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     const viewerElement = viewer.element as HTMLElement;
 
     const handleMouseMove = (event: MouseEvent) => {
-      const viewerBounds = viewerElement.getBoundingClientRect();
-      const viewerPoint = new OpenSeadragon.Point(
-        event.clientX - viewerBounds.left,
-        event.clientY - viewerBounds.top,
-      );
-      const imagePoint =
-        viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+      const imagePoint = toImagePoint(viewer, event);
 
       const isOverAnnotation = api
         .getAnnotations()
@@ -627,23 +598,20 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     };
   }, [api, canDrawPoint, canTagFrame, drawIntent, editMode, hideAnnotations]);
 
-  const viewerOptions = useMemo<OpenSeadragon.Options>(
-    () => ({
-      tileSources: {
-        type: "image",
-        url: dataUrl,
-      },
-      minZoomImageRatio: 0.8,
-      maxZoomPixelRatio: 100,
-      visibilityRatio: 0.5,
-      constrainDuringPan: true,
-      animationTime: 0.3,
-      showNavigationControl: false,
-      mouseNavEnabled: false,
-      imageSmoothingEnabled: false,
-    }),
-    [dataUrl],
-  );
+  const viewerOptions: OpenSeadragon.Options = {
+    tileSources: {
+      type: "image",
+      url: dataUrl,
+    },
+    minZoomImageRatio: 0.8,
+    maxZoomPixelRatio: 100,
+    visibilityRatio: 0.5,
+    constrainDuringPan: true,
+    animationTime: 0.3,
+    showNavigationControl: false,
+    mouseNavEnabled: false,
+    imageSmoothingEnabled: false,
+  };
 
   const formatDetails = (annotation: ImageAnnotation) => {
     const point = isPointAnno(annotation)

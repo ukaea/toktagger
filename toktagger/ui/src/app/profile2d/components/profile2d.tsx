@@ -18,7 +18,7 @@ import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useElementHeight } from "@/app/hooks/useElementHeight";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "@adobe/react-spectrum";
 import * as d3 from "d3";
 
@@ -279,32 +279,30 @@ export const Profile2dView = () => {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
-  // Memoised so an annotation drag doesn't tear down and rebuild the plot mid-draw.
-  const plot = useMemo(() => {
-    if (!viewData || !plotProps) return null;
-    const interpFunc =
-      colorMapInterpolators[plotProps.colorMap ?? ""] ?? d3.interpolateCividis;
-    const createPlotFunc = logScale
-      ? createLogScalePlot
-      : createLinearScalePlot;
-    return createPlotFunc(viewData, plotProps, interpFunc);
-  }, [viewData, plotProps, logScale]);
-
-  const plotData = useMemo<Partial<Plotly.PlotData>[]>(() => {
-    if (!viewData || !plot) return [];
-    return buildPlotData(viewData, plot.values, plotProps?.thresholdActive);
-  }, [viewData, plot, plotProps?.thresholdActive]);
-
-  // The plot grows into spare height, but never shrinks below MIN_PLOT_HEIGHT -
-  // the column scrolls instead.
+  // Before the plot is built: the compiler won't memoise across a hook, and a rebuilt plot drops mid-draw shapes.
   const { ref: plotAreaRef, height: plotAreaHeight } =
     useElementHeight<HTMLDivElement>();
+
+  const plot =
+    viewData && plotProps
+      ? (logScale ? createLogScalePlot : createLinearScalePlot)(
+          viewData,
+          plotProps,
+          colorMapInterpolators[plotProps.colorMap ?? ""] ??
+            d3.interpolateCividis,
+        )
+      : null;
+
+  const plotData: Partial<Plotly.PlotData>[] =
+    viewData && plot
+      ? buildPlotData(viewData, plot.values, plotProps?.thresholdActive)
+      : [];
+
   const plotHeight = Math.max(plotAreaHeight, MIN_PLOT_HEIGHT);
 
-  const plotLayout = useMemo(
-    () => (plot ? buildPlotLayout(plot.colorAxis, isDarkMode, plotHeight) : {}),
-    [plot, isDarkMode, plotHeight],
-  );
+  const plotLayout = plot
+    ? buildPlotLayout(plot.colorAxis, isDarkMode, plotHeight)
+    : {};
 
   if (!viewData || !profileViewParams || !plot) {
     return null;

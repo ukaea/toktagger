@@ -2,8 +2,6 @@
  * Plugs the video view into the shared Save and Clear buttons in the left toolbox.
  * Clear only clears the current frame.
  */
-"use client";
-
 import React from "react";
 import { useSample } from "@/app/contexts/SampleContext";
 import {
@@ -45,9 +43,6 @@ export function VideoNavAdapterBridge({
     // screen", and a frame's annotations are only ever the ones being drawn on it.
     clear: () => {
       session.clearCurrentFrame();
-    },
-    afterSave: () => {
-      session.markSaved();
     },
   };
 
