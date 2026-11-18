@@ -7,6 +7,7 @@ from toktagger.api.schemas.data import (
     MultiProfile2DData,
     MultiVariateTimeSeriesData,
     Profile2DData,
+    SpectrogramData,
     TimeSeriesData,
 )
 from toktagger.api.schemas.views import Profile2DViewParams, ViewParams, ViewType
@@ -27,8 +28,11 @@ class Profile2DView:
     def convert_profile_to_view(
         self, data: Profile2DData | TimeSeriesData
     ) -> Profile2DData:
+        is_spectrogram = isinstance(data, TimeSeriesData)
         if isinstance(data, TimeSeriesData):
-            dim_1, time, values = compute_stft(data)  # shape (dim_1, time)
+            dim_1, time, values = compute_stft(
+                data, self.params.stft
+            )  # shape (dim_1, time)
         elif isinstance(data, Profile2DData):
             time = np.array(data.time)
             dim_1 = np.array(data.dim_1)
@@ -76,7 +80,8 @@ class Profile2DView:
         ds = ds.sel(dim_1=slice(dim_1_min, dim_1_max))
         ds = ds.clip(values_min, values_max)
 
-        return Profile2DData(
+        output_type = SpectrogramData if is_spectrogram else Profile2DData
+        return output_type(
             time=ds.time.values.tolist(),
             dim_1=ds.dim_1.values.tolist(),
             values=ds.values.tolist(),

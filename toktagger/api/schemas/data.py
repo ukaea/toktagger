@@ -24,6 +24,10 @@ class Profile2DData(Data):
     values: list[list[float]]
 
 
+class SpectrogramData(Profile2DData):
+    kind: Literal["spectrogram"] = "spectrogram"
+
+
 class MultiProfile2DData(Data):
     values: dict[str, Profile2DData | None]
 
@@ -45,7 +49,12 @@ class ImageParams(DataParams):
 
 
 DataResponseType = (
-    Data | ImageData | MultiVariateTimeSeriesData | Profile2DData | MultiProfile2DData
+    Data
+    | ImageData
+    | MultiVariateTimeSeriesData
+    | SpectrogramData
+    | Profile2DData
+    | MultiProfile2DData
 )
 
 DataParamTypes = DataParams | ImageParams
