@@ -1,3 +1,4 @@
+import asyncio
 import random
 import time
 
@@ -13,6 +14,7 @@ from tests.db_definitions import USER_ADMIN_ID
 from tests.identity import get_auth_token, session_headers
 from toktagger.api.auth.core import get_internal_token
 from toktagger.api.main import RAY_NAMESPACE, Server
+from toktagger.api.routers import models as models_router
 from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.samples import SampleIn, TimeSeriesFileData
 
@@ -86,6 +88,12 @@ async def models_api_client(monkeypatch, settings, db_client, ray_session):
     ) as client:
         client.app = app
         yield client
+
+    # A prediction write still pending here would land in the next test's database.
+    pending_writes = list(models_router._prediction_writes)
+    for write in pending_writes:
+        write.cancel()
+    await asyncio.gather(*pending_writes, return_exceptions=True)
 
     # Cancel the "abc123" pending task, in case this test didn't (e.g. it wasn't
     # the cancel-training test), so it doesn't linger for the rest of the module.

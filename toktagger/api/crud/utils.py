@@ -522,6 +522,9 @@ async def replace_predictions(
     project_obj_id = convert_to_objectid(project_id, "projects")
     model_obj_id = convert_to_objectid(model_id, "models")
 
+    if not await db_client.get_document_by_id("projects", project_obj_id):
+        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
     if not await db_client.get_document_by_id(
         collection="models", object_id=model_obj_id
     ):
