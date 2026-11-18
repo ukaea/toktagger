@@ -1,28 +1,60 @@
 # tests/test_settings.py
 
+import argparse
 import pathlib
+import tempfile
 
 import pydantic
 import pytest
+import tomllib
 from pydantic_settings import SettingsConfigDict
-import tempfile
-from toktagger.api.config import Settings
 
 from scripts.generate_example_config import create_default_toml_file
-import tomllib
+from toktagger.api.cli import apply_cli_overrides
+from toktagger.api.config import Settings
 
 ENV_VARS = [
     "SERVER_HOST",
     "SERVER_PORT",
     "SERVER_RELOAD",
+    "SERVER_WORKERS",
     "SERVER_CACHE_DIR",
+    "SERVER_CORS_ORIGINS",
+    "SERVER_FORWARDED_ALLOW_IPS",
+    "SERVER_SHUTDOWN_TIMEOUT",
     "DATABASE_MONGO_URL",
+    "AUTH_SECRET_KEY",
+    "AUTH_COOKIE_NAME",
+    "AUTH_COOKIE_SECURE",
+    "AUTH_COOKIE_SAMESITE",
+    "AUTH_PROVIDER",
+    "AUTH_ISSUER_URL",
+    "AUTH_CLIENT_ID",
+    "AUTH_CLIENT_SECRET",
+    "AUTH_SCOPES",
+    "AUTH_ROLES_CLAIM",
+    "AUTH_ADMIN_GROUP",
+    "AUTH_PUBLIC_URL",
+    "AUTH_VERIFY_BEARER_AUDIENCE",
+    "AUTH_CANAILLE_PORT",
+    "AUTH_CANAILLE_PUBLIC_URL",
+    "AUTH_CANAILLE_BOOTSTRAP_PASSWORD",
     "UDA_HOST",
     "UDA_META_PLUGINNAME",
     "UDA_METANEW_PLUGINNAME",
     "SAL_HOST",
     "MODELS_CACHE_DIR",
     "MODELS_MAX_ACTORS",
+    "MODELS_MAX_GPU_ACTORS",
+    "MODELS_FORCE_NUM_GPUS",
+    "MODELS_LOAD_SAFETENSORS_ONLY",
+    "MODELS_LOCAL_LOAD_ENABLED",
+    "MODELS_GITLAB_LOAD_ENABLED",
+    "MODELS_GITLAB_URL",
+    "MODELS_GITLAB_TOKEN",
+    "MODELS_GITLAB_PROJECT_ID",
+    "MODELS_HUGGINGFACE_LOAD_ENABLED",
+    "MODELS_HUGGINGFACE_USERSPACE",
 ]
 
 
@@ -34,12 +66,14 @@ def setup_test_settings(monkeypatch):
     """
     for name in ENV_VARS:
         monkeypatch.delenv(name, raising=False)
-    with tempfile.NamedTemporaryFile(mode="w", prefix=".toml") as tempf:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml") as tempf:
 
         class TestSettings(Settings):
             model_config = SettingsConfigDict(
                 toml_file=tempf.name,
                 env_nested_delimiter="_",
+                env_nested_max_split=1,
             )
 
         yield TestSettings, tempf
@@ -53,9 +87,22 @@ def test_default_settings(setup_test_settings):
     assert settings.server.host == "localhost"
     assert settings.server.port == 8002
     assert settings.server.reload is False
+    assert settings.server.workers == 1
     assert isinstance(settings.server.cache_dir, pathlib.Path)
 
     assert settings.database.mongo_url == "./toktagger_db"
+
+    assert settings.auth.secret_key is None
+    assert settings.auth.provider == "canaille"
+    assert settings.auth.issuer_url is None
+    assert settings.auth.client_id == "toktagger"
+    assert settings.auth.client_secret is None
+    assert settings.auth.scopes == "openid profile email"
+    assert settings.auth.roles_claim == "groups"
+    assert settings.auth.admin_group == "toktagger-admins"
+    assert settings.auth.verify_bearer_audience is True
+    assert settings.auth.canaille_port == 8003
+    assert settings.auth.canaille_bootstrap_password is None
 
     assert settings.uda.host == "uda2.mast.l"
     assert settings.uda.meta_pluginname == "MASTU_DB"
@@ -65,14 +112,32 @@ def test_default_settings(setup_test_settings):
 
     assert isinstance(settings.models.cache_dir, pathlib.Path)
     assert settings.models.max_actors == 5
+    assert settings.models.max_gpu_actors is None
+    assert settings.models.force_num_gpus is False
+    assert settings.models.load_safetensors_only is False
+
+    assert settings.models.local_load_enabled is True
+
+    assert settings.models.gitlab_load_enabled is True
+    assert settings.models.gitlab_url is None
+    assert settings.models.gitlab_token is None
+    assert settings.models.gitlab_project_id is None
+
+    assert settings.models.huggingface_load_enabled is True
+    assert settings.models.huggingface_userspace is None
 
 
-def test_env_overrides_simple_nested_fields(monkeypatch, setup_test_settings):
+def test_env_overrides_simple_nested_fields(
+    monkeypatch,
+    setup_test_settings,
+):
     TestSettings, _ = setup_test_settings
 
     monkeypatch.setenv("SERVER_HOST", "0.0.0.0")
     monkeypatch.setenv("SERVER_PORT", "9000")
     monkeypatch.setenv("SERVER_RELOAD", "true")
+    monkeypatch.setenv("SERVER_WORKERS", "4")
+    monkeypatch.setenv("AUTH_SECRET_KEY", "test-secret")
     monkeypatch.setenv("UDA_HOST", "uda-test-host")
     monkeypatch.setenv("SAL_HOST", "https://sal.example.com")
 
@@ -81,17 +146,150 @@ def test_env_overrides_simple_nested_fields(monkeypatch, setup_test_settings):
     assert settings.server.host == "0.0.0.0"
     assert settings.server.port == 9000
     assert settings.server.reload is True
+    assert settings.server.workers == 4
+    assert settings.auth.secret_key == "test-secret"
     assert settings.uda.host == "uda-test-host"
     assert settings.sal.host == "https://sal.example.com"
 
 
-def test_env_overrides_fields_with_underscores(monkeypatch, setup_test_settings):
+def test_oidc_provider_requires_issuer_and_secret(setup_test_settings):
     TestSettings, _ = setup_test_settings
 
-    monkeypatch.setenv("DATABASE_MONGO_URL", "mongodb://user:pass@mongo:27017")
+    with pytest.raises(pydantic.ValidationError, match="issuer_url and auth.client"):
+        TestSettings(auth={"provider": "oidc"})
+
+    with pytest.raises(pydantic.ValidationError, match="auth.client_secret"):
+        TestSettings(auth={"provider": "oidc", "issuer_url": "https://idp.example.com"})
+
+    with pytest.raises(pydantic.ValidationError, match="auth.issuer_url"):
+        TestSettings(auth={"provider": "oidc", "client_secret": "secret"})
+
+
+def test_oidc_provider_accepts_complete_settings(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(
+        auth={
+            "provider": "oidc",
+            "issuer_url": "https://idp.example.com/realms/toktagger",
+            "client_secret": "secret",
+        }
+    )
+
+    assert settings.auth.provider == "oidc"
+
+
+def test_canaille_provider_needs_no_issuer(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(auth={"provider": "canaille"})
+
+    assert settings.auth.issuer_url is None
+
+
+def test_unknown_auth_provider_rejected(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    with pytest.raises(pydantic.ValidationError):
+        TestSettings(auth={"provider": "ldap"})
+
+
+def test_auth_env_overrides(monkeypatch, setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    monkeypatch.setenv("AUTH_PROVIDER", "oidc")
+    monkeypatch.setenv("AUTH_ISSUER_URL", "https://idp.example.com/realms/tt")
+    monkeypatch.setenv("AUTH_CLIENT_ID", "my-client")
+    monkeypatch.setenv("AUTH_CLIENT_SECRET", "env-secret")
+    monkeypatch.setenv("AUTH_ROLES_CLAIM", "realm_access.roles")
+    monkeypatch.setenv("AUTH_ADMIN_GROUP", "tt-admins")
+    monkeypatch.setenv("AUTH_VERIFY_BEARER_AUDIENCE", "false")
+    monkeypatch.setenv("AUTH_CANAILLE_PORT", "9003")
+
+    settings = TestSettings()
+
+    assert settings.auth.provider == "oidc"
+    assert settings.auth.issuer_url == "https://idp.example.com/realms/tt"
+    assert settings.auth.client_id == "my-client"
+    assert settings.auth.client_secret == "env-secret"
+    assert settings.auth.roles_claim == "realm_access.roles"
+    assert settings.auth.admin_group == "tt-admins"
+    assert settings.auth.verify_bearer_audience is False
+    assert settings.auth.canaille_port == 9003
+
+
+def test_cors_origins_default_and_override(monkeypatch, setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    assert TestSettings().server.cors_origins == ["http://localhost:5173"]
+
+    monkeypatch.setenv("SERVER_CORS_ORIGINS", "[]")
+    assert TestSettings().server.cors_origins == []
+
+    monkeypatch.setenv(
+        "SERVER_CORS_ORIGINS", '["https://a.example", "https://b.example"]'
+    )
+    assert TestSettings().server.cors_origins == [
+        "https://a.example",
+        "https://b.example",
+    ]
+
+
+def test_proxy_and_timeout_defaults_and_override(monkeypatch, setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    server = TestSettings().server
+    assert server.forwarded_allow_ips == "127.0.0.1"
+    assert server.shutdown_timeout == 120
+    assert server.healthcheck_timeout == 60
+
+    monkeypatch.setenv("SERVER_FORWARDED_ALLOW_IPS", "10.0.0.5")
+    monkeypatch.setenv("SERVER_SHUTDOWN_TIMEOUT", "300")
+    monkeypatch.setenv("SERVER_HEALTHCHECK_TIMEOUT", "30")
+    server = TestSettings().server
+    assert server.forwarded_allow_ips == "10.0.0.5"
+    assert server.shutdown_timeout == 300
+    assert server.healthcheck_timeout == 30
+
+
+def test_public_urls_default_from_server_settings(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(server={"host": "example.org", "port": 9000})
+
+    assert settings.public_url == "http://example.org:9000"
+    assert settings.canaille_public_url == "http://example.org:8003"
+
+
+def test_public_urls_use_explicit_values_without_trailing_slash(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    settings = TestSettings(
+        auth={
+            "public_url": "https://toktagger.example.com/",
+            "canaille_public_url": "https://auth.example.com/",
+        }
+    )
+
+    assert settings.public_url == "https://toktagger.example.com"
+    assert settings.canaille_public_url == "https://auth.example.com"
+
+
+def test_env_overrides_fields_with_underscores(
+    monkeypatch,
+    setup_test_settings,
+):
+    TestSettings, _ = setup_test_settings
+
+    monkeypatch.setenv(
+        "DATABASE_MONGO_URL",
+        "mongodb://user:pass@mongo:27017",
+    )
     monkeypatch.setenv("UDA_META_PLUGINNAME", "TEST_META")
     monkeypatch.setenv("UDA_METANEW_PLUGINNAME", "TEST_METANEW")
     monkeypatch.setenv("MODELS_MAX_ACTORS", "10")
+    monkeypatch.setenv("MODELS_MAX_GPU_ACTORS", "2")
+    monkeypatch.setenv("MODELS_FORCE_NUM_GPUS", "true")
 
     settings = TestSettings()
 
@@ -99,6 +297,8 @@ def test_env_overrides_fields_with_underscores(monkeypatch, setup_test_settings)
     assert settings.uda.meta_pluginname == "TEST_META"
     assert settings.uda.metanew_pluginname == "TEST_METANEW"
     assert settings.models.max_actors == 10
+    assert settings.models.max_gpu_actors == 2
+    assert settings.models.force_num_gpus is True
 
 
 def test_toml_loading(setup_test_settings):
@@ -126,6 +326,18 @@ def test_toml_loading(setup_test_settings):
         [models]
         cache_dir = "/tmp/toktagger-models"
         max_actors = 3
+        max_gpu_actors = 2
+        force_num_gpus = true
+        load_safetensors_only = true
+        local_load_enabled = false
+
+        gitlab_load_enabled = false
+        gitlab_url = "https://gitlab.example.com"
+        gitlab_token = "toml-token"
+        gitlab_project_id = 456
+
+        huggingface_load_enabled = false
+        huggingface_userspace = "toml-userspace"
         """
     )
     toml_file.flush()
@@ -147,9 +359,24 @@ def test_toml_loading(setup_test_settings):
 
     assert settings.models.cache_dir == pathlib.Path("/tmp/toktagger-models")
     assert settings.models.max_actors == 3
+    assert settings.models.max_gpu_actors == 2
+    assert settings.models.force_num_gpus is True
+    assert settings.models.load_safetensors_only is True
+    assert settings.models.local_load_enabled is False
+
+    assert settings.models.gitlab_load_enabled is False
+    assert settings.models.gitlab_url == "https://gitlab.example.com"
+    assert settings.models.gitlab_token == "toml-token"
+    assert settings.models.gitlab_project_id == 456
+
+    assert settings.models.huggingface_load_enabled is False
+    assert settings.models.huggingface_userspace == "toml-userspace"
 
 
-def test_env_takes_precedence_over_toml(monkeypatch, setup_test_settings):
+def test_env_takes_precedence_over_toml(
+    monkeypatch,
+    setup_test_settings,
+):
     TestSettings, toml_file = setup_test_settings
 
     toml_file.write(
@@ -191,7 +418,8 @@ def test_env_and_toml_applied(monkeypatch, setup_test_settings):
 
 
 def test_init_kwargs_take_precedence_over_env_and_toml(
-    monkeypatch, setup_test_settings
+    monkeypatch,
+    setup_test_settings,
 ):
     TestSettings, toml_file = setup_test_settings
 
@@ -225,6 +453,24 @@ def test_invalid_models_max_actors_rejected(setup_test_settings):
         TestSettings(models={"max_actors": 0})
 
 
+def test_invalid_models_max_gpu_actors_rejected(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    with pytest.raises(pydantic.ValidationError):
+        TestSettings(models={"max_gpu_actors": 0})
+
+
+def test_invalid_gitlab_project_id_rejected(setup_test_settings):
+    TestSettings, _ = setup_test_settings
+
+    with pytest.raises(pydantic.ValidationError):
+        TestSettings(
+            models={
+                "gitlab_project_id": "not-an-integer",
+            }
+        )
+
+
 def test_invalid_server_port_rejected(setup_test_settings):
     TestSettings, _ = setup_test_settings
 
@@ -232,7 +478,10 @@ def test_invalid_server_port_rejected(setup_test_settings):
         TestSettings(server={"port": "not-a-port"})
 
 
-def test_path_env_vars_are_converted_to_paths(monkeypatch, setup_test_settings):
+def test_path_env_vars_are_converted_to_paths(
+    monkeypatch,
+    setup_test_settings,
+):
     TestSettings, _ = setup_test_settings
 
     monkeypatch.setenv("SERVER_CACHE_DIR", "/tmp/server-cache")
@@ -245,17 +494,72 @@ def test_path_env_vars_are_converted_to_paths(monkeypatch, setup_test_settings):
 
 
 def test_create_toml():
-    # Create template with defaults
-    with tempfile.TemporaryDirectory() as file:
-        create_default_toml_file(pathlib.Path(file).joinpath("example.toml"))
+    with tempfile.TemporaryDirectory() as directory:
+        example_path = pathlib.Path(directory).joinpath("example.toml")
 
-        # Check it can be loaded as toml
-        with pathlib.Path(file).joinpath("example.toml").open("rb") as toml_file:
+        create_default_toml_file(example_path)
+
+        with example_path.open("rb") as toml_file:
             example_toml = tomllib.load(toml_file)
 
         assert all(
-            (
-                key in example_toml.keys()
-                for key in ("database", "models", "sal", "server", "uda")
-            )
+            key in example_toml
+            for key in ("database", "models", "sal", "server", "uda")
         )
+
+
+def _parse_cli(argv: list[str]) -> argparse.Namespace:
+    """The same flags main() defines, so the defaults under test are the real ones."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host")
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--reload", action="store_true")
+    parser.add_argument("--workers", type=int)
+    return parser.parse_args(argv)
+
+
+def test_cli_leaves_configured_server_settings_alone():
+    """Flags the user did not pass must not overwrite the file or the environment.
+
+    SERVER_WORKERS is the documented way to ask for multiple workers, and an
+    argparse default of 1 used to silently put it back to single-worker.
+    """
+    settings = Settings()
+    settings.server.host = "0.0.0.0"
+    settings.server.port = 9999
+    settings.server.workers = 4
+
+    apply_cli_overrides(settings, _parse_cli(["--no-browser"]))
+
+    assert settings.server.host == "0.0.0.0"
+    assert settings.server.port == 9999
+    assert settings.server.workers == 4
+    assert settings.server.reload is False
+
+
+def test_cli_flags_override_configured_server_settings():
+    """An explicitly passed flag still wins."""
+    settings = Settings()
+    settings.server.workers = 4
+
+    apply_cli_overrides(
+        settings,
+        _parse_cli(["--host", "127.0.0.1", "--port", "1234", "--workers", "2"]),
+    )
+
+    assert settings.server.host == "127.0.0.1"
+    assert settings.server.port == 1234
+    assert settings.server.workers == 2
+
+
+def test_cli_reload_flag_is_opt_in_only():
+    """--reload is store_true, so absence means "leave it as configured"."""
+    settings = Settings()
+    settings.server.reload = True
+
+    apply_cli_overrides(settings, _parse_cli([]))
+    assert settings.server.reload is True
+
+    apply_cli_overrides(settings, _parse_cli(["--reload"]))
+    assert settings.server.reload is True

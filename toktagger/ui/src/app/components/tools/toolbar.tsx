@@ -1,7 +1,5 @@
 "use client";
 import {
-  Provider,
-  defaultTheme,
   Flex,
   View,
   Header,
@@ -15,18 +13,9 @@ import {
   Heading,
   InlineAlert,
 } from "@adobe/react-spectrum";
-import {
-  MultiVariateTimeSeriesDataSchema,
-  PlotProps,
-  SpectrogramData,
-  SpectrogramDataSchema,
-  SpectrogramViewParamsSchema,
-  TaskType,
-  ViewParams,
-} from "@/types";
+import { MultiVariateTimeSeriesDataSchema, PlotProps, TaskType } from "@/types";
 import { getAnnotationsForSample } from "@/app/core";
 import { PeakDetectionTool } from "@/app/components/annotators/peaks";
-import { DataRangeSlider } from "@/app/components/tools/dataRangeSlider";
 import { ModelPredictTool } from "@/app/components/tools/modelPredictSample";
 import { ShotLabels } from "../annotators/labels";
 import { OutlierDetectionTool } from "../annotators/outliers";
@@ -36,60 +25,10 @@ import { ExportTool } from "./export";
 import { ImportButton } from "./import";
 import { NavigationBar } from "./nav";
 import { useSample } from "@/app/contexts/SampleContext";
-import SpectrogramThresholdTool from "../annotators/thresholding";
+import Profile2DThresholdTool from "../annotators/thresholding";
+import { Profile2DViewParamsWidget } from "@/app/profile2d/components/profile2dViewParamsWidget";
 import { VideoToolbox } from "@/app/video/components/video-toolbox";
 import { useServerHealth } from "@/app/contexts/healthContext";
-
-type AmplitudeSliderInfo = {
-  data: SpectrogramData;
-  viewParams: ViewParams;
-  setViewParams: (viewParams: ViewParams) => void;
-  plotProps: PlotProps;
-};
-
-function AmplitudeSlider({
-  data,
-  viewParams,
-  setViewParams,
-  plotProps,
-}: AmplitudeSliderInfo) {
-  const onAmplitudeRangeChange = async ({
-    start,
-    end,
-  }: {
-    start: number;
-    end: number;
-  }) => {
-    const params = SpectrogramViewParamsSchema.parse(viewParams);
-    params.amplitude_min = Math.pow(10, start);
-    params.amplitude_max = Math.pow(10, end);
-    setViewParams(params);
-  };
-
-  const numDigits = plotProps.numSignificantDigits || 4;
-  const smallPrecisionFactor = Math.pow(10, -1 * numDigits);
-  const largePrecisionFactor = Math.pow(10, numDigits);
-
-  let ampValues = data.amplitude.flat();
-  ampValues = ampValues.map((x: number) =>
-    Math.log10(Math.max(x, smallPrecisionFactor)),
-  );
-
-  const displayAmplitudeValues = (val: number) => {
-    return `${Math.round(Math.pow(10, val) * largePrecisionFactor) / largePrecisionFactor}`;
-  };
-
-  return (
-    <DataRangeSlider
-      name={"Amplitude Range"}
-      data={ampValues}
-      onChange={onAmplitudeRangeChange}
-      getValueLabel={(val) =>
-        `${displayAmplitudeValues(val.start)} - ${displayAmplitudeValues(val.end)}`
-      }
-    />
-  );
-}
 
 type ColorMapPickerInfo = {
   plotProps: PlotProps;
@@ -150,12 +89,11 @@ export default function ToolBar() {
     project,
     sample,
     data,
-    setAnnotations,
-    viewParams,
-    setViewParams,
+    syncAnnotationsFromServer,
     plotProps,
     setPlotProps,
     isValidated,
+    canAnnotate,
   } = useSample();
 
   const { modelsEnabled } = useServerHealth();
@@ -179,6 +117,12 @@ export default function ToolBar() {
     defaultExpanded?: boolean;
   }[] = [];
 
+  const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
+  tools.push({
+    name: "Shot Labels",
+    component: <ShotLabels labels={labels} canAnnotate={canAnnotate} />,
+  });
+
   if (data && project.task == TaskType.TimeSeries) {
     const result = MultiVariateTimeSeriesDataSchema.safeParse(data);
 
@@ -188,73 +132,57 @@ export default function ToolBar() {
     }
 
     const tsData = result.data;
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels}></ShotLabels>,
-    });
 
-    tools.push({
-      name: "Peak Detection",
-      component: (
-        <PeakDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></PeakDetectionTool>
-      ),
-    });
+    if (canAnnotate) {
+      tools.push({
+        name: "Peak Detection",
+        component: (
+          <PeakDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+          ></PeakDetectionTool>
+        ),
+      });
 
-    tools.push({
-      name: "Outlier Detection",
-      component: (
-        <OutlierDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></OutlierDetectionTool>
-      ),
-    });
+      tools.push({
+        name: "Outlier Detection",
+        component: (
+          <OutlierDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+          ></OutlierDetectionTool>
+        ),
+      });
 
-    tools.push({
-      name: "Change Point Detection",
-      component: (
-        <ChangePointDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></ChangePointDetectionTool>
-      ),
-    });
+      tools.push({
+        name: "Change Point Detection",
+        component: (
+          <ChangePointDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+          ></ChangePointDetectionTool>
+        ),
+      });
 
-    tools.push({
-      name: "Jump Detection",
-      component: (
-        <JumpDetectionTool
-          project_id={project_id}
-          sample_id={sample_id}
-          data={tsData}
-        ></JumpDetectionTool>
-      ),
-    });
-  } else if (data && project.task == TaskType.Spectrogram) {
-    const resultSpec = SpectrogramDataSchema.safeParse(data);
-    if (!resultSpec.success) {
-      console.warn("MHD spectrogram data is not available");
-      return null;
+      tools.push({
+        name: "Jump Detection",
+        component: (
+          <JumpDetectionTool
+            project_id={project_id}
+            sample_id={sample_id}
+            data={tsData}
+          ></JumpDetectionTool>
+        ),
+      });
     }
-
-    const mhdData = resultSpec.data;
+  } else if (project.task == TaskType.Profile2D) {
+    // Not gated on data so the signal picker below still lets the user recover.
     tools.push({
-      name: "Amplitude Range",
-      component: (
-        <AmplitudeSlider
-          data={mhdData}
-          viewParams={viewParams}
-          setViewParams={setViewParams}
-          plotProps={plotProps}
-        />
-      ),
+      name: "View Parameters",
+      component: <Profile2DViewParamsWidget />,
     });
 
     tools.push({
@@ -264,33 +192,26 @@ export default function ToolBar() {
       ),
     });
 
-    tools.push({
-      name: "Threshold",
-      component: (
-        <SpectrogramThresholdTool
-          project_id={project_id}
-          sample_id={sample_id}
-          signal_name={"mirnov"}
-          plotProps={plotProps}
-          setPlotProps={setPlotProps}
-        />
-      ),
-    });
+    if (canAnnotate) {
+      tools.push({
+        name: "Threshold",
+        component: (
+          <Profile2DThresholdTool
+            project_id={project_id}
+            sample_id={sample_id}
+          />
+        ),
+      });
+    }
   } else if (data && project.task === TaskType.Video) {
-    const labels = project.shot_labels || ["Valid Shot", "Invalid Shot"];
-
-    tools.push({
-      name: "Shot Labels",
-      component: <ShotLabels labels={labels} />,
-    });
-
     tools.push({
       name: "Video Tools",
       component: <VideoToolbox />,
       defaultExpanded: true,
     });
   }
-  if (modelsEnabled) {
+  // Predicting writes annotations, so it needs the annotator role.
+  if (modelsEnabled && canAnnotate) {
     tools.push({
       name: "Model Prediction",
       component: (
@@ -303,13 +224,25 @@ export default function ToolBar() {
   }
 
   const refreshAnnotations = async () => {
-    const dbAnnotations = await getAnnotationsForSample(project_id, sample_id);
-    setAnnotations(() => dbAnnotations);
+    syncAnnotationsFromServer(
+      await getAnnotationsForSample(project_id, sample_id),
+    );
   };
 
   return (
-    <Provider theme={defaultTheme} height="100vh">
-      <View overflow="auto" height="100vh" width="18vw">
+    // 100% (not 100vh) so the toolbar stops at the bottom of the window rather
+    // than running on below it by the height of the top bar.
+    <View overflow="auto" height="100%" width="18vw" flexShrink={0}>
+      <Flex
+        direction="column"
+        alignItems="center"
+        justifyContent="center"
+        gap="size-100"
+        width="100%"
+      >
+        {isValidated !== null && (
+          <AnnotationStatusAlert isValidated={isValidated} />
+        )}
         <Flex
           direction="column"
           alignItems="center"
@@ -317,70 +250,61 @@ export default function ToolBar() {
           gap="size-100"
           width="100%"
         >
-          {isValidated !== null && (
-            <AnnotationStatusAlert isValidated={isValidated} />
-          )}
-          <Flex
-            direction="column"
-            alignItems="center"
-            justifyContent="center"
-            gap="size-100"
-          >
-            <Header height="size-300" marginBottom="size-100">
-              <span style={{ fontSize: "1.2rem" }}>Controls</span>
-            </Header>
-            <NavigationBar project_id={project_id} sample_id={sample_id} />
-            <Accordion allowsMultipleExpanded={true} width="100%">
-              <Disclosure>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
-                </DisclosureTitle>
-                <DisclosurePanel>
-                  <ExportTool project={project} sample={sample} />
-                </DisclosurePanel>
-              </Disclosure>
-              <Disclosure>
-                <DisclosureTitle>
-                  <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
-                </DisclosureTitle>
-                <DisclosurePanel>
-                  <ImportButton
-                    project={project}
-                    sample={sample}
-                    refreshAnnotations={refreshAnnotations}
-                  />
-                </DisclosurePanel>
-              </Disclosure>
-            </Accordion>
-          </Flex>
-          {tools.length > 0 && (
-            <>
-              <Flex justifyContent="center" alignItems="center">
-                <Header height="size-300" marginBottom="size-100">
-                  <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
-                </Header>
-              </Flex>
-
-              <Accordion
-                allowsMultipleExpanded={true}
-                defaultExpandedKeys={tools
-                  .filter((item) => item.defaultExpanded)
-                  .map((item) => item.name)}
-                width="100%"
-              >
-                {tools.map((item) => (
-                  <Disclosure key={item.name} id={item.name}>
-                    <DisclosureTitle>
-                      <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
-                    </DisclosureTitle>
-                    <DisclosurePanel>{item.component}</DisclosurePanel>
-                  </Disclosure>
-                ))}
-              </Accordion>
-            </>
-          )}
+          <Header height="size-300" marginBottom="size-100">
+            <span style={{ fontSize: "1.2rem" }}>Controls</span>
+          </Header>
+          <NavigationBar project_id={project_id} sample_id={sample_id} />
+          <Accordion allowsMultipleExpanded={true} width="100%">
+            <Disclosure>
+              <DisclosureTitle>
+                <span style={{ fontSize: "0.8rem" }}>Export Annotations</span>
+              </DisclosureTitle>
+              <DisclosurePanel>
+                <ExportTool project={project} sample={sample} />
+              </DisclosurePanel>
+            </Disclosure>
+            <Disclosure>
+              <DisclosureTitle>
+                <span style={{ fontSize: "0.8rem" }}>Import Annotations</span>
+              </DisclosureTitle>
+              <DisclosurePanel>
+                <ImportButton
+                  project={project}
+                  sample={sample}
+                  refreshAnnotations={refreshAnnotations}
+                  canAnnotate={canAnnotate}
+                />
+              </DisclosurePanel>
+            </Disclosure>
+          </Accordion>
         </Flex>
-      </View>
-    </Provider>
+        {tools.length > 0 && (
+          <>
+            <Flex justifyContent="center" alignItems="center">
+              <Header height="size-300" marginBottom="size-100">
+                <span style={{ fontSize: "1.2rem" }}>Toolbox</span>
+              </Header>
+            </Flex>
+
+            <Accordion
+              allowsMultipleExpanded={true}
+              defaultExpandedKeys={tools
+                .filter((item) => item.defaultExpanded)
+                .map((item) => item.name)}
+              width="100%"
+            >
+              {tools.map((item) => (
+                <Disclosure key={item.name} id={item.name}>
+                  <DisclosureTitle>
+                    <span style={{ fontSize: "0.8rem" }}>{item.name}</span>
+                  </DisclosureTitle>
+                  <DisclosurePanel>{item.component}</DisclosurePanel>
+                </Disclosure>
+              ))}
+            </Accordion>
+          </>
+        )}
+      </Flex>
+    </View>
   );
 }

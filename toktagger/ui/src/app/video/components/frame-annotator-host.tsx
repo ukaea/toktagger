@@ -1,6 +1,8 @@
-"use client";
-
-import React, { useEffect, useMemo, useRef, useState } from "react";
+/**
+ * The canvas: shows the current frame in OpenSeadragon with the Annotorious layer on top.
+ * It handles points and frame labels itself, since Annotorious has no tools for them.
+ */
+import React, { useEffect, useRef, useState } from "react";
 import OpenSeadragon from "openseadragon";
 import {
   OpenSeadragonAnnotator,
@@ -16,12 +18,13 @@ import {
 import "@annotorious/react/annotorious-react.css";
 import "react-contexify/ReactContexify.css";
 import { Item, Menu, Submenu, useContextMenu } from "react-contexify";
+import { ToastQueue } from "@adobe/react-spectrum";
 import { mountPlugin as mountToolsPlugin } from "@annotorious/plugin-tools";
 import "@annotorious/plugin-tools/annotorious-plugin-tools.css";
 
 import { useVideoSession } from "@/app/video/components/video-session";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useVideoUiState } from "@/app/video/components/video-context";
+import { useVideoUiState } from "@/app/contexts/VideoContext";
 import {
   getLabelTrack,
   isPointAnno,
@@ -34,10 +37,10 @@ import {
 } from "./anno-utils";
 import { AnnotationPopup } from "./annotation-popup";
 import { annotationContainsPoint, setViewerCursor } from "./overlay-sync-utils";
-import { CanvasModeToolbar } from "./ui_elements";
 
 const VIDEO_CANVAS_MENU_ID = "video-canvas-menu";
 
+// Drag pans and scroll zooms, but clicks never zoom, since clicks select and draw
 function setGestureNavigation(
   viewer: OpenSeadragon.Viewer,
   navEnabled: boolean,
@@ -67,6 +70,7 @@ function setGestureNavigation(
   unknown.dblClickToZoom = false;
 }
 
+// The Annotorious drawing layer, found by its class name since Annotorious does not expose it
 function findAnnotationOverlay(viewerElement: HTMLElement | null) {
   if (!viewerElement) return null;
 
@@ -82,6 +86,24 @@ function findAnnotationOverlay(viewerElement: HTMLElement | null) {
   }
 
   return null;
+}
+
+// The viewer and the drawing layer on top of it, which both need to catch clicks
+function getClickTargets(viewer: OpenSeadragon.Viewer): HTMLElement[] {
+  const viewerElement = viewer.element as HTMLElement;
+  return [viewerElement, findAnnotationOverlay(viewerElement)].filter(
+    (target, index, list): target is HTMLElement =>
+      !!target && list.indexOf(target) === index,
+  );
+}
+
+function toImagePoint(viewer: OpenSeadragon.Viewer, event: MouseEvent) {
+  const viewerBounds = (viewer.element as HTMLElement).getBoundingClientRect();
+  const viewerPoint = new OpenSeadragon.Point(
+    event.clientX - viewerBounds.left,
+    event.clientY - viewerBounds.top,
+  );
+  return viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
 }
 
 function stopEvent(event: Event) {
@@ -100,30 +122,19 @@ function isSecondaryMouseEvent(event: MouseEvent | PointerEvent) {
   return event.button !== 0 || (event.buttons & 2) === 2;
 }
 
-function isEditableEventTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-
-  if (target instanceof HTMLTextAreaElement) return true;
-  if (target instanceof HTMLSelectElement) return true;
-  if (target instanceof HTMLInputElement) {
-    return target.type !== "checkbox" && target.type !== "radio";
-  }
-
-  return false;
-}
-
 function isAnnotationPopupEventTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return Boolean(target.closest('[aria-label="Annotation actions"]'));
 }
 
+// OpenSeadragon's built-in shortcuts: r rotates and f flips the image
 function isBlockedViewModeKey(event: Event | undefined) {
   if (!(event instanceof KeyboardEvent)) return false;
   const key = event.key.toLowerCase();
   return key === "r" || key === "f";
 }
 
+// The topmost shape under the pointer, checking the most recently drawn first
 function findAnnotationAtPointer(
   api: AnnotoriousOpenSeadragonAnnotator,
   event: MouseEvent,
@@ -131,14 +142,7 @@ function findAnnotationAtPointer(
   const viewer = api.viewer;
   if (!viewer) return null;
 
-  const viewerElement = viewer.element as HTMLElement;
-  const viewerBounds = viewerElement.getBoundingClientRect();
-  const viewerPoint = new OpenSeadragon.Point(
-    event.clientX - viewerBounds.left,
-    event.clientY - viewerBounds.top,
-  );
-  const imagePoint =
-    viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+  const imagePoint = toImagePoint(viewer, event);
 
   return (
     [...api.getAnnotations()]
@@ -148,36 +152,25 @@ function findAnnotationAtPointer(
   );
 }
 
-/**
- * Top-level host that provides the Annotorious context and renders the annotator.
- */
-export function FrameAnnotatorHost(props: { imageBase64: string }) {
-  return <Inner imageBase64={props.imageBase64} />;
-}
-
-/**
- * View-only annotator host:
- * - renders the Annotorious OpenSeadragon annotator + popup UI for the current frame
- * - reports the image’s natural size to the session (used for bounds clamping)
- *
- * Note: all Annotorious integration (create/update/delete/selectionChanged),
- * overlay normalization/clamping, and session persistence now live in
- * VideoSessionProvider. This component should not sync overlays or write back
- * to the session store directly.
- */
-function Inner({ imageBase64 }: { imageBase64: string }) {
+/** Renders the canvas for one frame's base64 image. */
+export function FrameAnnotatorHost({ imageBase64 }: { imageBase64: string }) {
   const { annotationLabels } = useSample();
   const { setVideoLastClassName } = useVideoUiState();
   const {
     frame,
+    byFrame,
     setImageNatural,
     selection,
     setSelection,
     drawingTool,
-    setDrawingTool,
-    panMode,
-    setPanMode,
+    editMode,
+    drawIntent,
+    canDrawShape,
+    canDrawPoint,
+    canTagFrame,
     hideAnnotations,
+    canAnnotate,
+    toggleFrameLabel,
     createPointAnnotation,
     deleteAnnotation,
   } = useVideoSession();
@@ -188,28 +181,22 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
   const [dismissedPopupAnnotationId, setDismissedPopupAnnotationId] = useState<
     string | null
   >(null);
-  const [isPointAnnotationSelected, setIsPointAnnotationSelected] =
-    useState(false);
-  const shiftDrawActiveRef = useRef(false);
-  const classItems = useMemo(
-    () => annotationLabels.map((label) => ({ name: label.name })),
-    [annotationLabels],
-  );
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const classItems = annotationLabels.map((label) => ({ name: label.name }));
 
   useEffect(() => {
     if (!api?.on || !api?.off) return;
 
     const onSelectionChanged = (arr: ImageAnnotation[]) => {
       if (arr.length === 0) {
-        setIsPointAnnotationSelected(false);
+        setSelectedPointId(null);
         setDismissedPopupAnnotationId(null);
         return;
       }
 
-      setIsPointAnnotationSelected(isPointAnno(arr[0]));
-
       const selectedId =
         typeof arr[0]?.id === "string" ? String(arr[0].id) : null;
+      setSelectedPointId(isPointAnno(arr[0]) ? selectedId : null);
       if (!selectedId) {
         setDismissedPopupAnnotationId(null);
         return;
@@ -241,16 +228,20 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     setImageNatural(null);
   }, [frame, setImageNatural]);
 
-  const dataUrl = useMemo(
-    () => `data:image/png;base64,${imageBase64}`,
-    [imageBase64],
-  );
+  const dataUrl = `data:image/png;base64,${imageBase64}`;
+  const viewer = api?.viewer;
+  const savedViewRef = useRef<{
+    bounds: OpenSeadragon.Rect;
+    size: OpenSeadragon.Point;
+  } | null>(null);
 
+  // Report the image size to the session, which uses it to keep shapes inside the image
   useEffect(() => {
     if (!api?.viewer) return;
 
-    const onOpen = () => {
-      const item = api.viewer.world.getItemAt(0);
+    const viewer = api.viewer;
+    const onImageAdded = () => {
+      const item = viewer.world.getItemAt(0);
       if (!item) return;
 
       const size = item.getContentSize();
@@ -261,16 +252,100 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       }
     };
 
-    api.viewer.addHandler("open", onOpen);
-    onOpen();
+    viewer.world.addHandler("add-item", onImageAdded);
+    onImageAdded();
 
     return () => {
-      api.viewer.removeHandler("open", onOpen);
+      viewer.world.removeHandler("add-item", onImageAdded);
     };
-  }, [api, dataUrl, setImageNatural]);
+  }, [api, dataUrl, frame, setImageNatural]);
+
+  // Points are fixed-size dots so they stay visible at any zoom. The dot hides while its point is being edited.
+  useEffect(() => {
+    if (!viewer) return;
+
+    const dots = new Set<HTMLElement>();
+    const removeDots = () => {
+      dots.forEach((dot) => viewer.removeOverlay(dot));
+      dots.clear();
+    };
+
+    const addPointDots = () => {
+      removeDots();
+      if (hideAnnotations || !viewer.isOpen()) return;
+
+      for (const annotation of byFrame.get(frame) ?? []) {
+        const point = readPointGeometry(annotation);
+        if (!point || (editMode && annotation.id === selectedPointId)) {
+          continue;
+        }
+
+        const dot = document.createElement("div");
+        dot.id = `toktagger-video-point-${annotation.id}`;
+        dot.style.width = "4px";
+        dot.style.height = "4px";
+        dot.style.boxSizing = "border-box";
+        dot.style.border = "1px solid #222";
+        dot.style.borderRadius = "50%";
+        dot.style.backgroundColor = "white";
+        dot.style.pointerEvents = "none";
+        dot.setAttribute("aria-hidden", "true");
+
+        viewer.addOverlay({
+          element: dot,
+          location: viewer.viewport.imageToViewportCoordinates(
+            point.x,
+            point.y,
+          ),
+          placement: OpenSeadragon.Placement.CENTER,
+          checkResize: false,
+        });
+        dot.parentElement?.style.setProperty("pointer-events", "none");
+        dots.add(dot);
+      }
+    };
+
+    viewer.world.addHandler("add-item", addPointDots);
+    addPointDots();
+
+    return () => {
+      viewer.world.removeHandler("add-item", addPointDots);
+      removeDots();
+    };
+  }, [viewer, byFrame, frame, hideAnnotations, editMode, selectedPointId]);
+
+  // Keep the zoom and pan when moving between frames of the same size
+  useEffect(() => {
+    if (!viewer) return;
+
+    const saveView = (event: OpenSeadragon.RemoveItemWorldEvent) => {
+      savedViewRef.current = {
+        bounds: viewer.viewport.getBounds(),
+        size: event.item.getContentSize(),
+      };
+    };
+
+    const restoreView = (event: OpenSeadragon.AddItemWorldEvent) => {
+      const saved = savedViewRef.current;
+      if (!saved || !saved.size.equals(event.item.getContentSize())) return;
+
+      // Deferred so it lands after the Annotorious wrapper's goHome() in addTiledImage's success callback.
+      queueMicrotask(() =>
+        viewer.viewport.fitBoundsWithConstraints(saved.bounds, true),
+      );
+    };
+
+    viewer.world.addHandler("remove-item", saveView);
+    viewer.world.addHandler("add-item", restoreView);
+
+    return () => {
+      viewer.world.removeHandler("remove-item", saveView);
+      viewer.world.removeHandler("add-item", restoreView);
+    };
+  }, [viewer]);
 
   useEffect(() => {
-    if (!api?.viewer || !panMode) return;
+    if (!api?.viewer) return;
 
     const blockTransformKeys = (event: OpenSeadragon.CanvasKeyEvent) => {
       if (!isBlockedViewModeKey(event.originalEvent)) return;
@@ -283,14 +358,15 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     return () => {
       api.viewer.removeHandler("canvas-key", blockTransformKeys);
     };
-  }, [api, panMode]);
+  }, [api]);
 
+  // Hide annotations by making the Annotorious layer invisible and letting clicks pass through it
   useEffect(() => {
     if (!api) return;
 
     if (api.viewer) {
-      api.viewer.setMouseNavEnabled(panMode);
-      setGestureNavigation(api.viewer, panMode);
+      api.viewer.setMouseNavEnabled(true);
+      setGestureNavigation(api.viewer, true);
 
       const overlay = findAnnotationOverlay(api.viewer.element as HTMLElement);
       if (overlay) {
@@ -298,14 +374,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         overlay.style.opacity = hideAnnotations ? "0" : "1";
       }
     }
-
-    api.setUserSelectAction(
-      hideAnnotations
-        ? UserSelectAction.NONE
-        : panMode
-          ? UserSelectAction.SELECT
-          : UserSelectAction.EDIT,
-    );
 
     if (hideAnnotations) {
       api.setSelected?.();
@@ -320,19 +388,21 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         overlay.style.opacity = "1";
       }
     };
-  }, [api, hideAnnotations, panMode]);
+  }, [api, hideAnnotations]);
 
+  // Right-click on empty image space opens the class label menu. Other right and middle clicks are swallowed.
   useEffect(() => {
     if (!api?.viewer) return;
 
-    const viewerElement = api.viewer.element as HTMLElement;
-    const overlay = findAnnotationOverlay(viewerElement);
-    const targets = [viewerElement, overlay].filter(
-      (target, index, list): target is HTMLElement =>
-        !!target && list.indexOf(target) === index,
-    );
+    const targets = getClickTargets(api.viewer);
 
     const blockContextMenu = (event: MouseEvent) => {
+      // macOS fires contextmenu on Ctrl+primary click, which is the draw gesture here.
+      if (event.button === 0 && event.ctrlKey) {
+        event.preventDefault();
+        return;
+      }
+
       const annotation = hideAnnotations
         ? null
         : findAnnotationAtPointer(api, event);
@@ -340,7 +410,8 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       stopEvent(event);
       api.cancelDrawing?.();
 
-      if (!annotation?.id && classItems.length > 0) {
+      // The menu only arms a class for drawing, so a viewer gets no menu.
+      if (!annotation?.id && classItems.length > 0 && canAnnotate) {
         showCanvasMenu({ event });
       }
     };
@@ -373,110 +444,66 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         target.removeEventListener("auxclick", blockSecondaryMouse, true);
       }
     };
-  }, [api, classItems.length, hideAnnotations, showCanvasMenu]);
+  }, [api, classItems.length, hideAnnotations, showCanvasMenu, canAnnotate]);
 
-  const drawingEnabled = !!selection.className && !panMode && !hideAnnotations;
-  const annotoriousDrawingTool = toAnnotoriousDrawingTool(drawingTool);
-  const annotoriousDrawingEnabled = drawingEnabled && drawingTool !== "point";
+  // Explain why nothing was drawn when someone Ctrl + clicks without edit mode or a tool
+  useEffect(() => {
+    if (!api?.viewer || hideAnnotations) return;
+
+    const viewerElement = api.viewer.element as HTMLElement;
+    const warnInvalidDraw = (event: PointerEvent) => {
+      if (event.button !== 0 || !event.ctrlKey) return;
+
+      if (!canAnnotate) {
+        ToastQueue.info(
+          "You have view-only access to this project - annotations cannot be edited",
+          { timeout: 5000 },
+        );
+      } else if (!editMode) {
+        ToastQueue.info(
+          "Change to Edit Mode to draw annotations - see help popup in annotation toolbar for more info",
+          { timeout: 5000 },
+        );
+      } else if (!drawingTool) {
+        ToastQueue.info(
+          "Select a tool to draw annotation - see help popup in annotation toolbar for more info",
+          { timeout: 5000 },
+        );
+      }
+    };
+
+    viewerElement.addEventListener("pointerdown", warnInvalidDraw, true);
+    return () => {
+      viewerElement.removeEventListener("pointerdown", warnInvalidDraw, true);
+    };
+  }, [api, drawingTool, editMode, hideAnnotations, canAnnotate]);
+
+  // Annotorious always needs a tool set. Drawing itself stays off unless canDrawShape is true.
+  const annotoriousDrawingTool = drawingTool
+    ? toAnnotoriousDrawingTool(drawingTool)
+    : "rectangle";
+  const annotoriousDrawingEnabled = canDrawShape;
 
   const selectClassName = (name: string) => {
     const cls = (name ?? "").trim();
     if (!cls) return;
 
     setVideoLastClassName(cls);
-    setSelection({ className: cls, trackId: null, source: "explicit" });
+    setSelection({ className: cls, trackId: null });
   };
 
+  // Point tool: Ctrl + click places a point. Listening in the capture phase gets the click before Annotorious.
   useEffect(() => {
-    const releaseShiftDraw = () => {
-      if (!shiftDrawActiveRef.current) return;
-      shiftDrawActiveRef.current = false;
-      setPanMode(true);
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Shift") return;
-      if (event.repeat) return;
-      if (shiftDrawActiveRef.current) return;
-      if (isEditableEventTarget(event.target)) return;
-      if (hideAnnotations) return;
-      if (!panMode) return;
-
-      shiftDrawActiveRef.current = true;
-      setPanMode(false);
-    };
-
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key !== "Shift") return;
-      releaseShiftDraw();
-    };
-
-    const onVisibilityChange = () => {
-      if (!document.hidden) return;
-      releaseShiftDraw();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", releaseShiftDraw);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", releaseShiftDraw);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [hideAnnotations, panMode, setPanMode]);
-
-  useEffect(() => {
-    if (!api) return;
-
-    api.setDrawingTool(annotoriousDrawingTool);
-    api.setDrawingEnabled(annotoriousDrawingEnabled);
-
-    if (!annotoriousDrawingEnabled) {
-      api.cancelDrawing?.();
-    }
-  }, [api, annotoriousDrawingEnabled, annotoriousDrawingTool]);
-
-  useEffect(() => {
-    if (!api?.viewer || !drawingEnabled || drawingTool !== "point") return;
+    if (!api?.viewer || !canDrawPoint) return;
 
     const viewer = api.viewer;
-    const viewerElement = viewer.element as HTMLElement;
-    const overlay = findAnnotationOverlay(viewerElement);
-    const targets = [viewerElement, overlay].filter(
-      (target, index, list): target is HTMLElement =>
-        !!target && list.indexOf(target) === index,
-    );
+    const targets = getClickTargets(viewer);
 
     const handlePointClick = (event: MouseEvent) => {
       if (isSecondaryMouseEvent(event)) return;
       if (isAnnotationPopupEventTarget(event.target)) return;
 
-      const annotation = findAnnotationAtPointer(api, event);
-      if (annotation) return;
-
-      if ((api.getSelected?.() ?? []).length > 0 || selection.trackId) {
-        stopEvent(event);
-        api.cancelDrawing?.();
-        api.setSelected?.();
-        setSelection({
-          className: selection.className,
-          trackId: null,
-          source: "explicit",
-        });
-        return;
-      }
-
-      const viewerBounds = viewerElement.getBoundingClientRect();
-      const viewerPoint = new OpenSeadragon.Point(
-        event.clientX - viewerBounds.left,
-        event.clientY - viewerBounds.top,
-      );
-      const imagePoint =
-        viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+      const imagePoint = toImagePoint(viewer, event);
 
       stopEvent(event);
       api.cancelDrawing?.();
@@ -492,18 +519,44 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
         target.removeEventListener("click", handlePointClick, true);
       }
     };
-  }, [
-    api,
-    createPointAnnotation,
-    drawingEnabled,
-    drawingTool,
-    selection.className,
-    selection.trackId,
-    setSelection,
-  ]);
+  }, [api, canDrawPoint, createPointAnnotation]);
 
+  // Frame Label tool: Ctrl + click anywhere toggles the selected class's label on this frame
   useEffect(() => {
-    if (!api?.viewer || hideAnnotations || (!drawingEnabled && !panMode)) {
+    if (!api?.viewer || !canTagFrame) return;
+
+    const targets = getClickTargets(api.viewer);
+
+    const handleFrameTagClick = (event: MouseEvent) => {
+      if (isSecondaryMouseEvent(event)) return;
+      if (isAnnotationPopupEventTarget(event.target)) return;
+
+      const cls = (selection.className ?? "").trim();
+      if (!cls) return;
+
+      stopEvent(event);
+      api.cancelDrawing?.();
+      toggleFrameLabel();
+    };
+
+    for (const target of targets) {
+      target.addEventListener("click", handleFrameTagClick, true);
+    }
+
+    return () => {
+      for (const target of targets) {
+        target.removeEventListener("click", handleFrameTagClick, true);
+      }
+    };
+  }, [api, canTagFrame, selection.className, toggleFrameLabel]);
+
+  // Cursor: a crosshair while placing points or frame labels, and a pointer over shapes in edit mode
+  useEffect(() => {
+    if (
+      !api?.viewer ||
+      hideAnnotations ||
+      (drawIntent && !canDrawPoint && !canTagFrame)
+    ) {
       return;
     }
 
@@ -511,13 +564,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     const viewerElement = viewer.element as HTMLElement;
 
     const handleMouseMove = (event: MouseEvent) => {
-      const viewerBounds = viewerElement.getBoundingClientRect();
-      const viewerPoint = new OpenSeadragon.Point(
-        event.clientX - viewerBounds.left,
-        event.clientY - viewerBounds.top,
-      );
-      const imagePoint =
-        viewer.viewport.viewerElementToImageCoordinates(viewerPoint);
+      const imagePoint = toImagePoint(viewer, event);
 
       const isOverAnnotation = api
         .getAnnotations()
@@ -525,13 +572,14 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
           annotationContainsPoint(annotation, imagePoint),
         );
 
-      const cursor = panMode
-        ? isOverAnnotation
-          ? "default"
-          : ""
-        : isOverAnnotation
-          ? "pointer"
-          : "";
+      const cursor =
+        canDrawPoint || canTagFrame
+          ? "crosshair"
+          : isOverAnnotation
+            ? editMode
+              ? "pointer"
+              : "default"
+            : "";
 
       setViewerCursor(viewerElement, cursor);
     };
@@ -548,31 +596,29 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
       viewerElement.removeEventListener("mouseleave", clearCursor);
       clearCursor();
     };
-  }, [api, drawingEnabled, hideAnnotations, panMode]);
+  }, [api, canDrawPoint, canTagFrame, drawIntent, editMode, hideAnnotations]);
 
-  const viewerOptions = useMemo<OpenSeadragon.Options>(
-    () => ({
-      tileSources: {
-        type: "image",
-        url: dataUrl,
-      },
-      minZoomImageRatio: 0.8,
-      maxZoomPixelRatio: 10,
-      visibilityRatio: 0.5,
-      constrainDuringPan: true,
-      animationTime: 0.3,
-      showNavigationControl: false,
-      mouseNavEnabled: false,
-    }),
-    [dataUrl],
-  );
+  const viewerOptions: OpenSeadragon.Options = {
+    tileSources: {
+      type: "image",
+      url: dataUrl,
+    },
+    minZoomImageRatio: 0.8,
+    maxZoomPixelRatio: 100,
+    visibilityRatio: 0.5,
+    constrainDuringPan: true,
+    animationTime: 0.3,
+    showNavigationControl: false,
+    mouseNavEnabled: false,
+    imageSmoothingEnabled: false,
+  };
 
   const formatDetails = (annotation: ImageAnnotation) => {
     const point = isPointAnno(annotation)
       ? readPointGeometry(annotation)
       : null;
     if (point) {
-      return `x=${Math.round(point.x)}, y=${Math.round(point.y)}`;
+      return `x=${Math.floor(point.x)}, y=${Math.floor(point.y)}`;
     }
 
     const rect = isRectangleAnno(annotation)
@@ -595,37 +641,20 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
     return `pts=${polygon.points.length}, x=${Math.round(minX)}, y=${Math.round(minY)}, w=${Math.round(width)}, h=${Math.round(height)}`;
   };
 
-  const resetView = () => {
-    const viewer = api?.viewer;
-    const viewport = viewer?.viewport;
-    if (!viewport) return;
-
-    viewport.goHome(true);
-    viewport.applyConstraints();
-  };
-
   return (
     <div className="w-full flex justify-center">
-      <div
-        className={`relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px] ${
-          isPointAnnotationSelected ? "video-point-selected" : ""
-        }`}
-      >
-        <CanvasModeToolbar
-          panMode={panMode}
-          drawingTool={drawingTool}
-          hideAnnotations={hideAnnotations}
-          onTogglePanMode={() => setPanMode(!panMode)}
-          onSelectRectangle={() => setDrawingTool("rectangle")}
-          onSelectPolygon={() => setDrawingTool("polygon")}
-          onSelectPoint={() => setDrawingTool("point")}
-          onResetView={resetView}
-        />
-
+      <div className="relative w-full max-w-[1100px] h-[calc(100dvh-240px)] min-h-[360px]">
         <OpenSeadragonAnnotator
           tool={annotoriousDrawingTool}
           drawingEnabled={annotoriousDrawingEnabled}
           drawingMode="drag"
+          userSelectAction={
+            hideAnnotations || drawIntent
+              ? UserSelectAction.NONE
+              : editMode
+                ? UserSelectAction.EDIT
+                : UserSelectAction.SELECT
+          }
           autoSave
           style={(_annotation: ImageAnnotation, state?: AnnotationState) => ({
             strokeWidth: state?.selected ? 3 : 2,
@@ -661,6 +690,7 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
                   trackId={trackId}
                   geometry={geometry}
                   details={details}
+                  deleteDisabled={!editMode}
                   onDeleteBox={() => {
                     const id = annotation?.id;
                     if (!id) return;
@@ -675,16 +705,6 @@ function Inner({ imageBase64 }: { imageBase64: string }) {
             }}
           />
         </OpenSeadragonAnnotator>
-
-        <style>{`
-          .video-point-selected .a9s-corner-top,
-          .video-point-selected .a9s-corner-handle-right,
-          .video-point-selected .a9s-corner-handle-bottom,
-          .video-point-selected .a9s-corner-handle-left {
-            display: none;
-            pointer-events: none;
-          }
-        `}</style>
 
         <Menu
           id={VIDEO_CANVAS_MENU_ID}

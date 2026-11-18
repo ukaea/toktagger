@@ -96,7 +96,7 @@ export function ModelPredictModal({
 
   useEffect(() => {
     const updateSchema = async () => {
-      if (!selectedModel || selectedModel.training_status != "completed") {
+      if (!selectedModel || selectedModel.status != "completed") {
         setSchema(null);
         return;
       }
@@ -111,15 +111,23 @@ export function ModelPredictModal({
   useEffect(() => {
     const fetchModels = async () => {
       if (!project._id) return;
-      const response = await getModels(project._id);
+      try {
+        const response = await getModels(project._id);
 
-      if (response.ok) {
-        const data = await response.json();
-        const models = data as Model[];
-        setModels(models);
-      } else {
-        const errorMessage = await response.json();
-        setMessage(errorMessage.detail);
+        if (response.ok) {
+          const data = await response.json();
+          const models = data as Model[];
+          setModels(models);
+        } else {
+          const errorMessage = await response.json();
+          setMessage(errorMessage.detail);
+          setMessageIcon(
+            <Alert aria-label="Failed" color="negative" size="S" />,
+          );
+        }
+      } catch {
+        // Keep the last fetched list; the next poll retries
+        setMessage("Could not contact the server to fetch models.");
         setMessageIcon(<Alert aria-label="Failed" color="negative" size="S" />);
       }
     };
@@ -238,7 +246,9 @@ export function ModelPredictModal({
                   !selectedKeys ||
                   !models ||
                   !selectedModel ||
-                  !["started", "queued"].includes(selectedModel.training_status)
+                  !["queued", "training", "loading"].includes(
+                    selectedModel.status,
+                  )
                 }
                 onPress={stopTrainingJob}
               >
@@ -266,9 +276,9 @@ export function ModelPredictModal({
                       <Cell>{item["type"]}</Cell>
                       <Cell>{item["version"]}</Cell>
                       <Cell>
-                        {item["training_status"] === "started"
+                        {item["status"] === "training"
                           ? "Training: " + Math.round(item["progress"]) + "%"
-                          : item["training_status"]}
+                          : item["status"]}
                       </Cell>
                       <Cell>{Math.round(item["score"])}</Cell>
                     </Row>
@@ -303,7 +313,7 @@ export function ModelPredictModal({
                 !selectedKeys ||
                 !models ||
                 !selectedModel ||
-                selectedModel.training_status != "completed"
+                selectedModel.status != "completed"
               }
               onPress={pressSubmit}
             >

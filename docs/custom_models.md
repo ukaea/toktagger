@@ -86,25 +86,31 @@ class MyCustomModel(Model):
         # Your prediction logic here
         pass
     
-    def save(self, file_path: str):
-        """
-        Save the trained model to disk.
-        
-        Args:
-            file_path: Path where model should be saved
+    def save(self, results_dir: pathlib.Path) -> None:
+        """Save the trained model to disk.
+
+        Parameters
+        ----------
+        results_dir : pathlib.Path
+            The path to a directory in the model cache where your model weights and accompanying information should be saved.
         """
         # Your save logic here
-        pass
     
-    def load(self, file_path: str):
-        """
-        Load a trained model from disk.
-        
-        Args:
-            file_path: Path to the saved model
+    def load(
+        self, results_dir: pathlib.Path, weights_filename: str | None = None
+    ) -> None:
+        """Load a pretrained model from disk.
+
+        Parameters
+        ----------
+        results_dir : pathlib.Path
+            The path to a directory in the model cache where model weights should be loaded from.
+        weights_filename : str | None, optional
+            The name of the weights file within the above directory to load, by default None
+            Note that this is optional, but should take precedence if provided.
         """
         # Your load logic here
-        pass
+
 ```
 
 ### Step 3: Optionally define required parameters
@@ -124,7 +130,7 @@ The `@ModelRegistry.register()` decorator automatically registers your model wit
 Models can be registered for one or more of the following tasks:
 
 - `"time-series"` - Time series annotation
-- `"spectrogram"` - Spectrogram annotation
+- `"profile-2d"` - 2D profile annotation
 - `"video"` - Video frame annotation
 
 ### Step 4: Run Server with Custom Model
@@ -141,6 +147,8 @@ from my_models import MyCustomModel
 server = Server()
 server.run()
 ```
+
+To run your model in the Docker Compose stack, read [Add custom data loaders and models](deployment.md#add-custom-data-loaders-and-models).
 
 ## Data Handling
 
@@ -204,7 +212,7 @@ Use the `log_progress()` method to send training updates to the UI:
 
 ```python
 # At the start of training
-self.log_progress(training_status="started")
+self.log_progress(status="training")
 
 # During training (update progress and score)
 self.log_progress(
@@ -214,7 +222,7 @@ self.log_progress(
 
 # At the end of training
 self.log_progress(
-    training_status="completed",
+    status="completed",
     progress=100,
     score=final_accuracy
 )
@@ -222,7 +230,7 @@ self.log_progress(
 
 **Training Status Options:**
 - `"queued"` - Model is waiting to start training
-- `"started"` - Training has begun
+- `"training"` - Training has begun
 - `"completed"` - Training finished successfully
 - `"failed"` - Training encountered an error
 - `"aborted"` - Training was manually stopped
@@ -360,7 +368,7 @@ class RandomForestModel(Model):
     ) -> float:
         """Train the Random Forest model"""
         
-        self.log_progress(training_status="started")
+        self.log_progress(status="training")
         
         # Split data
         self.split_data(
@@ -389,7 +397,7 @@ class RandomForestModel(Model):
             final_accuracy = train_accuracy
         
         self.log_progress(
-            training_status="completed",
+            status="completed",
             progress=100,
             score=final_accuracy
         )
@@ -455,33 +463,6 @@ Then run:
 ```sh
 python run_server.py
 ```
-
-## Using Docker
-
-If you are using the docker compose option to run the server, you can provide a custom script to add your own models. Create a file that imports your models and runs the server:
-
-```python
-# custom_toktagger.py
-from toktagger.api.main import Server
-from my_models import MyCustomModel  # Import to register
-
-server = Server()
-server.run(
-    host="0.0.0.0",
-    port=8002
-)
-```
-
-Then provide the path to your script when running docker compose:
-
-```sh
-CUSTOM_SCRIPT=./custom_toktagger.py docker compose --env-file .env.dev -f docker-compose.dev.yml up --build
-```
-
-!!! tip
-    Make sure you provide the **path** to your script, not just the filename.
-    
-    e.g., provide `CUSTOM_SCRIPT=./custom_toktagger.py`, not `CUSTOM_SCRIPT=custom_toktagger.py`.
 
 ## Annotation Types
 

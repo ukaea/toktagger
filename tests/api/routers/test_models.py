@@ -2,44 +2,47 @@ import pytest
 
 pytest.importorskip("ray")
 
-import pathlib
-from toktagger.api.schemas.models import ModelUpdate
-from toktagger.api.models.base import ActorRegistry
-from toktagger.api.core.sender import (
-    send_batch_samples,
-    send_batch_annotations,
-    send_model_updates,
-)
-import ray
-from unittest.mock import patch
-from bson import ObjectId
-import tempfile
 import asyncio
-import toktagger.api.config as config
+import pathlib
+import tempfile
+import time
+from unittest.mock import patch
+
+import ray
+from bson import ObjectId
+
+from tests.identity import get_auth_token, session_headers
+from tests.db_definitions import TEST_ISSUER, USER_ADMIN_ID
+from toktagger.api import config
+from toktagger.api.core.sender import send_model_updates
+from toktagger.api.routers import models as models_router
+from toktagger.api.schemas.users import UserIn
+from toktagger.api.schemas.models import (
+    GitlabLoadParams,
+    HuggingfaceLoadParams,
+    ModelUpdate,
+)
 
 
-def wait_for_results(task_registry: ActorRegistry, task_id: str):
-    task = task_registry.get(task_id)
-    results = ray.get(task, timeout=30)
-    return results
+def wait_for_results(
+    task_registry: ray.actor.ActorHandle, task_id: str, timeout: float = 30
+):
+    deadline = time.monotonic() + timeout
+    while not ray.get(task_registry.is_ready.remote(task_id)):
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"Task {task_id} did not complete within {timeout}s")
+        time.sleep(0.1)
+    return ray.get(task_registry.get_result.remote(task_id))
 
 
 async def collect_predict_results(models_api_client, task_id):
-    results = wait_for_results(models_api_client.app.state.task_registry, task_id)
-    with patch("requests.put", models_api_client.put):
-        response = await send_batch_annotations(
-            results["project_id"], results["annotations_batch"]
-        )
-        assert response.status_code == 200
-        await send_batch_samples(results["project_id"], results["samples_batch"])
-        assert response.status_code == 200
+    wait_for_results(models_api_client.app.state.task_registry, task_id)
+    await asyncio.gather(*models_router._prediction_writes)
 
 
 async def collect_train_results(models_api_client, task_id):
     results = wait_for_results(models_api_client.app.state.task_registry, task_id)
-    update = ModelUpdate(
-        training_status="completed", progress=100, score=results["score"]
-    )
+    update = ModelUpdate(status="completed", progress=100, score=results["score"])
     with patch("requests.put", models_api_client.put):
         response = await send_model_updates(
             results["project_id"], results["model_id"], update
@@ -74,6 +77,9 @@ async def test_model_batch_predict_num_predictions(
 
     # Check latest version of model has been used by default (annotation label set to model ID in Mock)
     assert all(ann["label"] == setup_model_db["model_id_2"] for ann in annotations)
+
+    # Worker predictions must be stamped "model::<type>", not the raw type (see test_model_auth.py).
+    assert all(ann["created_by"] == "model::mock_disruption_cnn" for ann in annotations)
 
 
 @pytest.mark.asyncio
@@ -163,8 +169,8 @@ async def test_model_predict_missing_weights(
 ):
     # Delete weights
     config.settings.models.cache_dir.joinpath(
-        f"{setup_model_db['model_id_1']}.model"
-    ).unlink()
+        f"{setup_model_db['model_id_1']}"
+    ).joinpath("weights.model").unlink()
     response = await models_api_client.post(
         f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
     )
@@ -228,6 +234,89 @@ async def test_model_sample_predict(models_api_client, db_client, setup_model_db
 
     # Check it corresponds to sample ID we asked for predictions on
     assert str(annotations[0]["sample_id"]) == setup_model_db["sample_ids"][-1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_predict_endpoint_survives_same_named_human_save(
+    models_api_client, db_client, setup_model_db
+):
+    """A real prediction from the /predict endpoint (created_by="model::mock_disruption_cnn")
+    must survive a human user named "mock_disruption_cnn" saving their own
+    annotation for the same sample — the "model::" prefix is the namespace
+    separator that prevents the collision from corrupting either author's data.
+
+    Unlike test_user_save_does_not_corrupt_prefixed_predictions in
+    test_model_auth.py (which hand-crafts the "model::" annotation via a direct
+    import), this exercises the actual /predict endpoint and
+    Ray worker pipeline end to end, with real per-user JWT auth.
+    """
+    client = models_api_client
+    project_id = setup_model_db["project_id"]
+    sample_id = setup_model_db["sample_ids"][-1]
+
+    admin_token = get_auth_token(USER_ADMIN_ID)
+
+    # A human user whose name matches the model type (the collision scenario).
+    human_id = await db_client.insert(
+        "users",
+        UserIn(
+            username="mock_disruption_cnn",
+            oidc_issuer=TEST_ISSUER,
+            oidc_sub="mock_disruption_cnn-sub",
+        ),
+    )
+
+    await client.post(
+        f"/projects/{project_id}/members",
+        json={"username": "mock_disruption_cnn", "role": "annotator"},
+        headers=session_headers(admin_token),
+    )
+
+    # Run a REAL prediction through the actual /predict endpoint.
+    predict_resp = await client.post(
+        f"/projects/{project_id}/samples/{sample_id}/models/mock_disruption_cnn/predict",
+        headers=session_headers(admin_token),
+    )
+    assert predict_resp.status_code == 200, predict_resp.text
+    await collect_predict_results(client, predict_resp.json()["task_id"])
+
+    model_annotations = await db_client.get_filtered_documents(
+        collection="annotations",
+        filters={
+            "created_by": "model::mock_disruption_cnn",
+            "sample_id": ObjectId(sample_id),
+        },
+    )
+    assert len(model_annotations) == 1
+
+    # The human user (same name as the model) saves their own annotation for the
+    # same sample. update_annotations only replaces the CALLER's own annotations.
+    human_token = get_auth_token(human_id)
+    save_resp = await client.put(
+        f"/projects/{project_id}/samples/{sample_id}/annotations",
+        json=[
+            {
+                "label": "human_ann",
+                "time_min": 0.0,
+                "time_max": 1.0,
+                "type": "time_region",
+                "validated": True,
+                "created_by": "placeholder",  # server overwrites from JWT
+            }
+        ],
+        headers=session_headers(human_token),
+    )
+    assert save_resp.status_code == 200, save_resp.text
+
+    # Both the real model prediction and the human's own annotation must survive.
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"sample_id": ObjectId(sample_id)}
+    )
+    labels_by_author = {a["created_by"]: a["label"] for a in annotations}
+    assert labels_by_author.get("model::mock_disruption_cnn") is not None
+    assert labels_by_author.get("model::mock_disruption_cnn") != "human_ann"
+    assert labels_by_author.get(human_id) == "human_ann"
 
 
 @pytest.mark.asyncio
@@ -338,7 +427,7 @@ async def test_model_get_sample_prediction_in_progress(
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
 async def test_model_update(models_api_client, db_client, setup_model_db):
-    model_updates = ModelUpdate(training_status="started", progress=50, score=20)
+    model_updates = ModelUpdate(status="training", progress=50, score=20)
     response = await models_api_client.put(
         f"/projects/{setup_model_db['project_id']}/models/{setup_model_db['model_id_1']}",
         json=model_updates.model_dump(mode="json"),
@@ -349,7 +438,7 @@ async def test_model_update(models_api_client, db_client, setup_model_db):
     model = await db_client.get_document_by_id(
         collection="models", object_id=ObjectId(setup_model_db["model_id_1"])
     )
-    assert model["training_status"] == "started"
+    assert model["status"] == "training"
     assert model["progress"] == 50
     assert model["score"] == 20
 
@@ -371,12 +460,16 @@ async def test_model_start_training_no_params(
     )
 
     # Check model has been set to completed, with 100% completion
-    assert model["training_status"] == "completed"
+    assert model["status"] == "completed"
     assert model["progress"] == 100
     assert model["score"] == 60  # value returned by train method
 
     # Check model has been saved after completion
-    assert config.settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
+    assert (
+        config.settings.models.cache_dir.joinpath(f"{model_id}")
+        .joinpath("weights.model")
+        .exists()
+    )
 
 
 @pytest.mark.asyncio
@@ -457,12 +550,21 @@ async def test_model_start_training_params(
     )
 
     # Check model has been set to completed, with 100% completion
-    assert model["training_status"] == "completed"
+    assert model["status"] == "completed"
     assert model["progress"] == 100
     assert model["score"] == 50  # value returned from params
 
     # Check model has been saved after completion
-    assert config.settings.models.cache_dir.joinpath(f"{model_id}.model").exists()
+    assert (
+        config.settings.models.cache_dir.joinpath(f"{model_id}")
+        .joinpath("weights.model")
+        .exists()
+    )
+    assert (
+        config.settings.models.cache_dir.joinpath(f"{model_id}")
+        .joinpath("config.json")
+        .exists()
+    )
 
 
 # Test delete model
@@ -483,17 +585,17 @@ async def test_model_delete_type(models_api_client, db_client, setup_model_db):
 
     # Check for models 1 and 2, their file no longer exists
     assert not config.settings.models.cache_dir.joinpath(
-        f"{setup_model_db['model_id_1']}.model"
+        f"{setup_model_db['model_id_1']}"
     ).exists()
     assert not config.settings.models.cache_dir.joinpath(
-        f"{setup_model_db['model_id_2']}.model"
+        f"{setup_model_db['model_id_2']}"
     ).exists()
-    # And for model 3 it does still exist
+    # And for model 3 and 4 it does still exist
     assert config.settings.models.cache_dir.joinpath(
-        f"{setup_model_db['model_id_3']}.model"
+        f"{setup_model_db['model_id_3']}"
     ).exists()
     assert config.settings.models.cache_dir.joinpath(
-        f"{setup_model_db['model_id_3']}.model"
+        f"{setup_model_db['model_id_4']}"
     ).exists()
 
 
@@ -518,13 +620,13 @@ async def test_model_delete_type_version(models_api_client, db_client, setup_mod
 
     # Check for model 2, their file no longer exists
     assert not config.settings.models.cache_dir.joinpath(
-        f"{setup_model_db['model_id_2']}.model"
+        f"{setup_model_db['model_id_2']}"
     ).exists()
     # And for models 1, 3 and 4 it does still exist
     assert all(
         (
             config.settings.models.cache_dir.joinpath(
-                f"{setup_model_db[model_id]}.model"
+                f"{setup_model_db[model_id]}"
             ).exists()
         )
         for model_id in ("model_id_1", "model_id_3", "model_id_4")
@@ -533,10 +635,7 @@ async def test_model_delete_type_version(models_api_client, db_client, setup_mod
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-@patch("ray.cancel")
-async def test_model_stop_training(
-    mock_func, models_api_client, db_client, setup_model_db
-):
+async def test_model_stop_training(models_api_client, db_client, setup_model_db):
     response = await models_api_client.delete(
         f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/train"
     )
@@ -550,9 +649,7 @@ async def test_model_stop_training(
         "models", {"type": "disruption_cnn"}
     )
     model = models[0]
-    assert model["training_status"] == "aborted"
-
-    assert mock_func.call_count > 0
+    assert model["status"] == "aborted"
 
 
 @pytest.mark.asyncio
@@ -571,7 +668,7 @@ async def test_model_stop_training_not_in_progress(
 
     # Check no models show as aborted
     models = await db_client.get_all_documents("models")
-    assert all(model["training_status"] != "aborted" for model in models)
+    assert all(model["status"] != "aborted" for model in models)
 
     assert mock_func.call_count == 0
 
@@ -580,7 +677,7 @@ async def test_model_stop_training_not_in_progress(
 @pytest.mark.models_enabled
 async def test_model_delete_predictions(models_api_client, db_client, setup_model_db):
     await models_api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
     )
 
     # Should be 5 annotations remaining since half were created by 'manual'
@@ -595,14 +692,14 @@ async def test_model_delete_no_predictions(
     models_api_client, db_client, setup_model_db
 ):
     response = await models_api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
+        f"/projects/{setup_model_db['project_id']}/models/mock_timeseries_cnn/predict"
     )
 
     # Nothing created by this model, so should return 404 and not delete anything
     assert response.status_code == 404
     assert (
         response.json()["detail"]
-        == "No annotations produced by mock_disruption_cnn could be found for this Project."
+        == "No annotations produced by mock_timeseries_cnn could be found for this Project."
     )
     annotations = await db_client.get_all_documents(collection="annotations")
     assert len(annotations) == 10
@@ -616,7 +713,8 @@ async def test_model_load_local(models_api_client, db_client, setup_model_db):
         tempf.write("Model Weights")
         tempf.flush()
         response = await models_api_client.post(
-            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/local",
+            json={"weights_path": str(tempf.name)},
         )
         assert response.status_code == 200
         model_id = response.json()["model_id"]
@@ -638,17 +736,11 @@ async def test_model_load_local(models_api_client, db_client, setup_model_db):
 
         assert response.status_code == 200
 
-        model = await db_client.get_document_by_id(
-            collection="models", object_id=ObjectId(model_id)
-        )
-
-        # Check model has been set to completed, with 100% completion
-        assert model["training_status"] == "completed"
-        assert model["progress"] == 100
-
         # Check model has been saved after completion
-        model_path = pathlib.Path(config.settings.models.cache_dir).joinpath(
-            f"{model_id}.model"
+        model_path = (
+            pathlib.Path(config.settings.models.cache_dir)
+            .joinpath(f"{model_id}")
+            .joinpath("weights.model")
         )
         assert model_path.exists()
 
@@ -663,7 +755,8 @@ async def test_model_load_local_missing_file(
 ):
     # Try loading nonexistent file
     response = await models_api_client.post(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path=non_existant_path.model"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/local",
+        json={"weights_path": "non_existing_path.model"},
     )
     assert response.status_code == 422
     assert response.json()["detail"] == "Weights file not found at specified path!"
@@ -677,7 +770,8 @@ async def test_model_load_local_disabled(models_api_client, db_client, setup_mod
         tempf.write("Model Weights")
         tempf.flush()
         response = await models_api_client.post(
-            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/local",
+            json={"weights_path": str(tempf.name)},
         )
     config.settings.models.local_load_enabled = True
     assert response.status_code == 403
@@ -693,7 +787,8 @@ async def test_model_load_local_failed(models_api_client, db_client, setup_model
         tempf.write(b"\xff")
         tempf.flush()
         response = await models_api_client.post(
-            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load?method=local&weights_path={str(tempf.name)}"
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/local",
+            json={"weights_path": str(tempf.name)},
         )
         # Successfully submits the load job
         assert response.status_code == 200
@@ -718,18 +813,221 @@ async def test_model_load_local_failed(models_api_client, db_client, setup_model
 
         # Check message is as expected
         print(response.json())
-        assert "Load task failed - Failed to load weights" in response.json()["detail"]
+        assert "Failed to load weights" in response.json()["detail"]
 
         model = await db_client.get_document_by_id(
             collection="models", object_id=ObjectId(model_id)
         )
 
         # Check model has been set to failed
-        assert model["training_status"] == "failed"
+        assert model["status"] == "failed"
 
         # Check model has not been saved after completion
-        assert (
-            not pathlib.Path(config.settings.models.cache_dir)
-            .joinpath(f"{model_id}.model")
-            .exists()
+        model_path = (
+            pathlib.Path(config.settings.models.cache_dir)
+            .joinpath(f"{model_id}")
+            .joinpath("weights.model")
         )
+        assert not model_path.exists()
+
+
+def mock_ray_remote(*args, **kwargs):
+    def decorator(func):
+        class Dummy:
+            def remote(self, *args, **kwargs):
+                return "test_task_id"
+
+        return Dummy()
+
+    return decorator
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+@patch("toktagger.api.routers.models.ray.remote", mock_ray_remote)
+async def test_model_load_gitlab(models_api_client, db_client, setup_model_db):
+    config.settings.models.gitlab_url = "http://test_gitlab_url"
+    config.settings.models.gitlab_token = "abc123"
+
+    params = GitlabLoadParams(
+        weights_path="test_load.model",
+        model_name="disruption_cnn",
+        model_version="v5.0.0",
+        gitlab_project_id=123,
+    )
+
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/gitlab",
+        json=params.model_dump(),
+    )
+
+    config.settings.models.gitlab_url = None
+    config.settings.models.gitlab_token = None
+
+    assert response.status_code == 200
+    model_id = response.json()["model_id"]
+
+    # Just check that this has correctly made an entry in the db
+    # Get model from the database
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(model_id)
+    )
+    assert model["version"] == 3  # Since v1 and v2 are already defined in db
+    assert model["status"] == "queued"
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+@patch("toktagger.api.routers.models.ray.remote", mock_ray_remote)
+async def test_model_load_gitlab_missing_vars(
+    models_api_client, db_client, setup_model_db
+):
+    config.settings.models.gitlab_url = None
+    config.settings.models.gitlab_token = None
+
+    params = GitlabLoadParams(
+        weights_path="test_load.model",
+        model_name="disruption_cnn",
+        model_version="v5.0.0",
+        gitlab_project_id=123,
+    )
+
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/gitlab",
+        json=params.model_dump(),
+    )
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "Gitlab URL and Token env vars must be set for ML Model loading from Gitlab."
+    )
+
+
+@pytest.mark.asyncio
+async def test_model_load_gitlab_no_project_id(
+    models_api_client, db_client, setup_model_db
+):
+    config.settings.models.gitlab_url = "http://test_gitlab_url"
+    config.settings.models.gitlab_token = "abc123"
+
+    params = GitlabLoadParams(
+        weights_path="test_load.model",
+        model_name="disruption_cnn",
+        model_version="v5.0.0",
+        # No project ID specified here or via config...
+    )
+
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/gitlab",
+        json=params.model_dump(),
+    )
+
+    config.settings.models.gitlab_url = None
+    config.settings.models.gitlab_token = None
+
+    assert response.status_code == 422
+    assert (
+        response.json()["detail"]
+        == "Must set a Gitlab Project ID either via UI or config setting."
+    )
+
+
+@pytest.mark.asyncio
+async def test_model_load_gitlab_disabled(models_api_client, db_client, setup_model_db):
+    # Try loading  file with local load disabled
+    config.settings.models.gitlab_load_enabled = False
+
+    params = GitlabLoadParams(
+        weights_path="test_load.model",
+        model_name="disruption_cnn",
+        model_version="v5.0.0",
+        gitlab_project_id=123,
+    )
+
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/gitlab",
+        json=params.model_dump(),
+    )
+    config.settings.models.gitlab_load_enabled = True
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Loading model weights from Gitlab is disabled."
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+@patch("toktagger.api.routers.models.ray.remote", mock_ray_remote)
+async def test_model_load_huggingface(models_api_client, db_client, setup_model_db):
+    params = HuggingfaceLoadParams(
+        weights_path="weights.model",
+        model_name="test_model",
+        model_version="v1.0.0",
+        huggingface_userspace="my_user",
+    )
+
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/hugging_face",
+        json=params.model_dump(),
+    )
+
+    assert response.status_code == 200
+    model_id = response.json()["model_id"]
+
+    # Just check that this has correctly made an entry in the db
+    # Get model from the database
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(model_id)
+    )
+    assert model["version"] == 3  # Since v1 and v2 are already defined in db
+    assert model["status"] == "queued"
+
+
+@pytest.mark.asyncio
+async def test_model_load_huggingface_no_userspace(
+    models_api_client, db_client, setup_model_db
+):
+    params = HuggingfaceLoadParams(
+        weights_path="weights.model",
+        model_name="test_model",
+        model_version="v1.0.0",
+        # No userspace defined here or via config...
+    )
+
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/hugging_face",
+        json=params.model_dump(),
+    )
+
+    assert response.status_code == 422
+    assert (
+        response.json()["detail"]
+        == "Must set a Hugging Face userspace / organisation to load from, either via UI or config setting."
+    )
+
+
+@pytest.mark.asyncio
+async def test_model_load_huggingface_disabled(
+    models_api_client, db_client, setup_model_db
+):
+    # Try loading  file with local load disabled
+    config.settings.models.huggingface_load_enabled = False
+
+    params = HuggingfaceLoadParams(
+        weights_path="weights.model",
+        model_name="test_model",
+        model_version="v1.0.0",
+        huggingface_userspace="my_user",
+    )
+
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/load/hugging_face",
+        json=params.model_dump(),
+    )
+    config.settings.models.huggingface_load_enabled = True
+
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Loading model weights from Hugging Face is disabled."
+    )

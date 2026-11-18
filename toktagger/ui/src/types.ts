@@ -1,14 +1,34 @@
-import { PlotlyHTMLElement } from "plotly.js";
+import { Config, PlotlyHTMLElement } from "plotly.js";
 import { z } from "zod/v4";
 
-export const BaseAnnotationSchema = z.object({
+// Display only; the raw created_by value is kept for ownership checks, filtering, etc.
+export const CreatedBySchema = z.object({
+  created_by: z.string().default("manual"),
+  // Read-only author name the backend resolves from created_by.
+  created_by_name: z.string().nullish(),
+  created_by_deleted: z.boolean().optional(),
+});
+export type CreatedByFields = z.infer<typeof CreatedBySchema>;
+
+export const pickCreatedBy = ({
+  created_by,
+  created_by_name,
+  created_by_deleted,
+}: CreatedByFields): CreatedByFields => ({
+  created_by,
+  created_by_name,
+  created_by_deleted,
+});
+
+export const BaseAnnotationSchema = CreatedBySchema.extend({
+  _id: z.string().nullable().default(null),
   project_id: z.string().nullable().default(null),
   sample_id: z.string().nullable().default(null),
   shot_id: z.number().optional(),
   timestamp: z.string().optional(),
   validated: z.boolean().nullable().default(null),
   uncertainty: z.number().nullable().default(1),
-  created_by: z.string().default("manual"),
+  signal_name: z.string().nullable().default(null),
   label: z.string(),
   type: z.string(),
 });
@@ -43,10 +63,19 @@ export const BoundingBoxSchema = BaseAnnotationSchema.extend({
 
 export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 
-export const VideoBoundingBoxSchema = BaseAnnotationSchema.extend({
-  type: z.literal("video_bounding_box"),
+export const VideoAnnotationBaseSchema = BaseAnnotationSchema.extend({
   frame: z.number().int(),
   track_id: z.string(), // force string
+});
+
+export const VideoFrameLabelSchema = VideoAnnotationBaseSchema.extend({
+  type: z.literal("video_frame_label"),
+});
+
+export type VideoFrameLabel = z.infer<typeof VideoFrameLabelSchema>;
+
+export const VideoBoundingBoxSchema = VideoAnnotationBaseSchema.extend({
+  type: z.literal("video_bounding_box"),
   height: z.number().int(),
   width: z.number().int(),
   x_min: z.number().int(),
@@ -54,32 +83,53 @@ export const VideoBoundingBoxSchema = BaseAnnotationSchema.extend({
 });
 
 export type VideoBoundingBox = z.infer<typeof VideoBoundingBoxSchema>;
+export type VideoBoundingBoxInput = z.input<typeof VideoBoundingBoxSchema>;
+
+const PolygonCoordinatesSchema = z
+  .array(z.number())
+  .min(6)
+  .refine((coordinates) => coordinates.length % 2 === 0, {
+    message: "A polygon must contain an even number of coordinates",
+  });
+
+const VideoPolygonCoordinatesSchema = z
+  .array(z.number().int())
+  .min(6)
+  .refine((coordinates) => coordinates.length % 2 === 0, {
+    message: "A polygon must contain an even number of coordinates",
+  });
 
 export const PolygonSchema = BaseAnnotationSchema.extend({
   type: z.literal("polygon"),
-  segmentation: z.array(z.number()).min(6),
+  segmentation: z.array(PolygonCoordinatesSchema).length(1),
 });
 
 export type Polygon = z.infer<typeof PolygonSchema>;
 
-export const VideoPolygonSchema = BaseAnnotationSchema.extend({
+export const VideoPolygonSchema = VideoAnnotationBaseSchema.extend({
   type: z.literal("video_polygon"),
-  frame: z.number().int(),
-  track_id: z.string(),
-  segmentation: z.array(z.number().int()).min(6),
+  segmentation: z.array(VideoPolygonCoordinatesSchema).length(1),
 });
 
 export type VideoPolygon = z.infer<typeof VideoPolygonSchema>;
+export type VideoPolygonInput = z.input<typeof VideoPolygonSchema>;
 
-export const VideoPointSchema = BaseAnnotationSchema.extend({
+export const VideoPointSchema = VideoAnnotationBaseSchema.extend({
   type: z.literal("video_point"),
-  frame: z.number().int(),
-  track_id: z.string(),
   x: z.number().int(),
   y: z.number().int(),
 });
 
 export type VideoPoint = z.infer<typeof VideoPointSchema>;
+export type VideoPointInput = z.input<typeof VideoPointSchema>;
+
+export const VideoShapeSchema = z.discriminatedUnion("type", [
+  VideoBoundingBoxSchema,
+  VideoPolygonSchema,
+  VideoPointSchema,
+]);
+
+export type VideoShapeInput = z.input<typeof VideoShapeSchema>;
 
 export const AnnotationSchema = z.union([
   TimePointSchema,
@@ -90,12 +140,25 @@ export const AnnotationSchema = z.union([
   VideoBoundingBoxSchema,
   VideoPolygonSchema,
   VideoPointSchema,
+  VideoFrameLabelSchema,
 ]);
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
+export const AnnotationConflictSchema = z.object({
+  detail: z.object({
+    message: z.string(),
+    stale_ids: z.array(z.string()),
+  }),
+});
+
 export type NavAdapter = {
   getAnnotations: () => Annotation[];
-  clear: () => void;
+  // includeOthers clears every annotation on the sample rather than only the
+  // caller's own. The Clear button passes the "Show Others' Annotations" state, so
+  // what the button discards is always what the user can see.
+  clear: (includeOthers?: boolean) => void | Promise<void>;
+  // Deletes the annotations the user removed that a save cannot remove for them.
+  syncRemovals?: () => Promise<void>;
   afterSave?: () => void;
 };
 
@@ -104,24 +167,26 @@ export type Annotations = z.infer<typeof AnnotationsSchema>;
 
 export const TimeSeriesDataSchema = z.object({
   time: z.array(z.number()),
-  values: z.array(z.number()),
+  // Nullable: the API serialises NaN samples in a signal as null.
+  values: z.array(z.number().nullable()),
 });
 export type TimeSeriesData = z.infer<typeof TimeSeriesDataSchema>;
 
 export const MultiVariateTimeSeriesDataSchema = z.object({
-  values: z.record(z.string(), TimeSeriesDataSchema),
+  // Null marks a signal the server could not load.
+  values: z.record(z.string(), TimeSeriesDataSchema.nullable()),
 });
 export type MultiVariateTimeSeriesData = z.infer<
   typeof MultiVariateTimeSeriesDataSchema
 >;
 
-export const SpectrogramDataSchema = z.object({
+export const Profile2DDataSchema = z.object({
   time: z.array(z.number()),
-  frequency: z.array(z.number()),
-  amplitude: z.array(z.array(z.number())),
-  threshold_mask: z.array(z.array(z.number())).optional(),
+  dim_1: z.array(z.number()),
+  // Nullable: the API serialises NaN samples in a profile as null.
+  values: z.array(z.array(z.number().nullable())),
 });
-export type SpectrogramData = z.infer<typeof SpectrogramDataSchema>;
+export type Profile2DData = z.infer<typeof Profile2DDataSchema>;
 export const ImageDataSchema = z.object({
   frame: z.number(),
   values: z.string(), // base64 PNG
@@ -131,7 +196,7 @@ export type ImageData = z.infer<typeof ImageDataSchema>;
 export const DataSchema = z.union([
   TimeSeriesDataSchema,
   MultiVariateTimeSeriesDataSchema,
-  SpectrogramDataSchema,
+  Profile2DDataSchema,
   ImageDataSchema,
 ]);
 export type Data = z.infer<typeof DataSchema>;
@@ -166,27 +231,18 @@ export const VSpanSchema = BaseDisplayAnnotationSchema.extend({
 });
 export type VSpan = z.infer<typeof VSpanSchema>;
 
-export const SpectrogramMaskSchema = z.object({
-  values: z.array(z.array(z.number())),
-});
-export type SpectrogramMask = z.infer<typeof SpectrogramMaskSchema>;
-
-export const DisplayAnnotationSchema = z.union([
-  ZoneSchema,
-  VSpanSchema,
-  SpectrogramMaskSchema,
-]);
+export const DisplayAnnotationSchema = z.union([ZoneSchema, VSpanSchema]);
 export type DisplayAnnotation = z.infer<typeof DisplayAnnotationSchema>;
 
 export enum TaskType {
   TimeSeries = "time-series",
-  // Spectrogram = "spectrogram",
+  Profile2D = "profile-2d",
   Video = "video",
 }
 
 export const TaskSchema = z.enum([
   TaskType.TimeSeries,
-  // TaskType.Spectrogram,
+  TaskType.Profile2D,
   TaskType.Video,
 ]);
 
@@ -209,6 +265,15 @@ export const ProjectSchema = z.object({
   video_bounding_box_labels: z.array(z.string()).default([]),
 });
 export type Project = z.infer<typeof ProjectSchema>;
+
+export const ProjectUpdateSchema = ProjectSchema.omit({
+  _id: true,
+  task: true,
+  data_loader: true,
+  timestamp: true,
+  model_types: true,
+});
+export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 
 export const FileDataSchema = z.object({
   file_name: z.string(),
@@ -262,13 +327,35 @@ export const ModelSchema = z.object({
   project_id: z.string(),
   type: z.string(),
   version: z.int(),
-  training_status: z.string(),
+  status: z.string(),
   progress: z.number(),
   score: z.number(),
   task_id: z.string(),
 });
 
 export type Model = z.infer<typeof ModelSchema>;
+
+export const LocalLoadFormSchema = z.object({
+  weights_path: z.string().nonempty(),
+});
+export type LocalLoadForm = z.infer<typeof LocalLoadFormSchema>;
+
+export const GitlabLoadFormSchema = z.object({
+  model_name: z.string().nonempty(),
+  weights_path: z.string().nonempty(),
+  model_version: z.string().nullish(),
+  gitlab_project_id: z.number().min(1),
+});
+export type GitlabLoadForm = z.infer<typeof GitlabLoadFormSchema>;
+
+export const HuggingfaceLoadFormSchema = z.object({
+  model_name: z.string().nonempty(),
+  weights_path: z.string().nonempty(),
+  model_version: z.string().nullish(),
+  huggingface_userspace: z.string().nonempty(),
+});
+export type HuggingfaceLoadForm = z.infer<typeof HuggingfaceLoadFormSchema>;
+
 export const DataParamsSchema = z.object({
   name: z.string(),
   // Only used for video/image loader params.
@@ -288,21 +375,22 @@ export const SamplesSummarySchema = z.object({
 export type SamplesSummary = z.infer<typeof SamplesSummarySchema>;
 
 export const ViewParamsSchema = z.object({
-  name: z.string(),
+  name: z.literal("identity"),
 });
 export type ViewParams = z.infer<typeof ViewParamsSchema>;
 
-export const SpectrogramViewParamsSchema = ViewParamsSchema.extend({
-  nperseg: z.number().optional(),
+export const Profile2DViewParamsSchema = ViewParamsSchema.extend({
+  name: z.literal("profile_2d"),
+  signal_name: z.string(),
+  log_scale: z.boolean().default(false),
   time_min: z.number().optional(),
   time_max: z.number().optional(),
-  frequency_min: z.number().optional(),
-  frequency_max: z.number().optional(),
-  amplitude_min: z.number().optional(),
-  amplitude_max: z.number().optional(),
-  threshold_value: z.number().optional(),
+  dim_1_min: z.number().optional(),
+  dim_1_max: z.number().optional(),
+  values_min: z.number().optional(),
+  values_max: z.number().optional(),
 });
-export type SpectrogramViewParams = z.infer<typeof SpectrogramViewParamsSchema>;
+export type Profile2DViewParams = z.infer<typeof Profile2DViewParamsSchema>;
 
 export const HealthInfoSchema = z.object({
   name: z.string(),
@@ -319,6 +407,8 @@ export type ToolingProps = {
   forceUpdate?: number;
   onUpdate?: CallableFunction;
   selectedXRange?: [number, number];
+  // Restricts rendering to a single subplot (e.g. "xy2"); all subplots by default.
+  subplot?: string;
 };
 
 export enum ToolingTypes {
@@ -349,14 +439,64 @@ export type TimeSeriesAnnotationPoint = {
   y: number;
 };
 
-export type TimeSeriesAnnotation = {
+export type TimeSeriesAnnotation = CreatedByFields & {
   id: string;
-  created_by: string;
+  // The backend's own _id, when this annotation already exists in the DB (e.g. loaded
+  // via GET, possibly another user's). null for annotations drawn locally and not yet
+  // saved. Must round-trip back out on save so the server can tell "existing" from
+  // "new" and avoid re-stamping someone else's annotation under the saving user.
+  db_id: string | null;
   label: string;
   type: TimeSeriesAnnotationType;
   points: TimeSeriesAnnotationPoint[];
   selected: boolean;
+  // Binds the annotation to a specific signal; null for single-signal views.
+  signal_name?: string | null;
 };
+
+export const CurrentUserSchema = z.object({
+  _id: z.string(),
+  username: z.string(),
+  global_role: z.enum(["admin", "user"]),
+  is_active: z.boolean(),
+  email: z.string().nullish(),
+  display_name: z.string().nullish(),
+});
+export type CurrentUser = z.infer<typeof CurrentUserSchema>;
+
+export const LogoutResponseSchema = z.object({
+  logout_url: z.string().nullable(),
+});
+
+export const ApiTokenSchema = z.object({
+  _id: z.string(),
+  name: z.string(),
+  hint: z.string(),
+  created_at: z.string(),
+  expires_at: z.string(),
+  last_used_at: z.string().nullable(),
+});
+export type ApiToken = z.infer<typeof ApiTokenSchema>;
+
+export const ApiTokenCreatedSchema = ApiTokenSchema.extend({
+  token: z.string(),
+});
+
+// Mirrors the backend's ProjectMember, as GET /users/me/memberships returns it.
+export const ProjectMemberSchema = z.object({
+  project_id: z.string(),
+  user_id: z.string(),
+  role: z.enum(["admin", "annotator", "viewer"]),
+  show_others_annotations: z.boolean(),
+});
+export type ProjectMember = z.infer<typeof ProjectMemberSchema>;
+
+// Mirrors ProjectMemberOut: what GET /projects/{id}/members adds for the member list.
+export const ProjectMemberOutSchema = ProjectMemberSchema.extend({
+  _id: z.string(),
+  username: z.string(),
+});
+export type ProjectMemberOut = z.infer<typeof ProjectMemberOutSchema>;
 
 export type ToolingCallbacks = {
   start: (
@@ -367,10 +507,11 @@ export type ToolingCallbacks = {
   ) => void;
   move: (x: number, y: number) => void;
   end: (x: number, y: number) => void;
-  hover?: (x: number, y: number) => void;
-  // Discards any in-progress annotation and resets tool-local state - called when a draw
-  // is abandoned (tool switched mid-draw, Escape pressed) rather than completed normally
+  hover?: (x: number, y: number, axisSize: { x: number; y: number }) => void;
+  // Called when a draw is abandoned (tool switched or Escape pressed) instead of finished
   cancel?: () => void;
+  // Alternative gesture for finishing an in-progress shape (e.g. double-click to close a polygon)
+  doubleClick?: (x: number, y: number) => void;
 };
 
 export type PlotProps = {
@@ -388,6 +529,7 @@ type PlotlyAxisTransforms = {
 };
 export interface ExtendedPlotlyHTMLElement extends PlotlyHTMLElement {
   _fullLayout: Record<string, PlotlyAxisTransforms>;
+  _context: { doubleClick: Config["doubleClick"] };
 }
 
 export interface SelectionRange {
@@ -400,3 +542,35 @@ export interface SelectionRange {
     high: number;
   };
 }
+
+export enum AnnotatorTypes {
+  PEAK_DETECTION = "peak_detection",
+  CHANGE_POINT_DETECTION = "change_point_detection",
+  JUMP_DETECTION = "jump_detection",
+  OUTLIER_DETECTION = "outlier_detection",
+  PROFILE_2D_THRESHOLD = "profile_2d_threshold",
+}
+
+export const annotatorCreatedBy = (type: AnnotatorTypes) =>
+  `annotators::${type}`;
+
+export const modelCreatedBy = (modelType: string) => `model::${modelType}`;
+
+const NON_HUMAN_AUTHOR_KINDS: Record<string, string> = {
+  model: "model",
+  annotators: "annotator",
+};
+
+export const displayCreatedBy = ({
+  created_by,
+  created_by_name,
+  created_by_deleted,
+}: CreatedByFields) => {
+  const [prefix, ...rest] = created_by.split("::");
+  const kind = rest.length > 0 ? NON_HUMAN_AUTHOR_KINDS[prefix] : undefined;
+  // Tag non-human authors so a user with the same name cannot be mistaken for them.
+  if (kind) return `${created_by_name || rest.join("::")} (${kind})`;
+  if (created_by_name) return created_by_name;
+  if (created_by_deleted) return "Deleted user";
+  return created_by;
+};

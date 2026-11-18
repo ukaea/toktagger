@@ -21,17 +21,53 @@ import {
 } from "@/app/contexts/TimeSeriesContext";
 import { useEffect, useState } from "react";
 import { TimeSeriesAnnotationType } from "@/types";
+import { useSample } from "@/app/contexts/SampleContext";
+
+const categoryAllocsKey = (projectId: string) =>
+  `ts-category-allocs-${projectId}`;
+
+// Reads the saved category -> label allocations, discarding corrupt storage.
+// Individual labels are still checked against the project's categories below.
+function readSavedAllocations(projectId: string): Record<string, string> {
+  const savedRaw = sessionStorage.getItem(categoryAllocsKey(projectId));
+  if (!savedRaw) return {};
+
+  try {
+    const parsed: unknown = JSON.parse(savedRaw);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+    ) {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // Malformed JSON - fall through and discard.
+  }
+
+  sessionStorage.removeItem(categoryAllocsKey(projectId));
+  return {};
+}
 
 export const AnnotationToolbar = () => {
-  const { editMode, toolingCallbacks, categories, activeAnnotationTool } =
-    useTimeSeriesState();
+  const {
+    editMode,
+    toolingCallbacks,
+    categories,
+    activeAnnotationTool,
+    canAnnotate,
+  } = useTimeSeriesState();
   const { setEditMode, setAnnotationTool } = useTimeSeriesActions();
+  const { project } = useSample();
+  const projectId = project?._id;
 
   const [categoryAllocations, setCategoryAllocations] = useState<
     Map<TimeSeriesAnnotationType, string>
   >(new Map());
 
-  const [firstTimeEdit, setFirstTimeEdit] = useState(true);
+  const [firstTimeEdit, setFirstTimeEdit] = useState(
+    () => localStorage.getItem("ts-help-seen") !== "true",
+  );
   const [contextHelpManualOpen, setContextHelpManualOpen] = useState<
     boolean | undefined
   >(undefined);
@@ -40,20 +76,45 @@ export const AnnotationToolbar = () => {
   const modeText = editMode ? "Edit Mode" : "View Mode";
 
   useEffect(() => {
+    if (!projectId) return;
+    const saved = readSavedAllocations(projectId);
+
     const categoryMap: Map<TimeSeriesAnnotationType, string> = new Map();
     categories.forEach((category) => {
       if (!categoryMap.has(category.type)) {
-        categoryMap.set(category.type, category.label);
+        const savedLabel = saved[category.type];
+        const savedValid =
+          savedLabel !== undefined &&
+          [...categories.values()].some(
+            (c) => c.type === category.type && c.label === savedLabel,
+          );
+        categoryMap.set(
+          category.type,
+          savedValid ? savedLabel : category.label,
+        );
       }
     });
     setCategoryAllocations(categoryMap);
-  }, [categories]);
+  }, [categories, projectId]);
+
+  useEffect(() => {
+    if (!projectId || categoryAllocations.size === 0) return;
+    const record: Record<string, string> = {};
+    categoryAllocations.forEach((label, type) => {
+      record[type] = label;
+    });
+    sessionStorage.setItem(
+      categoryAllocsKey(projectId),
+      JSON.stringify(record),
+    );
+  }, [categoryAllocations, projectId]);
 
   return (
     <View
       width="size-3000"
       flexShrink={0}
       marginTop="size-200"
+      overflow="auto"
       data-testid="annotation-toolbar"
     >
       <Flex direction="column" alignItems="center" gap="size-150">
@@ -62,8 +123,8 @@ export const AnnotationToolbar = () => {
           <Button
             width="size-1600"
             variant={modeVariant}
+            isDisabled={!canAnnotate}
             onPress={() => {
-              setAnnotationTool(null);
               setEditMode(!editMode);
               if (firstTimeEdit) {
                 setContextHelpManualOpen(true);
@@ -73,10 +134,13 @@ export const AnnotationToolbar = () => {
             {modeText}
           </Button>
           <Tooltip>
-            Click to enter{" "}
-            {editMode
-              ? "view mode - annotations disabled"
-              : "edit mode - annotations enabled"}
+            {canAnnotate
+              ? `Click to enter ${
+                  editMode
+                    ? "view mode - annotations disabled"
+                    : "edit mode - annotations enabled"
+                } (shortcut: e)`
+              : "You have view-only access to this project — annotations cannot be edited."}
           </Tooltip>
         </TooltipTrigger>
         <Divider size="S" marginX="size-200" />
@@ -143,6 +207,7 @@ export const AnnotationToolbar = () => {
           isOpen={firstTimeEdit ? contextHelpManualOpen : undefined}
           onOpenChange={() => {
             setFirstTimeEdit(false);
+            localStorage.setItem("ts-help-seen", "true");
           }}
           aria-label="annotation-context-help"
         >
@@ -150,7 +215,7 @@ export const AnnotationToolbar = () => {
           <Content>
             <Text>
               Use the top button to switch between <b>edit mode</b> and{" "}
-              <b>view mode</b>.
+              <b>view mode</b>. Press <b>e</b> to toggle quickly.
               <br />
               <br />
               Activate the desired tool using the list of buttons - use the

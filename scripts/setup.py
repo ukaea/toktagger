@@ -1,7 +1,45 @@
+import os
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import Optional
+
 import requests
+
+from toktagger.api.config import settings
+
+BASE_URL = f"http://{settings.server.host}:{settings.server.port}"
+
+
+class SetupError(RuntimeError):
+    """Raised when the TokTagger API rejects a setup script request."""
+
+
+def _raise_for_status(response: requests.Response) -> None:
+    if response.ok:
+        return
+
+    try:
+        detail = response.json().get("detail")
+    except (ValueError, AttributeError):
+        detail = None
+
+    if detail:
+        raise SetupError(f"{response.status_code} error from {response.url}: {detail}")
+    response.raise_for_status()
+
+
+def get_token() -> str:
+    token = os.environ.get("TOKTAGGER_API_TOKEN")
+    if not token:
+        raise SetupError(
+            "Set TOKTAGGER_API_TOKEN to an API token. Create one on the TokTagger "
+            "Profile page."
+        )
+    return token
+
+
+def _auth(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
 
 
 def create_project(
@@ -9,6 +47,8 @@ def create_project(
     task: str,
     data_loader: str,
     query_strategy: str,
+    token: str,
+    base_url: str = BASE_URL,
     time_min: float = -0.1,
     time_max: float = 0.8,
     min_time_step: float = 0.0001,
@@ -24,30 +64,45 @@ def create_project(
     }
 
     response = requests.post(
-        "http://localhost:8002/projects",
+        f"{base_url}/projects",
         json=project,
+        headers=_auth(token),
     )
+    _raise_for_status(response)
     project_id = response.json()["_id"]
     return project_id
 
 
-def create_uda_samples(project_id: str, shot_ids: list[int]):
+def create_uda_samples(
+    project_id: str,
+    shot_ids: list[int],
+    token: str,
+    base_url: str = BASE_URL,
+    signals: list[str] | None = None,
+):
     samples = []
     for shot_id in shot_ids:
         sample = {
             "project_id": project_id,
             "shot_id": shot_id,
             "data": {
-                "signal_names": ["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"],
+                "signal_names": signals,
                 "protocol": "uda",
             },
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"{base_url}/projects/{project_id}/samples",
+        json=samples,
+        headers=_auth(token),
+    )
+    _raise_for_status(r)
 
 
-def create_sal_samples(project_id: str, shot_ids: list[int]):
+def create_sal_samples(
+    project_id: str, shot_ids: list[int], token: str, base_url: str = BASE_URL
+):
     samples = []
     for shot_id in shot_ids:
         sample = {
@@ -60,10 +115,17 @@ def create_sal_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"{base_url}/projects/{project_id}/samples",
+        json=samples,
+        headers=_auth(token),
+    )
+    _raise_for_status(r)
 
 
-def create_fair_mast_samples(project_id: str, shot_ids: list[int]):
+def create_fair_mast_samples(
+    project_id: str, shot_ids: list[int], token: str, base_url: str = BASE_URL
+):
     samples = []
     for shot_id in shot_ids:
         sample = {
@@ -76,16 +138,23 @@ def create_fair_mast_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"{base_url}/projects/{project_id}/samples",
+        json=samples,
+        headers=_auth(token),
+    )
+    _raise_for_status(r)
 
 
 def create_local_samples(
     project_id: str,
     shot_ids: list[int],
-    base_path: str,
-    file_type: str,
-    signals: Optional[list[str]] = None,
-    annotations: Optional[list[dict]] = None,
+    token: str,
+    base_url: str = BASE_URL,
+    base_path: str = ".",
+    file_type: str = "parquet",
+    signals: list[str] | None = None,
+    annotations: list[dict] | None = None,
 ):
     samples = []
 
@@ -105,10 +174,21 @@ def create_local_samples(
             sample["annotations"] = annotations[shot_id]
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"{base_url}/projects/{project_id}/samples",
+        json=samples,
+        headers=_auth(token),
+    )
+    _raise_for_status(r)
 
 
-def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
+def create_image_samples(
+    project_id: str,
+    shot_ids: list[int],
+    image_dir: str,
+    token: str,
+    base_url: str = BASE_URL,
+):
     samples = []
     for shot_id in shot_ids:
         samples.append(
@@ -125,12 +205,16 @@ def create_image_samples(project_id: str, shot_ids: list[int], image_dir: str):
         )
 
     r = requests.post(
-        f"http://localhost:8002/projects/{project_id}/samples", json=samples
+        f"{base_url}/projects/{project_id}/samples",
+        json=samples,
+        headers=_auth(token),
     )
-    r.raise_for_status()
+    _raise_for_status(r)
 
 
-def create_uda_camera_samples(project_id: str, shot_ids: list[int]):
+def create_uda_camera_samples(
+    project_id: str, shot_ids: list[int], token: str, base_url: str = BASE_URL
+):
     samples = []
     for shot_id in shot_ids:
         sample = {
@@ -143,7 +227,12 @@ def create_uda_camera_samples(project_id: str, shot_ids: list[int]):
         }
         samples.append(sample)
 
-    requests.post(f"http://localhost:8002/projects/{project_id}/samples", json=samples)
+    r = requests.post(
+        f"{base_url}/projects/{project_id}/samples",
+        json=samples,
+        headers=_auth(token),
+    )
+    _raise_for_status(r)
 
 
 def main():
@@ -155,7 +244,14 @@ def main():
         type=str,
         help="Base path for remote data files",
     )
+    parser.add_argument(
+        "--url",
+        default=BASE_URL,
+        help="Base URL of the TokTagger API",
+    )
     args = parser.parse_args()
+
+    token = get_token()
 
     base_path = Path(args.base_path)
 
@@ -164,33 +260,86 @@ def main():
     shot_ids = [int(path.stem) for path in shot_files]
 
     project_id = create_project(
-        "UDA Disruption Project", "time-series", "uda", "sequential"
+        "UDA Disruption Project",
+        "time-series",
+        "uda",
+        "sequential",
+        token=token,
+        base_url=args.url,
     )
-    create_uda_samples(project_id, shot_ids)
+    create_uda_samples(
+        project_id,
+        shot_ids,
+        token=token,
+        base_url=args.url,
+        signals=["ip", "ANE_DENSITY", "/xsx/HCAM/L/7"],
+    )
 
     project_id = create_project(
-        "Local ELM Project", "time-series", "tabular", "sequential"
+        "Local ELM Project",
+        "time-series",
+        "tabular",
+        "sequential",
+        token=token,
+        base_url=args.url,
     )
     create_local_samples(
-        project_id, shot_ids, base_path=base_path / "summary", file_type="parquet"
+        project_id,
+        shot_ids,
+        token=token,
+        base_url=args.url,
+        base_path=base_path / "summary",
+        file_type="parquet",
     )
 
     shot_files = Path("./data/test/mhd").glob("*.parquet")
     shot_files = list(shot_files)
     shot_ids = [int(path.stem) for path in shot_files]
     project_id = create_project(
-        "Local MHD Project", "spectrogram", "tabular", "random", min_time_step=0.000001
+        "Local MHD Project",
+        "profile-2d",
+        "tabular",
+        "random",
+        token=token,
+        base_url=args.url,
+        min_time_step=0.000001,
     )
     create_local_samples(
         project_id,
         shot_ids,
+        token=token,
+        base_url=args.url,
         base_path=base_path / "mhd",
         file_type="parquet",
-        signals=["mirnov"],
+        signals=["mirnov", "saddle_0"],
+    )
+
+    project_id = create_project(
+        "UDA MHD Project",
+        "profile-2d",
+        "uda",
+        "sequential",
+        token=token,
+        base_url=args.url,
+        min_time_step=1e-6,
+    )
+    shot_ids = [
+        52583,
+    ]
+    create_uda_samples(
+        project_id,
+        shot_ids,
+        token=token,
+        base_url=args.url,
+        signals=["/XMB/SANX13-01/CH13", "/XMB/SANX13-01/CH14", "/XMB/SANX13-01/CH15"],
     )
     # ---- Image / UFO demo project ----
-    project_id = create_project("Frame Project", "video", "image", "random")
-    create_image_samples(project_id, [10101], Path("./data/test/video/"))
+    project_id = create_project(
+        "Frame Project", "video", "image", "random", token=token, base_url=args.url
+    )
+    create_image_samples(
+        project_id, [10101], Path("./data/test/video/"), token=token, base_url=args.url
+    )
 
     # JET data
     project_id = create_project(
@@ -198,12 +347,14 @@ def main():
         "time-series",
         "sal",
         query_strategy="sequential",
+        token=token,
+        base_url=args.url,
         time_min=38,
         time_max=None,
         min_time_step=0.0001,
     )
     shot_ids = [87737]
-    create_sal_samples(project_id, shot_ids)
+    create_sal_samples(project_id, shot_ids, token=token, base_url=args.url)
 
     # FAIR MAST
     project_id = create_project(
@@ -211,18 +362,29 @@ def main():
         "time-series",
         "fair_mast",
         query_strategy="sequential",
+        token=token,
+        base_url=args.url,
     )
     shot_ids = [30421]
-    create_fair_mast_samples(project_id, shot_ids)
+    create_fair_mast_samples(project_id, shot_ids, token=token, base_url=args.url)
 
     shot_ids = [30421]
     project_id = create_project(
-        "UDA Camera Frame Project", "video", "uda_camera", "random"
+        "UDA Camera Frame Project",
+        "video",
+        "uda_camera",
+        "random",
+        token=token,
+        base_url=args.url,
     )
-    create_uda_camera_samples(project_id, shot_ids)
+    create_uda_camera_samples(project_id, shot_ids, token=token, base_url=args.url)
 
     print("Projects and samples created successfully.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SetupError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)

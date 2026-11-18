@@ -41,13 +41,25 @@ Home = "index.md"
 "Time Series Labelling" = "time_series.md"
 
 [[project.nav]]
+"2D Profile Labelling" = "profile_2d.md"
+
+[[project.nav]]
 "Video Labelling" = "video.md"
 
 [[project.nav]]
 Annotators = "annotators.md"
 
 [[project.nav]]
+"Machine Learning Models" = "ml_models.md"
+
+[[project.nav]]
 "Data Loaders" = "data_loaders.md"
+
+[[project.nav]]
+"User Management" = "user_management.md"
+
+[[project.nav]]
+Deployment = "deployment.md"
 
 [[project.nav]]
 Advanced = [
@@ -63,5 +75,5 @@ Advanced = [
     {"Building the Docs" = "dev/building-the-docs.md"},
     {"API Design" = "dev/API-Design.md"},
     {"System Architecture" = "dev/System-Architecture.md"},
-    {"User Interface" = [{"Overall Design" = "dev/User-Interface-Overall-Design.md"}, {Planning = "dev/User-Interface-Planning.md"}, {"UI Details" = "dev/User-Interface-Details.md"}, {Providers = "dev/Providers.md"}, {"Context Menu" = "dev/Context-Menu-Provider.md"}]},
+    {"User Interface" = [{"Overview & Stack" = "dev/User-Interface-Overall-Design.md"}, {Planning = "dev/User-Interface-Planning.md"}, {"UI Details" = "dev/User-Interface-Details.md"}, {Providers = "dev/Providers.md"}, {"Context Menu" = "dev/Context-Menu-Provider.md"}, {"Time Series & Profile 2D" = "dev/User-Interface-Time-Series-and-Profile-2D.md"}, {Video = "dev/User-Interface-Video.md"}]},
 ]

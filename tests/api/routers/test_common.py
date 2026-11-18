@@ -2,7 +2,8 @@
 
 import pytest
 from bson.objectid import ObjectId
-from tests.db_definitions import SAMPLE_1, ANNOTATION_1
+
+from tests.db_definitions import ANNOTATION_1, SAMPLE_1
 
 
 def create_endpoint(
@@ -154,7 +155,9 @@ async def test_invalid_id(
         ["/projects/id/models/mock_disruption_cnn/train", "get"],
         ["/projects/id/models/mock_disruption_cnn/train", "put"],
         ["/projects/id/models/mock_disruption_cnn/train", "delete"],
-        ["/projects/id/models/mock_disruption_cnn/load", "post"],
+        ["/projects/id/models/mock_disruption_cnn/load/local", "post"],
+        ["/projects/id/models/mock_disruption_cnn/load/gitlab", "post"],
+        ["/projects/id/models/mock_disruption_cnn/load/hugging_face", "post"],
         ["/projects/id/models/mock_disruption_cnn/load/abc123", "get"],
         ["/projects/id/models/mock_disruption_cnn/predict", "post"],
         ["/projects/id/models/mock_disruption_cnn/predict", "delete"],

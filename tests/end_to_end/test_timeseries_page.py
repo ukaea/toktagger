@@ -1,15 +1,29 @@
-from playwright.sync_api import Page, expect
-import pathlib
-from tests.endpoints import create_project, create_local_samples, create_model_samples
 import pytest
-import requests
+
+pytest.importorskip("playwright")
+import pathlib
 import time
+from collections.abc import Callable
+from typing import Literal
+
+import pytest
+from playwright.sync_api import Page, expect
+
+from tests.end_to_end import form_check, save_annotations
+from tests.end_to_end.conftest import login_as
+from tests.endpoints import (
+    add_project_member,
+    create_local_samples,
+    create_model_samples,
+    create_project,
+    create_user,
+    session,
+)
 from toktagger.api.schemas.annotations import TimePoint, TimeRegion
-from typing import Literal, Tuple, Callable
-from tests.end_to_end import form_check
+from toktagger.api.schemas.annotators import AnnotatorTypes
 
 
-def setup_project(page: Page) -> Tuple[str, str, Callable]:
+def setup_project(page: Page) -> tuple[str, str, Callable]:
     # Create Project
     project_id = create_project("Test Project", "time-series", "tabular")
     # And a sample for disruption
@@ -187,27 +201,32 @@ def test_timeseries_add_time_zone(zone_type, server_setup, page: Page):
 def test_timeseries_drag_time_zone(
     zone_type, handle, drag_to, server_setup, page: Page
 ):
-    setup_project(page)
+    project_id, sample_id, _reload = setup_project(page)
 
     add_annotation(page, "TIME REGION", zone_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=zone_type)).to_be_visible()
-    bounds_text = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    annotations = save_annotations(page, project_id, sample_id)
+    assert len(annotations) == 1
+    initial = annotations[0]
+    initial_left_position, initial_right_position = (
+        initial["time_min"],
+        initial["time_max"],
     )
-    initial_left_position, initial_right_position = map(float, bounds_text.split(" - "))
 
     page.get_by_role("button", name="View Mode").click()
 
     # Click handle, drag to new position
     page.get_by_label(f"zone.{handle}").drag_to(page.locator(drag_to))
-    time.sleep(0.1)
-    # Check values in table correctly updated
-    bounds_text = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
+    # Check saved values correctly updated
+    annotations = save_annotations(page, project_id, sample_id)
+    assert len(annotations) == 1
+    updated = annotations[0]
+    updated_left_position, updated_right_position = (
+        updated["time_min"],
+        updated["time_max"],
     )
-    updated_left_position, updated_right_position = map(float, bounds_text.split(" - "))
 
     if drag_to == ".wdrag":
         # Dragging left, left position should have reduced
@@ -285,25 +304,26 @@ def test_timeseries_add_time_point(server_setup, page: Page, time_point_type: st
 def test_timeseries_drag_vspan(
     drag_to: str, time_point_type: str, server_setup, page: Page
 ):
-    setup_project(page)
+    project_id, sample_id, _reload = setup_project(page)
 
     add_annotation(page, "TIME POINT", time_point_type)
 
     # Check added to list
     expect(page.get_by_role("gridcell", name=time_point_type)).to_be_visible()
-    initial_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
-    )
+    annotations = save_annotations(page, project_id, sample_id)
+    assert len(annotations) == 1
+    initial = annotations[0]
+    initial_position = initial["time"]
 
     page.get_by_role("button", name="View Mode").click()
 
     # Click handle, drag to new position
     page.get_by_label("time-point").drag_to(page.locator(drag_to))
-    time.sleep(0.1)
-    # Check values in table correctly updated
-    updated_position = float(
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
-    )
+    # Check saved value correctly updated
+    annotations = save_annotations(page, project_id, sample_id)
+    assert len(annotations) == 1
+    updated = annotations[0]
+    updated_position = updated["time"]
 
     if drag_to == ".wdrag":
         # Dragging left, position should have reduced
@@ -320,12 +340,6 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     # Check added to list
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
-    bounds_text = (
-        page.get_by_role("row").nth(1).get_by_role("gridcell").nth(2).inner_text()
-    )
-    time_zone_left_position, time_zone_right_position = map(
-        float, bounds_text.split(" - ")
-    )
 
     page.wait_for_timeout(500)
 
@@ -333,9 +347,6 @@ def test_timeseries_save_annotations(server_setup, page: Page):
 
     # Check added to list
     expect(page.get_by_role("gridcell", name="Disruption")).to_be_visible()
-    disruption_position = float(
-        page.get_by_role("row").nth(2).get_by_role("gridcell").nth(2).inner_text()
-    )
 
     # Press Save and wait for the PUT request to the server to complete
     with page.expect_response(
@@ -346,7 +357,7 @@ def test_timeseries_save_annotations(server_setup, page: Page):
         page.get_by_role("button", name="Save").click(force=True)
 
     # Check annotation stored in db
-    response = requests.get(
+    response = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     )
     assert response.status_code == 200
@@ -355,20 +366,21 @@ def test_timeseries_save_annotations(server_setup, page: Page):
     assert len(annotations) == 2
 
     for annotation in annotations:
-        assert annotation["created_by"] == "manual"
+        assert annotation["created_by_name"] == "admin"
         assert annotation["validated"]  # == True
         assert annotation["uncertainty"] == 0
 
     disruption_annotation = next(
         ann for ann in annotations if ann["label"] == "Disruption"
     )
-    assert round(disruption_annotation["time"], 4) == float(disruption_position)
     assert disruption_annotation["type"] == "time_point"
 
     flattop_annotation = next(ann for ann in annotations if ann["label"] == "Flat Top")
-    assert round(flattop_annotation["time_min"], 4) == float(time_zone_left_position)
-    assert round(flattop_annotation["time_max"], 4) == float(time_zone_right_position)
+    assert flattop_annotation["time_min"] < flattop_annotation["time_max"]
     assert flattop_annotation["type"] == "time_region"
+
+    # The time point was drawn to the left of the time region
+    assert disruption_annotation["time"] < flattop_annotation["time_min"]
 
 
 def test_timeseries_load_annotations(server_setup, page: Page):
@@ -376,17 +388,30 @@ def test_timeseries_load_annotations(server_setup, page: Page):
 
     # Create annotations of each type
     rampup = TimeRegion(
-        label="Ramp Up", created_by="peak_detection", time_min=10, time_max=20
+        label="Ramp Up",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=10,
+        time_max=20,
     )
     flattop = TimeRegion(
-        label="Flat Top", created_by="peak_detection", time_min=20, time_max=70
+        label="Flat Top",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=20,
+        time_max=70,
     )
     rampdown = TimeRegion(
-        label="Ramp Down", created_by="peak_detection", time_min=70, time_max=90
+        label="Ramp Down",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=70,
+        time_max=90,
     )
-    disruption = TimePoint(label="Disruption", created_by="peak_detection", time=91)
+    disruption = TimePoint(
+        label="Disruption",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time=91,
+    )
     # Add annotations
-    response = requests.put(
+    response = session.put(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
         json=[
             model.model_dump(mode="json")
@@ -402,34 +427,24 @@ def test_timeseries_load_annotations(server_setup, page: Page):
     expect(page.get_by_label("time-zone", exact=True)).to_have_count(3)
 
     # Check all four entries have correct info in table
-    row = page.get_by_role("row").filter(
-        has=page.get_by_role("gridcell", name="Disruption")
-    )
-    assert float(row.get_by_role("gridcell").nth(2).inner_text()) == disruption.time
+    for label, annotation_type in (
+        ("Disruption", "TIME POINT"),
+        ("Ramp Up", "TIME REGION"),
+        ("Flat Top", "TIME REGION"),
+        ("Ramp Down", "TIME REGION"),
+    ):
+        row = page.get_by_role("row").filter(
+            has=page.get_by_role("gridcell", name=label)
+        )
+        expect(row).to_contain_text(annotation_type)
+        expect(row).to_contain_text("peak_detection")
 
-    row = page.get_by_role("row").filter(
-        has=page.get_by_role("gridcell", name="Ramp Up")
-    )
-    bounds_text = row.get_by_role("gridcell").nth(2).inner_text()
-    left_position, right_position = map(float, bounds_text.split(" - "))
-    assert float(left_position) == rampup.time_min
-    assert float(right_position) == rampup.time_max
-
-    row = page.get_by_role("row").filter(
-        has=page.get_by_role("gridcell", name="Flat Top")
-    )
-    bounds_text = row.get_by_role("gridcell").nth(2).inner_text()
-    left_position, right_position = map(float, bounds_text.split(" - "))
-    assert float(left_position) == flattop.time_min
-    assert float(right_position) == flattop.time_max
-
-    row = page.get_by_role("row").filter(
-        has=page.get_by_role("gridcell", name="Ramp Down")
-    )
-    bounds_text = row.get_by_role("gridcell").nth(2).inner_text()
-    left_position, right_position = map(float, bounds_text.split(" - "))
-    assert float(left_position) == rampdown.time_min
-    assert float(right_position) == rampdown.time_max
+    # Check the loaded positions survive a save unchanged
+    saved = {ann["label"]: ann for ann in save_annotations(page, project_id, sample_id)}
+    assert saved["Disruption"]["time"] == disruption.time
+    for region in (rampup, flattop, rampdown):
+        assert saved[region.label]["time_min"] == region.time_min
+        assert saved[region.label]["time_max"] == region.time_max
 
 
 def test_timeseries_update_annotations(server_setup, page: Page):
@@ -437,14 +452,24 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     # Create annotations of each type
     rampup = TimeRegion(
-        label="Ramp Up", created_by="peak_detection", time_min=10, time_max=20
+        label="Ramp Up",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=10,
+        time_max=20,
     )
     flattop = TimeRegion(
-        label="Flat Top", created_by="peak_detection", time_min=20, time_max=70
+        label="Flat Top",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time_min=20,
+        time_max=70,
     )
-    disruption = TimePoint(label="Disruption", created_by="peak_detection", time=71)
+    disruption = TimePoint(
+        label="Disruption",
+        created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
+        time=71,
+    )
     # Add annotations
-    response = requests.put(
+    response = session.put(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
         json=[model.model_dump(mode="json") for model in (rampup, flattop, disruption)],
     )
@@ -459,7 +484,7 @@ def test_timeseries_update_annotations(server_setup, page: Page):
     page.get_by_role("button", name="View Mode").click()
     page.locator("body").click()
 
-    # Delete a zone
+    # Delete a zone (the first one, "Flat Top")
     page.get_by_label("time-zone").first.click(button="right")
     expect(page.get_by_role("menuitem", name="Delete")).to_be_visible()
     page.get_by_role("menuitem", name="Delete").click(force=True)
@@ -470,21 +495,18 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     time.sleep(1)
 
-    row = page.get_by_role("row").filter(
-        has=page.get_by_role("gridcell", name="Disruption")
-    )
-    updated_disruption_time = float(row.get_by_role("gridcell").nth(2).inner_text())
-
-    # Press Save and wait for the PUT request to the server to complete
+    # Press Save and wait for the deleted zone's bulk-delete call to complete - it's
+    # the last of the two requests the save issues, so waiting on it covers the PUT too.
     with page.expect_response(
         lambda r: (
-            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+            r.url.endswith(f"samples/{sample_id}/annotations")
+            and r.request.method == "DELETE"
         )
     ):
         page.get_by_role("button", name="Save").click(force=True)
 
     # Check annotation stored in db
-    response = requests.get(
+    response = session.get(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
     )
     assert response.status_code == 200
@@ -492,20 +514,158 @@ def test_timeseries_update_annotations(server_setup, page: Page):
 
     time.sleep(1)
 
-    # Check one annotation removed
+    # These annotations are all annotators::peak_detection's, not admin's, but admin
+    # is still allowed to edit them in place (Ramp Up's move) and delete them (Flat
+    # Top) - the save just never claims admin validated a model's own work, so
+    # `validated` stays untouched and `created_by` keeps its original author.
     assert len(annotations) == 2
-    print(annotations)
-
-    # Check all annotations marked as validated
     for annotation in annotations:
-        assert annotation["validated"]  # == True
-        assert annotation["uncertainty"] == 0
+        assert not annotation["validated"]
+        assert (
+            annotation["created_by"]
+            == f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}"
+        )
+    assert {a["label"] for a in annotations} == {"Ramp Up", "Disruption"}
 
-    # Check time of disruption updated
     disruption_annotation = next(
         ann for ann in annotations if ann["label"] == "Disruption"
     )
-    assert round(disruption_annotation["time"], 4) == updated_disruption_time
+    assert disruption_annotation["time"] > disruption.time
+
+
+def test_viewer_cannot_enter_edit_mode(server_setup, admin_token, browser):
+    create_user("viewer_erin", "erin_pass123")
+    project_id = create_project("Viewer Lock Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    add_project_member(project_id, "viewer_erin", role="viewer")
+
+    erin_page = login_as(browser, "viewer_erin", "erin_pass123")
+    erin_page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{ids[0]}")
+    expect(erin_page.get_by_label("time-series")).to_be_visible()
+
+    # Save and the edit-mode toggle are both disabled for a viewer.
+    expect(erin_page.get_by_role("button", name="Save")).to_be_disabled()
+    expect(erin_page.get_by_role("button", name="View Mode")).to_be_disabled()
+
+    # Clicking the disabled mode toggle (force=True bypasses Playwright's normal
+    # actionability check) must not flip it into Edit Mode - it's blocked
+    # server-side by the same canAnnotate check the button's own disabled state
+    # reflects, not just by the click never registering.
+    erin_page.get_by_role("button", name="View Mode").click(force=True)
+    expect(erin_page.get_by_role("button", name="View Mode")).to_be_visible()
+    expect(erin_page.get_by_role("button", name="Edit Mode")).to_be_hidden()
+
+    erin_page.context.close()
+
+
+def test_viewer_role_survives_sample_navigation(server_setup, admin_token, browser):
+    """A viewer's permissions must not be re-derived on every sample change.
+
+    The toolbar/nav bar remount whenever the sample changes (page.tsx's
+    stale-render guard). Role state used to live in a per-component hook, so each
+    remount briefly re-defaulted to "permitted" before the membership re-check
+    resolved -- Save and the edit toggle flashed enabled. Role now lives in
+    SampleContext instead, which does not remount, so the membership lookup
+    should fire once and Save/View Mode should never be seen enabled.
+    """
+    create_user("viewer_gail", "gail_pass123")
+    project_id = create_project("Viewer Nav Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000, 10001], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    add_project_member(project_id, "viewer_gail", role="viewer")
+
+    members_requests = []
+    gail_page = login_as(browser, "viewer_gail", "gail_pass123")
+    gail_page.on(
+        "request",
+        lambda request: (
+            members_requests.append(request.url)
+            if "/users/me/memberships" in request.url
+            else None
+        ),
+    )
+
+    gail_page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{ids[0]}")
+    expect(gail_page.get_by_role("button", name="Save")).to_be_disabled()
+    assert len(members_requests) == 1
+
+    gail_page.get_by_role("button", name="Next Sample").click()
+    expect(gail_page).to_have_url(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{ids[1]}"
+    )
+    expect(gail_page.get_by_role("button", name="Save")).to_be_disabled()
+    expect(gail_page.get_by_role("button", name="View Mode")).to_be_disabled()
+    # Confirms role state was carried over rather than re-fetched and briefly
+    # defaulted open: a second fetch would mean a second remount happened.
+    assert len(members_requests) == 1
+
+    gail_page.context.close()
+
+
+def test_show_others_annotations_toggle_works_for_admin(
+    server_setup, admin_token, browser, page: Page
+):
+    # The backend always stamps created_by with the authenticated caller, so a
+    # genuinely different identity's annotation has to come from a second real
+    # user's own session - not from PUTting a different created_by as admin.
+    create_user("annotator_frank", "frank_pass123")
+    project_id = create_project("Show Others Toggle Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    sample_id = ids[0]
+    add_project_member(project_id, "annotator_frank", role="annotator")
+
+    frank_page = login_as(browser, "annotator_frank", "frank_pass123")
+    frank_page.goto(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}"
+    )
+    expect(frank_page.get_by_label("time-series")).to_be_visible()
+    add_annotation(frank_page, "TIME POINT", "Disruption")
+    with frank_page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        frank_page.get_by_role("button", name="Save").click(force=True)
+    frank_page.context.close()
+
+    # create_project auto-adds its creator (admin) as a project member, so this
+    # toggle has a real membership preference to flip.
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    expect(page.get_by_label("time-point").first).to_be_visible()
+
+    page.get_by_role("checkbox", name="Show Others' Annotations").click()
+    expect(page.get_by_label("time-point")).to_have_count(0)
+
+    page.get_by_role("checkbox", name="Show Others' Annotations").click()
+    expect(page.get_by_label("time-point").first).to_be_visible()
+
+
+def test_timeseries_table_delete_annotation(server_setup, page: Page):
+    """The table's delete button is locked in View Mode and removes the annotation in Edit Mode."""
+    project_id, sample_id, _reload = setup_project(page)
+
+    add_annotation(page, "TIME REGION", "Flat Top")
+    # add_annotation leaves us in View Mode.
+
+    row = page.get_by_role("row").filter(
+        has=page.get_by_role("gridcell", name="Flat Top")
+    )
+    delete_button = row.get_by_role("button", name="Delete annotation")
+    expect(delete_button).to_be_disabled()
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(1)
+
+    page.get_by_role("button", name="View Mode").click()
+    page.locator("body").click()
+    delete_button.click()
+
+    expect(page.get_by_role("gridcell", name="Flat Top")).to_have_count(0)
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(0)
+    assert save_annotations(page, project_id, sample_id) == []
 
 
 def test_timeseries_annotator(server_setup, page: Page):
@@ -556,7 +716,7 @@ def test_timeseries_model_predict(
     server_setup, setup_model_samples, page: Page, model_name
 ):
     # Create Project
-    project_id, sample_ids = create_model_samples(setup_model_samples)
+    project_id, _sample_ids = create_model_samples(setup_model_samples)
 
     ids = create_local_samples(
         project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
@@ -660,7 +820,14 @@ def test_timeseries_model_predict(
     if model_name == "mock_params_timeseries_cnn":
         form_check(page, "Predict")
 
-    page.get_by_role("button", name="Predict", exact=True).click()
+    with page.expect_response(
+        lambda r: (
+            r.request.method == "GET"
+            and f"samples/{sample_id}/models/{model_name}/predict/" in r.url
+            and r.status == 200
+        )
+    ) as predictions_response:
+        page.get_by_role("button", name="Predict", exact=True).click()
 
     # Should generate a new set of predictions after a short time
     expect(page.get_by_label("time-point", exact=True)).to_have_count(1)
@@ -671,15 +838,15 @@ def test_timeseries_model_predict(
     expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Flat Top")).to_be_visible()
 
-    row = page.get_by_role("row").filter(
-        has=page.get_by_role("gridcell", name="Disruption")
+    disruption = next(
+        ann for ann in predictions_response.value.json() if ann["label"] == "Disruption"
     )
     if model_name == "mock_params_timeseries_cnn":
         # Check disruption has the value of params.final_score + 1
-        assert float(row.get_by_role("gridcell").nth(2).inner_text()) == 51
+        assert disruption["time"] == 51
     else:
         # Hardcoded time to 60+1 inside mock model
-        assert float(row.get_by_role("gridcell").nth(2).inner_text()) == 61
+        assert disruption["time"] == 61
 
     # Disable tool, it should disappear
     model_predict.get_by_role("switch", name="Enable Tool").click()
@@ -706,3 +873,63 @@ def test_timeseries_models_disabled(server_setup, page: Page):
 
     # Check model prediction tool is not visible
     expect(page.get_by_role("button", name="Model Prediction")).to_be_hidden()
+
+
+def test_editing_a_sample_keeps_another_users_validated_flag(
+    server_setup, admin_token, browser, page: Page
+):
+    """Drawing in this view must not downgrade a colleague's validated annotation.
+
+    The view has no validated or uncertainty control, so converting back to the
+    stored shape has to invent both, and the conversion runs over every annotation
+    on the sample after each draw - not only the one being drawn.
+    """
+    create_user("annotator_hazel", "hazel_pass123")
+    project_id = create_project("Validated Flag Project", "time-series", "tabular")
+    ids = create_local_samples(
+        project_id, [10000], pathlib.Path(__file__).parents[1], ["Ip"]
+    )
+    sample_id = ids[0]
+    add_project_member(project_id, "annotator_hazel", role="annotator")
+
+    hazel_page = login_as(browser, "annotator_hazel", "hazel_pass123")
+    hazel_page.goto(
+        f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}"
+    )
+    expect(hazel_page.get_by_label("time-series")).to_be_visible()
+    add_annotation(hazel_page, "TIME POINT", "Disruption")
+    with hazel_page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        hazel_page.get_by_role("button", name="Save").click(force=True)
+    hazel_page.context.close()
+
+    stored = session.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    ).json()
+    assert [a["validated"] for a in stored] == [True], stored
+
+    # Admin opens the same sample and draws their own annotation alongside hazel's.
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    expect(page.get_by_label("time-point").first).to_be_visible()
+    add_annotation(page, "TIME REGION", "Flat Top")
+    with page.expect_response(
+        lambda r: (
+            f"samples/{sample_id}/annotations" in r.url and r.request.method == "PUT"
+        )
+    ):
+        page.get_by_role("button", name="Save").click(force=True)
+
+    stored = session.get(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations"
+    ).json()
+    by_author = {a["created_by_name"]: a for a in stored}
+    assert set(by_author) == {"annotator_hazel", "admin"}, stored
+    assert by_author["annotator_hazel"]["validated"] is True, (
+        "hazel's validated flag must survive an edit by somebody else"
+    )
+    assert by_author["annotator_hazel"]["uncertainty"] == 0, (
+        "a validated annotation keeps uncertainty 0, not the invented default of 1"
+    )

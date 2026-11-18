@@ -30,6 +30,8 @@ Create a class that inherits from `DataLoader` and implement the required method
 @LoaderRegistry.register("my_custom_loader")
 class MyCustomLoader(DataLoader):
     """DataLoader for retrieving data from my custom data source"""
+
+    signal_name_help = "Use the sensor names from my data source, for example temp_1, temp_2."
     
     def __init__(self, params):
         # Initialize your data source connection here
@@ -56,6 +58,10 @@ class MyCustomLoader(DataLoader):
         # Your implementation here
         pass
 ```
+
+#### Signal name help (optional)
+
+Set the `signal_name_help` class attribute to tell users which signal names your data loader accepts. The **Add Samples** dialog shows this text in the help tooltip next to the **Signal Names** field. You can include example signal names in this text. If you do not set `signal_name_help`, the dialog shows a general help text.
 
 ### Step 3: Register the Loader
 
@@ -97,6 +103,8 @@ class MyDataLoader(DataLoader):
 server = Server()
 server.run()
 ```
+
+To run your data loader in the Docker Compose stack, read [Add custom data loaders and models](deployment.md#add-custom-data-loaders-and-models).
 
 ## Data Types and Schemas
 
@@ -167,14 +175,23 @@ class MultiVariateTimeSeriesData(Data):
     values: dict[str, TimeSeriesData | None]  # Signal name -> data
 ```
 
-#### `SpectrogramData`
-For frequency-time representations:
+#### `Profile2DData`
+For a quantity measured against time and one other dimension, such as frequency,
+radius or channel:
 
 ```python
-class SpectrogramData(Data):
+class Profile2DData(Data):
     time: list[float]
-    frequency: list[float]
-    amplitude: list[list[float]]  # 2D array
+    dim_1: list[float]
+    values: list[list[float]]  # 2D array, indexed [dim_1][time]
+```
+
+#### `MultiProfile2DData`
+For multiple 2D profiles:
+
+```python
+class MultiProfile2DData(Data):
+    values: dict[str, Profile2DData | None]  # Signal name -> profile
 ```
 
 
@@ -390,24 +407,3 @@ config.settings = UpdatedSettings()
 server = Server()
 server.run()
 ```
-
-## Using Docker
-If you are using the docker compose option to run the server, you can provide a custom script similar to the one above to add your own data loaders. To do this, create a file similar to the one above, but making sure to pass the following arguments into `server.run()`:
-
-```python
-server.run(
-    host="0.0.0.0",
-    port=8002
-)
-```
-
-You can then provide the path to your script when running docker compose. For example, say we have the above script in a file called `custom_toktagger.py` - We simply need to add `CUSTOM_SCRIPT=./custom_toktagger.py` before the docker compose command, and a SQL URL as an environment variable:
-
-```sh
-CUSTOM_SCRIPT=./custom_toktagger.py SQL_URL=<Your URL> docker compose --env-file .env.dev -f docker-compose.dev.yml up --build
-```
-
-!!! tip
-    Make sure you provide the **path** to your script, and not a string. 
-    
-    e.g, provide `CUSTOM_SCRIPT=./custom_toktagger.py`, and **not** `CUSTOM_SCRIPT=custom_toktagger.py`.

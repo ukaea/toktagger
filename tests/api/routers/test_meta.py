@@ -1,6 +1,7 @@
 import pytest
+from toktagger.api import config
+from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
 from toktagger.api.schemas.samples import ShotData
-import toktagger.api.config as config
 
 
 @pytest.mark.asyncio
@@ -18,6 +19,44 @@ async def test_get_data_schema(api_client, setup_db):
     data = response.json()
     assert data["title"] == "ShotData"
     assert data == ShotData.model_json_schema()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("loader", ["uda", "sal", "fair_mast", "tabular"])
+async def test_get_signal_name_help(api_client, setup_db, loader):
+    response = await api_client.get(f"/meta/dataloader/{loader}/help")
+    assert response.status_code == 200
+    assert response.json() == LoaderRegistry.get(loader).signal_name_help
+
+
+@pytest.mark.asyncio
+async def test_get_signal_name_help_custom_loader(api_client, setup_db):
+    @LoaderRegistry.register("custom_help_test")
+    class CustomHelpLoader(DataLoader):
+        signal_name_help = "Custom help text."
+
+        @classmethod
+        def sample_data_type(cls) -> type[ShotData]:
+            return ShotData
+
+        def get_sample(self, sample, params=None, **kwargs):
+            raise NotImplementedError
+
+    @LoaderRegistry.register("custom_no_help_test")
+    class CustomNoHelpLoader(CustomHelpLoader):
+        signal_name_help = None
+
+    try:
+        response = await api_client.get("/meta/dataloader/custom_help_test/help")
+        assert response.status_code == 200
+        assert response.json() == "Custom help text."
+
+        response = await api_client.get("/meta/dataloader/custom_no_help_test/help")
+        assert response.status_code == 200
+        assert response.json() is None
+    finally:
+        LoaderRegistry._registry.pop("custom_help_test")
+        LoaderRegistry._registry.pop("custom_no_help_test")
 
 
 @pytest.mark.asyncio
@@ -45,17 +84,30 @@ async def test_get_model_types(api_client, setup_db, task):
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
 @pytest.mark.parametrize("local", [True, False])
-async def test_get_model_load_methods(api_client, setup_db, local):
+@pytest.mark.parametrize("gitlab", [True, False])
+@pytest.mark.parametrize("hugging_face", [True, False])
+async def test_get_model_load_methods(
+    api_client, setup_db, local, gitlab, hugging_face
+):
+    expected_methods = ["local", "gitlab", "hugging_face"]
     if not local:
         config.settings.models.local_load_enabled = False
+        expected_methods.remove("local")
+    if not gitlab:
+        config.settings.models.gitlab_load_enabled = False
+        expected_methods.remove("gitlab")
+    if not hugging_face:
+        config.settings.models.huggingface_load_enabled = False
+        expected_methods.remove("hugging_face")
+
     response = await api_client.get("/meta/models/load")
-    config.settings.models.local_load_enabled = True  # Restore default setting
+    config.settings.models.local_load_enabled = True  # Restore default settings
+    config.settings.models.huggingface_load_enabled = True
+    config.settings.models.gitlab_load_enabled = True
+
     assert response.status_code == 200
     data = response.json()
-    if local:
-        assert data == ["local"]
-    else:
-        assert data == []
+    assert data == expected_methods
 
 
 @pytest.mark.asyncio

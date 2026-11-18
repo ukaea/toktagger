@@ -1,16 +1,19 @@
-import toktagger.api.core.annotators as annotators
 import numpy
-from scipy.datasets import electrocardiogram
-from toktagger.api.schemas.annotations import SpectrogramMask
-from toktagger.api.schemas.data import TimeSeriesData, MultiVariateTimeSeriesData
 import numpy as np
+import pytest
+from scipy.datasets import electrocardiogram
+
+from toktagger.api.core import annotators
+from toktagger.api.schemas.annotations import Polygon as PolygonAnnotation
 from toktagger.api.schemas.annotators import (
-    PeakDetectionParams,
-    OutlierDetectionParams,
-    JumpDetectionParams,
-    SpectrogramThresholdParams,
+    AnnotatorTypes,
     ChangePointDetectionParams,
+    JumpDetectionParams,
+    OutlierDetectionParams,
+    PeakDetectionParams,
+    Profile2DThresholdParams,
 )
+from toktagger.api.schemas.data import MultiVariateTimeSeriesData, TimeSeriesData
 
 
 def test_find_peaks():
@@ -174,17 +177,38 @@ def test_changepoint_annotator_no_change():
     assert np.isclose(regions[0].time_max, 99)
 
 
-def test_spectrogram_threshold():
+def test_profile_2d_threshold():
     data = electrocardiogram()[2000:4000]
     ts_data = TimeSeriesData(time=numpy.arange(len(data)), values=data)
     mv_data = MultiVariateTimeSeriesData(values={"Ip": ts_data})
 
-    params = SpectrogramThresholdParams(signal_name="Ip", percentile=95)
-    annotator = annotators.SpectrogramThresholdAnnotator(params)
+    params = Profile2DThresholdParams(
+        signal_name="Ip", percentile=95, dim_1_min=0, min_size=1
+    )
+    annotator = annotators.Profile2DThresholdAnnotator(params)
     result = annotator.predict(mv_data)
 
-    assert isinstance(result, SpectrogramMask)
-    mask = numpy.array(result.values)
-    assert mask.shape == (129, 17)
-    assert mask.min() == 0
-    assert mask.max() == 1
+    # The exact polygon count depends on contour finding in scikit-image, so assert
+    # the properties that matter rather than pinning a number that drifts.
+    assert isinstance(result, list)
+    assert len(result) > 0
+    for annotation in result:
+        assert isinstance(annotation, PolygonAnnotation)
+        assert (
+            annotation.created_by
+            == f"annotators::{AnnotatorTypes.PROFILE_2D_THRESHOLD.value}"
+        )
+        assert annotation.signal_name == "Ip"
+        # COCO segmentation: one ring of at least three (x, y) pairs.
+        assert len(annotation.segmentation) == 1
+        assert len(annotation.segmentation[0]) >= 6
+        assert len(annotation.segmentation[0]) % 2 == 0
+
+
+def test_profile_2d_threshold_missing_signal_raises():
+    mv_data = MultiVariateTimeSeriesData(values={"Ip": None})
+    params = Profile2DThresholdParams(signal_name="Ip", percentile=95)
+    annotator = annotators.Profile2DThresholdAnnotator(params)
+
+    with pytest.raises(TypeError, match="does not exist"):
+        annotator.predict(mv_data)

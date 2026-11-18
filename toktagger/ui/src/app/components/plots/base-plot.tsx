@@ -51,6 +51,9 @@ type TimeSeriesPlotProps = {
   plotId?: string;
   plotConfig: PlotConfiguration;
   rescaleOnZoom?: boolean;
+  ariaLabel?: string;
+  // Hides the hover tooltip while drawing (Ctrl held) so it doesn't obscure the shape.
+  muteHoverWhileDrawing?: boolean;
   children:
     | React.ReactElement<InjectedProps>
     | React.ReactElement<InjectedProps>[];
@@ -60,6 +63,8 @@ export const BaseTimeSeriesPlot = ({
   plotId: externalId,
   plotConfig: { data, layout, config = DEFAULT_PLOTLY_CONFIG },
   rescaleOnZoom = true,
+  ariaLabel = "time-series",
+  muteHoverWhileDrawing = false,
   children,
 }: TimeSeriesPlotProps) => {
   const [plotReady, setPlotReady] = useState(false);
@@ -70,6 +75,7 @@ export const BaseTimeSeriesPlot = ({
     triggerUpdate,
     findSelectedAnnotations,
     setOngoingAction,
+    setFocusXRange,
   } = useTimeSeriesActions();
   const {
     activeAnnotationTool,
@@ -77,6 +83,7 @@ export const BaseTimeSeriesPlot = ({
     isDrawing,
     ongoingAction,
     editMode,
+    focusXRange,
   } = useTimeSeriesState();
 
   const isDraggingRef = useRef(false);
@@ -268,18 +275,26 @@ export const BaseTimeSeriesPlot = ({
             { timeout: 5000 },
           );
         }
-        const selection: SelectionRange = {
-          x: {
-            low: eventData.range.x[0],
-            high: eventData.range.x[1],
-          },
-          y: {
-            low: eventData.range.y[0],
-            high: eventData.range.y[1],
-          },
-        };
-        console.log(selection);
-        findSelectedAnnotations(selection);
+        // Range is keyed by axis id (e.g. y2 on a second subplot), not always x/y.
+        const range = eventData.range as unknown as Record<string, number[]>;
+        const xRange =
+          range[Object.keys(range).find((k) => k.startsWith("x")) ?? ""];
+        const yRange =
+          range[Object.keys(range).find((k) => k.startsWith("y")) ?? ""];
+
+        if (xRange && yRange) {
+          const selection: SelectionRange = {
+            x: {
+              low: Math.min(xRange[0], xRange[1]),
+              high: Math.max(xRange[0], xRange[1]),
+            },
+            y: {
+              low: Math.min(yRange[0], yRange[1]),
+              high: Math.max(yRange[0], yRange[1]),
+            },
+          };
+          findSelectedAnnotations(selection);
+        }
       }
       relayout(plot, EMPTY_PLOTLY_SELECTION); // Immediately remove selection indicator
     };
@@ -303,20 +318,52 @@ export const BaseTimeSeriesPlot = ({
       return;
     }
 
-    const plot = document.getElementById(plotId);
+    const plot = document.getElementById(plotId) as ExtendedPlotlyHTMLElement;
 
     if (!plot) {
       console.error("Could not locate plot to set drag mode");
       return;
     }
 
+    // Set directly rather than via config, since that would trigger a full replot
+    plot._context.doubleClick = isDrawing ? false : "reset+autosize";
+
     if (isDrawing) {
-      relayout(plot, { dragmode: false });
+      relayout(
+        plot,
+        muteHoverWhileDrawing
+          ? { dragmode: false, hovermode: false }
+          : { dragmode: false },
+      );
       return;
     }
 
-    relayout(plot, { dragmode: "pan" });
-  }, [isDrawing, plotId, plotReady]);
+    relayout(
+      plot,
+      muteHoverWhileDrawing
+        ? { dragmode: "pan", hovermode: "closest" }
+        : { dragmode: "pan" },
+    );
+  }, [isDrawing, muteHoverWhileDrawing, plotId, plotReady]);
+
+  useEffect(() => {
+    if (!plotReady || !focusXRange) return;
+
+    const plot = document.getElementById(plotId) as ExtendedPlotlyHTMLElement;
+    if (!plot) {
+      console.error("Could not locate plot to focus x range");
+      return;
+    }
+
+    const [x0, x1] = focusXRange;
+    const [viewStart, viewEnd] = plot._fullLayout.xaxis.range;
+    // Keep the current zoom unless the annotation doesn't fit, then pad it to ~80% of the view
+    const span = Math.max(viewEnd - viewStart, (x1 - x0) * 1.25);
+    const centre = (x0 + x1) / 2;
+    relayout(plot, { "xaxis.range": [centre - span / 2, centre + span / 2] });
+
+    setFocusXRange(null);
+  }, [focusXRange, plotId, plotReady, setFocusXRange]);
 
   useEffect(() => {
     if (!plotReady) {
@@ -330,7 +377,7 @@ export const BaseTimeSeriesPlot = ({
     }
 
     function getClickData(
-      event: PointerEvent,
+      event: MouseEvent,
       _plot: PlotlyHTMLElement,
       resolveAgainst?: HTMLElement | null, // This is used to ensure the annotation is resolved against the starting subplot
     ): TimeSeriesAnnotationPoint & { axisSize: { x: number; y: number } } {
@@ -452,7 +499,7 @@ export const BaseTimeSeriesPlot = ({
       );
       toolingCallbacks
         .get(activeAnnotationTool.type)
-        ?.hover?.(clickLocation.x, clickLocation.y);
+        ?.hover?.(clickLocation.x, clickLocation.y, clickLocation.axisSize);
     };
 
     const finishAnnotationCreation = (event: PointerEvent) => {
@@ -478,11 +525,25 @@ export const BaseTimeSeriesPlot = ({
       setOngoingAction(false); // Ensure this is always called even if the tool callback isn't found
     };
 
+    // Double-click to finish a shape (e.g. close a polygon), same gating as starting one
+    const doubleClickAnnotation = (event: MouseEvent) => {
+      if (!event.ctrlKey || !editMode || !activeAnnotationTool) return;
+      const clickLocation = getClickData(
+        event,
+        plot,
+        lockedSubplotElementRef.current,
+      );
+      toolingCallbacks
+        .get(activeAnnotationTool.type)
+        ?.doubleClick?.(clickLocation.x, clickLocation.y);
+    };
+
     draggableElements.forEach((element) => {
       element.addEventListener("contextmenu", handleContextMenu);
       element.addEventListener("pointerdown", handleCancelSelection);
       element.addEventListener("pointerdown", startAnnotationCreation);
       element.addEventListener("pointermove", hoverAnnotation);
+      element.addEventListener("dblclick", doubleClickAnnotation);
 
       if (editMode) {
         element.addEventListener("pointermove", updateAnnotation);
@@ -496,6 +557,7 @@ export const BaseTimeSeriesPlot = ({
         element.removeEventListener("pointerdown", handleCancelSelection);
         element.removeEventListener("pointerdown", startAnnotationCreation);
         element.removeEventListener("pointermove", hoverAnnotation);
+        element.removeEventListener("dblclick", doubleClickAnnotation);
         element.removeEventListener("pointermove", updateAnnotation);
         element.removeEventListener("pointerup", finishAnnotationCreation);
       });
@@ -513,9 +575,10 @@ export const BaseTimeSeriesPlot = ({
   ]);
 
   return (
-    <div className="w-full px-6 py-3 space-y-3 flex-col">
+    // No vertical padding: the caller sizes the plot to this container.
+    <div className="w-full h-full px-6">
       {/* Div where plot is inserted */}
-      <div id={plotId} className="" aria-label="time-series">
+      <div id={plotId} className="" aria-label={ariaLabel}>
         <>
           {React.Children.map(children, (child) => {
             return React.isValidElement(child)

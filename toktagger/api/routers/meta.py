@@ -1,14 +1,23 @@
-from fastapi import APIRouter, Request, Depends
-from toktagger.api.core.data_loaders import LoaderRegistry
-from toktagger.api.schemas.models import LoadTypes
-from toktagger.api.models import models_dependencies_installed, check_models_enabled
 import typing
-import toktagger.api.config as config
+
+from fastapi import APIRouter, Depends, Request
+
+from toktagger.api import config
+from toktagger.api.auth.dependencies import get_current_user
+from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.models import check_models_enabled, models_dependencies_installed
+from toktagger.api.schemas.models import LoadMethods
 
 if models_dependencies_installed():
     from toktagger.api.models.base import ModelRegistry
+else:
+    ModelRegistry = None
 
-router = APIRouter(prefix="/meta", tags=["Metadata"])
+router = APIRouter(
+    prefix="/meta",
+    tags=["Metadata"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/dataloader")
@@ -21,6 +30,12 @@ async def get_dataloaders(request: Request) -> list[str]:
 async def get_data_schema(loader: str) -> dict[str, typing.Any]:
     """Get schema which is required for getting data with this dataloader"""
     return LoaderRegistry.get_data_schema(loader)
+
+
+@router.get("/dataloader/{loader}/help")
+async def get_signal_name_help(loader: str) -> str | None:
+    """Get help text which describes the signal names this dataloader expects."""
+    return LoaderRegistry.get_signal_name_help(loader)
 
 
 @router.get(
@@ -38,7 +53,34 @@ async def get_model_types(task: str) -> list[str]:
 )
 async def get_model_load_methods() -> list[str]:
     """Get list of enabled ways to load pretrained weights into the server."""
-    return [LoadTypes.LOCAL] if config.settings.models.local_load_enabled else []
+    enabled = []
+    if config.settings.models.local_load_enabled:
+        enabled.append(LoadMethods.LOCAL)
+    if config.settings.models.gitlab_load_enabled:
+        enabled.append(LoadMethods.GITLAB)
+    if config.settings.models.huggingface_load_enabled:
+        enabled.append(LoadMethods.HUGGINGFACE)
+
+    return enabled
+
+
+@router.get(
+    "/models/load/{load_method}",
+    dependencies=[Depends(check_models_enabled)],
+)
+async def get_model_load_method_allowlist(load_method: LoadMethods) -> str | None:
+    """Get allowed ID for loading from online projects, if applicable."""
+    match load_method:
+        case LoadMethods.LOCAL:
+            return None
+        case LoadMethods.GITLAB:
+            return (
+                str(config.settings.models.gitlab_project_id)
+                if config.settings.models.gitlab_project_id
+                else None
+            )
+        case LoadMethods.HUGGINGFACE:
+            return config.settings.models.huggingface_userspace
 
 
 @router.get(

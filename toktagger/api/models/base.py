@@ -1,24 +1,48 @@
-from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas.annotations import Annotation, AnnotationBase
-from toktagger.api.schemas.projects import Project, Task
-from toktagger.api.schemas.data import DataParamTypes
-from toktagger.api.core.data_loaders import DataLoader
-from sklearn.model_selection import train_test_split
-from abc import ABC, abstractmethod
-import typing
-import math
-from toktagger.api.core.sender import send_model_updates
-from toktagger.api.schemas.models import ModelUpdate
-from toktagger.api.models import models_dependencies_installed
-import pydantic
-import uuid
-from collections import OrderedDict
 import logging
+import math
+import pathlib
+import typing
+import uuid
+from abc import ABC, abstractmethod
+from collections import OrderedDict
+
+import pydantic
+from sklearn.model_selection import train_test_split
+
+from toktagger.api.core.data_loaders import DataLoader
+from toktagger.api.core.sender import send_model_updates
+from toktagger.api.models import models_dependencies_installed
+from toktagger.api.schemas.annotations import Annotation, AnnotationBase
+from toktagger.api.schemas.data import DataParamTypes
+from toktagger.api.schemas.models import ModelUpdate
+from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.schemas.samples import Sample
 
 logger = logging.getLogger("ray")
 
 if models_dependencies_installed():
     import ray
+else:
+
+    class _RayStub:
+        @staticmethod
+        def remote(*args, **kwargs):
+            if len(args) == 1 and not kwargs and callable(args[0]):
+                return args[0]
+
+            def decorator(target):
+                return target
+
+            return decorator
+
+        class ObjectRef:
+            pass
+
+        @staticmethod
+        def get_actor(name):
+            raise RuntimeError("Ray not installed")
+
+    ray = _RayStub()  # type: ignore[assignment]
 
 
 # Recursively walk through schema, finding things which need to be changed
@@ -73,7 +97,7 @@ class Model(ABC):
         self.project = project
         self.model = self.define_model()
         loader_registry: WorkerRegistry = ray.get_actor("WorkerLoaderRegistry")
-        data_loader: typing.Type[DataLoader] = ray.get(
+        data_loader: type[DataLoader] = ray.get(
             loader_registry.get.remote(project.data_loader)
         )
         self.data_loader: DataLoader = data_loader()
@@ -102,14 +126,19 @@ class Model(ABC):
         return self.predict(samples=samples, params=params, data_params=data_params)
 
     @typing.final
-    def wrapped_save(self, file_stem: str) -> None:
+    def wrapped_save(self, results_dir: pathlib.Path) -> None:
+        # Make sure results_dir exists
+        results_dir.mkdir(parents=True, exist_ok=True)
+
         if not self._trained:
             raise RuntimeError("Cannot save a model before it has been trained!")
-        self.save(file_stem=file_stem)
+        self.save(results_dir=results_dir)
 
     @typing.final
-    def wrapped_load(self, file_path: str) -> None:
-        self.load(file_path=file_path)
+    def wrapped_load(
+        self, results_dir: pathlib.Path, weights_filename: str | None = None
+    ) -> None:
+        self.load(results_dir=results_dir, weights_filename=weights_filename)
         self._trained = True
 
     @typing.final
@@ -119,24 +148,54 @@ class Model(ABC):
 
     def log_progress(
         self,
-        training_status: typing.Literal[
-            "queued", "started", "failed", "completed", "aborted"
+        status: typing.Literal[
+            "queued", "training", "loading", "failed", "completed", "aborted"
         ]
         | None = None,
         progress: float | None = None,
         score: float | None = None,
     ) -> None:
-        model_update = ModelUpdate(
-            training_status=training_status, progress=progress, score=score
-        )
+        """Send progress updates during model training to the TokTagger server.
+
+        Parameters
+        ----------
+        status : typing.Literal[ "queued", "training", "loading", "failed", "completed", "aborted" ] | None, optional
+            The current stage of model training, by default None
+        progress : float | None, optional
+            How far through training the model currently is (percentage, 0-100), by default None
+        score : float | None, optional
+            A metric of how well the model is performing (such as accuracy or loss), by default None
+        """
+        model_update = ModelUpdate(status=status, progress=progress, score=score)
         send_model_updates(self.project.id, self.id, model_update)
 
     def split_data(
         self,
         samples: list[Sample],
         annotations: list[list[Annotation]],
-        train_val_test_split: typing.Tuple[float, float, float],
+        train_val_test_split: tuple[float, float, float],
     ) -> None:
+        """Split annotations into training, validation and testing sets.
+
+        Parameters
+        ----------
+        samples : list[Sample]
+            The samples which this model is training on
+        annotations : list[list[Annotation]]
+            The annotations to split into groups
+        train_val_test_split : typing.Tuple[float, float, float]
+            The fraction of the total annotations to put in each of the training, validation and test sets respectively.
+            These should each be fractions which sum to 1.
+
+        Raises
+        ------
+        ValueError
+            Raised if annotations are missing for some samples provided
+        ValueError
+            Raised if the splits do not sum to 1
+        ValueError
+            Raised if the requested splits would leave no samples in the training set
+        """
         if len(samples) != len(annotations):
             raise ValueError("Annotations missing for some samples!")
         if not math.isclose(sum(train_val_test_split), 1):
@@ -194,8 +253,8 @@ class Model(ABC):
             )
 
     @abstractmethod
-    def define_model(self) -> None:
-        pass
+    def define_model(self) -> typing.Any:
+        """Define and return your model architecture here."""
 
     @abstractmethod
     def train(
@@ -204,9 +263,22 @@ class Model(ABC):
         annotations: list[list[Annotation]],
         params: pydantic.BaseModel | None = None,
     ) -> float:
-        # pass in list of samples and list of annotations
-        # return some measure of accuracy
-        pass
+        """Train your model here.
+
+        Parameters
+        ----------
+        samples : list[Sample]
+            A list of samples to use when training the model.
+        annotations : list[list[Annotation]]
+            A list of lists of annotations, one list of annotations per sample.
+        params : pydantic.BaseModel | None, optional
+            User specified parameters to be used when training the model, by default None
+
+        Returns
+        -------
+        float
+            The score of the trained model, such as accuracy or loss.
+        """
 
     @abstractmethod
     def predict(
@@ -215,36 +287,66 @@ class Model(ABC):
         params: pydantic.BaseModel | None = None,
         data_params: DataParamTypes | None = None,
     ) -> list[list[AnnotationBase]]:
-        # pass in list of samples and params required
-        # returns list / array / tensor of predictions and uncertainties
-        pass
+        """Predict over unseen samples with your model here.
+
+        Parameters
+        ----------
+        samples : list[Sample]
+            A list of samples to make predictions over
+        params : pydantic.BaseModel | None, optional
+            User specified parameters to be used when making predictions, by default None
+        data_params : DataParamTypes | None, optional
+            Data parameters to use when loading samples for the model to predict over, by default None
+
+        Returns
+        -------
+        list[list[AnnotationBase]]
+            A list of predicted annotations for each sample
+        """
 
     @abstractmethod
-    def save(self, file_stem: str) -> None:
-        pass
+    def save(self, results_dir: pathlib.Path) -> None:
+        """Save the model
+
+        Parameters
+        ----------
+        results_dir : pathlib.Path
+            The path to a directory in the model cache where your model weights and accompanying information should be saved.
+        """
 
     @abstractmethod
-    def load(self, file_path: str) -> None:
-        pass
+    def load(
+        self, results_dir: pathlib.Path, weights_filename: str | None = None
+    ) -> None:
+        """Load a pretrained model.
+
+        Parameters
+        ----------
+        results_dir : pathlib.Path
+            The path to a directory in the model cache where model weights should be loaded from.
+        weights_filename : str | None, optional
+            The name of the weights file within the above directory to load, by default None
+            Note that this is optional, but should take precedence if provided.
+        """
 
 
 class ModelRegistry:
-    _registry: dict[str, typing.Type[Model]] = {}
-    _tasks: dict[str, list[Task]] = {}
-    _training_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
-    _prediction_params: dict[str, typing.Type[pydantic.BaseModel]] = {}
+    _registry: typing.ClassVar[dict[str, type[Model]]] = {}
+    _tasks: typing.ClassVar[dict[str, list[Task]]] = {}
+    _training_params: typing.ClassVar[dict[str, type[pydantic.BaseModel]]] = {}
+    _prediction_params: typing.ClassVar[dict[str, type[pydantic.BaseModel]]] = {}
 
     @classmethod
     def register(
         cls,
         name: str,
         tasks: list[Task | str],
-        training_params: typing.Type[pydantic.BaseModel] | None = None,
-        prediction_params: typing.Type[pydantic.BaseModel] | None = None,
+        training_params: type[pydantic.BaseModel] | None = None,
+        prediction_params: type[pydantic.BaseModel] | None = None,
     ):
-        def decorator(model_class: typing.Type[Model]):
+        def decorator(model_class: type[Model]):
             if not issubclass(model_class, Model):
-                raise ValueError(
+                raise TypeError(
                     f"Loader '{name}' does not inherit from Model base class."
                 )
             if training_params and not issubclass(training_params, pydantic.BaseModel):
@@ -269,13 +371,13 @@ class ModelRegistry:
 
     @classmethod
     def get(cls, name: str):
-        model_class: typing.Type[Model] | None = cls._registry.get(name)
+        model_class: type[Model] | None = cls._registry.get(name)
         if not model_class:
             raise ValueError(f"No Model class called '{name}' found in registry!")
         return ray.remote(model_class)
 
     @classmethod
-    def get_name(cls, model_class: typing.Type[Model]) -> str:
+    def get_name(cls, model_class: type[Model]) -> str:
         return next(
             name for name, model in cls._registry.items() if model_class == model
         )
@@ -296,9 +398,9 @@ class ModelRegistry:
     @classmethod
     def get_params(
         cls, name: str, schema_type: typing.Literal["training", "prediction"]
-    ) -> typing.Type[pydantic.BaseModel] | None:
+    ) -> type[pydantic.BaseModel] | None:
         if schema_type == "training":
-            params: typing.Type[pydantic.BaseModel] | None = cls._training_params.get(
+            params: type[pydantic.BaseModel] | None = cls._training_params.get(
                 name, False
             )
         elif schema_type == "prediction":
@@ -337,9 +439,7 @@ class ModelRegistry:
             The JSONSchema of the params model, if required.
         """
 
-        params: typing.Type[pydantic.BaseModel] | None = cls.get_params(
-            name, schema_type
-        )
+        params: type[pydantic.BaseModel] | None = cls.get_params(name, schema_type)
         if not params:
             return None
 
@@ -363,8 +463,14 @@ class WorkerRegistry:
         return registered
 
 
+@ray.remote(num_cpus=0.1)
 class ActorRegistry:
-    """Registry to keep track of Ray actors, and the task they are associated with."""
+    """Registry to keep track of Ray actors, and the task they are associated with.
+
+    Runs as a single named, detached Ray actor shared by all uvicorn workers,
+    so actor limits and task IDs are tracked cluster-wide rather than
+    independently per worker process.
+    """
 
     def __init__(self, max_actors: int, max_gpu_actors: int):
         """Create task registry
@@ -382,43 +488,73 @@ class ActorRegistry:
                 "Insufficient CPU cores available for ML model functionality"
             )
 
-        self.gpu_enabled = True if max_gpu_actors > 0 else False
+        self._gpu_enabled = max_gpu_actors > 0
         self.max_actors = max_actors
         self.max_gpu_actors = max_gpu_actors
         self.tasks = {}
         self.actors = OrderedDict()
 
-    def register(self, task_ref: ray.ObjectRef) -> str:
-        """Store a Ray task reference in the registry and associate with a UUID.
+    def gpu_enabled(self) -> bool:
+        return self._gpu_enabled
+
+    def list_actors(self) -> list[str]:
+        return list(self.actors.keys())
+
+    def register(
+        self, task_ref: list[ray.ObjectRef], task_id: str | None = None
+    ) -> str:
+        """Store a Ray task reference in the registry and associate with an ID.
 
         Parameters
         ----------
-        task_ref : ray.ObjectRef
-            The reference to the Ray task
+        task_ref : list[ray.ObjectRef]
+            The task reference, wrapped in a list. Ray resolves a bare ObjectRef
+            passed to a remote call as a dependency and blocks until it finishes,
+            which would defeat polling it later via is_ready/get_result; a list
+            keeps it opaque to that.
+        task_id : str | None
+            The ID to store the task under, generated automatically if not given
 
         Returns
         -------
         str
-            A unique identifier for this task
+            The identifier for this task
         """
-        task_id = str(uuid.uuid4())
-        self.tasks[task_id] = task_ref
+        task_id = task_id or str(uuid.uuid4())
+        self.tasks[task_id] = task_ref[0]
         return task_id
 
-    def get(self, task_id: str) -> ray.ObjectRef | None:
-        """Convert a task ID back into the Ray task reference
+    def is_ready(self, task_id: str) -> bool | None:
+        """Non-blocking check of whether a task has finished.
 
-        Parameters
-        ----------
-        task_id : str
-            The unique identifier for this task
+        Runs inside the actor because Ray auto-dereferences any ObjectRef this
+        method would otherwise hand back across the actor boundary.
 
         Returns
         -------
-        ray.ObjectRef | None
-            The Ray task reference, if it exists in the Registry
+        bool | None
+            True/False if the task is known, None if task_id isn't registered
         """
-        return self.tasks.get(task_id)
+        task_ref = self.tasks.get(task_id)
+        if task_ref is None:
+            return None
+        ready, _ = ray.wait([task_ref], timeout=0)
+        return bool(ready)
+
+    def get_result(self, task_id: str):
+        """Blocking fetch of a finished task's result (raises if the task raised)."""
+        return ray.get(self.tasks[task_id])
+
+    def cancel(self, task_id: str) -> None:
+        """Cancel a registered task, if it exists.
+
+        Forces the cancel: a cooperative one only raises at the task's next
+        bytecode instruction, which never arrives for a task blocked in a
+        C-level call (e.g. time.sleep), leaving its worker slot stuck.
+        """
+        task_ref = self.tasks.get(task_id)
+        if task_ref is not None:
+            ray.cancel(task_ref, force=True)
 
     def update_actors(self, actor_name: str, use_gpu: bool) -> None:
         """Record that a Ray Actor has been accessed, and kill any stale Actors.
@@ -428,6 +564,9 @@ class ActorRegistry:
         actor_name : str
             The name of the Ray Actor
         """
+        if use_gpu and not self._gpu_enabled:
+            raise ValueError("GPU requested but GPU support is not enabled on server")
+
         # Set this actor to be the most recently used
         if actor_name in self.actors:
             self.actors.move_to_end(actor_name)
@@ -441,7 +580,7 @@ class ActorRegistry:
         stale_actor = None
         # Check GPU limit first
         gpu_count = sum(1 for gpu in self.actors.values() if gpu)
-        if self.gpu_enabled and gpu_count > self.max_gpu_actors:
+        if self._gpu_enabled and gpu_count > self.max_gpu_actors:
             # Find first actor which requires GPU
             stale_actor = next(
                 (actor for actor, gpu in self.actors.items() if gpu), None

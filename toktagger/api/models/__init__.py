@@ -1,6 +1,7 @@
 """Contains code for implemented ML models."""
 
 import importlib.util
+
 from fastapi import HTTPException
 
 
@@ -18,4 +19,8 @@ def check_models_enabled():
 
 if models_dependencies_installed():
     from toktagger.api.models.disruption import DisruptionCNN as DisruptionCNN
-    from toktagger.api.models.temp import VideoCNN as VideoCNN
+    from toktagger.api.models.ultralytics_detection.video_detection import (
+        RTDETRVideoDetectionModel as RTDETRVideoDetectionModel,
+        YoloVideoDetectionModel as YoloVideoDetectionModel,
+        YoloVideoDetectionP2Model as YoloVideoDetectionP2Model,
+    )

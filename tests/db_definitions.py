@@ -1,34 +1,40 @@
+import importlib
 import pathlib
+
+from toktagger.api.schemas.annotations import (
+    TimePointBatch,
+    TimeRegionBatch,
+)
 from toktagger.api.schemas.annotators import AnnotatorTypes
-from toktagger.api.schemas.projects import ProjectIn, Task, QueryStrategyType
+from toktagger.api.schemas.projects import (
+    ProjectIn,
+    ProjectMember,
+    QueryStrategyType,
+    Task,
+)
 from toktagger.api.schemas.samples import (
     SampleIn,
     ShotData,
     TimeSeriesFileData,
 )
-from toktagger.api.schemas.annotations import (
-    TimeRegionBatch,
-    TimePointBatch,
-)
-
-import importlib
+from toktagger.api.schemas.users import UserIn
 
 if importlib.util.find_spec("ray") is not None:
     from tests.models_definitions import (
-        MockDisruptionCNN as MockDisruptionCNN,
-        MockParamsTimeSeriesCNN as MockParamsTimeSeriesCNN,
-        MockTimeSeriesCNN as MockTimeSeriesCNN,
         MODEL_1 as MODEL_1,
         MODEL_2 as MODEL_2,
         MODEL_3 as MODEL_3,
         MODEL_4 as MODEL_4,
+        MockDisruptionCNN as MockDisruptionCNN,
+        MockParamsTimeSeriesCNN as MockParamsTimeSeriesCNN,
+        MockTimeSeriesCNN as MockTimeSeriesCNN,
     )
 
 
 # Define some common things to add to db
 PROJECT_1 = ProjectIn(
     name="test_project_0",
-    task=Task.SPECTROGRAM,
+    task=Task.PROFILE_2D,
     query_strategy=QueryStrategyType.SEQUENTIAL,
     data_loader="uda",
 )
@@ -119,3 +125,35 @@ ANNOTATION_5 = TimePointBatch(
     uncertainty=0.8,
     created_by=AnnotatorTypes.PEAK_DETECTION,
 )
+
+
+TEST_ISSUER = "https://idp.example.com/realms/toktagger"
+
+# Fixed, so session tokens can be minted before the users are inserted.
+USER_ADMIN_ID = "100000000000000000000001"
+USER_ALICE_ID = "100000000000000000000002"
+USER_BOB_ID = "100000000000000000000003"
+
+USER_ADMIN = UserIn(
+    username="admin",
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="admin-sub",
+    global_role="admin",
+    is_active=True,
+)
+USER_ALICE = UserIn(
+    username="alice",
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="alice-sub",
+    global_role="user",
+    is_active=True,
+)
+USER_BOB = UserIn(
+    username="bob",
+    oidc_issuer=TEST_ISSUER,
+    oidc_sub="bob-sub",
+    global_role="user",
+    is_active=True,
+)
+
+PROJECT_ADMIN = ProjectMember(role="admin")

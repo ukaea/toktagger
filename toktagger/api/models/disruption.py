@@ -1,16 +1,18 @@
+import logging
+import pathlib
+import typing
+
+import pydantic
+import torch
+from sklearn.metrics import mean_absolute_error, root_mean_squared_error
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
+
+from toktagger.api.models.base import Model, ModelRegistry
+from toktagger.api.schemas.annotations import Annotation, TimePoint
+from toktagger.api.schemas.data import DataParams, TimeSeriesData
 from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample
-from toktagger.api.schemas.annotations import TimePoint
-from toktagger.api.schemas.data import TimeSeriesData, DataParams
-from sklearn.metrics import mean_absolute_error, root_mean_squared_error
-import torch.nn as nn
-import torch
-from torch.utils.data import DataLoader, Dataset
-from toktagger.api.schemas.annotations import Annotation
-import typing
-from toktagger.api.models.base import Model, ModelRegistry
-import logging
-import pydantic
 
 logger = logging.getLogger("ray")
 
@@ -112,7 +114,7 @@ class DisruptionCNN(Model):
         annotations: list[list[Annotation]],
         params: DisruptionCNNTrainParams,
     ) -> float:
-        self.log_progress(training_status="started")
+        self.log_progress(status="training")
 
         if not self.gpu_available() and params.device != "cpu":
             raise ValueError(
@@ -304,7 +306,7 @@ class DisruptionCNN(Model):
         final_accuracy = test_accuracy or val_accuracy or train_accuracy
 
         self.log_progress(
-            training_status="completed",
+            status="completed",
             progress=int((epoch / params.num_epochs) * 100),
             score=final_accuracy,
         )
@@ -358,14 +360,21 @@ class DisruptionCNN(Model):
                     uncertainty=stds[i].item(),
                     label="Disruption",
                     time=means[i].item(),
-                    created_by=self.type,
+                    created_by=f"model::{self.type}",
                 )
             ]
             for i in range(len(samples))
         ]
 
-    def save(self, file_stem: str):
-        torch.save(self.model.state_dict(), f"{file_stem}.model")
+    def save(self, results_dir: pathlib.Path) -> None:
+        torch.save(self.model.state_dict(), results_dir.joinpath("weights.model"))
 
-    def load(self, file_path: str):
-        self.model.load_state_dict(torch.load(file_path, map_location="cpu"))
+    def load(
+        self, results_dir: pathlib.Path, weights_filename: str | None = None
+    ) -> None:
+        if weights_filename:
+            results_path = results_dir.joinpath(weights_filename)
+        else:
+            results_path = results_dir.joinpath("weights.model")
+
+        self.model.load_state_dict(torch.load(results_path, map_location="cpu"))

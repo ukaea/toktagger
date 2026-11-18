@@ -73,7 +73,7 @@ export function SpectrumBaseWidget(props: WidgetProps) {
         isDisabled={disabled || readonly}
         minValue={schema.minimum || schema.exclusiveMinimum}
         maxValue={schema.maximum || schema.exclusiveMaximum}
-        step={type === "integer" ? 1 : 0.1}
+        step={type === "integer" ? 1 : undefined}
         formatOptions={type === "integer" ? { maximumFractionDigits: 0 } : {}}
         validationState={rawErrors?.length ? "invalid" : "valid"}
         errorMessage={rawErrors?.[0]}
@@ -535,7 +535,11 @@ const ModelForm = forwardRef<Form, ModelFormProps>(
                     : "GPU tasks are disabled. This may be because no GPU devices were detected. If you believe this was incorrect, you can force the number of GPU nodes to make available via configuration options."}
                 </Content>
                 <Footer>
-                  <Link href="https://ukaea.github.io/toktagger/custom_models#gpu-usage">
+                  <Link
+                    href="https://ukaea.github.io/toktagger/custom_models#gpu-usage"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Learn more about configuring GPU usage for ML Models in
                     TokTagger.
                   </Link>

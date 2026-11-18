@@ -1,28 +1,37 @@
+from abc import ABC, abstractmethod
+from collections.abc import Iterable
+from itertools import pairwise
+
 import numpy as np
 import ruptures as rpt
-import hmmlearn.hmm as hmm
-from abc import ABC, abstractmethod
-from scipy.signal import find_peaks, peak_widths
-from scipy.ndimage import uniform_filter1d, gaussian_filter
+from hmmlearn import hmm
 from scipy.interpolate import interp1d
-
+from scipy.ndimage import gaussian_filter, uniform_filter, uniform_filter1d
+from scipy.signal import find_peaks, peak_widths, stft
+from shapely.geometry import Polygon
+from skimage import measure, morphology
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from toktagger.api.schemas.data import MultiVariateTimeSeriesData
+
+from toktagger.api.schemas.annotations import (
+    # Aliased to avoid clashing with shapely's Polygon, used below for geometry.
+    Polygon as PolygonAnnotation,
+)
+from toktagger.api.schemas.annotations import TimeRegion
 from toktagger.api.schemas.annotators import (
+    AnnotatorParamTypes,
     AnnotatorTypes,
     ChangePointDetectionParams,
-    PeakDetectionParams,
     JumpDetectionParams,
     OutlierDetectionParams,
+    PeakDetectionParams,
+    Profile2DThresholdParams,
 )
-from scipy.signal import stft
-
-from toktagger.api.schemas.data import TimeSeriesData
-from toktagger.api.schemas.annotations import SpectrogramMask, TimeRegion
-from toktagger.api.schemas.annotators import (
-    SpectrogramThresholdParams,
-    AnnotatorParamTypes,
+from toktagger.api.schemas.data import (
+    MultiProfile2DData,
+    MultiVariateTimeSeriesData,
+    Profile2DData,
+    TimeSeriesData,
 )
 from toktagger.api.schemas.projects import Task
 
@@ -141,11 +150,41 @@ def downsample_time_series(
     return time_coarse, signal
 
 
-def compute_stft(data: TimeSeriesData) -> np.ndarray:
+def _coords_to_flat_list(coords: Iterable[tuple[float, float]]) -> list[float]:
+    """
+    Convert an iterable of (x,y) coordinates to COCO flattened list [x1,y1,x2,y2,...].
+    Drops the closing coordinate if it's equal to the first (Shapely exterior rings often close).
+    """
+    coords = list(coords)
+    if len(coords) == 0:
+        return []
+    # If last is same as first, drop it
+    if len(coords) > 1 and coords[0] == coords[-1]:
+        coords = coords[:-1]
+    flat = []
+    for x, y in coords:
+        # keep floats (COCO accepts floats)
+        flat.append(float(x))
+        flat.append(float(y))
+    return flat
+
+
+def compute_stft(data: TimeSeriesData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     time = np.array(data.time)
     values = np.array(data.values)
 
-    sample_rate = 1 / (time[1] - time[0])
+    if len(time) < 2:
+        raise ValueError(
+            "At least two time samples are required to compute a sample rate."
+        )
+
+    time_step = np.abs(np.median(np.diff(time)))
+    if time_step == 0:
+        raise ValueError(
+            "Cannot compute a sample rate: the median time step between samples is zero."
+        )
+
+    sample_rate = 1 / time_step
 
     freq, ts, Zxx = stft(
         values,
@@ -153,6 +192,8 @@ def compute_stft(data: TimeSeriesData) -> np.ndarray:
         nperseg=256,
         noverlap=128,
     )
+    freq /= 1000
+    ts += time[0]
 
     return freq, ts, np.abs(Zxx)
 
@@ -218,7 +259,7 @@ class PeakDetectionAnnotator(DataAnnotator):
         trend = uniform_filter1d(signal, 1000)
         dalpha_detrend = signal - trend
 
-        peak_idx, params = find_peaks(
+        peak_idx, _params = find_peaks(
             dalpha_detrend,
             prominence=self.params.prominence,
             width=[1, 150],
@@ -237,7 +278,7 @@ class PeakDetectionAnnotator(DataAnnotator):
                     label="Unknown",
                     time_min=max(float(peak_time - width), np.min(time)),
                     time_max=min(float(peak_time + width), np.max(time)),
-                    created_by=AnnotatorTypes.PEAK_DETECTION,
+                    created_by=f"annotators::{AnnotatorTypes.PEAK_DETECTION.value}",
                 )
                 regions.append(region)
 
@@ -309,7 +350,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Unknown",
-                created_by=AnnotatorTypes.OUTLIER_DETECTION,
+                created_by=f"annotators::{AnnotatorTypes.OUTLIER_DETECTION.value}",
             )
             for imin, imax in bounds
         ]
@@ -334,7 +375,7 @@ class OutlierDetectionAnnotator(DataAnnotator):
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Unknown",
-                created_by=AnnotatorTypes.OUTLIER_DETECTION,
+                created_by=f"annotators::{AnnotatorTypes.OUTLIER_DETECTION.value}",
             )
             for imin, imax in bounds
         ]
@@ -419,9 +460,9 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 time_min=time[imin],
                 time_max=time[imax],
                 label="Unknown",
-                created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
+                created_by=f"annotators::{AnnotatorTypes.CHANGE_POINT_DETECTION.value}",
             )
-            for imin, imax in zip(result, result[1:])
+            for imin, imax in pairwise(result)
         ]
         return bounds
 
@@ -457,7 +498,7 @@ class ChangePointDetectionAnnotator(DataAnnotator):
                 time_min=tmin,
                 time_max=tmax,
                 label="Unknown",
-                created_by=AnnotatorTypes.CHANGE_POINT_DETECTION,
+                created_by=f"annotators::{AnnotatorTypes.CHANGE_POINT_DETECTION.value}",
             )
             for (tmin, tmax) in bounds
         ]
@@ -541,49 +582,119 @@ class JumpDetectionAnnotator(DataAnnotator):
                     time_min=tmin,
                     time_max=tmax,
                     label="Unknown",
-                    created_by=AnnotatorTypes.JUMP_DETECTION,
+                    created_by=f"annotators::{AnnotatorTypes.JUMP_DETECTION.value}",
                 )
             )
 
         return bounds
 
 
-class SpectrogramThresholdAnnotator:
+class Profile2DThresholdAnnotator:
     """
-    SpectrogramThresholdAnnotator for generating a spectrogram mask based on thresholding.
-    This annotator computes the Short-Time Fourier Transform (STFT) of a specified signal
-    from multivariate time series data, applies a percentile-based threshold to the
-    spectrogram values, and generates a binary mask indicating regions exceeding the threshold.
+    Profile2DThresholdAnnotator for generating a 2D profile mask based on thresholding.
+    This annotator applies a percentile-based threshold to the 2D profile values, and generates a list of polygon annotations
+    representing the regions where the profile exceeds the threshold.
 
     Parameters
     ----------
-    params : SpectrogramThresholdParams
-        Configuration parameters for spectrogram thresholding, including signal name and percentile.
+    params : Profile2DThresholdParams
+        Configuration parameters for 2D profile thresholding, including signal name and percentile.
 
     Methods
     -------
-    predict(data: MultiVariateTimeSeriesData) -> SpectrogramMask
-        Computes the spectrogram mask based on the specified thresholding parameters.
+    predict(data: MultiVariateTimeSeriesData) -> list[PolygonAnnotation]
+        Computes the 2D profile mask based on the specified thresholding parameters.
+
+    Raises
+    ------
+    TypeError
+        If the data for the configured signal name is missing or not a supported type.
 
     Examples
     --------
-    >>> annotator = SpectrogramThresholdAnnotator(params)
+    >>> annotator = Profile2DThresholdAnnotator(params)
     >>> mask = annotator.predict(data)
     """
 
-    def __init__(self, params: SpectrogramThresholdParams):
+    def __init__(self, params: Profile2DThresholdParams):
         self.params = params
 
-    def predict(self, data: MultiVariateTimeSeriesData) -> SpectrogramMask:
-        _, _, values = compute_stft(data.values[self.params.signal_name])
+    def predict(
+        self, data: MultiProfile2DData | MultiVariateTimeSeriesData
+    ) -> list[PolygonAnnotation]:
+        signal = data.values[self.params.signal_name]
 
-        threshold_value = np.percentile(values, self.params.percentile)
-        threshold_mask = values > threshold_value
-        return SpectrogramMask(
-            label="SpectrogramMask",
-            values=threshold_mask.tolist(),
-            created_by=AnnotatorTypes.SPECTROGRAM_THRESHOLD,
-        )
+        if isinstance(signal, TimeSeriesData):
+            dim_1, time, values = compute_stft(signal)
+        elif isinstance(signal, Profile2DData):
+            dim_1 = np.array(signal.dim_1)
+            time = np.array(signal.time)
+            values = np.array(signal.values).T
+        else:
+            raise TypeError(
+                f"Profile data for {self.params.signal_name} does not exist."
+            )
+
+        values = np.nan_to_num(values, nan=1e-6).clip(1e-6)
+
+        if self.params.line_filter_width > 0:
+            values = values - uniform_filter(
+                values, size=(self.params.line_filter_width, 1)
+            )
+        values = gaussian_filter(values, sigma=self.params.sigma)
+
+        mask = np.where(values > np.percentile(values, self.params.percentile), 1, 0)
+
+        if self.params.dim_1_min is not None:
+            mask[dim_1 < self.params.dim_1_min] = 0
+
+        if self.params.dim_1_max is not None:
+            mask[dim_1 > self.params.dim_1_max] = 0
+
+        labeled_regions = measure.label(mask, connectivity=2)
+
+        if self.params.min_size > 0:
+            labeled_regions = morphology.remove_small_objects(
+                labeled_regions, min_size=self.params.min_size
+            )
+
+        # Convert each labeled region to polygons
+        polygons: list[Polygon] = []
+        for region_label in range(1, labeled_regions.max() + 1):
+            # Create a binary mask for the current label
+            region_mask = labeled_regions == region_label
+
+            # Find contours at the 0.5 level
+            contours = measure.find_contours(region_mask, 0.5)
+
+            for contour in contours:
+                if (
+                    self.params.max_polygon_points
+                    and len(contour) > self.params.max_polygon_points
+                ):
+                    indices = np.round(
+                        np.linspace(0, len(contour) - 1, self.params.max_polygon_points)
+                    ).astype(int)
+                    contour = contour[indices]
+                # Contour coordinates are (row, col), convert to (x, y)
+                contour_coords = [
+                    (int(np.round(c[1])), int(np.round(c[0]))) for c in contour
+                ]
+                contour_coords = [(time[x], dim_1[y]) for x, y in contour_coords]
+                poly = Polygon(contour_coords)
+                if poly.is_valid and poly.area > 0:
+                    polygons.append(poly)
+
+        annotations = [
+            PolygonAnnotation(
+                segmentation=[_coords_to_flat_list(polygon.exterior.coords)],
+                label="Unknown",
+                created_by=f"annotators::{AnnotatorTypes.PROFILE_2D_THRESHOLD.value}",
+                signal_name=self.params.signal_name,
+            )
+            for polygon in polygons
+        ]
+        return annotations
 
 
 ANNOTATORS = {
@@ -591,7 +702,7 @@ ANNOTATORS = {
     AnnotatorTypes.OUTLIER_DETECTION: OutlierDetectionAnnotator,
     AnnotatorTypes.CHANGE_POINT_DETECTION: ChangePointDetectionAnnotator,
     AnnotatorTypes.JUMP_DETECTION: JumpDetectionAnnotator,
-    AnnotatorTypes.SPECTROGRAM_THRESHOLD: SpectrogramThresholdAnnotator,
+    AnnotatorTypes.PROFILE_2D_THRESHOLD: Profile2DThresholdAnnotator,
 }
 
 # Currently only allowing these annotators to task mapping
@@ -603,6 +714,6 @@ ANNOTATORS_PER_TASK = {
         AnnotatorTypes.CHANGE_POINT_DETECTION,
         AnnotatorTypes.JUMP_DETECTION,
     ],
-    Task.SPECTROGRAM: [AnnotatorTypes.SPECTROGRAM_THRESHOLD],
+    Task.PROFILE_2D: [AnnotatorTypes.PROFILE_2D_THRESHOLD],
     Task.VIDEO: [],
 }

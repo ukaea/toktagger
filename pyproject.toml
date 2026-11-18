@@ -1,7 +1,7 @@
 [project]
 name = "toktagger"
-version = "0.3.1"
-requires-python = ">=3.10,<3.14"
+version = "0.4.0"
+requires-python = ">=3.11,<3.14"
 authors = [
 ]
 maintainers = [
@@ -14,38 +14,55 @@ classifiers = [
 
 dependencies = [
   "fastapi",
-  "uvicorn",
+  "uvicorn[standard]",
   "fsspec",
   "xarray",
   "s3fs",
-  "zarr",
+  "zarr>=3",
   "scipy",
-  "pyarrow<24",
+  "pyarrow<26",
   "pymongo",
   "requests",
-  "numpy<2",
+  "numpy<3",
   "scikit-learn",
-  "pandas<=2.2.3",
+  "pandas<=3.1.0",
   "pillow",
-  "uda",
-  "sal",
   "ruptures>=1.1.10",
   "psutil>=7.0.0",
   "mongita>=1.2.0",
   "filelock>=3.19.1",
   "hmmlearn>=0.3.3",
+  "shapely>=2.0.7",
+  "scikit-image>=0.24.0",
   "uda-xarray>=0.2.1",
   "sal-xarray>=0.2.1",
   "bump-my-version>=1.2.7",
   "platformdirs>=4.4.0",
   "pydantic-settings>=2.11.0",
+  "itsdangerous>=2.0.0",
+  "uda-mast>=1.4.1",
+  "authlib>=1.8.0",
+  "cryptography>=48.0.1",
+  "httpx>=0.28.1",
+  "canaille[front,oidc,server,sqlite]>=0.2.7",
+  "joserfc>=1.6,<1.8",
 ]
 [project.optional-dependencies]
 models = [
   "torch",
   "ray>=2.49.1",
+  "ultralytics==8.4.98",
+  "mlflow>=3.1.4",
+  "safetensors>=0.7.0",
+  "huggingface-hub>=1.22.0",
 ]
 
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -57,16 +74,36 @@ include = ["toktagger.api*"]
 [tool.ruff]
 exclude = [".venv", "notebooks"]
 
+[tool.ruff.lint.per-file-ignores]
+# `x as x` is the standard explicit-re-export idiom (also silences F401) for
+# pytest fixtures/constants imported into conftest for their side effect of
+# registration rather than direct use — not an accidental no-op alias.
+"tests/conftest.py" = ["PLC0414"]
+"tests/db_definitions.py" = ["PLC0414"]
+"tests/api/routers/conftest.py" = ["PLC0414"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom calls these in argument defaults by
+# design (the call is evaluated once per request by FastAPI, not at def
+# time as B008 assumes) — ruff's docs recommend this allowlist for FastAPI.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Body",
+    "toktagger.api.schemas.data.DataParams",
+    "toktagger.api.schemas.views.ViewParams",
+]
+
 [dependency-groups]
 dev = [
     "zensical",
     "pooch>=1.8.2",
-    "httpx>=0.28.1",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
-    "ruff>=0.12.9",
+    "ruff>=0.12.9,<0.16",
     "pre-commit>=4.3.0",
     "pytest-playwright>=0.7.1",
+    "respx>=0.23.1",
 ]
 
 [project.scripts]

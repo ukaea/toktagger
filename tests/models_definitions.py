@@ -1,3 +1,9 @@
+import pathlib
+import random
+import typing
+
+import pydantic
+
 from toktagger.api.models.base import Model, ModelRegistry
 from toktagger.api.schemas.annotations import (
     TimePoint,
@@ -5,15 +11,8 @@ from toktagger.api.schemas.annotations import (
 )
 from toktagger.api.schemas.models import ModelIn
 
-import pathlib
-import typing
-import random
-import ray
-import pydantic
-
 
 # Create a mock model for use in our model definitions
-@ray.remote
 @ModelRegistry.register("mock_disruption_cnn", ["time-series"])
 class MockDisruptionCNN(Model):
     def define_model(self):
@@ -21,7 +20,7 @@ class MockDisruptionCNN(Model):
 
     def train(self, samples, annotations, *args, **kwargs):
         self.log_progress(
-            training_status="started",
+            status="training",
             progress=50,
             score=20,
         )
@@ -41,11 +40,15 @@ class MockDisruptionCNN(Model):
             for i in range(len(samples))
         ]
 
-    def save(self, file_stem: str):
-        pathlib.Path(file_stem).with_suffix(".model").write_text(self.model)
+    def save(self, results_dir: pathlib.Path):
+        results_dir.joinpath("weights.model").write_text(self.model)
 
-    def load(self, file_path):
-        self.model = pathlib.Path(file_path).read_text()
+    def load(self, results_dir: pathlib.Path, weights_filename: str | None = None):
+        if weights_filename:
+            results_file = results_dir.joinpath(weights_filename)
+        else:
+            results_file = results_dir.joinpath("weights.model")
+        self.model = results_file.read_text()
 
 
 class TimeSeriesCNN(Model):
@@ -54,7 +57,7 @@ class TimeSeriesCNN(Model):
 
     def train(self, samples, annotations, params=None):
         self.log_progress(
-            training_status="started",
+            status="training",
             progress=50,
             score=20,
         )
@@ -96,14 +99,17 @@ class TimeSeriesCNN(Model):
             )
         return anns
 
-    def save(self, file_stem: str):
-        pathlib.Path(file_stem).with_suffix(".model").write_text(self.model)
+    def save(self, results_dir: pathlib.Path):
+        results_dir.joinpath("weights.model").write_text(self.model)
 
-    def load(self, file_path):
-        self.model = pathlib.Path(file_path).read_text()
+    def load(self, results_dir: pathlib.Path, weights_filename: str | None = None):
+        if weights_filename:
+            results_file = results_dir.joinpath(weights_filename)
+        else:
+            results_file = results_dir.joinpath("weights.model")
+        self.model = results_file.read_text()
 
 
-@ray.remote
 @ModelRegistry.register("mock_timeseries_cnn", ["time-series"])
 class MockTimeSeriesCNN(TimeSeriesCNN):
     pass
@@ -116,7 +122,6 @@ class TimeSeriesCNNParams(pydantic.BaseModel):
     test_selection: typing.Literal["selection_1", "selection_2"]
 
 
-@ray.remote
 @ModelRegistry.register(
     "mock_params_timeseries_cnn",
     ["time-series"],
@@ -126,7 +131,7 @@ class TimeSeriesCNNParams(pydantic.BaseModel):
 class MockParamsTimeSeriesCNN(TimeSeriesCNN):
     def train(self, samples, annotations, params: TimeSeriesCNNParams):
         self.log_progress(
-            training_status="started",
+            status="training",
             progress=50,
             score=20,
         )
@@ -168,11 +173,15 @@ class MockParamsTimeSeriesCNN(TimeSeriesCNN):
             )
         return anns
 
+    def save(self, results_dir: pathlib.Path):
+        results_dir.joinpath("weights.model").write_text(self.model)
+        results_dir.joinpath("config.json").touch()
+
 
 MODEL_1 = ModelIn(
     type="mock_disruption_cnn",
     version=1,
-    training_status="completed",
+    status="completed",
     progress=100,
     score=80,
 )
@@ -180,14 +189,14 @@ MODEL_1 = ModelIn(
 MODEL_2 = ModelIn(
     type="mock_disruption_cnn",
     version=2,
-    training_status="completed",
+    status="completed",
     progress=100,
     score=90,
 )
 MODEL_3 = ModelIn(
     type="disruption_cnn",
     version=3,
-    training_status="started",
+    status="training",
     progress=50,
     score=60,
     task_id="abc123",
@@ -195,7 +204,7 @@ MODEL_3 = ModelIn(
 MODEL_4 = ModelIn(
     type="mock_params_timeseries_cnn",
     version=1,
-    training_status="completed",
+    status="completed",
     progress=100,
     score=80,
 )

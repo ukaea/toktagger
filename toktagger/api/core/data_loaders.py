@@ -4,8 +4,9 @@ import io
 import os
 import pathlib
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Type
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd
@@ -13,28 +14,29 @@ import pydantic
 import xarray as xr
 from PIL import Image
 
+from toktagger.api import config
 from toktagger.api.schemas.data import (
-    Data,
-    DataParamTypes,
-    ImageParams,
     DataParams,
+    DataParamTypes,
+    DataResponseType,
     ImageData,
+    ImageParams,
+    MultiProfile2DData,
     MultiVariateTimeSeriesData,
+    Profile2DData,
     TimeSeriesData,
 )
 from toktagger.api.schemas.samples import (
+    DataTypes,
     FileData,
+    ImageArrayFileData,
+    ImageFileData,
     Sample,
     ShotData,
     TimeSeriesFileData,
-    ImageFileData,
-    ImageArrayFileData,
-    DataTypes,
 )
-import toktagger.api.config as config
 
-# Set up UDA environment variables with defaults if not already set. This is required for
-# the pyuda client to work correctly outside of Freia.
+# Set UDA env var defaults so the pyuda client works correctly outside of Freia.
 os.environ["UDA_HOST"] = os.environ.get("UDA_HOST", config.settings.uda.host)
 os.environ["UDA_META_PLUGINNAME"] = os.environ.get(
     "UDA_META_PLUGINNAME", config.settings.uda.meta_pluginname
@@ -43,8 +45,7 @@ os.environ["UDA_METANEW_PLUGINNAME"] = os.environ.get(
     "UDA_METANEW_PLUGINNAME", config.settings.uda.metanew_pluginname
 )
 
-# Setup SAL environment variables with defaults if not already set. This is required for
-# the SAL client to work correctly.
+# Set SAL env var defaults so the SAL client works correctly.
 os.environ["SAL_HOST"] = os.environ.get("SAL_HOST", config.settings.sal.host)
 
 
@@ -52,12 +53,18 @@ class DataLoaderError(Exception):
     """Custom exception for data loader errors."""
 
 
+class FrameNotFoundError(DataLoaderError):
+    """The requested video frame does not exist."""
+
+
 class DataLoader(ABC):
+    signal_name_help: ClassVar[str | None] = None
+
     @classmethod
     @abstractmethod
     def sample_data_type(
         cls,
-    ) -> Type[DataTypes]:
+    ) -> type[DataTypes]:
         # Return whatever type the data loader expects to be passed in as sample_data when getting the sample
         pass
 
@@ -67,18 +74,18 @@ class DataLoader(ABC):
         sample: Sample,
         params: DataParamTypes = DataParams(),
         **kwargs,
-    ) -> Data:
+    ) -> DataResponseType:
         pass
 
 
 class LoaderRegistry:
-    _registry: dict[str, DataLoader] = {}
+    _registry: ClassVar[dict[str, DataLoader]] = {}
 
     @classmethod
     def register(cls, name: str):
         def decorator(loader_class: DataLoader):
             if not issubclass(loader_class, DataLoader):
-                raise ValueError(
+                raise TypeError(
                     f"Loader '{name}' does not inherit from DataLoader base class."
                 )
             if (sample_data_type := loader_class.sample_data_type()) not in (
@@ -114,13 +121,17 @@ class LoaderRegistry:
             raise ValueError(f"No DataLoader class called '{name}' found in registry!")
         return loader_class.sample_data_type().model_json_schema()
 
+    @classmethod
+    def get_signal_name_help(cls, name: str) -> str | None:
+        return cls.get(name).signal_name_help
+
 
 @LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
 
     @classmethod
-    def sample_data_type(cls) -> Type[ImageFileData]:
+    def sample_data_type(cls) -> type[ImageFileData]:
         return ImageFileData
 
     @pydantic.validate_call
@@ -133,7 +144,7 @@ class ImageDataLoader(DataLoader):
         sample_data: ImageFileData = sample.data
 
         # Find directory of images
-        dir_path = pathlib.Path(sample_data.file_name)
+        dir_path = pathlib.Path(sample_data.file_name).resolve()
         if not dir_path.exists() or not dir_path.is_dir():
             raise FileNotFoundError(
                 f"Could not find directory at '{dir_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
@@ -144,15 +155,23 @@ class ImageDataLoader(DataLoader):
         elif params.frame is None:
             files = sorted(dir_path.iterdir())
             if len(files) == 0:
-                raise FileNotFoundError("No files exist in specified directory!")
+                raise FrameNotFoundError("No files exist in specified directory!")
             file_path = files[0]
         else:
             file_path = dir_path.joinpath(f"{params.frame}.{sample_data.type}")
         if not file_path.exists():
-            raise FileNotFoundError(
+            raise FrameNotFoundError(
                 f"Could not find image file at '{file_path}', relative to {pathlib.Path().cwd()}"
             )
+        # return raw encoded file bytes if return_raw is True
+        if params.return_raw:
+            return ImageData(
+                frame=file_path.name.split(".")[0],
+                values=list(file_path.read_bytes()),
+            )
+
         im = Image.open(file_path)
+
         buffer = io.BytesIO()
         im.save(buffer, format="PNG")
         buffer.seek(0)
@@ -167,8 +186,13 @@ class ImageDataLoader(DataLoader):
 class ArrayDataLoader(DataLoader):
     """DataLoader for retrieving data using Numpy array files."""
 
+    signal_name_help = (
+        "Use the name of one array in the .npz file. Leave this field empty if the "
+        "file contains only one array."
+    )
+
     @classmethod
-    def sample_data_type(cls) -> Type[ImageArrayFileData]:
+    def sample_data_type(cls) -> type[ImageArrayFileData]:
         return ImageArrayFileData
 
     @pydantic.validate_call
@@ -181,7 +205,7 @@ class ArrayDataLoader(DataLoader):
         sample_data: ImageArrayFileData = sample.data
 
         # Find file
-        file_path = pathlib.Path(sample_data.file_name)
+        file_path = pathlib.Path(sample_data.file_name).resolve()
         if not file_path.exists():
             raise FileNotFoundError(
                 f"Could not find directory at '{file_path}', relative to {pathlib.Path().cwd()} - {list(pathlib.Path().cwd().iterdir())}"
@@ -231,7 +255,7 @@ class ArrayDataLoader(DataLoader):
         frame = params.frame if params.frame is not None else 0
 
         if frame < 0 or frame >= arr.shape[0]:
-            raise DataLoaderError(
+            raise FrameNotFoundError(
                 f"Frame {frame} unavailable! Available frame range is 0 to {arr.shape[0] - 1}."
             )
 
@@ -241,10 +265,15 @@ class ArrayDataLoader(DataLoader):
         buffer = io.BytesIO()
         im.save(buffer, format="PNG")
         buffer.seek(0)
+        png_bytes = buffer.getvalue()
 
         return ImageData(
             frame=frame,
-            values=base64.b64encode(buffer.getvalue()).decode(),
+            values=(
+                list(png_bytes)
+                if params.return_raw
+                else base64.b64encode(png_bytes).decode()
+            ),
         )
 
 
@@ -252,8 +281,12 @@ class ArrayDataLoader(DataLoader):
 class TabularDataLoader(DataLoader):
     """DataLoader for retrieving data from a tabular file format (e.g., CSV, Parquet)"""
 
+    signal_name_help = (
+        "Use the column names in the file. Leave this field empty to load all columns."
+    )
+
     @classmethod
-    def sample_data_type(cls) -> Type[TimeSeriesFileData]:
+    def sample_data_type(cls) -> type[TimeSeriesFileData]:
         return TimeSeriesFileData
 
     @pydantic.validate_call
@@ -261,9 +294,9 @@ class TabularDataLoader(DataLoader):
         self,
         sample: Sample,
         params: DataParams,
-        time_min: Optional[float] = None,
-        time_max: Optional[float] = None,
-        min_time_step: Optional[float] = None,
+        time_min: float | None = None,
+        time_max: float | None = None,
+        min_time_step: float | None = None,
         **kwargs,
     ) -> MultiVariateTimeSeriesData:
         if not isinstance(sample.data, TimeSeriesFileData):
@@ -271,30 +304,27 @@ class TabularDataLoader(DataLoader):
                 f"Expected sample data of type 'TimeSeriesFileData' but got '{type(sample.data)}'"
             )
 
-        if not pathlib.Path(sample.data.file_name).exists():
-            raise FileNotFoundError(
-                f"Could not find file at '{sample.data.file_name}', relative to {pathlib.Path().cwd()}"
-            )
-
         item: TimeSeriesFileData = sample.data
+        file_path = pathlib.Path(item.file_name).resolve()
 
-        if item.file_name.endswith(".csv"):
-            df = pd.read_csv(item.file_name, usecols=item.signal_names)
-        elif item.file_name.endswith(".tsv"):
-            df = pd.read_csv(item.file_name, sep="\t", usecols=item.signal_names)
-        elif item.file_name.endswith(".parquet"):
-            df = pd.read_parquet(item.file_name, columns=item.signal_names)
-        elif item.file_name.endswith(".json"):
-            df = pd.read_json(item.file_name)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Could not find file at '{file_path}'")
+
+        if file_path.suffix == ".csv":
+            df = pd.read_csv(file_path, usecols=item.signal_names)
+        elif file_path.suffix == ".tsv":
+            df = pd.read_csv(file_path, sep="\t", usecols=item.signal_names)
+        elif file_path.suffix == ".parquet":
+            df = pd.read_parquet(file_path, columns=item.signal_names)
+        elif file_path.suffix == ".json":
+            df = pd.read_json(file_path)
             df = df[item.signal_names]
-        elif item.file_name.endswith(".xlsx"):
-            df = pd.read_excel(item.file_name, usecols=item.signal_names)
-        elif item.file_name.endswith(".feather"):
-            df = pd.read_feather(item.file_name, columns=item.signal_names)
+        elif file_path.suffix == ".xlsx":
+            df = pd.read_excel(file_path, usecols=item.signal_names)
+        elif file_path.suffix == ".feather":
+            df = pd.read_feather(file_path, columns=item.signal_names)
         else:
-            raise ValueError(
-                "Unsupported file format {}".format(Path(item.file_name).suffix)
-            )
+            raise ValueError(f"Unsupported file format {file_path.suffix}")
 
         df = df.fillna(0)
 
@@ -320,23 +350,45 @@ class TabularDataLoader(DataLoader):
         return MultiVariateTimeSeriesData(values=results)
 
 
+def _combine_signals(
+    results: dict[str, TimeSeriesData | Profile2DData | None],
+    none_loaded_message: str,
+    mixed_types_message: str,
+) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+    """Package loaded signals, keeping `None` for any that could not be loaded."""
+    loaded = [value for value in results.values() if value is not None]
+    if not loaded:
+        raise DataLoaderError(none_loaded_message)
+
+    if all(isinstance(value, TimeSeriesData) for value in loaded):
+        return MultiVariateTimeSeriesData(values=results)
+    elif all(isinstance(value, Profile2DData) for value in loaded):
+        return MultiProfile2DData(values=results)
+    raise DataLoaderError(mixed_types_message)
+
+
 @LoaderRegistry.register("uda")
 class UDADataLoader(DataLoader):
     """DataLoader for retrieving data using the UDA access layer"""
 
+    signal_name_help = (
+        "Use MAST or MAST-U signal names or aliases from UDA. All signals must be "
+        "time series or all signals must be 2D profiles. Do not mix them."
+    )
+
     @classmethod
-    def sample_data_type(self) -> Type[ShotData]:
+    def sample_data_type(self) -> type[ShotData]:
         return ShotData
 
     def get_sample(
         self,
         sample: Sample,
         params: DataParams,
-        time_min: Optional[float] = None,
-        time_max: Optional[float] = None,
-        min_time_step: Optional[float] = None,
+        time_min: float | None = None,
+        time_max: float | None = None,
+        min_time_step: float | None = None,
         **kwargs,
-    ) -> MultiVariateTimeSeriesData:
+    ) -> MultiVariateTimeSeriesData | MultiProfile2DData:
         if not isinstance(sample.data, ShotData):
             raise TypeError(
                 f"Expected sample data of type 'ShotData' but got '{type(sample.data)}'"
@@ -349,48 +401,68 @@ class UDADataLoader(DataLoader):
         results = {}
         for name in sample_data.signal_names:
             try:
-                signal = xr.open_dataset(f"uda://{name}:{sample.shot_id}", engine="uda")
-                data = signal["data"].values
-                time = signal["time"].values
-
-                if time_min is not None:
-                    mask = time >= time_min
-                    time = time[mask]
-                    data = data[mask]
-
-                if time_max is not None:
-                    mask = time <= time_max
-                    time = time[mask]
-                    data = data[mask]
-
-                if (
-                    min_time_step is not None
-                    and len(time) > 1
-                    and np.diff(time).mean() < min_time_step
-                ):
-                    time_base = np.arange(time[0], time[-1], min_time_step)
-                    data = np.interp(time_base, time, data)
-                    time = time_base
-
-                item = TimeSeriesData(time=time, values=data)
+                item = _get_uda_signal(
+                    name, sample.shot_id, time_min, time_max, min_time_step
+                )
                 results[name] = item
-            except Exception:
+            except Exception:  # noqa: BLE001 -- one bad signal should not fail the whole multi-signal load
                 results[name] = None
 
-        if all(values is None for values in results.values()):
-            raise DataLoaderError(
-                f"Could not load any signals for shot ID '{sample.shot_id}'. Check UDA connectivity and signal names."
-            )
+        return _combine_signals(
+            results,
+            f"Could not load any signals for shot ID '{sample.shot_id}'. Check UDA connectivity and signal names.",
+            f"Mixed data types found for shot ID '{sample.shot_id}'. Check UDA signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles).",
+        )
 
-        return MultiVariateTimeSeriesData(values=results)
+
+@lru_cache(maxsize=128)
+def _get_uda_signal(
+    name: str,
+    shot_id: int,
+    time_min: float | None = None,
+    time_max: float | None = None,
+    min_time_step: float | None = None,
+) -> Profile2DData | TimeSeriesData:
+    ds = xr.open_dataset(f"uda://{name}:{shot_id}", engine="uda")
+    ds = ds.sel(time=slice(time_min, time_max))
+
+    time = ds["time"].values
+    if (
+        min_time_step is not None
+        and len(time) > 1
+        and np.diff(time).mean() < min_time_step
+    ):
+        time = ds["time"].values
+        time_base = np.arange(time[0], time[-1], min_time_step)
+        ds = ds.interp(time=time_base, method="linear")
+
+    if len(ds.data.shape) == 1:
+        data = ds["data"].values
+        time = ds["time"].values
+
+        item = TimeSeriesData(time=time, values=data)
+        return item
+    elif len(ds.data.shape) == 2:
+        time = ds["time"].values
+        dim_1 = ds[ds.data.dims[1]].values
+        data = ds["data"].values
+
+        item = Profile2DData(time=time, dim_1=dim_1, values=data)
+        return item
+    else:
+        raise DataLoaderError(
+            f"Unsupported data shape {ds.data.shape} for signal '{name}'"
+        )
 
 
 @LoaderRegistry.register("uda_camera")
 class UDACameraDataLoader(DataLoader):
     """DataLoader for retrieving camera image data using the UDA access layer"""
 
+    signal_name_help = "Use exactly one MAST or MAST-U camera signal name from UDA."
+
     @classmethod
-    def sample_data_type(self) -> Type[ShotData]:
+    def sample_data_type(self) -> type[ShotData]:
         return ShotData
 
     def get_sample(
@@ -414,47 +486,95 @@ class UDACameraDataLoader(DataLoader):
             if params.frame is None:
                 params.frame = 0  # Default to first frame if not specified
 
-            signal = xr.open_dataset(
-                f"uda://{signal_name}:{sample.shot_id}",
-                engine="uda",
-                frame_number=params.frame,
-            )
+            try:
+                signal = xr.open_dataset(
+                    f"uda://{signal_name}:{sample.shot_id}",
+                    engine="uda",
+                    frame_number=params.frame,
+                )
+            except RuntimeError as e:
+                metadata_signal = xr.open_dataset(
+                    f"uda://{signal_name}:{sample.shot_id}",
+                    engine="uda",
+                    frame_number=0,
+                )
+                n_frames = metadata_signal["data"].attrs.get("n_frames")
+                if not isinstance(n_frames, (int, np.integer)):
+                    raise ValueError("UDA image metadata does not contain n_frames")
+
+                if params.frame < 0 or params.frame >= n_frames:
+                    raise FrameNotFoundError(
+                        f"Frame {params.frame} unavailable for image signal "
+                        f"'{signal_name}' and shot ID '{sample.shot_id}'."
+                    ) from e
+                raise
 
             image_array = signal["data"].values
             image_array = np.squeeze(image_array)
+
+            # Ensure at least 2D for Pillow (squeeze can reduce to 0D or 1D for tiny images)
+            if image_array.ndim == 0:
+                image_array = image_array.reshape(1, 1)
+            elif image_array.ndim == 1:
+                if image_array.shape[0] in (3, 4):
+                    image_array = image_array.reshape(1, 1, -1)  # single pixel RGB/RGBA
+                else:
+                    image_array = image_array.reshape(-1, 1)  # 1D grayscale strip
+
+            # Convert uint16 to uint8, scaled by the camera's declared bit depth.
+            if image_array.dtype == np.uint16:
+                bit_depth = signal["data"].attrs.get("depth")
+                if bit_depth:
+                    max_value = 2**bit_depth - 1
+                    scaled = image_array.astype(np.float64) * (255 / max_value)
+                    image_array = np.clip(scaled, 0, 255).astype(np.uint8)
+                else:
+                    image_array = np.clip(image_array, 0, 255).astype(np.uint8)
 
             im = Image.fromarray(image_array)
             buffer = io.BytesIO()
             im.save(buffer, format="PNG")
             buffer.seek(0)
+            png_bytes = buffer.getvalue()
 
             return ImageData(
                 frame=str(params.frame),
-                values=base64.b64encode(buffer.getvalue()).decode(),
+                values=(
+                    list(png_bytes)
+                    if params.return_raw
+                    else base64.b64encode(png_bytes).decode()
+                ),
             )
+        except FrameNotFoundError:
+            raise
         except Exception as e:
             raise DataLoaderError(
                 f"Could not load image signal '{signal_name}' for shot ID '{sample.shot_id}': {e}"
-            )
+            ) from e
 
 
 @LoaderRegistry.register("sal")
 class SALDataLoader(DataLoader):
     """DataLoader for retrieving data using the SAL access layer"""
 
+    signal_name_help = (
+        "Use the JET SAL path that follows pulse/<shot_id>/, in the format "
+        "ppf/signal/<owner>/<dda>/<dtype>."
+    )
+
     @classmethod
-    def sample_data_type(self) -> Type[ShotData]:
+    def sample_data_type(self) -> type[ShotData]:
         return ShotData
 
     def get_sample(
         self,
         sample: Sample,
         params: DataParams,
-        time_min: Optional[float] = None,
-        time_max: Optional[float] = None,
-        min_time_step: Optional[float] = None,
+        time_min: float | None = None,
+        time_max: float | None = None,
+        min_time_step: float | None = None,
         **kwargs,
-    ) -> MultiVariateTimeSeriesData:
+    ) -> MultiVariateTimeSeriesData | MultiProfile2DData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
 
@@ -469,109 +589,158 @@ class SALDataLoader(DataLoader):
 
         results = {}
         for name in sample_data.signal_names:
-            full_name = f"pulse/{sample.shot_id}/{name}"
             try:
-                signal = xr.open_dataset(f"sal://{full_name}", engine="sal")
-                data = signal["data"].values
-                time = signal["time"].values
-
-                if time_min is not None:
-                    mask = time >= time_min
-                    time = time[mask]
-                    data = data[mask]
-
-                if time_max is not None:
-                    mask = time <= time_max
-                    time = time[mask]
-                    data = data[mask]
-
-                if (
-                    min_time_step is not None
-                    and len(time) > 1
-                    and np.diff(time).mean() < min_time_step
-                ):
-                    time_base = np.arange(time[0], time[-1], min_time_step)
-                    data = np.interp(time_base, time, data)
-                    time = time_base
-
-                print(time_min, time_max, min_time_step)
-
-                item = TimeSeriesData(time=time, values=data)
+                item = _get_sal_signal(
+                    name=name,
+                    shot_id=sample.shot_id,
+                    time_min=time_min,
+                    time_max=time_max,
+                    min_time_step=min_time_step,
+                )
                 results[name] = item
-            except Exception:
+            except Exception:  # noqa: BLE001 -- one bad signal should not fail the whole multi-signal load
                 results[name] = None
 
-        if all(values is None for values in results.values()):
-            raise DataLoaderError(
-                f"Could not load any signals for shot ID '{sample.shot_id}'. Check SAL connectivity and signal names."
-            )
+        return _combine_signals(
+            results,
+            f"Could not load any signals for shot ID '{sample.shot_id}' from SAL. Check SAL connectivity and signal names.",
+            f"Mixed data types found for shot ID '{sample.shot_id}' from SAL. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles).",
+        )
 
-        return MultiVariateTimeSeriesData(values=results)
+
+@lru_cache(maxsize=128)
+def _get_sal_signal(
+    name: str,
+    shot_id: int,
+    time_min: float | None = None,
+    time_max: float | None = None,
+    min_time_step: float | None = None,
+) -> Profile2DData | TimeSeriesData:
+    full_name = f"pulse/{shot_id}/{name}"
+    ds = xr.open_dataset(
+        f"sal://{full_name}", engine="sal", host=os.environ["SAL_HOST"]
+    )
+    ds = ds.sel(time=slice(time_min, time_max))
+
+    time = ds["time"].values
+    if (
+        min_time_step is not None
+        and len(time) > 1
+        and np.diff(time).mean() < min_time_step
+    ):
+        time_base = np.arange(time[0], time[-1], min_time_step)
+        ds = ds.interp(time=time_base, method="linear")
+
+    if len(ds.data.shape) == 1:
+        data = ds["data"].values
+        time = ds["time"].values
+
+        item = TimeSeriesData(time=time, values=data)
+        return item
+    elif len(ds.data.shape) == 2:
+        time = ds["time"].values
+        dim_1 = ds[ds.data.dims[1]].values
+        data = ds["data"].values
+
+        item = Profile2DData(time=time, dim_1=dim_1, values=data)
+        return item
+    else:
+        raise DataLoaderError(
+            f"Unsupported data shape {ds.data.shape} for signal '{name}'"
+        )
 
 
 @LoaderRegistry.register("fair_mast")
 class FAIRMASTDataLoader(DataLoader):
+    signal_name_help = (
+        "Use the <group>/<variable> path of the signal in the FAIR MAST Level 2 "
+        "shot file."
+    )
+
     @classmethod
-    def sample_data_type(self) -> Type[ShotData]:
+    def sample_data_type(self) -> type[ShotData]:
         return ShotData
 
     def get_sample(
         self,
         sample: Sample,
         params: DataParams,
-        time_min: Optional[float] = None,
-        time_max: Optional[float] = None,
-        min_time_step: Optional[float] = None,
+        time_min: float | None = None,
+        time_max: float | None = None,
+        min_time_step: float | None = None,
         **kwargs,
-    ) -> MultiVariateTimeSeriesData:
+    ) -> MultiVariateTimeSeriesData | MultiProfile2DData:
         assert isinstance(sample.data, ShotData), "Sample data must be of type ShotData"
         sample_data: ShotData = sample.data
 
-        if not params.name == "identity":
-            raise TypeError(f"Expected blank parameters, but got '{params.name}'")
+        results = _get_fair_mast_signals(
+            file_path=f"https://s3.echo.stfc.ac.uk/mast/level2/shots/{sample.shot_id}.zarr",
+            signal_names=tuple(sample_data.signal_names),
+            time_min=time_min,
+            time_max=time_max,
+            min_time_step=min_time_step,
+        )
+        return results
 
-        endpoint = "https://s3.echo.stfc.ac.uk/mast/level2/shots"
-        file_path = f"{endpoint}/{sample.shot_id}.zarr"
 
-        kwargs = {"chunks": None}
+@lru_cache(maxsize=128)
+def _get_fair_mast_signals(
+    file_path: str,
+    signal_names: tuple[str],
+    time_min: float | None = None,
+    time_max: float | None = None,
+    min_time_step: float | None = None,
+) -> MultiVariateTimeSeriesData | MultiProfile2DData:
+    kwargs = {"chunks": None}
+    # Disable default index creation if supported, to avoid performance issues on large datasets
+    sig = inspect.signature(xr.open_dataset)
+    if "create_default_indexes" in sig.parameters:
+        kwargs["create_default_indexes"] = False
 
-        # check if xarray version supports create_default_indexes argument, and if so, set it to False
-        # to avoid unnecessary index creation which can cause performance issues with large datasets
-        sig = inspect.signature(xr.open_dataset)
-        if "create_default_indexes" in sig.parameters:
-            kwargs["create_default_indexes"] = False
+    data_tree = xr.open_datatree(file_path, **kwargs)
 
-        data_tree = xr.open_datatree(file_path, **kwargs)
+    results = {}
+    for name in signal_names:
+        try:
+            ds = data_tree[name]
+        except KeyError:
+            results[name] = None
+            continue
 
-        results = {}
-        for name in sample_data.signal_names:
-            try:
-                ds = data_tree[name]
-                data = ds.values
-                time = ds.time.values
+        ds = ds.sel(time=slice(time_min, time_max))
 
-                if time_min is not None:
-                    mask = time >= time_min
-                    time = time[mask]
-                    data = data[mask]
+        time = ds["time"].values
 
-                if time_max is not None:
-                    mask = time <= time_max
-                    time = time[mask]
-                    data = data[mask]
+        if (
+            min_time_step is not None
+            and len(time) > 1
+            and np.diff(time).mean() < min_time_step
+        ):
+            time_base = np.arange(time[0], time[-1], min_time_step)
+            ds = ds.interp(time=time_base, method="linear")
 
-                if (
-                    min_time_step is not None
-                    and len(time) > 1
-                    and np.diff(time).mean() < min_time_step
-                ):
-                    time_base = np.arange(time[0], time[-1], min_time_step)
-                    data = np.interp(time_base, time, data)
-                    time = time_base
+        if len(ds.data.shape) == 1:
+            data = ds.values
+            time = ds["time"].values
 
-                item = TimeSeriesData(time=time, values=data)
-                results[name] = item
-            except Exception:
-                results[name] = None
+            item = TimeSeriesData(time=time, values=data)
+            results[name] = item
+        elif len(ds.data.shape) == 2:
+            dim_1_name = next(dim for dim in ds.dims if dim != "time")
+            ds = ds.transpose("time", dim_1_name)
+            time = ds["time"].values
+            dim_1 = ds[dim_1_name].values
+            values = ds.values
 
-        return MultiVariateTimeSeriesData(values=results)
+            item = Profile2DData(time=time, dim_1=dim_1, values=values)
+            results[name] = item
+        else:
+            raise DataLoaderError(
+                f"Unsupported data shape {ds.data.shape} for signal '{name}'"
+            )
+
+    return _combine_signals(
+        results,
+        f"Could not load any signals from FAIR-MAST file at '{file_path}'. Check signal names and file accessibility.",
+        f"Mixed data types found for file '{file_path}'. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles).",
+    )

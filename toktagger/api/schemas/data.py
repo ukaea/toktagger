@@ -1,5 +1,7 @@
-from typing import Union, Literal
+from typing import Literal
+
 from pydantic import BaseModel
+
 from toktagger.api.schemas import ConfiguredModel
 
 
@@ -16,19 +18,19 @@ class MultiVariateTimeSeriesData(Data):
     values: dict[str, TimeSeriesData | None]
 
 
-class CompositeData(Data):
-    values: dict[str, "DataResponseType"]
-
-
-class SpectrogramData(Data):
+class Profile2DData(Data):
     time: list[float]
-    frequency: list[float]
-    amplitude: list[list[float]]
+    dim_1: list[float]
+    values: list[list[float]]
+
+
+class MultiProfile2DData(Data):
+    values: dict[str, Profile2DData | None]
 
 
 class ImageData(Data):
     frame: int
-    values: str  # Base64 encoded string
+    values: str | list[int]  # Base64-encoded string or raw encoded file bytes
 
 
 class DataParams(ConfiguredModel):
@@ -38,14 +40,12 @@ class DataParams(ConfiguredModel):
 class ImageParams(DataParams):
     name: Literal["image"] = "image"
     frame: int | None
+    # Optional: Return raw encoded image bytes instead of base64.
+    return_raw: bool = False
 
 
-DataResponseType = Union[
-    Data,
-    ImageData,
-    MultiVariateTimeSeriesData,
-    CompositeData,
-    SpectrogramData,
-]
+DataResponseType = (
+    Data | ImageData | MultiVariateTimeSeriesData | Profile2DData | MultiProfile2DData
+)
 
-DataParamTypes = Union[DataParams, ImageParams]
+DataParamTypes = DataParams | ImageParams
