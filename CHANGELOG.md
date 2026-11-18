@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+* Added DEFUSE data loader for signals in DEFUSE HDF5 output files
+* Add Samples dialog now finds files whose names end with the shot ID, for example `MASTUno48264.h5`
+
 ## [v0.4.0](https://github.com/ukaea/toktagger/releases/tag/v0.4.0) - 2025-10-27
 * Added support for multi-user deployments
 * Added support for OIDC authentication layer

@@ -1,7 +1,7 @@
 import pytest
 from toktagger.api import config
 from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
-from toktagger.api.schemas.samples import ShotData
+from toktagger.api.schemas.samples import DefuseFileData, ShotData
 
 
 @pytest.mark.asyncio
@@ -9,7 +9,10 @@ async def test_get_data_loaders(api_client, setup_db):
     response = await api_client.get("/meta/dataloader")
     assert response.status_code == 200
     data = response.json()
-    assert all(item in data for item in ("uda", "image", "tabular", "sal", "fair_mast"))
+    assert all(
+        item in data
+        for item in ("uda", "image", "tabular", "sal", "fair_mast", "defuse")
+    )
 
 
 @pytest.mark.asyncio
@@ -22,7 +25,17 @@ async def test_get_data_schema(api_client, setup_db):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("loader", ["uda", "sal", "fair_mast", "tabular"])
+async def test_get_defuse_data_schema(api_client, setup_db):
+    response = await api_client.get("/meta/dataloader/defuse")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "DefuseFileData"
+    assert data["properties"]["type"]["const"] == "h5"
+    assert data == DefuseFileData.model_json_schema()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("loader", ["uda", "sal", "fair_mast", "tabular", "defuse"])
 async def test_get_signal_name_help(api_client, setup_db, loader):
     response = await api_client.get(f"/meta/dataloader/{loader}/help")
     assert response.status_code == 200

@@ -9,10 +9,12 @@ from typing import Literal
 import pytest
 from playwright.sync_api import Page, expect
 
+from tests.defuse_files import write_defuse_file
 from tests.end_to_end import form_check, save_annotations
 from tests.end_to_end.conftest import login_as
 from tests.endpoints import (
     add_project_member,
+    create_defuse_samples,
     create_local_samples,
     create_model_samples,
     create_project,
@@ -933,3 +935,31 @@ def test_editing_a_sample_keeps_another_users_validated_flag(
     assert by_author["annotator_hazel"]["uncertainty"] == 0, (
         "a validated annotation keeps uncertainty 0, not the invented default of 1"
     )
+
+
+def test_timeseries_defuse_sample(server_setup, page: Page, tmp_path: pathlib.Path):
+    project_id = create_project("Test Project", "time-series", "defuse")
+    file_path = write_defuse_file(tmp_path / "MASTUno12345.h5")
+    sample_id = create_defuse_samples(project_id, {12345: file_path}, ["IPLA", "ZMAG"])[
+        0
+    ]
+
+    with page.expect_response(
+        lambda response: response.url.endswith(f"/samples/{sample_id}/data")
+    ) as response_info:
+        page.goto(f"http://localhost:8002/ui/projects/{project_id}/samples/{sample_id}")
+    values = response_info.value.json()["values"]
+    assert sorted(values) == ["IPLA", "ZMAG"]
+    assert values["ZMAG"]["values"][0] == pytest.approx(2.0)
+
+    graph = page.get_by_label("time-series")
+    expect(graph).to_be_visible()
+    expect(graph.get_by_text("IPLA", exact=True).first).to_be_visible()
+    expect(graph.get_by_text("ZMAG", exact=True).first).to_be_visible()
+
+    add_annotation(page, "TIME REGION", "Ramp Up")
+    expect(page.get_by_role("gridcell", name="Ramp Up")).to_be_visible()
+    # The view draws the region once on each signal subplot
+    expect(page.get_by_label("time-zone", exact=True)).to_have_count(len(values))
+    annotations = save_annotations(page, project_id, sample_id)
+    assert len(annotations) == 1

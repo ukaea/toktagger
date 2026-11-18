@@ -36,6 +36,16 @@ import NumericalRange, {
   NumericalRangeType,
 } from "@/app/components/ui/numerical_range";
 
+// Pydantic writes a single-value Literal as "const" rather than "enum"
+const FileTypeSchema = z.object({
+  properties: z.object({
+    type: z.union([
+      z.object({ enum: z.array(z.string()).min(1) }),
+      z.object({ const: z.string() }),
+    ]),
+  }),
+});
+
 const DEFAULT_SIGNAL_NAME_HELP =
   "Use the signal names that the data loader expects.";
 
@@ -77,6 +87,9 @@ export const AddSamplesEditor = ({
   const [shotInputMethod, setShotInputMethod] = useState<string>("range"); // "range" or "file"
   const [shotRange, setShotRange] = useState<NumericalRangeType>();
   const [shotIds, setShotIds] = useState<number[]>([]);
+  const [shotFileNames, setShotFileNames] = useState<Map<number, string>>(
+    new Map(),
+  );
 
   // Shot Data fields
   const [signalNames, setSignalNames] = useState<string>("");
@@ -88,6 +101,13 @@ export const AddSamplesEditor = ({
 
   // Determine if we should use directories (for image data)
   const useDirectories = dataSchema?.title === "ImageFileData";
+  const isTimeSeriesFile =
+    dataSchema?.title === "TimeSeriesFileData" ||
+    dataSchema?.title === "DefuseFileData";
+  const isFileData =
+    isTimeSeriesFile ||
+    dataSchema?.title === "ImageFileData" ||
+    dataSchema?.title === "ImageArrayFileData";
 
   // Fetch the data schema type from the load registry
   useEffect(() => {
@@ -115,12 +135,24 @@ export const AddSamplesEditor = ({
             return;
           }
 
-          const fileTypes = schema.properties.type.enum;
+          const fileTypeSchema = FileTypeSchema.safeParse(schema);
+          if (!fileTypeSchema.success) {
+            ToastQueue.negative(`No file types found for ${dataLoader}.`, {
+              timeout: 3000,
+            });
+            return;
+          }
+          const typeProperty = fileTypeSchema.data.properties.type;
+          const fileTypes =
+            "enum" in typeProperty ? typeProperty.enum : [typeProperty.const];
           setFileTypes(
-            fileTypes.map((ft: string) => ({
+            fileTypes.map((ft) => ({
               key: ft,
               value: ft.toUpperCase(),
             })),
+          );
+          setFileType((current) =>
+            fileTypes.includes(current) ? current : fileTypes[0],
           );
         } else {
           ToastQueue.negative(`Error fetching data schema for ${dataLoader}.`, {
@@ -209,19 +241,20 @@ export const AddSamplesEditor = ({
         const result = await response.json();
         const fileNames: string[] = result;
 
-        // Extract shot IDs from file names using regex (assuming shot ID is a number in the file name)
-        const extractedShotIds = fileNames
-          .map((fileName) => {
-            const regex = useDirectories
-              ? /^\d+$/
-              : new RegExp(`^\\d+\\.${fileType}$`);
+        // Shot ID is the trailing number of the file name, e.g. MASTUno48264.h5 -> 48264
+        const regex = useDirectories
+          ? /^(\d+)$/
+          : new RegExp(`(\\d+)\\.${fileType}$`);
+        const extractedFileNames = new Map<number, string>();
+        for (const fileName of fileNames) {
+          const match = fileName.split("/").pop()?.match(regex);
+          if (match) {
+            extractedFileNames.set(parseInt(match[1], 10), fileName);
+          }
+        }
 
-            const match = fileName.split("/").pop()?.match(regex);
-            return match ? parseInt(match[0], 10) : null;
-          })
-          .filter((id): id is number => id !== null);
-
-        setShotIds(extractedShotIds);
+        setShotFileNames(extractedFileNames);
+        setShotIds([...extractedFileNames.keys()]);
       } else {
         ToastQueue.negative(`Error fetching files for ${dirPath}.`, {
           timeout: 3000,
@@ -260,17 +293,12 @@ export const AddSamplesEditor = ({
               signal_names: signals,
             } as ShotData,
           };
-        } else if (
-          dataSchema?.title === "ImageFileData" ||
-          dataSchema?.title === "ImageArrayFileData" ||
-          dataSchema?.title === "TimeSeriesFileData"
-        ) {
-          // File Data or Time Series File Data
-          let fileName: string =
-            dirPath + "/" + (shotId.toString() + "." + fileType); // Default file name format
-          if (useDirectories) {
-            fileName = dirPath + "/" + shotId.toString(); // For directories, the "file name" is just the directory path with shot ID
-          }
+        } else if (isFileData) {
+          const fileName =
+            shotFileNames.get(shotId) ??
+            (useDirectories
+              ? `${dirPath}/${shotId}`
+              : `${dirPath}/${shotId}.${fileType}`);
 
           const fileData: Record<string, string | string[]> = {
             file_name: fileName,
@@ -285,10 +313,7 @@ export const AddSamplesEditor = ({
               .map((s) => s.trim())
               .filter((s) => s.length > 0);
 
-            if (
-              dataSchema?.title === "TimeSeriesFileData" &&
-              columns.length > 0
-            ) {
+            if (isTimeSeriesFile && columns.length > 0) {
               fileData.signal_names = columns;
               return {
                 ...baseSample,
@@ -356,6 +381,7 @@ export const AddSamplesEditor = ({
 
   useEffect(() => {
     setShotIds([]);
+    setShotFileNames(new Map());
   }, [dataSchema, shotInputMethod]);
 
   return (
@@ -440,9 +466,7 @@ export const AddSamplesEditor = ({
               </Form>
             )}
 
-            {(dataSchema?.title === "ImageFileData" ||
-              dataSchema?.title === "ImageArrayFileData" ||
-              dataSchema?.title === "TimeSeriesFileData") && (
+            {isFileData && (
               <Form maxWidth="size-6000">
                 <ComboBox
                   label="File Type"
@@ -473,10 +497,7 @@ export const AddSamplesEditor = ({
             )}
 
             {/* Display found shot IDs */}
-            {(dataSchema?.title === "ImageFileData" ||
-              dataSchema?.title === "ImageArrayFileData" ||
-              dataSchema?.title === "TimeSeriesFileData") &&
-            shotIds.length > 0 ? (
+            {isFileData && shotIds.length > 0 ? (
               <Text>
                 Found <strong>{shotIds.length}</strong>{" "}
                 {useDirectories ? "directories" : "files"} with shot IDs:{" "}
@@ -489,12 +510,12 @@ export const AddSamplesEditor = ({
               </Text>
             )}
 
-            {(dataSchema?.title === "TimeSeriesFileData" ||
+            {(isTimeSeriesFile ||
               dataSchema?.title === "ImageArrayFileData") && (
               <Form maxWidth="size-6000">
                 <TextField
                   label={
-                    dataSchema?.title === "TimeSeriesFileData"
+                    isTimeSeriesFile
                       ? "Signal Names (comma-separated)"
                       : "Signal Name"
                   }
