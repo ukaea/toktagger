@@ -13,6 +13,7 @@ class Task(str, Enum):
     TIME_SERIES = "time-series"
     PROFILE_2D = "profile-2d"
     VIDEO = "video"
+    RADIAL_PROFILE = "radial-profile"
 
 
 class QueryStrategyType(str, Enum):

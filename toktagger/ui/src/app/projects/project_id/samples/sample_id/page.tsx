@@ -4,6 +4,7 @@ import React from "react";
 import { TaskType } from "@/types";
 import { TimeSeriesView } from "@/app/time_series/components/time-series";
 import { Profile2dView } from "@/app/profile2d/components/profile2d";
+import { RadialProfileView } from "@/app/radial_profile/components/radial-profile";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
@@ -32,6 +33,8 @@ const SampleView = () => {
     return isLoading && !data ? <LoadingView /> : <VideoView />;
   if (project.task === TaskType.Profile2D)
     return isLoading && !data ? <LoadingView /> : <Profile2dView />;
+  if (project.task === TaskType.RadialProfile)
+    return isLoading && !data ? <LoadingView /> : <RadialProfileView />;
   return null;
 };
 

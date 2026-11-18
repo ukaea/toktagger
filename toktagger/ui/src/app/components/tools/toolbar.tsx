@@ -203,6 +203,13 @@ export default function ToolBar() {
         ),
       });
     }
+  } else if (project.task === TaskType.RadialProfile) {
+    tools.push({
+      name: "Color Map",
+      component: (
+        <ColorMapPicker plotProps={plotProps} setPlotProps={setPlotProps} />
+      ),
+    });
   } else if (data && project.task === TaskType.Video) {
     tools.push({
       name: "Video Tools",

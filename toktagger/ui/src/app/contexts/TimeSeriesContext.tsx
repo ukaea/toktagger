@@ -178,10 +178,11 @@ export const TimeSeriesProvider = ({
   // Viewers can't enter edit mode - gated here (rather than only disabling the
   // toolbar button) so the "e" keyboard shortcut is blocked too.
   const setEditMode = (update: boolean | ((prev: boolean) => boolean)) => {
-    setEditModeRaw((prev) => {
-      const next = typeof update === "function" ? update(prev) : update;
-      return canAnnotate ? next : false;
-    });
+    const next =
+      canAnnotate && (typeof update === "function" ? update(editMode) : update);
+    // Leaving edit mode commits pending edits now, so a quick Save cannot miss the sync debounce.
+    if (editMode && !next) setSyncCounter((prev) => (prev + 1) % 100);
+    setEditModeRaw(next);
   };
 
   // If the role check resolves to "can't annotate" after edit mode was already on

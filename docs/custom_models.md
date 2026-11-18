@@ -131,6 +131,7 @@ Models can be registered for one or more of the following tasks:
 
 - `"time-series"` - Time series annotation
 - `"profile-2d"` - 2D profile annotation
+- `"radial-profile"` - Radial profile annotation
 - `"video"` - Video frame annotation
 
 ### Step 4: Run Server with Custom Model

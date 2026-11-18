@@ -18,6 +18,8 @@ A project defines the annotation task, data source, and labeling configuration f
     - **Name**: A descriptive name for your project (e.g., "Disruption Detection")
     - **Task**: The type of annotation task:
         - `time-series` - Label multi-variate time series signals at specific time points or over time intervals
+        - `profile-2d` - Label 2D signals (for example spectrograms) shown as a heatmap against time
+        - `radial-profile` - Label radial profiles (for example Thomson scattering) by radius and time, next to time series signals. Refer to [Radial Profile Labelling](radial_profile.md)
         - `video` - Frame-by-frame bounding box annotation of video data
     - **Data Loader**: [Where your data comes from:](./data_loaders.md)
         - `uda` - Load signals using UDA (for MAST/MAST-U data)

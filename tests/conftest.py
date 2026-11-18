@@ -13,6 +13,7 @@ from bson.objectid import ObjectId
 from httpx import ASGITransport, AsyncClient
 
 from tests import db_definitions, endpoints
+import tests.radial_definitions  # noqa: F401  registers the synthetic_radial loader
 from tests.db_definitions import USER_ADMIN_ID
 from tests.identity import get_auth_token, session_cookies, session_headers
 from toktagger.api import config

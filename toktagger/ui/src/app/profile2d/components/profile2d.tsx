@@ -5,6 +5,7 @@ import {
   applyGlobalStyle,
   arrayMax,
   arrayMin,
+  getColorMapInterpolator,
   sumOverFirstAxis,
 } from "@/app/utils";
 import { BaseTimeSeriesPlot } from "@/app/components/plots/base-plot";
@@ -20,7 +21,6 @@ import { useSample } from "@/app/contexts/SampleContext";
 import { useElementHeight } from "@/app/hooks/useElementHeight";
 import { useEffect, useState } from "react";
 import { View } from "@adobe/react-spectrum";
-import * as d3 from "d3";
 
 // The subplot annotations with real y values should be restricted to.
 const HEATMAP_SUBPLOT = "xy2";
@@ -44,14 +44,6 @@ type ProfileValues = (number | null)[][];
 // An empty profile (signal not loaded) has no min/max, so fall back to a default.
 const finiteOr = (value: number, fallback: number) =>
   Number.isFinite(value) ? value : fallback;
-
-const colorMapInterpolators: Record<string, (value: number) => string> = {
-  Viridis: d3.interpolateViridis,
-  Plasma: d3.interpolatePlasma,
-  Inferno: d3.interpolateInferno,
-  Magma: d3.interpolateMagma,
-  Cividis: d3.interpolateCividis,
-};
 
 // Leaves the lowest values fully transparent so the background shows through.
 const buildColorScale = (
@@ -288,8 +280,7 @@ export const Profile2dView = () => {
       ? (logScale ? createLogScalePlot : createLinearScalePlot)(
           viewData,
           plotProps,
-          colorMapInterpolators[plotProps.colorMap ?? ""] ??
-            d3.interpolateCividis,
+          getColorMapInterpolator(plotProps.colorMap),
         )
       : null;
 

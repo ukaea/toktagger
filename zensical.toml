@@ -44,6 +44,9 @@ Home = "index.md"
 "2D Profile Labelling" = "profile_2d.md"
 
 [[project.nav]]
+"Radial Profile Labelling" = "radial_profile.md"
+
+[[project.nav]]
 "Video Labelling" = "video.md"
 
 [[project.nav]]
