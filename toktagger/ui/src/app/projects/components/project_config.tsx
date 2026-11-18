@@ -1,4 +1,11 @@
-import { Project, ProjectUpdate, TaskType } from "@/types";
+import {
+  AutoAddShots,
+  Project,
+  ProjectUpdate,
+  SignalNameRules,
+  SignalNameRulesSchema,
+  TaskType,
+} from "@/types";
 import {
   Button,
   ActionButton,
@@ -22,13 +29,30 @@ import {
   Disclosure,
   DisclosureTitle,
   DisclosurePanel,
+  Switch,
 } from "@adobe/react-spectrum";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 import Edit from "@spectrum-icons/workflow/EditCircle";
 import { useState, useEffect } from "react";
+import { z } from "zod/v4";
 import { BACKEND_API_URL, apiFetch } from "@/app/core";
 import { useAPISchema } from "@/app/contexts/apiSchema";
 import { SchemaParser } from "@/schemaParser";
+
+const DEFAULT_SIGNAL_NAME_HELP =
+  "Use the signal names that the data loader expects.";
+
+const SignalNameHelp = ({ helpText }: { helpText: string | null }) => (
+  <ContextualHelp>
+    <Heading>Signal names</Heading>
+    <Content>
+      <Text>
+        {helpText ?? DEFAULT_SIGNAL_NAME_HELP} Refer to the Data Loaders
+        documentation for examples.
+      </Text>
+    </Content>
+  </ContextualHelp>
+);
 
 // Query strategies
 const QueryStrategies = [
@@ -136,6 +160,24 @@ export function ProjectConfigEditor({
     string[]
   >(_project?.video_bounding_box_labels || []);
 
+  // Auto-add new shots fields
+  const [latestShotSupported, setLatestShotSupported] =
+    useState<boolean>(false);
+  const [signalNameHelp, setSignalNameHelp] = useState<string | null>(null);
+  const [autoAddEnabled, setAutoAddEnabled] = useState<boolean>(
+    _project?.auto_add_shots?.enabled ?? false,
+  );
+  const [autoAddInterval, setAutoAddInterval] = useState<number>(
+    _project?.auto_add_shots?.interval_minutes ?? 10,
+  );
+
+  // Signal name fields
+  const [signalNameRules, setSignalNameRules] =
+    useState<SignalNameRules | null>(null);
+  const [signalNames, setSignalNames] = useState<string>(
+    _project?.signal_names.join(", ") ?? "",
+  );
+
   useEffect(() => {
     const parser = new SchemaParser(schema);
     const defaultShotLabels = parser.parseDefaultShotLabels();
@@ -203,6 +245,48 @@ export function ProjectConfigEditor({
     fetchDataLoaders();
   }, [dataLoader]);
 
+  const usesSignalNames = signalNameRules !== null && signalNameRules.max !== 0;
+
+  // Only some data loaders can find new shots, so only show auto-add for those
+  useEffect(() => {
+    if (!dataLoader) {
+      return;
+    }
+    async function fetchLatestShotSupport() {
+      try {
+        const [supportResponse, helpResponse, rulesResponse] =
+          await Promise.all([
+            apiFetch(
+              `${BACKEND_API_URL}/meta/dataloader/${dataLoader}/latest-shot-support`,
+            ),
+            apiFetch(`${BACKEND_API_URL}/meta/dataloader/${dataLoader}/help`),
+            apiFetch(
+              `${BACKEND_API_URL}/meta/dataloader/${dataLoader}/signal-names`,
+            ),
+          ]);
+        const supported = z
+          .boolean()
+          .safeParse(supportResponse.ok ? await supportResponse.json() : false);
+        setLatestShotSupported(supported.success && supported.data);
+        const helpText = z
+          .string()
+          .nullable()
+          .safeParse(helpResponse.ok ? await helpResponse.json() : null);
+        setSignalNameHelp(helpText.success ? helpText.data : null);
+        const rules = SignalNameRulesSchema.safeParse(
+          rulesResponse.ok ? await rulesResponse.json() : null,
+        );
+        setSignalNameRules(rules.success ? rules.data : null);
+      } catch (error) {
+        setLatestShotSupported(false);
+        ToastQueue.negative(`Error fetching data loader settings: ${error}`, {
+          timeout: 3000,
+        });
+      }
+    }
+    fetchLatestShotSupport();
+  }, [dataLoader]);
+
   const onFormSubmit = async (close: () => void) => {
     try {
       // Validate required fields
@@ -215,9 +299,37 @@ export function ProjectConfigEditor({
         return;
       }
 
+      const projectSignalNames = usesSignalNames
+        ? signalNames
+            .split(",")
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0)
+        : [];
+      if (signalNameRules && projectSignalNames.length < signalNameRules.min) {
+        ToastQueue.negative(
+          `At least ${signalNameRules.min} signal name(s) required for this data loader`,
+          { timeout: 3000 },
+        );
+        return;
+      }
+      if (
+        signalNameRules?.max != null &&
+        projectSignalNames.length > signalNameRules.max
+      ) {
+        ToastQueue.negative(
+          `At most ${signalNameRules.max} signal name(s) allowed for this data loader`,
+          { timeout: 3000 },
+        );
+        return;
+      }
+      const autoAddShots: AutoAddShots | undefined = latestShotSupported
+        ? { enabled: autoAddEnabled, interval_minutes: autoAddInterval }
+        : undefined;
+
       const projectUpdate: ProjectUpdate = {
         name: projectName,
         query_strategy: queryStrategy,
+        signal_names: projectSignalNames,
         time_min: timeMin,
         time_max: timeMax,
         min_time_step: minTimeStep,
@@ -227,6 +339,7 @@ export function ProjectConfigEditor({
         bounding_box_labels: boundingBoxLabels,
         polygon_labels: polygonLabels,
         video_bounding_box_labels: videoBoundingBoxLabels,
+        auto_add_shots: autoAddShots,
       };
       const newProject: Partial<Project> = {
         ...projectUpdate,
@@ -327,6 +440,21 @@ export function ProjectConfigEditor({
                   <Item key={item.key}>{item.value}</Item>
                 )}
               </ComboBox>
+
+              <TextField
+                label="Signal Names"
+                isHidden={!usesSignalNames}
+                width="100%"
+                value={signalNames}
+                onChange={setSignalNames}
+                isRequired={(signalNameRules?.min ?? 0) > 0}
+                description={
+                  isEditing
+                    ? "Comma-separated list of signals to load. A change updates all samples in the project."
+                    : "Comma-separated list of signals to load for every sample in the project."
+                }
+                contextualHelp={<SignalNameHelp helpText={signalNameHelp} />}
+              />
 
               <RadioGroup
                 label="Query Strategy"
@@ -432,6 +560,44 @@ export function ProjectConfigEditor({
                     />
                   )}
                 </DisclosurePanel>
+              </Disclosure>
+              <Disclosure>
+                {latestShotSupported && (
+                  <>
+                    <DisclosureTitle>
+                      <span style={{ fontSize: "0.9rem" }}>
+                        Auto-add New Shots
+                      </span>
+                    </DisclosureTitle>
+                    <DisclosurePanel>
+                      <Flex direction="column" gap="size-100" width="100%">
+                        <Switch
+                          isSelected={autoAddEnabled}
+                          onChange={setAutoAddEnabled}
+                          width="100%"
+                        >
+                          Check for new shots at a set interval
+                        </Switch>
+                        <NumberField
+                          label="Check Interval (minutes)"
+                          width="100%"
+                          minValue={1}
+                          step={1}
+                          value={autoAddInterval}
+                          onChange={(value) =>
+                            setAutoAddInterval(isNaN(value) ? 10 : value)
+                          }
+                          isDisabled={!autoAddEnabled}
+                        />
+                        <Text>
+                          Only shots above the highest shot in the project are
+                          added. New samples use the signal names of the
+                          project.
+                        </Text>
+                      </Flex>
+                    </DisclosurePanel>
+                  </>
+                )}
               </Disclosure>
             </Form>
           </Content>

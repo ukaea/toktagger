@@ -49,3 +49,10 @@ DataResponseType = (
 )
 
 DataParamTypes = DataParams | ImageParams
+
+
+class SignalNameRules(BaseModel):
+    """The number of signal names a data loader accepts. A max of None means no limit."""
+
+    min: int
+    max: int | None

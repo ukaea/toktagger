@@ -78,6 +78,10 @@ async def create_project(
     """Create a new project and auto-add the creator as project admin."""
     if project.data_loader not in LoaderRegistry.names():
         raise HTTPException(422, detail="Invalid data loader specified.")
+    try:
+        LoaderRegistry.check_signal_names(project.data_loader, project.signal_names)
+    except ValueError as error:
+        raise HTTPException(422, detail=str(error)) from error
 
     db_client: MongoDBClient = request.app.state.db_client
     project_id = await db_client.insert(collection="projects", model=project)
@@ -118,7 +122,23 @@ async def update_project(
     current_user: UserOut = Depends(require_project_admin_role),
 ):
     """Update a project's information."""
-    await utils.update_project(request.app.state.db_client, project_id, project)
+    db_client = request.app.state.db_client
+    existing = await utils.get_project(db_client, project_id)
+    if project.auto_add_shots and not LoaderRegistry.supports_latest_shot(
+        existing.data_loader
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Data loader '{existing.data_loader}' does not support adding new shots automatically.",
+        )
+    if project.signal_names is not None:
+        try:
+            LoaderRegistry.check_signal_names(
+                existing.data_loader, project.signal_names
+            )
+        except ValueError as error:
+            raise HTTPException(422, detail=str(error)) from error
+    await utils.update_project(db_client, project_id, project, existing.data_loader)
 
 
 @router.delete(

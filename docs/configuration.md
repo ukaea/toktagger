@@ -96,3 +96,14 @@ These settings should be defined under the `[sal]` heading in the TOML file:
 | Setting         | Environment Variable    | Type         | Default                                 | Description                                                              |
 |-----------------|-------------------------|--------------|-----------------------------------------|--------------------------------------------------------------------------|
 | host            | SAL_HOST                | str          | https://sal.jetdata.eu                  | URL for the SAL server to connect to for JET data loaders.               |
+
+## Polling Settings
+These settings control the background task that adds new shots to projects with **Auto-add New Shots** set to on. Define them under the `[polling]` heading in the TOML file:
+
+| Setting             | Environment Variable         | Type | Default | Description                                                                                       |
+|---------------------|------------------------------|------|---------|---------------------------------------------------------------------------------------------------|
+| enabled             | POLLING_ENABLED              | bool | true    | Whether to run the background task that adds new shots to projects with auto-add enabled.         |
+| tick_seconds        | POLLING_TICK_SECONDS         | int  | 60      | Time (in seconds) between checks for projects which are due a check for new shots.               |
+| max_shots_per_check | POLLING_MAX_SHOTS_PER_CHECK  | int  | 100     | Maximum number of new shots to add to one project in one check.                                   |
+
+Each project has its own check interval. The `tick_seconds` value is only how frequently the server looks for projects that are due a check.

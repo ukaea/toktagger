@@ -246,12 +246,25 @@ export const TaskSchema = z.enum([
   TaskType.Video,
 ]);
 
+export const AutoAddShotsSchema = z.object({
+  enabled: z.boolean(),
+  interval_minutes: z.number().int().min(1),
+});
+export type AutoAddShots = z.infer<typeof AutoAddShotsSchema>;
+
+export const SignalNameRulesSchema = z.object({
+  min: z.number().int(),
+  max: z.number().int().nullable(),
+});
+export type SignalNameRules = z.infer<typeof SignalNameRulesSchema>;
+
 export const ProjectSchema = z.object({
   _id: z.string().nullable(),
   name: z.string(),
   task: TaskSchema,
   query_strategy: z.string(),
   data_loader: z.string(),
+  signal_names: z.array(z.string()).default([]),
   timestamp: z.string().optional(),
   time_min: z.number().nullable().optional(),
   time_max: z.number().nullable().optional(),
@@ -263,6 +276,8 @@ export const ProjectSchema = z.object({
   bounding_box_labels: z.array(z.string()).default([]),
   polygon_labels: z.array(z.string()).default([]),
   video_bounding_box_labels: z.array(z.string()).default([]),
+  auto_add_shots: AutoAddShotsSchema.nullable().optional(),
+  shots_last_checked: z.string().nullable().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
@@ -272,6 +287,7 @@ export const ProjectUpdateSchema = ProjectSchema.omit({
   data_loader: true,
   timestamp: true,
   model_types: true,
+  shots_last_checked: true,
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 
@@ -297,6 +313,9 @@ export const ShotDataSchema = z.object({
   signal_names: z.array(z.string()),
 });
 export type ShotData = z.infer<typeof ShotDataSchema>;
+
+export const ShotDataInSchema = ShotDataSchema.omit({ signal_names: true });
+export type ShotDataIn = z.infer<typeof ShotDataInSchema>;
 
 export const SampleDataSchema = z.union([
   TimeSeriesFileDataSchema,

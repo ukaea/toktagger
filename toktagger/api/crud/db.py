@@ -107,6 +107,14 @@ class MongoDBClient:
             {"_id": object_id}, {"$set": updates}
         )
 
+    async def update_filtered(
+        self,
+        collection: CollectionName,
+        filters: dict,
+        updates: dict[str, typing.Any],
+    ):
+        return await self.db[collection].update_many(filters, {"$set": updates})
+
     async def get_document_by_id(
         self,
         collection: CollectionName,

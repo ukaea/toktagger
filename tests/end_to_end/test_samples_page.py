@@ -433,7 +433,9 @@ def test_samples_jump_to_next_button(
 
 def test_create_samples_shot_data_range(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "time-series", "uda")
+    project_id = create_project(
+        "Test Project", "time-series", "uda", signal_names=["ip", "dalpha"]
+    )
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -449,17 +451,17 @@ def test_create_samples_shot_data_range(server_setup, page: Page):
     expect(modal).to_be_visible()
     expect(modal.get_by_role("heading", name="Add Samples to Project")).to_be_visible()
 
-    # Check we can now see Shot Min, Shot Max, and Signal Names
+    # Check we can now see Shot Min, Shot Max, and the project's signal names
     expect(modal.get_by_text("Shot Min", exact=True)).to_be_visible()
     expect(modal.get_by_text("Shot Max", exact=True)).to_be_visible()
-    expect(modal.get_by_role("textbox", name="Signal Names")).to_be_visible()
+    expect(modal.get_by_role("textbox", name="Signal Names")).to_have_count(0)
+    expect(modal.get_by_test_id("add-samples-signal-names")).to_contain_text(
+        "ip, dalpha"
+    )
 
     # Fill in these fields
     modal.get_by_role("textbox", name="Shot Min").fill("12380")
     modal.get_by_role("textbox", name="Shot Max").fill("12385")
-
-    # Add signal names
-    modal.get_by_role("textbox", name="Signal Names").fill("ip, dalpha")
 
     # Create samples
     modal.get_by_role("button", name="Add Samples").click()
@@ -479,7 +481,9 @@ def test_create_samples_shot_data_range(server_setup, page: Page):
 
 def test_create_samples_shot_data_file(server_setup, page: Page):
     # Create a project
-    project_id = create_project("Test Project", "time-series", "uda")
+    project_id = create_project(
+        "Test Project", "time-series", "uda", signal_names=["ip", "dalpha"]
+    )
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -498,9 +502,9 @@ def test_create_samples_shot_data_file(server_setup, page: Page):
     # Select Text File option
     modal.get_by_role("radio", name="Text File").click()
 
-    # Check we can now see Choose File button and Signal Names textbox
+    # Check we can now see Choose File button, and no Signal Names textbox
     expect(modal.get_by_role("button", name="Choose File")).to_be_visible()
-    expect(modal.get_by_role("textbox", name="Signal Names")).to_be_visible()
+    expect(modal.get_by_role("textbox", name="Signal Names")).to_have_count(0)
 
     # Create a Time Point annotation using sample ID in schema
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv") as file:
@@ -532,9 +536,6 @@ def test_create_samples_shot_data_file(server_setup, page: Page):
         # the shot IDs may not be ready yet when "Add Samples" is clicked
         expect(page.get_by_text("Loaded 6 shot IDs from CSV")).to_be_visible()
 
-    # Add signal names
-    modal.get_by_role("textbox", name="Signal Names").fill("ip, dalpha")
-
     # Create samples
     modal.get_by_role("button", name="Add Samples").click()
 
@@ -556,7 +557,9 @@ def test_create_samples_shot_data_file(server_setup, page: Page):
 )
 def test_create_samples_file_data(server_setup, page: Page, file_type: str):
     # Create a project
-    project_id = create_project("Test Project", "time-series", "tabular")
+    project_id = create_project(
+        "Test Project", "time-series", "tabular", signal_names=["ip", "dalpha"]
+    )
 
     # Navigate to page
     page.goto(f"http://localhost:8002/ui/projects/{project_id}")
@@ -577,10 +580,10 @@ def test_create_samples_file_data(server_setup, page: Page, file_type: str):
         pathlib.Path(tempd).joinpath(f"10000.{file_type.lower()}").touch()
         pathlib.Path(tempd).joinpath(f"10001.{file_type.lower()}").touch()
 
-        # Check we can see File Type, Directory Path, and Signal Names input fields
+        # Check we can see File Type and Directory Path, but no Signal Names field
         expect(modal.get_by_role("combobox", name="File Type")).to_be_visible()
         expect(modal.get_by_role("textbox", name="Directory Path")).to_be_visible()
-        expect(modal.get_by_role("textbox", name="Signal Names")).to_be_visible()
+        expect(modal.get_by_role("textbox", name="Signal Names")).to_have_count(0)
 
         # Select given file type in dropdown
         modal.get_by_role("button", name="File Type").click()
@@ -592,9 +595,6 @@ def test_create_samples_file_data(server_setup, page: Page, file_type: str):
         expect(
             modal.get_by_text("Found 2 files with shot IDs: 10000, 10001")
         ).to_be_visible()
-
-        # Add signal names
-        modal.get_by_role("textbox", name="Signal Names").fill("ip, dalpha")
 
         # Create samples
         modal.get_by_role("button", name="Add Samples").click()

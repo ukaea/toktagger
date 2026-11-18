@@ -33,6 +33,23 @@ class SAL(pydantic.BaseModel):
     )
 
 
+class Polling(pydantic.BaseModel):
+    enabled: bool = pydantic.Field(
+        True,
+        description="Whether to run the background task that adds new shots to projects with auto-add enabled.",
+    )
+    tick_seconds: int = pydantic.Field(
+        60,
+        gt=0,
+        description="Time (in seconds) between checks for projects which are due a check for new shots.",
+    )
+    max_shots_per_check: int = pydantic.Field(
+        100,
+        gt=0,
+        description="Maximum number of new shots to add to one project in one check.",
+    )
+
+
 class Database(pydantic.BaseModel):
     mongo_url: str = pydantic.Field(
         "./toktagger_db",
@@ -259,6 +276,7 @@ class Settings(BaseSettings):
     uda: UDA = pydantic.Field(default_factory=UDA)
     sal: SAL = pydantic.Field(default_factory=SAL)
     models: Models = pydantic.Field(default_factory=Models)
+    polling: Polling = pydantic.Field(default_factory=Polling)
 
     model_config = SettingsConfigDict(
         toml_file="toktagger.toml",

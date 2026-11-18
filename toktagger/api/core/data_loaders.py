@@ -11,8 +11,10 @@ from typing import ClassVar
 import numpy as np
 import pandas as pd
 import pydantic
+import pyuda
 import xarray as xr
 from PIL import Image
+from sal.client import SALClient
 
 from toktagger.api import config
 from toktagger.api.schemas.data import (
@@ -59,6 +61,16 @@ class FrameNotFoundError(DataLoaderError):
 
 class DataLoader(ABC):
     signal_name_help: ClassVar[str | None] = None
+    min_signal_names: ClassVar[int] = 0
+    max_signal_names: ClassVar[int | None] = None
+    supports_latest_shot: ClassVar[bool] = False
+
+    @classmethod
+    def latest_shot(cls) -> int:
+        """Return the highest shot number available from the data source."""
+        raise NotImplementedError(
+            f"Data loader '{cls.__name__}' cannot find the latest shot."
+        )
 
     @classmethod
     @abstractmethod
@@ -125,10 +137,47 @@ class LoaderRegistry:
     def get_signal_name_help(cls, name: str) -> str | None:
         return cls.get(name).signal_name_help
 
+    @classmethod
+    def supports_latest_shot(cls, name: str) -> bool:
+        return cls.get(name).supports_latest_shot
+
+    @classmethod
+    def check_signal_names(cls, name: str, signal_names: list[str]) -> None:
+        """Raise a ValueError if the number of signal names is not valid for this loader."""
+        loader_class = cls.get(name)
+        minimum, maximum = loader_class.min_signal_names, loader_class.max_signal_names
+        if maximum == 0 and signal_names:
+            raise ValueError(f"Data loader '{name}' does not use signal names.")
+        if len(signal_names) < minimum:
+            raise ValueError(
+                f"Data loader '{name}' needs at least {minimum} signal name(s)."
+            )
+        if maximum is not None and len(signal_names) > maximum:
+            raise ValueError(
+                f"Data loader '{name}' accepts at most {maximum} signal name(s)."
+            )
+
+    @classmethod
+    def signal_name_fields(
+        cls, name: str, signal_names: list[str]
+    ) -> dict[str, list[str] | str | None]:
+        """Return the sample data fields which hold the given signal names for this loader."""
+        data_fields = cls.get(name).sample_data_type().model_fields
+        if "signal_names" in data_fields:
+            # An empty list means "load all columns" for loaders whose field defaults to None.
+            if not signal_names and data_fields["signal_names"].default is None:
+                return {"signal_names": None}
+            return {"signal_names": signal_names}
+        if "signal_name" in data_fields:
+            return {"signal_name": signal_names[0] if signal_names else None}
+        return {}
+
 
 @LoaderRegistry.register("image")
 class ImageDataLoader(DataLoader):
     """DataLoader for retrieving data using a folder of image files"""
+
+    max_signal_names = 0
 
     @classmethod
     def sample_data_type(cls) -> type[ImageFileData]:
@@ -190,6 +239,7 @@ class ArrayDataLoader(DataLoader):
         "Use the name of one array in the .npz file. Leave this field empty if the "
         "file contains only one array."
     )
+    max_signal_names = 1
 
     @classmethod
     def sample_data_type(cls) -> type[ImageArrayFileData]:
@@ -375,10 +425,16 @@ class UDADataLoader(DataLoader):
         "Use MAST or MAST-U signal names or aliases from UDA. All signals must be "
         "time series or all signals must be 2D profiles. Do not mix them."
     )
+    min_signal_names = 1
+    supports_latest_shot = True
 
     @classmethod
     def sample_data_type(self) -> type[ShotData]:
         return ShotData
+
+    @classmethod
+    def latest_shot(cls) -> int:
+        return _uda_latest_shot()
 
     def get_sample(
         self,
@@ -413,6 +469,10 @@ class UDADataLoader(DataLoader):
             f"Could not load any signals for shot ID '{sample.shot_id}'. Check UDA connectivity and signal names.",
             f"Mixed data types found for shot ID '{sample.shot_id}'. Check UDA signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles).",
         )
+
+
+def _uda_latest_shot() -> int:
+    return int(pyuda.Client().latest_shot())
 
 
 @lru_cache(maxsize=128)
@@ -460,10 +520,17 @@ class UDACameraDataLoader(DataLoader):
     """DataLoader for retrieving camera image data using the UDA access layer"""
 
     signal_name_help = "Use exactly one MAST or MAST-U camera signal name from UDA."
+    min_signal_names = 1
+    max_signal_names = 1
+    supports_latest_shot = True
 
     @classmethod
     def sample_data_type(self) -> type[ShotData]:
         return ShotData
+
+    @classmethod
+    def latest_shot(cls) -> int:
+        return _uda_latest_shot()
 
     def get_sample(
         self,
@@ -561,10 +628,24 @@ class SALDataLoader(DataLoader):
         "Use the JET SAL path that follows pulse/<shot_id>/, in the format "
         "ppf/signal/<owner>/<dda>/<dtype>."
     )
+    min_signal_names = 1
+    supports_latest_shot = True
 
     @classmethod
     def sample_data_type(self) -> type[ShotData]:
         return ShotData
+
+    @classmethod
+    def latest_shot(cls) -> int:
+        _check_sal_credentials()
+        client = SALClient(host=os.environ["SAL_HOST"])
+        client.prompt_for_password = False
+        pulses = [
+            int(branch) for branch in client.list("/pulse").branches if branch.isdigit()
+        ]
+        if not pulses:
+            raise DataLoaderError("SAL returned no pulse numbers.")
+        return max(pulses)
 
     def get_sample(
         self,
@@ -581,11 +662,7 @@ class SALDataLoader(DataLoader):
         if not params.name == "identity":
             raise TypeError(f"Expected blank parameters, but got '{params.name}'")
 
-        has_user_credentials = Path("~/.sal/credentials").expanduser().exists()
-        if not has_user_credentials:
-            raise DataLoaderError(
-                "SAL authentication credentials not found. Please set up SAL credentials at '~/.sal/credentials' to use the SAL data loader."
-            )
+        _check_sal_credentials()
 
         results = {}
         for name in sample_data.signal_names:
@@ -605,6 +682,13 @@ class SALDataLoader(DataLoader):
             results,
             f"Could not load any signals for shot ID '{sample.shot_id}' from SAL. Check SAL connectivity and signal names.",
             f"Mixed data types found for shot ID '{sample.shot_id}' from SAL. Check signal names to ensure they all correspond to the same type of data (e.g., all time series or all 2D profiles).",
+        )
+
+
+def _check_sal_credentials() -> None:
+    if not Path("~/.sal/credentials").expanduser().exists():
+        raise DataLoaderError(
+            "SAL authentication credentials not found. Please set up SAL credentials at '~/.sal/credentials' to use the SAL data loader."
         )
 
 
@@ -656,6 +740,7 @@ class FAIRMASTDataLoader(DataLoader):
         "Use the <group>/<variable> path of the signal in the FAIR MAST Level 2 "
         "shot file."
     )
+    min_signal_names = 1
 
     @classmethod
     def sample_data_type(self) -> type[ShotData]:

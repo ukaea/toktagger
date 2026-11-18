@@ -6,6 +6,7 @@ from toktagger.api import config
 from toktagger.api.auth.dependencies import get_current_user
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.models import check_models_enabled, models_dependencies_installed
+from toktagger.api.schemas.data import SignalNameRules
 from toktagger.api.schemas.models import LoadMethods
 
 if models_dependencies_installed():
@@ -36,6 +37,21 @@ async def get_data_schema(loader: str) -> dict[str, typing.Any]:
 async def get_signal_name_help(loader: str) -> str | None:
     """Get help text which describes the signal names this dataloader expects."""
     return LoaderRegistry.get_signal_name_help(loader)
+
+
+@router.get("/dataloader/{loader}/signal-names")
+async def get_signal_name_rules(loader: str) -> SignalNameRules:
+    """Get the minimum and maximum number of signal names this dataloader accepts."""
+    loader_class = LoaderRegistry.get(loader)
+    return SignalNameRules(
+        min=loader_class.min_signal_names, max=loader_class.max_signal_names
+    )
+
+
+@router.get("/dataloader/{loader}/latest-shot-support")
+async def get_latest_shot_support(loader: str) -> bool:
+    """Get whether this dataloader can find new shots, so they can be added automatically."""
+    return LoaderRegistry.supports_latest_shot(loader)
 
 
 @router.get(

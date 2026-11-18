@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   Cell,
   Column,
@@ -52,6 +52,8 @@ import { JumpToNextButton } from "@/app/components/tools/nav";
 import { useServerHealth } from "@/app/contexts/healthContext";
 import { useProjectRole } from "@/app/hooks/useProjectRole";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
+
+const AUTO_ADD_REFRESH_MS = 60_000;
 
 type SamplesTableProps = {
   project_id: string;
@@ -255,6 +257,19 @@ export default function ProjectView() {
     hasId,
   ]);
 
+  // The server adds new shots in the background, so poll to show them
+  const autoAddEnabled = project?.auto_add_shots?.enabled ?? false;
+  const onAutoAddRefresh = useEffectEvent(() => {
+    refreshSamples();
+  });
+  useEffect(() => {
+    if (!autoAddEnabled) {
+      return;
+    }
+    const intervalId = setInterval(onAutoAddRefresh, AUTO_ADD_REFRESH_MS);
+    return () => clearInterval(intervalId);
+  }, [autoAddEnabled]);
+
   if (loadError) {
     return loadError.forbidden ? (
       <ForbiddenView message={loadError.message} />
@@ -291,6 +306,14 @@ export default function ProjectView() {
         <div className="w-full md:w-4/5 p-6 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 rounded-lg shadow-lg backdrop-blur-sm">
           <h1 className="text-2xl font-bold mb-4">Samples</h1>
           <Provider theme={defaultTheme}>
+            {project.auto_add_shots?.enabled && (
+              <Text data-testid="auto-add-shots-status">
+                Checking for new shots every{" "}
+                {project.auto_add_shots.interval_minutes} min
+                {project.shots_last_checked &&
+                  ` · last checked ${new Date(project.shots_last_checked).toLocaleString()}`}
+              </Text>
+            )}
             <View overflow="auto">
               <Flex
                 direction="row"

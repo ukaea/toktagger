@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
@@ -8,6 +9,7 @@ from bson import ObjectId
 from fastapi import HTTPException
 from pydantic import TypeAdapter
 
+from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.models.base import ModelRegistry
 from toktagger.api.schemas import convert_to_objectid
@@ -25,9 +27,17 @@ from toktagger.api.schemas.projects import (
     ProjectMember,
     ProjectMemberOut,
     ProjectMemberUpdate,
+    ProjectShotsChecked,
     ProjectUpdate,
 )
-from toktagger.api.schemas.samples import FileData, Sample, SampleSummary, SampleUpdate
+from toktagger.api.schemas.samples import (
+    FileData,
+    Sample,
+    SampleIn,
+    SampleSummary,
+    SampleUpdate,
+    ShotData,
+)
 from toktagger.api.schemas.users import (
     UserBase,
     UserIn,
@@ -259,13 +269,59 @@ async def delete_model(
 
 
 async def update_project(
-    db_client: MongoDBClient, project_id: str, project: ProjectUpdate
+    db_client: MongoDBClient,
+    project_id: str,
+    project: ProjectUpdate,
+    data_loader: str,
 ) -> None:
+    """Update a project, and write changed signal names to all of its samples."""
     project_id = convert_to_objectid(project_id, "projects")
 
     result = await db_client.update("projects", project, project_id)
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
+
+    if project.signal_names is not None:
+        fields = LoaderRegistry.signal_name_fields(data_loader, project.signal_names)
+        if fields:
+            await db_client.update_filtered(
+                "samples",
+                {"project_id": project_id},
+                {f"data.{field}": value for field, value in fields.items()},
+            )
+
+
+def apply_project_signal_names(project: Project, samples: list[SampleIn]) -> None:
+    """Set the signal names of each sample to the signal names of the project."""
+    fields = LoaderRegistry.signal_name_fields(
+        project.data_loader, project.signal_names
+    )
+    for sample in samples:
+        sample.data = sample.data.model_copy(update=fields)
+
+
+async def backfill_project_signal_names(db_client: MongoDBClient) -> None:
+    """Give projects made before project-level signal names the signal names of their first sample."""
+    for document in await db_client.get_all_documents("projects"):
+        if "signal_names" in document:
+            continue
+        first_samples = await db_client.get_filtered_documents(
+            collection="samples",
+            filters={"project_id": document["_id"]},
+            sort_by="shot_id",
+            sort_direction="ascending",
+            limit=1,
+        )
+        sample_data = first_samples[0]["data"] if first_samples else {}
+        if sample_data.get("signal_names"):
+            signal_names = list(sample_data["signal_names"])
+        elif sample_data.get("signal_name"):
+            signal_names = [sample_data["signal_name"]]
+        else:
+            signal_names = []
+        await db_client.update(
+            "projects", ProjectUpdate(signal_names=signal_names), document["_id"]
+        )
 
 
 async def delete_projects(
@@ -624,6 +680,72 @@ async def get_sample_summary(
         summary.data.file_name = str(Path(summary.data.file_name).parent)
 
     return summary
+
+
+async def get_max_shot_id(db_client: MongoDBClient, project_id: str) -> int | None:
+    """Return the highest shot ID in this project, or None if it has no samples."""
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    samples = await db_client.get_filtered_documents(
+        collection="samples",
+        filters={"project_id": project_obj_id},
+        sort_by="shot_id",
+        sort_direction="descending",
+        limit=1,
+    )
+    return int(samples[0]["shot_id"]) if samples else None
+
+
+async def get_auto_add_shots_projects(db_client: MongoDBClient) -> list[Project]:
+    docs = await db_client.get_filtered_documents(
+        collection="projects", filters={"auto_add_shots.enabled": True}
+    )
+    return [Project(**doc) for doc in docs]
+
+
+async def add_new_shots(
+    db_client: MongoDBClient, project: Project, latest_shot: int, max_shots: int
+) -> list[int]:
+    """Add samples for the shots above the project's highest shot ID, up to `latest_shot`.
+
+    A project with no samples gets only `latest_shot`, so that old shots are not backfilled.
+    Returns the shot IDs which were added.
+    """
+    if not project.auto_add_shots:
+        return []
+
+    max_shot_id = await get_max_shot_id(db_client, project.id)
+    first_shot = latest_shot if max_shot_id is None else max_shot_id + 1
+    shot_ids = list(range(first_shot, min(latest_shot, first_shot + max_shots - 1) + 1))
+    if not shot_ids:
+        return []
+
+    project_obj_id = convert_to_objectid(project.id, "projects")
+    existing = await db_client.get_filtered_documents(
+        collection="samples",
+        filters={"project_id": project_obj_id, "shot_id": {"$in": shot_ids}},
+    )
+    existing_shot_ids = {doc["shot_id"] for doc in existing}
+    new_shot_ids = [shot_id for shot_id in shot_ids if shot_id not in existing_shot_ids]
+    if not new_shot_ids:
+        return []
+
+    shot_data = ShotData.model_validate(
+        {"protocol": project.data_loader, "signal_names": project.signal_names}
+    )
+    samples = [SampleIn(shot_id=shot_id, data=shot_data) for shot_id in new_shot_ids]
+    await db_client.insert_many(
+        collection="samples", models=samples, ids={"project_id": project_obj_id}
+    )
+    return new_shot_ids
+
+
+async def set_shots_last_checked(
+    db_client: MongoDBClient, project_id: str, checked: datetime
+) -> None:
+    project_obj_id = convert_to_objectid(project_id, "projects")
+    await db_client.update(
+        "projects", ProjectShotsChecked(shots_last_checked=checked), project_obj_id
+    )
 
 
 async def import_annotations(

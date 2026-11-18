@@ -61,7 +61,37 @@ class MyCustomLoader(DataLoader):
 
 #### Signal name help (optional)
 
-Set the `signal_name_help` class attribute to tell users which signal names your data loader accepts. The **Add Samples** dialog shows this text in the help tooltip next to the **Signal Names** field. You can include example signal names in this text. If you do not set `signal_name_help`, the dialog shows a general help text.
+Set the `signal_name_help` class attribute to tell users which signal names your data loader accepts. The **Create Project** and **Edit Project** dialogs show this text in the help tooltip next to the **Signal Names** field. You can include example signal names in this text. If you do not set `signal_name_help`, the dialogs show a general help text.
+
+#### Number of signal names (optional)
+
+Signal names are a project setting. The server gives the signal names of the project to each sample. Set these class attributes to control how many signal names a project can have:
+
+- `min_signal_names`: The minimum number of signal names. The default is `0`. Use `1` if your data loader cannot load a sample without a signal name.
+- `max_signal_names`: The maximum number of signal names. The default is `None` (no limit). Use `0` if your data loader does not use signal names. Then the **Signal Names** field does not show.
+
+```python
+class MyCustomLoader(DataLoader):
+    min_signal_names = 1
+    max_signal_names = 1
+```
+
+The server writes the signal names to the `signal_names` field of the sample data, or to the `signal_name` field if the sample data type has only that field.
+
+#### Latest shot (optional)
+
+If your data source can tell the latest shot number, the server can add new shots to a project automatically. To enable this, set `supports_latest_shot = True` and override the `latest_shot` class method. The method must return the highest shot number that is available:
+
+```python
+class MyCustomLoader(DataLoader):
+    supports_latest_shot = True
+
+    @classmethod
+    def latest_shot(cls) -> int:
+        return my_data_source.get_latest_shot_number()
+```
+
+The server calls `latest_shot` in a worker thread, so it can block. The loader must use `ShotData`, and the loader name must be a valid `ShotData` protocol. If you do not override `latest_shot`, the **Auto-add New Shots** settings do not show for your data loader.
 
 ### Step 3: Register the Loader
 
@@ -118,7 +148,7 @@ For shot-based data sources (like UDA, databases):
 ```python
 class ShotData(BaseModel):
     protocol: Literal["uda", "sal"]
-    signal_names: list[str]  # List of signals to retrieve
+    signal_names: list[str]  # List of signals to retrieve, set from the project
 ```
 
 **Use when**: Data is identified by shot number and signal names.

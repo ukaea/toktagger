@@ -504,7 +504,7 @@ def test_create_toml():
 
         assert all(
             key in example_toml
-            for key in ("database", "models", "sal", "server", "uda")
+            for key in ("database", "models", "polling", "sal", "server", "uda")
         )
 
 

@@ -37,12 +37,14 @@ PROJECT_1 = ProjectIn(
     task=Task.PROFILE_2D,
     query_strategy=QueryStrategyType.SEQUENTIAL,
     data_loader="uda",
+    signal_names=["Ip"],
 )
 PROJECT_2 = ProjectIn(
     name="test_project_1",
     task=Task.TIME_SERIES,
     query_strategy=QueryStrategyType.SEQUENTIAL,
     data_loader="tabular",
+    signal_names=["Ip"],
 )
 PROJECT_3 = ProjectIn(
     name="project_2",

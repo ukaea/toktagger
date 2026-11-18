@@ -9,6 +9,7 @@ from toktagger.api.auth.dependencies import (
     require_project_annotator,
     require_project_viewer,
 )
+from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.core.query_strategy import QUERY_STRATEGIES
 from toktagger.api.crud import utils
 from toktagger.api.crud.db import MongoDBClient
@@ -109,10 +110,15 @@ async def add_samples(
     choose them.
     """
     project_obj_id = convert_to_objectid(project_id, "projects")
-    if not await request.app.state.db_client.get_document_by_id(
-        "projects", project_obj_id
-    ):
-        raise HTTPException(status_code=404, detail="Project not found with that ID.")
+    project = await utils.get_project(request.app.state.db_client, project_id)
+    try:
+        LoaderRegistry.check_signal_names(project.data_loader, project.signal_names)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{error} Set the signal names in the project settings.",
+        ) from error
+    utils.apply_project_signal_names(project, samples)
 
     # Remove annotations (if they exist), these will be added later
     all_annotations = [sample.annotations for sample in samples]

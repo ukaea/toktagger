@@ -7,12 +7,12 @@ Below is a brief outline of the design of the backend API and what each endpoint
 
 ## `/projects/{project_id}`
 - **GET**: Get a single project using its ID
-- **PUT**: Update a project using its ID
+- **PUT**: Update a project using its ID. If the update changes `signal_names`, the server also updates the signal names of all samples in the project.
 - **DELETE**: Delete a project using its ID
 
 ## `/projects/{project_id}/samples`
 - **GET**: Get info about which samples are being investigated in this project (which pulses etc)
-- **PUT**: Add extra samples to this project
+- **PUT**: Add extra samples to this project. The server gives each new sample the signal names of the project.
 - **DELETE**: Remove samples from this project
 
 ## `/projects/{project_id}/samples/next`

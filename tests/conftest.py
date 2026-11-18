@@ -110,6 +110,7 @@ def settings():
             auth=config.Auth(canaille_bootstrap_password=E2E_ADMIN_PASSWORD),
             uda=config.UDA(),
             sal=config.SAL(),
+            polling=config.Polling(),
         )
         config.settings = s
         yield s

@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -27,7 +27,10 @@ class TimeSeriesFileData(FileData):
 
 class ShotData(BaseModel):
     protocol: Literal["uda", "uda_camera", "sal", "fair_mast"]
-    signal_names: Annotated[list[str], Field(min_length=1)]
+    signal_names: list[str] = Field(
+        default_factory=list,
+        description="The signal names to load. The server sets these from the project.",
+    )
 
 
 DataTypes = TimeSeriesFileData | ImageFileData | ImageArrayFileData | ShotData
