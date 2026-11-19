@@ -17,6 +17,65 @@ async def test_get_all_samples(api_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "query, expected_keys",
+    [
+        ({}, ["sample_id_1", "sample_id_2"]),
+        ({"start": 1, "count": 1}, ["sample_id_2"]),
+        ({"shot_id": 2}, ["sample_id_2"]),
+        ({"start": 2}, []),
+    ],
+)
+async def test_get_samples_ids(api_client, setup_db, query, expected_keys):
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples",
+        params={
+            "ids": [
+                setup_db["sample_id_2"],
+                setup_db["sample_id_3"],
+                setup_db["sample_id_1"],
+                setup_db["sample_id_1"],
+                "0" * 24,
+            ],
+            "sort_direction": "ascending",
+            **query,
+        },
+    )
+
+    assert response.status_code == 200
+    assert [sample["_id"] for sample in response.json()] == [
+        setup_db[key] for key in expected_keys
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_samples_ids_filtered_before_pagination(api_client, setup_db):
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples",
+        params={
+            "ids": [setup_db["sample_id_2"]],
+            "count": 1,
+            "sort_direction": "ascending",
+        },
+    )
+
+    assert response.status_code == 200
+    assert [sample["_id"] for sample in response.json()] == [setup_db["sample_id_2"]]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sample_id", ["0" * 24, "invalid"])
+async def test_get_samples_ids_unknown_or_invalid(api_client, setup_db, sample_id):
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples", params={"ids": [sample_id]}
+    )
+
+    assert response.status_code == (400 if sample_id == "invalid" else 200)
+    if sample_id != "invalid":
+        assert response.json() == []
+
+
+@pytest.mark.asyncio
 async def test_get_all_samples_sortby(api_client, setup_db):
     response = await api_client.get(
         f"/projects/{setup_db['project_id_1']}/samples?sort_by=shot_id"

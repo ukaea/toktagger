@@ -8,13 +8,20 @@ import httpx
 import os
 from pydantic import TypeAdapter
 
+from toktagger.api.schemas.annotations import (
+    AnnotationTypes,
+)
 from toktagger.api.schemas.data import (
     DataParamTypes,
     DataParams,
     DataResponseType,
 )
+from toktagger.api.schemas.projects import ProjectIn, ProjectUpdate
 from toktagger.api.schemas.samples import (
+    SampleIn,
     SampleSummary,
+    SampleUpdate,
+    SampleUpdateBatchItem,
 )
 from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
@@ -259,6 +266,19 @@ class TokTaggerClient:
             )
         return projects[0]
 
+    def create_project(self, project: ProjectIn) -> Project:
+        """Create a project and return it bound to this client."""
+        body = project.model_dump(mode="json", include=set(ProjectIn.model_fields))
+        data = self._request("POST", "/projects", json=body).json()
+        # Creation returns only an ID; fetch the server's stored configuration.
+        return self.get_project(data["_id"])
+
+    def update_project(self, project_id: str, updates: ProjectUpdate) -> Project:
+        """Apply partial updates and return a freshly fetched, client-bound project."""
+        body = updates.model_dump(mode="json", exclude_unset=True)
+        self._request("PUT", f"/projects/{project_id}", json=body)
+        return self.get_project(project_id)
+
     def list_samples(
         self,
         project_id: str,
@@ -310,6 +330,39 @@ class TokTaggerClient:
             "GET", f"/projects/{project_id}/samples", params=params
         ).json()
         return [self._bootstrap_sample(sample) for sample in data]
+
+    def create_samples(self, project_id: str, samples: list[SampleIn]) -> list[Sample]:
+        """Create samples and return them bound to this client in input order."""
+        body = [
+            sample.model_dump(mode="json", include=set(SampleIn.model_fields))
+            for sample in samples
+        ]
+        sample_ids = self._request(
+            "POST", f"/projects/{project_id}/samples", json=body
+        ).json()
+        if not sample_ids:
+            return []
+        data = self._request(
+            "GET",
+            f"/projects/{project_id}/samples",
+            params={"ids": sample_ids, "count": len(sample_ids)},
+        ).json()
+        samples = [self._bootstrap_sample(sample) for sample in data]
+        if len(samples) != len(sample_ids):
+            return NotFoundError("Some samples were not created correctly!")
+        return samples
+
+    def update_sample(
+        self, project_id: str, sample_id: str, updates: SampleUpdate
+    ) -> Sample:
+        """Apply partial updates and return a freshly fetched, client-bound sample."""
+        # The bulk endpoint does not check that the sample belongs to this project.
+        self.get_sample(project_id, sample_id)
+        body = SampleUpdateBatchItem(id=sample_id, updates=updates).model_dump(
+            mode="json", by_alias=True, exclude_unset=True
+        )
+        self._request("PUT", f"/projects/{project_id}/samples", json=[body])
+        return self.get_sample(project_id, sample_id)
 
     def get_sample(self, project_id: str, sample_id: str) -> Sample:
         """Get a single sample by project and sample ID.
@@ -458,6 +511,63 @@ class TokTaggerClient:
         ).json()
         return DataResponseTypeAdapter.validate_python(data)
 
+    def create_annotations(
+        self, project_id: str, sample_id: str, annotations: list[AnnotationTypes]
+    ) -> list[AnnotationOutTypes]:
+        """Append new annotations to a single sample without replacing existing ones.
+
+        Parameters
+        ----------
+        project_id : str
+            The ID of the project containing the sample.
+        sample_id : str
+            The ID of the sample to add annotations to.
+        annotations : list[AnnotationTypes]
+            New annotations, such as TimeRegion or VideoBoundingBox.
+            Shot, project and sample IDs are derived from the target sample;
+            supplied annotation IDs are ignored.
+
+        Returns
+        -------
+        list[AnnotationOutTypes]
+            Freshly fetched, client-bound annotations in input order, or an
+            empty list if no annotations were supplied.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If the server cannot be reached.
+        TokTaggerAPIError
+            If the API returns a non-2xx response (e.g. 404 if the project or
+            sample does not exist, or 403 if the caller cannot annotate it).
+
+        Notes
+        -----
+        Requires project annotator/admin or global-admin access. Human
+        annotations are attributed to the authenticated caller; registered
+        machine authors are preserved. Any validated addition marks the sample
+        validated; unvalidated additions do not clear its validation flag.
+        Other samples are untouched, including those sharing the same shot ID.
+
+        Creation and the follow-up bulk fetch are not transactional; check for
+        saved annotations before retrying a failed request to avoid duplicates.
+        """
+        body = [
+            annotation.model_dump(mode="json", by_alias=True, exclude={"id"})
+            for annotation in annotations
+        ]
+        path = f"/projects/{project_id}/samples/{sample_id}/annotations"
+        annotation_ids = self._request("POST", path, json=body).json()
+        if not annotation_ids:
+            return []
+        data = self._request(
+            "GET", path, params={"ids": annotation_ids, "count": len(annotation_ids)}
+        ).json()
+        annotations = [self._bootstrap_annotation(annotation) for annotation in data]
+        if len(annotations) != len(annotation_ids):
+            return NotFoundError("Some annotations were not created correctly!")
+        return annotations
+
     def get_annotation(
         self, project_id: str, sample_id: str, annotation_id: str
     ) -> AnnotationOutTypes:
@@ -476,7 +586,7 @@ class TokTaggerClient:
         -------
         AnnotationOutTypes
             The concrete annotation, with resolved author information and
-            this client attached.
+            this client attached for chained updates.
 
         Raises
         ------
@@ -496,6 +606,60 @@ class TokTaggerClient:
             f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
         ).json()
         return self._bootstrap_annotation(data)
+
+    def update_annotation(
+        self,
+        project_id: str,
+        sample_id: str,
+        annotation_id: str,
+        annotation: AnnotationTypes,
+    ) -> AnnotationOutTypes:
+        """Update one annotation by ID and return it bound to this client.
+
+        Parameters
+        ----------
+        project_id : str
+            The ID of the project containing the annotation.
+        sample_id : str
+            The ID of the sample containing the annotation.
+        annotation_id : str
+            The ID of the annotation to update.
+        annotation : AnnotationTypes
+            The label and geometry, plus optional fields to update. The type
+            must match the stored annotation. Omitted optional fields and
+            None values are left unchanged.
+
+        Returns
+        -------
+        AnnotationOutTypes
+            The updated annotation, parsed into its concrete type and bound
+            to this client.
+
+        Raises
+        ------
+        TokTaggerClientError
+            If the server cannot be reached.
+        TokTaggerAPIError
+            If the API returns a non-2xx response (e.g. 404 for an annotation
+            outside this project/sample, 403 for insufficient permissions, or
+            422 for an annotation type change).
+
+        Notes
+        -----
+        IDs, authorship, shot ID and creation timestamp are preserved.
+        Other annotations are untouched. Setting validated=True marks the
+        sample validated; other updates leave its validation flag unchanged.
+
+        The update is followed by get_annotation(). If that fetch fails,
+        the update may already have been saved.
+        """
+        body = annotation.model_dump(mode="json", exclude_unset=True)
+        self._request(
+            "PUT",
+            f"/projects/{project_id}/samples/{sample_id}/annotations/{annotation_id}",
+            json=body,
+        )
+        return self.get_annotation(project_id, sample_id, annotation_id)
 
     def list_annotations(
         self,

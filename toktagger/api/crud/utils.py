@@ -88,6 +88,7 @@ async def get_samples(
     sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
     count: int | None = None,
+    ids: list[str] | None = None,
 ) -> list[Sample]:
     # Return a list of all samples for this project and info about them
     project_obj_id = convert_to_objectid(project_id, "projects")
@@ -96,6 +97,10 @@ async def get_samples(
         raise HTTPException(status_code=404, detail="Project not found with that ID.")
 
     filters = {"project_id": project_obj_id}
+    if ids is not None:
+        filters["_id"] = {
+            "$in": [convert_to_objectid(sample_id, "samples") for sample_id in ids]
+        }
 
     if validated is not None:
         filters["validated_annotations"] = validated
@@ -360,8 +365,16 @@ async def get_annotations(
     sort_direction: Literal["ascending", "descending"] = "descending",
     start: int = 0,
     count: int | None = None,
+    ids: list[str] | None = None,
 ) -> list[AnnotationOutTypes]:
     db_filters = {"project_id": convert_to_objectid(project_id, "projects")}
+    if ids is not None:
+        db_filters["_id"] = {
+            "$in": [
+                convert_to_objectid(annotation_id, "annotations")
+                for annotation_id in ids
+            ]
+        }
 
     if sample_id:
         db_filters["sample_id"] = convert_to_objectid(sample_id, "samples")

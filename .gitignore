@@ -182,5 +182,7 @@ toktagger/ui/*.tsbuildinfo
 # Ignore config file
 toktagger.toml
 
+# Ignore beads config dir
+.beads/*
 # Local Mongita database directory (should live in user cache dir, not the repo)
 toktagger_db/
