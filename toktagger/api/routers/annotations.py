@@ -38,6 +38,8 @@ def stale_annotations_conflict(stale_ids: list[str]) -> HTTPException:
 
 @router.get(
     "/annotations",
+    operation_id="get_project_annotations",
+    tags=["MCP"],
     response_model=list[AnnotationOutTypes],
     responses={
         200: {"description": "Annotations for this project returned successfully."},
@@ -71,7 +73,55 @@ async def get_all_annotations(
     ),
     current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
-    """Retrieve all annotations for this project."""
+    """
+    Retrieve all annotations for a project, subject to specified filters, with
+    optional sorting, pagination, and filtering by validation status.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to retrieve annotations for.
+    sort_by : str
+        Field to sort responses by, by default '_id' (equivalent to timestamp).
+    sort_direction : Literal["ascending", "descending"]
+        Direction to sort responses, by default 'descending'.
+    start : int
+        Index of the first annotation you want returned when sorted by the
+        above parameter.
+    count : int | None
+        The number of annotations to return, leave blank to return all entries.
+    validated : bool | None
+        Whether to return only validated or unvalidated annotations, leave
+        blank for all annotations.
+
+    current_user : UserOut
+        The authenticated project member (viewer, annotator, or admin), or a
+        global admin. Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    list[AnnotationOutTypes]
+        A list of Annotation objects relating to the requested project.
+
+    Notes
+    -----
+    Results respect the caller's show_others_annotations membership preference.
+    When false, only their own annotations are returned, even if created_by
+    requests another author. Responses include resolved author display names.
+    Global admins without a membership see all authors.
+
+    Use When:
+        - You need to review all annotations for a project
+        - You need to filter annotations by validated/unvalidated status
+        - You need to sort annotations by any of their attributes, eg by uncertainty, or timestamp
+    Do Not Use When:
+        - You need annotations for a specific sample — use get_sample_annotations instead
+        - You want to create or update annotations — use import_annotations or update_sample_annotations instead
+    Example User Requests:
+        - "Show me all annotations for this project"
+        - "Show me validated annotations for this project"
+        - "Give me the ten most uncertain annotations"
+    """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
 
@@ -100,6 +150,8 @@ async def get_all_annotations(
 
 @router.put(
     "/annotations",
+    operation_id="import_annotations",
+    tags=["MCP"],
     responses={
         200: {"description": "Annotations for this project updated successfully."},
         404: {"description": "Project not found with that ID."},
@@ -114,7 +166,41 @@ async def import_annotations(
     ),
     current_user: UserOut = Depends(require_project_annotator),
 ) -> None:
-    """Update or add annotations for this project."""
+    """
+    Update or add annotations for this project, bulk creating annotations for
+    one or more samples within the project.
+
+    Parameters
+    ----------
+    annotations : list[AnnotationBatchTypes]
+        The annotations to create, which may span one or more samples within
+        the project.
+    project_id : str
+        The ID of the project to update annotations for.
+
+    current_user : UserOut
+        The authenticated project annotator/admin, or a global admin.
+        Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    Human authorship is assigned to the authenticated caller, including admins.
+    Reserved machine-author prefixes are preserved when importing predictions.
+
+    Use When:
+        - You are importing annotations from an external source (e.g. JSON file)
+        - You want to bulk-add annotations to multiple samples at once
+    Do Not Use When:
+        - You are adding annotations for a single sample — use update_sample_annotations instead
+        - You are querying annotations — use get_project_annotations or get_sample_annotations instead
+    Example User Requests:
+        - "Import these annotations from this JSON file"
+    """
     db_client: MongoDBClient = request.app.state.db_client
     # Every human caller — admins included — is recorded as the author of the
     # annotations they import, so authorship is always auditable. Machine authorship
@@ -128,6 +214,7 @@ async def import_annotations(
 
 @router.delete(
     "/annotations",
+    operation_id="delete_all_annotations",
     responses={
         200: {"description": "Annotations for this project deleted successfully."},
         404: {"description": "Project not found with that ID."},
@@ -140,7 +227,27 @@ async def delete_all_annotations(
     ),
     current_user: UserOut = Depends(require_project_admin_role),
 ):
-    """Delete ALL annotations for the given project."""
+    """
+    Delete ALL annotations for the given project.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete all annotations for.
+
+    current_user : UserOut
+        The authenticated project admin, or a global admin.
+        Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
+    """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.delete_annotations(db_client=db_client, project_id=project_id)
@@ -148,6 +255,8 @@ async def delete_all_annotations(
 
 @router.get(
     "/samples/{sample_id}/annotations",
+    operation_id="get_sample_annotations",
+    tags=["MCP"],
     response_model=list[AnnotationOutTypes],
     responses={
         200: {"description": "Annotations for this sample returned successfully."},
@@ -184,6 +293,59 @@ async def get_annotations(
     ),
     current_user: UserOut = Depends(require_project_viewer),
 ) -> list[AnnotationOutTypes]:
+    """
+    Get all annotations for a specific sample within a project, with optional
+    sorting, pagination, and filtering by validation status or creator.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to get samples from.
+    sample_id : str
+        The ID of the sample to get annotations from.
+    sort_by : str
+        Field to sort responses by, by default '_id' (equivalent to timestamp).
+    sort_direction : Literal["ascending", "descending"]
+        Direction to sort responses, by default 'descending'.
+    start : int
+        Index of the first annotation you want returned when sorted newest - oldest.
+    count : int | None
+        The number of annotations to return, leave blank to return all entries.
+    validated : bool | None
+        Whether to return only validated or unvalidated annotations, leave blank
+        for all annotations.
+    created_by : str | None
+        Filter by a user ID or a synthetic model:: / annotators:: author value;
+        the membership visibility preference takes precedence.
+
+    current_user : UserOut
+        The authenticated project member (viewer, annotator, or admin), or a
+        global admin. Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    list[AnnotationOutTypes]
+        A list of Annotation objects for the specified sample.
+
+    Notes
+    -----
+    Results respect the caller's show_others_annotations membership preference.
+    When false, only their own annotations are returned, even if created_by
+    requests another author. Responses include resolved author display names.
+    Global admins without a membership see all authors.
+
+    Use When:
+        - You need to get annotations for a specific sample
+        - You want to see what model predictions exist for a sample (filter by created_by)
+        - You want to check if a sample's annotations have already been human-validated
+        - You are building a sample-level annotation review UI
+    Do Not Use When:
+        - You need all annotations for a project — use get_project_annotations instead
+        - You are creating/updating annotations — use update_sample_annotations instead
+    Example User Requests:
+        - "What annotations exist for this sample?"
+        - "Show me the model predictions for this sample"
+    """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
     await utils.get_sample(
@@ -218,6 +380,8 @@ async def get_annotations(
 
 @router.put(
     "/samples/{sample_id}/annotations",
+    operation_id="update_sample_annotations",
+    tags=["MCP"],
     responses={
         200: {"description": "Annotations for this sample updated successfully."},
         404: {"description": "Project or Sample not found with that ID."},
@@ -239,11 +403,53 @@ async def update_annotations(
     ),
     current_user: UserOut = Depends(require_project_annotator),
 ) -> list[str]:
-    """Update the annotations for a sample.
+    """
+    Update the list of annotations for a given sample in a specified project.
 
-    The caller's own annotations are replaced wholesale. Annotations belonging to
-    another user or to a model are edited in place instead, keeping their author, so
-    a client that cannot see them (show_others_annotations=false) can never delete them.
+    The caller's own annotations are replaced. Existing annotations belonging
+    to other users or machines are edited in place by ID, preserving authorship;
+    omitting them does not delete them. New machine predictions keep their
+    synthetic author and replace that author's previous set. Other new annotations
+    are attributed to the caller. Confirm destructive replacements with the user.
+    Use explicit DELETE endpoints to remove another author's annotations.
+
+    Stale edits return 409 with stale_ids. The initial stale-ID check precedes
+    writes, but concurrent deletion can still cause a 409 during an in-place edit.
+    The sample is marked validated if validated is true or any submitted
+    annotation is validated; false does not clear its existing validation flag.
+
+    Parameters
+    ----------
+    annotations : list[AnnotationBatchTypes]
+        The caller's replacement annotations and any in-place edits by ID.
+    project_id : str
+        The ID of the project to update annotations for.
+    sample_id : str
+        The ID of the sample to update annotations for.
+    validated : bool | None
+        Whether to set sample to validated (useful if no annotations present).
+
+    current_user : UserOut
+        The authenticated project annotator/admin, or a global admin.
+        Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    list[str]
+        The IDs of inserted and edited annotations.
+
+    Notes
+    -----
+    Use When:
+        - An annotator has finished reviewing a sample and wants to save their annotations
+        - You want to validate or correct model predictions while preserving authorship
+        - You are correcting or refining annotations for a single sample
+    Do Not Use When:
+        - You do not have permission to overwrite existing annotations - check with the user first
+        - You are only querying annotations for a sample - use get_sample_annotations instead
+    Example User Requests:
+        - "Save my annotations for this sample"
+        - "Mark these annotations as validated with my corrections"
     """
     db_client: MongoDBClient = request.app.state.db_client
 
@@ -327,6 +533,7 @@ async def update_annotations(
 
 @router.delete(
     "/samples/{sample_id}/annotations",
+    operation_id="delete_sample_annotations",
     responses={
         200: {"description": "Matching annotations deleted; unknown ids are ignored."},
         404: {"description": "Project or Sample not found with that ID."},
@@ -344,10 +551,35 @@ async def remove_annotations(
     ),
     current_user: UserOut = Depends(require_project_annotator),
 ) -> int:
-    """Delete the given annotations for a sample, or ALL of them if no ids are given.
+    """
+    Delete selected annotations, or ALL annotations when the body is omitted.
 
-    Mirrors remove_annotation's 404 tolerance: an id already gone is the state being
-    asked for, so unknown ids are silently ignored rather than failing the whole batch.
+    Deletion is not limited to the caller's authorship. Unknown annotation IDs
+    are ignored. Confirm the scope before deleting.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete samples from.
+    sample_id : str
+        The ID of the sample to delete annotations from.
+
+    annotation_ids : list[str] | None
+        JSON list of annotation IDs to delete; omit the body to delete all.
+        An empty list deletes nothing.
+
+    current_user : UserOut
+        The authenticated project annotator/admin, or a global admin.
+        Resolved by the server, not supplied in the request.
+
+    Returns
+    -------
+    int
+        The number of annotations deleted.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
     """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)
@@ -378,11 +610,33 @@ async def remove_annotation(
     annotation_id: str = Path(description="The ID of the annotation to delete."),
     current_user: UserOut = Depends(require_project_annotator),
 ):
-    """Delete a single annotation, whoever created it.
+    """
+    Delete a single annotation, whoever created it.
 
-    The batch save (PUT above) carries no "deleted ids" signal and its replace step is
-    scoped to the caller's own annotations, so removing someone else's annotation --
-    or a model's prediction -- has to be an explicit call.
+    The batch save (PUT above) carries no "deleted ids" signal and its replace
+    step is scoped to the caller's own annotations, so removing someone else's
+    annotation -- or a model's prediction -- has to be an explicit call.
+
+    Parameters
+    ----------
+    project_id : str
+        The ID of the project to delete from.
+    sample_id : str
+        The ID of the sample to delete an annotation from.
+    annotation_id : str
+        The ID of the annotation to delete.
+    current_user : UserOut
+        The authenticated project annotator/admin, or a global admin. Resolved
+        by the server, not supplied in the request.
+
+    Returns
+    -------
+    None
+        No response body on success.
+
+    Notes
+    -----
+    This endpoint is not exposed to the MCP server.
     """
     db_client: MongoDBClient = request.app.state.db_client
     await utils.get_project(db_client=db_client, project_id=project_id)

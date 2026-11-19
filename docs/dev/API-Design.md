@@ -1,6 +1,16 @@
 # API Endpoints
 Below is a brief outline of the design of the backend API and what each endpoint does. For full documentation of these endpoints, launch the application and go to `http://localhost:8002/docs`.
 
+## `/users/me/tokens`
+- **GET**: List the current user's bearer tokens; optionally filter with `purpose=api` or `purpose=mcp`.
+- **POST**: Create a bearer token with `name`, `expires_in_days`, and `purpose` (`api` by default). The raw token is returned only once.
+- **DELETE `/users/me/tokens/{token_id}`**: Revoke a token owned by the current user.
+
+Token management requires a browser session. API tokens authenticate REST requests. MCP-purpose tokens authenticate only routes tagged `MCP`, including direct REST calls; other protected routes reject them with HTTP 401. This restriction is enforced centrally in personal-token authentication and preserves existing account and authorization checks. Adding the `MCP` tag grants MCP-token access as well as exposing a tool. MCP tool calls forward the incoming `Authorization` header per request to the in-process FastAPI backend, where normal authentication and authorization run. Shared client headers are not modified. MCP initialization and tool discovery do not currently require authentication.
+REST requests and internal MCP tool requests use the same FastAPI application, sharing exception handlers, middleware, dependency overrides, and application state. The MCP HTTP application is mounted at `/mcp`; its lifespan runs alongside the backend lifespan. Resource lock timeouts return HTTP 409, which MCP reports as a tool error with the same conflict status and detail.
+
+Bearer tokens are stored in the `bearer_tokens` collection; documents without a purpose are treated as `api` tokens.
+
 ## `/projects`
 - **GET**: Get a list of all available projects
 - **POST**: Create a new project
