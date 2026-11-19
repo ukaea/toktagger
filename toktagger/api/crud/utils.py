@@ -16,6 +16,7 @@ from toktagger.api.schemas.annotations import (
     AnnotationBatchTypes,
     AnnotationOutTypeAdapter,
     AnnotationOutTypes,
+    AnnotationTypes,
 )
 from toktagger.api.schemas.annotators import AnnotatorTypes
 from toktagger.api.schemas.auth import BearerTokenOut
@@ -382,6 +383,28 @@ async def get_annotations(
     return [AnnotationOutTypeAdapter.validate_python(a) for a in annotations]
 
 
+async def get_annotation(
+    db_client: MongoDBClient,
+    project_id: str,
+    sample_id: str,
+    annotation_id: str,
+) -> AnnotationOutTypes:
+    """Fetch a scoped annotation, optionally restricting it to a visible author."""
+    filters = {
+        "_id": convert_to_objectid(annotation_id, "annotations"),
+        "project_id": convert_to_objectid(project_id, "projects"),
+        "sample_id": convert_to_objectid(sample_id, "samples"),
+    }
+    documents = await db_client.get_filtered_documents(
+        "annotations", filters=filters, limit=1
+    )
+    if not documents:
+        raise HTTPException(
+            status_code=404, detail="Annotation not found for that project and sample."
+        )
+    return AnnotationOutTypeAdapter.validate_python(documents[0])
+
+
 def is_machine_author(created_by: str | None) -> bool:
     """Whether created_by names a registered model or a built-in annotator."""
     prefix, _, name = (created_by or "").partition("::")
@@ -549,7 +572,7 @@ async def update_annotation_by_id(
     project_id: str,
     sample_id: str,
     annotation_id: str,
-    annotation: AnnotationBatchTypes,
+    annotation: AnnotationTypes | AnnotationBatchTypes,
 ) -> bool:
     """Edit one existing annotation in place, keeping its original author.
 
@@ -573,7 +596,16 @@ async def update_annotation_by_id(
         mode="python",
         exclude_unset=True,
         exclude_none=True,
-        exclude={"id", "created_by", "project_id", "sample_id"},
+        exclude={
+            "id",
+            "created_by",
+            "project_id",
+            "sample_id",
+            "shot_id",
+            "timestamp",
+            "created_by_name",
+            "created_by_deleted",
+        },
     )
     if not updates:
         return True

@@ -12,8 +12,8 @@ class AnnotationBase(ConfiguredModel):
     """Base class for annotation inputs, without IDs."""
 
     label: str
-    created_by: str
     validated: bool = False
+    created_by: str | None = None
     signal_name: str | None = None
     uncertainty: float | None = 1
 
@@ -22,7 +22,7 @@ class AnnotationBase(ConfiguredModel):
         if isinstance(values, dict):
             if values.get("validated"):
                 values["uncertainty"] = 0
-            elif values.get("uncertainty") is None:
+            elif "uncertainty" in values and values["uncertainty"] is None:
                 values["uncertainty"] = 1
         return values
 
@@ -128,10 +128,6 @@ class AnnotationBatch(AnnotationBase):
     project_id: str | None = None
     sample_id: str | None = None
     shot_id: int | None = None
-    # Optional here (unlike AnnotationBase) so imported/saved annotations don't need to
-    # supply it — every route that accepts a batch stamps the caller's own identity over
-    # whatever's provided anyway.
-    created_by: str | None = None
 
 
 class AnnotationOut(AnnotationBatch):
@@ -141,50 +137,44 @@ class AnnotationOut(AnnotationBatch):
     project_id: str
     sample_id: str
     shot_id: int
+    created_by: str
     # Resolved from created_by when read; None for a deleted user or a legacy placeholder.
     created_by_name: str | None = None
     created_by_deleted: bool = False
 
 
-def create_out_model(base_class, name_suffix="Out"):
+def create_combined_model(combine_class, base_class, name_suffix="Out"):
     """Create an Out variant of an annotation class by combining it with AnnotationOut."""
     class_name = f"{base_class.__name__}{name_suffix}"
     return create_model(
         class_name,
-        __base__=(base_class, AnnotationOut),
-    )
-
-
-def create_batch_model(base_class, name_suffix="Batch"):
-    """Create a Batch variant of an annotation class by combining it with AnnotationBatch."""
-    class_name = f"{base_class.__name__}{name_suffix}"
-    return create_model(
-        class_name,
-        __base__=(AnnotationBatch, base_class),
+        __base__=(combine_class, base_class),
     )
 
 
 # Generate Out classes using factory function
-TimePointOut = create_out_model(TimePoint)
-TimeRegionOut = create_out_model(TimeRegion)
-BoundingBoxOut = create_out_model(BoundingBox)
-PolygonOut = create_out_model(Polygon)
-VideoBoundingBoxOut = create_out_model(VideoBoundingBox)
-VideoPolygonOut = create_out_model(VideoPolygon)
-VideoPointOut = create_out_model(VideoPoint)
-VideoFrameLabelOut = create_out_model(VideoFrameLabel)
-ClassLabelOut = create_out_model(ClassLabel)
+TimePointOut = create_combined_model(AnnotationOut, TimePoint, "Out")
+TimeRegionOut = create_combined_model(AnnotationOut, TimeRegion, "Out")
+BoundingBoxOut = create_combined_model(AnnotationOut, BoundingBox, "Out")
+PolygonOut = create_combined_model(AnnotationOut, Polygon, "Out")
+VideoBoundingBoxOut = create_combined_model(AnnotationOut, VideoBoundingBox, "Out")
+VideoPolygonOut = create_combined_model(AnnotationOut, VideoPolygon, "Out")
+VideoPointOut = create_combined_model(AnnotationOut, VideoPoint, "Out")
+VideoFrameLabelOut = create_combined_model(AnnotationOut, VideoFrameLabel, "Out")
+ClassLabelOut = create_combined_model(AnnotationOut, ClassLabel, "Out")
 
 # Generate Batch classes using factory function
-TimePointBatch = create_batch_model(TimePoint)
-TimeRegionBatch = create_batch_model(TimeRegion)
-BoundingBoxBatch = create_batch_model(BoundingBox)
-PolygonBatch = create_batch_model(Polygon)
-VideoBoundingBoxBatch = create_batch_model(VideoBoundingBox)
-VideoPolygonBatch = create_batch_model(VideoPolygon)
-VideoPointBatch = create_batch_model(VideoPoint)
-VideoFrameLabelBatch = create_batch_model(VideoFrameLabel)
-ClassLabelBatch = create_batch_model(ClassLabel)
+TimePointBatch = create_combined_model(AnnotationBatch, TimePoint, "Batch")
+TimeRegionBatch = create_combined_model(AnnotationBatch, TimeRegion, "Batch")
+BoundingBoxBatch = create_combined_model(AnnotationBatch, BoundingBox, "Batch")
+PolygonBatch = create_combined_model(AnnotationBatch, Polygon, "Batch")
+VideoBoundingBoxBatch = create_combined_model(
+    AnnotationBatch, VideoBoundingBox, "Batch"
+)
+VideoPolygonBatch = create_combined_model(AnnotationBatch, VideoPolygon, "Batch")
+VideoPointBatch = create_combined_model(AnnotationBatch, VideoPoint, "Batch")
+VideoFrameLabelBatch = create_combined_model(AnnotationBatch, VideoFrameLabel, "Batch")
+ClassLabelBatch = create_combined_model(AnnotationBatch, ClassLabel, "Batch")
 
 
 # Union types for annotations

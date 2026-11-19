@@ -81,7 +81,7 @@ async def create_annotations(
         - You are testing different annotator types on a sample
         - You need initial annotation suggestions for human review
     Do Not Use When:
-        - You want to save annotations to the database - use update_sample_annotations instead
+        - You want to save annotations to the database - use add_sample_annotations instead
         - You want to train an ML model - use start_model_training instead
         - You want to get predictions from an ML model - use create_model_predictions or create_sample_model_predictions instead
         - You need to inspect diagnostic data - retrieve raw data with the Python client instead
