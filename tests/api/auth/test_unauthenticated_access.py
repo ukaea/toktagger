@@ -20,6 +20,8 @@ _PUBLIC_PATHS = {
     "/",
     "/{full_path:path}",
     "/health",
+    "/mcp",
+    "/mcp/",
     "/docs",
     "/docs/oauth2-redirect",
     "/redoc",
