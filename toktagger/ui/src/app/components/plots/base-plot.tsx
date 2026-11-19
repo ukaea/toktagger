@@ -651,7 +651,14 @@ export const BaseTimeSeriesPlot = ({
       }
     >
       {/* Div where plot is inserted */}
-      <div id={plotId} ref={plotRef} className="" aria-label={ariaLabel}>
+      <div
+        id={plotId}
+        ref={plotRef}
+        className=""
+        aria-label={ariaLabel}
+        // Plotly's responsive autosize drops layout.height and measures this div, so it must carry the height.
+        style={{ height: fittedLayout.height }}
+      >
         <>
           {React.Children.map(children, (child) => {
             return React.isValidElement(child)
