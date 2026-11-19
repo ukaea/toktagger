@@ -48,6 +48,15 @@ def get_user(user_id: str) -> dict:
     return response.json()
 
 
+def create_api_token() -> dict:
+    response = session.post(
+        "http://localhost:8002/users/me/tokens",
+        json={"name": "API token", "purpose": "api"},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["token"]
+
+
 def add_project_member(project_id: str, username: str, role: str = "annotator"):
     response = session.post(
         f"http://localhost:8002/projects/{project_id}/members",
@@ -109,6 +118,18 @@ def create_local_samples(
 
     response = session.post(
         f"http://localhost:8002/projects/{project_id}/samples", json=samples
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
+def create_annotations(
+    project_id: str, sample_id: str, annotations: list[dict]
+) -> None:
+    """Overwrite the annotations on a sample (as the UI's PUT endpoint does)."""
+    response = session.put(
+        f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
+        json=annotations,
     )
     assert response.status_code == 200
     return response.json()
